@@ -1,0 +1,84 @@
+<idea-plugin>
+  <id>com.redhat.devtools.intellij.lsp4ij</id>
+  <name>Language Server Protocol Client</name>
+  <version>1.0</version>
+  <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
+
+  <change-notes><![CDATA[
+    <h3>0.0.1</h3>
+    <ul>
+      <li>Initial release</li>
+    </ul>    
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/1?closed=1">changelog</a>.
+  ]]>
+  </change-notes>
+
+  <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
+  <idea-version since-build="222"/>
+
+<!-- LSP extension points -->
+    <extensionPoints>
+        <extensionPoint name="server" beanClass="com.redhat.devtools.intellij.lsp4ij.ServerExtensionPointBean">
+            <with attribute="clientClass" implements="com.redhat.devtools.intellij.lsp4ij.client.LanguageClientImpl"/>
+            <with attribute="serverClass" implements="org.eclipse.lsp4j.services.LanguageServer"/>
+        </extensionPoint>
+        <extensionPoint name="languageMapping"
+                        beanClass="com.redhat.devtools.intellij.lsp4ij.LanguageMappingExtensionPointBean"/>
+        <extensionPoint name="serverIconProvider"
+                        beanClass="com.redhat.devtools.intellij.lsp4ij.ServerIconProviderExtensionPointBean"/>
+    </extensionPoints>
+
+    <!-- LSP consoles -->
+    <extensions defaultExtensionNs="com.intellij">
+        <projectConfigurable groupId="language"
+                             id="LanguageServers"
+                             bundle="messages.LanguageServerBundle"
+                             nonDefaultProject="true"
+                             key="language.servers"
+                             instance="com.redhat.devtools.intellij.lsp4ij.settings.LanguageServerListConfigurable"/>
+        <projectService id="com.redhat.devtools.intellij.lsp4ij.settings.UserDefinedLanguageServerSettings"
+                        serviceImplementation="com.redhat.devtools.intellij.lsp4ij.settings.UserDefinedLanguageServerSettings"/>
+        <toolWindow id="Language Servers"
+                    anchor="bottom"
+                    factoryClass="com.redhat.devtools.intellij.lsp4ij.console.LSPConsoleToolWindowFactory"
+                    canCloseContents="false"
+                    icon="AllIcons.Webreferences.Server"/>
+    </extensions>
+
+    <actions resource-bundle="messages.LanguageServerBundle">
+        <action id="lsp.console.explorer.restart"
+                class="com.redhat.devtools.intellij.lsp4ij.console.explorer.actions.RestartServerAction"
+                icon="AllIcons.Actions.Restart"/>
+        <action id="lsp.console.explorer.stop"
+                class="com.redhat.devtools.intellij.lsp4ij.console.explorer.actions.StopServerAction"
+                icon="AllIcons.Actions.Suspend"/>
+        <action id="lsp.console.explorer.pause"
+                class="com.redhat.devtools.intellij.lsp4ij.console.explorer.actions.PauseServerAction"
+                icon="AllIcons.Actions.Pause"/>
+        <action id="lsp.console.explorer.copy.command"
+                class="com.redhat.devtools.intellij.lsp4ij.console.explorer.actions.CopyStartServerCommandAction"
+                icon="AllIcons.Actions.Copy"/>
+    </actions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="com.redhat.devtools.intellij.lsp4ij.LanguageServiceAccessor"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.intellij.lsp4ij.lifecycle.LanguageServerLifecycleManager"/>
+        <completion.contributor id="LSPCompletionContributor" language="any"
+                                implementationClass="com.redhat.devtools.intellij.lsp4ij.operations.completion.LSPCompletionContributor"
+                                order="first"/>
+        <gotoDeclarationHandler
+                implementation="com.redhat.devtools.intellij.lsp4ij.operations.navigation.LSPGotoDeclarationHandler"/>
+        <gotoDeclarationHandler
+                implementation="com.redhat.devtools.intellij.lsp4ij.operations.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
+        <highlightUsagesHandlerFactory
+                implementation="com.redhat.devtools.intellij.lsp4ij.operations.highlight.LSPHighlightUsagesHandlerFactory"/>
+        <notificationGroup id="Language Server Protocol" displayType="BALLOON" hideFromSettings="true"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener topic="com.intellij.openapi.project.ProjectManagerListener"
+                  class="com.redhat.devtools.intellij.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+    </applicationListeners>
+    
+</idea-plugin>

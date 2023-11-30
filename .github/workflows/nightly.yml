@@ -1,0 +1,69 @@
+# GitHub Actions Workflow created for handling the release process based on the draft release prepared with the Build workflow.
+# Running the publishPlugin task requires all following secrets to be provided: PUBLISH_TOKEN, PRIVATE_KEY, PRIVATE_KEY_PASSWORD, CERTIFICATE_CHAIN.
+# See https://plugins.jetbrains.com/docs/intellij/plugin-signing.html for more information.
+
+name: Publish Nightly Build
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      publishToMarketPlace:
+        description: 'Publish to JetBrains Marketplace ?'
+        required: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'false'
+
+jobs:
+  should-build-change:
+    runs-on: ubuntu-latest
+    outputs:
+      repo-cache-hit: ${{ steps.cache-last-commit.outputs.cache-hit }}
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v4
+      - run: |
+          git rev-parse HEAD >> lastCommit
+      - name: Check New Changes
+        id: cache-last-commit
+        uses: actions/cache@v3
+        with:
+          path: lastCommit
+          key: lastCommit-${{ hashFiles('lastCommit') }}
+
+  # Prepare and publish the plugin to JetBrains Marketplace repository
+  pre-release:
+    needs: should-build-change
+    if: ${{ needs.should-build-change.outputs.repo-cache-hit != 'true' || github.event_name != 'schedule' }}
+    name: Publish Plugin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # Check out current repository
+      - name: Fetch Sources
+        uses: actions/checkout@v4
+
+      # Set up Java environment for the next steps
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: Publish Plugin
+        env:
+          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+        run: |
+          PLUGIN_VERSION=$(./get_timestamp_version.sh)
+          ./gradlew publishPlugin -Pchannel=nightly -PpluginVersion=${PLUGIN_VERSION}

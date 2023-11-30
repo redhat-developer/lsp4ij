@@ -1,0 +1,8 @@
+target
+.idea
+*.iml
+build
+.gradle
+out
+.DS_Store
+intellij-community-tmp
