@@ -1,0 +1,104 @@
+name: Release Plugin
+
+#Only one job at a time
+concurrency: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publishToMarketPlace:
+        description: 'Publish to JetBrains Marketplace ?'
+        required: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'false'
+
+jobs:
+  # Prepare and publish the plugin to JetBrains Marketplace repository
+  release:
+    if: ${{ inputs.publishToMarketPlace == 'true'}}
+    name: Publish to Marketplace
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # Check out current repository
+      - name: Fetch Sources
+        uses: actions/checkout@v4
+
+      # Set up Java environment for the next steps
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: Set Release Version
+        id: release_version
+        shell: bash
+        run: |
+          PLUGIN_VERSION=$(./set_release_version.sh)
+          echo "Release version: $PLUGIN_VERSION"
+          echo "PLUGIN_VERSION=${PLUGIN_VERSION}" >> $GITHUB_ENV
+
+      # Publish the plugin to JetBrains Marketplace
+      - name: Publish Plugin to JetBrains Marketplace
+        env:
+          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+        run: |
+          ./gradlew publishPlugin -PpluginVersion=$PLUGIN_VERSION -Pchannel=default
+          echo "Published $PLUGIN_VERSION to the Jetbrains Marketplace"
+
+      - name: Tag Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git commit -sam "chore(skip-release): set version to $PLUGIN_VERSION"
+          git tag $PLUGIN_VERSION
+          git push origin $PLUGIN_VERSION
+
+      # Set next SNAPSHOT version
+      - name: Increment Plugin Version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_VERSION=$(./increment_version.sh)
+          echo "Set $NEW_VERSION in gradle.properties"
+          git commit -sam "chore(skip-release): set version to $NEW_VERSION"
+          git push origin main
+
+      - name: Simple conventional changelog
+        uses: lstocchi/simple-conventional-changelog@13071c09073f5deddf03d44d9af6a8b0f81ef227 #0.0.11
+        id: changelog
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          current-tag: ${{env.PLUGIN_VERSION}}
+          types-mapping: 'feat:Features,fix:Bug Fixes,docs:Documentation,refactor:Refactoring,build:Build,chore:Other'
+
+      # Create a new Github release
+      - name: Create Github Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${PLUGIN_VERSION} \
+            --title "${PLUGIN_VERSION}" \
+            --notes "$(cat << 'EOM'
+          ${{ steps.changelog.outputs.changelog }}
+          EOM
+          )"
+
+      - name: Upload Release Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${PLUGIN_VERSION} ./build/distributions/*

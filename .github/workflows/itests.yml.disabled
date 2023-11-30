@@ -1,0 +1,90 @@
+# This workflow will build a Java project with Gradle
+# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
+
+name: Integration tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK 17
+      uses: actions/setup-java@v1
+      with:
+        java-version: 17
+    - name: Run integration tests
+      run: |
+        export DISPLAY=:99.0
+        Xvfb -ac :99 -screen 0 1920x1080x24 &
+        chmod +x gradlew
+        ./gradlew integrationTest
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}-integration-test-reports
+        path: build/reports/tests/integrationTest
+      if: always()
+    - name: Archiving screenshots
+      uses: actions/upload-artifact@v2
+      with: 
+        name: ${{ runner.os }}-screenshots
+        path: |
+          build/screenshots/
+      if: always()
+      
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK 17
+      uses: actions/setup-java@v1
+      with:
+        java-version: 17
+    - name: Run integration tests
+      run: |
+        ./gradlew integrationTest
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}-integration-test-reports
+        path: build/reports/tests/integrationTest
+      if: always()
+    - name: Archiving screenshots
+      uses: actions/upload-artifact@v2
+      with: 
+        name: ${{ runner.os }}-screenshots
+        path: |
+          build/screenshots/
+      if: always()
+      
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK 17
+      uses: actions/setup-java@v1
+      with:
+        java-version: 17
+    - name: Run integration tests
+      run: |
+        .\gradlew.bat integrationTest
+      shell: powershell
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ runner.os }}-integration-test-reports
+        path: build\reports\tests\integrationTest
+      if: always()
+    - name: Archiving screenshots
+      uses: actions/upload-artifact@v2
+      with: 
+        name: ${{ runner.os }}-screenshots
+        path: |
+          build\screenshots\
+      if: always()

@@ -1,0 +1,19 @@
+[versions]
+# libraries
+annotations = "24.0.1"
+
+# plugins
+testlogger = "3.2.0"
+kotlin = "1.9.10"
+changelog = "2.2.0"
+gradleIntelliJPlugin = "1.16.0"
+
+
+[libraries]
+annotations = { group = "org.jetbrains", name = "annotations", version.ref = "annotations" }
+
+[plugins]
+changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
+gradleIntelliJPlugin = { id = "org.jetbrains.intellij", version.ref = "gradleIntelliJPlugin" }
+kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+testLogger = { id = "com.adarshr.test-logger", version.ref = "testlogger" }
