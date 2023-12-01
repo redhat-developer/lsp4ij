@@ -12,6 +12,8 @@
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/1?closed=1">changelog</a>.
   ]]>
   </change-notes>
+  <depends>com.intellij.modules.platform</depends>
+
 
   <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
   <idea-version since-build="222"/>
