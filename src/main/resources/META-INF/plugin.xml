@@ -1,6 +1,6 @@
 <idea-plugin>
-  <id>com.redhat.devtools.intellij.lsp4ij</id>
-  <name>Language Server Protocol Client</name>
+  <id>com.redhat.devtools.lsp4ij</id>
+    <name>LSP4IJ</name>
   <version>1.0</version>
   <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
