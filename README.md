@@ -2,9 +2,29 @@
 
 ## Description
 <!-- Plugin description -->
-LSP4IJ is a free and open-source Language Server Protocol client compatible with all flavours of IntelliJ.
+
+LSP4IJ is a free and open-source [Language Server protocol (LSP)](https://microsoft.github.io/language-server-protocol/) client compatible with all flavours of IntelliJ.
 
 <!-- Plugin description end -->
+
+LSP4IJ provides:
+
+* Language server `extension points` to add any language server:
+  * `com.redhat.devtools.lsp4ij.server` extension point to define a language server.
+  * `com.redhat.devtools.lsp4ij.languageMapping` to associate an Intellij language with a language server definition.
+* an `LSP Consoles view` to tracks LSP requests, responses and notifications in a console:
+
+![LSP console](docs/images/LSPConsole.png)
+
+* a `Language Servers settings page` to configure the LSP trace level, the debug port to use to debug language server:
+
+![Language Server settings](docs/images/LanguageServerSettings.png)
+
+## Who is using LSP4IJ?
+
+Here are some projects that use LSP4IJ:
+
+ * [Quarkus Tools for IntelliJ](https://github.com/redhat-developer/intellij-quarkus)
 
 ## Requirements
 
@@ -15,6 +35,7 @@ LSP4IJ is a free and open-source Language Server Protocol client compatible with
 
 This is an open source project open to anyone. Contributions are extremely welcome!
 
+ 
 ### Building
 
 Project is managed by Gradle. So building is quite easy.
@@ -36,7 +57,6 @@ You can also easily test the plugin. Just run the following command:
 ./gradlew runIde
 ```
 
-
 #### Testing the CI builds
 
 You can also download and install CI builds of the latest commits or a specific pull request:
@@ -45,6 +65,17 @@ You can also download and install CI builds of the latest commits or a specific 
 - click on the build you are interested in
 - scroll down and download the `LSP4IJ <version>.zip` file
 - install `LSP4IJ <version>.zip` into IntelliJ IDEA by following these [instructions](https://www.jetbrains.com/help/idea/managing-plugins.html#install_plugin_from_disk).
+
+#### Testing nightly builds
+
+You can easily install nightly builds from the nightly channel:
+
+- in IntelliJ, open `Setting > Plugins > [Gear icon] > Manage Plugin Repositories...`
+- Add `https://plugins.jetbrains.com/plugins/nightly/23257` and press `OK`
+<img alt="Nightly Channel Repository" src="images/nightly-channel-repo.png" width="500px" />
+- install the latest `LSP4IJ` version
+
+Nightly builds are published once a day.
 
 Data and Telemetry
 ==================
