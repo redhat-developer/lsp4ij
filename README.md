@@ -3,9 +3,9 @@
 ## Description
 <!-- Plugin description -->
 
-LSP4IJ is a free and open-source [Language Server protocol (LSP)](https://microsoft.github.io/language-server-protocol/) client compatible with all flavours of IntelliJ.
+LSP4IJ is a free and open-source [Language Server protocol (LSP)](https://microsoft.github.io/language-server-protocol/) client compatible with all flavours of IntelliJ.  
 
-<!-- Plugin description end -->
+It currently doesn't provide any useful functionality on its own, but is instead used as a dependency for other extensions, willing to integrate language servers with IntelliJ products.
 
 LSP4IJ provides:
 
@@ -19,6 +19,7 @@ LSP4IJ provides:
 * a `Language Servers settings page` to configure the LSP trace level, the debug port to use to debug language server:
 
 ![Language Server settings](docs/images/LanguageServerSettings.png)
+<!-- Plugin description end -->
 
 ## Who is using LSP4IJ?
 
