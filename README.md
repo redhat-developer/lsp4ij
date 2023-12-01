@@ -14,11 +14,11 @@ LSP4IJ provides:
   * `com.redhat.devtools.lsp4ij.languageMapping` to associate an Intellij language with a language server definition.
 * an `LSP Consoles view` to tracks LSP requests, responses and notifications in a console:
 
-![LSP console](docs/images/LSPConsole.png)
+![LSP console](https://github.com/redhat-developer/lsp4ij/blob/HEAD/docs/images/LSPConsole.png?raw=true)
 
 * a `Language Servers settings page` to configure the LSP trace level, the debug port to use to debug language server:
 
-![Language Server settings](docs/images/LanguageServerSettings.png)
+![Language Server settings](https://github.com/redhat-developer/lsp4ij/blob/HEAD/docs/images/LanguageServerSettings.png?raw=true)
 <!-- Plugin description end -->
 
 ## Who is using LSP4IJ?
