@@ -19,15 +19,22 @@ It currently doesn't provide any useful functionality on its own, but is instead
 LSP4IJ provides:
 
 * Language server `extension points` to add any language server:
-  * `com.redhat.devtools.lsp4ij.server` extension point to define a language server.
-  * `com.redhat.devtools.lsp4ij.languageMapping` to associate an Intellij language with a language server definition.
-* an `LSP Consoles view` to tracks LSP requests, responses and notifications in a console:
+  * [com.redhat.devtools.lsp4ij.server](./docs/DeveloperGuide.md#declare-server-with-extension-point) extension point to define a language server.
+  * [com.redhat.devtools.lsp4ij.languageMapping](./docs/DeveloperGuide.md#declare-language-mapping-with-extension-point) to associate an IntelliJ language with a language server definition.
+* an [LSP Consoles view](./docs/UserGuide.md#lsp-console) to tracks LSP requests, responses and notifications in a console:
 
-![LSP console](https://github.com/redhat-developer/lsp4ij/blob/HEAD/docs/images/LSPConsole.png?raw=true)
+![LSP console](./docs/images/LSPConsole.png)
 
-* a `Language Servers settings page` to configure the LSP trace level, the debug port to use to debug language server:
+* a [Language Servers preferences page](./docs/UserGuide.md#language-servers-preferences) to configure the LSP trace level, the debug port to use to debug language server:
 
-![Language Server settings](https://github.com/redhat-developer/lsp4ij/blob/HEAD/docs/images/LanguageServerSettings.png?raw=true)
+![Language Server preferences](./docs/images/LanguageServerPreferences.png)
+
+You can start with:
+
+ * [Developer guide](./docs/DeveloperGuide.md) which explains step by step how to integrate a language server in LSP4J in an external IntelliJ plugin.
+ * [User guide](./docs/UserGuide.md) which explains how to use LSP console and Language server preferences.
+ * [LSP support](./docs/LSPSupport.md) which explains the LSP support.
+
 <!-- Plugin description end -->
 
 ## Who is using LSP4IJ?
@@ -89,7 +96,7 @@ Nightly builds are published once a day.
 
 Data and Telemetry
 ==================
-The JetBrains IntelliJ Quarkus Tools plugin collects anonymous [usage data](USAGE_DATA.md) and sends it to Red Hat servers to help improve our products and services. Read our [privacy statement](https://developers.redhat.com/article/tool-data-collection) to learn more. This extension respects the Red Hat Telemetry setting which you can learn more about at [https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting](https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting)
+The LSP4IJ plugin collects anonymous [usage data](USAGE_DATA.md) and sends it to Red Hat servers to help improve our products and services. Read our [privacy statement](https://developers.redhat.com/article/tool-data-collection) to learn more. This extension respects the Red Hat Telemetry setting which you can learn more about at [https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting](https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting)
 
 ## Feedback
 
