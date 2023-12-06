@@ -1,89 +1,155 @@
 <idea-plugin>
-  <id>com.redhat.devtools.lsp4ij</id>
+    <id>com.redhat.devtools.lsp4ij</id>
     <name>LSP4IJ</name>
-  <version>1.0</version>
-  <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
+    <version>1.0</version>
+    <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
-  <change-notes><![CDATA[
+    <change-notes><![CDATA[
     <h3>0.0.1</h3>
     <ul>
       <li>Initial release</li>
     </ul>    
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/1?closed=1">changelog</a>.
-  ]]>
-  </change-notes>
-  <depends>com.intellij.modules.platform</depends>
-  <!-- FIXME we shouldn't have a dependency to Java, this is caused by using 'LightRecordField' (e.g. in LSPIJUtils.getNavigationElement(PsiElement)) -->
-  <depends>com.intellij.modules.java</depends>
-  <depends>com.redhat.devtools.intellij.telemetry</depends>
+    ]]>
+    </change-notes>
+    <depends>com.intellij.modules.platform</depends>
+    <!-- FIXME we shouldn't have a dependency to Java, this is caused by using 'LightRecordField' (e.g. in LSPIJUtils.getNavigationElement(PsiElement)) -->
+    <depends>com.intellij.modules.java</depends>
+    <depends>com.redhat.devtools.intellij.telemetry</depends>
 
 
-  <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-  <idea-version since-build="222"/>
+    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
+    <idea-version since-build="222"/>
 
-<!-- LSP extension points -->
+    <!-- LSP extension points -->
     <extensionPoints>
-        <extensionPoint name="server" beanClass="com.redhat.devtools.lsp4ij.ServerExtensionPointBean">
-            <with attribute="clientClass" implements="com.redhat.devtools.lsp4ij.client.LanguageClientImpl"/>
-            <with attribute="serverClass" implements="org.eclipse.lsp4j.services.LanguageServer"/>
+        <extensionPoint
+                name="server"
+                beanClass="com.redhat.devtools.lsp4ij.ServerExtensionPointBean">
+            <with attribute="clientClass"
+                  implements="com.redhat.devtools.lsp4ij.client.LanguageClientImpl"/>
+            <with attribute="serverClass"
+                  implements="org.eclipse.lsp4j.services.LanguageServer"/>
         </extensionPoint>
-        <extensionPoint name="languageMapping"
-                        beanClass="com.redhat.devtools.lsp4ij.LanguageMappingExtensionPointBean"/>
-        <extensionPoint name="serverIconProvider"
-                        beanClass="com.redhat.devtools.lsp4ij.ServerIconProviderExtensionPointBean"/>
+        <extensionPoint
+                name="languageMapping"
+                beanClass="com.redhat.devtools.lsp4ij.LanguageMappingExtensionPointBean"/>
+        <extensionPoint
+                name="serverIconProvider"
+                beanClass="com.redhat.devtools.lsp4ij.ServerIconProviderExtensionPointBean"/>
     </extensionPoints>
+
+    <!-- Language Server support -->
+    <extensions defaultExtensionNs="com.intellij">
+
+        <!-- LSP project services -->
+        <projectService serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServiceAccessor"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager"/>
+
+        <!-- LSP textDocument/publishDiagnostics notification support -->
+        <externalAnnotator
+                id="LSPDiagnosticAnnotator"
+                language=""
+                implementationClass="com.redhat.devtools.lsp4ij.operations.diagnostics.LSPDiagnosticAnnotator"/>
+
+        <!-- LSP textDocument/completion request support -->
+        <completion.contributor
+                id="LSPCompletionContributor"
+                language="any"
+                implementationClass="com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionContributor"
+                order="first"/>
+
+        <!-- LSP textDocument/definition request support -->
+        <gotoDeclarationHandler
+                id="LSPGotoDeclarationHandler"
+                implementation="com.redhat.devtools.lsp4ij.operations.navigation.LSPGotoDeclarationHandler"/>
+
+        <!-- LSP textDocument/documentLink request support -->
+        <externalAnnotator
+                id="LSPDocumentLinkAnnotator"
+                language=""
+                implementationClass="com.redhat.devtools.lsp4ij.operations.documentLink.LSPDocumentLinkAnnotator"/>
+        <gotoDeclarationHandler
+                id="LSPDocumentLinkGotoDeclarationHandler"
+                implementation="com.redhat.devtools.lsp4ij.operations.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
+
+        <!-- LSP textDocument/documentHighlight request support -->
+        <highlightUsagesHandlerFactory
+                id="LSPHighlightUsagesHandlerFactory"
+                implementation="com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightUsagesHandlerFactory"/>
+
+        <!-- LSP textDocument/hover request support -->
+        <!-- language="any" doesn't work for hover.
+            <lang.documentationProvider
+                id="LSPTextHover"
+                language="any"
+                implementationClass="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
+                order="first"/>-->
+
+        <!-- LSP textDocument/codeLens request support -->
+        <!-- language="any" doesn't work for inlay hint.
+            <codeInsight.inlayProvider
+                id="LSPCodelensInlayProvider"
+                language="any"
+                implementationClass="com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensInlayProvider"/>-->
+
+        <!-- LSP textDocument/inlayHint request support -->
+        <!-- language="any" doesn't work for inlay hint.
+                id="LSPInlayHintInlayProvider"
+                language="any"
+                implementationClass="com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintInlayProvider"/>-->
+
+        <notificationGroup
+                id="Language Server Protocol"
+                displayType="BALLOON"
+                hideFromSettings="true"/>
+    </extensions>
 
     <!-- LSP consoles -->
     <extensions defaultExtensionNs="com.intellij">
-        <projectConfigurable groupId="language"
-                             id="LanguageServers"
-                             bundle="messages.LanguageServerBundle"
-                             nonDefaultProject="true"
-                             key="language.servers"
-                             instance="com.redhat.devtools.lsp4ij.settings.LanguageServerListConfigurable"/>
-        <projectService id="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"
-                        serviceImplementation="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"/>
-        <toolWindow id="Language Servers"
-                    anchor="bottom"
-                    factoryClass="com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowFactory"
-                    canCloseContents="false"
-                    icon="AllIcons.Webreferences.Server"/>
+        <projectConfigurable
+                groupId="language"
+                id="LanguageServers"
+                bundle="messages.LanguageServerBundle"
+                nonDefaultProject="true"
+                key="language.servers"
+                instance="com.redhat.devtools.lsp4ij.settings.LanguageServerListConfigurable"/>
+        <projectService
+                id="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"
+                serviceImplementation="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"/>
+        <toolWindow
+                id="Language Servers"
+                anchor="bottom"
+                factoryClass="com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowFactory"
+                canCloseContents="false"
+                icon="AllIcons.Webreferences.Server"/>
     </extensions>
 
     <actions resource-bundle="messages.LanguageServerBundle">
-        <action id="lsp.console.explorer.restart"
+        <action
+                id="lsp.console.explorer.restart"
                 class="com.redhat.devtools.lsp4ij.console.explorer.actions.RestartServerAction"
                 icon="AllIcons.Actions.Restart"/>
-        <action id="lsp.console.explorer.stop"
+        <action
+                id="lsp.console.explorer.stop"
                 class="com.redhat.devtools.lsp4ij.console.explorer.actions.StopServerAction"
                 icon="AllIcons.Actions.Suspend"/>
-        <action id="lsp.console.explorer.pause"
+        <action
+                id="lsp.console.explorer.pause"
                 class="com.redhat.devtools.lsp4ij.console.explorer.actions.PauseServerAction"
                 icon="AllIcons.Actions.Pause"/>
-        <action id="lsp.console.explorer.copy.command"
+        <action
+                id="lsp.console.explorer.copy.command"
                 class="com.redhat.devtools.lsp4ij.console.explorer.actions.CopyStartServerCommandAction"
                 icon="AllIcons.Actions.Copy"/>
     </actions>
 
-    <extensions defaultExtensionNs="com.intellij">
-        <projectService serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServiceAccessor"/>
-        <projectService
-                serviceImplementation="com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager"/>
-        <completion.contributor id="LSPCompletionContributor" language="any"
-                                implementationClass="com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionContributor"
-                                order="first"/>
-        <gotoDeclarationHandler
-                implementation="com.redhat.devtools.lsp4ij.operations.navigation.LSPGotoDeclarationHandler"/>
-        <gotoDeclarationHandler
-                implementation="com.redhat.devtools.lsp4ij.operations.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
-        <highlightUsagesHandlerFactory
-                implementation="com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightUsagesHandlerFactory"/>
-        <notificationGroup id="Language Server Protocol" displayType="BALLOON" hideFromSettings="true"/>
-    </extensions>
-
+    <!-- LSP application listeners -->
     <applicationListeners>
-        <listener topic="com.intellij.openapi.project.ProjectManagerListener"
-                  class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+        <listener
+                topic="com.intellij.openapi.project.ProjectManagerListener"
+                class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
     </applicationListeners>
-    
+
 </idea-plugin>

@@ -19,8 +19,10 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.DocumentHighlight;
@@ -45,6 +47,9 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
 
     @Override
     public @Nullable HighlightUsagesHandlerBase createHighlightUsagesHandler(@NotNull Editor editor, @NotNull PsiFile file) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(file.getLanguage())) {
+            return null;
+        }
         List<LSPHighlightPsiElement> targets = getTargets(editor, file);
         return targets.isEmpty() ? null : new LSPHighlightUsagesHandler(editor, file, targets);
     }

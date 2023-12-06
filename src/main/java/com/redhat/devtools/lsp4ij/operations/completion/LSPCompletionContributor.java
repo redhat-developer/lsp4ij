@@ -26,6 +26,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -53,6 +54,10 @@ public class LSPCompletionContributor extends CompletionContributor {
         PsiFile psiFile = parameters.getOriginalFile();
         VirtualFile file = psiFile.getVirtualFile();
         if (file == null) {
+            return;
+        }
+
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile.getLanguage())) {
             return;
         }
 

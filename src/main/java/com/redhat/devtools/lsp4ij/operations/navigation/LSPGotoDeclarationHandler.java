@@ -22,6 +22,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
@@ -45,6 +46,9 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
     @Nullable
     @Override
     public PsiElement[] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(sourceElement.getLanguage())) {
+            return null;
+        }
         VirtualFile file = LSPIJUtils.getFile(sourceElement);
         if (file == null) {
             return PsiElement.EMPTY_ARRAY;

@@ -21,7 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.AbstractLSPInlayProvider;
+import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayProvider;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -174,10 +174,10 @@ public class LSPInlayHintInlayProvider extends AbstractLSPInlayProvider {
             languageServer.getTextDocumentService()
                     .resolveInlayHint(inlayHint)
                     .thenAcceptAsync(resolvedInlayHint -> {
-                        executeClientCommand(source, resolvedInlayHint.getLabel().getRight().get(index).getCommand());
+                        executeClientCommand(source, resolvedInlayHint.getLabel().getRight().get(index).getCommand(), project);
                     });
         } else {
-            executeClientCommand(source, inlayHint.getLabel().getRight().get(index).getCommand());
+            executeClientCommand(source, inlayHint.getLabel().getRight().get(index).getCommand(), project);
         }
     }
 

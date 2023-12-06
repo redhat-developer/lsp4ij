@@ -25,6 +25,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActionIntentionAction;
 import org.eclipse.lsp4j.Diagnostic;
@@ -40,19 +41,25 @@ import java.util.List;
  */
 public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> {
 
-	@Nullable
-	@Override
-	public Boolean collectInformation(@NotNull PsiFile file, @NotNull Editor editor, boolean hasErrors) {
-		return Boolean.TRUE;
-	}
-
-	@Override
-	public @Nullable Boolean doAnnotate(Boolean unused) {
+    @Nullable
+    @Override
+    public Boolean collectInformation(@NotNull PsiFile file, @NotNull Editor editor, boolean hasErrors) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(file.getLanguage())) {
+            return Boolean.FALSE;
+        }
         return Boolean.TRUE;
-	}
+    }
 
     @Override
-    public void apply(@NotNull PsiFile file, Boolean unused, @NotNull AnnotationHolder holder) {
+    public @Nullable Boolean doAnnotate(Boolean result) {
+        return result;
+    }
+
+    @Override
+    public void apply(@NotNull PsiFile file, Boolean applyAnnotator, @NotNull AnnotationHolder holder) {
+        if (!applyAnnotator) {
+            return;
+        }
         URI fileUri = LSPIJUtils.toUri(file);
         Document document = LSPIJUtils.getDocument(file.getVirtualFile());
 
