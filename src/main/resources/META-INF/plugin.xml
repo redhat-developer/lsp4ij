@@ -10,12 +10,32 @@
       <li>Initial release</li>
     </ul>    
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/1?closed=1">changelog</a>.
+  ]]>
+  </change-notes>
+  <description>
+    <![CDATA[
+    <p>LSP4IJ is a free and open-source <a href="https://microsoft.github.io/language-server-protocol/">Language Server protocol (LSP)</a> client compatible with all flavors of IntelliJ.</p>
+
+    <p>It currently doesn't provide any useful functionality on its own but is instead used as a dependency for other extensions, willing to integrate language servers with IntelliJ products.</p>
+
+    <h3>LSP4IJ provides:</h3>
+    <ul>
+        <li>Language server <code>extension points</code> to add any language server:
+            <ul>
+                <li><code>com.redhat.devtools.lsp4ij.server</code> extension point to define a language server.</li>
+                <li><code>com.redhat.devtools.lsp4ij.languageMapping</code> to associate an IntelliJ language with a language server definition.</li>
+            </ul>
+        </li>
+        <li>An <code>LSP Consoles view</code> to track LSP requests, responses, and notifications in a console.</li>
+        <li>A <code>Language Servers settings page</code> to configure the LSP trace level and the debug port to use to debug the language server.</li>
+    </ul>
     ]]>
-    </change-notes>
-    <depends>com.intellij.modules.platform</depends>
-    <!-- FIXME we shouldn't have a dependency to Java, this is caused by using 'LightRecordField' (e.g. in LSPIJUtils.getNavigationElement(PsiElement)) -->
-    <depends>com.intellij.modules.java</depends>
-    <depends>com.redhat.devtools.intellij.telemetry</depends>
+  </description>
+
+  <depends>com.intellij.modules.platform</depends>
+  <!-- FIXME we shouldn't have a dependency to Java, this is caused by using 'LightRecordField' (e.g. in LSPIJUtils.getNavigationElement(PsiElement)) -->
+  <depends>com.intellij.modules.java</depends>
+  <depends>com.redhat.devtools.intellij.telemetry</depends>
 
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->

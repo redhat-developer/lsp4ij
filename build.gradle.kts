@@ -1,5 +1,4 @@
 import com.adarshr.gradle.testlogger.theme.ThemeType
-import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.tasks.RunPluginVerifierTask.VerificationReportsFormats.*
 import org.jetbrains.intellij.tasks.RunPluginVerifierTask.FailureLevel.*
 
@@ -51,12 +50,11 @@ sourceSets {
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
     implementation("org.zeroturnaround:zt-zip:1.14")
-    implementation("com.kotcrab.remark:remark:1.2.0")
-    implementation("org.jsoup:jsoup:1.14.2")
+    implementation("org.jsoup:jsoup:1.17.1")
     implementation("org.eclipse.lsp4j:org.eclipse.lsp4j:$lsp4jVersion")
     // Required by lsp4j as the version from IJ is incompatible
-    implementation("com.google.code.gson:gson:2.8.9")
-    implementation("com.vladsch.flexmark:flexmark:0.62.2")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.vladsch.flexmark:flexmark:0.64.8")
 
     testImplementation("com.redhat.devtools.intellij:intellij-common-ui-test-library:0.2.0")
     testImplementation("org.assertj:assertj-core:3.19.0")
@@ -151,20 +149,6 @@ tasks {
         version = properties("pluginVersion")
         sinceBuild = properties("pluginSinceBuild")
         untilBuild = properties("pluginUntilBuild")
-
-        // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
-        pluginDescription = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map {
-            val start = "<!-- Plugin description -->"
-            val end = "<!-- Plugin description end -->"
-
-            with(it.lines()) {
-                if (!containsAll(listOf(start, end))) {
-                    throw GradleException("Plugin description section not found in README.md:\n$start ... $end")
-                }
-                subList(indexOf(start) + 1, indexOf(end)).joinToString("\n").let(::markdownToHTML)
-            }
-        }
-
         //TODO inject changelog into plugin.xml change-notes
     }
 
