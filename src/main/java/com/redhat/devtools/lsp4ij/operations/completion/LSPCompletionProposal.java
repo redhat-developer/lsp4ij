@@ -285,7 +285,7 @@ public class LSPCompletionProposal extends LookupElement {
         LanguageServiceAccessor.getInstance(project)
                 .resolveServerDefinition(languageServer.getServer()).map(definition -> definition.id)
                 .ifPresent(id -> {
-                    CommandExecutor.executeCommand(project, command, documentUri, id);
+                    CommandExecutor.executeCommand(command, documentUri, project, id);
                 });
 
     }

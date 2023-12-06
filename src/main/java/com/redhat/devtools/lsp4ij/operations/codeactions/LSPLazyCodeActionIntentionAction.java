@@ -112,7 +112,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     }
 
     private void executeCommand(Command command, @NotNull Project project, PsiFile file, String serverId) {
-        CommandExecutor.executeCommand(project, command, LSPIJUtils.toUri(file), serverId);
+        CommandExecutor.executeCommand(command, LSPIJUtils.toUri(file), project, serverId);
     }
 
     private LanguageServerWrapper getLanguageServerWrapper() {
