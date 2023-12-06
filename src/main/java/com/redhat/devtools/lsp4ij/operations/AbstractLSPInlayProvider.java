@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij;
+package com.redhat.devtools.lsp4ij.operations;
 
 import com.intellij.codeInsight.hints.*;
 import com.intellij.codeInsight.hints.presentation.PresentationFactory;
@@ -25,6 +25,8 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.layout.LCFlags;
 import com.intellij.ui.layout.LayoutKt;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.Command;
@@ -39,6 +41,15 @@ import java.awt.*;
 public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoSettings> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPInlayProvider.class);
+
+    private static final InlayHintsCollector EMPTY_INLAY_HINTS_COLLECTOR = new InlayHintsCollector() {
+
+        @Override
+        public boolean collect(@NotNull PsiElement psiElement, @NotNull Editor editor, @NotNull InlayHintsSink inlayHintsSink) {
+            // Do nothing
+            return true;
+        }
+    };
 
     private final Key<CancellationSupport> cancellationSupportKey;
 
@@ -55,6 +66,11 @@ public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoS
                                                      @NotNull Editor editor,
                                                      @NotNull NoSettings o,
                                                      @NotNull InlayHintsSink inlayHintsSink) {
+
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile.getLanguage())) {
+            return EMPTY_INLAY_HINTS_COLLECTOR;
+        }
+
         CancellationSupport previousCancellationSupport = editor.getUserData(cancellationSupportKey);
         if (previousCancellationSupport != null) {
             previousCancellationSupport.cancel();
@@ -147,7 +163,7 @@ public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoS
         return true;
     }
 
-    protected void executeClientCommand(Component source, Command command) {
+    protected void executeClientCommand(@NotNull Component source, @NotNull Command command, @NotNull Project project) {
         if (command != null) {
             AnAction action = ActionManager.getInstance().getAction(command.getCommand());
             if (action != null) {

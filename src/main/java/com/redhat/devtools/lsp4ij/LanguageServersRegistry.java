@@ -41,6 +41,7 @@ public class LanguageServersRegistry {
         enum Scope {
             project, application
         }
+
         private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
         public final @Nonnull
@@ -65,7 +66,7 @@ public class LanguageServersRegistry {
             this.isSingleton = isSingleton;
             this.lastDocumentDisconnectedTimeout = lastDocumentDisconnectedTimeout != null && lastDocumentDisconnectedTimeout > 0 ? lastDocumentDisconnectedTimeout : DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT;
             this.languageIdMappings = new ConcurrentHashMap<>();
-            this.scope = scope == null || scope.isBlank()? Scope.application : Scope.valueOf(scope);
+            this.scope = scope == null || scope.isBlank() ? Scope.application : Scope.valueOf(scope);
             this.supportsLightEdit = supportsLightEdit;
             setEnabled(true);
         }
@@ -271,7 +272,7 @@ public class LanguageServersRegistry {
 
         private final DocumentMatcher documentMatcher;
 
-        public LanguageMapping(@NotNull Language language, @Nullable String id, @Nullable String languageId,  @NotNull DocumentMatcher documentMatcher) {
+        public LanguageMapping(@NotNull Language language, @Nullable String id, @Nullable String languageId, @NotNull DocumentMatcher documentMatcher) {
             this.language = language;
             this.id = id;
             this.languageId = languageId;
@@ -288,6 +289,12 @@ public class LanguageServersRegistry {
                 .stream()
                 .map(AbstractMap.SimpleEntry::getValue)
                 .collect(Collectors.toSet());
+    }
+
+    public boolean isLanguageSupported(@NotNull Language language) {
+        return connections
+                .stream()
+                .anyMatch(entry -> language.isKindOf(entry.getKey()));
     }
 
 }

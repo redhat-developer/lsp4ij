@@ -26,10 +26,7 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.DocumentLinkParams;
@@ -40,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
@@ -56,10 +54,13 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<LSPVirtualF
     @Nullable
     @Override
     public List<LSPVirtualFileData> collectInformation(@NotNull PsiFile psiFile, @NotNull Editor editor, boolean hasErrors) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile.getLanguage())) {
+            return Collections.emptyList();
+        }
         Document document = editor.getDocument();
         VirtualFile file = LSPIJUtils.getFile(document);
         if (file == null) {
-            return null;
+            return Collections.emptyList();
         }
         List<LSPVirtualFileData> datas = new ArrayList<>();
         final CancellationSupport cancellationSupport = new CancellationSupport();
@@ -110,7 +111,7 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<LSPVirtualF
     }
 
     @Override
-    public void apply(@NotNull PsiFile file, List<LSPVirtualFileData> datas, @NotNull AnnotationHolder holder) {
+    public void apply(@NotNull PsiFile file, @NotNull List<LSPVirtualFileData> datas, @NotNull AnnotationHolder holder) {
         if (datas.isEmpty()) {
             return;
         }

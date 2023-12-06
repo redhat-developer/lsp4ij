@@ -22,6 +22,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.io.URLUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionProposal;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
@@ -30,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -68,6 +70,9 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
     @Nullable
     @Override
     public String generateDoc(@NotNull PsiElement element, @Nullable PsiElement originalElement) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(originalElement.getLanguage())) {
+            return null;
+        }
         try {
             Project project = element.getProject();
             if (project.isDisposed()) {

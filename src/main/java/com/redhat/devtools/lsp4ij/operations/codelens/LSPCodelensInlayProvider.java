@@ -21,7 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.AbstractLSPInlayProvider;
+import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayProvider;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -148,10 +148,10 @@ public class LSPCodelensInlayProvider extends AbstractLSPInlayProvider {
                 Boolean.TRUE.equals(capabilities.getCodeLensProvider().getResolveProvider()))
         ) {
             languageServer.getTextDocumentService().resolveCodeLens(codeLens).thenAcceptAsync(resolvedCodeLens ->
-                    executeClientCommand(source, resolvedCodeLens.getCommand())
+                    executeClientCommand(source, resolvedCodeLens.getCommand(), project)
             );
         } else {
-            executeClientCommand(source, codeLens.getCommand());
+            executeClientCommand(source, codeLens.getCommand(), project);
         }
     }
 

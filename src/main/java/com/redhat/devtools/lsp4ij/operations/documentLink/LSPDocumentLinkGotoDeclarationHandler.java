@@ -24,10 +24,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiManager;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.*;
 import org.eclipse.lsp4j.DocumentLink;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,6 +32,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 
 /**
  * {@link GotoDeclarationHandler} implementation used to open LSP document link with CTrl+Click.
@@ -43,6 +41,9 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
 
     @Override
     public PsiElement @Nullable [] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(sourceElement.getLanguage())) {
+            return PsiElement.EMPTY_ARRAY;
+        }
         Document document = editor.getDocument();
         VirtualFile file = LSPIJUtils.getFile(document);
         Module module = LSPIJUtils.getModule(file, sourceElement.getProject());
