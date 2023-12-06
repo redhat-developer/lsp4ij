@@ -165,13 +165,7 @@ public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoS
 
     protected void executeClientCommand(@NotNull Component source, @NotNull Command command, @NotNull Project project) {
         if (command != null) {
-            AnAction action = ActionManager.getInstance().getAction(command.getCommand());
-            if (action != null) {
-                DataContext context = SimpleDataContext.getSimpleContext(CommandExecutor.LSP_COMMAND, command, DataManager.getInstance().getDataContext(source));
-                action.actionPerformed(new AnActionEvent(null, context,
-                        ActionPlaces.UNKNOWN, new Presentation(),
-                        ActionManager.getInstance(), 0));
-            }
+            CommandExecutor.executeCommandClientSide(command, null, project, source);
         }
     }
 
