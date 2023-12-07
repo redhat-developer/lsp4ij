@@ -49,7 +49,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
     private final LanguageServerExplorerLifecycleListener listener;
     private boolean disposed;
 
-    private TreeSelectionListener treeSelectionListener = event -> {
+    private final TreeSelectionListener treeSelectionListener = event -> {
         if (isDisposed()) {
             return;
         }
@@ -101,7 +101,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         tree.setRootVisible(false);
 
         // Fill tree will all language server definitions, ordered alphabetically
-        LanguageServersRegistry.getInstance().getAllDefinitions().stream()
+        LanguageServersRegistry.getInstance().getServerDefinitions().stream()
                 .sorted(Comparator.comparing(LanguageServersRegistry.LanguageServerDefinition::getDisplayName))
                 .map(LanguageServerTreeNode::new)
                 .forEach(top::add);
@@ -120,8 +120,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                 if (path != null) {
                     DefaultActionGroup group = null;
                     Object node = path.getLastPathComponent();
-                    if (node instanceof LanguageServerProcessTreeNode) {
-                        LanguageServerProcessTreeNode processTreeNode = (LanguageServerProcessTreeNode) node;
+                    if (node instanceof LanguageServerProcessTreeNode processTreeNode) {
                         switch (processTreeNode.getServerStatus()) {
                             case starting:
                             case started:

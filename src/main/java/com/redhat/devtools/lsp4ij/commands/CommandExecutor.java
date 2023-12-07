@@ -109,7 +109,7 @@ public class CommandExecutor {
             return false;
         }
         LanguageServersRegistry.LanguageServerDefinition languageServerDefinition = LanguageServersRegistry.getInstance()
-                .getDefinition(languageServerId);
+                .getServerDefinition(languageServerId);
         if (languageServerDefinition == null) {
             return false;
         }

@@ -183,6 +183,8 @@ public class LanguageServersRegistry {
         return INSTANCE;
     }
 
+    private final Map<String, LanguageServerDefinition> serverDefinitions = new HashMap<>();
+
     private final List<ContentTypeToLanguageServerDefinition> connections = new ArrayList<>();
 
     private Map<String, LanguageServerIconProviderDefinition> serverIcons = new HashMap<>();
@@ -192,11 +194,10 @@ public class LanguageServersRegistry {
     }
 
     private void initialize() {
-        Map<String, LanguageServerDefinition> servers = new HashMap<>();
         List<LanguageMapping> languageMappings = new ArrayList<>();
         for (ServerExtensionPointBean server : ServerExtensionPointBean.EP_NAME.getExtensions()) {
             if (server.id != null && !server.id.isEmpty()) {
-                servers.put(server.id, new ExtensionLanguageServerDefinition(server));
+                serverDefinitions.put(server.id, new ExtensionLanguageServerDefinition(server));
             }
         }
         for (LanguageMappingExtensionPointBean extension : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
@@ -211,7 +212,7 @@ public class LanguageServersRegistry {
         }
 
         for (LanguageMapping mapping : languageMappings) {
-            LanguageServerDefinition lsDefinition = servers.get(mapping.languageId);
+            LanguageServerDefinition lsDefinition = serverDefinitions.get(mapping.languageId);
             if (lsDefinition != null) {
                 registerAssociation(lsDefinition, mapping);
             } else {
@@ -248,16 +249,6 @@ public class LanguageServersRegistry {
         connections.add(new ContentTypeToLanguageServerDefinition(language, serverDefinition, mapping.getDocumentMatcher()));
     }
 
-    public @Nullable
-    LanguageServerDefinition getDefinition(@NonNull String languageServerId) {
-        for (ContentTypeToLanguageServerDefinition mapping : this.connections) {
-            if (mapping.getValue().id.equals(languageServerId)) {
-                return mapping.getValue();
-            }
-        }
-        return null;
-    }
-
     /**
      * internal class to capture content-type mappings for language servers
      */
@@ -284,13 +275,33 @@ public class LanguageServersRegistry {
         }
     }
 
-    public Set<LanguageServerDefinition> getAllDefinitions() {
-        return connections
-                .stream()
-                .map(AbstractMap.SimpleEntry::getValue)
-                .collect(Collectors.toSet());
+    /**
+     * Returns the language server definition for the given language server id and null otherwise.
+     *
+     * @param languageServerId the language server id.
+     *
+     * @return the language server definition for the given language server id and null otherwise.
+     */
+    public @Nullable LanguageServerDefinition getServerDefinition(@NonNull String languageServerId) {
+        return serverDefinitions.get(languageServerId);
     }
 
+    /**
+     * Returns the registered server definitions.
+     *
+     * @return the registered server definitions.
+     */
+    public Collection<LanguageServerDefinition> getServerDefinitions() {
+        return serverDefinitions.values();
+    }
+
+    /**
+     * Returns true if the given language is supported by a language server and false otherwise.
+     *
+     * @param language the IJ language
+     *
+     * @return true if the given language is supported by a language server and false otherwise.
+     */
     public boolean isLanguageSupported(@NotNull Language language) {
         return connections
                 .stream()
