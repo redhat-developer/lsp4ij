@@ -26,8 +26,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import java.util.Collection;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * UI settings which show:
@@ -43,13 +43,13 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     private static final String ID = "LanguageServers";
 
     private final Project project;
-    private final Set<LanguageServersRegistry.LanguageServerDefinition> languageServeDefinitions;
+    private final Collection<LanguageServersRegistry.LanguageServerDefinition> languageServeDefinitions;
 
     private boolean isTreeInitialized;
 
     public LanguageServerListConfigurable(Project project) {
         this.project = project;
-        this.languageServeDefinitions = LanguageServersRegistry.getInstance().getAllDefinitions();
+        this.languageServeDefinitions = LanguageServersRegistry.getInstance().getServerDefinitions();
     }
 
     @Override
@@ -85,10 +85,9 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                 .installTreeSpeedSearch(myTree, treePath -> ((MyNode) treePath.getLastPathComponent()).getDisplayName(), true);
     }
 
-    private MyNode addLanguageServerDefinitionNode(LanguageServersRegistry.LanguageServerDefinition languageServerDefinition) {
+    private void addLanguageServerDefinitionNode(LanguageServersRegistry.LanguageServerDefinition languageServerDefinition) {
         MyNode node = new MyNode(new LanguageServerConfigurable(languageServerDefinition, TREE_UPDATER, project));
         addNode(node, myRoot);
-        return node;
     }
 
     private void reloadTree() {
