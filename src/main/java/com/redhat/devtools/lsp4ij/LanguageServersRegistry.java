@@ -17,14 +17,12 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
-import org.eclipse.lsp4j.jsonrpc.validation.NonNull;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import javax.swing.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,12 +42,12 @@ public class LanguageServersRegistry {
 
         private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
-        public final @Nonnull
+        public final @NotNull
         String id;
-        public final @Nonnull
+        public final @NotNull
         String label;
         public final boolean isSingleton;
-        public final @Nonnull
+        public final @NotNull
         Map<Language, String> languageIdMappings;
         public final String description;
         public final int lastDocumentDisconnectedTimeout;
@@ -57,9 +55,9 @@ public class LanguageServersRegistry {
 
         public final boolean supportsLightEdit;
 
-        final @Nonnull Scope scope;
+        final @NotNull Scope scope;
 
-        public LanguageServerDefinition(@Nonnull String id, @Nonnull String label, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, String scope, boolean supportsLightEdit) {
+        public LanguageServerDefinition(@NotNull String id, @NotNull String label, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, String scope, boolean supportsLightEdit) {
             this.id = id;
             this.label = label;
             this.description = description;
@@ -90,11 +88,11 @@ public class LanguageServersRegistry {
             this.enabled = enabled;
         }
 
-        public void registerAssociation(@Nonnull Language language, @Nonnull String languageId) {
+        public void registerAssociation(@NotNull Language language, @NotNull String languageId) {
             this.languageIdMappings.put(language, languageId);
         }
 
-        @Nonnull
+        @NotNull
         public String getDisplayName() {
             return label != null ? label : id;
         }
@@ -282,7 +280,7 @@ public class LanguageServersRegistry {
      *
      * @return the language server definition for the given language server id and null otherwise.
      */
-    public @Nullable LanguageServerDefinition getServerDefinition(@NonNull String languageServerId) {
+    public @Nullable LanguageServerDefinition getServerDefinition(@NotNull String languageServerId) {
         return serverDefinitions.get(languageServerId);
     }
 

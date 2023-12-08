@@ -1,13 +1,30 @@
+/*******************************************************************************
+ * Copyright (c) 2023 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server;
 
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 
+/**
+ * Stream connection provider API used to:
+ * <ul>
+ *     <li>start a language server.</li>
+ *     <li>get the stream of LSP requests, responses and notifications.</li>
+ * </ul>
+ */
 public interface StreamConnectionProvider {
 
     void start() throws CannotStartProcessException;

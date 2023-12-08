@@ -41,7 +41,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -93,8 +92,8 @@ public class LSPIJUtils {
         }
     }
 
-    @Nonnull
-    public static Language getFileLanguage(@Nonnull VirtualFile file, Project project) {
+    @NotNull
+    public static Language getFileLanguage(@NotNull VirtualFile file, Project project) {
         return ReadAction.compute(() -> LanguageUtil.getLanguageForPsi(project, file));
     }
 
@@ -230,8 +229,8 @@ public class LSPIJUtils {
         return new Position(line, column);
     }
 
-    @Nonnull
-    public static WorkspaceFolder toWorkspaceFolder(@Nonnull Project project) {
+    @NotNull
+    public static WorkspaceFolder toWorkspaceFolder(@NotNull Project project) {
         WorkspaceFolder folder = new WorkspaceFolder();
         folder.setUri(toUri(project).toASCIIString());
         folder.setName(project.getName());
