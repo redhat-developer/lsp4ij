@@ -1,6 +1,17 @@
+/*******************************************************************************
+ * Copyright (c) 2023 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,6 +19,9 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Process stream connection provider used to start a language server with a process.
+ */
 public abstract class ProcessStreamConnectionProvider implements StreamConnectionProvider {
     private @Nullable
     Process process;

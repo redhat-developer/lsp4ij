@@ -12,19 +12,18 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import org.eclipse.lsp4j.*;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Arrays;
 import java.util.List;
-
-import org.eclipse.lsp4j.*;
-
-import javax.annotation.Nonnull;
 
 /**
  *
  */
 public class SupportedFeatures {
 
-	public static @Nonnull TextDocumentClientCapabilities getTextDocumentClientCapabilities() {
+	public static @NotNull TextDocumentClientCapabilities getTextDocumentClientCapabilities() {
 		final var textDocumentClientCapabilities = new TextDocumentClientCapabilities();
 
 		// Code Action support
@@ -119,7 +118,7 @@ public class SupportedFeatures {
 		return textDocumentClientCapabilities;
 	}
 
-	public static @Nonnull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
+	public static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
 		final var workspaceClientCapabilities = new WorkspaceClientCapabilities();
 		workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
 		// TODO
