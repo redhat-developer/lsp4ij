@@ -14,9 +14,11 @@ import com.intellij.icons.AllIcons;
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -116,6 +118,10 @@ public class LanguageServersRegistry {
         public boolean supportsCurrentEditMode(@NotNull Project project) {
             return project != null && (supportsLightEdit || !LightEdit.owns(project));
         }
+
+        public Icon getIcon() {
+            return AllIcons.Webreferences.Server;
+        }
     }
 
     static class ExtensionLanguageServerDefinition extends LanguageServerDefinition {
@@ -172,6 +178,18 @@ public class LanguageServersRegistry {
             }
             return super.getServerInterface();
         }
+
+        @Override
+        public Icon getIcon() {
+            if (!StringUtils.isEmpty(extension.icon)) {
+                try {
+                    return IconLoader.findIcon(extension.icon, extension.getPluginDescriptor().getPluginClassLoader());
+                } catch (Exception e) {
+                    LOGGER.error("Error while loading custom server icon for server id='" + extension.id + "'.", e);
+                }
+            }
+            return super.getIcon();
+        }
     }
 
     private static LanguageServersRegistry INSTANCE = null;
@@ -186,8 +204,6 @@ public class LanguageServersRegistry {
     private final Map<String, LanguageServerDefinition> serverDefinitions = new HashMap<>();
 
     private final List<ContentTypeToLanguageServerDefinition> connections = new ArrayList<>();
-
-    private Map<String, LanguageServerIconProviderDefinition> serverIcons = new HashMap<>();
 
     private LanguageServersRegistry() {
         initialize();
@@ -207,10 +223,6 @@ public class LanguageServersRegistry {
             }
         }
 
-        for (ServerIconProviderExtensionPointBean extension : ServerIconProviderExtensionPointBean.EP_NAME.getExtensions()) {
-            serverIcons.put(extension.serverId, new LanguageServerIconProviderDefinition(extension));
-        }
-
         for (LanguageMapping mapping : languageMappings) {
             LanguageServerDefinition lsDefinition = serverDefinitions.get(mapping.languageId);
             if (lsDefinition != null) {
@@ -219,12 +231,6 @@ public class LanguageServersRegistry {
                 LOGGER.warn("server '" + mapping.id + "' not available"); //$NON-NLS-1$ //$NON-NLS-2$
             }
         }
-    }
-
-    public Icon getServerIcon(String serverId) {
-        LanguageServerIconProviderDefinition iconProvider = serverIcons.get(serverId);
-        Icon icon = iconProvider != null ? iconProvider.getIcon() : null;
-        return icon != null ? icon : AllIcons.Webreferences.Server;
     }
 
     /**
