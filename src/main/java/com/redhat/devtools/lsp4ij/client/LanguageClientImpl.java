@@ -44,7 +44,6 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     public LanguageClientImpl(Project project) {
         this.project = project;
-        Disposer.register(project, this);
     }
 
     public Project getProject() {

@@ -45,18 +45,12 @@
     <extensionPoints>
         <extensionPoint
                 name="server"
-                beanClass="com.redhat.devtools.lsp4ij.ServerExtensionPointBean">
-            <with attribute="clientClass"
-                  implements="com.redhat.devtools.lsp4ij.client.LanguageClientImpl"/>
-            <with attribute="serverClass"
-                  implements="org.eclipse.lsp4j.services.LanguageServer"/>
+                beanClass="com.redhat.devtools.lsp4ij.ServerExtensionPointBean" >
+            <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.LanguageServerFactory"/>
         </extensionPoint>
         <extensionPoint
                 name="languageMapping"
                 beanClass="com.redhat.devtools.lsp4ij.LanguageMappingExtensionPointBean"/>
-        <extensionPoint
-                name="serverIconProvider"
-                beanClass="com.redhat.devtools.lsp4ij.ServerIconProviderExtensionPointBean"/>
     </extensionPoints>
 
     <!-- Language Server support -->

@@ -14,25 +14,33 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.extensions.ExtensionPointName;
-import com.intellij.openapi.extensions.PluginAware;
 import com.intellij.serviceContainer.BaseKeyedLazyInstance;
 import com.intellij.util.xmlb.annotations.Attribute;
 import com.intellij.util.xmlb.annotations.Tag;
-import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Server extension point.
  */
-public class ServerExtensionPointBean extends BaseKeyedLazyInstance<StreamConnectionProvider> implements PluginAware {
+public class ServerExtensionPointBean extends BaseKeyedLazyInstance<LanguageServerFactory> {
     public static final ExtensionPointName<ServerExtensionPointBean> EP_NAME = ExtensionPointName.create("com.redhat.devtools.lsp4ij.server");
 
+    /**
+     * The language server id used to associate language
+     * with 'com.redhat.devtools.lsp4ij.languageMapping' extension point.
+     */
     @Attribute("id")
     public String id;
 
+    /**
+     * The language server label displayed on the LSP console and Language Servers preferences.
+     */
     @Attribute("label")
     public String label;
 
+    /**
+     * The language server description displayed on the LSP console and Language Servers preferences.
+     */
     @Tag("description")
     public String description;
 
@@ -43,58 +51,32 @@ public class ServerExtensionPointBean extends BaseKeyedLazyInstance<StreamConnec
     @Attribute("icon")
     public String icon;
 
-    @Attribute("class")
-    public String serverImpl;
-    private Class<?> serverImplClass;
-
-    @Attribute("clientImpl")
-    public String clientImpl;
-    private Class clientClass;
-
-    @Attribute("serverInterface")
-    public String serverInterface;
-    private Class serverClass;
+    /**
+     * The {@link LanguageServerFactory} implementation used to create connection, language client and server interface.
+     */
+    @Attribute("factoryClass")
+    public String factoryClass;
 
     /**
-     *  Valid values are <code>project</code> and <code>application</code><br/>
-     *  When <code>project</code> scope is selected, the implementation of {@link StreamConnectionProvider} requires a
-     *  constructor with a single {@link com.intellij.openapi.project.Project} parameter
+     * true if language server is a singleton and false otherwise.
      */
-    @Attribute("scope")
-    public String scope;
-
     @Attribute("singleton")
     public boolean singleton;
 
+    /**
+     * true if language server supports light edit and false otherwise.
+     */
     @Attribute("supportsLightEdit")
     public boolean supportsLightEdit;
 
+    /**
+     * Timeout used when all files are closed before stopping the language server.
+     */
     @Attribute("lastDocumentDisconnectedTimeout")
     public Integer lastDocumentDisconnectedTimeout;
 
-    public Class getClientImpl() throws ClassNotFoundException {
-        if (clientClass == null) {
-            clientClass = getPluginDescriptor().getPluginClassLoader().loadClass(clientImpl);
-        }
-        return clientClass;
-    }
-
-    public Class getServerImpl() throws ClassNotFoundException {
-        if (serverImplClass == null) {
-            serverImplClass = getPluginDescriptor().getPluginClassLoader().loadClass(serverImpl);
-        }
-        return serverImplClass;
-    }
-
-    public Class getServerInterface() throws ClassNotFoundException {
-        if (serverClass == null) {
-            serverClass = getPluginDescriptor().getPluginClassLoader().loadClass(serverInterface);
-        }
-        return serverClass;
-    }
-
     @Override
     protected @Nullable String getImplementationClassName() {
-        return serverImpl;
+        return factoryClass;
     }
 }
