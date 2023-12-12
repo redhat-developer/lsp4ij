@@ -41,7 +41,7 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
 
     @Override
     public PsiElement @Nullable [] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(sourceElement.getLanguage())) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(sourceElement.getContainingFile())) {
             return PsiElement.EMPTY_ARRAY;
         }
         Document document = editor.getDocument();

@@ -67,7 +67,7 @@ public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoS
                                                      @NotNull NoSettings o,
                                                      @NotNull InlayHintsSink inlayHintsSink) {
 
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile.getLanguage())) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile)) {
             return EMPTY_INLAY_HINTS_COLLECTOR;
         }
 

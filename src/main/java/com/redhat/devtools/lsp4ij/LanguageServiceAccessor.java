@@ -265,7 +265,10 @@ public class LanguageServiceAccessor {
         // look for running language servers via content-type
         Queue<Language> contentTypes = new LinkedList<>();
         Set<Language> processedContentTypes = new HashSet<>();
-        contentTypes.add(LSPIJUtils.getFileLanguage(file, project));
+        Language language= LSPIJUtils.getFileLanguage(file, project);
+        if (language != null) {
+            contentTypes.add(language);
+        }
 
         while (!contentTypes.isEmpty()) {
             Language contentType = contentTypes.poll();

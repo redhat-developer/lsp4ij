@@ -14,6 +14,8 @@ import com.intellij.icons.AllIcons;
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -277,7 +279,6 @@ public class LanguageServersRegistry {
      * Returns the language server definition for the given language server id and null otherwise.
      *
      * @param languageServerId the language server id.
-     *
      * @return the language server definition for the given language server id and null otherwise.
      */
     public @Nullable LanguageServerDefinition getServerDefinition(@NotNull String languageServerId) {
@@ -294,13 +295,33 @@ public class LanguageServersRegistry {
     }
 
     /**
-     * Returns true if the given language is supported by a language server and false otherwise.
+     * Returns true if the language of the file is supported by a language server and false otherwise.
      *
-     * @param language the IJ language
-     *
-     * @return true if the given language is supported by a language server and false otherwise.
+     * @param file the file.
+     * @return true if the language of the file is supported by a language server and false otherwise.
      */
-    public boolean isLanguageSupported(@NotNull Language language) {
+    public boolean isLanguageSupported(@Nullable PsiFile file) {
+        if (file == null) {
+            return false;
+        }
+        return isLanguageSupported(file.getVirtualFile(), file.getProject());
+    }
+
+    /**
+     * Returns true if the language of the file is supported by a language server and false otherwise.
+     *
+     * @param file    the file.
+     * @param project the project.
+     * @return true if the language of the file is supported by a language server and false otherwise.
+     */
+    public boolean isLanguageSupported(@Nullable VirtualFile file, @NotNull Project project) {
+        if (file == null) {
+            return false;
+        }
+        Language language = LSPIJUtils.getFileLanguage(file, project);
+        if (language == null) {
+            return false;
+        }
         return connections
                 .stream()
                 .anyMatch(entry -> language.isKindOf(entry.getKey()));

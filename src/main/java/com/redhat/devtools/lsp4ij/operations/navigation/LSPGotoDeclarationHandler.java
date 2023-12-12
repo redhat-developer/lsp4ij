@@ -46,7 +46,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
     @Nullable
     @Override
     public PsiElement[] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(sourceElement.getLanguage())) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(sourceElement.getContainingFile())) {
             return null;
         }
         VirtualFile file = LSPIJUtils.getFile(sourceElement);
