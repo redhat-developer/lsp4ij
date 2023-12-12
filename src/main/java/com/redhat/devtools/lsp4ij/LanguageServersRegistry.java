@@ -38,11 +38,7 @@ import java.util.stream.Collectors;
 public class LanguageServersRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServersRegistry.class);
 
-    public abstract static class LanguageServerDefinition {
-
-        enum Scope {
-            project, application
-        }
+    public abstract static class LanguageServerDefinition implements LanguageServerFactory {
 
         private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
@@ -59,16 +55,13 @@ public class LanguageServersRegistry {
 
         public final boolean supportsLightEdit;
 
-        final @NotNull Scope scope;
-
-        public LanguageServerDefinition(@NotNull String id, @NotNull String label, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, String scope, boolean supportsLightEdit) {
+        public LanguageServerDefinition(@NotNull String id, @NotNull String label, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, boolean supportsLightEdit) {
             this.id = id;
             this.label = label;
             this.description = description;
             this.isSingleton = isSingleton;
             this.lastDocumentDisconnectedTimeout = lastDocumentDisconnectedTimeout != null && lastDocumentDisconnectedTimeout > 0 ? lastDocumentDisconnectedTimeout : DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT;
             this.languageIdMappings = new ConcurrentHashMap<>();
-            this.scope = scope == null || scope.isBlank() ? Scope.application : Scope.valueOf(scope);
             this.supportsLightEdit = supportsLightEdit;
             setEnabled(true);
         }
@@ -101,13 +94,13 @@ public class LanguageServersRegistry {
             return label != null ? label : id;
         }
 
-        public abstract StreamConnectionProvider createConnectionProvider(Project project);
-
-        public LanguageClientImpl createLanguageClient(Project project) {
+        @Override
+        public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
             return new LanguageClientImpl(project);
         }
 
-        public Class<? extends LanguageServer> getServerInterface() {
+        @Override
+        public @NotNull Class<? extends LanguageServer> getServerInterface() {
             return LanguageServer.class;
         }
 
@@ -127,24 +120,17 @@ public class LanguageServersRegistry {
     static class ExtensionLanguageServerDefinition extends LanguageServerDefinition {
         private final ServerExtensionPointBean extension;
 
+        private Icon icon;
+
         public ExtensionLanguageServerDefinition(ServerExtensionPointBean element) {
-            super(element.id, element.label, element.description, element.singleton, element.lastDocumentDisconnectedTimeout, element.scope, element.supportsLightEdit);
+            super(element.id, element.label, element.description, element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit);
             this.extension = element;
         }
 
         @Override
-        public StreamConnectionProvider createConnectionProvider(Project project) {
-            String serverImpl = extension.getImplementationClassName();
-            if (serverImpl == null || serverImpl.isEmpty()) {
-                throw new RuntimeException(
-                        "Exception occurred while creating an instance of the stream connection provider, you have to define server/@class attribute in the extension point."); //$NON-NLS-1$
-            }
+        public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
             try {
-                if (Scope.project == scope) {
-                    return (StreamConnectionProvider) project.instantiateClassWithConstructorInjection(extension.getServerImpl(), project,
-                            extension.getPluginDescriptor().getPluginId());
-                }
-                return (StreamConnectionProvider) project.instantiateClass(extension.getServerImpl(), extension.getPluginDescriptor().getPluginId());
+                return getFactory().createConnectionProvider(project);
             } catch (Exception e) {
                 throw new RuntimeException(
                         "Exception occurred while creating an instance of the stream connection provider", e); //$NON-NLS-1$
@@ -152,35 +138,55 @@ public class LanguageServersRegistry {
         }
 
         @Override
-        public LanguageClientImpl createLanguageClient(Project project) {
-            String clientImpl = extension.clientImpl;
-            if (clientImpl != null && !clientImpl.isEmpty()) {
-                try {
-                    return (LanguageClientImpl) project.instantiateClass(extension.getClientImpl(),
-                            extension.getPluginDescriptor().getPluginId());
-                } catch (ClassNotFoundException e) {
-                    LOGGER.warn(e.getLocalizedMessage(), e);
-                }
+        public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
+            LanguageClientImpl languageClient = null;
+            try {
+                languageClient = getFactory().createLanguageClient(project);
+            } catch (Exception e) {
+                LOGGER.warn("Exception occurred while creating an instance of the language client", e); //$NON-NLS-1$
             }
-            return super.createLanguageClient(project);
+            if (languageClient == null) {
+                languageClient = super.createLanguageClient(project);
+            }
+            return languageClient;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public Class<? extends LanguageServer> getServerInterface() {
-            String serverInterface = extension.serverInterface;
-            if (serverInterface != null && !serverInterface.isEmpty()) {
-                try {
-                    return (Class<? extends LanguageServer>) (Class<?>) extension.getServerInterface();
-                } catch (ClassNotFoundException exception) {
-                    LOGGER.warn(exception.getLocalizedMessage(), exception);
-                }
+        public @NotNull Class<? extends LanguageServer> getServerInterface() {
+            Class<? extends LanguageServer> serverInterface = null;
+            try {
+                serverInterface = getFactory().getServerInterface();
+            } catch (Exception e) {
+                LOGGER.warn("Exception occurred while getting server interface", e); //$NON-NLS-1$
             }
-            return super.getServerInterface();
+            if (serverInterface == null) {
+                serverInterface = super.getServerInterface();
+            }
+            return serverInterface;
+        }
+
+        private @NotNull LanguageServerFactory getFactory() {
+            String serverFactory = extension.getImplementationClassName();
+            if (serverFactory == null || serverFactory.isEmpty()) {
+                throw new RuntimeException(
+                        "Exception occurred while creating an instance of server factory, you have to define server/@factory attribute in the extension point."); //$NON-NLS-1$
+            }
+            return extension.getInstance();
         }
 
         @Override
         public Icon getIcon() {
+            if (icon == null) {
+                icon = findIcon();
+            }
+            return icon;
+        }
+
+        private synchronized Icon findIcon() {
+            if (icon != null) {
+                return icon;
+            }
             if (!StringUtils.isEmpty(extension.icon)) {
                 try {
                     return IconLoader.findIcon(extension.icon, extension.getPluginDescriptor().getPluginClassLoader());
