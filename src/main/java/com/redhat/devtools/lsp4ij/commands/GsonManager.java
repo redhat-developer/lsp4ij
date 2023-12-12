@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.commands;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import com.intellij.ide.plugins.cl.PluginClassLoader;
+import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
 
 import java.lang.reflect.Method;
 
@@ -34,14 +34,14 @@ public class GsonManager {
      * @return the JsonElement instance with the given class loader and null otherwise.
      */
     public static Object getJsonElementFromClassloader(JsonElement elt, ClassLoader actionClassLoader) {
-        if (elt.getClass().getClassLoader() == actionClassLoader || !(actionClassLoader instanceof PluginClassLoader)) {
+        if (elt.getClass().getClassLoader() == actionClassLoader || !(actionClassLoader instanceof PluginAwareClassLoader)) {
             // - the JsonElement class has the same class loader as the IJ Action class loader
             // - or the action class loader is not a PluginClassLoader
             // --> do nothing
             return null;
         }
         try {
-            Class<?> jsonParserClass = ((PluginClassLoader) actionClassLoader).tryLoadingClass(JsonParser.class.getName(), true);
+            Class<?> jsonParserClass = ((PluginAwareClassLoader) actionClassLoader).tryLoadingClass(JsonParser.class.getName(), true);
             if (jsonParserClass != null) {
                 try {
                     // Try to get static method JsonParser#parseString from the new version of Gson
