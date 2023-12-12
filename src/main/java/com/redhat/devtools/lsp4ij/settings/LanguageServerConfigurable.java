@@ -74,8 +74,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
 
     @Override
     public @Nullable Icon getIcon(boolean expanded) {
-        String serverId = languageServerDefinition.id;
-        return LanguageServersRegistry.getInstance().getServerIcon(serverId);
+        return languageServerDefinition.getIcon();
     }
 
     @Override
