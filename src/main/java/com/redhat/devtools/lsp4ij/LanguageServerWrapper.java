@@ -863,7 +863,7 @@ public class LanguageServerWrapper implements Disposable {
      * content type mapping for the language server
      */
     @Nullable
-    public String getLanguageId(Language language) {
+    public String getLanguageId(@Nullable Language language) {
         while (language != null) {
             String languageId = serverDefinition.languageIdMappings.get(language);
             if (languageId != null) {

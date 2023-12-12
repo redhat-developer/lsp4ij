@@ -57,7 +57,7 @@ public class LSPCompletionContributor extends CompletionContributor {
             return;
         }
 
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile.getLanguage())) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile)) {
             return;
         }
 

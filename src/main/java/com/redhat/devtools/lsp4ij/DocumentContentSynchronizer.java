@@ -73,9 +73,8 @@ public class DocumentContentSynchronizer implements DocumentListener {
         textDocument.setUri(this.fileUri);
         textDocument.setText(document.getText());
 
-        Language contentTypes = LSPIJUtils.getDocumentLanguage(document, languageServerWrapper.getProject());
-
-        String languageId = languageServerWrapper.getLanguageId(contentTypes);
+        Language language = LSPIJUtils.getDocumentLanguage(document, languageServerWrapper.getProject());
+        String languageId = languageServerWrapper.getLanguageId(language);
 
         //TODO: determine languageId more precisely
         /*IPath fromPortableString = Path.fromPortableString(this.fileUri.getPath());

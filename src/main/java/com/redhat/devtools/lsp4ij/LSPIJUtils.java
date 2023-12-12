@@ -92,8 +92,19 @@ public class LSPIJUtils {
         }
     }
 
-    @NotNull
+    /**
+     * Returns the file language of the given file and null otherwise.
+     *
+     * @param file the file.
+     * @param project the project.
+     *
+     * @return the file language of the given file and null otherwise.
+     */
+    @Nullable
     public static Language getFileLanguage(@NotNull VirtualFile file, Project project) {
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return LanguageUtil.getLanguageForPsi(project, file);
+        }
         return ReadAction.compute(() -> LanguageUtil.getLanguageForPsi(project, file));
     }
 
@@ -107,10 +118,6 @@ public class LSPIJUtils {
         }
         param.setTextDocument(id);
         return param;
-    }
-
-    public static TextDocumentPositionParams toTextDocumentPosistionParams(int offset, Document document) {
-        return toTextDocumentPositionParamsCommon(new TextDocumentPositionParams(), offset, document);
     }
 
     public static HoverParams toHoverParams(int offset, Document document) {
@@ -428,7 +435,15 @@ public class LSPIJUtils {
     }
 
 
-    public static Language getDocumentLanguage(Document document, Project project) {
+    /**
+     * Returns the language of the given document and null otherwise.
+     *
+     * @param document teh document.
+     * @param project the project.
+     *
+     * @return the language of the given document and null otherwise.
+     */
+    public static @Nullable Language getDocumentLanguage(Document document, Project project) {
         VirtualFile file = FileDocumentManager.getInstance().getFile(document);
         return getFileLanguage(file, project);
     }

@@ -47,7 +47,7 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
 
     @Override
     public @Nullable HighlightUsagesHandlerBase createHighlightUsagesHandler(@NotNull Editor editor, @NotNull PsiFile file) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(file.getLanguage())) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(file)) {
             return null;
         }
         List<LSPHighlightPsiElement> targets = getTargets(editor, file);

@@ -44,7 +44,7 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
     @Nullable
     @Override
     public Boolean collectInformation(@NotNull PsiFile file, @NotNull Editor editor, boolean hasErrors) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(file.getLanguage())) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(file)) {
             return Boolean.FALSE;
         }
         return Boolean.TRUE;

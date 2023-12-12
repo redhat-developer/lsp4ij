@@ -70,7 +70,7 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
     @Nullable
     @Override
     public String generateDoc(@NotNull PsiElement element, @Nullable PsiElement originalElement) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(originalElement.getLanguage())) {
+        if (!LanguageServersRegistry.getInstance().isLanguageSupported(originalElement.getContainingFile())) {
             return null;
         }
         try {
