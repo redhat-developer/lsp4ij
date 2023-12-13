@@ -23,6 +23,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
@@ -32,6 +33,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.light.LightRecordField;
+import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
@@ -245,12 +247,15 @@ public class LSPIJUtils {
     }
 
     public static URI toUri(Module module) {
-        VirtualFile[] roots = ModuleRootManager.getInstance(module).getContentRoots();
-        if (roots.length > 0) {
-            return toUri(roots[0]);
+        //Copied from https://github.com/JetBrains/intellij-community/blob/95435116133211db72d161bb7802331abc074db1/platform/lang-impl/src/com/intellij/openapi/module/WebModuleBuilder.java#L90C5-L95C46
+        VirtualFile dir = ProjectUtil.guessModuleDir(module);
+        if (dir == null) {
+            ModuleRootManager moduleRootManager = ModuleRootManager.getInstance(module);
+            dir = ArrayUtil.getFirstElement(moduleRootManager.getContentRoots());
         }
-        File file = new File(module.getModuleFilePath()).getParentFile();
-        return file.toURI();
+        assert dir != null : module.getProject();
+
+        return toUri(dir);
     }
 
     public static URI toUri(Project project) {
@@ -258,7 +263,11 @@ public class LSPIJUtils {
         if (roots.length > 0) {
             return toUri(roots[0]);
         }
-        File file = new File(project.getProjectFilePath()).getParentFile();
+        @Nullable String projectFilePath = project.getProjectFilePath();
+        if (projectFilePath == null) {
+            return null;
+        }
+        File file = new File(projectFilePath).getParentFile();
         return file.toURI();
     }
 
