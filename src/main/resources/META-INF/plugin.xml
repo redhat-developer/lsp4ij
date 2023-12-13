@@ -11,9 +11,9 @@
     </ul>    
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/1?closed=1">changelog</a>.
   ]]>
-  </change-notes>
-  <description>
-    <![CDATA[
+    </change-notes>
+    <description>
+        <![CDATA[
     <p>LSP4IJ is a free and open-source <a href="https://microsoft.github.io/language-server-protocol/">Language Server protocol (LSP)</a> client compatible with all flavors of IntelliJ.</p>
 
     <p>It currently doesn't provide any useful functionality on its own but is instead used as a dependency for other extensions, willing to integrate language servers with IntelliJ products.</p>
@@ -30,27 +30,29 @@
         <li>A <code>Language Servers settings page</code> to configure the LSP trace level and the debug port to use to debug the language server.</li>
     </ul>
     ]]>
-  </description>
+    </description>
 
-  <depends>com.intellij.modules.platform</depends>
-  <!-- FIXME we shouldn't have a dependency to Java, this is caused by using 'LightRecordField' (e.g. in LSPIJUtils.getNavigationElement(PsiElement)) -->
-  <depends>com.intellij.modules.java</depends>
-  <depends>com.redhat.devtools.intellij.telemetry</depends>
+    <depends>com.intellij.modules.platform</depends>
+    <!-- FIXME we shouldn't have a dependency to Java, this is caused by using 'LightRecordField' (e.g. in LSPIJUtils.getNavigationElement(PsiElement)) -->
+    <depends>com.intellij.modules.java</depends>
+    <depends>com.redhat.devtools.intellij.telemetry</depends>
 
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-    <idea-version since-build="222"/>
+    <idea-version since-build="223"/>
 
     <!-- LSP extension points -->
     <extensionPoints>
         <extensionPoint
                 name="server"
-                beanClass="com.redhat.devtools.lsp4ij.ServerExtensionPointBean" >
+                beanClass="com.redhat.devtools.lsp4ij.ServerExtensionPointBean">
             <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.LanguageServerFactory"/>
         </extensionPoint>
         <extensionPoint
                 name="languageMapping"
-                beanClass="com.redhat.devtools.lsp4ij.LanguageMappingExtensionPointBean"/>
+                beanClass="com.redhat.devtools.lsp4ij.LanguageMappingExtensionPointBean">
+            <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
+        </extensionPoint>
     </extensionPoints>
 
     <!-- Language Server support -->

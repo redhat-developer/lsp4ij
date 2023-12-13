@@ -85,8 +85,8 @@ public class LanguageServersRegistry {
             this.enabled = enabled;
         }
 
-        public void registerAssociation(@NotNull Language language, @NotNull String languageId) {
-            this.languageIdMappings.put(language, languageId);
+        public void registerAssociation(@NotNull Language language, @NotNull String serverId) {
+            this.languageIdMappings.put(language, serverId);
         }
 
         @NotNull
@@ -123,7 +123,7 @@ public class LanguageServersRegistry {
         private Icon icon;
 
         public ExtensionLanguageServerDefinition(ServerExtensionPointBean element) {
-            super(element.id, element.label, element.description, element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit);
+            super(element.id, element.getLabel(), element.getDescription(), element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit);
             this.extension = element;
         }
 
@@ -223,18 +223,18 @@ public class LanguageServersRegistry {
             }
         }
         for (LanguageMappingExtensionPointBean extension : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
-            Language language = Language.findLanguageByID(extension.language);
+            Language language = Language.findLanguageByID(extension.languageId);
             if (language != null) {
-                languageMappings.add(new LanguageMapping(language, extension.id, extension.serverId, extension.getDocumentMatcher()));
+                languageMappings.add(new LanguageMapping(language, extension.serverId, extension.getDocumentMatcher()));
             }
         }
 
         for (LanguageMapping mapping : languageMappings) {
-            LanguageServerDefinition lsDefinition = serverDefinitions.get(mapping.languageId);
+            LanguageServerDefinition lsDefinition = serverDefinitions.get(mapping.serverId);
             if (lsDefinition != null) {
                 registerAssociation(lsDefinition, mapping);
             } else {
-                LOGGER.warn("server '" + mapping.id + "' not available"); //$NON-NLS-1$ //$NON-NLS-2$
+                LOGGER.warn("server '" + mapping.serverId + "' not available"); //$NON-NLS-1$ //$NON-NLS-2$
             }
         }
     }
@@ -251,13 +251,10 @@ public class LanguageServersRegistry {
     }
 
 
-    public void registerAssociation(@NotNull LanguageServerDefinition serverDefinition, @Nullable LanguageMapping mapping) {
+    public void registerAssociation(@NotNull LanguageServerDefinition serverDefinition, @NotNull LanguageMapping mapping) {
         @NotNull Language language = mapping.language;
-        @Nullable String languageId = mapping.languageId;
-        if (languageId != null) {
-            serverDefinition.registerAssociation(language, languageId);
-        }
-
+        @NotNull String serverId = mapping.serverId;
+        serverDefinition.registerAssociation(language, serverId);
         connections.add(new ContentTypeToLanguageServerDefinition(language, serverDefinition, mapping.getDocumentMatcher()));
     }
 
@@ -267,18 +264,15 @@ public class LanguageServersRegistry {
     private static class LanguageMapping {
 
         @NotNull
-        public final String id;
-        @NotNull
         public final Language language;
-        @Nullable
-        public final String languageId;
-
+        @NotNull
+        public final String serverId;
+        @NotNull
         private final DocumentMatcher documentMatcher;
 
-        public LanguageMapping(@NotNull Language language, @Nullable String id, @Nullable String languageId, @NotNull DocumentMatcher documentMatcher) {
+        public LanguageMapping(@NotNull Language language, @NotNull String serverId, @NotNull DocumentMatcher documentMatcher) {
             this.language = language;
-            this.id = id;
-            this.languageId = languageId;
+            this.serverId = serverId;
             this.documentMatcher = documentMatcher;
         }
 
