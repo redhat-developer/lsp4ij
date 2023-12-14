@@ -21,7 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayProvider;
+import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -44,11 +44,11 @@ import java.util.stream.Collectors;
 /**
  * LSP textDocument/inlayHint support.
  */
-public class LSPInlayHintInlayProvider extends AbstractLSPInlayProvider {
+public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
 
-    private static final Key<CancellationSupport> CANCELLATION_SUPPORT_KEY = new Key<>(LSPInlayHintInlayProvider.class.getName() + "-CancellationSupport");
+    private static final Key<CancellationSupport> CANCELLATION_SUPPORT_KEY = new Key<>(LSPInlayHintsProvider.class.getName() + "-CancellationSupport");
 
-    public LSPInlayHintInlayProvider() {
+    public LSPInlayHintsProvider() {
         super(CANCELLATION_SUPPORT_KEY);
     }
 
