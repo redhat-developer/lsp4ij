@@ -15,11 +15,9 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.DocumentMatcher;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.AbstractMap;
 import java.util.concurrent.CompletableFuture;
 
 public class ContentTypeToLanguageServerDefinition {
@@ -86,4 +84,11 @@ public class ContentTypeToLanguageServerDefinition {
         return serverDefinition;
     }
 
+    public @Nullable Language getLanguage() {
+        return language;
+    }
+
+    public @Nullable FileType getFileType() {
+        return fileType;
+    }
 }

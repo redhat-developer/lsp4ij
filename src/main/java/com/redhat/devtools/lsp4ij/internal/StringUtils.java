@@ -13,6 +13,9 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import java.io.InputStream;
+import java.util.Scanner;
+
 public class StringUtils {
 
     /**
@@ -60,4 +63,5 @@ public class StringUtils {
     public static int length(final CharSequence cs) {
         return cs == null ? 0 : cs.length();
     }
+
 }

@@ -24,18 +24,23 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.CopyStartServerCommandAction;
-import com.redhat.devtools.lsp4ij.console.explorer.actions.RestartServerAction;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.PauseServerAction;
+import com.redhat.devtools.lsp4ij.console.explorer.actions.RestartServerAction;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.StopServerAction;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.util.Comparator;
+import java.util.Enumeration;
 
 /**
  * Language server explorer which shows language servers and their process.
@@ -48,6 +53,61 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
     private final Tree tree;
     private final LanguageServerExplorerLifecycleListener listener;
+    private final LanguageServerDefinitionListener definitionListener = new LanguageServerDefinitionListener() {
+
+        @Override
+        public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
+            // Some server definitions has been added, add them from the explorer
+            DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+            DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+            for (var serverDefinition : event.serverDefinitions) {
+                root.add(new LanguageServerTreeNode(serverDefinition));
+            }
+            treeModel.reload(root);
+        }
+
+        @Override
+        public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
+            // Some server definitions has been removed, remove them from the explorer
+            DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+            DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+            for (var serverDefinition : event.serverDefinitions) {
+                LanguageServerTreeNode node = findNodeForServer(serverDefinition, root);
+                if (node != null) {
+                    root.remove(node);
+                }
+            }
+            treeModel.reload(root);
+        }
+
+        @Override
+        public void handleChanged(LanguageServerChangedEvent event) {
+            if (event.nameChanged) {
+                // A server definition name has changed, rename the proper tree node label of the explorer
+                DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+                DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+                LanguageServerTreeNode node = findNodeForServer(event.serverDefinition, root);
+                if (node != null) {
+                    treeModel.nodeChanged(node);
+                }
+            }
+        }
+
+        private static @Nullable LanguageServerTreeNode findNodeForServer(@NotNull LanguageServerDefinition serverDefinition, DefaultMutableTreeNode root) {
+            Enumeration<TreeNode> children = root.children();
+            while (children.hasMoreElements()) {
+                TreeNode child = children.nextElement();
+                if (child instanceof LanguageServerTreeNode serverTreeNode) {
+                    if (serverDefinition.equals(serverTreeNode.getServerDefinition())) {
+                        return serverTreeNode;
+                    }
+                }
+            }
+            return null;
+        }
+
+    };
+
     private boolean disposed;
 
     private final TreeSelectionListener treeSelectionListener = event -> {
@@ -73,6 +133,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         listener = new LanguageServerExplorerLifecycleListener(this);
         LanguageServerLifecycleManager.getInstance(panel.getProject())
                 .addLanguageServerLifecycleListener(listener);
+        LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(definitionListener);
     }
 
     private void onLanguageServerSelected(LanguageServerTreeNode treeNode) {
@@ -102,10 +163,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         tree.setRootVisible(false);
 
         // Fill tree will all language server definitions, ordered alphabetically
-        LanguageServersRegistry.getInstance().getServerDefinitions().stream()
-                .sorted(Comparator.comparing(LanguageServerDefinition::getDisplayName))
-                .map(LanguageServerTreeNode::new)
-                .forEach(top::add);
+        loadLanguageServerDefinitions(top);
 
         tree.setCellRenderer(new LanguageServerTreeRenderer());
 
@@ -163,6 +221,15 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         return tree;
     }
 
+    private static void loadLanguageServerDefinitions(DefaultMutableTreeNode top) {
+        LanguageServersRegistry.getInstance()
+                .getServerDefinitions()
+                .stream()
+                .sorted(Comparator.comparing(LanguageServerDefinition::getDisplayName))
+                .map(LanguageServerTreeNode::new)
+                .forEach(top::add);
+    }
+
     public Tree getTree() {
         return tree;
     }
@@ -173,6 +240,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         tree.removeTreeSelectionListener(treeSelectionListener);
         LanguageServerLifecycleManager.getInstance(panel.getProject())
                 .removeLanguageServerLifecycleListener(listener);
+        LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(definitionListener);
     }
 
     public boolean isDisposed() {
