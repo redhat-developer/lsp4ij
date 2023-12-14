@@ -101,12 +101,18 @@
                 implementation="com.redhat.devtools.lsp4ij.operations.LSPInlayHintProvidersFactory"/>
 
         <!-- LSP textDocument/hover request support -->
-        <!-- language="any" doesn't work for hover.
+        <!-- This hover support works only if there are no language which defines a 'lang.documentationProvider'. In case if it exists a
+             'lang.documentationProvider' for the language, you need to declare in your plugin.xml
+
             <lang.documentationProvider
-                id="LSPTextHover"
-                language="any"
+                language="MyLanguage"
                 implementationClass="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
-                order="first"/>-->
+                order="first"/>
+        -->
+        <documentationProvider
+                id="LSPTextHover"
+                implementation="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
+                order="first"/>
 
         <notificationGroup
                 id="Language Server Protocol"
