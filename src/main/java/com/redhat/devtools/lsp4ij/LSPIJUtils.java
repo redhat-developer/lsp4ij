@@ -21,6 +21,7 @@ import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
@@ -95,17 +96,21 @@ public class LSPIJUtils {
     /**
      * Returns the file language of the given file and null otherwise.
      *
-     * @param file the file.
+     * @param file    the file.
      * @param project the project.
-     *
      * @return the file language of the given file and null otherwise.
      */
     @Nullable
-    public static Language getFileLanguage(@NotNull VirtualFile file, Project project) {
+    public static Language getFileLanguage(@NotNull VirtualFile file, @NotNull Project project) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return LanguageUtil.getLanguageForPsi(project, file);
+            return doGetFileLanguage(file, project);
         }
-        return ReadAction.compute(() -> LanguageUtil.getLanguageForPsi(project, file));
+        return ReadAction.compute(() -> doGetFileLanguage(file, project));
+    }
+
+    @Nullable
+    private static Language doGetFileLanguage(@NotNull VirtualFile file, @NotNull Project project) {
+        return LanguageUtil.getLanguageForPsi(project, file);
     }
 
     private static <T extends TextDocumentPositionParams> T toTextDocumentPositionParamsCommon(T param, int offset, Document document) {
@@ -432,20 +437,6 @@ public class LSPIJUtils {
                 }
             }
         }
-    }
-
-
-    /**
-     * Returns the language of the given document and null otherwise.
-     *
-     * @param document teh document.
-     * @param project the project.
-     *
-     * @return the language of the given document and null otherwise.
-     */
-    public static @Nullable Language getDocumentLanguage(Document document, Project project) {
-        VirtualFile file = FileDocumentManager.getInstance().getFile(document);
-        return getFileLanguage(file, project);
     }
 
     public static @Nullable VirtualFile findResourceFor(URI uri) {

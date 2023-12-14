@@ -1,0 +1,81 @@
+{
+  "languageServers": [
+    {
+      "name": "CSS Language Server",
+      "instructions": [
+        "To consume CSS language server you need to:",
+        "<ul>",
+        "  <li><a href=\"https://nodejs.org/en/download\">download and install nodejs</a></li>",
+        "  <li><a href=\"https://code.visualstudio.com/download\">download and install vscode</a>.</li>",
+        "  <li>Once vscode is installed, it will store the CSS language server in <b>${BASE_DIR}/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js</b></li>",
+        "  LSP4IJ tries to generate the proper <b>cssServerMain.js</b> file path according to your OS, but you will have to perhaps adjust it.",
+        "  </li> ",
+        "</ul>"
+      ],
+      "runtime": "node",
+      "programArgs": {
+        "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
+        "mac": "\"/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
+        "default": "\resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio"
+      },
+      "fileTypeMappings": [
+        {
+          "fileType": "CSS",
+          "languageId": "css"
+        }
+      ]
+    },
+    {
+      "name": "HTML Language Server",
+      "instructions": [
+        "To consume HTML language server you need to:",
+        "<ul>",
+        "  <li><a href=\"https://nodejs.org/en/download\">download and install nodejs</a></li>",
+        "  <li><a href=\"https://code.visualstudio.com/download\">download and install vscode</a>.</li>",
+        "  <li>Once vscode is installed, it will store the CSS language server in <b>${BASE_DIR}/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js</b></li>",
+        "  LSP4IJ tries to generate the proper <b>htmlServerMain.js</b> file path according to your OS, but you will have to perhaps adjust it.",
+        "  </li> ",
+        "</ul>"
+      ],
+      "runtime": "node",
+      "programArgs": {
+        "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
+        "mac": "\"/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
+        "default": "\resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio"
+      },
+      "languageMappings": [
+        {
+          "language": "HTML",
+          "languageId": "html"
+        }
+      ]
+    },
+    {
+      "name": "XML Language Server",
+      "instructions": [
+        "To consume <a href=\"https://github.com/eclipse/lemminx\">XML language server</a> you need to:",
+        "<ul>",
+        "  <li><a href=\"https://download.eclipse.org/justj/?file=lemminx/releases\">download org.eclipse.lemminx-uber.jar JAR</a></li>",
+        "  <li>Once <b>org.eclipse.lemminx-uber.jar</b> is downloaded you will need to adjust ${BASE_DIR} with your base dir",
+        "      where <b>org.eclipse.lemminx-uber.jar</b> file is stored.",
+        "  </li>",
+        "</ul>"
+      ],
+      "runtime": "java",
+      "programArgs": {
+        "default": "-classpath \"${BASE_DIR}/org.eclipse.lemminx-uber.jar\" org.eclipse.lemminx.XMLServerLauncher"
+      },
+      "languageMappings": [
+        {
+          "language": "XML"
+        },
+        {
+          "language": "DTD"
+        },
+        {
+          "language": "RELAX-NG"
+        }
+      ]
+    }
+  ]
+}

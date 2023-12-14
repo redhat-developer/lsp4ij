@@ -37,7 +37,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public class LanguageMappingExtensionPointBean extends BaseKeyedLazyInstance<DocumentMatcher> {
 
-    private static final DocumentMatcher DEFAULT_DOCUMENT_MATCHER = (file,project) -> true;
+    public static final DocumentMatcher DEFAULT_DOCUMENT_MATCHER = (file,project) -> true;
 
     public static final ExtensionPointName<LanguageMappingExtensionPointBean> EP_NAME = ExtensionPointName.create("com.redhat.devtools.lsp4ij.languageMapping");
 

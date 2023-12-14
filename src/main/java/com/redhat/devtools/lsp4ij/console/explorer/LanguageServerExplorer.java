@@ -20,6 +20,8 @@ import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.ui.AnimatedIcon;
 import com.intellij.ui.PopupHandler;
 import com.intellij.ui.treeStructure.Tree;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
@@ -48,6 +50,25 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
     private final Tree tree;
     private final LanguageServerExplorerLifecycleListener listener;
+    private final LanguageServerDefinitionListener definitionListener = new LanguageServerDefinitionListener() {
+        @Override
+        public void handleAdded(LanguageServerDefinition definition) {
+            DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+            DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+            root.add(new LanguageServerTreeNode(definition));
+            treeModel.reload(root);
+        }
+
+        @Override
+        public void handleRemoved(LanguageServerDefinition definition) {
+            DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+            DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+            root.removeAllChildren();
+            loadLanguageServerDefinitions(root);
+            treeModel.reload(root);
+        }
+    };
+
     private boolean disposed;
 
     private final TreeSelectionListener treeSelectionListener = event -> {
@@ -73,6 +94,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         listener = new LanguageServerExplorerLifecycleListener(this);
         LanguageServerLifecycleManager.getInstance(panel.getProject())
                 .addLanguageServerLifecycleListener(listener);
+        LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(definitionListener);
     }
 
     private void onLanguageServerSelected(LanguageServerTreeNode treeNode) {
@@ -102,10 +124,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         tree.setRootVisible(false);
 
         // Fill tree will all language server definitions, ordered alphabetically
-        LanguageServersRegistry.getInstance().getServerDefinitions().stream()
-                .sorted(Comparator.comparing(LanguageServerDefinition::getDisplayName))
-                .map(LanguageServerTreeNode::new)
-                .forEach(top::add);
+        loadLanguageServerDefinitions(top);
 
         tree.setCellRenderer(new LanguageServerTreeRenderer());
 
@@ -163,6 +182,15 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         return tree;
     }
 
+    private static void loadLanguageServerDefinitions(DefaultMutableTreeNode top) {
+        LanguageServersRegistry.getInstance()
+                .getServerDefinitions()
+                .stream()
+                .sorted(Comparator.comparing(LanguageServerDefinition::getDisplayName))
+                .map(LanguageServerTreeNode::new)
+                .forEach(top::add);
+    }
+
     public Tree getTree() {
         return tree;
     }
@@ -173,6 +201,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         tree.removeTreeSelectionListener(treeSelectionListener);
         LanguageServerLifecycleManager.getInstance(panel.getProject())
                 .removeLanguageServerLifecycleListener(listener);
+        LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(definitionListener);
     }
 
     public boolean isDisposed() {

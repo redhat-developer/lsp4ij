@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 
 import javax.swing.*;
@@ -41,7 +42,6 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
     }
 
     public Icon getIcon() {
-        String serverId = getServerDefinition().id;
         return serverDefinition.getIcon();
     }
 

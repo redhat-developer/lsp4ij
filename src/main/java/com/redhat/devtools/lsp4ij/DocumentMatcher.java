@@ -26,7 +26,7 @@ public interface DocumentMatcher {
     /**
      * Returns true if the given file matches a mapping with a language server and false otherwise.
      *
-     * @param file    teh file to check.
+     * @param file    the file to check.
      * @param project the file project.
      * @return true if the given file matches a mapping with a language server and false otherwise.
      */
