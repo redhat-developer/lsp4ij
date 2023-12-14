@@ -21,7 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayProvider;
+import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -46,12 +46,12 @@ import java.util.stream.Collectors;
 /**
  * LSP textDocument/codeLens support.
  */
-public class LSPCodelensInlayProvider extends AbstractLSPInlayProvider {
+public class LSPCodelensProvider extends AbstractLSPInlayHintsProvider {
 
-    private static final Key<CancellationSupport> CANCELLATION_SUPPORT_KEY = new Key<>(LSPCodelensInlayProvider.class.getName() + "-CancellationSupport");
+    private static final Key<CancellationSupport> CANCELLATION_SUPPORT_KEY = new Key<>(LSPCodelensProvider.class.getName() + "-CancellationSupport");
 
 
-    public LSPCodelensInlayProvider() {
+    public LSPCodelensProvider() {
         super(CANCELLATION_SUPPORT_KEY);
     }
 

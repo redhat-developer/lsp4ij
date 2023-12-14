@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.codeInsight.hints.NoSettings;
+import com.intellij.codeInsight.hints.ProviderInfo;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.lang.Language;
@@ -19,6 +21,8 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensProvider;
+import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -211,6 +215,8 @@ public class LanguageServersRegistry {
 
     private final List<ContentTypeToLanguageServerDefinition> connections = new ArrayList<>();
 
+    private final List<ProviderInfo<? extends Object>> inlayHintsProviders = new ArrayList<>();
+
     private LanguageServersRegistry() {
         initialize();
     }
@@ -222,6 +228,7 @@ public class LanguageServersRegistry {
                 serverDefinitions.put(server.id, new ExtensionLanguageServerDefinition(server));
             }
         }
+
         for (LanguageMappingExtensionPointBean extension : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
             Language language = Language.findLanguageByID(extension.languageId);
             if (language != null) {
@@ -236,6 +243,19 @@ public class LanguageServersRegistry {
             } else {
                 LOGGER.warn("server '" + mapping.serverId + "' not available"); //$NON-NLS-1$ //$NON-NLS-2$
             }
+        }
+
+        // register LSPInlayHintInlayHintsProvider + LSPCodelensInlayHintsProvider automatically for all languages
+        // which are associated with a language server.
+        Set<Language> distinctLanguages = languageMappings
+                .stream()
+                .map(mapping -> mapping.language)
+                .collect(Collectors.toSet());
+        LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
+        LSPCodelensProvider lspCodeLensProvider = new LSPCodelensProvider();
+        for (Language language : distinctLanguages) {
+            inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspInlayHintsProvider));
+            inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspCodeLensProvider));
         }
     }
 
@@ -331,6 +351,16 @@ public class LanguageServersRegistry {
         return connections
                 .stream()
                 .anyMatch(entry -> language.isKindOf(entry.getKey()));
+    }
+
+    /**
+     * Returns the LSP codeLens / inlayHint inlay hint providers for all languages which are associated with a language server.
+     *
+     * @param project the project.
+     * @return the LSP codeLens / inlayHint inlay hint providers for all languages which are associated with a language server.
+     */
+    public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos(@NotNull Project project) {
+        return inlayHintsProviders;
     }
 
 }

@@ -12,10 +12,7 @@ package com.redhat.devtools.lsp4ij.operations;
 
 import com.intellij.codeInsight.hints.*;
 import com.intellij.codeInsight.hints.presentation.PresentationFactory;
-import com.intellij.ide.DataManager;
 import com.intellij.lang.Language;
-import com.intellij.openapi.actionSystem.*;
-import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
@@ -37,10 +34,11 @@ import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.concurrent.CancellationException;
 
-public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoSettings> {
+public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvider<NoSettings> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPInlayProvider.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPInlayHintsProvider.class);
 
     private static final InlayHintsCollector EMPTY_INLAY_HINTS_COLLECTOR = new InlayHintsCollector() {
 
@@ -53,7 +51,7 @@ public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoS
 
     private final Key<CancellationSupport> cancellationSupportKey;
 
-    protected AbstractLSPInlayProvider(Key<CancellationSupport> cancellationSupportKey) {
+    protected AbstractLSPInlayHintsProvider(Key<CancellationSupport> cancellationSupportKey) {
         this.cancellationSupportKey = cancellationSupportKey;
     }
 
@@ -100,6 +98,8 @@ public abstract class AbstractLSPInlayProvider implements InlayHintsProvider<NoS
                 try {
                     doCollect(file, psiFile.getProject(), editor, getFactory(), inlayHintsSink, cancellationSupport);
                     cancellationSupport.checkCanceled();
+                } catch (CancellationException e) {
+                    // Do nothing
                 } catch (ProcessCanceledException e) {
                     // Cancel all LSP requests
                     cancellationSupport.cancel();

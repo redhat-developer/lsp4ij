@@ -95,6 +95,11 @@
                 id="LSPHighlightUsagesHandlerFactory"
                 implementation="com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightUsagesHandlerFactory"/>
 
+        <!-- LSP textDocument/codeLens + textDocument/inlayHint requests support -->
+        <codeInsight.inlayProviderFactory
+                id="LSPInlayHintProvidersFactory"
+                implementation="com.redhat.devtools.lsp4ij.operations.LSPInlayHintProvidersFactory"/>
+
         <!-- LSP textDocument/hover request support -->
         <!-- language="any" doesn't work for hover.
             <lang.documentationProvider
@@ -102,19 +107,6 @@
                 language="any"
                 implementationClass="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
                 order="first"/>-->
-
-        <!-- LSP textDocument/codeLens request support -->
-        <!-- language="any" doesn't work for inlay hint.
-            <codeInsight.inlayProvider
-                id="LSPCodelensInlayProvider"
-                language="any"
-                implementationClass="com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensInlayProvider"/>-->
-
-        <!-- LSP textDocument/inlayHint request support -->
-        <!-- language="any" doesn't work for inlay hint.
-                id="LSPInlayHintInlayProvider"
-                language="any"
-                implementationClass="com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintInlayProvider"/>-->
 
         <notificationGroup
                 id="Language Server Protocol"
