@@ -11,15 +11,16 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.lang.Language;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ContentTypeToLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
@@ -37,10 +38,44 @@ import java.util.stream.Collectors;
 /**
  * Language server accessor.
  */
-public class LanguageServiceAccessor {
+public class LanguageServiceAccessor implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
 
     private final Project project;
+
+    private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
+
+        @Override
+        public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
+            // Do nothing
+        }
+
+        @Override
+        public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
+            // Dispose all servers which are removed
+            List<LanguageServerWrapper> serversToDispose = startedServers
+                    .stream()
+                    .filter(server -> event.serverDefinitions.contains(server.serverDefinition))
+                    .collect(Collectors.toList());
+            serversToDispose.forEach(LanguageServerWrapper::dispose);
+            // Remove all servers which are removed from the cache
+            synchronized (startedServers) {
+                startedServers.removeAll(serversToDispose);
+            }
+        }
+
+        @Override
+        public void handleChanged(LanguageServerChangedEvent event) {
+            if (event.commandChanged || event.mappingsChanged) {
+                // Stop all servers where command or mappings has changed
+                List<LanguageServerWrapper> serversToStop = startedServers
+                        .stream()
+                        .filter(server -> event.serverDefinition.equals(server.serverDefinition))
+                        .collect(Collectors.toList());
+                serversToStop.forEach(LanguageServerWrapper::stop);
+            }
+        }
+    };
 
     public static LanguageServiceAccessor getInstance(@NotNull Project project) {
         return project.getService(LanguageServiceAccessor.class);
@@ -48,10 +83,10 @@ public class LanguageServiceAccessor {
 
     private LanguageServiceAccessor(Project project) {
         this.project = project;
+        LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(serverDefinitionListener);
     }
 
     private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
-    private Map<StreamConnectionProvider, LanguageServerDefinition> providersToLSDefinitions = new HashMap<>();
 
     @NotNull
     public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
@@ -110,11 +145,7 @@ public class LanguageServiceAccessor {
 
     public void projectClosing(Project project) {
         // On project closing, we dispose all language servers
-        startedServers.forEach(ls -> {
-            if (project.equals(ls.getProject())) {
-                ls.dispose();
-            }
-        });
+        disposeAllServers();
     }
 
     /**
@@ -266,21 +297,29 @@ public class LanguageServiceAccessor {
         Set<ContentTypeToLanguageServerDefinition> asyncMatchedDefinitions = null;
 
         // look for running language servers via content-type
-        Queue<Object> contentTypes = new LinkedList<>();
+        Queue<Object> languages = new LinkedList<>();
         Set<Object> processedContentTypes = new HashSet<>();
-        Language language= LSPIJUtils.getFileLanguage(file, project);
+        Language language = LSPIJUtils.getFileLanguage(file, project);
         if (language != null) {
-            contentTypes.add(language);
+            languages.add(language);
         }
-        contentTypes.add(file.getFileType());
+        FileType fileType = file.getFileType();
+        if (fileType != null) {
+            languages.add(fileType);
+        }
 
-        while (!contentTypes.isEmpty()) {
-            Object contentType = contentTypes.poll();
+        while (!languages.isEmpty()) {
+            Object contentType = languages.poll();
             if (processedContentTypes.contains(contentType)) {
                 continue;
             }
-            @Nullable Language currentLanguage = contentType instanceof  Language ? (Language) contentType : null;
-            @Nullable FileType currentFileType = contentType instanceof  FileType ? (FileType) contentType : null;
+            Language currentLanguage = null;
+            FileType currentFileType = null;
+            if (contentType instanceof FileType) {
+                currentFileType = (FileType) contentType;
+            } else {
+                currentLanguage = (Language) contentType;
+            }
             // Loop for server/language mapping
             for (ContentTypeToLanguageServerDefinition mapping : LanguageServersRegistry.getInstance()
                     .findLanguageServerDefinitionFor(currentLanguage, currentFileType)) {
@@ -380,18 +419,6 @@ public class LanguageServiceAccessor {
     }
 
     /**
-     * Gets list of running LS satisfying a capability predicate. This does not
-     * start any matching language servers, it returns the already running ones.
-     *
-     * @param request
-     * @return list of Language Servers
-     */
-    @NotNull
-    public List<LanguageServer> getActiveLanguageServers(Predicate<ServerCapabilities> request) {
-        return getLanguageServers(null, request, true);
-    }
-
-    /**
      * Gets list of LS initialized for given project
      *
      * @param onlyActiveLS true if this method should return only the already running
@@ -428,6 +455,23 @@ public class LanguageServiceAccessor {
     public Optional<LanguageServerDefinition> resolveServerDefinition(LanguageServer languageServer) {
         synchronized (startedServers) {
             return startedServers.stream().filter(wrapper -> languageServer.equals(wrapper.getServer())).findFirst().map(wrapper -> wrapper.serverDefinition);
+        }
+    }
+
+    @Override
+    public void dispose() {
+        LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(serverDefinitionListener);
+        disposeAllServers();
+    }
+
+    private void disposeAllServers() {
+        synchronized (startedServers) {
+            startedServers.forEach(ls -> {
+                if (project.equals(ls.getProject())) {
+                    ls.dispose();
+                }
+            });
+            startedServers.clear();
         }
     }
 

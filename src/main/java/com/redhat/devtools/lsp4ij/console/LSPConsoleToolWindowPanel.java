@@ -25,26 +25,33 @@ import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.CardLayoutPanel;
+import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
+import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.launching.ui.CommandLineWidget;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
 import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -144,6 +151,9 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         private final Set<Runnable> settingsChangeListeners = new HashSet<>();
 
+        private Set<LanguageServerDefinitionListener> serverDefinitionListeners = new HashSet<>();
+
+
         public ConsoleContentPanel(DefaultMutableTreeNode key) {
             if (key instanceof LanguageServerTreeNode) {
                 add(createDetailPanel((LanguageServerTreeNode) key), NAME_VIEW_DETAIL);
@@ -176,35 +186,61 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         private JComponent createDetailPanel(LanguageServerTreeNode key) {
             LanguageServerDefinition serverDefinition = key.getServerDefinition();
             Project project = LSPConsoleToolWindowPanel.this.project;
+
+            // Create Server Trace
             ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
-            UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings initialSettings = UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(serverDefinition.id);
+            com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings initialSettings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(serverDefinition.id);
             if (initialSettings != null && initialSettings.getServerTrace() != null) {
                 serverTraceComboBox.setSelectedItem(initialSettings.getServerTrace());
             }
             serverTraceComboBox.addItemListener(event -> {
                 ServerTrace serverTrace = (ServerTrace) event.getItem();
-                UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(serverDefinition.id);
+                com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(serverDefinition.id);
                 if (settings == null) {
-                    settings = new UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings();
+                    settings = new com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings();
                 }
                 settings.setServerTrace(serverTrace);
-                UserDefinedLanguageServerSettings.getInstance(project).setLanguageServerSettings(serverDefinition.id, settings);
+                com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).setLanguageServerSettings(serverDefinition.id, settings);
             });
 
             // Add a settings listener to keep serverTraceComboBox in sync with changes coming from the LSP settings page
             // See https://github.com/redhat-developer/intellij-quarkus/issues/1062
             Runnable settingsChangeListener = createSettingsChangeListener(serverDefinition.id, serverTraceComboBox);
-            UserDefinedLanguageServerSettings.getInstance(getProject()).addChangeHandler(settingsChangeListener);
+            com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(getProject()).addChangeHandler(settingsChangeListener);
             settingsChangeListeners.add(settingsChangeListener);
 
-            return FormBuilder.createFormBuilder()
+            // Create command line if needed
+            CommandLineWidget commandLine = null;
+            if (serverDefinition instanceof UserDefinedLanguageServerDefinition userDefinedLanguageServerDefinition) {
+                commandLine = new CommandLineWidget();
+                UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings launchSettings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(serverDefinition.id);
+                if (launchSettings != null) {
+                    commandLine.setText(launchSettings.getCommandLine() != null? launchSettings.getCommandLine() : "");
+                    final var c= commandLine;
+                    commandLine.getDocument().addDocumentListener(new DocumentAdapter() {
+                        @Override
+                        protected void textChanged(@NotNull DocumentEvent e) {
+                            launchSettings.setCommandLine(c.getText());
+                            userDefinedLanguageServerDefinition.setCommandLine(c.getText());
+                        }
+                    });
+                }
+                var serverDefinitionListener = createServerDefinitionListener(serverDefinition, commandLine);
+                LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(serverDefinitionListener);
+                serverDefinitionListeners.add(serverDefinitionListener);
+            }
+
+            FormBuilder builder = FormBuilder.createFormBuilder()
                     .setFormLeftIndent(10)
                     .addComponent(createTitleComponent(serverDefinition), 1)
-                    .addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox, 1)
-                    .addComponentFillVertically(new JPanel(), 0)
+                    .addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox, 1);
+
+            if (commandLine != null) {
+                builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.command"), commandLine, true);
+            }
+            return builder.addComponentFillVertically(new JPanel(), 0)
                     .getPanel();
         }
-
 
         private Runnable createSettingsChangeListener(String id, ComboBox<ServerTrace> serverTraceComboBox) {
             return new Runnable() {
@@ -213,7 +249,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                     if (isDisposed()) {
                         return;
                     }
-                    UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(id);
+                    com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(id);
                     if (settings == null) { //No settings have been set yet for this particular LS
                         return;
                     }
@@ -224,6 +260,31 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 }
             };
         }
+
+        @NotNull
+        private static LanguageServerDefinitionListener createServerDefinitionListener(LanguageServerDefinition serverDefinition, CommandLineWidget commandLine) {
+            return new LanguageServerDefinitionListener() {
+                @Override
+                public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
+                    // Do nothing
+                }
+
+                @Override
+                public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
+                    // Do nothing
+                }
+
+                @Override
+                public void handleChanged(@NotNull LanguageServerDefinitionListener.LanguageServerChangedEvent event) {
+                    if (event.commandChanged
+                            && event.serverDefinition.equals(serverDefinition)
+                            && !Objects.equals(((UserDefinedLanguageServerDefinition) serverDefinition).getCommandLine(), commandLine.getText())) {
+                        commandLine.setText(((UserDefinedLanguageServerDefinition) serverDefinition).getCommandLine());
+                    }
+                }
+            };
+        }
+
 
         private JComponent createTitleComponent(LanguageServerDefinition languageServerDefinition) {
             JLabel title = new JLabel(languageServerDefinition.getDisplayName());
@@ -262,10 +323,14 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         @Override
         public void dispose() {
-            for (Runnable settingsChangeListener : settingsChangeListeners) {
-                UserDefinedLanguageServerSettings.getInstance(getProject()).removeChangeHandler(settingsChangeListener);
+            for (var settingsChangeListener : settingsChangeListeners) {
+                com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(getProject()).removeChangeHandler(settingsChangeListener);
             }
             settingsChangeListeners.clear();
+            for (var serverDefinitionListener : serverDefinitionListeners) {
+                LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(serverDefinitionListener);
+            }
+            serverDefinitionListeners.clear();
             super.dispose();
             if (consoleView != null) {
                 consoleView.dispose();
@@ -314,6 +379,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
     /**
      * Code copied from https://github.com/apache/commons-lang/blob/24744a40b2c094945e542b71cc1fbf59caa0d70b/src/main/java/org/apache/commons/lang3/exception/ExceptionUtils.java#L400C5-L407C6
+     *
      * @param throwable
      * @return
      */
