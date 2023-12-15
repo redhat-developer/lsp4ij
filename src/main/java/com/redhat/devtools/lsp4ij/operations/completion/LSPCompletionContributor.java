@@ -132,7 +132,8 @@ public class LSPCompletionContributor extends CompletionContributor {
             // Create lookup item
             var lookupItem = createLookupItem(file, editor, completionPrefix.getCompletionOffset(), item, itemDefaults, languageServer);
             // Group it by using completion item kind
-            var groupedLookupItem = PrioritizedLookupElement.withGrouping(lookupItem, item.getKind().getValue());
+            int group = item.getKind() == null ? 0 : item.getKind().getValue();
+            var groupedLookupItem = PrioritizedLookupElement.withGrouping(lookupItem, group);
             // Compute the prefix
             String prefix = completionPrefix.getPrefixFor(lookupItem.getTextEditRange(), item);
             if (prefix != null) {
