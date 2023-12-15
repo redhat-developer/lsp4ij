@@ -1,6 +1,6 @@
 # Developer guide
 
-This section explains step by step how to add your own LSP language server in your IntelliJ plugin.
+This section provide step-by-step instructions how to contribute your own LSP language server in your IntelliJ plugin.
 
 ## Reference LSP4IJ
 
@@ -22,11 +22,12 @@ You need [to declare dependency in your plugin.xml](https://plugins.jetbrains.co
 
 ### Exclude all LSP4J dependencies
 
-LSP4IJ depends on [Eclipse LSP4J](https://github.com/eclipse-lsp4j/lsp4j) (Java binding for the [Language Server Protocol](https://microsoft.github.io/language-server-protocol) and the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol).). It uses a given version of LSPJ and their classes are loaded in the LSP4IJ plugin class loader.
+LSP4IJ depends on [Eclipse LSP4J](https://github.com/eclipse-lsp4j/lsp4j) (Java binding for the [Language Server Protocol](https://microsoft.github.io/language-server-protocol) and the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol).). It provides its own version of LSP4J and its classes are loaded in the LSP4IJ plugin class loader.
 
-Your IntelliJ Plugin should use `the same LSP4J classes than LSP4IJ` to avoid some `ClassCastException` errors. To do that you need to `exclude all LSP4J dependencies` from your plugin.
+Your IntelliJ Plugin must not embed its own version of LSP4J, in order to avoid conflicts with the version provided by LSP4IJ. Failing to do so will result in `ClassCastException` errors to be thrown. 
+Make sure that the LSP4J dependency in your plugin is either declared with a `runtimeOnly` scope or excluded entirely, if it's included as a transitive dependency.
 
-Here a sample used in [Quarkus Tools](https://github.com/redhat-developer/intellij-quarkus) in [build.gradle.kts](https://github.com/redhat-developer/intellij-quarkus/blob/main/build.gradle.kts) to exclude LSP4J dependency from the [Qute Language Server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) which have a dependency to LSP4J:
+Here is a sample used in [Quarkus Tools](https://github.com/redhat-developer/intellij-quarkus) in [build.gradle.kts](https://github.com/redhat-developer/intellij-quarkus/blob/main/build.gradle.kts) to exclude LSP4J dependency from the [Qute Language Server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls):
 
 ```
 implementation("com.redhat.microprofile:com.redhat.qute.ls:0.17.0) {
@@ -36,17 +37,52 @@ implementation("com.redhat.microprofile:com.redhat.qute.ls:0.17.0) {
 
 ## Declare server
 
+## LanguageServerFactory
+
+Create an implementation of [LanguageServerFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/LanguageServerFactory.java) to expose your `my.language.server.MyLanguageServer`, implementing [`StreamConnectionProvider`](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/StreamConnectionProvider.java) :
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
+        return new MyLanguageServer(project);
+    }
+
+    @Override //If you need to provide client specific features
+    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
+        return new MyLanguageClient(project);
+    }
+
+    @Override //If you need to expose a custom server API
+    public @NotNull Class<? extends LanguageServer> getServerInterface() {
+        return MyCustomServerAPI.class;
+    }
+
+}
+```
+
+If you need to provide client specific features (e.g. commands), you can override the `createLanguageClient` method to return your custom LSP client implementation.
+If you need to expose a custom server API, i.e. custom commands supported by your language server, you can override the `createLanguageClient` method to return a custom interface extending LSP4J's LanguageServer API.
 
 ### StreamConnectionProvider Implementation
 
-You need to implement the [StreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/StreamConnectionProvider.java) API which manages:
+Your `MyLanguageServer` needs to implement the [StreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/StreamConnectionProvider.java) API which manages:
 
- * start of your language server 
+ * the language server lifecycle (start/stop)
  * returns the input/error stream of LSP requests, responses, notifications.
 
 Generally, the language server is started with a process by using a runtime like Java, NodeJS, etc. In this case you need to extend [ProcessStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/ProcessStreamConnectionProvider.java)
 
-Here a basic sample which starts the `path/to/my/language/server/main.js` language server written in JavaScript with NodeJS runtime "path/to/nodejs/node.exe":
+Here is a basic sample which starts the `path/to/my/language/server/main.js` language server written in JavaScript, with the NodeJS runtime found in "path/to/nodejs/node.exe":
 
 ```java
 package my.language.server;
@@ -116,32 +152,6 @@ If your language server manages custom LSP requests, it is advised to extend [In
 
 You can see a full sample with [QuteLanguageClient](https://github.com/redhat-developer/intellij-quarkus/blob/main/src/main/java/com/redhat/devtools/intellij/qute/lsp/QuteLanguageClient.java)
 
-## LanguageServerFactory
-
-Create an implementation of [LanguageServerFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/LanguageServerFactory.java) to use your `my.language.server.MyLanguageServer`, `my.language.server.MyLanguageClient` and defines a custom LanguageServer API if you need:
-
-```java
-package my.language.server;
-
-import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServerFactory;
-import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
-import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
-import org.jetbrains.annotations.NotNull;
-
-public class MyLanguageServerFactory implements LanguageServerFactory {
-
-    @Override
-    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        return new MyLanguageServer(project);
-    }
-
-    @Override
-    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
-        return new MyLanguageClient(project);
-    }
-}
-```
 
 ## Declare server with extension point
 
@@ -226,24 +236,12 @@ and it must be registered as language mapping, with the `documentMatcher` attrib
   </extensions>
 ```
 
-## Add specific IJ features
+## Special cases
 
-When it is possible, LSP4IJ declare the IJ feature with `any` language.
+In general, LSP4IJ maps language server features to specific Intellij APIs. However, in some cases, the mapping needs to be declared explicitly in your plugin.xml.
 
-For instance `textDocument/publishDiagnostics` is managed with `externalAnnotator` in LSP4IJ
-with an empty language attribute, in order to support all languages:
-
-```xml
-<!-- LSP textDocument/publishDiagnostics notification support -->
-<externalAnnotator
-        id="LSPDiagnosticAnnotator"
-        language=""
-        implementationClass="com.redhat.devtools.lsp4ij.operations.diagnostics.LSPDiagnosticAnnotator"/>
-```
-
-Some LSP features (Hover, Inlay Hints, CodeLens) have to be mapped specifically to your language, in your plugin.xml:
-
- * `textDocument/hover`:
+### Hover support
+In case the language server provides hover support for a language already supported by Intellij or another plugin, you'll need to add a special mapping between that language and LSP4IJ, in your plugin.xml:
  
 ```xml 
 <lang.documentationProvider 
@@ -252,18 +250,6 @@ Some LSP features (Hover, Inlay Hints, CodeLens) have to be mapped specifically 
   order="first"/>
 ```
 
- * `textDocument/codeLens`:
- 
-```xml 
-<codeInsight.inlayProvider
-  language="MyLanguage" 
-  implementationClass="com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensInlayProvider"/>
-```
+See specific [hover implementation details](./LSPSupport.md#hover) for more details.
 
- * `textDocument/inlayHint`:
- 
-```xml 
-<codeInsight.inlayProvider
-  language="MyLanguage" 
-  implementationClass="com.redhat.devtools.lsp4ij.operations.codelens.LSPInlayHintInlayProvider"/>
 ```
