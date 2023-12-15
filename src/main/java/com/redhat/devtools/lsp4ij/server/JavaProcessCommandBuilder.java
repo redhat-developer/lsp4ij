@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.server;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.SystemInfo;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 
 import java.io.File;
@@ -88,6 +89,6 @@ public class JavaProcessCommandBuilder {
 
     private static String computeJavaPath() {
         return new File(System.getProperty("java.home"),
-                "bin/java" + (OS.current() == OS.WINDOWS ? ".exe" : "")).getAbsolutePath();
+                "bin/java" + (SystemInfo.isWindows ? ".exe" : "")).getAbsolutePath();
     }
 }
