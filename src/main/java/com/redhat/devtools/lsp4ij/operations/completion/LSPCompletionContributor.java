@@ -135,7 +135,10 @@ public class LSPCompletionContributor extends CompletionContributor {
             int group = item.getKind() == null ? 0 : item.getKind().getValue();
             var groupedLookupItem = PrioritizedLookupElement.withGrouping(lookupItem, group);
             // Compute the prefix
-            String prefix = completionPrefix.getPrefixFor(lookupItem.getTextEditRange(), item);
+            String prefix = null;
+            if (lookupItem.getTextEdit() != null) {
+                prefix = completionPrefix.getPrefixFor(lookupItem.getTextEditRange(), item);
+            }
             if (prefix != null) {
                 // Add the IJ completion item (lookup item) by using the computed prefix
                 result.withPrefixMatcher(prefix)

@@ -299,6 +299,10 @@ public class LSPCompletionProposal extends LookupElement {
         }
     }
 
+    public Either<TextEdit, InsertReplaceEdit> getTextEdit() {
+        return item.getTextEdit();
+    }
+
     public CompletionItem getItem() {
         return item;
     }
