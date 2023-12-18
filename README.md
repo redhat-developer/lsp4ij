@@ -89,7 +89,7 @@ You can easily install nightly builds from the nightly channel:
 
 - in IntelliJ, open `Setting > Plugins > [Gear icon] > Manage Plugin Repositories...`
 - Add `https://plugins.jetbrains.com/plugins/nightly/23257` and press `OK`
-<img alt="Nightly Channel Repository" src="images/nightly-channel-repo.png" width="500px" />
+<img alt="Nightly Channel Repository" src="docs/images/nightly-channel-repo.png" width="500px" />
 - install the latest `LSP4IJ` version
 
 Nightly builds are published once a day.
