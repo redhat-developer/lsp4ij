@@ -24,16 +24,22 @@ import com.intellij.util.io.URLUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionProposal;
+import com.vladsch.flexmark.ext.autolink.AutolinkExtension;
+import com.vladsch.flexmark.ext.gfm.strikethrough.StrikethroughExtension;
+import com.vladsch.flexmark.ext.tables.TablesExtension;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.util.data.MutableDataSet;
 import org.eclipse.lsp4j.MarkupContent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.redhat.devtools.lsp4ij.operations.documentation.MarkdownConverter.toHTML;
 
 /**
  * {@link DocumentationProviderEx} implementation for LSP to support:
@@ -45,8 +51,6 @@ import java.util.stream.Collectors;
  */
 public class LSPDocumentationProvider extends DocumentationProviderEx implements ExternalDocumentationHandler {
 
-    private static final Parser PARSER = Parser.builder().build();
-    private static final HtmlRenderer RENDERER = HtmlRenderer.builder().build();
 
     private static final Key<Integer> TARGET_OFFSET_KEY = new Key<>(LSPDocumentationProvider.class.getName());
 
@@ -70,15 +74,12 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
     @Nullable
     @Override
     public String generateDoc(@NotNull PsiElement element, @Nullable PsiElement originalElement) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(originalElement.getContainingFile())) {
-            return null;
-        }
         try {
             Project project = element.getProject();
             if (project.isDisposed()) {
                 return null;
             }
-            Editor editor = null;
+            Editor editor;
             List<MarkupContent> markupContent = null;
             if (element instanceof LSPPsiElementForLookupItem) {
                 // Show documentation for a given completion item in the "documentation popup" (see IJ Completion setting)
@@ -87,7 +88,7 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
                 markupContent = ((LSPPsiElementForLookupItem) element).getDocumentation();
             } else {
                 // Show documentation for a hovered element (LSP textDocument/hover request).
-                if (originalElement == null) {
+                if (originalElement == null || !LanguageServersRegistry.getInstance().isLanguageSupported(originalElement.getContainingFile())) {
                     return null;
                 }
                 editor = LSPIJUtils.editorForElement(originalElement);
@@ -107,9 +108,9 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
             }
             String s = markupContent
                     .stream()
-                    .map(m -> m.getValue())
+                    .map(MarkupContent::getValue)
                     .collect(Collectors.joining("\n\n"));
-            return styleHtml(editor, RENDERER.render(PARSER.parse(s)));
+            return styleHtml(editor, toHTML(s));
         } finally {
             if (originalElement != null) {
                 originalElement.putUserData(TARGET_OFFSET_KEY, null);
