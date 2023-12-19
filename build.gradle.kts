@@ -20,6 +20,7 @@ group = prop("pluginGroup")
 version = prop("pluginVersion")
 
 val lsp4jVersion = prop("lsp4jVersion")
+val flexmarkVersion = prop("flexmarkVersion")
 
 // Configure project's dependencies
 repositories {
@@ -54,8 +55,10 @@ dependencies {
     implementation("org.eclipse.lsp4j:org.eclipse.lsp4j:$lsp4jVersion")
     // Required by lsp4j as the version from IJ is incompatible
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation("com.vladsch.flexmark:flexmark:0.64.8")
-
+    implementation("com.vladsch.flexmark:flexmark:$flexmarkVersion")
+    implementation("com.vladsch.flexmark:flexmark-ext-tables:$flexmarkVersion")
+    implementation("com.vladsch.flexmark:flexmark-ext-autolink:$flexmarkVersion")
+    implementation("com.vladsch.flexmark:flexmark-ext-gfm-strikethrough:$flexmarkVersion")
     testImplementation("com.redhat.devtools.intellij:intellij-common-ui-test-library:0.2.0")
     testImplementation("org.assertj:assertj-core:3.19.0")
 
