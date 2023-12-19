@@ -25,7 +25,7 @@ public abstract class LSPCommandAction extends AnAction {
 
     @Override
     public final void actionPerformed(@NotNull AnActionEvent e) {
-        Command command = e.getData(CommandExecutor.LSP_COMMAND);
+        LSPCommand command = e.getData(CommandExecutor.LSP_COMMAND);
         if (command == null) {
             return;
         }
@@ -49,5 +49,5 @@ public abstract class LSPCommandAction extends AnAction {
      * @param command the LSP command.
      * @param e the action event.
      */
-    protected abstract void commandPerformed(@NotNull Command command, @NotNull AnActionEvent e);
+    protected abstract void commandPerformed(@NotNull LSPCommand command, @NotNull AnActionEvent e);
 }

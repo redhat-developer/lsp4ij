@@ -21,6 +21,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -51,7 +52,7 @@ import java.util.stream.Stream;
 public class CommandExecutor {
     private static final Logger LOGGER = LoggerFactory.getLogger(CommandExecutor.class);
 
-    public static final DataKey<Command> LSP_COMMAND = DataKey.create("com.redhat.devtools.lsp4ij.command");
+    public static final DataKey<LSPCommand> LSP_COMMAND = DataKey.create("com.redhat.devtools.lsp4ij.command");
 
     public static final DataKey<URI> LSP_COMMAND_DOCUMENT_URI = DataKey.create("com.redhat.devtools.lsp4ij.command.documentUri");
 
@@ -189,10 +190,9 @@ public class CommandExecutor {
         if (source != null) {
             contextBuilder.setParent(DataManager.getInstance().getDataContext(source));
         }
-        ensureArgumentsIsInProperClassloader(command, action.getClass().getClassLoader());
         contextBuilder
                 .add(CommonDataKeys.PROJECT, project)
-                .add(LSP_COMMAND, command);
+                .add(LSP_COMMAND, new LSPCommand(command, action.getClass().getClassLoader()));
         if (documentUri != null) {
             contextBuilder.add(LSP_COMMAND_DOCUMENT_URI, documentUri);
         }
@@ -211,7 +211,7 @@ public class CommandExecutor {
                 // If external plugin which consumes LSP4IJ and declare a gson dependency, it will have
                 // ClasCastException error which command arguments will be used.
                 // In this case, JsonElement requires to be updated by creating a new JsonElement with the external plugin class loader.
-                Object newElt = GsonManager.getJsonElementFromClassloader(elt, classLoader);
+                Object newElt = JSONUtils.getJsonElementFromClassloader(elt, classLoader);
                 if (newElt != null) {
                     arguments.set(i, newElt);
                 } else {
