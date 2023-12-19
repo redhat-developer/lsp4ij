@@ -356,10 +356,9 @@ public class LanguageServersRegistry {
     /**
      * Returns the LSP codeLens / inlayHint inlay hint providers for all languages which are associated with a language server.
      *
-     * @param project the project.
      * @return the LSP codeLens / inlayHint inlay hint providers for all languages which are associated with a language server.
      */
-    public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos(@NotNull Project project) {
+    public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos() {
         return inlayHintsProviders;
     }
 

@@ -25,10 +25,16 @@ import java.util.List;
  * to register all languages mapped with a language server with {@link LSPInlayHintsProvider} and {@link LSPCodelensProvider}
  * to avoid for the external plugin to declare in plugin.xml the 'codeInsight.inlayProvider'.
  */
-public class LSPInlayHintProvidersFactory implements InlayHintsProviderFactory  {
+public class LSPInlayHintProvidersFactory implements InlayHintsProviderFactory {
+    @NotNull
+    @Override
+    public List<ProviderInfo<? extends Object>> getProvidersInfo() {
+        return LanguageServersRegistry.getInstance().getInlayHintProviderInfos();
+    }
+
     @NotNull
     @Override
     public List<ProviderInfo<? extends Object>> getProvidersInfo(@NotNull Project project) {
-        return LanguageServersRegistry.getInstance().getInlayHintProviderInfos(project);
+        return getProvidersInfo();
     }
 }
