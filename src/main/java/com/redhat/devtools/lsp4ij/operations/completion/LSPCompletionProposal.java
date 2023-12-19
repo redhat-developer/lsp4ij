@@ -290,17 +290,17 @@ public class LSPCompletionProposal extends LookupElement {
 
     }
 
-    public Range getTextEditRange() {
+    public @Nullable Range getTextEditRange() {
+        Either<TextEdit, InsertReplaceEdit> textEdit = item.getTextEdit();
+        if (textEdit == null) {
+            return null;
+        }
         if (item.getTextEdit().isLeft()) {
             return item.getTextEdit().getLeft().getRange();
         } else {
             // here providing insert range, currently do not know if insert or replace is requested
             return item.getTextEdit().getRight().getInsert();
         }
-    }
-
-    public Either<TextEdit, InsertReplaceEdit> getTextEdit() {
-        return item.getTextEdit();
     }
 
     public CompletionItem getItem() {
