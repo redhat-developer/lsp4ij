@@ -72,7 +72,13 @@ public class LSPCompletionProposal extends LookupElement {
         this.currentOffset = offset;
         this.bestOffset = getPrefixCompletionStart(editor.getDocument(), offset);
         ServerCapabilities serverCapabilities = languageServer.getServerWrapper().getServerCapabilities();
-        this.supportResolveCompletion = serverCapabilities != null && serverCapabilities.getCompletionProvider() != null && serverCapabilities.getCompletionProvider().getResolveProvider();
+        if (serverCapabilities != null &&
+                serverCapabilities.getCompletionProvider() != null &&
+                serverCapabilities.getCompletionProvider().getResolveProvider() != null) {
+            this.supportResolveCompletion = serverCapabilities.getCompletionProvider().getResolveProvider();
+        } else {
+            this.supportResolveCompletion = false;
+        }
         putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
     }
 
