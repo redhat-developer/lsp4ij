@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.server.definition;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.lang.Language;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
@@ -40,7 +41,9 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
     String label;
     public final boolean isSingleton;
     public final @NotNull
-    Map<Language, String> languageIdMappings;
+    Map<Language, String> languageIdLanguageMappings;
+    public final @NotNull
+    Map<FileType, String> languageIdFileTypeMappings;
     public final String description;
     public final int lastDocumentDisconnectedTimeout;
     private boolean enabled;
@@ -53,7 +56,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
         this.description = description;
         this.isSingleton = isSingleton;
         this.lastDocumentDisconnectedTimeout = lastDocumentDisconnectedTimeout != null && lastDocumentDisconnectedTimeout > 0 ? lastDocumentDisconnectedTimeout : DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT;
-        this.languageIdMappings = new ConcurrentHashMap<>();
+        this.languageIdLanguageMappings = new ConcurrentHashMap<>();
+        this.languageIdFileTypeMappings = new ConcurrentHashMap<>();
         this.supportsLightEdit = supportsLightEdit;
         setEnabled(true);
     }
@@ -77,8 +81,12 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
         this.enabled = enabled;
     }
 
-    public void registerAssociation(@NotNull Language language, @NotNull String serverId) {
-        this.languageIdMappings.put(language, serverId);
+    public void registerAssociation(@NotNull Language language, @NotNull String languageId) {
+        this.languageIdLanguageMappings.put(language, languageId);
+    }
+
+    public void registerAssociation(@NotNull FileType fileType, @NotNull String languageId) {
+        this.languageIdFileTypeMappings.put(fileType, languageId);
     }
 
     @NotNull
@@ -107,4 +115,5 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
     public Icon getIcon() {
         return AllIcons.Webreferences.Server;
     }
+
 }

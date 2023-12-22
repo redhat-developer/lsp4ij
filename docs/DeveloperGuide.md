@@ -197,16 +197,18 @@ Here is sample snippet to associate the `XML` language with the `myLanguageServe
   </extensions>
 ```
 
-Some language servers uses the language field to know the language, you can declare it with the `languageId` attribute:
+Some language servers use the [TextDocumentItem#languageId](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem) field to identify the document on the server side. 
+For instance the [vscode-css-languageservice](https://github.com/microsoft/vscode-css-languageservice) (used by the vscode CSS language server) expects the `languageId` to be `css` or `less`. 
+To do that, you can declare it with the `languageId` attribute:
 
 ```xml
 </idea-plugin>
 
   <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
 
-    <languageMapping language="XML"
+    <languageMapping language="CSS"
                      serverId="myLanguageServerId"
-                     languageId="xml" />
+                     languageId="css" />
 
   </extensions>
 ```
@@ -250,11 +252,30 @@ and it must be registered as language mapping, with the `documentMatcher` attrib
   </extensions>
 ```
 
+## Declare fileType mapping with extension point
+
+If your plugin does not define an IntelliJ `language` but just a `File Type`, you can use `fileTypeMapping` 
+instead of using `languageMapping`. A good sample is if you want to map a CSS file to the CSS language server in 
+IntelliJ Community which only defines the CSS file type but not the CSS language.
+
+```xml
+</idea-plugin>
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+
+    <fileTypeMapping fileType="CSS"
+                     serverId="myLanguageServerId"
+                     languageId="css" />
+
+  </extensions>
+```
+
 ## Special cases
 
 In general, LSP4IJ maps language server features to specific Intellij APIs. However, in some cases, the mapping needs to be declared explicitly in your plugin.xml.
 
 ### Hover support
+
 In case the language server provides hover support for a language already supported by Intellij or another plugin, you'll need to add a special mapping between that language and LSP4IJ, in your plugin.xml:
  
 ```xml 

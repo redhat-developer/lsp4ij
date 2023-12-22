@@ -67,6 +67,11 @@
                 beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
+        <extensionPoint
+                name="fileTypeMapping"
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean">
+            <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
+        </extensionPoint>
     </extensionPoints>
 
     <!-- Language Server support -->

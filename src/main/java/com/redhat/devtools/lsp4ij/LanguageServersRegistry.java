@@ -13,16 +13,17 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.codeInsight.hints.NoSettings;
 import com.intellij.codeInsight.hints.ProviderInfo;
 import com.intellij.lang.Language;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensProvider;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
-import com.redhat.devtools.lsp4ij.server.definition.ContentTypeToLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean;
 import com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean;
 import com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean;
 import org.jetbrains.annotations.NotNull;
@@ -59,7 +60,8 @@ public class LanguageServersRegistry {
     }
 
     private void initialize() {
-        List<ServerLanguageMapping> languageMappings = new ArrayList<>();
+        List<ServerMapping> mappings = new ArrayList<>();
+
         for (ServerExtensionPointBean server : ServerExtensionPointBean.EP_NAME.getExtensions()) {
             if (server.id != null && !server.id.isEmpty()) {
                 serverDefinitions.put(server.id, new ExtensionLanguageServerDefinition(server));
@@ -69,25 +71,34 @@ public class LanguageServersRegistry {
         for (LanguageMappingExtensionPointBean extension : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
             Language language = Language.findLanguageByID(extension.language);
             if (language != null) {
-                @NotNull String languageId = StringUtils.isEmpty(extension.languageId) ? language.getID() : extension.languageId;;
-                languageMappings.add(new ServerLanguageMapping(language, extension.serverId, languageId, extension.getDocumentMatcher()));
+                @NotNull String languageId = StringUtils.isEmpty(extension.languageId) ? language.getID() : extension.languageId;
+                mappings.add(new ServerLanguageMapping(language, extension.serverId, languageId, extension.getDocumentMatcher()));
             }
         }
 
-        for (ServerLanguageMapping mapping : languageMappings) {
+        for (FileTypeMappingExtensionPointBean extension : FileTypeMappingExtensionPointBean.EP_NAME.getExtensions()) {
+            FileType fileType = FileTypeManager.getInstance().findFileTypeByName(extension.fileType);
+            if (fileType != null) {
+                @NotNull String languageId = StringUtils.isEmpty(extension.languageId) ? fileType.getName() : extension.languageId;
+                mappings.add(new ServerFileTypeMapping(fileType, extension.serverId, languageId, extension.getDocumentMatcher()));
+            }
+        }
+
+        for (ServerMapping mapping : mappings) {
             LanguageServerDefinition lsDefinition = serverDefinitions.get(mapping.getServerId());
             if (lsDefinition != null) {
                 registerAssociation(lsDefinition, mapping);
             } else {
-                LOGGER.warn("server '" + mapping.getServerId() + "' for mapping language IntelliJ '" + mapping.getLanguage() + "' not available"); //$NON-NLS-1$ //$NON-NLS-2$
+                LOGGER.warn(getServerNotAvailableMessage(mapping));
             }
         }
 
         // register LSPInlayHintInlayHintsProvider + LSPCodelensInlayHintsProvider automatically for all languages
         // which are associated with a language server.
-        Set<Language> distinctLanguages = languageMappings
+        Set<Language> distinctLanguages = mappings
                 .stream()
-                .map(mapping -> mapping.getLanguage())
+                .filter(mapping -> mapping instanceof ServerLanguageMapping)
+                .map(mapping -> ((ServerLanguageMapping) mapping).getLanguage())
                 .collect(Collectors.toSet());
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
         LSPCodelensProvider lspCodeLensProvider = new LSPCodelensProvider();
@@ -97,23 +108,48 @@ public class LanguageServersRegistry {
         }
     }
 
+    private static String getServerNotAvailableMessage(ServerMapping mapping) {
+        StringBuilder message = new StringBuilder("server '");
+        message.append(mapping.getServerId());
+        message.append("' for mapping IntelliJ ");
+        if (mapping instanceof ServerLanguageMapping languageMapping) {
+            message.append("language '");
+            message.append(languageMapping.getLanguage());
+            message.append("'");
+        } else if (mapping instanceof ServerFileTypeMapping fileTypeMapping) {
+            message.append("file type '");
+            message.append(fileTypeMapping.getFileType());
+            message.append("'");
+        }
+        message.append(" not available");
+        return message.toString();
+    }
+
     /**
-     * @param contentType
+     * @param language the language
+     * @param fileType the file type.
      * @return the {@link LanguageServerDefinition}s <strong>directly</strong> associated to the given content-type.
      * This does <strong>not</strong> include the one that match transitively as per content-type hierarchy
      */
-    List<ContentTypeToLanguageServerDefinition> findProviderFor(final @NotNull Language contentType) {
+    List<ContentTypeToLanguageServerDefinition> findServerDefinitionFor(final @Nullable Language language, @Nullable FileType fileType) {
         return connections.stream()
-                .filter(entry -> contentType.isKindOf(entry.getKey()))
+                .filter(mapping -> mapping.match(language, fileType))
                 .collect(Collectors.toList());
     }
 
 
-    public void registerAssociation(@NotNull LanguageServerDefinition serverDefinition, @NotNull ServerLanguageMapping mapping) {
-        @NotNull Language language = mapping.getLanguage();
-        @NotNull String languageId = mapping.getLanguageId();
-        serverDefinition.registerAssociation(language, languageId);
-        connections.add(new ContentTypeToLanguageServerDefinition(language, serverDefinition, mapping.getDocumentMatcher()));
+    public void registerAssociation(@NotNull LanguageServerDefinition serverDefinition, @NotNull ServerMapping mapping) {
+        if (mapping instanceof ServerLanguageMapping languageMapping) {
+            @NotNull Language language = languageMapping.getLanguage();
+            @NotNull String languageId = mapping.getLanguageId();
+            serverDefinition.registerAssociation(language, languageId);
+            connections.add(new ContentTypeToLanguageServerDefinition(language, serverDefinition, mapping.getDocumentMatcher()));
+        } else if (mapping instanceof ServerFileTypeMapping fileTypeMapping) {
+            @NotNull FileType fileType = fileTypeMapping.getFileType();
+            @NotNull String languageId = mapping.getLanguageId();
+            serverDefinition.registerAssociation(fileType, languageId);
+            connections.add(new ContentTypeToLanguageServerDefinition(fileType, serverDefinition, mapping.getDocumentMatcher()));
+        }
     }
 
     /**
@@ -141,11 +177,11 @@ public class LanguageServersRegistry {
      * @param file the file.
      * @return true if the language of the file is supported by a language server and false otherwise.
      */
-    public boolean isLanguageSupported(@Nullable PsiFile file) {
+    public boolean isFileSupported(@Nullable PsiFile file) {
         if (file == null) {
             return false;
         }
-        return isLanguageSupported(file.getVirtualFile(), file.getProject());
+        return isFileSupported(file.getVirtualFile(), file.getProject());
     }
 
     /**
@@ -155,17 +191,18 @@ public class LanguageServersRegistry {
      * @param project the project.
      * @return true if the language of the file is supported by a language server and false otherwise.
      */
-    public boolean isLanguageSupported(@Nullable VirtualFile file, @NotNull Project project) {
+    public boolean isFileSupported(@Nullable VirtualFile file, @NotNull Project project) {
         if (file == null) {
             return false;
         }
         Language language = LSPIJUtils.getFileLanguage(file, project);
-        if (language == null) {
+        FileType fileType = file.getFileType();
+        if (language == null && fileType == null) {
             return false;
         }
         return connections
                 .stream()
-                .anyMatch(entry -> language.isKindOf(entry.getKey()));
+                .anyMatch(mapping -> mapping.match(language, fileType));
     }
 
     /**

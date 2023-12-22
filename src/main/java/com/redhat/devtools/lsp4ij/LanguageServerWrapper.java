@@ -20,6 +20,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.*;
@@ -861,18 +862,30 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * @return The language ID that this wrapper is dealing with if defined in the
-     * content type mapping for the language server
+     * language mapping for the language server
      */
     @Nullable
     public String getLanguageId(@Nullable Language language) {
         while (language != null) {
-            String languageId = serverDefinition.languageIdMappings.get(language);
+            String languageId = serverDefinition.languageIdLanguageMappings.get(language);
             if (languageId != null) {
                 return languageId;
             }
             language = language.getBaseLanguage();
         }
         return null;
+    }
+
+    /**
+     * @return The language ID that this wrapper is dealing with if defined in the
+     * file type mapping for the language server
+     */
+    @Nullable
+    public String getLanguageId(@Nullable FileType fileType) {
+        if (fileType == null) {
+            return null;
+        }
+        return serverDefinition.languageIdFileTypeMappings.get(fileType);
     }
 
     public void registerCapability(RegistrationParams params) {

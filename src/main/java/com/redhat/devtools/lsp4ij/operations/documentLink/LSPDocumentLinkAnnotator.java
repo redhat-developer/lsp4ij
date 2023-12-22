@@ -54,7 +54,7 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<LSPVirtualF
     @Nullable
     @Override
     public List<LSPVirtualFileData> collectInformation(@NotNull PsiFile psiFile, @NotNull Editor editor, boolean hasErrors) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(psiFile)) {
+        if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return Collections.emptyList();
         }
         Document document = editor.getDocument();

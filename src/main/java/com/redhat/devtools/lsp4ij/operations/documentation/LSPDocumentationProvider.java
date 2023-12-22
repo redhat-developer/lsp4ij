@@ -24,18 +24,11 @@ import com.intellij.util.io.URLUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionProposal;
-import com.vladsch.flexmark.ext.autolink.AutolinkExtension;
-import com.vladsch.flexmark.ext.gfm.strikethrough.StrikethroughExtension;
-import com.vladsch.flexmark.ext.tables.TablesExtension;
-import com.vladsch.flexmark.html.HtmlRenderer;
-import com.vladsch.flexmark.parser.Parser;
-import com.vladsch.flexmark.util.data.MutableDataSet;
 import org.eclipse.lsp4j.MarkupContent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -88,7 +81,7 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
                 markupContent = ((LSPPsiElementForLookupItem) element).getDocumentation();
             } else {
                 // Show documentation for a hovered element (LSP textDocument/hover request).
-                if (originalElement == null || !LanguageServersRegistry.getInstance().isLanguageSupported(originalElement.getContainingFile())) {
+                if (originalElement == null || !LanguageServersRegistry.getInstance().isFileSupported(originalElement.getContainingFile())) {
                     return null;
                 }
                 editor = LSPIJUtils.editorForElement(originalElement);
