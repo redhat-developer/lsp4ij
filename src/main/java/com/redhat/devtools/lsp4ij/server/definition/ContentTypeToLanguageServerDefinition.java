@@ -11,28 +11,60 @@
 package com.redhat.devtools.lsp4ij.server.definition;
 
 import com.intellij.lang.Language;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.DocumentMatcher;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.AbstractMap;
 import java.util.concurrent.CompletableFuture;
 
-public class ContentTypeToLanguageServerDefinition extends AbstractMap.SimpleEntry<Language, LanguageServerDefinition> {
+public class ContentTypeToLanguageServerDefinition {
+    @Nullable
+    private final Language language;
 
+    @Nullable
+    private final FileType fileType;
+
+    @NotNull
+    private final LanguageServerDefinition serverDefinition;
+
+    @NotNull
     private final DocumentMatcher documentMatcher;
 
     public ContentTypeToLanguageServerDefinition(@NotNull Language language,
-                                                 @NotNull LanguageServerDefinition provider,
+                                                 @NotNull LanguageServerDefinition serverDefinition,
                                                  @NotNull DocumentMatcher documentMatcher) {
-        super(language, provider);
+        this.language = language;
+        this.fileType = null;
+        this.serverDefinition = serverDefinition;
         this.documentMatcher = documentMatcher;
     }
 
+    public ContentTypeToLanguageServerDefinition(@NotNull FileType fileType,
+                                                 @NotNull LanguageServerDefinition serverDefinition,
+                                                 @NotNull DocumentMatcher documentMatcher) {
+        this.language = null;
+        this.fileType = fileType;
+        this.serverDefinition = serverDefinition;
+        this.documentMatcher = documentMatcher;
+    }
+
+    public boolean match(Language language, FileType fileType) {
+        if (this.fileType != null) {
+            return this.fileType.equals(fileType);
+        }
+        if (this.language == null || language == null) {
+            return false;
+        }
+        return language.isKindOf(this.language);
+    }
+
     public boolean match(VirtualFile file, Project project) {
-        return getValue().supportsCurrentEditMode(project) && documentMatcher.match(file, project);
+        return getServerDefinition().supportsCurrentEditMode(project) && documentMatcher.match(file, project);
     }
 
     public boolean shouldBeMatchedAsynchronously(Project project) {
@@ -40,13 +72,18 @@ public class ContentTypeToLanguageServerDefinition extends AbstractMap.SimpleEnt
     }
 
     public boolean isEnabled() {
-        return getValue().isEnabled();
+        return getServerDefinition().isEnabled();
     }
 
     public @NotNull <R> CompletableFuture<Boolean> matchAsync(VirtualFile file, Project project) {
-        if (!getValue().supportsCurrentEditMode(project)) {
+        if (!getServerDefinition().supportsCurrentEditMode(project)) {
             return CompletableFuture.completedFuture(false);
         }
         return documentMatcher.matchAsync(file, project);
     }
+
+    public LanguageServerDefinition getServerDefinition() {
+        return serverDefinition;
+    }
+
 }

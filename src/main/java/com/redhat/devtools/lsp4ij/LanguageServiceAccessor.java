@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -265,22 +266,25 @@ public class LanguageServiceAccessor {
         Set<ContentTypeToLanguageServerDefinition> asyncMatchedDefinitions = null;
 
         // look for running language servers via content-type
-        Queue<Language> contentTypes = new LinkedList<>();
-        Set<Language> processedContentTypes = new HashSet<>();
+        Queue<Object> contentTypes = new LinkedList<>();
+        Set<Object> processedContentTypes = new HashSet<>();
         Language language= LSPIJUtils.getFileLanguage(file, project);
         if (language != null) {
             contentTypes.add(language);
         }
+        contentTypes.add(file.getFileType());
 
         while (!contentTypes.isEmpty()) {
-            Language contentType = contentTypes.poll();
-            if (contentType == null || processedContentTypes.contains(contentType)) {
+            Object contentType = contentTypes.poll();
+            if (processedContentTypes.contains(contentType)) {
                 continue;
             }
+            @Nullable Language currentLanguage = contentType instanceof  Language ? (Language) contentType : null;
+            @Nullable FileType currentFileType = contentType instanceof  FileType ? (FileType) contentType : null;
             // Loop for server/language mapping
             for (ContentTypeToLanguageServerDefinition mapping : LanguageServersRegistry.getInstance()
-                    .findProviderFor(contentType)) {
-                if (mapping == null || !mapping.isEnabled() || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getValue()))) {
+                    .findServerDefinitionFor(currentLanguage, currentFileType)) {
+                if (mapping == null || !mapping.isEnabled() || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
                     // the mapping is disabled
                     // or the server definition has been already added
                     continue;
@@ -299,7 +303,7 @@ public class LanguageServiceAccessor {
                         if (syncMatchedDefinitions == null) {
                             syncMatchedDefinitions = new HashSet<>();
                         }
-                        syncMatchedDefinitions.add(mapping.getValue());
+                        syncMatchedDefinitions.add(mapping.getServerDefinition());
                     }
                 }
             }
@@ -317,7 +321,7 @@ public class LanguageServiceAccessor {
                                                     .matchAsync(file, fileProject)
                                                     .thenApply(result -> {
                                                         if (result) {
-                                                            serverDefinitions.add(mapping.getValue());
+                                                            serverDefinitions.add(mapping.getServerDefinition());
                                                         }
                                                         return null;
                                                     });

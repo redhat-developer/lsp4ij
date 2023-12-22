@@ -13,27 +13,26 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition;
 
-import com.intellij.lang.Language;
+import com.intellij.openapi.fileTypes.FileType;
 import com.redhat.devtools.lsp4ij.DocumentMatcher;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Language mapping between a language server ID and an IntelliJ language.
+ * Mapping between a given {@link FileType} and a given language server.
  */
-public class ServerLanguageMapping extends ServerMapping {
+public class ServerFileTypeMapping extends ServerMapping {
 
     @NotNull
-    private final Language language;
+    private final FileType fileType;
 
-    public ServerLanguageMapping(@NotNull Language language, @NotNull String serverId, @NotNull String languageId, @NotNull DocumentMatcher documentMatcher) {
+    public ServerFileTypeMapping(@NotNull FileType fileType, @NotNull String serverId, @Nullable String languageId, @NotNull DocumentMatcher documentMatcher) {
         super(serverId, languageId, documentMatcher);
-        this.language = language;
+        this.fileType = fileType;
     }
 
-    @NotNull
-    public Language getLanguage() {
-        return language;
+    public @NotNull FileType getFileType() {
+        return fileType;
     }
 
 }

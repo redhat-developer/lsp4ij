@@ -16,6 +16,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
@@ -73,18 +74,7 @@ public class DocumentContentSynchronizer implements DocumentListener {
         textDocument.setUri(this.fileUri);
         textDocument.setText(document.getText());
 
-        Language language = LSPIJUtils.getDocumentLanguage(document, languageServerWrapper.getProject());
-        String languageId = languageServerWrapper.getLanguageId(language);
-
-        //TODO: determine languageId more precisely
-        /*IPath fromPortableString = Path.fromPortableString(this.fileUri.getPath());
-        if (languageId == null) {
-            languageId = fromPortableString.getFileExtension();
-            if (languageId == null) {
-                languageId = fromPortableString.lastSegment();
-            }
-        }*/
-
+        String languageId = getLanguageId(document, languageServerWrapper);
         textDocument.setLanguageId(languageId);
         textDocument.setVersion(++version);
         didOpenFuture = languageServerWrapper.getInitializedServer()
@@ -92,6 +82,22 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
         // Initialize LSP change events
         changeEvents = new ArrayList<>();
+    }
+
+    private static String getLanguageId(Document document, LanguageServerWrapper languageServer) {
+        VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+        if (file == null) {
+            return null;
+        }
+        Language language = LSPIJUtils.getFileLanguage(file, languageServer.getProject());
+        if (language != null) {
+            String languageId = languageServer.getLanguageId(language);
+            if (languageId != null) {
+                return languageId;
+            }
+        }
+        FileType fileType = file.getFileType();
+        return languageServer.getLanguageId(fileType);
     }
 
     @Override

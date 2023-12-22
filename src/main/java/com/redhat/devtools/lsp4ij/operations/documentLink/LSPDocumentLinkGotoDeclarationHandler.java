@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 
 /**
  * {@link GotoDeclarationHandler} implementation used to open LSP document link with CTrl+Click.
@@ -41,7 +40,7 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
 
     @Override
     public PsiElement @Nullable [] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
-        if (!LanguageServersRegistry.getInstance().isLanguageSupported(sourceElement.getContainingFile())) {
+        if (!LanguageServersRegistry.getInstance().isFileSupported(sourceElement.getContainingFile())) {
             return PsiElement.EMPTY_ARRAY;
         }
         Document document = editor.getDocument();
