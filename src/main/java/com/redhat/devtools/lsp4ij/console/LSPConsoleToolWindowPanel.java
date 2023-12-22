@@ -31,10 +31,10 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
@@ -174,7 +174,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         }
 
         private JComponent createDetailPanel(LanguageServerTreeNode key) {
-            LanguageServersRegistry.LanguageServerDefinition serverDefinition = key.getServerDefinition();
+            LanguageServerDefinition serverDefinition = key.getServerDefinition();
             Project project = LSPConsoleToolWindowPanel.this.project;
             ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
             UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings initialSettings = UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(serverDefinition.id);
@@ -225,7 +225,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             };
         }
 
-        private JComponent createTitleComponent(LanguageServersRegistry.LanguageServerDefinition languageServerDefinition) {
+        private JComponent createTitleComponent(LanguageServerDefinition languageServerDefinition) {
             JLabel title = new JLabel(languageServerDefinition.getDisplayName());
             String description = languageServerDefinition.description;
             if (description != null && description.length() > 0) {
@@ -273,7 +273,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         }
     }
 
-    private ConsoleView createConsoleView(@NotNull LanguageServersRegistry.LanguageServerDefinition serverDefinition, @NotNull Project project) {
+    private ConsoleView createConsoleView(@NotNull LanguageServerDefinition serverDefinition, @NotNull Project project) {
         var builder = new LSPTextConsoleBuilderImpl(serverDefinition, project);
         builder.setViewer(true);
         return builder.getConsole();

@@ -28,6 +28,7 @@ import com.redhat.devtools.lsp4ij.console.explorer.actions.RestartServerAction;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.PauseServerAction;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.StopServerAction;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -102,7 +103,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
         // Fill tree will all language server definitions, ordered alphabetically
         LanguageServersRegistry.getInstance().getServerDefinitions().stream()
-                .sorted(Comparator.comparing(LanguageServersRegistry.LanguageServerDefinition::getDisplayName))
+                .sorted(Comparator.comparing(LanguageServerDefinition::getDisplayName))
                 .map(LanguageServerTreeNode::new)
                 .forEach(top::add);
 

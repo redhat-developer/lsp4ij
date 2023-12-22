@@ -13,7 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -23,13 +23,13 @@ import javax.swing.tree.DefaultMutableTreeNode;
  */
 public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
-    private final LanguageServersRegistry.LanguageServerDefinition serverDefinition;
+    private final LanguageServerDefinition serverDefinition;
 
-    public LanguageServerTreeNode(LanguageServersRegistry.LanguageServerDefinition serverDefinition) {
+    public LanguageServerTreeNode(LanguageServerDefinition serverDefinition) {
         this.serverDefinition = serverDefinition;
     }
 
-    public LanguageServersRegistry.LanguageServerDefinition getServerDefinition() {
+    public LanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
 

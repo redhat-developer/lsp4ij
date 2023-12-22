@@ -25,6 +25,7 @@ import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.ExecuteCommandOptions;
 import org.eclipse.lsp4j.ExecuteCommandParams;
@@ -109,7 +110,7 @@ public class CommandExecutor {
         if (languageServerId == null) {
             return false;
         }
-        LanguageServersRegistry.LanguageServerDefinition languageServerDefinition = LanguageServersRegistry.getInstance()
+        LanguageServerDefinition languageServerDefinition = LanguageServersRegistry.getInstance()
                 .getServerDefinition(languageServerId);
         if (languageServerDefinition == null) {
             return false;
@@ -139,7 +140,7 @@ public class CommandExecutor {
 
     private static CompletableFuture<LanguageServer> getLanguageServerForCommand(Project project,
                                                                                  Command command,
-                                                                                 URI documentUri, LanguageServersRegistry.LanguageServerDefinition languageServerDefinition) throws IOException {
+                                                                                 URI documentUri, LanguageServerDefinition languageServerDefinition) throws IOException {
         VirtualFile file = LSPIJUtils.findResourceFor(documentUri);
         if (file == null) {
             return null;

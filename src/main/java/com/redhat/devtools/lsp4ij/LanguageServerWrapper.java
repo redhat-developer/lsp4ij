@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.internal.SupportedFeatures;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
@@ -163,7 +164,7 @@ public class LanguageServerWrapper implements Disposable {
     private MessageBusConnection messageBusConnection;
 
     @NotNull
-    public final LanguageServersRegistry.LanguageServerDefinition serverDefinition;
+    public final LanguageServerDefinition serverDefinition;
     @Nullable
     protected final Project initialProject;
     @NotNull
@@ -205,18 +206,18 @@ public class LanguageServerWrapper implements Disposable {
     private boolean initiallySupportsWorkspaceFolders = false;
 
     /* Backwards compatible constructor */
-    public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServersRegistry.LanguageServerDefinition serverDefinition) {
+    public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
         this(project, serverDefinition, null);
     }
 
-    public LanguageServerWrapper(@NotNull LanguageServersRegistry.LanguageServerDefinition serverDefinition, @Nullable URI initialPath) {
+    public LanguageServerWrapper(@NotNull LanguageServerDefinition serverDefinition, @Nullable URI initialPath) {
         this(null, serverDefinition, initialPath);
     }
 
     /**
      * Unified private constructor to set sensible defaults in all cases
      */
-    private LanguageServerWrapper(@Nullable Project project, @NotNull LanguageServersRegistry.LanguageServerDefinition serverDefinition,
+    private LanguageServerWrapper(@Nullable Project project, @NotNull LanguageServerDefinition serverDefinition,
                                   @Nullable URI initialPath) {
         this.initialProject = project;
         this.initialPath = initialPath;

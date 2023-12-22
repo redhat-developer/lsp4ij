@@ -16,7 +16,7 @@ package com.redhat.devtools.lsp4ij.console;
 import com.intellij.execution.filters.TextConsoleBuilderImpl;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -24,9 +24,9 @@ import org.jetbrains.annotations.NotNull;
  */
 public class LSPTextConsoleBuilderImpl extends TextConsoleBuilderImpl {
 
-    private final LanguageServersRegistry.LanguageServerDefinition serverDefinition;
+    private final LanguageServerDefinition serverDefinition;
 
-    public LSPTextConsoleBuilderImpl(@NotNull LanguageServersRegistry.LanguageServerDefinition serverDefinition, @NotNull Project project) {
+    public LSPTextConsoleBuilderImpl(@NotNull LanguageServerDefinition serverDefinition, @NotNull Project project) {
         super(project);
         this.serverDefinition = serverDefinition;
     }

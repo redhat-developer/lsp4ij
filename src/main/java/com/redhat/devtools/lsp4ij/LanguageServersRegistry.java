@@ -12,28 +12,25 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.codeInsight.hints.NoSettings;
 import com.intellij.codeInsight.hints.ProviderInfo;
-import com.intellij.icons.AllIcons;
-import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensProvider;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
-import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
-import org.eclipse.lsp4j.jsonrpc.Launcher;
-import org.eclipse.lsp4j.services.LanguageServer;
+import com.redhat.devtools.lsp4ij.server.definition.ContentTypeToLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -41,166 +38,6 @@ import java.util.stream.Collectors;
  */
 public class LanguageServersRegistry {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServersRegistry.class);
-
-    public abstract static class LanguageServerDefinition implements LanguageServerFactory {
-
-        private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
-
-        public final @NotNull
-        String id;
-        public final @NotNull
-        String label;
-        public final boolean isSingleton;
-        public final @NotNull
-        Map<Language, String> languageIdMappings;
-        public final String description;
-        public final int lastDocumentDisconnectedTimeout;
-        private boolean enabled;
-
-        public final boolean supportsLightEdit;
-
-        public LanguageServerDefinition(@NotNull String id, @NotNull String label, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, boolean supportsLightEdit) {
-            this.id = id;
-            this.label = label;
-            this.description = description;
-            this.isSingleton = isSingleton;
-            this.lastDocumentDisconnectedTimeout = lastDocumentDisconnectedTimeout != null && lastDocumentDisconnectedTimeout > 0 ? lastDocumentDisconnectedTimeout : DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT;
-            this.languageIdMappings = new ConcurrentHashMap<>();
-            this.supportsLightEdit = supportsLightEdit;
-            setEnabled(true);
-        }
-
-
-        /**
-         * Returns true if the language server definition is enabled and false otherwise.
-         *
-         * @return true if the language server definition is enabled and false otherwise.
-         */
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        /**
-         * Set enabled the language server definition.
-         *
-         * @param enabled enabled the language server definition.
-         */
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public void registerAssociation(@NotNull Language language, @NotNull String serverId) {
-            this.languageIdMappings.put(language, serverId);
-        }
-
-        @NotNull
-        public String getDisplayName() {
-            return label != null ? label : id;
-        }
-
-        @Override
-        public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
-            return new LanguageClientImpl(project);
-        }
-
-        @Override
-        public @NotNull Class<? extends LanguageServer> getServerInterface() {
-            return LanguageServer.class;
-        }
-
-        public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
-            return new Launcher.Builder<>();
-        }
-
-        public boolean supportsCurrentEditMode(@NotNull Project project) {
-            return project != null && (supportsLightEdit || !LightEdit.owns(project));
-        }
-
-        public Icon getIcon() {
-            return AllIcons.Webreferences.Server;
-        }
-    }
-
-    static class ExtensionLanguageServerDefinition extends LanguageServerDefinition {
-        private final ServerExtensionPointBean extension;
-
-        private Icon icon;
-
-        public ExtensionLanguageServerDefinition(ServerExtensionPointBean element) {
-            super(element.id, element.getLabel(), element.getDescription(), element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit);
-            this.extension = element;
-        }
-
-        @Override
-        public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-            try {
-                return getFactory().createConnectionProvider(project);
-            } catch (Exception e) {
-                throw new RuntimeException(
-                        "Exception occurred while creating an instance of the stream connection provider", e); //$NON-NLS-1$
-            }
-        }
-
-        @Override
-        public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
-            LanguageClientImpl languageClient = null;
-            try {
-                languageClient = getFactory().createLanguageClient(project);
-            } catch (Exception e) {
-                LOGGER.warn("Exception occurred while creating an instance of the language client", e); //$NON-NLS-1$
-            }
-            if (languageClient == null) {
-                languageClient = super.createLanguageClient(project);
-            }
-            return languageClient;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public @NotNull Class<? extends LanguageServer> getServerInterface() {
-            Class<? extends LanguageServer> serverInterface = null;
-            try {
-                serverInterface = getFactory().getServerInterface();
-            } catch (Exception e) {
-                LOGGER.warn("Exception occurred while getting server interface", e); //$NON-NLS-1$
-            }
-            if (serverInterface == null) {
-                serverInterface = super.getServerInterface();
-            }
-            return serverInterface;
-        }
-
-        private @NotNull LanguageServerFactory getFactory() {
-            String serverFactory = extension.getImplementationClassName();
-            if (serverFactory == null || serverFactory.isEmpty()) {
-                throw new RuntimeException(
-                        "Exception occurred while creating an instance of server factory, you have to define server/@factory attribute in the extension point."); //$NON-NLS-1$
-            }
-            return extension.getInstance();
-        }
-
-        @Override
-        public Icon getIcon() {
-            if (icon == null) {
-                icon = findIcon();
-            }
-            return icon;
-        }
-
-        private synchronized Icon findIcon() {
-            if (icon != null) {
-                return icon;
-            }
-            if (!StringUtils.isEmpty(extension.icon)) {
-                try {
-                    return IconLoader.findIcon(extension.icon, extension.getPluginDescriptor().getPluginClassLoader());
-                } catch (Exception e) {
-                    LOGGER.error("Error while loading custom server icon for server id='" + extension.id + "'.", e);
-                }
-            }
-            return super.getIcon();
-        }
-    }
 
     private static LanguageServersRegistry INSTANCE = null;
 
@@ -222,7 +59,7 @@ public class LanguageServersRegistry {
     }
 
     private void initialize() {
-        List<LanguageMapping> languageMappings = new ArrayList<>();
+        List<ServerLanguageMapping> languageMappings = new ArrayList<>();
         for (ServerExtensionPointBean server : ServerExtensionPointBean.EP_NAME.getExtensions()) {
             if (server.id != null && !server.id.isEmpty()) {
                 serverDefinitions.put(server.id, new ExtensionLanguageServerDefinition(server));
@@ -230,18 +67,19 @@ public class LanguageServersRegistry {
         }
 
         for (LanguageMappingExtensionPointBean extension : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
-            Language language = Language.findLanguageByID(extension.languageId);
+            Language language = Language.findLanguageByID(extension.language);
             if (language != null) {
-                languageMappings.add(new LanguageMapping(language, extension.serverId, extension.getDocumentMatcher()));
+                @NotNull String languageId = StringUtils.isEmpty(extension.languageId) ? language.getID() : extension.languageId;;
+                languageMappings.add(new ServerLanguageMapping(language, extension.serverId, languageId, extension.getDocumentMatcher()));
             }
         }
 
-        for (LanguageMapping mapping : languageMappings) {
-            LanguageServerDefinition lsDefinition = serverDefinitions.get(mapping.serverId);
+        for (ServerLanguageMapping mapping : languageMappings) {
+            LanguageServerDefinition lsDefinition = serverDefinitions.get(mapping.getServerId());
             if (lsDefinition != null) {
                 registerAssociation(lsDefinition, mapping);
             } else {
-                LOGGER.warn("server '" + mapping.serverId + "' not available"); //$NON-NLS-1$ //$NON-NLS-2$
+                LOGGER.warn("server '" + mapping.getServerId() + "' for mapping language IntelliJ '" + mapping.getLanguage() + "' not available"); //$NON-NLS-1$ //$NON-NLS-2$
             }
         }
 
@@ -249,7 +87,7 @@ public class LanguageServersRegistry {
         // which are associated with a language server.
         Set<Language> distinctLanguages = languageMappings
                 .stream()
-                .map(mapping -> mapping.language)
+                .map(mapping -> mapping.getLanguage())
                 .collect(Collectors.toSet());
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
         LSPCodelensProvider lspCodeLensProvider = new LSPCodelensProvider();
@@ -271,34 +109,11 @@ public class LanguageServersRegistry {
     }
 
 
-    public void registerAssociation(@NotNull LanguageServerDefinition serverDefinition, @NotNull LanguageMapping mapping) {
-        @NotNull Language language = mapping.language;
-        @NotNull String serverId = mapping.serverId;
-        serverDefinition.registerAssociation(language, serverId);
+    public void registerAssociation(@NotNull LanguageServerDefinition serverDefinition, @NotNull ServerLanguageMapping mapping) {
+        @NotNull Language language = mapping.getLanguage();
+        @NotNull String languageId = mapping.getLanguageId();
+        serverDefinition.registerAssociation(language, languageId);
         connections.add(new ContentTypeToLanguageServerDefinition(language, serverDefinition, mapping.getDocumentMatcher()));
-    }
-
-    /**
-     * internal class to capture content-type mappings for language servers
-     */
-    private static class LanguageMapping {
-
-        @NotNull
-        public final Language language;
-        @NotNull
-        public final String serverId;
-        @NotNull
-        private final DocumentMatcher documentMatcher;
-
-        public LanguageMapping(@NotNull Language language, @NotNull String serverId, @NotNull DocumentMatcher documentMatcher) {
-            this.language = language;
-            this.serverId = serverId;
-            this.documentMatcher = documentMatcher;
-        }
-
-        public DocumentMatcher getDocumentMatcher() {
-            return documentMatcher;
-        }
     }
 
     /**

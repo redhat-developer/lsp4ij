@@ -18,7 +18,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.NamedConfigurable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
@@ -31,14 +31,14 @@ import javax.swing.*;
  *     <li>Suspend and wait for a debugger</li>
  * </ul>
  */
-public class LanguageServerConfigurable extends NamedConfigurable<LanguageServersRegistry.LanguageServerDefinition> {
+public class LanguageServerConfigurable extends NamedConfigurable<LanguageServerDefinition> {
 
-    private final LanguageServersRegistry.LanguageServerDefinition languageServerDefinition;
+    private final LanguageServerDefinition languageServerDefinition;
     private final Project project;
 
     private LanguageServerView myView;
 
-    public LanguageServerConfigurable(LanguageServersRegistry.LanguageServerDefinition languageServerDefinition, Runnable updater, Project project) {
+    public LanguageServerConfigurable(LanguageServerDefinition languageServerDefinition, Runnable updater, Project project) {
         super(false, updater);
         this.languageServerDefinition = languageServerDefinition;
         this.project = project;
@@ -50,7 +50,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
     }
 
     @Override
-    public LanguageServersRegistry.LanguageServerDefinition getEditableObject() {
+    public LanguageServerDefinition getEditableObject() {
         return languageServerDefinition;
     }
 

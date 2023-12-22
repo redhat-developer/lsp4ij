@@ -22,7 +22,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
@@ -42,7 +42,7 @@ public class LanguageServerView implements Disposable {
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
     private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
 
-    public LanguageServerView(LanguageServersRegistry.LanguageServerDefinition languageServerDefinition) {
+    public LanguageServerView(LanguageServerDefinition languageServerDefinition) {
         JComponent descriptionPanel = createDescription(languageServerDefinition.description.trim());
         JPanel settingsPanel = createSettings(descriptionPanel);
         TitledBorder title = IdeBorderFactory.createTitledBorder(languageServerDefinition.getDisplayName());
