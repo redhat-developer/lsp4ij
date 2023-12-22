@@ -151,9 +151,9 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
                 codeAction = action.getRight();
                 title = action.getRight().getTitle();
                 familyName = StringUtils.isNotBlank(codeAction.getKind()) ? codeAction.getKind() : "LSP QuickFix";
-            } else {
+            } else if (action.isLeft()) {
                 command = action.getLeft();
-                title = action.getRight().getTitle();
+                title = command.getTitle();
                 familyName = "LSP Command";
             }
         }
