@@ -59,12 +59,12 @@
     <extensionPoints>
         <extensionPoint
                 name="server"
-                beanClass="com.redhat.devtools.lsp4ij.ServerExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean">
             <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.LanguageServerFactory"/>
         </extensionPoint>
         <extensionPoint
                 name="languageMapping"
-                beanClass="com.redhat.devtools.lsp4ij.LanguageMappingExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
     </extensionPoints>

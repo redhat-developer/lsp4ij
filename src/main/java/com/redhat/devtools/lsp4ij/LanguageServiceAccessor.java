@@ -17,6 +17,8 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.server.definition.ContentTypeToLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
@@ -48,7 +50,7 @@ public class LanguageServiceAccessor {
     }
 
     private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
-    private Map<StreamConnectionProvider, LanguageServersRegistry.LanguageServerDefinition> providersToLSDefinitions = new HashMap<>();
+    private Map<StreamConnectionProvider, LanguageServerDefinition> providersToLSDefinitions = new HashMap<>();
 
     @NotNull
     public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
@@ -127,7 +129,7 @@ public class LanguageServiceAccessor {
      * capabilities, {@code null} is returned.
      */
     public CompletableFuture<LanguageServer> getInitializedLanguageServer(VirtualFile file,
-                                                                          LanguageServersRegistry.LanguageServerDefinition lsDefinition, Predicate<ServerCapabilities> capabilitiesPredicate)
+                                                                          LanguageServerDefinition lsDefinition, Predicate<ServerCapabilities> capabilitiesPredicate)
             throws IOException {
         URI initialPath = LSPIJUtils.toUri(file);
         LanguageServerWrapper wrapper = getLSWrapperForConnection(file, lsDefinition, initialPath);
@@ -171,7 +173,7 @@ public class LanguageServiceAccessor {
         var serverDefinitions = mappings.getMatched();
         collectLanguageServersFromDefinition(file, project, serverDefinitions, matchedServers);
 
-        CompletableFuture<Set<LanguageServersRegistry.LanguageServerDefinition>> async = mappings.getAsyncMatched();
+        CompletableFuture<Set<LanguageServerDefinition>> async = mappings.getAsyncMatched();
         if (async != null) {
             // Collect async server definitions
             return async
@@ -191,7 +193,7 @@ public class LanguageServiceAccessor {
      * @param serverDefinitions the server definitions.
      * @param matchedServers    the list to update with get/created language server.
      */
-    private void collectLanguageServersFromDefinition(@NotNull VirtualFile file, @NotNull Project fileProject, @NotNull Set<LanguageServersRegistry.LanguageServerDefinition> serverDefinitions, @NotNull Set<LanguageServerWrapper> matchedServers) {
+    private void collectLanguageServersFromDefinition(@NotNull VirtualFile file, @NotNull Project fileProject, @NotNull Set<LanguageServerDefinition> serverDefinitions, @NotNull Set<LanguageServerWrapper> matchedServers) {
         synchronized (startedServers) {
             for (var serverDefinition : serverDefinitions) {
                 boolean useExistingServer = false;
@@ -222,11 +224,11 @@ public class LanguageServiceAccessor {
 
         public static final MatchedLanguageServerDefinitions NO_MATCH = new MatchedLanguageServerDefinitions(Collections.emptySet(), null);
 
-        private final Set<LanguageServersRegistry.LanguageServerDefinition> matched;
+        private final Set<LanguageServerDefinition> matched;
 
-        private final CompletableFuture<Set<LanguageServersRegistry.LanguageServerDefinition>> asyncMatched;
+        private final CompletableFuture<Set<LanguageServerDefinition>> asyncMatched;
 
-        public MatchedLanguageServerDefinitions(@NotNull Set<LanguageServersRegistry.LanguageServerDefinition> matchedLanguageServersDefinition, CompletableFuture<Set<LanguageServersRegistry.LanguageServerDefinition>> async) {
+        public MatchedLanguageServerDefinitions(@NotNull Set<LanguageServerDefinition> matchedLanguageServersDefinition, CompletableFuture<Set<LanguageServerDefinition>> async) {
             this.matched = matchedLanguageServersDefinition;
             this.asyncMatched = async;
         }
@@ -236,7 +238,7 @@ public class LanguageServiceAccessor {
          *
          * @return the matched server definitions get synchronously.
          */
-        public @NotNull Set<LanguageServersRegistry.LanguageServerDefinition> getMatched() {
+        public @NotNull Set<LanguageServerDefinition> getMatched() {
             return matched;
         }
 
@@ -245,7 +247,7 @@ public class LanguageServiceAccessor {
          *
          * @return the matched server definitions get asynchronously or null otherwise.
          */
-        public CompletableFuture<Set<LanguageServersRegistry.LanguageServerDefinition>> getAsyncMatched() {
+        public CompletableFuture<Set<LanguageServerDefinition>> getAsyncMatched() {
             return asyncMatched;
         }
     }
@@ -259,7 +261,7 @@ public class LanguageServiceAccessor {
      */
     private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull VirtualFile file, @NotNull Project fileProject) {
 
-        Set<LanguageServersRegistry.LanguageServerDefinition> syncMatchedDefinitions = null;
+        Set<LanguageServerDefinition> syncMatchedDefinitions = null;
         Set<ContentTypeToLanguageServerDefinition> asyncMatchedDefinitions = null;
 
         // look for running language servers via content-type
@@ -304,10 +306,10 @@ public class LanguageServiceAccessor {
         }
         if (syncMatchedDefinitions != null || asyncMatchedDefinitions != null) {
             // Some match...
-            CompletableFuture<Set<LanguageServersRegistry.LanguageServerDefinition>> async = null;
+            CompletableFuture<Set<LanguageServerDefinition>> async = null;
             if (asyncMatchedDefinitions != null) {
                 // Async match, compute a future which process all matchAsync and return a list of server definitions
-                final Set<LanguageServersRegistry.LanguageServerDefinition> serverDefinitions = Collections.synchronizedSet(new HashSet<>());
+                final Set<LanguageServerDefinition> serverDefinitions = Collections.synchronizedSet(new HashSet<>());
                 async = CompletableFuture.allOf(asyncMatchedDefinitions
                                 .stream()
                                 .map(mapping -> {
@@ -338,7 +340,7 @@ public class LanguageServiceAccessor {
     }
 
     private LanguageServerWrapper getLSWrapperForConnection(VirtualFile file,
-                                                            LanguageServersRegistry.LanguageServerDefinition serverDefinition, URI initialPath) throws IOException {
+                                                            LanguageServerDefinition serverDefinition, URI initialPath) throws IOException {
         if (!serverDefinition.isEnabled()) {
             // don't return a language server wrapper for the given server definition
             return null;
@@ -419,7 +421,7 @@ public class LanguageServiceAccessor {
                 .anyMatch(wrapper -> condition.test(wrapper.getServerCapabilities()));
     }
 
-    public Optional<LanguageServersRegistry.LanguageServerDefinition> resolveServerDefinition(LanguageServer languageServer) {
+    public Optional<LanguageServerDefinition> resolveServerDefinition(LanguageServer languageServer) {
         synchronized (startedServers) {
             return startedServers.stream().filter(wrapper -> languageServer.equals(wrapper.getServer())).findFirst().map(wrapper -> wrapper.serverDefinition);
         }

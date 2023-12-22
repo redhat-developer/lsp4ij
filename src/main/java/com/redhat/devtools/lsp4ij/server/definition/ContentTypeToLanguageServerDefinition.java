@@ -8,22 +8,24 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij;
+package com.redhat.devtools.lsp4ij.server.definition;
 
 import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.DocumentMatcher;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.AbstractMap;
 import java.util.concurrent.CompletableFuture;
 
-public class ContentTypeToLanguageServerDefinition extends AbstractMap.SimpleEntry<Language, LanguageServersRegistry.LanguageServerDefinition> {
+public class ContentTypeToLanguageServerDefinition extends AbstractMap.SimpleEntry<Language, LanguageServerDefinition> {
 
     private final DocumentMatcher documentMatcher;
 
     public ContentTypeToLanguageServerDefinition(@NotNull Language language,
-                                                 @NotNull LanguageServersRegistry.LanguageServerDefinition provider,
+                                                 @NotNull LanguageServerDefinition provider,
                                                  @NotNull DocumentMatcher documentMatcher) {
         super(language, provider);
         this.documentMatcher = documentMatcher;

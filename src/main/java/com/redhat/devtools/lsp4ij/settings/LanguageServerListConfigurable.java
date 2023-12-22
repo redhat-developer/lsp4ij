@@ -21,6 +21,7 @@ import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,7 +44,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     private static final String ID = "LanguageServers";
 
     private final Project project;
-    private final Collection<LanguageServersRegistry.LanguageServerDefinition> languageServeDefinitions;
+    private final Collection<LanguageServerDefinition> languageServeDefinitions;
 
     private boolean isTreeInitialized;
 
@@ -85,14 +86,14 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                 .installTreeSpeedSearch(myTree, treePath -> ((MyNode) treePath.getLastPathComponent()).getDisplayName(), true);
     }
 
-    private void addLanguageServerDefinitionNode(LanguageServersRegistry.LanguageServerDefinition languageServerDefinition) {
+    private void addLanguageServerDefinitionNode(LanguageServerDefinition languageServerDefinition) {
         MyNode node = new MyNode(new LanguageServerConfigurable(languageServerDefinition, TREE_UPDATER, project));
         addNode(node, myRoot);
     }
 
     private void reloadTree() {
         myRoot.removeAllChildren();
-        for (LanguageServersRegistry.LanguageServerDefinition languageServeDefinition : languageServeDefinitions) {
+        for (LanguageServerDefinition languageServeDefinition : languageServeDefinitions) {
             addLanguageServerDefinitionNode(languageServeDefinition);
         }
     }

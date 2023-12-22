@@ -197,6 +197,20 @@ Here is sample snippet to associate the `XML` language with the `myLanguageServe
   </extensions>
 ```
 
+Some language servers uses the language field to know the language, you can declare it with the `languageId` attribute:
+
+```xml
+</idea-plugin>
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+
+    <languageMapping language="XML"
+                     serverId="myLanguageServerId"
+                     languageId="xml" />
+
+  </extensions>
+```
+
 If the language check is not enough, you can implement a custom [DocumentMatcher](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/DocumentMatcher.java).
 For instance your language server could be mapped to the `Java` language, and you could implement a DocumentMatcher 
 to check if the module containing the file contains certain Java classes in its classpath.

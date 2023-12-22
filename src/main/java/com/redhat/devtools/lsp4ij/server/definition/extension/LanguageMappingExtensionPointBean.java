@@ -11,17 +11,29 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij;
+package com.redhat.devtools.lsp4ij.server.definition.extension;
 
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.extensions.RequiredElement;
 import com.intellij.serviceContainer.BaseKeyedLazyInstance;
 import com.intellij.util.xmlb.annotations.Attribute;
+import com.redhat.devtools.lsp4ij.DocumentMatcher;
+import org.eclipse.lsp4j.TextDocumentItem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Language mapping extension point.
+ *
+ * <pre>
+ *   <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+ *
+ *     <languageMapping language="XML"
+ *                      serverId="myLanguageServerId"
+ *                      languageId="xml" />
+ *
+ *   </extensions>
+ * </pre>
  */
 public class LanguageMappingExtensionPointBean extends BaseKeyedLazyInstance<DocumentMatcher> {
 
@@ -30,18 +42,25 @@ public class LanguageMappingExtensionPointBean extends BaseKeyedLazyInstance<Doc
     public static final ExtensionPointName<LanguageMappingExtensionPointBean> EP_NAME = ExtensionPointName.create("com.redhat.devtools.lsp4ij.languageMapping");
 
     /**
-     * The language mapped with the language server {{@link #serverId}server id}.
-     */
-    @Attribute("language")
-    @RequiredElement
-    public String languageId;
-
-    /**
-     * The language server mapped with the language {{@link #languageId}language id}.
+     * The language server mapped with the language {@link #language IntelliJ language}.
      */
     @Attribute("serverId")
     @RequiredElement
     public String serverId;
+
+    /**
+     * The IntelliJ language mapped with the language server {@link #serverId server id}.
+     */
+    @Attribute("language")
+    @RequiredElement
+    public String language;
+
+    /**
+     * The LSP language ID which must be used in the LSP {@link TextDocumentItem#getLanguageId()}. If it is not defined
+     * the languageId used will be the IntelliJ {#link language}.
+     */
+    @Attribute("languageId")
+    public String languageId;
 
     /**
      * The {@link DocumentMatcher document matcher}.

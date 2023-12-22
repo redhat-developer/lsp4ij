@@ -20,9 +20,9 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.console.actions.AutoFoldingAction;
 import com.redhat.devtools.lsp4ij.console.actions.ClearThisConsoleAction;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
@@ -35,9 +35,9 @@ import java.util.List;
  */
 public class LSPConsoleView extends ConsoleViewImpl {
 
-    private final LanguageServersRegistry.LanguageServerDefinition serverDefinition;
+    private final LanguageServerDefinition serverDefinition;
 
-    public LSPConsoleView(@NotNull LanguageServersRegistry.LanguageServerDefinition serverDefinition, @NotNull Project project,
+    public LSPConsoleView(@NotNull LanguageServerDefinition serverDefinition, @NotNull Project project,
                           @NotNull GlobalSearchScope searchScope,
                           boolean viewer,
                           boolean usePredefinedMessageFilter) {

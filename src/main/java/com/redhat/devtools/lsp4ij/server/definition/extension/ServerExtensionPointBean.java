@@ -11,18 +11,17 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij;
+package com.redhat.devtools.lsp4ij.server.definition.extension;
 
 import com.intellij.AbstractBundle;
-import com.intellij.BundleBase;
 import com.intellij.DynamicBundle;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.extensions.RequiredElement;
-import com.intellij.openapi.util.NlsContexts;
 import com.intellij.serviceContainer.BaseKeyedLazyInstance;
 import com.intellij.util.xmlb.annotations.Attribute;
 import com.intellij.util.xmlb.annotations.Tag;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +31,20 @@ import org.slf4j.LoggerFactory;
 import java.util.ResourceBundle;
 
 /**
- * Server extension point.
+ * Server extension point bean.
+ *
+ * <pre>
+ *   <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+ *     <server id="myLanguageServerId"
+ *         label="My Language Server"
+ *         factoryClass="my.language.server.MyLanguageServerFactory">
+ *     <description><![CDATA[
+ *      Some description written in HTML to display it in LSP consoles and Language Servers settings.
+ *      ]]>
+ *     </description>
+ *   </server>
+ * </extensions>
+ * </pre>
  */
 public class ServerExtensionPointBean extends BaseKeyedLazyInstance<LanguageServerFactory> {
 
@@ -42,7 +54,7 @@ public class ServerExtensionPointBean extends BaseKeyedLazyInstance<LanguageServ
 
     /**
      * The language server id used to associate language
-     * with 'com.redhat.devtools.lsp4ij.languageMapping' extension point.
+     * with {@link LanguageMappingExtensionPointBean language mapping} extension point.
      */
     @Attribute("id")
     @RequiredElement
