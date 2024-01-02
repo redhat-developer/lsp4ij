@@ -283,7 +283,7 @@ public class LanguageServiceAccessor {
             @Nullable FileType currentFileType = contentType instanceof  FileType ? (FileType) contentType : null;
             // Loop for server/language mapping
             for (ContentTypeToLanguageServerDefinition mapping : LanguageServersRegistry.getInstance()
-                    .findServerDefinitionFor(currentLanguage, currentFileType)) {
+                    .findLanguageServerDefinitionFor(currentLanguage, currentFileType)) {
                 if (mapping == null || !mapping.isEnabled() || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
                     // the mapping is disabled
                     // or the server definition has been already added
