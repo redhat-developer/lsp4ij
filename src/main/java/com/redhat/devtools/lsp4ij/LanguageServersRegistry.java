@@ -15,11 +15,13 @@ import com.intellij.codeInsight.hints.ProviderInfo;
 import com.intellij.lang.Language;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
+import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensProvider;
+import com.redhat.devtools.lsp4ij.operations.color.LSPColorProvider;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
@@ -62,12 +64,14 @@ public class LanguageServersRegistry {
     private void initialize() {
         List<ServerMapping> mappings = new ArrayList<>();
 
+        // Load language servers from extensions point
         for (ServerExtensionPointBean server : ServerExtensionPointBean.EP_NAME.getExtensions()) {
             if (server.id != null && !server.id.isEmpty()) {
                 serverDefinitions.put(server.id, new ExtensionLanguageServerDefinition(server));
             }
         }
 
+        // Load mappings from extensions point
         for (LanguageMappingExtensionPointBean extension : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
             Language language = Language.findLanguageByID(extension.language);
             if (language != null) {
@@ -100,11 +104,17 @@ public class LanguageServersRegistry {
                 .filter(mapping -> mapping instanceof ServerLanguageMapping)
                 .map(mapping -> ((ServerLanguageMapping) mapping).getLanguage())
                 .collect(Collectors.toSet());
+        // When a file is not linked to a language (just with a file type),
+        // the language received in InlayHintProviders is plain/text, we add it to support
+        // LSP codeLens, inlayHint, color for a file which is not linked to a language.
+        distinctLanguages.add(PlainTextLanguage.INSTANCE);
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
         LSPCodelensProvider lspCodeLensProvider = new LSPCodelensProvider();
+        LSPColorProvider lspColorProvider = new LSPColorProvider();
         for (Language language : distinctLanguages) {
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspInlayHintsProvider));
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspCodeLensProvider));
+            inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspColorProvider));
         }
     }
 
@@ -131,7 +141,7 @@ public class LanguageServersRegistry {
      * @return the {@link LanguageServerDefinition}s <strong>directly</strong> associated to the given content-type.
      * This does <strong>not</strong> include the one that match transitively as per content-type hierarchy
      */
-    List<ContentTypeToLanguageServerDefinition> findServerDefinitionFor(final @Nullable Language language, @Nullable FileType fileType) {
+    List<ContentTypeToLanguageServerDefinition> findLanguageServerDefinitionFor(final @Nullable Language language, @Nullable FileType fileType) {
         return connections.stream()
                 .filter(mapping -> mapping.match(language, fileType))
                 .collect(Collectors.toList());

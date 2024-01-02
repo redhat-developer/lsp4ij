@@ -43,8 +43,8 @@ public class SupportedFeatures {
 		// Inlay Hint support
 		textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities());
 
-		// TODO : support textDocument/colorPresentation
-		// textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities());
+		// textDocument/colorPresentation support
+		textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities());
 
 		// Completion support
 		final var completionItemCapabilities = new CompletionItemCapabilities(Boolean.TRUE);
