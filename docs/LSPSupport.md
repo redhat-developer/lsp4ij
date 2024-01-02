@@ -34,6 +34,8 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/definition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition)
  * ✅ [textDocument/codeAction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction)
  * ✅ [codeAction/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve)
+ * ✅ [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) (see [implementation details](#documentColor))
+ * ❌ [textDocument/colorPresentation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation).
  * ❌ [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration).
  * ❌ [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition).
  * ❌ [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation).
@@ -55,8 +57,6 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ❌ [textDocument/moniker](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker).
  * ❌ [textDocument/pullDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics). 
  * ❌ [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp).
- * ❌ [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor).
- * ❌ [textDocument/colorPresentation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation).
  * ❌ [textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting).
  * ❌ [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting).
  * ❌ [textDocument/onTypeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting).
@@ -106,7 +106,7 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
 [textDocument/documentHighlight](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight) is implemented via  
 `highlightUsagesHandlerFactory` extension point. As this extension point supports `any` language, it works out of the box.
 
-Here is an example with the `Qute language server`, highlighting item variables:
+Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls), highlighting item variables:
 
 ![textDocument/documentHighlight](./images/lsp-support/textDocument_documentHighlight.png)
 
@@ -119,7 +119,7 @@ Here is an example with the `Qute language server`, highlighting item variables:
 
 As those extension points support `any` language, `textDocument/documentLink` works out of the box.
 
-Here is an example with the `Qute language server`, displaying an `include` template with an hyperlink renderer (Ctrl+Click opens the document link):
+Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls), displaying an `include` template with an hyperlink renderer (Ctrl+Click opens the document link):
 
 ![textDocument/documentLink](./images/lsp-support/textDocument_documentLink.png)
 
@@ -142,7 +142,7 @@ To fix this issue for the `JAVA` language, you need to declare in your `plugin.x
   order="first"/>
 ```
 
-Here is an example with the `Qute language server` showing documentation while hovering over an `include` section:
+Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing documentation while hovering over an `include` section:
 
 ![textDocument/hover](./images/lsp-support/textDocument_hover.png)
 
@@ -152,7 +152,7 @@ Here is an example with the `Qute language server` showing documentation while h
 As LSP4IJ register [LSPCodeLensProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/codelens/LSPCodelensProvider.java) for all languages which are associate with a language server with
 [LSPInlayHintProvidersFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/LSPInlayHintProvidersFactory.java), it works out of the box.
 
-Here a sample with `Qute language server` which shows REST services URL with codeLens:
+Here a sample with [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) which shows REST services URL with codeLens:
 
 ![textDocument/codeLens](./images/lsp-support/textDocument_codeLens.png)
 
@@ -162,16 +162,26 @@ Here a sample with `Qute language server` which shows REST services URL with cod
 As LSP4IJ register [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/inlayhint/LSPInlayHintsProvider.java) for all languages which are associate with a language server with
 [LSPInlayHintProvidersFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/LSPInlayHintProvidersFactory.java), it works out of the box.
 
-Here is an example with the `Qute language server` showing the parameter's Java type as inlay hint:
+Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing the parameter's Java type as inlay hint:
 
 ![textDocument/inlayHint](./images/lsp-support/textDocument_inlayHint.png)
+
+#### DocumentColor
+
+[textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) is implemented with `codeInsight.inlayProvider` extension point.
+As LSP4IJ register [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/inlayhint/LSPInlayHintsProvider.java) for all languages which are associate with a language server with
+[LSPInlayHintProvidersFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/LSPInlayHintProvidersFactory.java), it works out of the box.
+
+Here is an example with the [CSS language server](https://github.com/microsoft/vscode-css-languageservice) showing the color's declaration with colorized square:
+
+![textDocument/documentColor](./images/lsp-support/textDocument_documentColor.png)
 
 #### Completion Proposals
 
 [textDocument/completion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion) is implemented with
 `completion.contributor` extension point. As this extension point supports `any` language, it works out of the box.
 
-Here is an example with the `Qute language server` showing method completion:
+Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing method completion:
 
 ![textDocument/completion](./images/lsp-support/textDocument_completion.png)
 
@@ -181,6 +191,6 @@ The [completionItem/resolve](https://microsoft.github.io/language-server-protoco
 
 [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) is implemented with an `externalAnnotator` extension point. As this extension point supports `any` language, it works out of the box.
 
-Here is an example with the `Qute language server` reporting errors:
+Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) reporting errors:
 
 ![textDocument/publishDiagnostics](./images/lsp-support/textDocument_publishDiagnostics.png)
