@@ -38,7 +38,7 @@ public class SeverityMapping {
      */
     public static @NotNull HighlightSeverity toHighlightSeverity(@Nullable DiagnosticSeverity severity) {
         if (severity == null) {
-            return HighlightSeverity.INFORMATION;
+            return HighlightSeverity.ERROR;
         }
         switch (severity) {
             case Warning:
