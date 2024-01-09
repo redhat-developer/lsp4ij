@@ -199,7 +199,7 @@ public class LSPCompletionProposal extends LookupElement {
     public void renderElement(LookupElementPresentation presentation) {
         presentation.setItemText(item.getLabel());
         presentation.setTypeText(item.getDetail());
-        presentation.setIcon(getIcon(item.getKind()));
+        presentation.setIcon(getIcon(item));
         if (isDeprecated()) {
             presentation.setStrikeout(true);
         }

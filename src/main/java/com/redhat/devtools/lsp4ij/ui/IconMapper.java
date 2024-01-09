@@ -15,11 +15,18 @@ package com.redhat.devtools.lsp4ij.ui;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.util.IconLoader;
+import com.intellij.util.ui.ColorIcon;
+import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
+import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.Icon;
+import javax.swing.*;
+import java.awt.*;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Maps LSP4J kinds to Intellij Icons. See the <a href="https://jetbrains.design/intellij/resources/icons_list/" target="_blank">JetBrains icon list</a> for reference.
@@ -37,14 +44,69 @@ public class IconMapper {
     // Original dark https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/icons/src/expui/fileTypes/text_dark.svg
     public static final @NotNull Icon Text = load("images/expui/fileTypes/text.svg");
 
+    private static final Map<String, Icon> colorToIconCache = new ConcurrentHashMap<>();
+
+    private static final int ICON_SIZE = 16;
 
     private IconMapper(){
     }
 
-
     /**
      * Maps LSP4J {@link CompletionItemKind} to Intellij Icons
      */
+    public static @Nullable Icon getIcon(@Nullable CompletionItem item) {
+        if (item == null || item.getKind() == null) {
+            return null;
+        }
+        Icon icon = null;
+        if (item.getKind() == CompletionItemKind.Color) {
+            icon = getColorIcon(item);
+        }
+        return icon == null? getIcon(item.getKind()) : icon;
+    }
+
+    private static Icon getColorIcon(@NotNull CompletionItem item) {
+        //While this method is private, we already know this is a Color kind, no need to check again
+        String docString = getDocString(item.getDocumentation());
+        String hexValue = null;
+        if (docString != null && docString.startsWith("#")) { //$NON-NLS-1$
+            hexValue = docString;
+        } else if (item.getLabel() != null && item.getLabel().startsWith("#")) { //$NON-NLS-1$
+            hexValue = item.getLabel();
+        }
+        return getColorIcon(hexValue);
+    }
+
+    private static @Nullable String getDocString(@Nullable Either<String, MarkupContent> documentation) {
+        if (documentation != null) {
+            if (documentation.isLeft()) {
+                return documentation.getLeft();
+            } else { //We ignore the markup content here, as we know this is a color kind
+                return documentation.getRight().getValue();
+            }
+        }
+        return null;
+    }
+
+    private static Icon getColorIcon(String hexValue) {
+        if (!isValidHexColor(hexValue)) {
+            return null;
+        }
+        return colorToIconCache.computeIfAbsent(hexValue.toUpperCase(), key -> {
+            try {
+                Color decodedColor = java.awt.Color.decode(key);
+                return new ColorIcon(ICON_SIZE, decodedColor, true);
+            } catch (Exception e) {
+                //ignore error
+            }
+            return AllIcons.Nodes.EmptyNode;
+        });
+    }
+
+    private static boolean isValidHexColor(String hexValue) {
+        return hexValue.matches("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$");
+    }
+
     public static @Nullable Icon getIcon(@Nullable CompletionItemKind kind) {
         if (kind == null) {
             return null;

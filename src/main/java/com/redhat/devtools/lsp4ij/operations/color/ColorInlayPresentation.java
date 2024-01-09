@@ -14,6 +14,7 @@ import com.intellij.codeInsight.hints.presentation.BasePresentation;
 import com.intellij.codeInsight.hints.presentation.PresentationFactory;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.ui.ColorUtil;
+import com.intellij.ui.Gray;
 import com.intellij.ui.JBColor;
 import org.jetbrains.annotations.NotNull;
 
@@ -62,7 +63,7 @@ public class ColorInlayPresentation extends BasePresentation {
         g.fillRect(x, y, getSquareDimension(), getSquareDimension());
 
         // Draw a border
-        g.setColor(isDarkTheme() ? Color.WHITE : Color.BLACK);
+        g.setColor(Gray.x00.withAlpha(40));//Same border color as com.intellij.util.ui.ColorIcon
         int borderWidth = 1;
         g.setStroke(new BasicStroke(borderWidth));
         g.drawRect(x, y, getSquareDimension(), getSquareDimension());
