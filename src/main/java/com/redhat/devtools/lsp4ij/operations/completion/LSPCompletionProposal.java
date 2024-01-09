@@ -396,7 +396,7 @@ public class LSPCompletionProposal extends LookupElement {
         }
         if (documentation.isLeft()) {
             String content = documentation.getLeft();
-            return new MarkupContent(content, MarkupKind.PLAINTEXT);
+            return new MarkupContent(MarkupKind.PLAINTEXT, content);
         }
         return documentation.getRight();
     }
