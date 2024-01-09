@@ -88,7 +88,7 @@ public class IconMapper {
         return null;
     }
 
-    private static Icon getColorIcon(String hexValue) {
+    private static Icon getColorIcon(@Nullable String hexValue) {
         if (!isValidHexColor(hexValue)) {
             return null;
         }
@@ -103,8 +103,8 @@ public class IconMapper {
         });
     }
 
-    private static boolean isValidHexColor(String hexValue) {
-        return hexValue.matches("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$");
+    private static boolean isValidHexColor(@Nullable String hexValue) {
+        return hexValue != null && hexValue.matches("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$");
     }
 
     public static @Nullable Icon getIcon(@Nullable CompletionItemKind kind) {
