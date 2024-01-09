@@ -29,15 +29,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class IconMapperTest {
 
     @Test
-    public void getIconTest()  {
-        assertNull(getIcon((CompletionItemKind)null));
+    public void getIconTest() {
+        assertNull(getIcon((CompletionItemKind) null));
         for (CompletionItemKind value : CompletionItemKind.values()) {
-            assertNotNull(getIcon(value), "Missing matching icon for "+value);
+            assertNotNull(getIcon(value), "Missing matching icon for " + value);
         }
     }
 
     @Test
-    public void getColorIconTest()  {
+    public void getColorIconTest() {
         String color = "#FFFFFF";
 
         CompletionItem item = new CompletionItem();
@@ -48,38 +48,43 @@ public class IconMapperTest {
         Icon whiteIcon = getIcon(item);
         assertNotNull(whiteIcon, "Should have an icon");
         assertNotEquals(AllIcons.Nodes.EmptyNode, whiteIcon);
-        assertTrue(whiteIcon instanceof ColorIcon, "Unexpected icon instance: "+ whiteIcon.getClass());
+        assertTrue(whiteIcon instanceof ColorIcon, "Unexpected icon instance: " + whiteIcon.getClass());
 
-        //Lower case color
+        // Lower case color
         item.setDocumentation(color.toLowerCase());
         Icon sameWhiteIcon = getIcon(item);
         assertEquals(whiteIcon, sameWhiteIcon);
 
-        //Other color
+        // Other color
         item.setDocumentation("#000000");
         Icon blackIcon = getIcon(item);
         assertNotEquals(whiteIcon, blackIcon);
 
-        //MarkupContent
+        // MarkupContent
         item = new CompletionItem();
         item.setKind(CompletionItemKind.Color);
-        item.setDocumentation(new MarkupContent("markdown", color ));
+        item.setDocumentation(new MarkupContent("markdown", color));
         Icon markdownIcon = getIcon(item);
         assertEquals(whiteIcon, markdownIcon);
 
-
-        //Label
+        // Label
         item = new CompletionItem();
         item.setKind(CompletionItemKind.Color);
         item.setLabel(color);
         Icon labelIcon = getIcon(item);
         assertEquals(whiteIcon, labelIcon);
 
-        //Invalid color
+        // Invalid color
         item = new CompletionItem();
         item.setKind(CompletionItemKind.Color);
         item.setLabel("#Nooope");
         Icon badColorIcon = getIcon(item);
         assertEquals(AllIcons.Nodes.EmptyNode, badColorIcon);
+
+        // Null color
+        item = new CompletionItem();
+        item.setKind(CompletionItemKind.Color);
+        Icon nullColorIcon = getIcon(item);
+        assertEquals(AllIcons.Nodes.EmptyNode, nullColorIcon);
     }
 }
