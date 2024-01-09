@@ -17,7 +17,6 @@ import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupElementPresentation;
 import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.TemplateManager;
-import com.intellij.codeInsight.template.impl.TemplateImpl;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorModificationUtil;
@@ -102,7 +101,7 @@ public class LSPCompletionProposal extends LookupElement {
         // Apply all text edits
         apply(context.getDocument(), context.getCompletionChar(), 0, context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
 
-        if (template != null && ((TemplateImpl) template).getVariableCount() > 0) {
+        if (template != null) {
             // LSP completion with snippet syntax, activate the inline template
             context.setAddCompletionChar(false);
             EditorModificationUtil.moveCaretRelatively(editor, -template.getTemplateText().length());
