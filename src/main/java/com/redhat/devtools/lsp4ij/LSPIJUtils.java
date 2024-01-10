@@ -28,10 +28,8 @@ import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.*;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.impl.light.LightRecordField;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
@@ -287,36 +285,6 @@ public class LSPIJUtils {
             LOGGER.warn("Invalid LSP text range", e);
             return null;
         }
-    }
-
-    public static Location toLocation(PsiElement psiMember) {
-        PsiElement sourceElement = getNavigationElement(psiMember);
-
-        if (sourceElement != null) {
-            PsiFile file = sourceElement.getContainingFile();
-            Document document = PsiDocumentManager.getInstance(psiMember.getProject()).getDocument(file);
-            if (document != null) {
-                TextRange range = sourceElement.getTextRange();
-                return toLocation(file, toRange(range, document));
-            }
-        }
-        return null;
-    }
-
-    private static @Nullable PsiElement getNavigationElement(PsiElement psiMember) {
-        //FIXME LightRecordField depends on the com.intellij.java plugin
-        if (psiMember instanceof LightRecordField) {
-            psiMember = ((LightRecordField) psiMember).getRecordComponent();
-        }
-        return psiMember.getNavigationElement();
-    }
-
-    public static Location toLocation(PsiFile file, Range range) {
-        return toLocation(file.getVirtualFile(), range);
-    }
-
-    public static Location toLocation(VirtualFile file, Range range) {
-        return new Location(toUriAsString(file), range);
     }
 
     public static void applyWorkspaceEdit(WorkspaceEdit edit) {

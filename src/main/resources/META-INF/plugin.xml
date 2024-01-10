@@ -47,10 +47,7 @@
     </description>
 
     <depends>com.intellij.modules.platform</depends>
-    <!-- FIXME we shouldn't have a dependency to Java, this is caused by using 'LightRecordField' (e.g. in LSPIJUtils.getNavigationElement(PsiElement)) -->
-    <depends>com.intellij.modules.java</depends>
     <depends>com.redhat.devtools.intellij.telemetry</depends>
-
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
     <idea-version since-build="223"/>
