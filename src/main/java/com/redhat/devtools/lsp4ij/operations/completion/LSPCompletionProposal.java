@@ -107,6 +107,11 @@ public class LSPCompletionProposal extends LookupElement {
             EditorModificationUtil.moveCaretRelatively(editor, -template.getTemplateText().length());
             TemplateManager.getInstance(context.getProject()).startTemplate(context.getEditor(), template);
         }
+        // Execute custom command of the completion item if needed
+        Command command = item.getCommand();
+        if (command != null) {
+            executeCustomCommand(command, LSPIJUtils.toUri(context.getDocument()));
+        }
     }
 
     /**
@@ -267,11 +272,7 @@ public class LSPCompletionProposal extends LookupElement {
                 LSPIJUtils.applyEdits(editor, document, Collections.singletonList(textEdit));
             }
 
-            // Execute custom command of the completion item if needed
-            Command command = item.getCommand();
-            if (command != null) {
-                executeCustomCommand(command, LSPIJUtils.toUri(document));
-            }
+
         } catch (RuntimeException ex) {
             LOGGER.warn(ex.getLocalizedMessage(), ex);
         }
