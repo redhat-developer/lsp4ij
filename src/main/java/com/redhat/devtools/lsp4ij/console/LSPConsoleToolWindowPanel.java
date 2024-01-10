@@ -25,6 +25,7 @@ import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.CardLayoutPanel;
+import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.util.ui.FormBuilder;
@@ -34,12 +35,16 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
+import com.redhat.devtools.lsp4ij.launching.LaunchConfigurationLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.launching.ui.CommandLineWidget;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.LaunchingLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
 import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
 import java.io.PrintWriter;
@@ -176,6 +181,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         private JComponent createDetailPanel(LanguageServerTreeNode key) {
             LanguageServerDefinition serverDefinition = key.getServerDefinition();
             Project project = LSPConsoleToolWindowPanel.this.project;
+
+            // Create Server Trace
             ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
             UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings initialSettings = UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(serverDefinition.id);
             if (initialSettings != null && initialSettings.getServerTrace() != null) {
@@ -197,11 +204,33 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             UserDefinedLanguageServerSettings.getInstance(getProject()).addChangeHandler(settingsChangeListener);
             settingsChangeListeners.add(settingsChangeListener);
 
-            return FormBuilder.createFormBuilder()
+            // Create command line if needed
+            CommandLineWidget commandLine = null;
+            if (serverDefinition instanceof LaunchingLanguageServerDefinition launchingLanguageServerDefinition) {
+                commandLine = new CommandLineWidget();
+                LaunchConfigurationLanguageServerSettings.LaunchConfigDefinitionSettings launchSettings = LaunchConfigurationLanguageServerSettings.getInstance().getLaunchConfigSettings(serverDefinition.id);
+                if (launchSettings != null) {
+                    commandLine.setText(launchSettings.getCommandLine() != null? launchSettings.getCommandLine() : "");
+                    final var c= commandLine;
+                    commandLine.getDocument().addDocumentListener(new DocumentAdapter() {
+                        @Override
+                        protected void textChanged(@NotNull DocumentEvent e) {
+                            launchSettings.setCommandLine(c.getText());
+                            launchingLanguageServerDefinition.setCommandLine(c.getText());
+                        }
+                    });
+                }
+            }
+
+            FormBuilder builder = FormBuilder.createFormBuilder()
                     .setFormLeftIndent(10)
                     .addComponent(createTitleComponent(serverDefinition), 1)
-                    .addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox, 1)
-                    .addComponentFillVertically(new JPanel(), 0)
+                    .addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox, 1);
+
+            if (commandLine != null) {
+                builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.command"), commandLine, true);
+            }
+            return builder.addComponentFillVertically(new JPanel(), 0)
                     .getPanel();
         }
 
@@ -314,6 +343,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
     /**
      * Code copied from https://github.com/apache/commons-lang/blob/24744a40b2c094945e542b71cc1fbf59caa0d70b/src/main/java/org/apache/commons/lang3/exception/ExceptionUtils.java#L400C5-L407C6
+     *
      * @param throwable
      * @return
      */
