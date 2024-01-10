@@ -173,6 +173,13 @@
                 id="lsp.console.explorer.copy.command"
                 class="com.redhat.devtools.lsp4ij.console.explorer.actions.CopyStartServerCommandAction"
                 icon="AllIcons.Actions.Copy"/>
+
+
+        <!-- Common LSP Client actions   -->
+        <!-- Reuse VS Code action ids while waiting for standardization of LSP commands https://github.com/microsoft/language-server-protocol/issues/788 -->
+        <action id="editor.action.triggerSuggest"
+                class="com.redhat.devtools.lsp4ij.commands.editor.TriggerSuggestAction"
+        />
     </actions>
 
     <!-- LSP application listeners -->
