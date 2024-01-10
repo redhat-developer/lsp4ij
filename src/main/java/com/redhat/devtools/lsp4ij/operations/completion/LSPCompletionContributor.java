@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
@@ -112,18 +113,27 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
+    private static final CompletionItemComparator completionProposalComparator = new CompletionItemComparator();
+
     private void addCompletionItems(PsiFile file, Editor editor, CompletionPrefix completionPrefix, Either<List<CompletionItem>,
             CompletionList> completion, LanguageServerItem languageServer, @NotNull CompletionResultSet result, CancellationSupport cancellationSupport) {
         CompletionItemDefaults itemDefaults = null;
-        List<CompletionItem> items = null;
+        List<CompletionItem> items = new ArrayList<>();
         if (completion.isLeft()) {
-            items = completion.getLeft();
+            items.addAll(completion.getLeft());
         } else {
             CompletionList completionList = completion.getRight();
             itemDefaults = completionList.getItemDefaults();
-            items = completionList.getItems();
+            items.addAll(completionList.getItems());
         }
-        for (var item : items) {
+
+        // Sort by item.sortText
+        items.sort(completionProposalComparator);
+        int size = items.size();
+
+        //Items now sorted by priority, low index == high priority
+        for (int i = 0; i < size; i++) {
+            var item = items.get(i);
             if (StringUtils.isBlank(item.getLabel())) {
                 // Invalid completion Item, ignore it
                 continue;
@@ -131,9 +141,8 @@ public class LSPCompletionContributor extends CompletionContributor {
             cancellationSupport.checkCanceled();
             // Create lookup item
             var lookupItem = createLookupItem(file, editor, completionPrefix.getCompletionOffset(), item, itemDefaults, languageServer);
-            // Group it by using completion item kind
-            int group = item.getKind() == null ? 0 : item.getKind().getValue();
-            var groupedLookupItem = PrioritizedLookupElement.withGrouping(lookupItem, group);
+
+            var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, size - i);
             // Compute the prefix
             var textEditRange = lookupItem.getTextEditRange();
             String prefix = textEditRange != null ? completionPrefix.getPrefixFor(textEditRange, item) : null;
@@ -141,11 +150,11 @@ public class LSPCompletionContributor extends CompletionContributor {
                 // Add the IJ completion item (lookup item) by using the computed prefix
                 result.withPrefixMatcher(prefix)
                         .caseInsensitive() // set case-insensitive to search Java class which starts with upper case
-                        .addElement(groupedLookupItem);
+                        .addElement(prioritizedLookupItem);
             } else {
                 // Should happen rarely, only when text edit is for multi-lines or if completion is triggered outside the text edit range.
                 // Add the IJ completion item (lookup item) which will use the IJ prefix
-                result.addElement(groupedLookupItem);
+                result.addElement(prioritizedLookupItem);
             }
         }
     }
