@@ -101,17 +101,30 @@ public class LSPCompletionProposal extends LookupElement {
         // Apply all text edits
         apply(context.getDocument(), context.getCompletionChar(), 0, context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
 
-        if (template != null) {
+        if (shouldStartTemplate(template)) {
             // LSP completion with snippet syntax, activate the inline template
             context.setAddCompletionChar(false);
             EditorModificationUtil.moveCaretRelatively(editor, -template.getTemplateText().length());
             TemplateManager.getInstance(context.getProject()).startTemplate(context.getEditor(), template);
         }
+
         // Execute custom command of the completion item if needed
         Command command = item.getCommand();
         if (command != null) {
             executeCustomCommand(command, LSPIJUtils.toUri(context.getDocument()));
         }
+    }
+
+    /**
+     * Returns true if the given template must be executed and false otherwise.
+     *
+     * @param template the template.
+     * @return true if the given template must be executed and false otherwise.
+     */
+    private static boolean shouldStartTemplate(@Nullable Template template) {
+        return template != null // Completion item is a Snippet (InsertTextFormat.Snippet)
+                && (template.getSegmentsCount() > 0 // There are some tabstops, e.g. $0, $1
+                || !template.getVariables().isEmpty()); // There are some placeholders, e.g ${1:name}
     }
 
     /**
