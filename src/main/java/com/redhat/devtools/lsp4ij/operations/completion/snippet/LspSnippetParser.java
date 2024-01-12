@@ -184,19 +184,24 @@ public class LspSnippetParser {
                         // - ${1} <-- tabstop
                         int index = readInt();
                         if (readChar(':')) {
-                            // - ${1:name} <-- placeholder
-                            String name = readString('}', '$');
-                            nestingLevel++;
-                            handler.startPlaceholder(index, name, nestingLevel);
-                            // placeholder ::= '${' int ':' any '}'
-                            if (current == '}') {
-                                // read next character
-                                read();
+                            if (readChar('}')) {
+                                // - ${1:} <-- tabstop
+                                handleTabstop(index);
                             } else {
-                                readAny();
+                                // - ${1:name} <-- placeholder
+                                String name = readString('}', '$');
+                                nestingLevel++;
+                                handler.startPlaceholder(index, name, nestingLevel);
+                                // placeholder ::= '${' int ':' any '}'
+                                if (current == '}') {
+                                    // read next character
+                                    read();
+                                } else {
+                                    readAny();
+                                }
+                                handler.endPlaceholder(nestingLevel);
+                                nestingLevel--;
                             }
-                            handler.endPlaceholder(nestingLevel);
-                            nestingLevel--;
                         } else if (readChar('|')) {
                             // - ${1|one,two,three|} <-- choice
                             handleChoice(null, index);
