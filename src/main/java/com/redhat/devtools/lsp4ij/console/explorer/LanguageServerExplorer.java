@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.console.explorer.actions.CopyStartServerComman
 import com.redhat.devtools.lsp4ij.console.explorer.actions.PauseServerAction;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.RestartServerAction;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.StopServerAction;
+import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
@@ -187,7 +188,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                                 group = new DefaultActionGroup();
                                 AnAction stopServerAction = ActionManager.getInstance().getAction(StopServerAction.ACTION_ID);
                                 group.add(stopServerAction);
-                                if (Boolean.getBoolean("idea.is.internal")) {
+                                if (IntelliJPlatformUtils.isDevMode()) {
                                     // In dev mode, enable the "Pause" action
                                     AnAction pauseServerAction = ActionManager.getInstance().getAction(PauseServerAction.ACTION_ID);
                                     group.add(pauseServerAction);

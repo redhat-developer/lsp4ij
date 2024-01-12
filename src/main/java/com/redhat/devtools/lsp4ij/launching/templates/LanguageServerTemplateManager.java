@@ -12,12 +12,17 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.google.gson.Gson;
 import com.intellij.openapi.application.ApplicationManager;
+import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Language server template manager.
@@ -27,25 +32,29 @@ public class LanguageServerTemplateManager {
     private final static Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplateManager.class);
 
     private static final String TEMPLATES_DIR = "templates";
-    private final LanguageServerTemplates root;
+
+    private final List<LanguageServerTemplate> templates;
 
     public static LanguageServerTemplateManager getInstance() {
         return ApplicationManager.getApplication().getService(LanguageServerTemplateManager.class);
     }
 
     private LanguageServerTemplateManager() {
-        LanguageServerTemplates tempRoot;
+        LanguageServerTemplates root;
         try (Reader templateReader = loadTemplateReader("template-ls.json")) {
-            tempRoot = new Gson().fromJson(templateReader, LanguageServerTemplates.class);
+            root = new Gson().fromJson(templateReader, LanguageServerTemplates.class);
         } catch (IOException e) {
-            LOGGER.warn("Failed to load LS templates:",e);
-            tempRoot = new LanguageServerTemplates();
+            LOGGER.warn("Failed to load LS templates:", e);
+            root = new LanguageServerTemplates();
         }
-        root = tempRoot;
+        templates = root.getTemplates()
+                .stream()
+                .filter(t -> IntelliJPlatformUtils.isDevMode() || !t.isDev())
+                .toList();
     }
 
     public List<LanguageServerTemplate> getTemplates() {
-        return root.getLanguageServers();
+        return templates;
     }
 
     static Reader loadTemplateReader(@NotNull String path) {

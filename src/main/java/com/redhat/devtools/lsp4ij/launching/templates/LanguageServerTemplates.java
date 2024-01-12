@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.templates;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,13 +20,12 @@ import java.util.List;
  */
 public class LanguageServerTemplates {
 
-    public LanguageServerTemplates() {
-        languageServers = new ArrayList<>();
-    }
+    protected List<LanguageServerTemplate> templates;
 
-    protected List<LanguageServerTemplate> languageServers;
-
-    public List<LanguageServerTemplate> getLanguageServers() {
-        return languageServers;
+    public @NotNull List<LanguageServerTemplate> getTemplates() {
+        if (templates == null) {
+            templates = new ArrayList<>();
+        }
+        return templates;
     }
 }

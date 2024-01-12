@@ -15,7 +15,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -52,13 +51,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
+import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClientInfo;
+
 /**
  * Language server wrapper.
  */
 public class LanguageServerWrapper implements Disposable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerWrapper.class);//$NON-NLS-1$
-    private static final String CLIENT_NAME = "IntelliJ";
+
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
     class Listener implements FileEditorManagerListener, VirtualFileListener {
@@ -445,15 +446,6 @@ public class LanguageServerWrapper implements Disposable {
 
         // no then...Async future here as we want this chain of operation to be sequential and "atomic"-ish
         return languageServer.initialize(initParams);
-    }
-
-    private ClientInfo getClientInfo() {
-        ApplicationInfo applicationInfo = ApplicationInfo.getInstance();
-        String versionName = applicationInfo.getVersionName();
-        String buildNumber = applicationInfo.getBuild().asString();
-
-        String intellijVersion = versionName + " (build " + buildNumber + ")";
-        return new ClientInfo(CLIENT_NAME, intellijVersion);
     }
 
     @Nullable
