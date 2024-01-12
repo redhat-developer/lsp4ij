@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.templates;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,7 +18,11 @@ import java.util.List;
  */
 public class LanguageServerTemplates {
 
-    private List<LanguageServerTemplate> languageServers;
+    public LanguageServerTemplates() {
+        languageServers = new ArrayList<>();
+    }
+
+    protected List<LanguageServerTemplate> languageServers;
 
     public List<LanguageServerTemplate> getLanguageServers() {
         return languageServers;

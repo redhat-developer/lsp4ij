@@ -11,13 +11,16 @@
 package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.intellij.openapi.util.SystemInfo;
+import com.intellij.openapi.util.io.StreamUtil;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.operations.documentation.MarkdownConverter;
 import org.apache.commons.io.IOUtils;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -118,11 +121,9 @@ public class LanguageServerTemplate {
         return description;
     }
 
-    private static String loadDocContent(String docPath) {
-        try (InputStream input = LanguageServerTemplateManager.loadTemplateStream( docPath)){
-            if (input != null) {
-                return IOUtils.toString(input, StandardCharsets.UTF_8);
-            }
+    private static String loadDocContent(@NotNull String docPath) {
+        try (Reader reader = LanguageServerTemplateManager.loadTemplateReader(docPath)){
+            return StreamUtil.readText(reader);
         } catch (Exception e) {
             LOGGER.warn("Error while loading language server template documentation '" + docPath + "'", e);
         }
