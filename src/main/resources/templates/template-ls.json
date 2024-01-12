@@ -1,5 +1,5 @@
 {
-  "languageServers": [
+  "templates": [
     {
       "name": "CSS Language Server",
       "docPath": "node/vscode-css-language-server.md",

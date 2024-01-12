@@ -21,8 +21,8 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Language server template manager.
@@ -40,17 +40,20 @@ public class LanguageServerTemplateManager {
     }
 
     private LanguageServerTemplateManager() {
-        LanguageServerTemplates root;
+        LanguageServerTemplates root = null;
         try (Reader templateReader = loadTemplateReader("template-ls.json")) {
             root = new Gson().fromJson(templateReader, LanguageServerTemplates.class);
         } catch (IOException e) {
             LOGGER.warn("Failed to load LS templates:", e);
-            root = new LanguageServerTemplates();
         }
-        templates = root.getTemplates()
-                .stream()
-                .filter(t -> IntelliJPlatformUtils.isDevMode() || !t.isDev())
-                .toList();
+        if (root != null) {
+            templates = root.getTemplates()
+                    .stream()
+                    .filter(t -> IntelliJPlatformUtils.isDevMode() || !t.isDev())
+                    .toList();
+        } else {
+            templates = Collections.emptyList();
+        }
     }
 
     public List<LanguageServerTemplate> getTemplates() {
