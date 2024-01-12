@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.Gson;
 import com.intellij.openapi.application.ApplicationManager;
 
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.List;
@@ -38,7 +39,7 @@ public class LanguageServerTemplateManager {
         return root.getLanguageServers();
     }
 
-    public static InputStream loadTemplateStream(String path) {
-        return LanguageServerTemplateManager.class.getClassLoader().getResourceAsStream(TEMPLATES_DIR + "/" + path);
+    static BufferedInputStream loadTemplateStream(String path) {
+        return new BufferedInputStream(LanguageServerTemplateManager.class.getClassLoader().getResourceAsStream(TEMPLATES_DIR + "/" + path));
     }
 }
