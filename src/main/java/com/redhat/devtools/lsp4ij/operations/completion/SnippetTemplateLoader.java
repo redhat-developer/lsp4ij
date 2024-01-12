@@ -106,7 +106,7 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
                 // which will be updated by the previous add variable
                 template.addVariableSegment(name);
             } else {
-                // The variable doesn't exists, add a variable which can be updated
+                // The variable doesn't exist, add a variable which can be updated
                 // and which will replace other variables with the same name.
                 existingVariables.add(name);
                 template.addVariable(name, new ConstantNode(name), null, true, false);

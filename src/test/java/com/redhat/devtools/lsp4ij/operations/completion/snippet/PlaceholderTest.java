@@ -21,9 +21,17 @@ import static com.redhat.devtools.lsp4ij.operations.completion.snippet.LspSnippe
 public class PlaceholderTest {
 
     @Test
-    public void simpleText() {
+    public void placeholde() {
         LspSnippetNode[] actual = LspSnippetAssert.parse("${1:name}");
         assertEquals(actual, LspSnippetAssert.placeholder(1, "name", 1));
     }
+
+    @Test
+    public void placeholderWithoutName() {
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:}");
+        assertEquals(actual, LspSnippetAssert.tabstop(1));
+    }
+
+
 
 }
