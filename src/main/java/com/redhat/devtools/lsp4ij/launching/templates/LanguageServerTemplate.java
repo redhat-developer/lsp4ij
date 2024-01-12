@@ -14,14 +14,11 @@ import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.StreamUtil;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.operations.documentation.MarkdownConverter;
-import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
 import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,8 +43,9 @@ public class LanguageServerTemplate {
     private final String UNIX_KEY = "unix";
     private final String DEFAULT_KEY = "default";
 
-    private final String OS_KEY = SystemInfo.isWindows ? "windows" : (SystemInfo.isMac ? "mac" : (SystemInfo.isUnix ? "unix" : null));
+    private final String OS_KEY = SystemInfo.isWindows ? WINDOWS_KEY : (SystemInfo.isMac ? MAC_KEY : (SystemInfo.isUnix ? UNIX_KEY : null));
     private String name;
+    private boolean dev;
     private String runtime;
     private Map<String /* OS */, String /* program args */> programArgs;
 
@@ -61,6 +59,10 @@ public class LanguageServerTemplate {
 
     public String getName() {
         return name;
+    }
+
+    public boolean isDev() {
+        return dev;
     }
 
     public String getRuntime() {
@@ -100,11 +102,15 @@ public class LanguageServerTemplate {
         return fileTypeMappings;
     }
 
+    public boolean hasDocumentation() {
+        return docPath != null && !docPath.isEmpty();
+    }
+
     public String getDescription() {
         if(description != null) {
             return description.isEmpty() ? null : description;
         }
-        if (docPath == null || docPath.isEmpty()) {
+        if (!hasDocumentation()) {
             return null;
         }
         String docContent = loadDocContent(docPath);
@@ -129,4 +135,5 @@ public class LanguageServerTemplate {
         }
         return null;
     }
+
 }

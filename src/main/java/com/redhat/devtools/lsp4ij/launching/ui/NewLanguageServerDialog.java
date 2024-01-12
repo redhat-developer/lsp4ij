@@ -109,7 +109,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         templateCombo.addItemListener(event -> {
             LanguageServerTemplate template = (LanguageServerTemplate) event.getItem();
             loadFromTemplate(template);
-            showInstructionButton.setEnabled(template.getDescription() != null && template != LanguageServerTemplate.NONE);
+            showInstructionButton.setEnabled(template.hasDocumentation() && template != LanguageServerTemplate.NONE);
         });
         panel.add(templateCombo, BorderLayout.WEST);
 

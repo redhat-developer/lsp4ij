@@ -33,6 +33,26 @@
           "languageId": "html"
         }
       ]
+    },
+    {
+      "name": "XML Language Server",
+      "dev": true,
+      "docPath": "java/lemminx.md",
+      "runtime": "java",
+      "programArgs": {
+        "default": "-classpath \"${BASE_DIR}/org.eclipse.lemminx-uber.jar\" org.eclipse.lemminx.XMLServerLauncher"
+      },
+      "languageMappings": [
+        {
+          "language": "XML"
+        },
+        {
+          "language": "DTD"
+        },
+        {
+          "language": "RELAX-NG"
+        }
+      ]
     }
   ]
 }
