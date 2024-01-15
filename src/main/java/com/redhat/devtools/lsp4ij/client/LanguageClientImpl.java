@@ -11,9 +11,8 @@
 package com.redhat.devtools.lsp4ij.client;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Disposer;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
@@ -88,7 +87,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     @Override
     public final CompletableFuture<ApplyWorkspaceEditResponse> applyEdit(ApplyWorkspaceEditParams params) {
         CompletableFuture<ApplyWorkspaceEditResponse> future = new CompletableFuture<>();
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+        WriteCommandAction.runWriteCommandAction(getProject(), () -> {
             LSPIJUtils.applyWorkspaceEdit(params.getEdit());
             future.complete(new ApplyWorkspaceEditResponse(true));
         });
