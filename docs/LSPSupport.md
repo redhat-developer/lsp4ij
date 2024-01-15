@@ -87,8 +87,8 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
 
 Current state of [Window Features]( https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#windowFeatures) support
 
- * ❌ [window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage).
- * ❌ [window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest).
+ * ✅ [window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage). (see [implementation details](#showMessage))
+ * ✅ [window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest).
  * ❌ [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage).
  * ❌ [window/showDocument](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument).
  * ❌ [window/workDoneProgress/create](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_workDoneProgress_create).
@@ -194,3 +194,19 @@ The [completionItem/resolve](https://microsoft.github.io/language-server-protoco
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) reporting errors:
 
 ![textDocument/publishDiagnostics](./images/lsp-support/textDocument_publishDiagnostics.png)
+
+#### Show Message
+
+[window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage) supports Markdown messages and clickable links.
+
+Here is an example with [Rust Analyzer](https://rust-analyzer.github.io/) reporting an error:
+
+```markdown
+{
+  "type": 1,
+  "message": "Failed to discover workspace.\nConsider adding the `Cargo.toml` of the workspace to the [`linkedProjects`](https://rust-analyzer.github.io/manual.html#rust-analyzer.linkedProjects) setting.\n\nFailed to load workspaces."
+}
+```
+is rendered as: 
+
+![window/showMessage](./images/lsp-support/window_showMessage.png)
