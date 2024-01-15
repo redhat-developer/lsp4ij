@@ -35,6 +35,24 @@
       ]
     },
     {
+      "name": "TypeScript Language Server",
+      "dev": true,
+      "docPath": "node/typescript-language-server.md",
+      "programArgs": {
+        "default": "typescript-language-server --stdio"
+      },
+      "fileTypeMappings": [
+        {
+          "fileType": "JavaScript",
+          "languageId": "javascript"
+        },
+        {
+          "fileType": "TypeScript",
+          "languageId": "typescript"
+        }
+      ]
+    },
+    {
       "name": "XML Language Server",
       "dev": true,
       "docPath": "java/lemminx.md",
