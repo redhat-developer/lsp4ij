@@ -21,7 +21,6 @@ import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
-import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ModuleRootManager;
@@ -42,10 +41,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
+import java.io.UnsupportedEncodingException;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
@@ -411,13 +409,22 @@ public class LSPIJUtils {
         return LocalFileSystem.getInstance().findFileByIoFile(Paths.get(uri).toFile());
     }
 
-    public static @Nullable VirtualFile findResourceFor(String uri) {
+    public static @Nullable VirtualFile findResourceFor(@NotNull String uri) {
         if (uri.startsWith(JAR_SCHEME) || uri.startsWith(JRT_SCHEME)) {
             // ex : jar:file:///C:/Users/azerr/.m2/repository/io/quarkus/quarkus-core/3.0.1.Final/quarkus-core-3.0.1.Final.jar!/io/quarkus/runtime/ApplicationConfig.class
             try {
                 return VfsUtil.findFileByURL(new URL(uri));
             } catch (MalformedURLException e) {
                 return null;
+            }
+        }
+        if (uri.contains("%")) {
+            try {
+                // ex : file:///c%3A/Users/azerr/IdeaProjects/untitled7/test.js
+                // the uri must be decoded (ex : file:///c:/Users) otherwise IntelliJ cannot retrieve the virtual file.
+                uri = URLDecoder.decode(uri, StandardCharsets.UTF_8.name());
+            } catch (UnsupportedEncodingException e) {
+                // Do nothing
             }
         }
         return VirtualFileManager.getInstance().findFileByUrl(VfsUtilCore.fixURLforIDEA(uri));
