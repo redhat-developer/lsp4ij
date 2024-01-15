@@ -1,6 +1,6 @@
 You can use the [TypeScript language server](https://github.com/typescript-language-server/typescript-language-server) by following these instructions:
 * [Install Node.js](https://nodejs.org/en/download)
-* [Read "Installing" section](https://github.com/typescript-language-server/typescript-language-server?tab=readme-ov-file#installing), basically, open a terminal and execute the following command:
+* [Read the "Installing" section](https://github.com/typescript-language-server/typescript-language-server?tab=readme-ov-file#installing), basically, open a terminal and execute the following command:
 
 **npm install -g typescript-language-server typescript**
 

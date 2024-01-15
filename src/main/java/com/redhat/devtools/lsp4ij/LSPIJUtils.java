@@ -340,7 +340,15 @@ public class LSPIJUtils {
             }
         } else if (edit.getChanges() != null) {
             for (Map.Entry<String, List<TextEdit>> change : edit.getChanges().entrySet()) {
-                VirtualFile file = findResourceFor(change.getKey());
+                String fileUri = change.getKey();
+                VirtualFile file = findResourceFor(fileUri);
+                if (file == null) {
+                    try {
+                        file = createFile(fileUri);
+                    } catch (Exception e) {
+                        LOGGER.error("Cannot create file '" + fileUri + "'", e);
+                    }
+                }
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
