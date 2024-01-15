@@ -23,128 +23,133 @@ import java.util.List;
  */
 public class SupportedFeatures {
 
-	public static @NotNull TextDocumentClientCapabilities getTextDocumentClientCapabilities() {
-		final var textDocumentClientCapabilities = new TextDocumentClientCapabilities();
+    public static @NotNull TextDocumentClientCapabilities getTextDocumentClientCapabilities() {
+        final var textDocumentClientCapabilities = new TextDocumentClientCapabilities();
 
-		// Code Action support
-		final var codeAction = new CodeActionCapabilities(new CodeActionLiteralSupportCapabilities(
-				new CodeActionKindCapabilities(Arrays.asList(CodeActionKind.QuickFix, CodeActionKind.Refactor,
-						CodeActionKind.RefactorExtract, CodeActionKind.RefactorInline,
-						CodeActionKind.RefactorRewrite, CodeActionKind.Source,
-						CodeActionKind.SourceOrganizeImports))),
-				true);
-		codeAction.setDataSupport(true);
-		codeAction.setResolveSupport(new CodeActionResolveSupportCapabilities(List.of("edit")));
-		textDocumentClientCapabilities.setCodeAction(codeAction);
+        // Publish diagnostics capabilities
+        final var publishDiagnosticsCapabilities = new PublishDiagnosticsCapabilities();
+        publishDiagnosticsCapabilities.setDataSupport(Boolean.TRUE);
+        textDocumentClientCapabilities.setPublishDiagnostics(publishDiagnosticsCapabilities);
 
-		// Code Lens support
-		textDocumentClientCapabilities.setCodeLens(new CodeLensCapabilities());
+        // Code Action support
+        final var codeAction = new CodeActionCapabilities(new CodeActionLiteralSupportCapabilities(
+                new CodeActionKindCapabilities(Arrays.asList(CodeActionKind.QuickFix, CodeActionKind.Refactor,
+                        CodeActionKind.RefactorExtract, CodeActionKind.RefactorInline,
+                        CodeActionKind.RefactorRewrite, CodeActionKind.Source,
+                        CodeActionKind.SourceOrganizeImports))),
+                true);
+        codeAction.setDataSupport(true);
+        codeAction.setResolveSupport(new CodeActionResolveSupportCapabilities(List.of("edit")));
+        textDocumentClientCapabilities.setCodeAction(codeAction);
 
-		// Inlay Hint support
-		textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities());
+        // Code Lens support
+        textDocumentClientCapabilities.setCodeLens(new CodeLensCapabilities());
 
-		// textDocument/colorPresentation support
-		textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities());
+        // Inlay Hint support
+        textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities());
 
-		// Completion support
-		final var completionItemCapabilities = new CompletionItemCapabilities(Boolean.TRUE);
-		completionItemCapabilities
-				.setDocumentationFormat(Arrays.asList(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
-		completionItemCapabilities.setInsertTextModeSupport(new CompletionItemInsertTextModeSupportCapabilities(List.of(InsertTextMode.AsIs, InsertTextMode.AdjustIndentation)));
+        // textDocument/colorPresentation support
+        textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities());
 
-		completionItemCapabilities.setResolveSupport(new CompletionItemResolveSupportCapabilities(List.of("documentation" /*, "detail", "additionalTextEdits" */)));
-		CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
-		completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
-		textDocumentClientCapabilities.setCompletion(completionCapabilities);
+        // Completion support
+        final var completionItemCapabilities = new CompletionItemCapabilities(Boolean.TRUE);
+        completionItemCapabilities
+                .setDocumentationFormat(Arrays.asList(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
+        completionItemCapabilities.setInsertTextModeSupport(new CompletionItemInsertTextModeSupportCapabilities(List.of(InsertTextMode.AsIs, InsertTextMode.AdjustIndentation)));
 
-		// Definition support
-		final var definitionCapabilities = new DefinitionCapabilities();
-		definitionCapabilities.setLinkSupport(Boolean.TRUE);
-		textDocumentClientCapabilities.setDefinition(definitionCapabilities);
+        completionItemCapabilities.setResolveSupport(new CompletionItemResolveSupportCapabilities(List.of("documentation" /*, "detail", "additionalTextEdits" */)));
+        CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
+        completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
+        textDocumentClientCapabilities.setCompletion(completionCapabilities);
 
-		// TODO support type definition
-		//final var typeDefinitionCapabilities = new TypeDefinitionCapabilities();
-		//typeDefinitionCapabilities.setLinkSupport(Boolean.TRUE);
-		//textDocumentClientCapabilities.setTypeDefinition(typeDefinitionCapabilities);
+        // Definition support
+        final var definitionCapabilities = new DefinitionCapabilities();
+        definitionCapabilities.setLinkSupport(Boolean.TRUE);
+        textDocumentClientCapabilities.setDefinition(definitionCapabilities);
 
-		// DocumentHighlight support
-		textDocumentClientCapabilities.setDocumentHighlight(new DocumentHighlightCapabilities());
+        // TODO support type definition
+        //final var typeDefinitionCapabilities = new TypeDefinitionCapabilities();
+        //typeDefinitionCapabilities.setLinkSupport(Boolean.TRUE);
+        //textDocumentClientCapabilities.setTypeDefinition(typeDefinitionCapabilities);
 
-		// DocumentLink support
-		textDocumentClientCapabilities.setDocumentLink(new DocumentLinkCapabilities());
+        // DocumentHighlight support
+        textDocumentClientCapabilities.setDocumentHighlight(new DocumentHighlightCapabilities());
 
-		// TODO : support textDocument/documentSymbol
-		/**  final var documentSymbol = new DocumentSymbolCapabilities();
-		documentSymbol.setHierarchicalDocumentSymbolSupport(true);
-		documentSymbol.setSymbolKind(new SymbolKindCapabilities(Arrays.asList(SymbolKind.Array,
-				SymbolKind.Boolean, SymbolKind.Class, SymbolKind.Constant, SymbolKind.Constructor,
-				SymbolKind.Enum, SymbolKind.EnumMember, SymbolKind.Event, SymbolKind.Field, SymbolKind.File,
-				SymbolKind.Function, SymbolKind.Interface, SymbolKind.Key, SymbolKind.Method, SymbolKind.Module,
-				SymbolKind.Namespace, SymbolKind.Null, SymbolKind.Number, SymbolKind.Object,
-				SymbolKind.Operator, SymbolKind.Package, SymbolKind.Property, SymbolKind.String,
-				SymbolKind.Struct, SymbolKind.TypeParameter, SymbolKind.Variable)));
-		textDocumentClientCapabilities.setDocumentSymbol(documentSymbol);
-		**/
-		// TODO : support textDocument/foldingRange
-		// textDocumentClientCapabilities.setFoldingRange(new FoldingRangeCapabilities());
-		// TODO : support textDocument/formatting
-		// textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
+        // DocumentLink support
+        textDocumentClientCapabilities.setDocumentLink(new DocumentLinkCapabilities());
 
-		// Hover support
-		final var hoverCapabilities = new HoverCapabilities();
-		hoverCapabilities.setContentFormat(Arrays.asList(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
-		textDocumentClientCapabilities.setHover(hoverCapabilities);
+        // TODO : support textDocument/documentSymbol
+        /**  final var documentSymbol = new DocumentSymbolCapabilities();
+         documentSymbol.setHierarchicalDocumentSymbolSupport(true);
+         documentSymbol.setSymbolKind(new SymbolKindCapabilities(Arrays.asList(SymbolKind.Array,
+         SymbolKind.Boolean, SymbolKind.Class, SymbolKind.Constant, SymbolKind.Constructor,
+         SymbolKind.Enum, SymbolKind.EnumMember, SymbolKind.Event, SymbolKind.Field, SymbolKind.File,
+         SymbolKind.Function, SymbolKind.Interface, SymbolKind.Key, SymbolKind.Method, SymbolKind.Module,
+         SymbolKind.Namespace, SymbolKind.Null, SymbolKind.Number, SymbolKind.Object,
+         SymbolKind.Operator, SymbolKind.Package, SymbolKind.Property, SymbolKind.String,
+         SymbolKind.Struct, SymbolKind.TypeParameter, SymbolKind.Variable)));
+         textDocumentClientCapabilities.setDocumentSymbol(documentSymbol);
+         **/
+        // TODO : support textDocument/foldingRange
+        // textDocumentClientCapabilities.setFoldingRange(new FoldingRangeCapabilities());
+        // TODO : support textDocument/formatting
+        // textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
 
-		// TODO: support onTypeFormatting
-		// textDocumentClientCapabilities.setOnTypeFormatting(null); // TODO
-		// TODO : support textDocument/rangeFormatting
-		// textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities());
-		// TODO : support textDocument/references
-		// textDocumentClientCapabilities.setReferences(new ReferencesCapabilities());
-		// TODO : support textDocument/rename
-		//final var renameCapabilities = new RenameCapabilities();
-		//renameCapabilities.setPrepareSupport(true);
-		//textDocumentClientCapabilities.setRename(renameCapabilities);
-		// TODO : support textDocument/signatureHelp
-		// textDocumentClientCapabilities.setSignatureHelp(new SignatureHelpCapabilities());
+        // Hover support
+        final var hoverCapabilities = new HoverCapabilities();
+        hoverCapabilities.setContentFormat(Arrays.asList(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
+        textDocumentClientCapabilities.setHover(hoverCapabilities);
 
-		// Synchronization support
-		textDocumentClientCapabilities
-				.setSynchronization(new SynchronizationCapabilities(Boolean.TRUE, Boolean.TRUE, Boolean.TRUE));
+        // TODO: support onTypeFormatting
+        // textDocumentClientCapabilities.setOnTypeFormatting(null); // TODO
+        // TODO : support textDocument/rangeFormatting
+        // textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities());
+        // TODO : support textDocument/references
+        // textDocumentClientCapabilities.setReferences(new ReferencesCapabilities());
+        // TODO : support textDocument/rename
+        //final var renameCapabilities = new RenameCapabilities();
+        //renameCapabilities.setPrepareSupport(true);
+        //textDocumentClientCapabilities.setRename(renameCapabilities);
+        // TODO : support textDocument/signatureHelp
+        // textDocumentClientCapabilities.setSignatureHelp(new SignatureHelpCapabilities());
 
-		// TODO
-		// SelectionRangeCapabilities selectionRange = new SelectionRangeCapabilities();
-		// textDocumentClientCapabilities.setSelectionRange(selectionRange);
-		return textDocumentClientCapabilities;
-	}
+        // Synchronization support
+        textDocumentClientCapabilities
+                .setSynchronization(new SynchronizationCapabilities(Boolean.TRUE, Boolean.TRUE, Boolean.TRUE));
 
-	public static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
-		final var workspaceClientCapabilities = new WorkspaceClientCapabilities();
-		workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
-		// TODO
-		// workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
-		workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
-		// TODO
-		// workspaceClientCapabilities.setSymbol(new SymbolCapabilities(Boolean.TRUE));
-		workspaceClientCapabilities.setWorkspaceFolders(Boolean.TRUE);
-		WorkspaceEditCapabilities editCapabilities = new WorkspaceEditCapabilities();
-		editCapabilities.setDocumentChanges(Boolean.TRUE);
-		// TODO
-		// editCapabilities.setResourceOperations(Arrays.asList(ResourceOperationKind.Create,
-		//		ResourceOperationKind.Delete, ResourceOperationKind.Rename));
-		// TODO
-		// editCapabilities.setFailureHandling(FailureHandlingKind.Undo);
-		workspaceClientCapabilities.setWorkspaceEdit(editCapabilities);
-		workspaceClientCapabilities.setDidChangeWatchedFiles(new DidChangeWatchedFilesCapabilities(Boolean.TRUE));
-		return workspaceClientCapabilities;
-	}
+        // TODO
+        // SelectionRangeCapabilities selectionRange = new SelectionRangeCapabilities();
+        // textDocumentClientCapabilities.setSelectionRange(selectionRange);
+        return textDocumentClientCapabilities;
+    }
 
-	public static WindowClientCapabilities getWindowClientCapabilities() {
-		final var windowClientCapabilities = new WindowClientCapabilities();
-		//windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
-		//windowClientCapabilities.setWorkDoneProgress(true);
-		//windowClientCapabilities.setShowMessage(new WindowShowMessageRequestCapabilities());
-		return windowClientCapabilities;
-	}
+    public static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
+        final var workspaceClientCapabilities = new WorkspaceClientCapabilities();
+        workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
+        // TODO
+        // workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
+        workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
+        // TODO
+        // workspaceClientCapabilities.setSymbol(new SymbolCapabilities(Boolean.TRUE));
+        workspaceClientCapabilities.setWorkspaceFolders(Boolean.TRUE);
+        WorkspaceEditCapabilities editCapabilities = new WorkspaceEditCapabilities();
+        editCapabilities.setDocumentChanges(Boolean.TRUE);
+        // TODO
+        // editCapabilities.setResourceOperations(Arrays.asList(ResourceOperationKind.Create,
+        //		ResourceOperationKind.Delete, ResourceOperationKind.Rename));
+        // TODO
+        // editCapabilities.setFailureHandling(FailureHandlingKind.Undo);
+        workspaceClientCapabilities.setWorkspaceEdit(editCapabilities);
+        workspaceClientCapabilities.setDidChangeWatchedFiles(new DidChangeWatchedFilesCapabilities(Boolean.TRUE));
+        return workspaceClientCapabilities;
+    }
+
+    public static WindowClientCapabilities getWindowClientCapabilities() {
+        final var windowClientCapabilities = new WindowClientCapabilities();
+        //windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
+        //windowClientCapabilities.setWorkDoneProgress(true);
+        //windowClientCapabilities.setShowMessage(new WindowShowMessageRequestCapabilities());
+        return windowClientCapabilities;
+    }
 
 }
