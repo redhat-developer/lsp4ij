@@ -419,6 +419,18 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Gets list of running LS satisfying a capability predicate. This does not
+     * start any matching language servers, it returns the already running ones.
+     *
+     * @param request
+     * @return list of Language Servers
+     */
+    @NotNull
+    public List<LanguageServer> getActiveLanguageServers(Predicate<ServerCapabilities> request) {
+        return getLanguageServers(null, request, true);
+    }
+    
+    /**
      * Gets list of LS initialized for given project
      *
      * @param onlyActiveLS true if this method should return only the already running
