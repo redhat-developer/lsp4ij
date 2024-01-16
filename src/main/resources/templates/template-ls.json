@@ -2,7 +2,7 @@
   "templates": [
     {
       "name": "CSS Language Server",
-      "docPath": "node/vscode-css-language-server.md",
+      "docPath": "nodejs/vscode-css-language-server.md",
       "runtime": "node",
       "programArgs": {
         "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
@@ -18,8 +18,22 @@
       ]
     },
     {
+      "name": "Go Language Server",
+      "dev": true,
+      "docPath": "go/gopls.md",
+      "programArgs": {
+        "default": "gopls -mode=stdio"
+      },
+      "fileTypeMappings": [
+        {
+          "fileType": "Go",
+          "languageId": "go"
+        }
+      ]
+    },
+    {
       "name": "HTML Language Server",
-      "docPath": "node/vscode-html-language-server.md",
+      "docPath": "nodejs/vscode-html-language-server.md",
       "runtime": "node",
       "programArgs": {
         "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
@@ -37,7 +51,7 @@
     {
       "name": "TypeScript Language Server",
       "dev": true,
-      "docPath": "node/typescript-language-server.md",
+      "docPath": "nodejs/typescript-language-server.md",
       "programArgs": {
         "default": "typescript-language-server --stdio"
       },
