@@ -178,9 +178,14 @@ public class LSPCompletionProposal extends LookupElement {
         }
         String insertText = getInsertText();
         try {
-            String subDoc = document.getText(new TextRange(
-                    Math.max(0, completionOffset - insertText.length()),
-                    Math.min(insertText.length(), completionOffset)));
+            // insertText= 'charAt'
+            // document= "".ch|a
+            // we have to return "".| as offset
+
+            // Search the offset between ["".ch|a]
+            int startOffset = Math.max(0, completionOffset - insertText.length());
+            int endOffset = startOffset + Math.min(insertText.length(), completionOffset);
+            String subDoc = document.getText(new TextRange(startOffset, endOffset)); // "".ch
             for (int i = 0; i < insertText.length() && i < completionOffset; i++) {
                 String tentativeCommonString = subDoc.substring(i);
                 if (insertText.startsWith(tentativeCommonString)) {
