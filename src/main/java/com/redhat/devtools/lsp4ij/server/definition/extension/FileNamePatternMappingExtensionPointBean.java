@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2020 Red Hat Inc. and others.
+ * Copyright (c) 2024 Red Hat Inc. and others.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v. 2.0 which is available at
@@ -28,31 +28,32 @@ import org.jetbrains.annotations.Nullable;
  * <pre>
  *   <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
  *
- *     <fileTypeMapping fileType="CSS"
+ *     <fileNamePatternMapping
+ *                      patterns="*.css;*.less"
  *                      serverId="myLanguageServerId"
  *                      languageId="css" />
  *   </extensions>
  * </pre>
  */
-public class FileTypeMappingExtensionPointBean extends BaseKeyedLazyInstance<DocumentMatcher> {
+public class FileNamePatternMappingExtensionPointBean extends BaseKeyedLazyInstance<DocumentMatcher> {
 
     private static final DocumentMatcher DEFAULT_DOCUMENT_MATCHER = (file,project) -> true;
 
-    public static final ExtensionPointName<FileTypeMappingExtensionPointBean> EP_NAME = ExtensionPointName.create("com.redhat.devtools.lsp4ij.fileTypeMapping");
+    public static final ExtensionPointName<FileNamePatternMappingExtensionPointBean> EP_NAME = ExtensionPointName.create("com.redhat.devtools.lsp4ij.fileNamePatternMapping");
 
     /**
-     * The language server mapped with the language {@link #fileType IntelliJ language}.
+     * The language server mapped with the language {@link #patterns file name patterns}.
      */
     @Attribute("serverId")
     @RequiredElement
     public String serverId;
 
     /**
-     * The IntelliJ file type mapped with the language server {@link #serverId server id}.
+     * Semicolon-separated list of patterns (strings containing ? and * characters) to be associated with the language server {@link #serverId server id}.
      */
-    @Attribute("fileType")
+    @Attribute("patterns")
     @RequiredElement
-    public String fileType;
+    public String patterns;
 
     /**
      * The LSP language ID which must be used in the LSP {@link TextDocumentItem#getLanguageId()}. If it is not defined

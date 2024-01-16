@@ -859,7 +859,7 @@ public class LanguageServerWrapper implements Disposable {
     @Nullable
     public String getLanguageId(@Nullable Language language) {
         while (language != null) {
-            String languageId = serverDefinition.languageIdLanguageMappings.get(language);
+            String languageId = serverDefinition.getLanguageId(language);
             if (languageId != null) {
                 return languageId;
             }
@@ -877,7 +877,16 @@ public class LanguageServerWrapper implements Disposable {
         if (fileType == null) {
             return null;
         }
-        return serverDefinition.languageIdFileTypeMappings.get(fileType);
+        return serverDefinition.getLanguageId(fileType);
+    }
+
+    /**
+     * @return The language ID that this wrapper is dealing with if defined in the
+     * file type mapping for the language server
+     */
+    @Nullable
+    public String getLanguageId(@NotNull String filename) {
+        return serverDefinition.getLanguageId(filename);
     }
 
     public void registerCapability(RegistrationParams params) {

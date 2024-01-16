@@ -12,8 +12,19 @@
       },
       "fileTypeMappings": [
         {
-          "fileType": "CSS",
+          "fileType": {
+            "name": "CSS"
+          },
           "languageId": "css"
+        },
+        {
+          "fileType": {
+            "name": "LESS",
+            "patterns": [
+              "*.less"
+            ]
+          },
+          "languageId": "less"
         }
       ]
     },
@@ -26,7 +37,12 @@
       },
       "fileTypeMappings": [
         {
-          "fileType": "Go",
+          "fileType": {
+            "name": "Go",
+            "patterns": [
+              "*.go"
+            ]
+          },
           "languageId": "go"
         }
       ]
@@ -57,11 +73,18 @@
       },
       "fileTypeMappings": [
         {
-          "fileType": "JavaScript",
+          "fileType": {
+            "name": "JavaScript"
+          },
           "languageId": "javascript"
         },
         {
-          "fileType": "TypeScript",
+          "fileType": {
+            "name": "TypeScript",
+            "patterns": [
+              "*.ts"
+            ]
+          },
           "languageId": "typescript"
         }
       ]

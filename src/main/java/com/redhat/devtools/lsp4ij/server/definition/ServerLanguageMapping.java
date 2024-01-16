@@ -26,7 +26,7 @@ public class ServerLanguageMapping extends ServerMapping {
     @NotNull
     private final Language language;
 
-    public ServerLanguageMapping(@NotNull Language language, @NotNull String serverId, @NotNull String languageId, @NotNull DocumentMatcher documentMatcher) {
+    public ServerLanguageMapping(@NotNull Language language, @NotNull String serverId, @Nullable String languageId, @NotNull DocumentMatcher documentMatcher) {
         super(serverId, languageId, documentMatcher);
         this.language = language;
     }

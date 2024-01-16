@@ -152,7 +152,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
     /**
      * Notifies all registered change handlers when the state changed
      */
-    public void fireStateChanged() {
+    private void fireStateChanged() {
         for (Runnable handler : myChangeHandlers) {
             handler.run();
         }

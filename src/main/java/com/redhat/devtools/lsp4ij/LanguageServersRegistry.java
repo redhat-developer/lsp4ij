@@ -14,6 +14,7 @@ import com.intellij.codeInsight.hints.NoSettings;
 import com.intellij.codeInsight.hints.ProviderInfo;
 import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
@@ -21,16 +22,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensProvider;
 import com.redhat.devtools.lsp4ij.operations.color.LSPColorProvider;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.server.definition.*;
-import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean;
-import com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean;
-import com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -55,7 +53,7 @@ public class LanguageServersRegistry {
 
     private final Map<String, LanguageServerDefinition> serverDefinitions = new HashMap<>();
 
-    private final List<ContentTypeToLanguageServerDefinition> connections = new ArrayList<>();
+    private final List<LanguageServerFileAssociation> fileAssociations = new ArrayList<>();
 
     private final Collection<LanguageServerDefinitionListener> listeners = new CopyOnWriteArrayList<>();
 
@@ -84,12 +82,8 @@ public class LanguageServersRegistry {
             Language language = Language.findLanguageByID(extension.language);
             if (language != null) {
                 String serverId = extension.serverId;
-                List<ServerMapping> mappingsForServer = mappings.get(serverId);
-                if (mappingsForServer == null) {
-                    mappingsForServer = new ArrayList<>();
-                    mappings.put(serverId, mappingsForServer);
-                }
-                @NotNull String languageId = StringUtils.isEmpty(extension.languageId) ? language.getID() : extension.languageId;
+                List<ServerMapping> mappingsForServer = mappings.computeIfAbsent(serverId, k -> new ArrayList<>());
+                @Nullable String languageId = extension.languageId;
                 mappingsForServer.add(new ServerLanguageMapping(language, serverId, languageId, extension.getDocumentMatcher()));
             }
         }
@@ -99,14 +93,19 @@ public class LanguageServersRegistry {
             FileType fileType = FileTypeManager.getInstance().findFileTypeByName(extension.fileType);
             if (fileType != null) {
                 String serverId = extension.serverId;
-                List<ServerMapping> mappingsForServer = mappings.get(serverId);
-                if (mappingsForServer == null) {
-                    mappingsForServer = new ArrayList<>();
-                    mappings.put(serverId, mappingsForServer);
-                }
-                @NotNull String languageId = StringUtils.isEmpty(extension.languageId) ? fileType.getName() : extension.languageId;
+                List<ServerMapping> mappingsForServer = mappings.computeIfAbsent(serverId, k -> new ArrayList<>());
+                @Nullable String languageId = extension.languageId;
                 mappingsForServer.add(new ServerFileTypeMapping(fileType, extension.serverId, languageId, extension.getDocumentMatcher()));
             }
+        }
+
+        // Load file name patterns mappings from extensions point
+        for (FileNamePatternMappingExtensionPointBean extension : FileNamePatternMappingExtensionPointBean.EP_NAME.getExtensions()) {
+            String serverId = extension.serverId;
+            List<ServerMapping> mappingsForServer = mappings.computeIfAbsent(serverId, k -> new ArrayList<>());
+            @Nullable String languageId = extension.languageId;
+            List<String> patterns = Arrays.asList(extension.patterns.split(";"));
+            mappingsForServer.add(new ServerFileNamePatternMapping(patterns, extension.serverId, languageId, extension.getDocumentMatcher()));
         }
 
         // Load language servers from extensions point
@@ -127,55 +126,43 @@ public class LanguageServersRegistry {
     }
 
     private void loadServersAndMappingFromSettings() {
-        for (var launch : UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings()) {
-            String serverId = launch.getServerId();
-
-            List<ServerMapping> mappings = new ArrayList<>();
-            // Collect mappings
-            for (var mapping : launch.getMappings()) {
-                if (mapping != null) {
-                    String mappingLanguage = mapping.getLanguage();
-                    if (!StringUtils.isEmpty(mappingLanguage)) {
-                        Language language = Language.findLanguageByID(mappingLanguage);
-                        if (language != null) {
-                            // Register language mapping from settings
-                            @NotNull String languageId = StringUtils.isEmpty(mapping.getLanguageId()) ? language.getID() : mapping.getLanguageId();
-                            mappings.add(new ServerLanguageMapping(language, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
-                        }
-                    } else {
-                        String mappingFileType = mapping.getFileType();
-                        if (!StringUtils.isEmpty(mappingFileType)) {
-                            FileType fileType = FileTypeManager.getInstance().findFileTypeByName(mappingFileType);
-                            if (fileType != null) {
-                                // Register file type mapping from settings
-                                @NotNull String languageId = StringUtils.isEmpty(mapping.getLanguageId()) ? fileType.getName() : mapping.getLanguageId();
-                                mappings.add(new ServerFileTypeMapping(fileType, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
-                            }
-                        }
-                    }
-                }
+        try {
+            for (var launch : UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings()) {
+                String serverId = launch.getServerId();
+                List<ServerMapping> mappings = toServerMappings(serverId, launch.getMappings());
+                // Register server definition from settings
+                addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(serverId, launch.getServerName(), "", launch.getCommandLine()), mappings);
             }
-
-            // Register server definition from settings
-            addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(serverId, launch.getServerName(), "", launch.getCommandLine()), mappings);
+        }
+        catch(Exception e) {
+            LOGGER.error("Error while loading user defined language servers from settings", e);
         }
     }
 
     private void updateInlayHintsProviders() {
         // register LSPInlayHintInlayHintsProvider + LSPCodelensInlayHintsProvider automatically for all languages
         // which are associated with a language server.
-        Set<Language> distinctLanguages = connections
+        Set<Language> distinctLanguages = fileAssociations
                 .stream()
-                .map(ContentTypeToLanguageServerDefinition::getLanguage)
+                .map(LanguageServerFileAssociation::getLanguage)
                 .filter(language -> language != null)
                 .collect(Collectors.toSet());
-        // When a file is not linked to a language (just with a file type),
+        // When a file is not linked to a language (just with a file type) but with textmate
+        // to support syntax coloration,the language received in InlayHintProviders
+        // is "textmate", we add it to support
+        // LSP codeLens, inlayHint, color for a file which is not linked to a language.
+        Language textMateLanguage = Language.findLanguageByID("textmate");
+        if (textMateLanguage != null) {
+            distinctLanguages.add(textMateLanguage);
+        }
+        // When a file is not linked to a language (just with a file type) and not linked to a textmate,
         // the language received in InlayHintProviders is plain/text, we add it to support
         // LSP codeLens, inlayHint, color for a file which is not linked to a language.
         distinctLanguages.add(PlainTextLanguage.INSTANCE);
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
         LSPCodelensProvider lspCodeLensProvider = new LSPCodelensProvider();
         LSPColorProvider lspColorProvider = new LSPColorProvider();
+        inlayHintsProviders.clear();
         for (Language language : distinctLanguages) {
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspInlayHintsProvider));
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspCodeLensProvider));
@@ -195,6 +182,12 @@ public class LanguageServersRegistry {
             message.append("file type '");
             message.append(fileTypeMapping.getFileType());
             message.append("'");
+        } else if (mapping instanceof ServerFileNamePatternMapping fileNamePatternMapping) {
+            message.append("file name pattern '");
+            message.append(fileNamePatternMapping.getFileNamePatterns()
+                    .stream()
+                    .collect(Collectors.joining(",")));
+            message.append("'");
         }
         message.append(" not available");
         return message.toString();
@@ -203,17 +196,18 @@ public class LanguageServersRegistry {
     /**
      * @param language the language
      * @param fileType the file type.
+     * @param file
      * @return the {@link LanguageServerDefinition}s <strong>directly</strong> associated to the given content-type.
      * This does <strong>not</strong> include the one that match transitively as per content-type hierarchy
      */
-    List<ContentTypeToLanguageServerDefinition> findLanguageServerDefinitionFor(final @Nullable Language language, @Nullable FileType fileType) {
-        return connections.stream()
-                .filter(mapping -> mapping.match(language, fileType))
+    List<LanguageServerFileAssociation> findLanguageServerDefinitionFor(final @Nullable Language language, @Nullable FileType fileType, @NotNull VirtualFile file) {
+        return fileAssociations.stream()
+                .filter(mapping -> mapping.match(language, fileType, file.getName()))
                 .collect(Collectors.toList());
     }
 
-    public List<ContentTypeToLanguageServerDefinition> findLanguageServerDefinitionFor(final @NotNull String serverId) {
-        return connections.stream()
+    public List<LanguageServerFileAssociation> findLanguageServerDefinitionFor(final @NotNull String serverId) {
+        return fileAssociations.stream()
                 .filter(mapping -> serverId.equals(mapping.getServerDefinition().id))
                 .collect(Collectors.toList());
     }
@@ -221,14 +215,25 @@ public class LanguageServersRegistry {
     public void registerAssociation(@NotNull LanguageServerDefinition serverDefinition, @NotNull ServerMapping mapping) {
         if (mapping instanceof ServerLanguageMapping languageMapping) {
             @NotNull Language language = languageMapping.getLanguage();
-            @NotNull String languageId = mapping.getLanguageId();
-            serverDefinition.registerAssociation(language, languageId);
-            connections.add(new ContentTypeToLanguageServerDefinition(language, serverDefinition, mapping.getDocumentMatcher()));
+            @Nullable String languageId = mapping.getLanguageId();
+            if (!StringUtils.isEmpty(languageId)) {
+                serverDefinition.registerAssociation(language, languageId);
+            }
+            fileAssociations.add(new LanguageServerFileAssociation(language, serverDefinition, mapping.getDocumentMatcher(), languageId));
         } else if (mapping instanceof ServerFileTypeMapping fileTypeMapping) {
             @NotNull FileType fileType = fileTypeMapping.getFileType();
-            @NotNull String languageId = mapping.getLanguageId();
-            serverDefinition.registerAssociation(fileType, languageId);
-            connections.add(new ContentTypeToLanguageServerDefinition(fileType, serverDefinition, mapping.getDocumentMatcher()));
+            @Nullable String languageId = mapping.getLanguageId();
+            if (!StringUtils.isEmpty(languageId)) {
+                serverDefinition.registerAssociation(fileType, languageId);
+            }
+            fileAssociations.add(new LanguageServerFileAssociation(fileType, serverDefinition, mapping.getDocumentMatcher(), languageId));
+        } else if (mapping instanceof ServerFileNamePatternMapping fileNamePatternMapping) {
+            List<FileNameMatcher> matchers = fileNamePatternMapping.getFileNameMatchers();
+            @Nullable String languageId = mapping.getLanguageId();
+            if (!StringUtils.isEmpty(languageId)) {
+                serverDefinition.registerAssociation(matchers, languageId);
+            }
+            fileAssociations.add(new LanguageServerFileAssociation(matchers, serverDefinition, mapping.getDocumentMatcher(), languageId));
         }
     }
 
@@ -252,7 +257,7 @@ public class LanguageServersRegistry {
     }
 
     public void addServerDefinition(@NotNull LanguageServerDefinition definition, @Nullable List<ServerMappingSettings> mappings) {
-        addServerDefinitionWithoutNotification(definition, toServerMapping(definition.id, mappings));
+        addServerDefinitionWithoutNotification(definition, toServerMappings(definition.id, mappings));
         updateInlayHintsProviders();
         LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(Collections.singleton(definition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
@@ -299,32 +304,43 @@ public class LanguageServersRegistry {
                         return ServerMappingSettings.createLanguageMappingSettings(languageMapping.getLanguage().getID(), languageMapping.getLanguageId());
                     } else if (mapping instanceof ServerFileTypeMapping fileTypeMapping) {
                         return ServerMappingSettings.createFileTypeMappingSettings(fileTypeMapping.getFileType().getName(), fileTypeMapping.getLanguageId());
+                    } else if (mapping instanceof ServerFileNamePatternMapping fileNamePatternMapping) {
+                        return ServerMappingSettings.createFileNamePatternsMappingSettings(fileNamePatternMapping.getFileNamePatterns(), fileNamePatternMapping.getLanguageId());
                     }
                     // should never occur
                     return null;
                 })
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    private static List<ServerMapping> toServerMapping(String serverId, List<ServerMappingSettings> mappingSettings) {
+    private static List<ServerMapping> toServerMappings(String serverId, List<ServerMappingSettings> mappingSettings) {
         List<ServerMapping> mappings = new ArrayList<>();
         if (!mappingSettings.isEmpty()) {
-            for (var mappingInfo : mappingSettings) {
-                String userLanguageId = mappingInfo.getLanguageId();
-                String mappingLanguage = mappingInfo.getLanguage();
+            for (var mapping : mappingSettings) {
+                String languageId = mapping.getLanguageId();
+                String mappingLanguage = mapping.getLanguage();
                 if (!StringUtils.isEmpty(mappingLanguage)) {
                     Language language = Language.findLanguageByID(mappingLanguage);
                     if (language != null) {
-                        @NotNull String languageId = StringUtils.isEmpty(userLanguageId) ? language.getID() : userLanguageId;
                         mappings.add(new ServerLanguageMapping(language, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
                     }
                 } else {
-                    String mappingFileType = mappingInfo.getFileType();
+                    boolean fileTypeMappingCreated = false;
+                    String mappingFileType = mapping.getFileType();
                     if (!StringUtils.isEmpty(mappingFileType)) {
                         FileType fileType = FileTypeManager.getInstance().findFileTypeByName(mappingFileType);
                         if (fileType != null) {
-                            @NotNull String languageId = StringUtils.isEmpty(userLanguageId) ? fileType.getName() : userLanguageId;
+                            // Register file type mapping from settings
                             mappings.add(new ServerFileTypeMapping(fileType, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
+                            fileTypeMappingCreated = true;
+                        }
+                    }
+                    if (!fileTypeMappingCreated) {
+                        List<String> patterns = mapping.getFileNamePatterns();
+                        if (patterns != null) {
+                            // Register file name patterns mapping from settings
+                            mappings.add(new ServerFileNamePatternMapping(patterns, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
                         }
                     }
                 }
@@ -354,11 +370,11 @@ public class LanguageServersRegistry {
     }
 
     private void removeAssociationsFor(LanguageServerDefinition definition) {
-        List<ContentTypeToLanguageServerDefinition> mappingsToRemove = connections
+        List<LanguageServerFileAssociation> mappingsToRemove = fileAssociations
                 .stream()
                 .filter(mapping -> definition.equals(mapping.getServerDefinition()))
                 .collect(Collectors.toList());
-        connections.removeAll(mappingsToRemove);
+        fileAssociations.removeAll(mappingsToRemove);
     }
 
 
@@ -372,7 +388,7 @@ public class LanguageServersRegistry {
         // remove associations
         removeAssociationsFor(definition);
         // Update associations
-        updateAssociations(definition, toServerMapping(definition.id, mappings));
+        updateAssociations(definition, toServerMappings(definition.id, mappings));
 
         UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(definition.id);
         boolean nameChanged = !Objects.equals(settings.getServerName(), name);
@@ -430,12 +446,9 @@ public class LanguageServersRegistry {
         }
         Language language = LSPIJUtils.getFileLanguage(file, project);
         FileType fileType = file.getFileType();
-        if (language == null && fileType == null) {
-            return false;
-        }
-        return connections
+        return fileAssociations
                 .stream()
-                .anyMatch(mapping -> mapping.match(language, fileType));
+                .anyMatch(mapping -> mapping.match(language, fileType, file.getName()));
     }
 
     /**
