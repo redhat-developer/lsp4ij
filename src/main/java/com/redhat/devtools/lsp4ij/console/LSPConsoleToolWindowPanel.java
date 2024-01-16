@@ -37,7 +37,7 @@ import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.launching.ui.CommandLineWidget;
+import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;

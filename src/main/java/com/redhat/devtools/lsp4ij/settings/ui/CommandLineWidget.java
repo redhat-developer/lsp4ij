@@ -11,7 +11,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.launching.ui;
+package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBFont;

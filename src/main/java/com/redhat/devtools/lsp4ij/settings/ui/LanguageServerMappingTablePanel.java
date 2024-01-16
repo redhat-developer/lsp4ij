@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.launching.ui;
+package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageUtil;
@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 /**
  * UI table used to insert/delete language mappings for a given language server definition.
  */
-public class LanguageServerMappingTablePanel extends ServerMappingTablePanel {
+public class LanguageServerMappingTablePanel extends AbstractServerMappingTablePanel {
 
     public LanguageServerMappingTablePanel() {
         this(true);

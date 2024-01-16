@@ -14,8 +14,11 @@
 package com.redhat.devtools.lsp4ij.launching;
 
 import com.intellij.util.xmlb.annotations.Attribute;
+import com.intellij.util.xmlb.annotations.Tag;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Language Server mapping settings used by the launch configuration.
@@ -25,8 +28,8 @@ public class ServerMappingSettings {
     @Attribute("language")
     private String language;
 
-    @Attribute("fileType")
-    private String fileType;
+    @Tag("fileType")
+    private FileTypeSettings fileType;
 
     @Attribute("languageId")
     private String languageId;
@@ -35,7 +38,9 @@ public class ServerMappingSettings {
 
     }
 
-    private ServerMappingSettings(@Nullable String language, @Nullable String fileType, @Nullable String languageId) {
+    private ServerMappingSettings(@Nullable String language,
+                                  @Nullable FileTypeSettings fileType,
+                                  @Nullable String languageId) {
         this.language = language;
         this.fileType = fileType;
         this.languageId = languageId;
@@ -46,7 +51,11 @@ public class ServerMappingSettings {
     }
 
     public static ServerMappingSettings createFileTypeMappingSettings(@NotNull String fileType, @Nullable String languageId) {
-        return new ServerMappingSettings(null, fileType, languageId);
+        return new ServerMappingSettings(null, new FileTypeSettings(fileType, null),languageId);
+    }
+
+    public static ServerMappingSettings createFileNamePatternsMappingSettings(@NotNull List<String> fileNamePatterns, @Nullable String languageId) {
+        return new ServerMappingSettings(null, new FileTypeSettings(null, fileNamePatterns),languageId);
     }
 
     public String getLanguage() {
@@ -54,7 +63,11 @@ public class ServerMappingSettings {
     }
 
     public String getFileType() {
-        return fileType;
+        return fileType != null ? fileType.getName() : null;
+    }
+
+    public List<String> getFileNamePatterns() {
+        return fileType != null ? fileType.getPatterns() : null;
     }
 
     public String getLanguageId() {
@@ -66,7 +79,11 @@ public class ServerMappingSettings {
     }
 
     public void setFileType(String fileType) {
-        this.fileType = fileType;
+        this.fileType = new FileTypeSettings(fileType, null);
+    }
+
+    public void setFileNamePatterns(List<String> fileNamePatterns) {
+        this.fileType = new FileTypeSettings(null, fileNamePatterns);
     }
 
     public void setLanguageId(String languageId) {

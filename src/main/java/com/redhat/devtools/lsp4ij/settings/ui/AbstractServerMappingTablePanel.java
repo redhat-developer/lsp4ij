@@ -11,12 +11,13 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.launching.ui;
+package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.ui.AnActionButton;
 import com.intellij.ui.AnActionButtonRunnable;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.table.TableView;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.ListTableModel;
 import com.intellij.util.ui.components.BorderLayoutPanel;
@@ -31,11 +32,13 @@ import java.util.List;
 /**
  * Base class for filling language server mappings with a UI table.
  */
-public abstract class ServerMappingTablePanel extends BorderLayoutPanel {
+public abstract class AbstractServerMappingTablePanel extends BorderLayoutPanel {
 
     private final TableView<ServerMappingSettings> table;
 
-    public ServerMappingTablePanel(ColumnInfo<ServerMappingSettings, String> columnId, boolean editable) {
+    private final List<Runnable> myChangeHandlers = ContainerUtil.createConcurrentList();
+
+    public AbstractServerMappingTablePanel(ColumnInfo<ServerMappingSettings, String> columnId, boolean editable) {
         ListTableModel<ServerMappingSettings> model = new ListTableModel<>(
                 new ColumnInfo[]{columnId, new LanguageIdColumn(editable)},
                 new ArrayList<>(),
@@ -63,6 +66,7 @@ public abstract class ServerMappingTablePanel extends BorderLayoutPanel {
             public void run(AnActionButton anActionButton) {
                 ServerMappingSettings newMapping = createServerMappingSettings();
                 table.getListTableModel().addRow(newMapping);
+                fireStateChanged();
             }
         };
     }
@@ -74,14 +78,15 @@ public abstract class ServerMappingTablePanel extends BorderLayoutPanel {
             @Override
             public void run(AnActionButton anActionButton) {
                 table.getListTableModel().removeRow(table.getSelectedRow());
+                fireStateChanged();
             }
         };
     }
 
     public void refresh(@NotNull List<ServerMappingSettings> mappings) {
         table.getListTableModel().setItems(mappings);
+        fireStateChanged();
     }
-
 
     private static class LanguageIdColumn extends ColumnInfo<ServerMappingSettings, String> {
 
@@ -110,5 +115,32 @@ public abstract class ServerMappingTablePanel extends BorderLayoutPanel {
 
     protected TableView<ServerMappingSettings> getTable() {
         return table;
+    }
+
+    /**
+     * Adds the given changeHandler to the list of registered change handlers
+     *
+     * @param changeHandler the changeHandler to remove
+     */
+    public void addChangeHandler(@NotNull Runnable changeHandler) {
+        myChangeHandlers.add(changeHandler);
+    }
+
+    /**
+     * Removes the given changeHandler from the list of registered change handlers
+     *
+     * @param changeHandler the changeHandler to remove
+     */
+    public void removeChangeHandler(@NotNull Runnable changeHandler) {
+        myChangeHandlers.remove(changeHandler);
+    }
+
+    /**
+     * Notifies all registered change handlers when the state changed
+     */
+    private void fireStateChanged() {
+        for (Runnable handler : myChangeHandlers) {
+            handler.run();
+        }
     }
 }

@@ -11,7 +11,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.launching.ui;
+package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 /**
  * UI table used to insert/delete file type mappings for a given language server definition.
  */
-public class FileTypeServerMappingTablePanel extends ServerMappingTablePanel {
+public class FileTypeServerMappingTablePanel extends AbstractServerMappingTablePanel {
 
     public FileTypeServerMappingTablePanel() {
         this(true);

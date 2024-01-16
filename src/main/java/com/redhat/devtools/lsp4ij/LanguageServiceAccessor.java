@@ -18,7 +18,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.server.definition.ContentTypeToLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import org.eclipse.lsp4j.ServerCapabilities;
@@ -294,7 +294,7 @@ public class LanguageServiceAccessor implements Disposable {
     private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull VirtualFile file, @NotNull Project fileProject) {
 
         Set<LanguageServerDefinition> syncMatchedDefinitions = null;
-        Set<ContentTypeToLanguageServerDefinition> asyncMatchedDefinitions = null;
+        Set<LanguageServerFileAssociation> asyncMatchedDefinitions = null;
 
         // look for running language servers via content-type
         Queue<Object> languages = new LinkedList<>();
@@ -321,8 +321,8 @@ public class LanguageServiceAccessor implements Disposable {
                 currentLanguage = (Language) contentType;
             }
             // Loop for server/language mapping
-            for (ContentTypeToLanguageServerDefinition mapping : LanguageServersRegistry.getInstance()
-                    .findLanguageServerDefinitionFor(currentLanguage, currentFileType)) {
+            for (LanguageServerFileAssociation mapping : LanguageServersRegistry.getInstance()
+                    .findLanguageServerDefinitionFor(currentLanguage, currentFileType, file)) {
                 if (mapping == null || !mapping.isEnabled() || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
                     // the mapping is disabled
                     // or the server definition has been already added
@@ -375,7 +375,7 @@ public class LanguageServiceAccessor implements Disposable {
         return MatchedLanguageServerDefinitions.NO_MATCH;
     }
 
-    private static boolean match(VirtualFile file, Project fileProject, ContentTypeToLanguageServerDefinition mapping) {
+    private static boolean match(VirtualFile file, Project fileProject, LanguageServerFileAssociation mapping) {
         if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
             return ReadAction.compute(() -> mapping.match(file, fileProject));
         }

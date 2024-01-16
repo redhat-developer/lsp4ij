@@ -24,12 +24,12 @@ public abstract class ServerMapping {
 
     @NotNull
     private final String serverId;
-    @NotNull
+    @Nullable
     private final String languageId;
     @NotNull
     private final DocumentMatcher documentMatcher;
 
-    public ServerMapping(@NotNull String serverId, @NotNull String languageId, @NotNull DocumentMatcher documentMatcher) {
+    public ServerMapping(@NotNull String serverId, @Nullable String languageId, @NotNull DocumentMatcher documentMatcher) {
         this.serverId = serverId;
         this.languageId = languageId;
         this.documentMatcher = documentMatcher;
@@ -40,7 +40,7 @@ public abstract class ServerMapping {
         return serverId;
     }
 
-    @NotNull
+    @Nullable
     public String getLanguageId() {
         return languageId;
     }

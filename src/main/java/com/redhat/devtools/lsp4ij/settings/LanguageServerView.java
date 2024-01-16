@@ -24,16 +24,14 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.launching.ui.CommandLineWidget;
-import com.redhat.devtools.lsp4ij.launching.ui.FileTypeServerMappingTablePanel;
-import com.redhat.devtools.lsp4ij.launching.ui.LanguageServerMappingTablePanel;
+import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
+import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -52,8 +50,8 @@ public class LanguageServerView implements Disposable {
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
     private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
-    private LanguageServerMappingTablePanel languageMappingsPanel;
-    private FileTypeServerMappingTablePanel fileTypeMappingsPanel;
+    private ServerMappingsPanel mappingPanel;
+
     public LanguageServerView(LanguageServerDefinition languageServerDefinition) {
         boolean isLaunchConfiguration = languageServerDefinition instanceof UserDefinedLanguageServerDefinition;
         JComponent descriptionPanel = createDescription(languageServerDefinition.description.trim());
@@ -81,13 +79,7 @@ public class LanguageServerView implements Disposable {
 
         }
         boolean editable = launchingServerDefinition;
-        languageMappingsPanel = new LanguageServerMappingTablePanel(editable);
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.mappings.language"),
-                languageMappingsPanel, true);
-
-        fileTypeMappingsPanel = new FileTypeServerMappingTablePanel(editable);
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.mappings.fileType"),
-                fileTypeMappingsPanel, true);
+        this.mappingPanel = new ServerMappingsPanel(builder, editable);
 
         return builder
                 .addComponentFillVertically(new JPanel(), 50)
@@ -156,11 +148,15 @@ public class LanguageServerView implements Disposable {
     }
 
     public void setLanguageMappings(@NotNull List<ServerMappingSettings> mappings) {
-        languageMappingsPanel.refresh(mappings);
+        mappingPanel.setLanguageMappings(mappings);
     }
 
     public void setFileTypeMappings(@NotNull List<ServerMappingSettings> mappings) {
-        fileTypeMappingsPanel.refresh(mappings);
+        mappingPanel.setFileTypeMappings(mappings);
+    }
+
+    public void setFileNamePatternMappings(List<ServerMappingSettings> mappings) {
+        mappingPanel.setFileNamePatternMappings(mappings);
     }
 
     @Override
@@ -169,8 +165,7 @@ public class LanguageServerView implements Disposable {
     }
 
     public List<ServerMappingSettings> getMappings() {
-        List<ServerMappingSettings> mappings =new ArrayList<>(languageMappingsPanel.getServerMappings());
-        mappings.addAll(fileTypeMappingsPanel.getServerMappings());
-        return mappings;
+        return mappingPanel.getAllMappings();
     }
+
 }

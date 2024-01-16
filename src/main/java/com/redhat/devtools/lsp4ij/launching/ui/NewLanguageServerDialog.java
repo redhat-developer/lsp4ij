@@ -27,6 +27,8 @@ import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
+import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,8 +50,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private JBTextField serverName;
     private CommandLineWidget commandLine;
-    private LanguageServerMappingTablePanel languageMappingsPanel;
-    private FileTypeServerMappingTablePanel fileTypeMappingsPanel;
+    private ServerMappingsPanel mappingsPanel;
 
     private static LanguageServerTemplate[] getLanguageServerTemplates() {
         List<LanguageServerTemplate> templates = new ArrayList<>();
@@ -76,10 +77,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         createServerNameField(builder);
         // Command line
         createCommandLineField(builder);
-        // Language mappings
-        createLanguageMappingsContent(builder);
-        // File type mappings
-        createFileTypeMappingsContent(builder);
+        this.mappingsPanel = new ServerMappingsPanel(builder);
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(builder.getPanel(), BorderLayout.CENTER);
@@ -129,9 +127,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String command = getCommandLine(template);
         commandLine.setText(command);
         // Update mappings
-        languageMappingsPanel.refresh(template.getLanguageMappings());
-        fileTypeMappingsPanel.refresh(template.getFileTypeMappings());
+        this.mappingsPanel.refreshMappings(template);
     }
+
 
     private void createServerNameField(FormBuilder builder) {
         serverName = new JBTextField();
@@ -161,18 +159,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
             command.append(entry.getProgramArgs());
         }
         return command.toString();
-    }
-
-    private void createLanguageMappingsContent(FormBuilder builder) {
-        languageMappingsPanel = new LanguageServerMappingTablePanel();
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.mappings.language"),
-                languageMappingsPanel, true);
-    }
-
-    private void createFileTypeMappingsContent(FormBuilder builder) {
-        fileTypeMappingsPanel = new FileTypeServerMappingTablePanel();
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.mappings.fileType"),
-                fileTypeMappingsPanel, true);
     }
 
     @Override
@@ -217,13 +203,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         super.doOKAction();
 
         String serverId = UUID.randomUUID().toString();
-
-        // Collect fileType/language mappings
-        var languageMappings = languageMappingsPanel.getServerMappings();
-        var fileTypeMappings = fileTypeMappingsPanel.getServerMappings();
-        List<ServerMappingSettings> mappingSettings = new ArrayList<>(languageMappings);
-        mappingSettings.addAll(fileTypeMappings);
-
+        List<ServerMappingSettings> mappingSettings = this.mappingsPanel.getAllMappings();
 
         // Register language server and mappings definition
         String serverName = this.serverName.getText();
