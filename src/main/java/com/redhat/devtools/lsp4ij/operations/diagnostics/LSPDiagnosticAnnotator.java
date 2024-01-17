@@ -28,9 +28,13 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.hint.LSPNavigationLinkHandler;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActionIntentionAction;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticRelatedInformation;
+import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -130,21 +134,65 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
             if (StringUtils.isNotBlank(errorCode)) {
                 tooltip.append("&nbsp(");
                 String href = diagnostic.getCodeDescription() != null ? diagnostic.getCodeDescription().getHref() : null;
-                boolean hasHref = StringUtils.isNotBlank(href);
-                if (hasHref) {
-                    tooltip.append("<a href=\"");
-                    tooltip.append(href);
-                    tooltip.append("\">");
-                }
-                tooltip.append(errorCode);
-                if (hasHref) {
-                    tooltip.append("</a>");
-                }
+                addLink(errorCode, href, tooltip);
                 tooltip.append(")");
             }
         }
+        // Diagnostic related informations
+        List<DiagnosticRelatedInformation> informations = diagnostic.getRelatedInformation();
+        if(informations != null) {
+            tooltip.append("<ul>");
+            for(var information: informations) {
+                String message = information.getMessage();
+                tooltip.append("<li>");
+                Location location = information.getLocation();
+                if (location != null) {
+                    String fileName = getFileName(location);
+                    String fileUrl = LSPNavigationLinkHandler.toNavigationUrl(location);
+                    addLink(fileName,fileUrl, tooltip);
+                    tooltip.append(":&nbsp;");
+                }
+                tooltip.append(message);
+                tooltip.append("</li>");
+            }
+            tooltip.append("</ul>");
+        }
         tooltip.append("</span></html>");
         return tooltip.toString();
+    }
+
+    @NotNull
+    private static String getFileName(Location location) {
+        String fileUri = location.getUri();
+        int index = fileUri.lastIndexOf('/');
+        String fileName = fileUri.substring(index + 1);
+        StringBuilder result = new StringBuilder(fileName);
+        Range range = location.getRange();
+        if (range != null) {
+            result.append("(");
+            result.append(range.getStart().getLine());
+            result.append(":");
+            result.append(range.getStart().getCharacter());
+            result.append(", ");
+            result.append(range.getEnd().getLine());
+            result.append(":");
+            result.append(range.getEnd().getCharacter());
+            result.append(")");
+        }
+        return fileName;
+    }
+
+    private static void addLink(String text, String href, StringBuilder tooltip) {
+        boolean hasHref = StringUtils.isNotBlank(href);
+        if (hasHref) {
+            tooltip.append("<a href=\"");
+            tooltip.append(href);
+            tooltip.append("\">");
+        }
+        tooltip.append(text);
+        if (hasHref) {
+            tooltip.append("</a>");
+        }
     }
 
 }
