@@ -54,11 +54,15 @@
 
     <!-- LSP extension points -->
     <extensionPoints>
+
+        <!-- Language server extension point -->
         <extensionPoint
                 name="server"
                 beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean">
             <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.LanguageServerFactory"/>
         </extensionPoint>
+
+        <!-- Language server mappings extension point -->
         <extensionPoint
                 name="languageMapping"
                 beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean">
@@ -76,7 +80,7 @@
 
         <!-- LSP application services -->
         <applicationService
-                serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry" />
+                serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry"/>
         <applicationService
                 id="com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings"
                 serviceImplementation="com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings"/>
@@ -196,6 +200,11 @@
                 class="com.redhat.devtools.lsp4ij.commands.editor.TriggerSuggestAction"
         />
     </actions>
+
+    <!-- LSP link handlers -->
+    <extensions defaultExtensionNs="com.intellij">
+        <codeInsight.linkHandler prefix="#lsp-navigation/" handlerClass="com.redhat.devtools.lsp4ij.hint.LSPNavigationLinkHandler"/>
+    </extensions>
 
     <!-- LSP application listeners -->
     <applicationListeners>

@@ -63,30 +63,54 @@ public class LSPIJUtils {
 
     private static final String JRT_SCHEME = JRT_PROTOCOL + ":";
 
-    public static void openInEditor(Location location, Project project) {
+    /**
+     * Open the LSP location in an editor.
+     *
+     * @param location the LSP location.
+     * @param project  the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@Nullable Location location, @NotNull Project project) {
         if (location == null) {
-            return;
+            return false;
         }
-        openInEditor(location.getUri(), location.getRange().getStart(), project);
+        return openInEditor(location.getUri(), location.getRange() != null ? location.getRange().getStart() : null, project);
     }
 
-    public static void openInEditor(String fileUri, Position position, Project project) {
+    /**
+     * Open the given fileUri with the given position in an editor.
+     *
+     * @param fileUri  the file Uri.
+     * @param position the position.
+     * @param project  the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@NotNull String fileUri, @Nullable Position position, @NotNull Project project) {
         VirtualFile file = findResourceFor(fileUri);
-        openInEditor(file, position, project);
+        return openInEditor(file, position, project);
     }
 
-    public static void openInEditor(VirtualFile file, Position position, Project project) {
+    /**
+     * Open the given file with the given position in an editor.
+     *
+     * @param file     the file.
+     * @param position the position.
+     * @param project  the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@Nullable VirtualFile file, @Nullable Position position, @NotNull Project project) {
         if (file != null) {
             if (position == null) {
-                FileEditorManager.getInstance(project).openFile(file, true);
+                return FileEditorManager.getInstance(project).openFile(file, true).length > 0;
             } else {
                 Document document = FileDocumentManager.getInstance().getDocument(file);
                 if (document != null) {
                     OpenFileDescriptor desc = new OpenFileDescriptor(project, file, LSPIJUtils.toOffset(position, document));
-                    FileEditorManager.getInstance(project).openTextEditor(desc, true);
+                    return FileEditorManager.getInstance(project).openTextEditor(desc, true) != null;
                 }
             }
         }
+        return false;
     }
 
     /**
