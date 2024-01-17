@@ -22,13 +22,16 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActionIntentionAction;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -93,6 +96,7 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
         // Create Intellij Annotation from the given LSP diagnostic
         AnnotationBuilder builder = holder
                 .newAnnotation(severity, message)
+                .tooltip(getToolTip(diagnostic))
                 .range(range);
 
         // Register lazy quick fixes
@@ -101,6 +105,46 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
             builder.withFix(fix);
         }
         builder.create();
+    }
+
+    /**
+     * Returns the annotation tooltip from the given LSP diagnostic.
+     *
+     * @param diagnostic the LSP diagnostic.
+     * @return the annotation tooltip from the given LSP diagnostic.
+     */
+    private static String getToolTip(Diagnostic diagnostic) {
+        // message
+        StringBuilder tooltip = new StringBuilder("<html>");
+        tooltip.append(StringUtil.escapeXmlEntities(diagnostic.getMessage()));
+        // source
+        tooltip.append("<span style=\"font: italic;\"> ");
+        String source = diagnostic.getSource();
+        if (StringUtils.isNotBlank(source)) {
+            tooltip.append(source);
+        }
+        // error code
+        Either<String, Integer> code = diagnostic.getCode();
+        if (code != null) {
+            String errorCode = code.isLeft() ? code.getLeft() : code.isRight() ? String.valueOf(code.getRight()) : null;
+            if (StringUtils.isNotBlank(errorCode)) {
+                tooltip.append("&nbsp(");
+                String href = diagnostic.getCodeDescription() != null ? diagnostic.getCodeDescription().getHref() : null;
+                boolean hasHref = StringUtils.isNotBlank(href);
+                if (hasHref) {
+                    tooltip.append("<a href=\"");
+                    tooltip.append(href);
+                    tooltip.append("\">");
+                }
+                tooltip.append(errorCode);
+                if (hasHref) {
+                    tooltip.append("</a>");
+                }
+                tooltip.append(")");
+            }
+        }
+        tooltip.append("</span></html>");
+        return tooltip.toString();
     }
 
 }

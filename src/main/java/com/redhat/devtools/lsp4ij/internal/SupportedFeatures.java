@@ -29,6 +29,7 @@ public class SupportedFeatures {
         // Publish diagnostics capabilities
         final var publishDiagnosticsCapabilities = new PublishDiagnosticsCapabilities();
         publishDiagnosticsCapabilities.setDataSupport(Boolean.TRUE);
+        publishDiagnosticsCapabilities.setCodeDescriptionSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setPublishDiagnostics(publishDiagnosticsCapabilities);
 
         // Code Action support
