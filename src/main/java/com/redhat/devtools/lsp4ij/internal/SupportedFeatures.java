@@ -64,6 +64,15 @@ public class SupportedFeatures {
         completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
         textDocumentClientCapabilities.setCompletion(completionCapabilities);
 
+        // Signature help support
+        SignatureHelpCapabilities signatureHelpCapabilities = new SignatureHelpCapabilities();
+        SignatureInformationCapabilities signatureInformationCapabilities = new SignatureInformationCapabilities();
+        ParameterInformationCapabilities parameterInformationCapabilities = new ParameterInformationCapabilities();
+        parameterInformationCapabilities.setLabelOffsetSupport(Boolean.TRUE);
+        signatureInformationCapabilities.setParameterInformation(parameterInformationCapabilities);
+        signatureHelpCapabilities.setSignatureInformation(signatureInformationCapabilities);
+        textDocumentClientCapabilities.setSignatureHelp(signatureHelpCapabilities);
+
         // Definition support
         final var definitionCapabilities = new DefinitionCapabilities();
         definitionCapabilities.setLinkSupport(Boolean.TRUE);

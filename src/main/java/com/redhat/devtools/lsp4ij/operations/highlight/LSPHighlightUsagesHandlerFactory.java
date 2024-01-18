@@ -41,6 +41,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+
+/**
+ * LSP implementation of {@link HighlightUsagesHandlerFactory} to support
+ * <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight>LSP 'textDocument/highlight'</a>.
+ */
 public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerFactory {
     private static final Logger LOGGER = Logger.getLogger(LSPHighlightUsagesHandlerFactory.class.getName());
 
@@ -88,7 +93,7 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
                 if (highlight != null) {
                     TextRange textRange = LSPIJUtils.toTextRange(highlight.getRange(), document);
                     if (textRange != null) {
-                        elements.add(new LSPHighlightPsiElement(textRange, highlight.getKind()));
+                        elements.add(new LSPHighlightPsiElement(psiFile, textRange, highlight.getKind()));
                     }
                 }
             }

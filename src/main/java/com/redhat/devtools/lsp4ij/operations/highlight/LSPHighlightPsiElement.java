@@ -13,28 +13,24 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.operations.highlight;
 
-import com.intellij.lang.ASTNode;
-import com.intellij.lang.Language;
-import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.impl.PsiElementBase;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.operations.LSPPsiElement;
 import org.eclipse.lsp4j.DocumentHighlightKind;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Implement a fake {@link PsiElement} which stores the required text edit (coming from Language server) to highlight.
- *
+ * <p>
  * This class provides the capability to highlight part of code by using Language server TextEdit and not by using the PsiElement.
  */
-public class LSPHighlightPsiElement extends PsiElementBase  {
+public class LSPHighlightPsiElement extends LSPPsiElement {
 
-    private final TextRange textRange;
-    private final DocumentHighlightKind kind;
+    private final @NotNull DocumentHighlightKind kind;
 
-    public LSPHighlightPsiElement(TextRange textRange, DocumentHighlightKind kind) {
-        this.textRange = textRange;
+    public LSPHighlightPsiElement(@NotNull PsiFile file, @NotNull TextRange textRange, @NotNull DocumentHighlightKind kind) {
+        super(file, textRange);
         this.kind = kind;
     }
 
@@ -42,58 +38,4 @@ public class LSPHighlightPsiElement extends PsiElementBase  {
         return kind;
     }
 
-    @Override
-    public @NotNull Language getLanguage() {
-        return null;
-    }
-
-    @Override
-    public PsiElement @NotNull [] getChildren() {
-        return new PsiElement[0];
-    }
-
-    @Override
-    public PsiElement getParent() {
-        return null;
-    }
-
-    @Override
-    public TextRange getTextRange() {
-        return textRange;
-    }
-
-    @Override
-    public int getStartOffsetInParent() {
-        return 0;
-    }
-
-    @Override
-    public int getTextLength() {
-        return 0;
-    }
-
-    @Override
-    public @Nullable PsiElement findElementAt(int offset) {
-        return null;
-    }
-
-    @Override
-    public int getTextOffset() {
-        return 0;
-    }
-
-    @Override
-    public @NlsSafe String getText() {
-        return null;
-    }
-
-    @Override
-    public char @NotNull [] textToCharArray() {
-        return new char[0];
-    }
-
-    @Override
-    public ASTNode getNode() {
-        return null;
-    }
 }

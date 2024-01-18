@@ -27,7 +27,6 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.Nullable;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -174,8 +173,7 @@ public class LSPLazyCodeActions {
 	 */
 	private static CodeActionParams createCodeActionParams(Diagnostic diagnostic, VirtualFile file) {
 		CodeActionParams params = new CodeActionParams();
-		URI fileUri = LSPIJUtils.toUri(file);
-		params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(fileUri));
+		params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(file));
 		Range range = diagnostic.getRange();
 		params.setRange(range);
 
