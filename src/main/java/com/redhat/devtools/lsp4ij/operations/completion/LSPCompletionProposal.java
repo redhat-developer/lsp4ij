@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.operations.completion;
 
+import com.intellij.codeInsight.AutoPopupController;
 import com.intellij.codeInsight.completion.CodeCompletionHandlerBase;
 import com.intellij.codeInsight.completion.CompletionInitializationContext;
 import com.intellij.codeInsight.completion.InsertionContext;
@@ -29,6 +30,7 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.operations.completion.snippet.LspSnippetIndentOptions;
+import com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -56,6 +58,7 @@ public class LSPCompletionProposal extends LookupElement {
     private final int initialOffset;
     private final PsiFile file;
     private final Boolean supportResolveCompletion;
+    private final boolean supportSignatureHelp;
     private int currentOffset;
     private int bestOffset;
     private final Editor editor;
@@ -78,6 +81,7 @@ public class LSPCompletionProposal extends LookupElement {
         } else {
             this.supportResolveCompletion = false;
         }
+        this.supportSignatureHelp = LSPParameterInfoHandler.isSignatureHelpProvider(serverCapabilities);
         putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
     }
 
@@ -112,6 +116,14 @@ public class LSPCompletionProposal extends LookupElement {
         Command command = item.getCommand();
         if (command != null) {
             executeCustomCommand(command, LSPIJUtils.toUri(context.getDocument()));
+        }
+
+        if (supportSignatureHelp) {
+            // The language server supports signature help, open the parameter info popup
+            AutoPopupController popupController = AutoPopupController.getInstance(context.getProject());
+            if (popupController != null) {
+                popupController.autoPopupParameterInfo(editor, null);
+            }
         }
     }
 

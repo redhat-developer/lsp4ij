@@ -58,7 +58,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
         Document document = editor.getDocument();
         URI fileUri = LSPIJUtils.toUri(file);
         Range viewPortRange = getViewPortRange(editor);
-        InlayHintParams param = new InlayHintParams(new TextDocumentIdentifier(fileUri.toASCIIString()), viewPortRange);
+        InlayHintParams param = new InlayHintParams(LSPIJUtils.toTextDocumentIdentifier(file), viewPortRange);
         BlockingDeque<Pair<InlayHint, LanguageServer>> pairs = new LinkedBlockingDeque<>();
 
         CompletableFuture<Void> future = collect(project, file, param, pairs, cancellationSupport);

@@ -35,7 +35,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -53,9 +52,8 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         if (file == null) {
             return PsiElement.EMPTY_ARRAY;
         }
-        URI uri = LSPIJUtils.toUri(file);
         Document document = editor.getDocument();
-        DefinitionParams params = new DefinitionParams(LSPIJUtils.toTextDocumentIdentifier(uri), LSPIJUtils.toPosition(offset, document));
+        DefinitionParams params = new DefinitionParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document));
         Set<PsiElement> targets = new HashSet<>();
         final CancellationSupport cancellationSupport = new CancellationSupport();
         try {

@@ -150,6 +150,17 @@
                 implementation="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
                 order="first"/>
 
+        <!-- LSP textDocument/signatureHelp -->
+        <codeInsight.parameterInfo
+            id="LSPParameterInfoHandlerForTEXT"
+            language="TEXT"
+            implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler" />
+
+        <codeInsight.parameterInfo
+                id="LSPParameterInfoHandlerForTextMate"
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler" />
+
         <notificationGroup
                 id="Language Server Protocol"
                 displayType="BALLOON"
