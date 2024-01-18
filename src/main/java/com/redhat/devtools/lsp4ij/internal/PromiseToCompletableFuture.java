@@ -27,6 +27,7 @@ import org.jetbrains.concurrency.CancellablePromise;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -150,7 +151,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
         if (executeInSmartMode) {
             action = action.inSmartMode(project);
         }
-        if (coalesceBy != null) {
+        if (coalesceBy != null && !(coalesceBy.length == 1 && Objects.isNull(coalesceBy[0]))) {
             action = action.coalesceBy(coalesceBy);
         }
         return action
