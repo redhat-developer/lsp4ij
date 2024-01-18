@@ -489,6 +489,10 @@ public class LSPIJUtils {
         return param;
     }
 
+    public static TextDocumentIdentifier toTextDocumentIdentifier(VirtualFile file) {
+        return toTextDocumentIdentifier(toUri(file));
+    }
+
     public static TextDocumentIdentifier toTextDocumentIdentifier(final URI uri) {
         return new TextDocumentIdentifier(uri.toASCIIString());
     }
