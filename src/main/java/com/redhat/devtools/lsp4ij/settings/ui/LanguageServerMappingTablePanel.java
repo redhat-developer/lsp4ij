@@ -40,7 +40,7 @@ public class LanguageServerMappingTablePanel extends AbstractServerMappingTableP
 
     public LanguageServerMappingTablePanel(boolean editable) {
         super(new LanguageColumn(editable), editable);
-        getTable().getEmptyText().setText(LanguageServerBundle.message("new.language.server.dialog.mappings.language.no"));
+        getTable().getEmptyText().setText(LanguageServerBundle.message("language.server.mappings.language.no"));
     }
 
     @Override
@@ -66,7 +66,7 @@ public class LanguageServerMappingTablePanel extends AbstractServerMappingTableP
         private final boolean editable;
 
         public LanguageColumn(boolean editable) {
-            super(LanguageServerBundle.message("new.language.server.dialog.mappings.language.column"));
+            super(LanguageServerBundle.message("language.server.mappings.language.column"));
             this.editable = editable;
         }
 

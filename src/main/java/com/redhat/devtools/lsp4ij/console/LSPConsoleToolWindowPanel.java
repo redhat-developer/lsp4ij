@@ -236,7 +236,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                     .addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox, 1);
 
             if (commandLine != null) {
-                builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.command"), commandLine, true);
+                builder.addLabeledComponent(LanguageServerBundle.message("language.server.command"), commandLine, true);
             }
             return builder.addComponentFillVertically(new JPanel(), 0)
                     .getPanel();

@@ -54,7 +54,7 @@ public class ServerMappingsPanel {
 
     private void createContent(FormBuilder builder, boolean editable) {
         tabbedPane = new JBTabbedPane();
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.mappings.title"), tabbedPane, true);
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.mappings.title"), tabbedPane, true);
 
         // Language mappings
         createLanguageMappingsContent(tabbedPane, editable);
@@ -67,19 +67,19 @@ public class ServerMappingsPanel {
     private void createLanguageMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
         languageMappingsPanel = new LanguageServerMappingTablePanel(editable);
         languageMappingsPanel.addChangeHandler(() -> updateTabTitleAt(LANGUAGE_TAB_INDEX));
-        tabbedPane.add(LanguageServerBundle.message("new.language.server.dialog.mappings.language"), languageMappingsPanel);
+        tabbedPane.add(LanguageServerBundle.message("language.server.mappings.language"), languageMappingsPanel);
     }
 
     private void createFileTypeMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
         fileTypeMappingsPanel = new FileTypeServerMappingTablePanel(editable);
         fileTypeMappingsPanel.addChangeHandler(() -> updateTabTitleAt(FILE_TYPE_TAB_INDEX));
-        tabbedPane.add(LanguageServerBundle.message("new.language.server.dialog.mappings.fileType"), fileTypeMappingsPanel);
+        tabbedPane.add(LanguageServerBundle.message("language.server.mappings.fileType"), fileTypeMappingsPanel);
     }
 
     private void createFileNamePatternMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
         fileNamePatternMappingsPanel = new FileNamePatternServerMappingTablePanel(editable);
         fileNamePatternMappingsPanel.addChangeHandler(() -> updateTabTitleAt(FILE_NAME_PATTERN_TAB_INDEX));
-        tabbedPane.add(LanguageServerBundle.message("new.language.server.dialog.mappings.fileNamePattern"), fileNamePatternMappingsPanel);
+        tabbedPane.add(LanguageServerBundle.message("language.server.mappings.fileNamePattern"), fileNamePatternMappingsPanel);
     }
 
     /**
@@ -190,15 +190,15 @@ public class ServerMappingsPanel {
         List<ServerMappingSettings> mappings = null;
         switch (tabIndex) {
             case LANGUAGE_TAB_INDEX:
-                baseTabTitle = LanguageServerBundle.message("new.language.server.dialog.mappings.language");
+                baseTabTitle = LanguageServerBundle.message("language.server.mappings.language");
                 mappings = languageMappingsPanel.getServerMappings();
                 break;
             case FILE_TYPE_TAB_INDEX:
-                baseTabTitle = LanguageServerBundle.message("new.language.server.dialog.mappings.fileType");
+                baseTabTitle = LanguageServerBundle.message("language.server.mappings.fileType");
                 mappings = fileTypeMappingsPanel.getServerMappings();
                 break;
             case FILE_NAME_PATTERN_TAB_INDEX:
-                baseTabTitle = LanguageServerBundle.message("new.language.server.dialog.mappings.fileNamePattern");
+                baseTabTitle = LanguageServerBundle.message("language.server.mappings.fileNamePattern");
                 mappings = fileNamePatternMappingsPanel.getServerMappings();
                 break;
         }

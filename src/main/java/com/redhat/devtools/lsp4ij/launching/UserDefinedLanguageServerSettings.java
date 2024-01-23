@@ -85,6 +85,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String commandLine;
 
+        private String configurationContent;
+
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
 
@@ -118,6 +120,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setMappings(List<ServerMappingSettings> mappings) {
             this.mappings = mappings;
+        }
+
+        public void setConfigurationContent(String configurationContent) {
+            this.configurationContent = configurationContent;
+        }
+
+        public String getConfigurationContent() {
+            return configurationContent;
         }
     }
 

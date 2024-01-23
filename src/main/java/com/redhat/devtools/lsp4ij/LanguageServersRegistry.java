@@ -131,10 +131,9 @@ public class LanguageServersRegistry {
                 String serverId = launch.getServerId();
                 List<ServerMapping> mappings = toServerMappings(serverId, launch.getMappings());
                 // Register server definition from settings
-                addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(serverId, launch.getServerName(), "", launch.getCommandLine()), mappings);
+                addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(serverId, launch.getServerName(), "", launch.getCommandLine(), launch.getConfigurationContent()), mappings);
             }
-        }
-        catch(Exception e) {
+        } catch (Exception e) {
             LOGGER.error("Error while loading user defined language servers from settings", e);
         }
     }
@@ -283,6 +282,7 @@ public class LanguageServersRegistry {
             if (mappings != null) {
                 settings.setMappings(toServerMappingSettings(mappings));
             }
+            settings.setConfigurationContent(definitionFromSettings.getConfigurationContent());
             UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(definition.id, settings);
         }
     }
@@ -381,9 +381,11 @@ public class LanguageServersRegistry {
     public void updateServerDefinition(@NotNull UserDefinedLanguageServerDefinition definition,
                                        @Nullable String name,
                                        @Nullable String commandLine,
-                                       @NotNull List<ServerMappingSettings> mappings) {
+                                       @NotNull List<ServerMappingSettings> mappings,
+                                       @Nullable String configurationContent) {
         definition.setName(name);
         definition.setCommandLine(commandLine);
+        definition.setConfigurationContent(configurationContent);
 
         // remove associations
         removeAssociationsFor(definition);
@@ -394,14 +396,16 @@ public class LanguageServersRegistry {
         boolean nameChanged = !Objects.equals(settings.getServerName(), name);
         boolean commandChanged = !Objects.equals(settings.getCommandLine(), commandLine);
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
+        boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), configurationContent);
 
         settings.setServerName(name);
         settings.setCommandLine(commandLine);
+        settings.setConfigurationContent(configurationContent);
         settings.setMappings(mappings);
 
-        if (nameChanged || commandChanged || mappingsChanged) {
+        if (nameChanged || commandChanged || mappingsChanged || configurationContentChanged) {
             // Notifications
-            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(definition, nameChanged, commandChanged, mappingsChanged);
+            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(definition, nameChanged, commandChanged, mappingsChanged, configurationContentChanged);
             for (LanguageServerDefinitionListener listener : this.listeners) {
                 try {
                     listener.handleChanged(event);

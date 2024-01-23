@@ -27,6 +27,6 @@ public class CommandLineWidget extends JBTextArea {
         super.setLineWrap(true);
         super.setWrapStyleWord(true);
         super.setFont(JBFont.regular());
-        super.getEmptyText().setText(LanguageServerBundle.message("new.language.server.dialog.command.emptyText"));
+        super.getEmptyText().setText(LanguageServerBundle.message("language.server.command.emptyText"));
     }
 }

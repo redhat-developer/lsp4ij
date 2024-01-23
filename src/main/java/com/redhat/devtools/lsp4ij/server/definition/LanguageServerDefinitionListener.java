@@ -49,12 +49,14 @@ public interface LanguageServerDefinitionListener {
         public final boolean commandChanged;
 
         public final boolean mappingsChanged;
+        public final boolean configurationChanged;
 
-        public LanguageServerChangedEvent(@NotNull LanguageServerDefinition serverDefinition, boolean nameChanged, boolean commandChanged, boolean mappingsChanged) {
+        public LanguageServerChangedEvent(@NotNull LanguageServerDefinition serverDefinition, boolean nameChanged, boolean commandChanged, boolean mappingsChanged, boolean configurationContentChanged) {
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
             this.mappingsChanged = mappingsChanged;
+            this.configurationChanged = configurationContentChanged;
         }
     }
     void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event);
