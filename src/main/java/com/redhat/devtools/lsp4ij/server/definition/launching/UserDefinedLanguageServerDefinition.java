@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
@@ -36,6 +37,11 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
         return new UserDefinedStreamConnectionProvider(commandLine, project);
+    }
+
+    @Override
+    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
+        return new UserDefinedLanguageClientImpl(project);
     }
 
     public void setName(String name) {

@@ -28,6 +28,7 @@ public class UserDefinedStreamConnectionProvider extends ProcessStreamConnection
 
     public UserDefinedStreamConnectionProvider(String commandLine, @NotNull Project project) {
         super.setCommands(createCommands(commandLine));
+
     }
 
     private List<String> createCommands(String commandLine) {
@@ -58,5 +59,10 @@ public class UserDefinedStreamConnectionProvider extends ProcessStreamConnection
             commandPart.setLength(0);
         }
         return commands;
+    }
+
+    @Override
+    public void stop() {
+        super.stop();
     }
 }

@@ -1,0 +1,381 @@
+{
+  "settings": {
+    "java": {
+      "home": "C:\\Users\\azerr\\Tools\\java-17-openjdk-17.0.3.0.6-3.win.x86_64",
+      "jdt": {
+        "ls": {
+          "java": {
+            "home": null
+          },
+          "vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx1G -Xms100m -Xlog:disable",
+          "lombokSupport": {
+            "enabled": true
+          },
+          "protobufSupport": {
+            "enabled": true
+          },
+          "androidSupport": {
+            "enabled": false
+          }
+        }
+      },
+      "server": {
+        "launchMode": "Hybrid"
+      },
+      "configuration": {
+        "workspaceCacheLimit": 90,
+        "updateBuildConfiguration": "interactive",
+        "checkProjectSettingsExclusions": false,
+        "maven": {
+          "userSettings": null,
+          "globalSettings": null,
+          "notCoveredPluginExecutionSeverity": "warning",
+          "defaultMojoExecutionAction": "ignore"
+        },
+        "runtimes": [
+          {
+            "name": "JavaSE-17",
+            "path": "C:/Users/azerr/Tools/java-17-openjdk-17.0.3.0.6-3.win.x86_64"
+          },
+          {
+            "name": "JavaSE-11",
+            "path": "C:\\Program Files\\RedHat\\java-11-openjdk-11.0.7.10-1.windows.redhat.x86_64"
+          },
+          {
+            "name": "JavaSE-1.8",
+            "path": "C:\\Program Files\\Java\\jre1.8.0_333"
+          }
+        ],
+        "detectJdksAtStart": true
+      },
+      "sharedIndexes": {
+        "enabled": "auto",
+        "location": ""
+      },
+      "trace": {
+        "server": "verbose"
+      },
+      "import": {
+        "projectSelection": "automatic",
+        "exclusions": [
+          "**/node_modules/**",
+          "**/.metadata/**",
+          "**/archetype-resources/**",
+          "**/META-INF/maven/**"
+        ],
+        "generatesMetadataFilesAtProjectRoot": false,
+        "maven": {
+          "enabled": true,
+          "offline": {
+            "enabled": false
+          },
+          "disableTestClasspathFlag": false
+        },
+        "gradle": {
+          "enabled": true,
+          "wrapper": {
+            "enabled": true
+          },
+          "version": null,
+          "home": "",
+          "java": {
+            "home": null
+          },
+          "user": {
+            "home": null
+          },
+          "offline": {
+            "enabled": false
+          },
+          "arguments": null,
+          "jvmArguments": null,
+          "annotationProcessing": {
+            "enabled": true
+          }
+        }
+      },
+      "project": {
+        "resourceFilters": [
+          "node_modules",
+          "\\.git"
+        ],
+        "importOnFirstTimeStartup": "automatic",
+        "importHint": true,
+        "encoding": "ignore",
+        "sourcePaths": [
+          "src"
+        ],
+        "outputPath": "bin",
+        "referencedLibraries": [
+          "lib/**/*.jar"
+        ],
+        "exportJar": {
+          "targetPath": "${workspaceFolder}/${workspaceFolderBasename}.jar"
+        },
+        "explorer": {
+          "showNonJavaResources": true
+        }
+      },
+      "showBuildStatusOnStart": {
+        "enabled": "notification"
+      },
+      "maven": {
+        "downloadSources": true,
+        "updateSnapshots": false
+      },
+      "imports": {
+        "gradle": {
+          "wrapper": {
+            "checksums": []
+          }
+        }
+      },
+      "autobuild": {
+        "enabled": true
+      },
+      "maxConcurrentBuilds": 1,
+      "settings": {
+        "url": null
+      },
+      "compile": {
+        "nullAnalysis": {
+          "nonnull": [
+            "javax.annotation.Nonnull",
+            "org.eclipse.jdt.annotation.NonNull",
+            "org.springframework.lang.NonNull"
+          ],
+          "nullable": [
+            "javax.annotation.Nullable",
+            "org.eclipse.jdt.annotation.Nullable",
+            "org.springframework.lang.Nullable"
+          ],
+          "nonnullbydefault": [
+            "javax.annotation.ParametersAreNonnullByDefault",
+            "org.eclipse.jdt.annotation.NonNullByDefault",
+            "org.springframework.lang.NonNullApi"
+          ],
+          "mode": "interactive"
+        }
+      },
+      "errors": {
+        "incompleteClasspath": {
+          "severity": "warning"
+        }
+      },
+      "format": {
+        "enabled": true,
+        "settings": {
+          "url": "",
+          "profile": null
+        },
+        "comments": {
+          "enabled": true
+        },
+        "onType": {
+          "enabled": true
+        },
+        "insertSpaces": false,
+        "tabSize": 4
+      },
+      "completion": {
+        "enabled": true,
+        "postfix": {
+          "enabled": true
+        },
+        "chain": {
+          "enabled": false
+        },
+        "favoriteStaticMembers": [
+          "org.junit.Assert.*",
+          "org.junit.Assume.*",
+          "org.junit.jupiter.api.Assertions.*",
+          "org.junit.jupiter.api.Assumptions.*",
+          "org.junit.jupiter.api.DynamicContainer.*",
+          "org.junit.jupiter.api.DynamicTest.*",
+          "org.mockito.Mockito.*",
+          "org.mockito.ArgumentMatchers.*",
+          "org.mockito.Answers.*"
+        ],
+        "filteredTypes": [
+          "java.awt.*",
+          "com.sun.*",
+          "sun.*",
+          "jdk.*",
+          "org.graalvm.*",
+          "io.micrometer.shaded.*"
+        ],
+        "guessMethodArguments": "insertBestGuessedArguments",
+        "matchCase": "firstLetter",
+        "importOrder": [
+          "#",
+          "java",
+          "javax",
+          "org",
+          "com",
+          ""
+        ],
+        "lazyResolveTextEdit": {
+          "enabled": true
+        },
+        "maxResults": 0
+      },
+      "signatureHelp": {
+        "enabled": true,
+        "description": {
+          "enabled": false
+        }
+      },
+      "templates": {
+        "fileHeader": [],
+        "typeComment": []
+      },
+      "codeGeneration": {
+        "insertionLocation": "afterCursor",
+        "hashCodeEquals": {
+          "useJava7Objects": false,
+          "useInstanceof": false
+        },
+        "useBlocks": false,
+        "generateComments": false,
+        "toString": {
+          "template": "${object.className} [${member.name()}=${member.value}, ${otherMembers}]",
+          "codeStyle": "STRING_CONCATENATION",
+          "skipNullValues": false,
+          "listArrayContents": true,
+          "limitElements": 0
+        }
+      },
+      "edit": {
+        "smartSemicolonDetection": {
+          "enabled": false
+        },
+        "validateAllOpenBuffersOnChanges": false
+      },
+      "cleanup": {
+        "actionsOnSave": []
+      },
+      "saveActions": {
+        "organizeImports": false
+      },
+      "sources": {
+        "organizeImports": {
+          "starThreshold": 99,
+          "staticStarThreshold": 99
+        }
+      },
+      "quickfix": {
+        "showAt": "line"
+      },
+      "codeAction": {
+        "sortMembers": {
+          "avoidVolatileChanges": true
+        }
+      },
+      "refactoring": {
+        "extract": {
+          "interface": {
+            "replace": true
+          }
+        }
+      },
+      "referencesCodeLens": {
+        "enabled": false
+      },
+      "implementationsCodeLens": {
+        "enabled": false
+      },
+      "references": {
+        "includeAccessors": true,
+        "includeDecompiledSources": true
+      },
+      "symbols": {
+        "includeSourceMethodDeclarations": false
+      },
+      "typeHierarchy": {
+        "lazyLoad": false
+      },
+      "inlayHints": {
+        "parameterNames": {
+          "enabled": "literals",
+          "exclusions": []
+        }
+      },
+      "eclipse": {
+        "downloadSources": false
+      },
+      "contentProvider": {
+        "preferred": null
+      },
+      "foldingRange": {
+        "enabled": true
+      },
+      "selectionRange": {
+        "enabled": true
+      },
+      "editor": {
+        "reloadChangedSources": "ask"
+      },
+      "debug": {
+        "logLevel": "warn",
+        "settings": {
+          "showHex": false,
+          "showStaticVariables": false,
+          "showQualifiedNames": false,
+          "showLogicalStructure": true,
+          "showToString": true,
+          "maxStringLength": 0,
+          "numericPrecision": 0,
+          "hotCodeReplace": "manual",
+          "enableRunDebugCodeLens": true,
+          "forceBuildBeforeLaunch": true,
+          "onBuildFailureProceed": false,
+          "console": "integratedTerminal",
+          "exceptionBreakpoint": {
+            "exceptionTypes": [],
+            "allowClasses": [],
+            "skipClasses": []
+          },
+          "stepping": {
+            "skipClasses": [],
+            "skipSynthetics": false,
+            "skipStaticInitializers": false,
+            "skipConstructors": false
+          },
+          "jdwp": {
+            "limitOfVariablesPerJdwpRequest": 100,
+            "requestTimeout": 3000,
+            "async": "auto"
+          },
+          "vmArgs": "",
+          "debugSupportOnDecompiledSource": "on"
+        }
+      },
+      "silentNotification": false,
+      "dependency": {
+        "showMembers": false,
+        "syncWithFolderExplorer": true,
+        "autoRefresh": true,
+        "refreshDelay": 2000,
+        "packagePresentation": "flat"
+      },
+      "help": {
+        "firstView": "auto",
+        "showReleaseNotes": true,
+        "collectErrorLog": false
+      },
+      "test": {
+        "defaultConfig": "",
+        "config": {}
+      },
+      "requirements": {
+        "JDK11Warning": true
+      },
+      "semanticHighlighting": {
+        "enabled": true
+      },
+      "telemetry": {
+        "enabled": true
+      }
+    }
+  }
+}
