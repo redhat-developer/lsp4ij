@@ -1,8 +1,98 @@
 {
   "templates": [
     {
+      "id": "gopls",
+      "name": "Go Language Server",
+      "dev": true,
+      "programArgs": {
+        "default": "gopls -mode=stdio"
+      },
+      "fileTypeMappings": [
+        {
+          "fileType": {
+            "name": "Go",
+            "patterns": [
+              "*.go"
+            ]
+          },
+          "languageId": "go"
+        }
+      ]
+    },
+    {
+      "id": "jdtls",
+      "name": "JDT Language Server",
+      "dev": true,
+      "programArgs": {
+        "windows": "\"${BASE_DIR}/bin/jdtls.bat\" -configuration \"C:/Users/${user.name}/.cache/jdtls\" -data \"$DATA_DIR\"",
+        "default": "\"${BASE_DIR}/bin/jdtls\" -configuration \"~/.cache/jdtls\" -data \"$DATA_DIR\""
+      },
+      "languageMappings": [
+        {
+          "language": "JAVA",
+          "languageId": "java"
+        }
+      ],
+      "fileTypeMappings": [
+        {
+          "fileType": {
+            "name": "Java",
+            "patterns": [
+              "*.java"
+            ]
+          },
+          "languageId": "java"
+        }
+      ]
+    },
+    {
+      "id": "lemminx",
+      "name": "XML Language Server",
+      "dev": true,
+      "runtime": "java",
+      "programArgs": {
+        "default": "-classpath \"${BASE_DIR}/org.eclipse.lemminx-uber.jar\" org.eclipse.lemminx.XMLServerLauncher"
+      },
+      "languageMappings": [
+        {
+          "language": "XML"
+        },
+        {
+          "language": "DTD"
+        },
+        {
+          "language": "RELAX-NG"
+        }
+      ]
+    },
+    {
+      "id": "typescript-language-server",
+      "name": "TypeScript Language Server",
+      "dev": true,
+      "programArgs": {
+        "default": "typescript-language-server --stdio"
+      },
+      "fileTypeMappings": [
+        {
+          "fileType": {
+            "name": "JavaScript"
+          },
+          "languageId": "javascript"
+        },
+        {
+          "fileType": {
+            "name": "TypeScript",
+            "patterns": [
+              "*.ts"
+            ]
+          },
+          "languageId": "typescript"
+        }
+      ]
+    },
+    {
+      "id": "vscode-css-language-server",
       "name": "CSS Language Server",
-      "docPath": "nodejs/vscode-css-language-server.md",
       "runtime": "node",
       "programArgs": {
         "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
@@ -29,27 +119,8 @@
       ]
     },
     {
-      "name": "Go Language Server",
-      "dev": true,
-      "docPath": "go/gopls.md",
-      "programArgs": {
-        "default": "gopls -mode=stdio"
-      },
-      "fileTypeMappings": [
-        {
-          "fileType": {
-            "name": "Go",
-            "patterns": [
-              "*.go"
-            ]
-          },
-          "languageId": "go"
-        }
-      ]
-    },
-    {
+      "id": "vscode-html-language-server",
       "name": "HTML Language Server",
-      "docPath": "nodejs/vscode-html-language-server.md",
       "runtime": "node",
       "programArgs": {
         "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
@@ -61,77 +132,6 @@
         {
           "language": "HTML",
           "languageId": "html"
-        }
-      ]
-    },
-    {
-      "name": "JDT Language Server",
-      "dev": true,
-      "docPath": "java/jdt.ls.md",
-      "programArgs": {
-        "windows": "\"${BASE_DIR}/bin/jdtls.bat\" -configuration \"C:/Users/${user.name}/.cache/jdtls\" -data \"$DATA_DIR\"",
-        "default": "\"${BASE_DIR}/bin/jdtls\" -configuration \"~/.cache/jdtls\" -data \"$DATA_DIR\""
-      },
-      "languageMappings": [
-        {
-          "language": "JAVA",
-          "languageId": "java"
-        }
-      ],
-      "fileTypeMappings": [
-        {
-          "fileType": {
-            "name": "Java",
-            "patterns": [
-              "*.java"
-            ]
-          },
-          "languageId": "java"
-        }
-      ]
-    },
-    {
-      "name": "TypeScript Language Server",
-      "dev": true,
-      "docPath": "nodejs/typescript-language-server.md",
-      "programArgs": {
-        "default": "typescript-language-server --stdio"
-      },
-      "fileTypeMappings": [
-        {
-          "fileType": {
-            "name": "JavaScript"
-          },
-          "languageId": "javascript"
-        },
-        {
-          "fileType": {
-            "name": "TypeScript",
-            "patterns": [
-              "*.ts"
-            ]
-          },
-          "languageId": "typescript"
-        }
-      ]
-    },
-    {
-      "name": "XML Language Server",
-      "dev": true,
-      "docPath": "java/lemminx.md",
-      "runtime": "java",
-      "programArgs": {
-        "default": "-classpath \"${BASE_DIR}/org.eclipse.lemminx-uber.jar\" org.eclipse.lemminx.XMLServerLauncher"
-      },
-      "languageMappings": [
-        {
-          "language": "XML"
-        },
-        {
-          "language": "DTD"
-        },
-        {
-          "language": "RELAX-NG"
         }
       ]
     }

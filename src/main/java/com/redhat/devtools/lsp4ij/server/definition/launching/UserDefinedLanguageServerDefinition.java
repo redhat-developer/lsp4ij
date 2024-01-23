@@ -13,10 +13,16 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.google.gson.JsonParser;
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.StringReader;
 
 /**
  * {@link com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition} implementation to start a
@@ -24,18 +30,29 @@ import org.jetbrains.annotations.NotNull;
  */
 public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);//$NON-NLS-1$
+
     private String name;
     private String commandLine;
 
-    public UserDefinedLanguageServerDefinition(@NotNull String id, @NotNull String label, String description, String commandLine) {
+    private String configurationContent;
+    private Object configuration;
+
+    public UserDefinedLanguageServerDefinition(@NotNull String id, @NotNull String label, String description, String commandLine, String configurationContent) {
         super(id, label, description, true, null, false);
         this.name = label;
         this.commandLine = commandLine;
+        this.configurationContent = configurationContent;
     }
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
         return new UserDefinedStreamConnectionProvider(commandLine, project);
+    }
+
+    @Override
+    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
+        return new UserDefinedLanguageClient(this, project);
     }
 
     public void setName(String name) {
@@ -50,8 +67,31 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.commandLine = commandLine;
     }
 
+    public String getConfigurationContent() {
+        return configurationContent;
+    }
+
+    public void setConfigurationContent(String configurationContent) {
+        this.configurationContent = configurationContent;
+        this.configuration = null;
+    }
+
+    public Object getLanguageServerConfiguration() {
+        if (configuration == null && configurationContent != null && !configurationContent.isEmpty()) {
+            try {
+                configuration = JsonParser.parseReader(new StringReader(configurationContent));
+            }
+            catch(Exception e) {
+                LOGGER.error("Error while parsing JSON configuration for the language server '" + id + "'", e);
+            }
+        }
+        return configuration;
+    }
+
     @Override
     public @NotNull String getDisplayName() {
         return name;
     }
+
+
 }

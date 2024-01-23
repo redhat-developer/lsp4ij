@@ -93,7 +93,7 @@ public abstract class AbstractServerMappingTablePanel extends BorderLayoutPanel 
         private final boolean editable;
 
         public LanguageIdColumn(boolean editable) {
-            super(LanguageServerBundle.message("new.language.server.dialog.mappings.languageId.column"));
+            super(LanguageServerBundle.message("language.server.mappings.languageId.column"));
             this.editable = editable;
         }
 

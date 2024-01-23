@@ -44,6 +44,9 @@ public class LanguageServerTemplate {
     private final String DEFAULT_KEY = "default";
 
     private final String OS_KEY = SystemInfo.isWindows ? WINDOWS_KEY : (SystemInfo.isMac ? MAC_KEY : (SystemInfo.isUnix ? UNIX_KEY : null));
+
+    private String id;
+
     private String name;
     private boolean dev;
     private String runtime;
@@ -53,9 +56,15 @@ public class LanguageServerTemplate {
 
     private List<ServerMappingSettings> languageMappings;
 
-    private String docPath;
+    private Boolean hasDocumentation;
 
     private String description;
+
+    private String configuration;
+
+    public String getId() {
+        return id;
+    }
 
     public String getName() {
         return name;
@@ -103,16 +112,17 @@ public class LanguageServerTemplate {
     }
 
     public boolean hasDocumentation() {
-        return docPath != null && !docPath.isEmpty();
+        return getId() != null && (hasDocumentation == null || !hasDocumentation.booleanValue());
     }
 
     public String getDescription() {
-        if(description != null) {
+        if (description != null) {
             return description.isEmpty() ? null : description;
         }
         if (!hasDocumentation()) {
             return null;
         }
+        String docPath = getId() + "/README.md";
         String docContent = loadDocContent(docPath);
         if (docContent == null) {
             description = "";
@@ -127,9 +137,23 @@ public class LanguageServerTemplate {
         return description;
     }
 
+    public String getConfiguration() {
+        if (configuration != null) {
+            return configuration.isEmpty() ? null : configuration;
+        }
+        String id = getId();
+        if (id == null) {
+            return null;
+        }
+        String configurationPath = getId() + "/settings.json";
+        String configurationContent = loadDocContent(configurationPath);
+        configuration = configurationContent != null ? configurationContent : "";
+        return configuration;
+    }
+
     private static String loadDocContent(@NotNull String docPath) {
-        try (Reader reader = LanguageServerTemplateManager.loadTemplateReader(docPath)){
-            return StreamUtil.readText(reader);
+        try (Reader reader = LanguageServerTemplateManager.loadTemplateReader(docPath)) {
+            return reader != null ? StreamUtil.readText(reader) : null;
         } catch (Exception e) {
             LOGGER.warn("Error while loading language server template documentation '" + docPath + "'", e);
         }

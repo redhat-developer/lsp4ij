@@ -14,20 +14,15 @@
 package com.redhat.devtools.lsp4ij.settings;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.IdeBorderFactory;
-import com.intellij.ui.PortField;
-import com.intellij.ui.components.JBCheckBox;
-import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
-import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
+import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -46,16 +41,14 @@ public class LanguageServerView implements Disposable {
 
     private final JPanel myMainPanel;
 
-    private final JBTextArea commandField = new CommandLineWidget();
-    private final PortField debugPortField = new PortField();
-    private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
-    private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
+    private LanguageServerPanel languageServerPanel;
+
     private ServerMappingsPanel mappingPanel;
 
     public LanguageServerView(LanguageServerDefinition languageServerDefinition) {
         boolean isLaunchConfiguration = languageServerDefinition instanceof UserDefinedLanguageServerDefinition;
         JComponent descriptionPanel = createDescription(languageServerDefinition.description.trim());
-        JPanel settingsPanel = createSettings(descriptionPanel,isLaunchConfiguration);
+        JPanel settingsPanel = createSettings(descriptionPanel, isLaunchConfiguration);
         if (!isLaunchConfiguration) {
             TitledBorder title = IdeBorderFactory.createTitledBorder(languageServerDefinition.getDisplayName());
             settingsPanel.setBorder(title);
@@ -65,22 +58,14 @@ public class LanguageServerView implements Disposable {
         this.myMainPanel = wrapper;
     }
 
-    private JPanel createSettings(JComponent description,boolean launchingServerDefinition) {
+    private JPanel createSettings(JComponent description, boolean launchingServerDefinition) {
         FormBuilder builder = FormBuilder.createFormBuilder()
-                .setFormLeftIndent(10)
-                .addComponent(description, 0);
-        if (launchingServerDefinition) {
-         builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.command"), commandField, true);
-        } else {
-            builder
-                    .addLabeledComponent(LanguageServerBundle.message("language.server.debug.port"), debugPortField, 5)
-                    .addComponent(debugSuspendCheckBox, 5)
-                    .addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox, 5);
-
-        }
-        boolean editable = launchingServerDefinition;
-        this.mappingPanel = new ServerMappingsPanel(builder, editable);
-
+                .setFormLeftIndent(10);
+        this.languageServerPanel = new LanguageServerPanel(builder,
+                description,
+                launchingServerDefinition ? LanguageServerPanel.EditionMode.EDIT_USER_DEFINED :
+                        LanguageServerPanel.EditionMode.EDIT_EXTENSION);
+        this.mappingPanel = languageServerPanel.getMappingsPanel();
         return builder
                 .addComponentFillVertically(new JPanel(), 50)
                 .getPanel();
@@ -96,10 +81,10 @@ public class LanguageServerView implements Disposable {
         titledComponent.setPreferredSize(JBUI.emptySize());
         if (description != null && !description.isBlank()) {
             titledComponent = UI.PanelFactory.panel(titledComponent)
-                                    .withComment(description)
-                                    .resizeX(true)
-                                    .resizeY(true)
-                                    .createPanel();
+                    .withComment(description)
+                    .resizeX(true)
+                    .resizeY(true)
+                    .createPanel();
         }
         return titledComponent;
     }
@@ -109,42 +94,46 @@ public class LanguageServerView implements Disposable {
     }
 
     public String getDebugPort() {
-        return debugPortField.getNumber() <= 0? "": Integer.toString(debugPortField.getNumber());
+        var debugPortField = languageServerPanel.getDebugPortField();
+        return debugPortField.getNumber() <= 0 ? "" : Integer.toString(debugPortField.getNumber());
     }
 
     public void setDebugPort(String debugPort) {
+        var debugPortField = languageServerPanel.getDebugPortField();
         int port = 0;
         try {
             port = Integer.parseInt(debugPort);
             if (port < debugPortField.getMin() || port > debugPortField.getMax()) {
                 port = 0;
             }
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         debugPortField.setNumber(port);
     }
 
     public boolean isDebugSuspend() {
-        return debugSuspendCheckBox.isSelected();
+        return languageServerPanel.getDebugSuspendCheckBox().isSelected();
     }
 
     public void setDebugSuspend(boolean debugSuspend) {
-        debugSuspendCheckBox.setSelected(debugSuspend);
+        languageServerPanel.getDebugSuspendCheckBox().setSelected(debugSuspend);
     }
 
     public ServerTrace getServerTrace() {
-        return (ServerTrace) serverTraceComboBox.getSelectedItem();
+        return (ServerTrace) languageServerPanel.getServerTraceComboBox().getSelectedItem();
     }
 
     public void setServerTrace(ServerTrace serverTrace) {
-        serverTraceComboBox.setSelectedItem(serverTrace);
+        languageServerPanel.getServerTraceComboBox().setSelectedItem(serverTrace);
     }
 
     public String getCommandLine() {
-        return commandField.getText();
+        return languageServerPanel.getCommandLine().getText();
     }
 
     public void setCommandLine(String commandLine) {
-        commandField.setText(commandLine);
+        languageServerPanel.getCommandLine().setText(commandLine);
+
     }
 
     public void setLanguageMappings(@NotNull List<ServerMappingSettings> mappings) {
@@ -158,6 +147,17 @@ public class LanguageServerView implements Disposable {
     public void setFileNamePatternMappings(List<ServerMappingSettings> mappings) {
         mappingPanel.setFileNamePatternMappings(mappings);
     }
+
+    public String getConfigurationContent() {
+        return languageServerPanel.getConfiguration().getText();
+    }
+
+    public void setConfigurationContent(String configurationContent) {
+        var configuration = languageServerPanel.getConfiguration();
+        configuration.setText(configurationContent);
+        configuration.setCaretPosition(0);
+    }
+
 
     @Override
     public void dispose() {

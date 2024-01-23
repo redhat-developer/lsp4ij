@@ -33,7 +33,7 @@ public class FileNamePatternServerMappingTablePanel extends AbstractServerMappin
 
     public FileNamePatternServerMappingTablePanel(boolean editable) {
         super(new FileNamePatternColumn(editable), editable);
-        getTable().getEmptyText().setText(LanguageServerBundle.message("new.language.server.dialog.mappings.fileNamePattern.no"));
+        getTable().getEmptyText().setText(LanguageServerBundle.message("language.server.mappings.fileNamePattern.no"));
     }
 
     @Override
@@ -46,7 +46,7 @@ public class FileNamePatternServerMappingTablePanel extends AbstractServerMappin
             private final boolean editable;
 
             public FileNamePatternColumn(boolean editable) {
-                super(LanguageServerBundle.message("new.language.server.dialog.mappings.fileNamePattern.column"));
+                super(LanguageServerBundle.message("language.server.mappings.fileNamePattern.column"));
                 this.editable = editable;
             }
 

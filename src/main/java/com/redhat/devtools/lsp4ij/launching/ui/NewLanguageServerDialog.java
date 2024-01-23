@@ -16,9 +16,6 @@ import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.ListCellRendererWrapper;
-import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.JBTextField;
-import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBInsets;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
@@ -27,8 +24,7 @@ import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
-import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
+import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,9 +44,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
     private final ComboBox<LanguageServerTemplate> templateCombo = new ComboBox<>(new DefaultComboBoxModel<>(getLanguageServerTemplates()));
     private final Project project;
 
-    private JBTextField serverName;
-    private CommandLineWidget commandLine;
-    private ServerMappingsPanel mappingsPanel;
+    private LanguageServerPanel languageServerPanel;
 
     private static LanguageServerTemplate[] getLanguageServerTemplates() {
         List<LanguageServerTemplate> templates = new ArrayList<>();
@@ -73,11 +67,12 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Template combo
         createTemplateCombo(builder);
-        // Server name
-        createServerNameField(builder);
-        // Command line
-        createCommandLineField(builder);
-        this.mappingsPanel = new ServerMappingsPanel(builder);
+        // Create server name,  command line, mappings, configuration UI
+        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED);
+
+        // Add validation
+        addValidator(this.languageServerPanel.getServerName());
+        addValidator(this.languageServerPanel.getCommandLine());
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(builder.getPanel(), BorderLayout.CENTER);
@@ -122,29 +117,23 @@ public class NewLanguageServerDialog extends DialogWrapper {
     }
 
     private void loadFromTemplate(LanguageServerTemplate template) {
-        // Update name and command
+        // Update name
+        var serverName = this.languageServerPanel.getServerName();
         serverName.setText(template.getName() != null ? template.getName() : "");
+
+        // Update command
+        var commandLine = this.languageServerPanel.getCommandLine();
         String command = getCommandLine(template);
         commandLine.setText(command);
+
         // Update mappings
-        this.mappingsPanel.refreshMappings(template);
-    }
+        var mappingsPanel = this.languageServerPanel.getMappingsPanel();
+        mappingsPanel.refreshMappings(template);
 
-
-    private void createServerNameField(FormBuilder builder) {
-        serverName = new JBTextField();
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.serverName"), serverName);
-        addValidator(serverName);
-    }
-
-    private void createCommandLineField(FormBuilder builder) {
-        commandLine = new CommandLineWidget();
-
-        JBScrollPane scrollPane = new JBScrollPane(commandLine);
-        scrollPane.setMinimumSize(new Dimension(JBUIScale.scale(600), JBUIScale.scale(100)));
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.command"), scrollPane, true);
-
-        addValidator(commandLine);
+        // Update configuration
+        var configuration = this.languageServerPanel.getConfiguration();
+        configuration.setText(template.getConfiguration() != null ? template.getConfiguration() : "");
+        configuration.setCaretPosition(0);
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
@@ -163,7 +152,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     public JComponent getPreferredFocusedComponent() {
-        return serverName;
+        return this.languageServerPanel.getServerName();
     }
 
     @Override
@@ -182,6 +171,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
     }
 
     private ValidationInfo validateServerName() {
+        var serverName = this.languageServerPanel.getServerName();
         if (serverName.getText().isBlank()) {
             String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.serverName.must.be.set");
             return new ValidationInfo(errorMessage, serverName);
@@ -190,6 +180,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
     }
 
     private ValidationInfo validateCommand() {
+        var commandLine = this.languageServerPanel.getCommandLine();
         if (commandLine.getText().isBlank()) {
             String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
             return new ValidationInfo(errorMessage, commandLine);
@@ -203,12 +194,13 @@ public class NewLanguageServerDialog extends DialogWrapper {
         super.doOKAction();
 
         String serverId = UUID.randomUUID().toString();
-        List<ServerMappingSettings> mappingSettings = this.mappingsPanel.getAllMappings();
+        List<ServerMappingSettings> mappingSettings = this.languageServerPanel.getMappingsPanel().getAllMappings();
 
         // Register language server and mappings definition
-        String serverName = this.serverName.getText();
-        String commandLine = this.commandLine.getText();
-        UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId, serverName, "", commandLine);
+        String serverName = this.languageServerPanel.getServerName().getText();
+        String commandLine = this.languageServerPanel.getCommandLine().getText();
+        String configuration = this.languageServerPanel.getConfiguration().getText();
+        UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId, serverName, "", commandLine, configuration);
         LanguageServersRegistry.getInstance().addServerDefinition(definition, mappingSettings);
 
     }

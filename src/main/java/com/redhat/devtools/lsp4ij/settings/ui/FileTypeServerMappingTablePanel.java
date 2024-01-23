@@ -43,7 +43,7 @@ public class FileTypeServerMappingTablePanel extends AbstractServerMappingTableP
 
     public FileTypeServerMappingTablePanel(boolean editable) {
         super(new FileTypeColumn(editable), editable);
-        getTable().getEmptyText().setText(LanguageServerBundle.message("new.language.server.dialog.mappings.fileType.no"));
+        getTable().getEmptyText().setText(LanguageServerBundle.message("language.server.mappings.fileType.no"));
     }
 
     @Override
@@ -67,7 +67,7 @@ public class FileTypeServerMappingTablePanel extends AbstractServerMappingTableP
         private final boolean editable;
 
         public FileTypeColumn(boolean editable) {
-            super(LanguageServerBundle.message("new.language.server.dialog.mappings.fileType.column"));
+            super(LanguageServerBundle.message("language.server.mappings.fileType.column"));
             this.editable = editable;
         }
 
