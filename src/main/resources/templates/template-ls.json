@@ -115,6 +115,15 @@
             ]
           },
           "languageId": "less"
+        },
+        {
+          "fileType": {
+            "name": "SCSS",
+            "patterns": [
+              "*.scss"
+            ]
+          },
+          "languageId": "scss"
         }
       ]
     },
