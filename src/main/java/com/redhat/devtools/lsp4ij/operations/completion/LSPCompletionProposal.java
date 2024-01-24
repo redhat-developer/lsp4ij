@@ -99,7 +99,7 @@ public class LSPCompletionProposal extends LookupElement {
             template = SnippetTemplateFactory.createTemplate(snippetContent, context.getProject(), name -> getVariableValue(name), indentOptions);
             // Update the TextEdit with the content snippet content without placeholders
             // ex : ${1:name} --> name
-            updateInsertText(template.getTemplateText());
+            updateInsertTextForTemplateProcessing(template.getTemplateText());
         }
 
         // Apply all text edits
@@ -139,6 +139,32 @@ public class LSPCompletionProposal extends LookupElement {
                 || !template.getVariables().isEmpty()); // There are some placeholders, e.g ${1:name}
     }
 
+
+    /**
+     * Update the insert text with the given new value <code>newText</code>.
+     *
+     * <p>
+     * This method is called when a completion insert text uses snippet syntax (ex : ${0:var}) and
+     * the insert text must remove this snippet syntax (ex : var) to process after the IntelliJ template.
+     * </p>
+     *
+     * @param newText the new text (without snippet syntax)
+     */
+    private void updateInsertTextForTemplateProcessing(String newText) {
+        Either<TextEdit, InsertReplaceEdit> eitherTextEdit = this.item.getTextEdit();
+        if (eitherTextEdit != null) {
+            if (eitherTextEdit.isLeft()) {
+                eitherTextEdit.getLeft().setNewText(newText);
+            } else {
+                eitherTextEdit.getRight().setNewText(newText);
+            }
+        } else {
+            if (item.getInsertText() != null) {
+                item.setInsertText(newText);
+            }
+        }
+    }
+
     /**
      * Returns the text content to insert coming from the LSP CompletionItem.
      *
@@ -158,17 +184,6 @@ public class LSPCompletionProposal extends LookupElement {
             insertText = this.item.getLabel();
         }
         return insertText;
-    }
-
-    private void updateInsertText(String newText) {
-        Either<TextEdit, InsertReplaceEdit> eitherTextEdit = this.item.getTextEdit();
-        if (eitherTextEdit != null) {
-            if (eitherTextEdit.isLeft()) {
-                eitherTextEdit.getLeft().setNewText(newText);
-            } else {
-                eitherTextEdit.getRight().setNewText(newText);
-            }
-        }
     }
 
     public int getPrefixCompletionStart(Document document, int completionOffset) {
