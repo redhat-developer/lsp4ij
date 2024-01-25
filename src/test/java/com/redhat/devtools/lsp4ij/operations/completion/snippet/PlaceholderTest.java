@@ -32,6 +32,10 @@ public class PlaceholderTest {
         assertEquals(actual, LspSnippetAssert.tabstop(1));
     }
 
-
-
+    @Test
+    public void placeholderWithEscapeDollar() {
+        LspSnippetNode[] actual = LspSnippetAssert.parse("\\$${1:var}");
+        assertEquals(actual, LspSnippetAssert.text("$"),
+                LspSnippetAssert.placeholder(1, "var", 1));
+    }
 }
