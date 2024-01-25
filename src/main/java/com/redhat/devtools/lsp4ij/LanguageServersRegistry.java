@@ -21,6 +21,7 @@ import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
@@ -146,13 +147,14 @@ public class LanguageServersRegistry {
                 .map(LanguageServerFileAssociation::getLanguage)
                 .filter(language -> language != null)
                 .collect(Collectors.toSet());
-        // When a file is not linked to a language (just with a file type) but with textmate
-        // to support syntax coloration,the language received in InlayHintProviders
-        // is "textmate", we add it to support
+        // When a file is not linked to a language
+        //  - if the file is associated to a textmate to support syntax coloration
+        //  - otherwise if the file is associated (by default) to plain/text file type
+        // the language received in InlayHintProviders
+        // is "textmate" / "TEXT" language, we add them to support
         // LSP codeLens, inlayHint, color for a file which is not linked to a language.
-        Language textMateLanguage = Language.findLanguageByID("textmate");
-        if (textMateLanguage != null) {
-            distinctLanguages.add(textMateLanguage);
+        for (var simpleLanguage : SimpleLanguageUtils.getSupportedSimpleLanguages()) {
+            distinctLanguages.add(simpleLanguage);
         }
         // When a file is not linked to a language (just with a file type) and not linked to a textmate,
         // the language received in InlayHintProviders is plain/text, we add it to support
