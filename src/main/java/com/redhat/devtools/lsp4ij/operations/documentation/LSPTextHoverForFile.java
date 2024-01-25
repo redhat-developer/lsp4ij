@@ -124,25 +124,28 @@ public class LSPTextHoverForFile implements Disposable {
             if (contents == null || contents.isEmpty()) {
                 return null;
             }
-            String s = contents.stream().map(content -> {
-                if (content.isLeft()) {
-                    return content.getLeft();
-                } else if (content.isRight()) {
-                    MarkedString markedString = content.getRight();
-                    // TODO this won't work fully until markup parser will support syntax
-                    // highlighting but will help display
-                    // strings with language tags, e.g. without it things after <?php tag aren't
-                    // displayed
-                    if (markedString.getLanguage() != null && !markedString.getLanguage().isEmpty()) {
-                        return String.format("```%s%n%s%n```", markedString.getLanguage(), markedString.getValue()); //$NON-NLS-1$
-                    } else {
-                        return markedString.getValue();
-                    }
-                } else {
-                    return ""; //$NON-NLS-1$
-                }
-            }).filter(((Predicate<String>) String::isEmpty).negate()).collect(Collectors.joining("\n\n"));
-            return new MarkupContent(s, MarkupKind.PLAINTEXT);
+            String s = contents.stream()
+                    .map(content -> {
+                        if (content.isLeft()) {
+                            return content.getLeft();
+                        } else if (content.isRight()) {
+                            MarkedString markedString = content.getRight();
+                            // TODO this won't work fully until markup parser will support syntax
+                            // highlighting but will help display
+                            // strings with language tags, e.g. without it things after <?php tag aren't
+                            // displayed
+                            if (markedString.getLanguage() != null && !markedString.getLanguage().isEmpty()) {
+                                return String.format("```%s%n%s%n```", markedString.getLanguage(), markedString.getValue()); //$NON-NLS-1$
+                            } else {
+                                return markedString.getValue();
+                            }
+                        } else {
+                            return ""; //$NON-NLS-1$
+                        }
+                    })
+                    .filter(((Predicate<String>) String::isEmpty).negate())
+                    .collect(Collectors.joining("\n\n"));
+            return new MarkupContent(MarkupKind.PLAINTEXT, s);
         } else {
             return hoverContent.getRight();
         }

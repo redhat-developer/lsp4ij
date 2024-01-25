@@ -125,8 +125,9 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 #### Hover
 
 [textDocument/hover](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover) is implemented with `documentationProvider` extension point to support any language.
-However as IJ `documentationProvider` doesn't support aggregation of several documentationProvider, it takes
-the first `documentationProvider` which found.
+
+However, as IJ `documentationProvider` doesn't support aggregation of several documentationProvider, it takes
+the first `documentationProvider` that is found.
 
 If your language already supports `lang.documentationProvider` (`documentationProvider` for a given language),
 this `lang.documentationProvider` will be used instead of the LSP `documentationProvider`.
@@ -140,6 +141,10 @@ To fix this issue for the `JAVA` language, you need to declare in your `plugin.x
   implementationClass="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider" 
   order="first"/>
 ```
+
+By default, LSP4IJ can support LSP hover when the file is associated with a `TextMate` grammar, but if your file
+is associated with the `TEXT` file type (ex : once you associate your file with a user-defined file type like `CSS` files)
+you will lose the LSP hover support. See some explanation [here](https://github.com/redhat-developer/lsp4ij/issues/97#issuecomment-1909804353).
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing documentation while hovering over an `include` section:
 

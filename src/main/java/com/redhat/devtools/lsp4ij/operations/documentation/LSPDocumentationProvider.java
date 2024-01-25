@@ -23,6 +23,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.util.io.URLUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionProposal;
 import org.eclipse.lsp4j.MarkupContent;
 import org.jetbrains.annotations.NotNull;
@@ -60,6 +61,9 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
         if (contextElement != null) {
             // Store the offset where the hover has been triggered
             contextElement.putUserData(TARGET_OFFSET_KEY, targetOffset);
+        }
+        if (contextElement != null && SimpleLanguageUtils.isSupported(file.getLanguage())) {
+            return contextElement;
         }
         return super.getCustomDocumentationElement(editor, file, contextElement, targetOffset);
     }
