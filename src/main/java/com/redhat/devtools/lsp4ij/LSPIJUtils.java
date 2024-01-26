@@ -291,20 +291,39 @@ public class LSPIJUtils {
         return new Range(LSPIJUtils.toPosition(range.getStartOffset(), document), LSPIJUtils.toPosition(range.getEndOffset(), document));
     }
 
+    public static @Nullable TextRange toTextRange(Range range, Document document) {
+        return toTextRange(range, document, false);
+    }
+
     /**
      * Returns the IJ {@link TextRange} from the given LSP range and null otherwise.
      *
-     * @param range    the LSP range to conert.
+     * @param range    the LSP range to convert.
      * @param document the document.
      * @return the IJ {@link TextRange} from the given LSP range and null otherwise.
      */
-    public static @Nullable TextRange toTextRange(Range range, Document document) {
+    public static @Nullable TextRange toTextRange(Range range, Document document, boolean adjust) {
         try {
-            final int start = LSPIJUtils.toOffset(range.getStart(), document);
-            final int end = LSPIJUtils.toOffset(range.getEnd(), document);
-            if (start >= end || end > document.getTextLength()) {
+            int start = LSPIJUtils.toOffset(range.getStart(), document);
+            int end = LSPIJUtils.toOffset(range.getEnd(), document);
+            int docLength = document.getTextLength();
+            if (start > end || end > docLength) {
                 // Language server reports invalid diagnostic, ignore it.
                 return null;
+            }
+            // Adjust start / end offset if needed
+            if (start == end) {
+                if (!adjust) {
+                    // No adjustment, the TextRange with start/end offset is invalid
+                    return null;
+                }
+                // Adjust the end offset if the offset is not at the end of the line.
+                int offset = start;
+                int lineStartOffset = document.getLineStartOffset(range.getEnd().getLine());
+                int lineEndOffset = document.getLineEndOffset(range.getEnd().getLine());
+                if (!isEndOfLine(offset, range.getEnd().getLine(), document)) {
+                    end++;
+                }
             }
             return new TextRange(start, end);
         } catch (IndexOutOfBoundsException e) {
@@ -312,6 +331,11 @@ public class LSPIJUtils {
             LOGGER.warn("Invalid LSP text range", e);
             return null;
         }
+    }
+
+    private static boolean isEndOfLine(int offset, int line, @NotNull Document document) {
+        int lineEndOffset = document.getLineEndOffset(line);
+        return offset == lineEndOffset;
     }
 
     public static void applyWorkspaceEdit(WorkspaceEdit edit) {

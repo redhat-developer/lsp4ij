@@ -42,10 +42,12 @@ public class SeverityMapping {
         }
         switch (severity) {
             case Warning:
-                return HighlightSeverity.WEAK_WARNING;
+                return HighlightSeverity.WARNING;
             case Hint:
             case Information:
-                return HighlightSeverity.INFORMATION;
+                // Annotation is not shown when HighlightSeverity.Information severity is used
+                // HighlightSeverity.WEAK_WARNING is used in this case.
+                return HighlightSeverity.WEAK_WARNING;
             default:
                 return HighlightSeverity.ERROR;
         }
