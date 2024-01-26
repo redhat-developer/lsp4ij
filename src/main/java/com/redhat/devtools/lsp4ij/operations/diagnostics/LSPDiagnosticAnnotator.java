@@ -88,20 +88,31 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
     }
 
     private static void createAnnotation(Diagnostic diagnostic, Document document, LSPDiagnosticsForServer diagnosticsForServer, AnnotationHolder holder) {
-        TextRange range = LSPIJUtils.toTextRange(diagnostic.getRange(), document);
+        // Get the text range from teh given LSP diagnostic range.
+        // Since IJ cannot highlight an error when the start/end range offset are the same
+        // the method LSPIJUtils.toTextRange is called with adjust, in other words when start/end range offset are the same:
+        // - when the offset is at the end of the line, the method returns a text range with the same  offset,
+        // and annotation must be created with Annotation#setAfterEndOfLine(true).
+        // - when the offset is inside the line, the end offset is incremented.
+        TextRange range = LSPIJUtils.toTextRange(diagnostic.getRange(), document, true);
         if (range == null) {
             // Language server reports invalid diagnostic, ignore it.
             return;
         }
+
         // Collect information required to create Intellij Annotations
         HighlightSeverity severity = SeverityMapping.toHighlightSeverity(diagnostic.getSeverity());
         String message = diagnostic.getMessage();
 
-        // Create Intellij Annotation from the given LSP diagnostic
+        // Create IntelliJ Annotation from the given LSP diagnostic
         AnnotationBuilder builder = holder
                 .newAnnotation(severity, message)
                 .tooltip(getToolTip(diagnostic))
                 .range(range);
+        if (range.getStartOffset() == range.getEndOffset()) {
+            // Show the annotation at the end of line.
+            builder.afterEndOfLine();
+        }
 
         // Register lazy quick fixes
         List<LSPLazyCodeActionIntentionAction> fixes = diagnosticsForServer.getQuickFixesFor(diagnostic);
@@ -140,16 +151,16 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
         }
         // Diagnostic related informations
         List<DiagnosticRelatedInformation> informations = diagnostic.getRelatedInformation();
-        if(informations != null) {
+        if (informations != null) {
             tooltip.append("<ul>");
-            for(var information: informations) {
+            for (var information : informations) {
                 String message = information.getMessage();
                 tooltip.append("<li>");
                 Location location = information.getLocation();
                 if (location != null) {
                     String fileName = getFileName(location);
                     String fileUrl = LSPNavigationLinkHandler.toNavigationUrl(location);
-                    addLink(fileName,fileUrl, tooltip);
+                    addLink(fileName, fileUrl, tooltip);
                     tooltip.append(":&nbsp;");
                 }
                 tooltip.append(message);
