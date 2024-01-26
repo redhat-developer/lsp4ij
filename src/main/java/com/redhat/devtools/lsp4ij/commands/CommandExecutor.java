@@ -21,16 +21,9 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import org.eclipse.lsp4j.Command;
-import org.eclipse.lsp4j.ExecuteCommandOptions;
-import org.eclipse.lsp4j.ExecuteCommandParams;
-import org.eclipse.lsp4j.TextEdit;
-import org.eclipse.lsp4j.WorkspaceEdit;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -127,7 +120,14 @@ public class CommandExecutor {
                 ExecuteCommandParams params = new ExecuteCommandParams();
                 params.setCommand(command.getCommand());
                 params.setArguments(command.getArguments());
-                server.getWorkspaceService().executeCommand(params);
+                server.getWorkspaceService().executeCommand(params)
+                        .exceptionally(error -> {
+                            // Language server throws an error when executing a command
+                            // Display it with an IntelliJ notification.
+                            MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
+                            ServerMessageHandler.showMessage(languageServerDefinition.getDisplayName(), messageParams);
+                            return error;
+                        });
             });
             return true;
         } catch (IOException e) {
