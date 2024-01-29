@@ -14,13 +14,16 @@
 
 LSP4IJ is a free and open-source [Language Server protocol (LSP)](https://microsoft.github.io/language-server-protocol/) client compatible with all flavours of IntelliJ.  
 
-It currently doesn't provide any useful functionality on its own, but is instead used as a dependency for other extensions, willing to integrate language servers with IntelliJ products.
+It allows you to integrate any `language server` that communicates with its client via `stdio`:
 
-LSP4IJ provides:
-
-* Language server `extension points` to add any language server:
+* by `developing an IntelliJ plugin` with LSP `extension points`:
   * [com.redhat.devtools.lsp4ij.server](./docs/DeveloperGuide.md#declare-server-with-extension-point) extension point to define a language server.
   * [com.redhat.devtools.lsp4ij.languageMapping](./docs/DeveloperGuide.md#declare-language-mapping-with-extension-point) to associate an IntelliJ language with a language server definition.
+* by manually adding [language server definitions](./docs/UserDefinedLanguageServer.md), 
+supporting custom server settings. This approach doesn't require developing a specific IntelliJ plugin.
+
+LSP4IJ also provides:
+
 * an [LSP Consoles view](./docs/UserGuide.md#lsp-console) to tracks LSP requests, responses and notifications in a console:
 
 ![LSP console](./docs/images/LSPConsole.png)
@@ -29,11 +32,12 @@ LSP4IJ provides:
 
 ![Language Server preferences](./docs/images/LanguageServerPreferences.png)
 
-You can start with:
+You can find more documentation in:
 
- * [Developer guide](./docs/DeveloperGuide.md) which explains step by step how to integrate a language server in LSP4J in an external IntelliJ plugin.
- * [User guide](./docs/UserGuide.md) which explains how to use LSP console and Language server preferences.
- * [LSP support](./docs/LSPSupport.md) which explains the LSP support.
+ * [the developer guide](./docs/DeveloperGuide.md), providing step-by-step instructions on how to integrate a language server in LSP4J in an external IntelliJ plugin.
+ * [the User-defined language server documentation](./docs/UserDefinedLanguageServer.md), explaining how to integrate a language server in LSP4J with few settings. 
+ * [the user guide](./docs/UserGuide.md), which explains how to use LSP console and Language Server preferences.
+ * [the LSP Support overview](./docs/LSPSupport.md), describing which LSP features are implemented, and how.
 
 <!-- Plugin description end -->
 
