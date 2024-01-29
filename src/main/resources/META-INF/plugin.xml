@@ -14,34 +14,74 @@
     </change-notes>
     <description>
         <![CDATA[
-    <p><a href="https://github.com/redhat-developer/lsp4ij" >LSP4IJ</a> is a free and open-source <a href="https://microsoft.github.io/language-server-protocol/">Language Server protocol (LSP)</a> client compatible with all flavors of IntelliJ.</p>
+    <p>
+        <a href="https://github.com/redhat-developer/lsp4ij">LSP4IJ</a>
+        is a free and open-source <a href="https://microsoft.github.io/language-server-protocol/">Language Server
+        protocol (LSP)
+    </a> client compatible with all flavors of IntelliJ.
+    </p>
 
-    <p>It currently doesn't provide any useful functionality on its own but is instead used as a dependency for other extensions, willing to integrate language servers with IntelliJ products.</p>
-
-    <h3>LSP4IJ provides:</h3>
+    <p>It allows you to integrate any <code>language server</code> that communicates with its client via <code>
+        stdio</code>:
+    </p>
     <ul>
-        <li>Language server <code>extension points</code> to add any language server:
+        <li>by <code>developing an IntelliJ plugin</code> with LSP <code>extension points</code>:
             <ul>
-                <li><a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-server-with-extension-point" >com.redhat.devtools.lsp4ij.server</a> extension point to define a language server.</li>
-                <li><a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-language-mapping-with-extension-point" >com.redhat.devtools.lsp4ij.languageMapping</a> to associate an IntelliJ language with a language server definition.</li>
+                <li>
+                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-server-with-extension-point">
+                        com.redhat.devtools.lsp4ij.server
+                    </a>
+                    extension point to define a language server.
+                </li>
+                <li>
+                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-language-mapping-with-extension-point">
+                        com.redhat.devtools.lsp4ij.languageMapping
+                    </a>
+                    to associate an IntelliJ language with a language server definition.
+                </li>
             </ul>
         </li>
-        <li>An <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console" >LSP Consoles view</a> to track LSP requests, responses, and notifications in a console.</li>
-        <li>A <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#language-servers-preferences" >Language Servers preferences page</a> to configure the LSP trace level and the debug port to use to debug the language server.</li>
+        <li>by manually adding <a
+                href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md">language
+            server definitions</a>, supporting custom server settings. This approach doesn't require developing a
+            specific IntelliJ plugin.
+        </li>
     </ul>
 
-    <p>You can start with :
-      <ul>
-        <li>
-          <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md" > which explains step by step how to integrate a language server in LSP4J in an external IntelliJ plugin.
+    <p>LSP4IJ also provides:</p>
+    <ul>
+        <li>An <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console">LSP Consoles
+            view
+        </a> to track LSP requests, responses, and notifications in a console.
         </li>
-        <li>
-          <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md" > which explains how to use LSP console and Language server preferences.
+        <li>A <a
+                href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#language-servers-preferences">
+            Language Servers preferences page
+        </a> to configure the LSP trace level and the debug port to use to debug the language server.
         </li>
-        <li>
-          <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md" > which explains the LSP support.
-        </li>
-      </ul>
+    </ul>
+
+    <p>You can find more documentation in:
+        <ul>
+            <li>
+                <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md">the developer guide
+                </a>,
+                providing step-by-step instructions on how to integrate a language server in LSP4J in an external IntelliJ plugin.
+            </li>
+            <li>
+                <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md">the User-defined language server documentation
+                </a>
+               , explaining how to integrate a language server in LSP4J with few settings.
+            </li>
+            <li>
+                <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md">the user guide</a>
+                ,which explains how to use LSP console and Language Server preferences.
+            </li>
+            <li>
+                <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md">the LSP Support overview</a>
+                , describing which LSP features are implemented, and how.
+            </li>
+        </ul>
     </p>
     ]]>
     </description>
@@ -152,14 +192,14 @@
 
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo
-            id="LSPParameterInfoHandlerForTEXT"
-            language="TEXT"
-            implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler" />
+                id="LSPParameterInfoHandlerForTEXT"
+                language="TEXT"
+                implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler"/>
 
         <codeInsight.parameterInfo
                 id="LSPParameterInfoHandlerForTextMate"
                 language="textmate"
-                implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler" />
+                implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler"/>
 
         <notificationGroup
                 id="Language Server Protocol"
@@ -219,7 +259,8 @@
 
     <!-- LSP link handlers -->
     <extensions defaultExtensionNs="com.intellij">
-        <codeInsight.linkHandler prefix="#lsp-navigation/" handlerClass="com.redhat.devtools.lsp4ij.hint.LSPNavigationLinkHandler"/>
+        <codeInsight.linkHandler prefix="#lsp-navigation/"
+                                 handlerClass="com.redhat.devtools.lsp4ij.hint.LSPNavigationLinkHandler"/>
     </extensions>
 
     <!-- LSP application listeners -->
