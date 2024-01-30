@@ -3,7 +3,6 @@
     {
       "id": "gopls",
       "name": "Go Language Server",
-      "dev": true,
       "programArgs": {
         "default": "gopls -mode=stdio"
       },
@@ -16,6 +15,43 @@
             ]
           },
           "languageId": "go"
+        },
+        {
+          "fileType": {
+            "name": "Go Module File",
+            "patterns": [
+              "go.mod"
+            ]
+          },
+          "languageId": "go.mod"
+        },
+        {
+          "fileType": {
+            "name": "Go Work File",
+            "patterns": [
+              "go.work"
+            ]
+          },
+          "languageId": "go.work"
+        },
+        {
+          "fileType": {
+            "name": "Go Checksum File",
+            "patterns": [
+              "go.sum"
+            ]
+          },
+          "languageId": "go.sum"
+        },
+        {
+          "fileType": {
+            "name": "Go Template File",
+            "patterns": [
+              ".tmpl",
+              ".gotmpl"
+            ]
+          },
+          "languageId": "gotmpl"
         }
       ]
     },
@@ -68,7 +104,6 @@
     {
       "id": "typescript-language-server",
       "name": "TypeScript Language Server",
-      "dev": true,
       "programArgs": {
         "default": "typescript-language-server --stdio"
       },

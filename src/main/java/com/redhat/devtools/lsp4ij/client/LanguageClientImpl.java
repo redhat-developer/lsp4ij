@@ -12,10 +12,14 @@ package com.redhat.devtools.lsp4ij.client;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
 import com.redhat.devtools.lsp4ij.operations.diagnostics.LSPDiagnosticHandler;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -112,6 +116,27 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
             return CompletableFuture.completedFuture(folders);
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
+    }
+
+    @Override
+    public CompletableFuture<Void> refreshInlayHints() {
+        return CompletableFuture.runAsync(() -> {
+            if (wrapper == null) {
+                return;
+            }
+            refreshInlayHintsForAllOpenedFiles();
+        });
+    }
+
+    private void refreshInlayHintsForAllOpenedFiles() {
+        for (var fileData : wrapper.getConnectedFiles()) {
+            VirtualFile file = fileData.getFile();
+            final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+            if (psiFile != null) {
+                Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
+                InlayHintsFactoryBridge.refreshInlayHints(psiFile, editors, true);
+            }
+        }
     }
 
     @Override

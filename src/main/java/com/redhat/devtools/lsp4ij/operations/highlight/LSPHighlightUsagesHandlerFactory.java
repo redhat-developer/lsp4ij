@@ -21,6 +21,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -78,10 +79,10 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
             BlockingDeque<DocumentHighlight> highlights = new LinkedBlockingDeque<>();
 
             CompletableFuture<Void> future = LanguageServiceAccessor.getInstance(editor.getProject())
-                    .getLanguageServers(file, capabilities -> LSPIJUtils.hasCapability(capabilities.getDocumentHighlightProvider()))
+                    .getLanguageServers(file, LanguageServerItem::isDocumentHighlightSupported)
                     .thenAcceptAsync(languageServers ->
                             cancellationSupport.execute(CompletableFuture.allOf(languageServers.stream()
-                                    .map(languageServer -> cancellationSupport.execute(languageServer.getServer().getTextDocumentService().documentHighlight(params)))
+                                    .map(languageServer -> cancellationSupport.execute(languageServer.getTextDocumentService().documentHighlight(params)))
                                     .map(request -> request.thenAcceptAsync(result -> {
                                         if (result != null) {
                                             highlights.addAll(result);

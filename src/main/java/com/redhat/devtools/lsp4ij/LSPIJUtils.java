@@ -30,6 +30,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.*;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
@@ -207,7 +208,22 @@ public class LSPIJUtils {
     }
 
     /**
-     * Returns the virtual file corresponding to the PSI file.
+     * Returns the Psi file corresponding to the virtual file in the given project.
+     *
+     * @param file    the virtual file.
+     * @param project the project.
+     * @return the Psi file corresponding to the virtual file in the given project.
+     */
+    public static @Nullable PsiFile getPsiFile(@NotNull VirtualFile file, @NotNull Project project) {
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return PsiManager.getInstance(project).findFile(file);
+        }
+        return ReadAction.compute(() -> PsiManager.getInstance(project).findFile(file));
+    }
+
+
+    /**
+     * Returns the virtual file corresponding to the Psi file.
      *
      * @return the virtual file, or {@code null} if the file exists only in memory.
      */
@@ -251,6 +267,29 @@ public class LSPIJUtils {
     public static int toOffset(Position start, Document document) throws IndexOutOfBoundsException {
         int lineStartOffset = document.getLineStartOffset(start.getLine());
         return lineStartOffset + start.getCharacter();
+    }
+
+    /**
+     * Returns the offset of the line identation.
+     *
+     * @param start    the LSP position start.
+     * @param document the document.
+     * @return the offset of the line identation.
+     * @throws IndexOutOfBoundsException
+     */
+    public static int getLineIndentOffset(Position start, int tabSize, Document document) throws IndexOutOfBoundsException {
+        int lineStartOffset = document.getLineStartOffset(start.getLine());
+        int lineEndOffset = document.getLineEndOffset(start.getLine());
+        int offset = lineStartOffset;
+        for (int current = lineStartOffset; current <= lineEndOffset; current++) {
+            char c = document.getText().charAt(current);
+            if (Character.isWhitespace(c)) {
+                offset += (c == '\t') ? tabSize : 1;
+            } else {
+                break;
+            }
+        }
+        return offset;
     }
 
     public static Position toPosition(int offset, Document document) {
@@ -486,18 +525,50 @@ public class LSPIJUtils {
         return VirtualFileManager.getInstance().findFileByUrl(VfsUtilCore.fixURLforIDEA(uri));
     }
 
+    /**
+     * Returns the editor which is editing the given Psi element and null otherwise.
+     *
+     * @param element the Psi element.
+     * @return the editor which is editing the given Psi element and null otherwise.
+     */
     public static @Nullable Editor editorForElement(@Nullable PsiElement element) {
-        if (element != null && element.getContainingFile() != null && element.getContainingFile().getVirtualFile() != null) {
-            return editorForFile(element.getContainingFile().getVirtualFile(), element.getProject());
+        VirtualFile file = element != null && element.getContainingFile() != null ? element.getContainingFile().getVirtualFile() : null;
+        if (file != null) {
+            return editorForFile(file, element.getProject());
         }
         return null;
     }
 
+    /**
+     * Returns the editors which are editing the given virtual file and an empty array otherwise.
+     *
+     * @param file    the virtual file.
+     * @param project the project.
+     * @return the editors which are editing the given virtual file and an empty array otherwise
+     */
+    public static @NotNull Editor[] editorsForFile(@Nullable VirtualFile file, @NotNull Project project) {
+        return editorsForDocument(getDocument(file), project);
+    }
+
+    /**
+     * Returns the first editor which is editing the given virtual file and an empty array otherwise.
+     *
+     * @param file    the virtual file.
+     * @param project the project.
+     * @return the first editor which is editing the given virtual file and an empty array otherwise
+     */
     private static @Nullable Editor editorForFile(@Nullable VirtualFile file, @NotNull Project project) {
-        Editor[] editors = editorsForDocument(getDocument(file), project);
+        Editor[] editors = editorsForFile(file, project);
         return editors.length > 0 ? editors[0] : null;
     }
 
+    /**
+     * Returns the editors which are editing the given document and an empty array otherwise.
+     *
+     * @param document the document.
+     * @param project  the project.
+     * @return the editors which are editing the given document and an empty array otherwise
+     */
     private static @NotNull Editor[] editorsForDocument(@Nullable Document document, @Nullable Project project) {
         if (document == null) {
             return new Editor[0];

@@ -30,7 +30,6 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.operations.completion.snippet.LspSnippetIndentOptions;
-import com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -73,15 +72,8 @@ public class LSPCompletionProposal extends LookupElement {
         this.initialOffset = offset;
         this.currentOffset = offset;
         this.bestOffset = getPrefixCompletionStart(editor.getDocument(), offset);
-        ServerCapabilities serverCapabilities = languageServer.getServerWrapper().getServerCapabilities();
-        if (serverCapabilities != null &&
-                serverCapabilities.getCompletionProvider() != null &&
-                serverCapabilities.getCompletionProvider().getResolveProvider() != null) {
-            this.supportResolveCompletion = serverCapabilities.getCompletionProvider().getResolveProvider();
-        } else {
-            this.supportResolveCompletion = false;
-        }
-        this.supportSignatureHelp = LSPParameterInfoHandler.isSignatureHelpProvider(serverCapabilities);
+        this.supportResolveCompletion = languageServer.isResolveCompletionSupported();
+        this.supportSignatureHelp = languageServer.isSignatureHelpSupported();
         putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
     }
 

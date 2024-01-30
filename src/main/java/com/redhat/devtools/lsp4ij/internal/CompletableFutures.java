@@ -11,11 +11,14 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij;
+package com.redhat.devtools.lsp4ij.internal;
 
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -35,12 +38,11 @@ public class CompletableFutures {
      * {@link org.eclipse.lsp4j.jsonrpc.CompletableFutures#computeAsync} that
      * accepts a function that returns a CompletableFuture.
      *
-     * @see CompletableFutures#computeAsyncCompose(Function)
-     *
      * @param <R>  the return type of the asynchronous computation
      * @param code the code to run asynchronously
      * @return a future that sends the correct $/cancelRequest notification when
-     *         canceled
+     * canceled
+     * @see CompletableFutures#computeAsyncCompose(Function)
      */
     public static <R> CompletableFuture<R> computeAsyncCompose(
             Function<CancelChecker, CompletableFuture<R>> code) {
@@ -48,6 +50,27 @@ public class CompletableFutures {
         CompletableFuture<R> result = start.thenComposeAsync(code);
         start.complete(new FutureCancelChecker(result));
         return result;
+    }
+
+    /**
+     * Merge the given futures List<CompletableFuture<List<T>>> in one future CompletableFuture<List<T>.
+     *
+     * @param futures             the list of futures which return a List<T>.
+     * @param cancellationSupport the cancellation support.
+     * @param <T>                 the merged futures.
+     * @return
+     */
+    public static <T> @NotNull CompletableFuture<List<T>> mergeInOneFuture(@NotNull List<CompletableFuture<List<T>>> futures,
+                                                                           @NotNull CancellationSupport cancellationSupport) {
+        CompletableFuture<Void> allFutures = cancellationSupport
+                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
+        return allFutures.thenApply(Void -> {
+            List<T> mergedDataList = new ArrayList<>();
+            for (CompletableFuture<List<T>> dataListFuture : futures) {
+                mergedDataList.addAll(dataListFuture.join());
+            }
+            return mergedDataList;
+        });
     }
 
     /**

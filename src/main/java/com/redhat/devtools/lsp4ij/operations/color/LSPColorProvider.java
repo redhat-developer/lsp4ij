@@ -17,26 +17,21 @@ import com.intellij.codeInsight.hints.presentation.SequencePresentation;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
-import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayHintsProvider;
-import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.services.LanguageServer;
+import org.eclipse.lsp4j.Color;
 import org.jetbrains.annotations.NotNull;
 
-import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -44,78 +39,73 @@ import java.util.stream.Collectors;
  */
 public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
 
-    private static final Key<CancellationSupport> CANCELLATION_SUPPORT_KEY = new Key<>(LSPColorProvider.class.getName() + "-CancellationSupport");
-
-    public LSPColorProvider() {
-        super(CANCELLATION_SUPPORT_KEY);
-    }
-
     @Override
-    protected void doCollect(@NotNull VirtualFile file, @NotNull Project project, @NotNull Editor editor, @NotNull PresentationFactory factory, @NotNull InlayHintsSink inlayHintsSink, @NotNull CancellationSupport cancellationSupport) throws InterruptedException {
-        Document document = editor.getDocument();
-        URI fileUri = LSPIJUtils.toUri(file);
-        DocumentColorParams param = new DocumentColorParams(new TextDocumentIdentifier(fileUri.toASCIIString()));
-        BlockingDeque<Pair<ColorInformation, LanguageServer>> pairs = new LinkedBlockingDeque<>();
+    protected void doCollect(@NotNull PsiFile psiFile,
+                             @NotNull Editor editor,
+                             @NotNull PresentationFactory factory,
+                             @NotNull InlayHintsSink inlayHintsSink,
+                             @NotNull List<CompletableFuture> pendingFutures) throws InterruptedException {
+        // Get LSP color information from cache or create them
+        LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
+        CompletableFuture<List<ColorData>> future = colorSupport.getColors();
 
-        CompletableFuture<Void> future = collect(project, file, param, pairs, cancellationSupport);
-        List<Pair<Integer, Pair<ColorInformation, LanguageServer>>> colorInformations = createColorInformations(document, pairs, future);
-        colorInformations.stream()
-                .collect(Collectors.groupingBy(p -> p.first))
-                .forEach((offset, list) ->
-                        inlayHintsSink.addInlineElement(offset, false, toPresentation(editor, list, factory, cancellationSupport), false));
+        try {
+            List<Pair<Integer, ColorData>> codeLenses = createColorInformation(editor.getDocument(), future);
+            // Render color information
+            codeLenses.stream()
+                    .collect(Collectors.groupingBy(p -> p.first))
+                    .forEach((offset, list) ->
+                            inlayHintsSink.addInlineElement(
+                                    offset,
+                                    false,
+                                    toPresentation(list, factory))
+                    );
+        } finally {
+            if (!future.isDone()) {
+                // the future which collects all textDocument/colorInformation for all servers is not finished
+                // add it to the pending futures to refresh again the UI when this future will be finished.
+                pendingFutures.add(future);
+            }
+        }
     }
 
     @NotNull
-    private List<Pair<Integer, Pair<ColorInformation, LanguageServer>>> createColorInformations(
-            @NotNull Document document,
-            BlockingDeque<Pair<ColorInformation, LanguageServer>> pairs,
-            CompletableFuture<Void> future)
-            throws InterruptedException {
-        List<Pair<Integer, Pair<ColorInformation, LanguageServer>>> colorInformations = new ArrayList<>();
-        while (!future.isDone() || !pairs.isEmpty()) {
-            ProgressManager.checkCanceled();
-            Pair<ColorInformation, LanguageServer> pair = pairs.poll(25, TimeUnit.MILLISECONDS);
-            if (pair != null) {
-                int offset = LSPIJUtils.toOffset(pair.getFirst().getRange().getStart(), document);
-                colorInformations.add(Pair.create(offset, pair));
+    private List<Pair<Integer, ColorData>> createColorInformation(Document document,
+                                                                  CompletableFuture<List<ColorData>> future) throws InterruptedException {
+        List<Pair<Integer, ColorData>> colorInformation = new ArrayList<>();
+        if (future.isDone()) {
+            List<ColorData> data = future.getNow(Collections.emptyList());
+            fillColor(document, data, colorInformation);
+        } else {
+            while (!future.isDone()) {
+                ProgressManager.checkCanceled();
+                try {
+                    List<ColorData> data = future.get(25, TimeUnit.MILLISECONDS);
+                    fillColor(document, data, colorInformation);
+                } catch (TimeoutException | ExecutionException e) {
+                    // Do nothing
+                }
             }
         }
-        return colorInformations;
+        return colorInformation;
     }
 
-    private CompletableFuture<Void> collect(@NotNull Project project, @NotNull VirtualFile file, DocumentColorParams param, BlockingDeque<Pair<ColorInformation, LanguageServer>> pairs, CancellationSupport cancellationSupport) {
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LSPColorProvider::isColorProvider)
-                .thenComposeAsync(languageServers -> cancellationSupport.execute(CompletableFuture.allOf(languageServers.stream()
-                        .map(languageServer ->
-                                cancellationSupport.execute(languageServer.getServer().getTextDocumentService().documentColor(param))
-                                        .thenAcceptAsync(colorInformations -> {
-                                            // textDocument/color may return null
-                                            if (colorInformations != null) {
-                                                colorInformations.stream()
-                                                        .filter(Objects::nonNull)
-                                                        .forEach(colorInformation -> pairs.add(new Pair(colorInformation, languageServer.getServer())));
-                                            }
-                                        }))
-                        .toArray(CompletableFuture[]::new))));
+    private static void fillColor(Document document, List<ColorData> data, List<Pair<Integer, ColorData>> colors) {
+        for (var codeLensData : data) {
+            int offset = LSPIJUtils.toOffset(codeLensData.color().getRange().getStart(), document);
+            colors.add(Pair.create(offset, codeLensData));
+        }
     }
 
-    private InlayPresentation toPresentation(@NotNull Editor editor,
-                                             @NotNull List<Pair<Integer, Pair<ColorInformation, LanguageServer>>> elements,
-                                             @NotNull PresentationFactory factory,
-                                             @NotNull CancellationSupport cancellationSupport) {
+    private InlayPresentation toPresentation(@NotNull List<Pair<Integer, ColorData>> elements,
+                                             @NotNull PresentationFactory factory) {
         List<InlayPresentation> presentations = new ArrayList<>();
         elements.forEach(p -> {
-            cancellationSupport.checkCanceled();
-            Color color = p.second.first.getColor();
-            java.awt.Color c = new java.awt.Color((float) color.getRed(), (float) color.getGreen(), (float) color.getBlue(), (float)color.getAlpha());
+            Color color = p.second.color().getColor();
+            java.awt.Color c = new java.awt.Color((float) color.getRed(), (float) color.getGreen(), (float) color.getBlue(), (float) color.getAlpha());
             presentations.add(new ColorInlayPresentation(c, factory));
         });
         return new SequencePresentation(presentations);
-    }
-
-    private static boolean isColorProvider(final ServerCapabilities capabilities) {
-        return capabilities != null && LSPIJUtils.hasCapability(capabilities.getColorProvider());
     }
 
 }

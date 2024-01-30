@@ -19,7 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- *
+ * LSP client capabilities.
  */
 public class SupportedFeatures {
 
@@ -152,6 +152,10 @@ public class SupportedFeatures {
         // editCapabilities.setFailureHandling(FailureHandlingKind.Undo);
         workspaceClientCapabilities.setWorkspaceEdit(editCapabilities);
         workspaceClientCapabilities.setDidChangeWatchedFiles(new DidChangeWatchedFilesCapabilities(Boolean.TRUE));
+
+        // Refresh support for InlayHint
+        workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));
+
         return workspaceClientCapabilities;
     }
 

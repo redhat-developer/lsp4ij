@@ -15,6 +15,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.CoalesceByKey;
 import com.redhat.devtools.lsp4ij.internal.PromiseToCompletableFuture;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
@@ -59,6 +60,19 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // Wait for indexing is finished and read action is enabled
         // --> force the start of all languages servers mapped with the given file when indexing is finished and read action is allowed
         new ConnectToLanguageServerCompletableFuture(file, project);
+    }
+
+    @Override
+    public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
+        // file is closed
+        PsiFile psiFile = LSPIJUtils.getPsiFile(file, source.getProject());
+        if (psiFile != null) {
+            if (LSPFileSupport.hasSupport(psiFile)) {
+                // The closed file is mapped with language servers, dispose it
+                // to cancel all LSP codeLens, inlayHint, color, etc futures
+                LSPFileSupport.getSupport(psiFile).dispose();
+            }
+        }
     }
 
     private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {

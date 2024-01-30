@@ -14,7 +14,6 @@ import com.intellij.codeInsight.hints.InlayHintsProviderFactory;
 import com.intellij.codeInsight.hints.ProviderInfo;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensProvider;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
 import org.jetbrains.annotations.NotNull;
 
@@ -22,7 +21,7 @@ import java.util.List;
 
 /**
  * {@link InlayHintsProviderFactory inlay hint factory} implementation
- * to register all languages mapped with a language server with {@link LSPInlayHintsProvider} and {@link LSPCodelensProvider}
+ * to register all languages mapped with a language server with {@link LSPInlayHintsProvider} and {@link DeprecatedLSPCodeLensProvider}
  * to avoid for the external plugin to declare in plugin.xml the 'codeInsight.inlayProvider'.
  */
 public class LSPInlayHintProvidersFactory implements InlayHintsProviderFactory {

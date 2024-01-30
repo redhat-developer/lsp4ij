@@ -22,6 +22,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -59,14 +60,14 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         try {
             Project project = editor.getProject();
             LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file, capabilities -> LSPIJUtils.hasCapability(capabilities.getDefinitionProvider()))
+                    .getLanguageServers(file, LanguageServerItem::isDefinitionSupported)
                     .thenComposeAsync(languageServers ->
                             cancellationSupport.execute(
                                     CompletableFuture.allOf(
                                             languageServers
                                                     .stream()
                                                     .map(server ->
-                                                            cancellationSupport.execute(server.getServer().getTextDocumentService().definition(params))
+                                                            cancellationSupport.execute(server.getTextDocumentService().definition(params))
                                                                     .thenAcceptAsync(definitions -> targets.addAll(toElements(project, definitions))))
                                                     .toArray(CompletableFuture[]::new))))
                     .get(1_000, TimeUnit.MILLISECONDS);
