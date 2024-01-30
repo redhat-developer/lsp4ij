@@ -18,27 +18,25 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayHintsProvider;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.operations.AbstractLSPInlayHintsProvider;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
-import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
-import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -46,66 +44,73 @@ import java.util.stream.Collectors;
  */
 public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
 
-    private static final Key<CancellationSupport> CANCELLATION_SUPPORT_KEY = new Key<>(LSPInlayHintsProvider.class.getName() + "-CancellationSupport");
-
     public LSPInlayHintsProvider() {
-        super(CANCELLATION_SUPPORT_KEY);
+
     }
 
-
     @Override
-    protected void doCollect(@NotNull VirtualFile file, @NotNull Project project, @NotNull Editor editor, @NotNull PresentationFactory factory, @NotNull InlayHintsSink inlayHintsSink, @NotNull CancellationSupport cancellationSupport) throws InterruptedException {
-        Document document = editor.getDocument();
-        URI fileUri = LSPIJUtils.toUri(file);
+    protected void doCollect(@NotNull PsiFile psiFile,
+                             @NotNull Editor editor,
+                             @NotNull PresentationFactory factory,
+                             @NotNull InlayHintsSink inlayHintsSink,
+                             @NotNull List<CompletableFuture> pendingFutures) throws InterruptedException {
+        // Get LSP inlay hints from cache or create them
+        LSPInlayHintsSupport inlayHintSupport = LSPFileSupport.getSupport(psiFile).getInlayHintsSupport();
         Range viewPortRange = getViewPortRange(editor);
-        InlayHintParams param = new InlayHintParams(LSPIJUtils.toTextDocumentIdentifier(file), viewPortRange);
-        BlockingDeque<Pair<InlayHint, LanguageServer>> pairs = new LinkedBlockingDeque<>();
+        InlayHintParams params = new InlayHintParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), viewPortRange);
+        CompletableFuture<List<InlayHintData>> future = inlayHintSupport.getInlayHints(params);
 
-        CompletableFuture<Void> future = collect(project, file, param, pairs, cancellationSupport);
-        List<Pair<Integer, Pair<InlayHint, LanguageServer>>> inlayHints = createInlayHints(document, pairs, future);
-        inlayHints.stream()
-                .collect(Collectors.groupingBy(p -> p.first))
-                .forEach((offset, list) ->
-                        inlayHintsSink.addInlineElement(offset, false, toPresentation(editor, list, factory, cancellationSupport), false));
+        try {
+            List<Pair<Integer, InlayHintData>> inlayHints = createInlayHints(editor.getDocument(), future);
+            // Render inlay hints and collect all unfinished inlayHint/resolve futures
+            inlayHints.stream()
+                    .collect(Collectors.groupingBy(p -> p.first))
+                    .forEach((offset, list) ->
+                            inlayHintsSink.addInlineElement(
+                                    offset,
+                                    false,
+                                    toPresentation(editor, list, factory, pendingFutures),
+                                    false));
+        } finally {
+            if (!future.isDone()) {
+                // the future which collects all textDocument/inlayHint for all servers is not finished
+                // add it to the pending futures to refresh again the UI when this future will be finished.
+                pendingFutures.add(future);
+            }
+        }
     }
 
     @NotNull
-    private List<Pair<Integer, Pair<InlayHint, LanguageServer>>> createInlayHints(
-            @NotNull Document document,
-            BlockingDeque<Pair<InlayHint, LanguageServer>> pairs,
-            CompletableFuture<Void> future)
-            throws InterruptedException {
-        List<Pair<Integer, Pair<InlayHint, LanguageServer>>> inlayHints = new ArrayList<>();
-        while (!future.isDone() || !pairs.isEmpty()) {
-            ProgressManager.checkCanceled();
-            Pair<InlayHint, LanguageServer> pair = pairs.poll(25, TimeUnit.MILLISECONDS);
-            if (pair != null) {
-                int offset = LSPIJUtils.toOffset(pair.getFirst().getPosition(), document);
-                inlayHints.add(Pair.create(offset, pair));
+    private List<Pair<Integer, InlayHintData>> createInlayHints(Document document,
+                                                                CompletableFuture<List<InlayHintData>> future) throws InterruptedException {
+        List<Pair<Integer, InlayHintData>> inlayHints = new ArrayList<>();
+        if (future.isDone()) {
+            List<InlayHintData> data = future.getNow(Collections.emptyList());
+            fillInlayHints(document, data, inlayHints);
+        } else {
+            while (!future.isDone()) {
+                ProgressManager.checkCanceled();
+                try {
+                    List<InlayHintData> data = future.get(25, TimeUnit.MILLISECONDS);
+                    fillInlayHints(document, data, inlayHints);
+                } catch (TimeoutException | ExecutionException e) {
+                    // Do nothing
+                }
             }
         }
         return inlayHints;
     }
 
-    private CompletableFuture<Void> collect(@NotNull Project project, @NotNull VirtualFile file, InlayHintParams param, BlockingDeque<Pair<InlayHint, LanguageServer>> pairs, CancellationSupport cancellationSupport) {
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, capabilities -> capabilities.getInlayHintProvider() != null)
-                .thenComposeAsync(languageServers -> cancellationSupport.execute(CompletableFuture.allOf(languageServers.stream()
-                        .map(languageServer ->
-                                cancellationSupport.execute(languageServer.getServer().getTextDocumentService().inlayHint(param))
-                                        .thenAcceptAsync(inlayHints -> {
-                                            // textDocument/codeLens may return null
-                                            if (inlayHints != null) {
-                                                inlayHints.stream().filter(Objects::nonNull)
-                                                        .forEach(inlayHint -> pairs.add(new Pair(inlayHint, languageServer.getServer())));
-                                            }
-                                        }))
-                        .toArray(CompletableFuture[]::new))));
+    private static void fillInlayHints(Document document, List<InlayHintData> data, List<Pair<Integer, InlayHintData>> inlayHints) {
+        for (var inlayHintData : data) {
+            int offset = LSPIJUtils.toOffset(inlayHintData.inlayHint().getPosition(), document);
+            inlayHints.add(Pair.create(offset, inlayHintData));
+        }
     }
 
     @NotNull
     private static Range getViewPortRange(Editor editor) {
-        // LSP textDocument/inlayHnt request parameter expects to fill the visible view port range.
+        // LSP textDocument/inlayHint request parameter expects to fill the visible view port range.
         // As Intellij inlay hint provider is refreshed just only when editor is opened or editor content changed
         // and not when editor is scrolling, the view port range must be created with full text document offsets.
         Position start = new Position(0, 0);
@@ -115,13 +120,12 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
     }
 
     private InlayPresentation toPresentation(@NotNull Editor editor,
-                                             @NotNull List<Pair<Integer, Pair<InlayHint, LanguageServer>>> elements,
+                                             @NotNull List<Pair<Integer, InlayHintData>> elements,
                                              @NotNull PresentationFactory factory,
-                                             @NotNull CancellationSupport cancellationSupport) {
+                                             @NotNull List<CompletableFuture> toResolve) {
         List<InlayPresentation> presentations = new ArrayList<>();
         elements.forEach(p -> {
-            cancellationSupport.checkCanceled();
-            Either<String, List<InlayHintLabelPart>> label = p.second.first.getLabel();
+            Either<String, List<InlayHintLabelPart>> label = p.second.inlayHint().getLabel();
             if (label.isLeft()) {
                 presentations.add(factory.smallText(label.getLeft()));
             } else {
@@ -143,7 +147,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
     private InlayPresentation createInlayPresentation(
             Project project,
             PresentationFactory factory,
-            Pair<Integer, Pair<InlayHint, LanguageServer>> p,
+            Pair<Integer, InlayHintData> p,
             int index,
             InlayHintLabelPart part) {
         InlayPresentation text = factory.smallText(part.getValue());
@@ -151,7 +155,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
             // InlayHintLabelPart defines a Command, create a clickable inlay hint
             int finalIndex = index;
             text = factory.referenceOnHover(text, (event, translated) ->
-                    executeClientCommand(p.second.second, p.second.first, finalIndex, (Component) event.getSource(), project)
+                    executeCommand(p.second.languageServer(), p.second.inlayHint(), finalIndex, (Component) event.getSource(), project)
             );
         }
         return text;
@@ -162,27 +166,45 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
         return (command != null && command.getCommand() != null && !command.getCommand().isEmpty());
     }
 
-    private void executeClientCommand(
-            LanguageServer languageServer,
-            InlayHint inlayHint,
-            int index,
-            Component source,
-            Project project
-    ) {
-        if (LanguageServiceAccessor.getInstance(project)
-                .checkCapability(languageServer, capabilites -> isResolveSupported(capabilites.getInlayHintProvider()))) {
+    /**
+     * Execute codeLens command.
+     *
+     * @param languageServer the language server.
+     * @param inlayHint      the inlay hint.
+     * @param index          the inlay part index where the command should be defined.
+     * @param source         the component source.
+     * @param project        the project.
+     */
+    private void executeCommand(@NotNull LanguageServerItem languageServer,
+                                @NotNull InlayHint inlayHint,
+                                int index,
+                                @Nullable Component source,
+                                @NotNull Project project) {
+        if (languageServer.isResolveInlayHintSupported()) {
             languageServer.getTextDocumentService()
                     .resolveInlayHint(inlayHint)
                     .thenAcceptAsync(resolvedInlayHint -> {
-                        executeClientCommand(source, resolvedInlayHint.getLabel().getRight().get(index).getCommand(), project);
-                    });
+                                if (resolvedInlayHint != null) {
+                                    executeClientCommand(source, getCommand(resolvedInlayHint, index), project);
+                                }
+                            }
+                    );
         } else {
-            executeClientCommand(source, inlayHint.getLabel().getRight().get(index).getCommand(), project);
+            executeClientCommand(source, getCommand(inlayHint, index), project);
         }
     }
 
-    private static boolean isResolveSupported(Either<Boolean, InlayHintRegistrationOptions> provider) {
-        return provider.isRight() && provider.getRight().getResolveProvider();
+    private static @Nullable Command getCommand(@Nullable InlayHint inlayHint, int index) {
+        if (inlayHint == null) {
+            return null;
+        }
+        if (inlayHint.getLabel() != null && inlayHint.getLabel().isRight()) {
+            List<InlayHintLabelPart> parts = inlayHint.getLabel().getRight();
+            if (index < parts.size()) {
+                return parts.get(index).getCommand();
+            }
+        }
+        return null;
     }
 
 }

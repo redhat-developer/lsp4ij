@@ -25,7 +25,6 @@ import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodelensProvider;
 import com.redhat.devtools.lsp4ij.operations.color.LSPColorProvider;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.server.definition.*;
@@ -158,15 +157,13 @@ public class LanguageServersRegistry {
         }
         // When a file is not linked to a language (just with a file type) and not linked to a textmate,
         // the language received in InlayHintProviders is plain/text, we add it to support
-        // LSP codeLens, inlayHint, color for a file which is not linked to a language.
+        // LSP inlayHint, color for a file which is not linked to a language.
         distinctLanguages.add(PlainTextLanguage.INSTANCE);
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
-        LSPCodelensProvider lspCodeLensProvider = new LSPCodelensProvider();
         LSPColorProvider lspColorProvider = new LSPColorProvider();
         inlayHintsProviders.clear();
         for (Language language : distinctLanguages) {
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspInlayHintsProvider));
-            inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspCodeLensProvider));
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspColorProvider));
         }
     }

@@ -73,11 +73,11 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<LSPVirtualF
             Project project = editor.getProject();
             BlockingDeque<Pair<List<DocumentLink>, LanguageServerWrapper>> documentLinks = new LinkedBlockingDeque<>();
             CompletableFuture<Void> future = LanguageServiceAccessor.getInstance(project).getLanguageServers(file,
-                            capabilities -> capabilities.getDocumentLinkProvider() != null)
+                            LanguageServerItem::isDocumentLinkSupported)
                     .thenAcceptAsync(languageServers ->
                             cancellationSupport.execute(CompletableFuture.allOf(languageServers.stream()
                                     .map(languageServer -> Pair.pair(
-                                            cancellationSupport.execute(languageServer.getServer().getTextDocumentService().documentLink(params))
+                                            cancellationSupport.execute(languageServer.getTextDocumentService().documentLink(params))
                                             , languageServer.getServerWrapper()))
                                     .map(request -> request.getFirst().thenAcceptAsync(result -> {
                                         if (result != null) {

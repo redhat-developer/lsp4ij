@@ -20,7 +20,6 @@ import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
@@ -79,7 +78,7 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
         if (file == null) {
             return;
         }
-        final PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+        final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
         if (psiFile == null) {
             return;
         }

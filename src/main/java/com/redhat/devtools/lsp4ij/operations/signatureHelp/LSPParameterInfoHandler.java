@@ -21,6 +21,7 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.*;
@@ -250,28 +251,17 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
                                                          @NotNull BlockingDeque<Pair<SignatureHelp, LanguageServer>> pairs,
                                                          @NotNull CancellationSupport cancellationSupport) {
         return LanguageServiceAccessor.getInstance(context.getProject())
-                .getLanguageServers(context.getFile().getVirtualFile(), LSPParameterInfoHandler::isSignatureHelpProvider)
+                .getLanguageServers(context.getFile().getVirtualFile(), LanguageServerItem::isSignatureHelpSupported)
                 .thenComposeAsync(languageServers -> cancellationSupport.execute(
                         CompletableFuture.allOf(languageServers.stream()
                                 .map(languageServer ->
-                                        cancellationSupport.execute(languageServer.getServer().getTextDocumentService().signatureHelp(params))
+                                        cancellationSupport.execute(languageServer.getTextDocumentService().signatureHelp(params))
                                                 .thenAcceptAsync(signatureHelp -> {
                                                     // textDocument/signatureHelp may return null
                                                     pairs.add(new Pair<>(signatureHelp, languageServer.getServer()));
                                                 }))
                                 .toArray(CompletableFuture[]::new))));
     }
-
-    /**
-     * Returns true if the language server can support signature help and false otherwise.
-     *
-     * @param serverCapabilities the server capabilities.
-     * @return true if the language server can support signature help and false otherwise.
-     */
-    public static boolean isSignatureHelpProvider(ServerCapabilities serverCapabilities) {
-        return serverCapabilities != null && serverCapabilities.getSignatureHelpProvider() != null;
-    }
-
 
     @NotNull
     private static LSPSignatureHelperPsiElement toLSPSignatureHelperPsiElement(ParameterInfoContext context) {

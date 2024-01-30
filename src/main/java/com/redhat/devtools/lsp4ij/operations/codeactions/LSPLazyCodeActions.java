@@ -20,7 +20,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
-import com.redhat.devtools.lsp4ij.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.eclipse.lsp4j.*;

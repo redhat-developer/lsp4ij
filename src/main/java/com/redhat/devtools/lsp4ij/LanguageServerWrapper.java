@@ -226,14 +226,14 @@ public class LanguageServerWrapper implements Disposable {
         this.serverDefinition = serverDefinition;
         this.connectedDocuments = new HashMap<>();
         String projectName = sanitize((project != null && project.getName() != null && !serverDefinition.isSingleton) ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
-        String dispatcherThreadNameFormat ="LS-" + serverDefinition.id + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
+        String dispatcherThreadNameFormat = "LS-" + serverDefinition.id + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
         this.dispatcher = Executors
                 .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(dispatcherThreadNameFormat).build());
 
         // Executor service passed through to the LSP4j layer when we attempt to start the LS. It will be used
         // to create a listener that sits on the input stream and processes inbound messages (responses, or server-initiated
         // requests).
-        String listenerThreadNameFormat ="LS-" + serverDefinition.id + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
+        String listenerThreadNameFormat = "LS-" + serverDefinition.id + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
         this.listener = Executors
                 .newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(listenerThreadNameFormat).build());
         udateStatus(ServerStatus.none);
@@ -249,7 +249,7 @@ public class LanguageServerWrapper implements Disposable {
      * Removes '%' from the given name
      */
     private static String sanitize(String name) {
-        return name.replace("%","");
+        return name.replace("%", "");
     }
 
     public Project getProject() {
@@ -502,7 +502,7 @@ public class LanguageServerWrapper implements Disposable {
                     stop();
                 } catch (Throwable t) {
                     //Need to catch time task exceptions, or it will cancel the timer
-                    LOGGER.error("Failed to stop language server "+LanguageServerWrapper.this.serverDefinition.id, t);
+                    LOGGER.error("Failed to stop language server " + LanguageServerWrapper.this.serverDefinition.id, t);
                 }
             }
         }, TimeUnit.SECONDS.toMillis(this.serverDefinition.lastDocumentDisconnectedTimeout));
@@ -762,8 +762,23 @@ public class LanguageServerWrapper implements Disposable {
         return connectedDocuments.containsKey(location);
     }
 
+    /**
+     * Returns the LSP file data coming from this language server for the given file uri.
+     *
+     * @param fileUri the file Uri.
+     * @return the LSP file data coming from this language server for the given file uri.
+     */
     public @Nullable LSPVirtualFileData getLSPVirtualFileData(URI fileUri) {
         return connectedDocuments.get(fileUri);
+    }
+
+    /**
+     * Returns all LSP files connected to this language server.
+     *
+     * @return all LSP files connected to this language server.
+     */
+    public Collection<LSPVirtualFileData> getConnectedFiles() {
+        return Collections.unmodifiableCollection(connectedDocuments.values());
     }
 
     /**

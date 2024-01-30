@@ -10,7 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import org.eclipse.lsp4j.CodeActionOptions;
+import org.eclipse.lsp4j.InlayHintRegistrationOptions;
+import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.eclipse.lsp4j.services.TextDocumentService;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Item which stores the initialized LSP4j language server and the language server wrapper.
@@ -19,16 +25,18 @@ public class LanguageServerItem {
 
     private final LanguageServerWrapper serverWrapper;
     private final LanguageServer server;
+    private final ServerCapabilities serverCapabilities;
 
     public LanguageServerItem(LanguageServer server, LanguageServerWrapper serverWrapper) {
         this.server = server;
         this.serverWrapper = serverWrapper;
+        this.serverCapabilities = serverWrapper.getServerCapabilities();
     }
 
     /**
      * Returns the LSP4j language server.
      *
-     * @return  the LSP4j language server.
+     * @return the LSP4j language server.
      */
     public LanguageServer getServer() {
         return server;
@@ -37,10 +45,223 @@ public class LanguageServerItem {
     /**
      * Returns the language server wrapper.
      *
-     * @return  the language server wrapper.
+     * @return the language server wrapper.
      */
     public LanguageServerWrapper getServerWrapper() {
         return serverWrapper;
+    }
+
+    /**
+     * Returns the server capabilities of the language server.
+     *
+     * @return the server capabilities of the language server.
+     */
+    public ServerCapabilities getServerCapabilities() {
+        return serverCapabilities;
+    }
+
+    /**
+     * Returns true if the language server can support resolve completion and false otherwise.
+     *
+     * @return true if the language server can support resolve completion and false otherwise.
+     */
+    public boolean isResolveCompletionSupported() {
+        return isResolveCompletionSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support signature help and false otherwise.
+     *
+     * @return true if the language server can support signature help and false otherwise.
+     */
+    public boolean isSignatureHelpSupported() {
+        return isSignatureHelpSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support resolve code lens and false otherwise.
+     *
+     * @return true if the language server can support resolve code lens and false otherwise.
+     */
+    public boolean isResolveCodeLensSupported() {
+        return isResolveCodeLensSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support resolve inlay hint and false otherwise.
+     *
+     * @return true if the language server can support resolve inlay hint and false otherwise.
+     */
+    public boolean isResolveInlayHintSupported() {
+        return isResolveInlayHintSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support resolve code action and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support resolve code action and false otherwise.
+     */
+    public static boolean isCodeActionResolveSupported(@Nullable ServerCapabilities serverCapabilities) {
+        if (serverCapabilities != null) {
+            Either<Boolean, CodeActionOptions> caProvider = serverCapabilities.getCodeActionProvider();
+            if (caProvider.isLeft()) {
+                // It is wrong, but we need to parse the registerCapability
+                return caProvider.getLeft();
+            } else if (caProvider.isRight()) {
+                CodeActionOptions options = caProvider.getRight();
+                return options.getResolveProvider() != null && options.getResolveProvider().booleanValue();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the language server can support resolve completion and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support resolve completion and false otherwise.
+     */
+    public static boolean isResolveCompletionSupported(@Nullable ServerCapabilities serverCapabilities) {
+        if (serverCapabilities != null &&
+                serverCapabilities.getCompletionProvider() != null &&
+                serverCapabilities.getCompletionProvider().getResolveProvider() != null) {
+            return serverCapabilities.getCompletionProvider().getResolveProvider().booleanValue();
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the language server can support signature help and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support signature help and false otherwise.
+     */
+    public static boolean isSignatureHelpSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getSignatureHelpProvider() != null;
+    }
+
+    /**
+     * Returns true if the language server can support code lens and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support code lens and false otherwise.
+     */
+    public static boolean isCodeLensSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getCodeLensProvider() != null;
+    }
+
+    /**
+     * Returns true if the language server can support resolve code lens and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support resolve code lens and false otherwise.
+     */
+    public static boolean isResolveCodeLensSupported(@Nullable ServerCapabilities serverCapabilities) {
+        if (serverCapabilities != null &&
+                serverCapabilities.getCodeLensProvider() != null &&
+                serverCapabilities.getCodeLensProvider().getResolveProvider() != null) {
+            return serverCapabilities.getCodeLensProvider().getResolveProvider().booleanValue();
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the language server can support resolve inlay hint and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support resolve inlay hint and false otherwise.
+     */
+    public static boolean isResolveInlayHintSupported(@Nullable ServerCapabilities serverCapabilities) {
+        if (serverCapabilities != null) {
+            Either<Boolean, InlayHintRegistrationOptions> inlayHintProvider = serverCapabilities.getInlayHintProvider();
+            if (inlayHintProvider.isLeft()) {
+                // It is wrong, but we need to parse the registerCapability
+                return inlayHintProvider.getLeft();
+            } else if (inlayHintProvider.isRight()) {
+                InlayHintRegistrationOptions options = inlayHintProvider.getRight();
+                return options.getResolveProvider() != null && options.getResolveProvider().booleanValue();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the language server can support inlay hint and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support inlay hint and false otherwise.
+     */
+    public static boolean isInlayHintSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getInlayHintProvider() != null;
+    }
+
+    /**
+     * Returns true if the language server can support color and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support color and false otherwise.
+     */
+    public static boolean isColorSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getColorProvider());
+    }
+
+    /**
+     * Returns true if the language server can support definition and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support definition and false otherwise.
+     */
+    public static boolean isDefinitionSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getDefinitionProvider());
+    }
+
+    /**
+     * Returns true if the language server can support document highlight and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support document highlight and false otherwise.
+     */
+    public static boolean isDocumentHighlightSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getDocumentHighlightProvider());
+    }
+
+    /**
+     * Returns true if the language server can support document link and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support document link and false otherwise.
+     */
+    public static boolean isDocumentLinkSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getDocumentLinkProvider() != null;
+    }
+
+    /**
+     * Returns true if the language server can support document link and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support document link and false otherwise.
+     */
+    public static boolean isHoverSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                ((serverCapabilities.getHoverProvider().isLeft() && serverCapabilities.getHoverProvider().getLeft())
+                        || serverCapabilities.getHoverProvider().isRight());
+    }
+
+    /**
+     * Returns the LSP {@link TextDocumentService} of the language server.
+     *
+     * @return the LSP {@link TextDocumentService} of the language server.
+     */
+    public TextDocumentService getTextDocumentService() {
+        return getServer().getTextDocumentService();
     }
 
 }

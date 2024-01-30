@@ -18,6 +18,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
@@ -102,13 +103,13 @@ public class LSPTextHoverForFile implements Disposable {
             this.lastOffset = offset;
             CancellationSupport cancellationSupport = new CancellationSupport();
             this.lspRequest = LanguageServiceAccessor.getInstance(element.getProject())
-                    .getLanguageServers(file, capabilities -> isHoverCapable(capabilities))
+                    .getLanguageServers(file, LanguageServerItem::isHoverSupported)
                     .thenApplyAsync(languageServers -> // Async is very important here, otherwise the LS Client thread is in
                             // deadlock and doesn't read bytes from LS
                             languageServers.stream()
                                     .map(languageServer ->
                                             cancellationSupport.execute(
-                                                            languageServer.getServer().getTextDocumentService()
+                                                            languageServer.getTextDocumentService()
                                                                     .hover(LSPIJUtils.toHoverParams(offset, document)))
                                                     .join()
                                     ).filter(Objects::nonNull).collect(Collectors.toList()));
@@ -149,10 +150,6 @@ public class LSPTextHoverForFile implements Disposable {
         } else {
             return hoverContent.getRight();
         }
-    }
-
-    private static boolean isHoverCapable(ServerCapabilities capabilities) {
-        return (capabilities.getHoverProvider().isLeft() && capabilities.getHoverProvider().getLeft()) || capabilities.getHoverProvider().isRight();
     }
 
     @Override

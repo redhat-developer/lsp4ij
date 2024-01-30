@@ -238,10 +238,10 @@
       }
     },
     "referencesCodeLens": {
-      "enabled": false
+      "enabled": true
     },
     "implementationsCodeLens": {
-      "enabled": false
+      "enabled": true
     },
     "references": {
       "includeAccessors": true,

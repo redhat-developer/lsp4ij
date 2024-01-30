@@ -27,12 +27,11 @@ import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.CodeAction;
-import org.eclipse.lsp4j.CodeActionOptions;
 import org.eclipse.lsp4j.Command;
-import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
+import static com.redhat.devtools.lsp4ij.LanguageServerItem.isCodeActionResolveSupported;
 import static com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActions.NO_CODEACTION_AT_INDEX;
 
 /**
@@ -77,7 +76,8 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     public void invoke(@NotNull Project project, Editor editor, PsiFile file) throws IncorrectOperationException {
         String serverId = getLanguageServerWrapper().serverDefinition.id;
         if (codeAction != null) {
-            if (codeAction.getEdit() == null && codeAction.getCommand() == null && isCodeActionResolveSupported()) {
+            if (codeAction.getEdit() == null && codeAction.getCommand() == null
+                    && isCodeActionResolveSupported(getLanguageServerWrapper().getServerCapabilities())) {
                 // Unresolved code action "edit" property. Resolve it.
                 getLanguageServerWrapper().getInitializedServer()
                         .thenApply(ls ->
@@ -117,21 +117,6 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
 
     private LanguageServerWrapper getLanguageServerWrapper() {
         return lazyCodeActions.getLanguageServerWrapper();
-    }
-
-    private boolean isCodeActionResolveSupported() {
-        ServerCapabilities capabilities = getLanguageServerWrapper().getServerCapabilities();
-        if (capabilities != null) {
-            Either<Boolean, CodeActionOptions> caProvider = capabilities.getCodeActionProvider();
-            if (caProvider.isLeft()) {
-                // It is wrong, but we need to parse the registerCapability
-                return caProvider.getLeft();
-            } else if (caProvider.isRight()) {
-                CodeActionOptions options = caProvider.getRight();
-                return options.getResolveProvider().booleanValue();
-            }
-        }
-        return false;
     }
 
     @Override

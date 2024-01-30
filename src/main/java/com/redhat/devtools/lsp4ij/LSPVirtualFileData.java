@@ -28,16 +28,29 @@ import java.util.List;
  */
 public class LSPVirtualFileData {
 
+    private final VirtualFile file;
+
     private final LSPDiagnosticsForServer diagnosticsForServer;
 
     private final LSPDocumentLinkForServer documentLinkForServer;
 
     private final DocumentContentSynchronizer synchronizer;
 
+
     public LSPVirtualFileData(LanguageServerWrapper languageServerWrapper, VirtualFile file, DocumentContentSynchronizer synchronizer) {
+        this.file = file;
         this.synchronizer = synchronizer;
         this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServerWrapper,file);
         this.documentLinkForServer = new LSPDocumentLinkForServer(languageServerWrapper, file);
+    }
+
+    /**
+     * Returns the virtual file.
+     *
+     * @return the virtual file.
+     */
+    public VirtualFile getFile() {
+        return file;
     }
 
     public DocumentContentSynchronizer getSynchronizer() {

@@ -171,7 +171,12 @@
                 id="LSPHighlightUsagesHandlerFactory"
                 implementation="com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightUsagesHandlerFactory"/>
 
-        <!-- LSP textDocument/codeLens + textDocument/inlayHint requests support -->
+        <!-- LSP textDocument/codeLens request support -->
+        <codeInsight.codeVisionProvider
+                id="LSPCodeLensProvider"
+                implementation="com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensProvider" />
+
+        <!-- LSP textDocument/inlayHint + textDocument/colorInformation requests support -->
         <codeInsight.inlayProviderFactory
                 id="LSPInlayHintProvidersFactory"
                 implementation="com.redhat.devtools.lsp4ij.operations.LSPInlayHintProvidersFactory"/>
