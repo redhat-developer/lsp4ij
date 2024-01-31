@@ -15,7 +15,7 @@ import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.ListCellRendererWrapper;
+import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBInsets;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
@@ -82,7 +82,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
     private void createTemplateCombo(FormBuilder builder) {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.X_AXIS));
-        templateCombo.setRenderer(new ListCellRendererWrapper<LanguageServerTemplate>() {
+        templateCombo.setRenderer(new SimpleListCellRenderer<LanguageServerTemplate>() {
             @Override
             public void customize(@NotNull JList list,
                                   @Nullable LanguageServerTemplate value,
@@ -97,7 +97,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
             }
         });
 
-        final JButton showInstructionButton = super.createHelpButton(JBInsets.emptyInsets());
+        final JButton showInstructionButton = super.createHelpButton(new JBInsets(0,0,0,0));
         showInstructionButton.setText("");
         templateCombo.addItemListener(event -> {
             LanguageServerTemplate template = (LanguageServerTemplate) event.getItem();
@@ -108,8 +108,10 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         showInstructionButton.addActionListener(e -> {
             LanguageServerTemplate template = (LanguageServerTemplate) templateCombo.getSelectedItem();
-            ShowInstructionDialog dialog = new ShowInstructionDialog(template, project);
-            dialog.show();
+            if (template != null) {
+                ShowInstructionDialog dialog = new ShowInstructionDialog(template, project);
+                dialog.show();
+            }
         });
         showInstructionButton.setEnabled(false);
         panel.add(showInstructionButton, BorderLayout.CENTER);

@@ -6,7 +6,7 @@ annotations = "24.0.1"
 testlogger = "3.2.0"
 kotlin = "1.9.10"
 changelog = "2.2.0"
-gradleIntelliJPlugin = "1.16.0"
+gradleIntelliJPlugin = "1.16.1"
 
 
 [libraries]
