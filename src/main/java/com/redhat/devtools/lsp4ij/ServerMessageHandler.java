@@ -43,29 +43,19 @@ public class ServerMessageHandler {
     }
 
     private static Icon messageTypeToIcon(MessageType type) {
-        Icon result = null;
-
-        switch (type) {
-            case Error:
-                result = AllIcons.General.Error;
-                break;
-            case Info:
-            case Log:
-                result =  AllIcons.General.Information;
-                break;
-            case Warning:
-                result = AllIcons.General.Warning;
-        }
-        return result;
+        return switch (type) {
+            case Error -> AllIcons.General.Error;
+            case Info, Log -> AllIcons.General.Information;
+            case Warning -> AllIcons.General.Warning;
+        };
     }
 
     private static NotificationType messageTypeToNotificationType(MessageType type) {
-        NotificationType result = switch (type) {
+        return switch (type) {
             case Error -> NotificationType.ERROR;
             case Info, Log -> NotificationType.INFORMATION;
             case Warning -> NotificationType.WARNING;
         };
-        return result;
     }
 
 
@@ -75,7 +65,8 @@ public class ServerMessageHandler {
      * @param params the message parameters
      */
     public static void showMessage(String title, MessageParams params) {
-        Notification notification = new Notification(LanguageServerBundle.message("language.server.protocol.groupId"), title, toHTML(params.getMessage()), messageTypeToNotificationType(params.getType()), NotificationListener.URL_OPENING_LISTENER);
+        Notification notification = new Notification(LanguageServerBundle.message("language.server.protocol.groupId"), title, toHTML(params.getMessage()), messageTypeToNotificationType(params.getType()));
+        notification.setListener(NotificationListener.URL_OPENING_LISTENER);
         notification.setIcon(messageTypeToIcon(params.getType()));
         Notifications.Bus.notify(notification);
     }
