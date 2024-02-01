@@ -82,6 +82,13 @@ intellij {
     plugins = properties("platformPlugins").map { it.split(',').map(String::trim).filter(String::isNotEmpty) }
 }
 
+idea {
+    module {
+        isDownloadJavadoc = true
+        isDownloadSources = true
+    }
+}
+
 configurations {
     runtimeClasspath {
         exclude(group = "org.slf4j", module = "slf4j-api")
