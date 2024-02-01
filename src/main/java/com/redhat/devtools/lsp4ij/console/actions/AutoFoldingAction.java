@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.console.actions;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.ToggleAction;
 import com.intellij.openapi.editor.Editor;
@@ -68,5 +69,10 @@ public class AutoFoldingAction extends ToggleAction implements DumbAware {
                 region.setExpanded(expanded);
             }
         });
+    }
+
+    @Override
+    public @NotNull ActionUpdateThread getActionUpdateThread() {
+        return ActionUpdateThread.EDT;
     }
 }
