@@ -1,6 +1,6 @@
 # Developer guide
 
-This section provide step-by-step instructions how to contribute your own LSP language server in your IntelliJ plugin.
+This section provides step-by-step instructions for contributing an LSP language server in your IntelliJ plugin.
 
 ## Reference LSP4IJ
 
@@ -30,22 +30,22 @@ the [Language Server Protocol](https://microsoft.github.io/language-server-proto
 the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol).). It provides its own version of LSP4J
 and its classes are loaded in the LSP4IJ plugin class loader.
 
-Your IntelliJ Plugin must not embed its own version of LSP4J, in order to avoid conflicts with the version provided by
+If your IntelliJ Plugin contributes a Java-based language server, it must not embed its own version of LSP4J, in order to avoid conflicts with the version provided by
 LSP4IJ. Failing to do so will result in `ClassCastException` errors to be thrown.
 Make sure that the LSP4J dependency in your plugin is either declared with a `runtimeOnly` scope or excluded entirely,
-if it's included as a transitive dependency.
+if it's referenced as a transitive dependency.
 
-Here is a sample used in [Quarkus Tools](https://github.com/redhat-developer/intellij-quarkus)
-in [build.gradle.kts](https://github.com/redhat-developer/intellij-quarkus/blob/main/build.gradle.kts) to exclude LSP4J
+Here is an example from the [build.gradle.kts](https://github.com/redhat-developer/intellij-quarkus/blob/main/build.gradle.kts) of the [Quarkus Tools](https://github.com/redhat-developer/intellij-quarkus) project,
+excluding the LSP4J
 dependency from the [Qute Language Server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls):
 
-```
+```kotlin
 implementation("com.redhat.microprofile:com.redhat.qute.ls:0.17.0) {
   exclude("org.eclipse.lsp4j")
 }
 ```
 
-## Declare server
+## Write Server-related code
 
 ## LanguageServerFactory
 
@@ -85,6 +85,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 
 If you need to provide client specific features (e.g. commands), you can override the `createLanguageClient` method to
 return your custom LSP client implementation.
+
 If you need to expose a custom server API, i.e. custom commands supported by your language server, you can override
 the `createLanguageClient` method to return a custom interface extending LSP4J's LanguageServer API.
 
@@ -92,17 +93,17 @@ the `createLanguageClient` method to return a custom interface extending LSP4J's
 
 Your `MyLanguageServer` needs to implement
 the [StreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/StreamConnectionProvider.java)
-API which manages:
+API which :
 
-* the language server lifecycle (start/stop)
+* manages the language server lifecycle (start/stop)
 * returns the input/error stream of LSP requests, responses, notifications.
 
-Generally, the language server is started with a process by using a runtime like Java, NodeJS, etc. In this case you
+Frequently, a language server process is started through a runtime like Java, Node.js, etc. In this case you
 need to
 extend [ProcessStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/ProcessStreamConnectionProvider.java)
 
 Here is a basic sample which starts the `path/to/my/language/server/main.js` language server written in JavaScript, with
-the NodeJS runtime found in "path/to/nodejs/node.exe":
+the Node.js runtime found in "path/to/nodejs/node.exe":
 
 ```java
 package my.language.server;
@@ -121,8 +122,8 @@ public class MyLanguageServer extends ProcessStreamConnectionProvider {
 }
 ```
 
-If your language server is written in Java, to build the command, you can
-use [JavaProcessCommandBuilder](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/JavaProcessCommandBuilder.java):
+If your language server is written in Java, you can
+use [JavaProcessCommandBuilder](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/JavaProcessCommandBuilder.java) to build the launch command:
 
 ```java
 package my.language.server;
@@ -145,19 +146,17 @@ public class MyLanguageServer extends ProcessStreamConnectionProvider {
 }
 ```
 
-This builder takes care of filling command with Java runtime and generate the command with debug if the settings of the
+This builder takes care of filling command with the current Java runtime, and adds additional debug flags if the settings of the
 language server `myLanguageServerId` defines a debug port.
 
-You can see a full sample
-with [QuteServer](https://github.com/redhat-developer/intellij-quarkus/blob/main/src/main/java/com/redhat/devtools/intellij/qute/lsp/QuteServer.java)
+You can see a complete example
+with the [QuteServer](https://github.com/redhat-developer/intellij-quarkus/blob/main/src/main/java/com/redhat/devtools/intellij/qute/lsp/QuteServer.java) implementation.
 
 ### LanguageClientImpl
 
-It is not required but you can override
-the [LanguageClientImpl](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/LanguageClientImpl.java)
-to, for instance:
+It is not required, but you can override the [LanguageClientImpl](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/LanguageClientImpl.java) to, for instance:
 
-* add some IJ listeners when language client is created.
+* add some IJ listeners when the language client is created.
 * override some LSP methods.
 
 ```java
@@ -173,16 +172,15 @@ public class MyLanguageClient extends LanguageClientImpl {
 }
 ```
 
-If your language server manages custom LSP requests, it is advised to
-extend [IndexAwareLanguageClient](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/IndexAwareLanguageClient.java)
+If your language server manages custom LSP requests, it is recommended to extend [IndexAwareLanguageClient](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/IndexAwareLanguageClient.java), to ensure it won't be adversely affected by indexing operations.
 
-You can see a full sample
+You can see a full example
 with [QuteLanguageClient](https://github.com/redhat-developer/intellij-quarkus/blob/main/src/main/java/com/redhat/devtools/intellij/qute/lsp/QuteLanguageClient.java)
 
-## Declare server with extension point
+## Extension point declaration
 
-The last step is to declare the server in your plugin.xml with `com.redhat.devtools.lsp4ij.server` extension point
-to use your `my.language.server.MyLanguageServerFactory`:
+The next step is to declare the server in your plugin.xml with the `com.redhat.devtools.lsp4ij.server` extension point
+referencing your `my.language.server.MyLanguageServerFactory`:
 
 ```xml
 
@@ -191,7 +189,7 @@ to use your `my.language.server.MyLanguageServerFactory`:
             label="My Language Server"
             factoryClass="my.language.server.MyLanguageServerFactory">
         <description><![CDATA[
-        Some description written in HTML to display it in LSP consoles and Language Servers settings.
+        Some description written in HTML to display it in the LSP consoles view and Language Servers settings.
         ]]>
         </description>
     </server>
@@ -199,13 +197,13 @@ to use your `my.language.server.MyLanguageServerFactory`:
 
 ```
 
-Once the declaration is done, your server should appear in the LSP console:
+A that point, once the declaration is done, your server should appear in the `LSP Consoles` view:
 
 ![My LanguageServer in LSP Console](./images/MyLanguageServerInLSPConsole.png)
 
-## Declare mapping with extension point
+## Declare file mappings
 
-Once the server is defined, you need to associate an IntelliJ language with the `server` defined by the id attribute.
+Once the server is defined in your `plugin.xml`, you still need to associate an IntelliJ language with the `server` defined by the id attribute.
 You can use three kinds of mappings:
 
 * [Language mapping](#language-mapping) with the `com.redhat.devtools.lsp4ij.languageMapping` extension point
@@ -220,11 +218,11 @@ You can use three kinds of mappings:
   This mapping can be very helpful if you need to support syntax coloration with TextMate.
   Indeed, when you manually define
   a [File type](https://www.jetbrains.com/help/idea/creating-and-registering-file-types.html) for some file name
-  patterns, you loose the TextMate syntax coloration.
+  patterns, **you loose the TextMate syntax coloration**.
 
 ### Language mapping
 
-Here is sample snippet to associate the `XML` language with the `myLanguageServerId` server:
+Here is a sample snippet to associate the `XML` language with the `myLanguageServerId` server:
 
 ```xml
 
@@ -329,7 +327,7 @@ Using `fileNamePatternMapping` is recommended if you want to keep the `TextMate`
 disable the syntax coloration with TextMate).
 
 A good example is if you want to associate
-the [TypeScript Language Server](https://github.com/typescript-language-server/typescript-language-server)
+the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 without breaking existing syntax coloration managed with `TextMate` in `IntelliJ Community`.
 
 ```xml
@@ -362,3 +360,35 @@ you'll need to add a special mapping between that language and LSP4IJ, in your p
 ```
 
 See specific [hover implementation details](./LSPSupport.md#hover) for more details.
+
+## LSP commands
+
+### LSPCommandAction
+
+If the language server support requires to implement a custom client command, you can extend
+[LSPCommandAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/LSPCommandAction.java) and register it 
+in `plugin.xml` with a `standard` action element.
+
+### Default commands
+
+LSP4IJ provides default LSP commands that you language servers leverage.
+
+#### editor.action.triggerSuggest
+
+[TriggerSuggestAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/editor/TriggerSuggestAction.java) emulates Visual Studio Code's `editor.action.triggerSuggest` command, 
+to trigger code completion after selecting a completion item.
+
+This command is used for instance with the [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
+to reopen completion after `applying color completion item`:
+
+![editor.action.triggerSuggest](./images/commands/TriggerSuggestAction.gif)
+
+#### editor.action.showReferences
+
+[ShowReferencesAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/editor/ShowReferencesAction.java) emulates Visual Studio Code's `editor.action.showReferences` command, 
+to show the LSP references in a popup.
+
+This command is used for instance with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) 
+to open `references/implementations` in a popup when  clicking on a `Codelens` :
+
+![editor.action.showReferences](./images/commands/ShowReferencesAction.png)

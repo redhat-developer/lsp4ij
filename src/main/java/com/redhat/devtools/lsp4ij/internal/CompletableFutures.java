@@ -13,6 +13,8 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressManager;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
@@ -20,6 +22,9 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 /**
@@ -67,7 +72,10 @@ public class CompletableFutures {
         return allFutures.thenApply(Void -> {
             List<T> mergedDataList = new ArrayList<>();
             for (CompletableFuture<List<T>> dataListFuture : futures) {
-                mergedDataList.addAll(dataListFuture.join());
+                var data = dataListFuture.join();
+                if (data != null) {
+                    mergedDataList.addAll(data);
+                }
             }
             return mergedDataList;
         });
@@ -77,10 +85,30 @@ public class CompletableFutures {
      * Returns true if the given {@link CompletableFuture} is done normally and false otherwise.
      *
      * @param future the completable future.
-     *
      * @return true if the given {@link CompletableFuture} is done normally and false otherwise.
      */
     public static boolean isDoneNormally(CompletableFuture<?> future) {
         return future != null && future.isDone() && !future.isCancelled() && !future.isCompletedExceptionally();
     }
+
+    /**
+     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
+     *
+     * @param future the future to wait.
+     */
+    public static void waitUntilDone(CompletableFuture<?> future) throws ExecutionException, ProcessCanceledException {
+        while (!future.isDone()) {
+            try {
+                // wait for 25 ms
+                future.get(25, TimeUnit.MILLISECONDS);
+                // check progress canceled
+                ProgressManager.checkCanceled();
+                // No ProcessCanceledException thrown, wait again for 25ms....
+            } catch (TimeoutException ignore) {
+            } catch (InterruptedException e) {
+                Thread.interrupted();
+            }
+        }
+    }
+
 }

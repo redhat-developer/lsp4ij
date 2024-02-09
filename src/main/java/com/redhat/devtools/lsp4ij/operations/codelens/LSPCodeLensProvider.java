@@ -16,12 +16,12 @@ import com.intellij.codeInsight.codeVision.ui.model.TextCodeVisionEntry;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
@@ -34,21 +34,27 @@ import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static com.intellij.codeInsight.codeVision.CodeVisionState.Ready;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP textDocument/codeLens support.
- *
  */
 public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPCodeLensProvider.class);
 
     private static final String LSP_CODE_LENS_PROVIDER_ID = "LSPCodeLensProvider";
 
@@ -95,9 +101,11 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         CompletableFuture<List<CodeLensData>> future = getCodeLenses(psiFile);
         try {
             // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitFor(future);
+            waitUntilDone(future);
         } catch (CancellationException | ProcessCanceledException e) {
             return CodeVisionState.NotReady.INSTANCE;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while collecting LSP CodeLens", e);
         }
         if (isDoneNormally(future)) {
             // All code lenses from all language server are loaded.
@@ -106,12 +114,14 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             for (var codeLensData : data) {
                 CodeLens codeLens = codeLensData.codeLens();
                 var resolvedCodeLensFuture = codeLensData.resolvedCodeLensFuture();
-                if (resolvedCodeLensFuture!= null && !resolvedCodeLensFuture.isDone()) {
+                if (resolvedCodeLensFuture != null && !resolvedCodeLensFuture.isDone()) {
                     // The resolve code lens future is not finished, wait for...
                     try {
-                        waitFor(resolvedCodeLensFuture);
+                        waitUntilDone(resolvedCodeLensFuture);
                     } catch (CancellationException | ProcessCanceledException e) {
-
+                        // Do nothing
+                    } catch (ExecutionException e) {
+                        LOGGER.error("Error while resolving LSP CodeLens", e);
                     }
                 }
                 if (isDoneNormally(resolvedCodeLensFuture)) {
@@ -151,41 +161,22 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             return new TextCodeVisionEntry(text, this.getId(), null, text, text, Collections.emptyList());
         }
         // Code lens defines a command, create a clickable code vsion to execute the command.
-        return new ClickableTextCodeVisionEntry(text, getId(), (e,editor) -> {
+        return new ClickableTextCodeVisionEntry(text, getId(), (e, editor) -> {
             if (languageServer.isResolveCodeLensSupported()) {
                 languageServer.getTextDocumentService()
                         .resolveCodeLens(codeLens)
                         .thenAcceptAsync(resolvedCodeLens -> {
                                     if (resolvedCodeLens != null) {
-                                        CommandExecutor.executeCommandClientSide(command, null, project, null);
+                                        UIUtil.invokeLaterIfNeeded(() ->
+                                                CommandExecutor.executeCommandClientSide(command, null, editor, project, null, e));
                                     }
                                 }
                         );
             } else {
-                CommandExecutor.executeCommandClientSide(command, null, project, null);
+                CommandExecutor.executeCommandClientSide(command, null, editor, project, null, e);
             }
             return null;
-        }, null,text, text, Collections.emptyList());
-    }
-
-    /**
-     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
-     * @param future the future to wait.
-     */
-    @Nullable
-    private static void waitFor(CompletableFuture<?> future) {
-        while (!future.isDone()) {
-            try {
-                future.get(25, TimeUnit.MILLISECONDS);
-                ProgressManager.checkCanceled();
-            } catch (ExecutionException e) {
-
-            } catch (InterruptedException e) {
-                Thread.interrupted();
-            } catch (TimeoutException e) {
-
-            }
-        }
+        }, null, text, text, Collections.emptyList());
     }
 
     private static CompletableFuture<List<CodeLensData>> getCodeLenses(@NotNull PsiFile psiFile) {
@@ -199,7 +190,6 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             future = codeLensSupport.getCodeLenses();
         }
         return future;
-
     }
 
     @Override

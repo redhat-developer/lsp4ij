@@ -40,9 +40,8 @@ import java.util.*;
 )
 public class UserDefinedLanguageServerSettings implements PersistentStateComponent<UserDefinedLanguageServerSettings.MyState> {
 
-    private volatile MyState myState = new MyState();
-
     private final List<Runnable> myChangeHandlers = ContainerUtil.createConcurrentList();
+    private volatile MyState myState = new MyState();
 
     public static UserDefinedLanguageServerSettings getInstance() {
         return ApplicationManager.getApplication().getService(UserDefinedLanguageServerSettings.class);
@@ -77,70 +76,6 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         return myState.myState.values();
     }
 
-    public static class UserDefinedLanguageServerItemSettings {
-
-        private String serverId;
-
-        private String serverName;
-
-        private String commandLine;
-
-        private String configurationContent;
-
-        @XCollection(elementTypes = ServerMappingSettings.class)
-        private List<ServerMappingSettings> mappings;
-
-        public void setServerId(String serverId) {
-            this.serverId = serverId;
-        }
-
-        public String getServerId() {
-            return serverId;
-        }
-
-        public void setServerName(String serverName) {
-            this.serverName = serverName;
-        }
-
-        public String getServerName() {
-            return serverName;
-        }
-
-        public String getCommandLine() {
-            return commandLine;
-        }
-
-        public void setCommandLine(String commandLine) {
-            this.commandLine = commandLine;
-        }
-
-        public List<ServerMappingSettings> getMappings() {
-            return mappings != null ? mappings : Collections.emptyList();
-        }
-
-        public void setMappings(List<ServerMappingSettings> mappings) {
-            this.mappings = mappings;
-        }
-
-        public void setConfigurationContent(String configurationContent) {
-            this.configurationContent = configurationContent;
-        }
-
-        public String getConfigurationContent() {
-            return configurationContent;
-        }
-    }
-
-    public static class MyState {
-        @Tag("state")
-        @XCollection
-        public Map<String, UserDefinedLanguageServerItemSettings> myState = new TreeMap<>();
-
-        MyState() {
-        }
-
-    }
-
     /**
      * Adds the given changeHandler to the list of registered change handlers
      *
@@ -166,6 +101,70 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         for (Runnable handler : myChangeHandlers) {
             handler.run();
         }
+    }
+
+    public static class UserDefinedLanguageServerItemSettings {
+
+        private String serverId;
+
+        private String serverName;
+
+        private String commandLine;
+
+        private String configurationContent;
+
+        @XCollection(elementTypes = ServerMappingSettings.class)
+        private List<ServerMappingSettings> mappings;
+
+        public String getServerId() {
+            return serverId;
+        }
+
+        public void setServerId(String serverId) {
+            this.serverId = serverId;
+        }
+
+        public String getServerName() {
+            return serverName;
+        }
+
+        public void setServerName(String serverName) {
+            this.serverName = serverName;
+        }
+
+        public String getCommandLine() {
+            return commandLine;
+        }
+
+        public void setCommandLine(String commandLine) {
+            this.commandLine = commandLine;
+        }
+
+        public List<ServerMappingSettings> getMappings() {
+            return mappings != null ? mappings : Collections.emptyList();
+        }
+
+        public void setMappings(List<ServerMappingSettings> mappings) {
+            this.mappings = mappings;
+        }
+
+        public String getConfigurationContent() {
+            return configurationContent;
+        }
+
+        public void setConfigurationContent(String configurationContent) {
+            this.configurationContent = configurationContent;
+        }
+    }
+
+    public static class MyState {
+        @Tag("state")
+        @XCollection
+        public Map<String, UserDefinedLanguageServerItemSettings> myState = new TreeMap<>();
+
+        MyState() {
+        }
+
     }
 
 }

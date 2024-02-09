@@ -10,8 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.commands;
 
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.util.ui.EDT;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -29,14 +32,20 @@ public abstract class LSPCommandAction extends AnAction {
         if (command == null) {
             return;
         }
-        commandPerformed(command, e);
+        if (getCommandPerformedThread() == ActionUpdateThread.EDT && !EDT.isCurrentThreadEdt()) {
+            // The command requires to be executed in EDT Thread
+            ApplicationManager.getApplication().invokeLater(() -> {
+                commandPerformed(command, e);
+            });
+        } else {
+            commandPerformed(command, e);
+        }
     }
 
     /**
      * Returns the document URI which performs the action and null otherwise.
      *
      * @param e the action event.
-     *
      * @return the document URI which performs the action and null otherwise.
      */
     protected @Nullable URI getDocumentUri(@NotNull AnActionEvent e) {
@@ -44,10 +53,17 @@ public abstract class LSPCommandAction extends AnAction {
     }
 
     /**
+     * Specifies the thread and the way {@link LSPCommandAction#commandPerformed(LSPCommand, AnActionEvent)}.
+     */
+    protected @NotNull ActionUpdateThread getCommandPerformedThread() {
+        return ActionUpdateThread.BGT;
+    }
+
+    /**
      * Performs the LSP command logic.
      *
      * @param command the LSP command.
-     * @param e the action event.
+     * @param e       the action event.
      */
     protected abstract void commandPerformed(@NotNull LSPCommand command, @NotNull AnActionEvent e);
 }

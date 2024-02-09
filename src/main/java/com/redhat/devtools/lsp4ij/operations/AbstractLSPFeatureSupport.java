@@ -30,6 +30,9 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
     // The current modification stamp of the Psi file
     private long modificationStamp;
 
+    // true if the future must be canceled when the Psi file is modified and false otherwise.
+    private boolean cancelWhenFileModified;
+
     // The current LSP requests for all language servers applying to a given Psi file
     private @Nullable CompletableFuture<Result> future;
 
@@ -37,8 +40,13 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
     private @Nullable CancellationSupport cancellationSupport;
 
     public AbstractLSPFeatureSupport(@NotNull PsiFile file) {
+        this(file, true);
+    }
+    
+    public AbstractLSPFeatureSupport(@NotNull PsiFile file, boolean cancelWhenFileModified) {
         this.file = file;
         this.modificationStamp = -1;
+        this.cancelWhenFileModified = cancelWhenFileModified;
     }
 
     /**
@@ -73,7 +81,11 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * @return true if the current LSP requests is valid and false otherwise.
      */
     private boolean isValidLSPFuture() {
-        return future != null && !future.isCompletedExceptionally() && this.file.getModificationStamp() == modificationStamp;
+        return future != null && !future.isCompletedExceptionally() && checkFileValid();
+    }
+
+    private boolean checkFileValid() {
+        return !cancelWhenFileModified || this.file.getModificationStamp() == modificationStamp;
     }
 
     /**

@@ -17,7 +17,6 @@ import com.intellij.codeInsight.hints.presentation.SequencePresentation;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -29,7 +28,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.awt.*;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -131,7 +130,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
             } else {
                 int index = 0;
                 for (InlayHintLabelPart part : label.getRight()) {
-                    InlayPresentation text = createInlayPresentation(editor.getProject(), factory, p, index, part);
+                    InlayPresentation text = createInlayPresentation(editor, factory, p, index, part);
                     if (part.getTooltip() != null && part.getTooltip().isLeft()) {
                         text = factory.withTooltip(part.getTooltip().getLeft(), text);
                     }
@@ -145,7 +144,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
 
     @NotNull
     private InlayPresentation createInlayPresentation(
-            Project project,
+            Editor editor,
             PresentationFactory factory,
             Pair<Integer, InlayHintData> p,
             int index,
@@ -155,7 +154,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
             // InlayHintLabelPart defines a Command, create a clickable inlay hint
             int finalIndex = index;
             text = factory.referenceOnHover(text, (event, translated) ->
-                    executeCommand(p.second.languageServer(), p.second.inlayHint(), finalIndex, (Component) event.getSource(), project)
+                    executeCommand(p.second.languageServer(), p.second.inlayHint(), finalIndex, event, editor)
             );
         }
         return text;
@@ -172,25 +171,25 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
      * @param languageServer the language server.
      * @param inlayHint      the inlay hint.
      * @param index          the inlay part index where the command should be defined.
-     * @param source         the component source.
-     * @param project        the project.
+     * @param event         the Mouse event.
+     * @param editor        the editor.
      */
     private void executeCommand(@NotNull LanguageServerItem languageServer,
                                 @NotNull InlayHint inlayHint,
                                 int index,
-                                @Nullable Component source,
-                                @NotNull Project project) {
+                                @Nullable MouseEvent event,
+                                @NotNull Editor editor) {
         if (languageServer.isResolveInlayHintSupported()) {
             languageServer.getTextDocumentService()
                     .resolveInlayHint(inlayHint)
                     .thenAcceptAsync(resolvedInlayHint -> {
                                 if (resolvedInlayHint != null) {
-                                    executeClientCommand(source, getCommand(resolvedInlayHint, index), project);
+                                    executeClientCommand(getCommand(resolvedInlayHint, index), editor, event);
                                 }
                             }
                     );
         } else {
-            executeClientCommand(source, getCommand(inlayHint, index), project);
+            executeClientCommand(getCommand(inlayHint, index), editor, event);
         }
     }
 

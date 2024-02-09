@@ -22,7 +22,6 @@ import com.redhat.devtools.lsp4ij.operations.AbstractLSPFeatureSupport;
 import org.eclipse.lsp4j.DocumentColorParams;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -82,14 +81,13 @@ public class LSPColorSupport extends AbstractLSPFeatureSupport<DocumentColorPara
         return cancellationSupport.execute(languageServer.getTextDocumentService().documentColor(params))
                 .thenApplyAsync(colorInformation -> {
                     if (colorInformation == null) {
-                        // textDocument/codeLens may return null
+                        // textDocument/colorInformation may return null
                         return Collections.emptyList();
                     }
-                    List<ColorData> data = new ArrayList<>();
-                    colorInformation.stream()
+                    return colorInformation.stream()
                             .filter(Objects::nonNull)
-                            .forEach(color -> data.add(new ColorData(color, languageServer)));
-                    return data;
+                            .map(color -> new ColorData(color, languageServer))
+                            .toList();
                 });
     }
 
