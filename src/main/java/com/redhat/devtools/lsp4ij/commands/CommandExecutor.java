@@ -19,6 +19,7 @@ import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.*;
@@ -31,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.awt.*;
+import java.awt.event.InputEvent;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -66,15 +68,17 @@ public class CommandExecutor {
      *                         applicable. If {@code null}, the command will not be executed on
      *                         the language server.
      */
-    public static void executeCommand(@Nullable Command command, @Nullable URI documentUri,
-                                      @NotNull Project project, @Nullable String languageServerId) {
+    public static void executeCommand(@Nullable Command command,
+                                      @Nullable URI documentUri,
+                                      @NotNull Project project,
+                                      @Nullable String languageServerId) {
         if (command == null) {
             return;
         }
         if (executeCommandServerSide(command, documentUri, project, languageServerId)) {
             return;
         }
-        if (executeCommandClientSide(command, null, project, null)) {
+        if (executeCommandClientSide(command, null, null, project, null, null)) {
             return;
         }
         // tentative fallback
@@ -98,8 +102,10 @@ public class CommandExecutor {
      *                         applicable.
      * @return true if the LSP command on server side has been executed successfully and false otherwise.
      */
-    private static boolean executeCommandServerSide(@NotNull Command command, @Nullable URI documentUri,
-                                                    @NotNull Project project, @Nullable String languageServerId) {
+    private static boolean executeCommandServerSide(@NotNull Command command,
+                                                    @Nullable URI documentUri,
+                                                    @NotNull Project project,
+                                                    @Nullable String languageServerId) {
         if (languageServerId == null) {
             return false;
         }
@@ -159,12 +165,17 @@ public class CommandExecutor {
      * @param command     the LSP Command to be executed. If {@code null} this method will
      *                    do nothing.
      * @param documentUri the URI of the document for which the command was created
+     * @param editor      the editor.
      * @param project     the project.
      * @param source      the component which has triggered the command and null otherwise.
      * @return true if the LSP command on server side has been executed successfully and false otherwise.
      */
-    public static boolean executeCommandClientSide(@NotNull Command command, @Nullable URI documentUri,
-                                                   @NotNull Project project, @Nullable Component source) {
+    public static boolean executeCommandClientSide(@NotNull Command command,
+                                                   @Nullable URI documentUri,
+                                                   @Nullable Editor editor,
+                                                   @NotNull Project project,
+                                                   @Nullable Component source,
+                                                   @Nullable InputEvent inputEvent) {
         Application workbench = ApplicationManager.getApplication();
         if (workbench == null) {
             return false;
@@ -173,8 +184,8 @@ public class CommandExecutor {
         if (action == null) {
             return false;
         }
-        DataContext dataContext = createDataContext(documentUri, command, action, source, project);
-        ActionUtil.invokeAction(action, dataContext, ActionPlaces.UNKNOWN, null, null);
+        DataContext dataContext = createDataContext(documentUri, command, action, source, editor, project);
+        ActionUtil.invokeAction(action, dataContext, ActionPlaces.UNKNOWN, inputEvent, null);
         return true;
     }
 
@@ -186,7 +197,12 @@ public class CommandExecutor {
         return ActionManager.getInstance().getAction(commandId);
     }
 
-    private static DataContext createDataContext(URI documentUri, Command command, AnAction action, Component source, Project project) {
+    private static DataContext createDataContext(@Nullable URI documentUri,
+                                                 @NotNull Command command,
+                                                 @NotNull AnAction action,
+                                                 @Nullable Component source,
+                                                 @Nullable Editor editor,
+                                                 @NotNull Project project) {
         SimpleDataContext.Builder contextBuilder = SimpleDataContext.builder();
         if (source != null) {
             contextBuilder.setParent(DataManager.getInstance().getDataContext(source));
@@ -196,6 +212,9 @@ public class CommandExecutor {
                 .add(LSP_COMMAND, new LSPCommand(command, action.getClass().getClassLoader()));
         if (documentUri != null) {
             contextBuilder.add(LSP_COMMAND_DOCUMENT_URI, documentUri);
+        }
+        if (editor != null) {
+            contextBuilder.add(CommonDataKeys.EDITOR, editor);
         }
         return contextBuilder.build();
     }

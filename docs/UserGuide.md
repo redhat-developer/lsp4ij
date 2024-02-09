@@ -2,7 +2,7 @@
 
 ## LSP console
 
-Although not directly useful to users in most cases, the Language Server console view is extremely important 
+Although not directly useful to users in most cases, the Language Server console view is extremely valuable 
 when we need to troubleshoot issues with the language servers.
 
 The state of the servers is visible, stop and restart is available with a right-click, and you can enable different levels of tracing:
@@ -24,3 +24,20 @@ The preference page under `Preferences | Languages & Frameworks | Language Serve
 to configure language servers debugging and tracing:
 
 ![Language Server preferences](./images/LanguageServerPreferences.png)
+
+## Actions
+
+### Find Usages
+
+The following LSP features are integrated with the standard `Find Usages` menu (provided they're supported by the underlying language server): 
+
+* [Declarations](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration)
+* [Definitions](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition)
+* [Type Definitions](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition)
+* [References](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references)
+* [Implementations](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation)
+
+![Find Usages menu](./images/find-usages/FindUsagesMenu.png)
+
+
+![Find Usages result](./images/find-usages/FindUsagesResult.png)

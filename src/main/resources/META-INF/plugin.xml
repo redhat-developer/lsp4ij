@@ -138,6 +138,8 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServiceAccessor"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.usages.LSPUsagesManager"/>
 
         <!-- LSP textDocument/publishDiagnostics notification support -->
         <externalAnnotator
@@ -174,7 +176,7 @@
         <!-- LSP textDocument/codeLens request support -->
         <codeInsight.codeVisionProvider
                 id="LSPCodeLensProvider"
-                implementation="com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensProvider" />
+                implementation="com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensProvider"/>
 
         <!-- LSP textDocument/inlayHint + textDocument/colorInformation requests support -->
         <codeInsight.inlayProviderFactory
@@ -206,11 +208,37 @@
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler"/>
 
+        <!-- LSP Find Usages (LSP) support shows:
+             - textDocument/declaration
+             - textDocument/definition
+             - textDocument/typeDefinition
+             - textDocument/references
+             - textDocument/implementation
+        -->
+        <customUsageSearcher
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageSearcher" />
+        <usageTargetProvider
+                order="last"
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTargetProvider" />
+        <findUsagesHandlerFactory
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory" />
+        <usageTypeProvider
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider" />
+
         <notificationGroup
                 id="Language Server Protocol"
                 displayType="BALLOON"
                 hideFromSettings="true"/>
     </extensions>
+
+    <!-- Common LSP Client actions  -->
+    <actions>
+        <!-- Reuse VS Code action ids while waiting for standardization of LSP commands https://github.com/microsoft/language-server-protocol/issues/788 -->
+        <action id="editor.action.triggerSuggest"
+                class="com.redhat.devtools.lsp4ij.commands.editor.TriggerSuggestAction"/>
+        <action id="editor.action.showReferences"
+                class="com.redhat.devtools.lsp4ij.commands.editor.ShowReferencesAction"/>
+    </actions>
 
     <!-- LSP consoles -->
     <extensions defaultExtensionNs="com.intellij">
@@ -253,13 +281,6 @@
                 id="lsp.console.explorer.copy.command"
                 class="com.redhat.devtools.lsp4ij.console.explorer.actions.CopyStartServerCommandAction"
                 icon="AllIcons.Actions.Copy"/>
-
-
-        <!-- Common LSP Client actions   -->
-        <!-- Reuse VS Code action ids while waiting for standardization of LSP commands https://github.com/microsoft/language-server-protocol/issues/788 -->
-        <action id="editor.action.triggerSuggest"
-                class="com.redhat.devtools.lsp4ij.commands.editor.TriggerSuggestAction"
-        />
     </actions>
 
     <!-- LSP link handlers -->

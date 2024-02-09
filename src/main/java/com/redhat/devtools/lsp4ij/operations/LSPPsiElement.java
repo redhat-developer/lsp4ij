@@ -14,11 +14,13 @@
 package com.redhat.devtools.lsp4ij.operations;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiInvalidElementAccessException;
 import com.intellij.psi.impl.FakePsiElement;
+import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,6 +32,7 @@ public class LSPPsiElement extends FakePsiElement {
     private final @NotNull PsiFile file;
 
     private @NotNull TextRange textRange;
+    private String name;
 
     public LSPPsiElement(@NotNull PsiFile file, @NotNull TextRange textRange) {
         this.file = file;
@@ -58,8 +61,47 @@ public class LSPPsiElement extends FakePsiElement {
     }
 
     @Override
+    public int getStartOffsetInParent() {
+        return textRange.getStartOffset();
+    }
+
+    @Override
+    public int getTextOffset() {
+        return textRange.getStartOffset();
+    }
+
+    @Override
+    public int getTextLength() {
+        return textRange.getEndOffset() - textRange.getStartOffset();
+    }
+
+    @Override
+    public String getName() {
+        if (name != null) {
+            return name;
+        }
+        name = file.getText().substring(textRange.getStartOffset(), textRange.getEndOffset());
+        return name;
+    }
+
+    @NotNull
+    public char[] textToCharArray() {
+        return getName().toCharArray();
+    }
+
+    @Override
+    public @Nullable @NonNls String getText() {
+        return getName();
+    }
+
+    @Override
+    public @NlsSafe @Nullable String getLocationString() {
+        return file.getName();
+    }
+
+    @Override
     public PsiElement getParent() {
-        return null;
+        return file;
     }
 
     @Override

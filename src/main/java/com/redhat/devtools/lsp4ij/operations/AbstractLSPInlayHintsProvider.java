@@ -27,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.InputEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -156,9 +157,9 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         return true;
     }
 
-    protected void executeClientCommand(@NotNull Component source, @Nullable Command command, @NotNull Project project) {
+    protected void executeClientCommand(@Nullable Command command, @NotNull Editor editor, @Nullable InputEvent event) {
         if (command != null) {
-            CommandExecutor.executeCommandClientSide(command, null, project, source);
+            CommandExecutor.executeCommandClientSide(command, null, editor, editor.getProject(), event != null ? (Component) event.getSource() : null, event);
         }
     }
 

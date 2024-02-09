@@ -1,13 +1,13 @@
 # User-defined language server
 
 LSP4IJ provides the capability to consume any language server without developing
-an IntelliJ plugin with `User-defined language server`.
+an IntelliJ plugin via a `User-defined language server`.
 
 ![New Language Server Dialog with TypeScript](./images/user-defined-ls/TypeScriptServerDialog.png)
 
 The main idea is to: 
 
- * install the language server and its requirements(ex : `NodeJS` to 
+ * install the language server and its requirements(ex : `Node.js` to 
 execute a language server written in JavaScript/TypeScript), 
  * declare the command which starts the language server.
  * associate the language server with the proper files (identified by IntelliJ Language, File Type or file name pattern)

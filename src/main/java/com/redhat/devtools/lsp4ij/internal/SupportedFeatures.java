@@ -73,15 +73,20 @@ public class SupportedFeatures {
         signatureHelpCapabilities.setSignatureInformation(signatureInformationCapabilities);
         textDocumentClientCapabilities.setSignatureHelp(signatureHelpCapabilities);
 
+        // Declaration  support
+        final var declarationCapabilities = new DeclarationCapabilities();
+        declarationCapabilities.setLinkSupport(Boolean.TRUE);
+        textDocumentClientCapabilities.setDeclaration(declarationCapabilities);
+
         // Definition support
         final var definitionCapabilities = new DefinitionCapabilities();
         definitionCapabilities.setLinkSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setDefinition(definitionCapabilities);
 
-        // TODO support type definition
-        //final var typeDefinitionCapabilities = new TypeDefinitionCapabilities();
-        //typeDefinitionCapabilities.setLinkSupport(Boolean.TRUE);
-        //textDocumentClientCapabilities.setTypeDefinition(typeDefinitionCapabilities);
+        // Type Definition support
+        final var typeDefinitionCapabilities = new TypeDefinitionCapabilities();
+        typeDefinitionCapabilities.setLinkSupport(Boolean.TRUE);
+        textDocumentClientCapabilities.setTypeDefinition(typeDefinitionCapabilities);
 
         // DocumentHighlight support
         textDocumentClientCapabilities.setDocumentHighlight(new DocumentHighlightCapabilities());
@@ -111,18 +116,22 @@ public class SupportedFeatures {
         hoverCapabilities.setContentFormat(Arrays.asList(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
         textDocumentClientCapabilities.setHover(hoverCapabilities);
 
+        // References support
+        textDocumentClientCapabilities.setReferences(new ReferencesCapabilities());
+
+        // Implementation support
+        var implementationCapabilities = new ImplementationCapabilities();
+        implementationCapabilities.setLinkSupport(Boolean.TRUE);
+        textDocumentClientCapabilities.setImplementation(implementationCapabilities);
+
         // TODO: support onTypeFormatting
         // textDocumentClientCapabilities.setOnTypeFormatting(null); // TODO
         // TODO : support textDocument/rangeFormatting
         // textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities());
-        // TODO : support textDocument/references
-        // textDocumentClientCapabilities.setReferences(new ReferencesCapabilities());
         // TODO : support textDocument/rename
         //final var renameCapabilities = new RenameCapabilities();
         //renameCapabilities.setPrepareSupport(true);
         //textDocumentClientCapabilities.setRename(renameCapabilities);
-        // TODO : support textDocument/signatureHelp
-        // textDocumentClientCapabilities.setSignatureHelp(new SignatureHelpCapabilities());
 
         // Synchronization support
         textDocumentClientCapabilities

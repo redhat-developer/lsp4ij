@@ -10,9 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import org.eclipse.lsp4j.CodeActionOptions;
-import org.eclipse.lsp4j.InlayHintRegistrationOptions;
-import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
@@ -94,6 +92,51 @@ public class LanguageServerItem {
      */
     public boolean isResolveInlayHintSupported() {
         return isResolveInlayHintSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support references and false otherwise.
+     *
+     * @return true if the language server can support references and false otherwise.
+     */
+    public boolean isReferencesSupported() {
+        return isReferencesSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support implementation and false otherwise.
+     *
+     * @return true if the language server can support implementation and false otherwise.
+     */
+    public boolean isImplementationSupported() {
+        return isImplementationSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support declaration and false otherwise.
+     *
+     * @return true if the language server can support declaration and false otherwise.
+     */
+    public boolean isDeclarationSupported() {
+        return isDeclarationSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support definition and false otherwise.
+     *
+     * @return true if the language server can support definition and false otherwise.
+     */
+    public boolean isDefinitionSupported() {
+        return isDefinitionSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support type definition and false otherwise.
+     *
+     * @return true if the language server can support type definition and false otherwise.
+     */
+    public boolean isTypeDefinitionSupported() {
+        return isTypeDefinitionSupported(getServerCapabilities());
     }
 
     /**
@@ -211,6 +254,17 @@ public class LanguageServerItem {
     }
 
     /**
+     * Returns true if the language server can support declaration and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support declaration and false otherwise.
+     */
+    public static boolean isDeclarationSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getDeclarationProvider());
+    }
+
+    /**
      * Returns true if the language server can support definition and false otherwise.
      *
      * @param serverCapabilities the server capabilities.
@@ -219,6 +273,17 @@ public class LanguageServerItem {
     public static boolean isDefinitionSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
                 LSPIJUtils.hasCapability(serverCapabilities.getDefinitionProvider());
+    }
+
+    /**
+     * Returns true if the language server can support type definition and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support type definition and false otherwise.
+     */
+    public static boolean isTypeDefinitionSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getTypeDefinitionProvider());
     }
 
     /**
@@ -251,8 +316,29 @@ public class LanguageServerItem {
      */
     public static boolean isHoverSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                ((serverCapabilities.getHoverProvider().isLeft() && serverCapabilities.getHoverProvider().getLeft())
-                        || serverCapabilities.getHoverProvider().isRight());
+                LSPIJUtils.hasCapability(serverCapabilities.getHoverProvider());
+    }
+
+    /**
+     * Returns true if the language server can support references and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support references and false otherwise.
+     */
+    public static boolean isReferencesSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getReferencesProvider());
+    }
+
+    /**
+     * Returns true if the language server can support references and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support references and false otherwise.
+     */
+    public static boolean isImplementationSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getImplementationProvider());
     }
 
     /**
