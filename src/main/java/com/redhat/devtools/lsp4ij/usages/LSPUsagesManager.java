@@ -16,18 +16,14 @@ import com.intellij.codeInsight.navigation.actions.GotoDeclarationAction;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
 import com.intellij.ui.awt.RelativePoint;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.operations.LSPPsiElementFactory;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
-import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,6 +34,12 @@ import java.util.List;
  * LSP usage manager.
  */
 public class LSPUsagesManager {
+
+    private static final LSPPsiElementFactory<LSPUsagePsiElement> USAGE_ELEMENT_FACTORY
+            = (psiFile, textRange) -> new LSPUsagePsiElement(psiFile, textRange);
+
+    private static final LSPPsiElementFactory<LSPUsageTriggeredPsiElement> USAGE_TRIGGERED_ELEMENT_FACTORY
+            = (psiFile, textRange) -> new LSPUsageTriggeredPsiElement(psiFile, textRange);
 
     public static LSPUsagesManager getInstance(@NotNull Project project) {
         return project.getService(LSPUsagesManager.class);
@@ -80,47 +82,24 @@ public class LSPUsagesManager {
     public static LSPUsagePsiElement toPsiElement(@NotNull Location location,
                                                   @NotNull LSPUsagePsiElement.UsageKind kind,
                                                   @NotNull Project project) {
-        return toPsiElement(location.getUri(), location.getRange(), kind, project);
+        LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, project, USAGE_ELEMENT_FACTORY);
+        element.setKind(kind);
+        return element;
     }
 
     @Nullable
     public static LSPUsagePsiElement toPsiElement(@NotNull LocationLink location,
                                                   @NotNull LSPUsagePsiElement.UsageKind kind,
                                                   @NotNull Project project) {
-        return toPsiElement(location.getTargetUri(), location.getTargetRange(), kind, project);
-    }
-
-    @Nullable
-    private static LSPUsagePsiElement toPsiElement(@NotNull String uri,
-                                                   @NotNull Range range,
-                                                   @NotNull LSPUsagePsiElement.UsageKind kind, Project project) {
-        VirtualFile file = LSPIJUtils.findResourceFor(uri);
-        if (file == null) {
-            return null;
-        }
-        Document document = LSPIJUtils.getDocument(file);
-        if (document == null) {
-            return null;
-        }
-        TextRange textRange = LSPIJUtils.toTextRange(range, document);
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-        return new LSPUsagePsiElement(psiFile, textRange, kind);
+        LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, project, USAGE_ELEMENT_FACTORY);
+        element.setKind(kind);
+        return element;
     }
 
     @Nullable
     public static LSPUsageTriggeredPsiElement toUsageTriggeredPsiElement(@NotNull Location location,
                                                                          @NotNull Project project) {
-        VirtualFile file = LSPIJUtils.findResourceFor(location.getUri());
-        if (file == null) {
-            return null;
-        }
-        Document document = LSPIJUtils.getDocument(file);
-        if (document == null) {
-            return null;
-        }
-        TextRange textRange = LSPIJUtils.toTextRange(location.getRange(), document);
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-        return new LSPUsageTriggeredPsiElement(psiFile, textRange);
+        return LSPPsiElementFactory.toPsiElement(location, project, USAGE_TRIGGERED_ELEMENT_FACTORY);
     }
 
     private void showNoUsage(DataContext dataContext) {

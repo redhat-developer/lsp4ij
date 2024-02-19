@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class LSPUsagePsiElement extends LSPPsiElement {
 
-    private final UsageKind kind;
+    private UsageKind kind;
 
     public static enum UsageKind {
         declarations,
@@ -30,9 +30,8 @@ public class LSPUsagePsiElement extends LSPPsiElement {
         implementations;
     }
 
-    public LSPUsagePsiElement(@NotNull PsiFile file, @NotNull TextRange textRange, @NotNull UsageKind kind) {
+    public LSPUsagePsiElement(@NotNull PsiFile file, @NotNull TextRange textRange) {
         super(file, textRange);
-        this.kind = kind;
     }
 
     /**
@@ -42,5 +41,9 @@ public class LSPUsagePsiElement extends LSPPsiElement {
      */
     public UsageKind getKind() {
         return kind;
+    }
+
+    public void setKind(UsageKind kind) {
+        this.kind = kind;
     }
 }
