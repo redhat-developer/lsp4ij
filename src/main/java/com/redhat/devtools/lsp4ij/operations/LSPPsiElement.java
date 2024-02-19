@@ -108,4 +108,5 @@ public class LSPPsiElement extends FakePsiElement {
     public boolean isValid() {
         return true;
     }
+
 }

@@ -11,22 +11,18 @@
 package com.redhat.devtools.lsp4ij.operations.navigation;
 
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationHandler;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
+import com.redhat.devtools.lsp4ij.operations.LSPPsiElement;
 import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
@@ -38,7 +34,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
+
+import static com.redhat.devtools.lsp4ij.operations.LSPPsiElementFactory.toPsiElement;
 
 public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPGotoDeclarationHandler.class);
@@ -85,39 +82,22 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         return targets.toArray(new PsiElement[targets.size()]);
     }
 
-    private List<PsiElement> toElements(Project project, Either<List<? extends Location>, List<? extends LocationLink>> definitions) {
-        List<? extends Location> locations = definitions != null ? toLocation(definitions) : Collections.emptyList();
-        return locations.stream().map(location -> toElement(project, location)).filter(Objects::nonNull).collect(Collectors.toList());
-    }
-
-    private PsiElement toElement(Project project, Location location) {
-        return ApplicationManager.getApplication().runReadAction((Computable<PsiElement>) () -> {
-            PsiElement element = null;
-            VirtualFile file = LSPIJUtils.findResourceFor(location.getUri());
-            if (file != null) {
-                PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-                if (psiFile != null) {
-                    Document document = PsiDocumentManager.getInstance(project).getDocument(psiFile);
-                    if (document != null) {
-                        element = psiFile.findElementAt(LSPIJUtils.toOffset(location.getRange().getStart(), document));
-                    }
-                }
-            }
-            return element;
-        });
-    }
-
-    /**
-     * Unify the definition result has a list of Location.
-     *
-     * @param definitions the definition result
-     * @return the list of locations
-     */
-    private List<? extends Location> toLocation(Either<List<? extends Location>, List<? extends LocationLink>> definitions) {
-        if (definitions.isLeft()) {
-            return definitions.getLeft();
-        } else {
-            return definitions.getRight().stream().map(link -> new Location(link.getTargetUri(), link.getTargetRange())).collect(Collectors.toList());
+    private static List<LSPPsiElement> toElements(Project project, Either<List<? extends Location>, List<? extends LocationLink>> definitions) {
+        if (definitions == null) {
+            return Collections.emptyList();
         }
+        if (definitions.isLeft()) {
+            return definitions.getLeft()
+                    .stream()
+                    .map(location -> toPsiElement(location, project))
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        return definitions.getRight()
+                .stream()
+                .map(location -> toPsiElement(location, project))
+                .filter(Objects::nonNull)
+                .toList();
     }
+
 }
