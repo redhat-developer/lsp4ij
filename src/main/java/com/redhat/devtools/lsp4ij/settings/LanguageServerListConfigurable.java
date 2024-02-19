@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings;
 
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.options.SearchableConfigurable;
@@ -120,6 +121,11 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                 NewLanguageServerDialog dialog = new NewLanguageServerDialog(project);
                 dialog.show();
             }
+
+            @Override
+            public @NotNull ActionUpdateThread getActionUpdateThread() {
+                return ActionUpdateThread.BGT;
+            }
         };
         var removeAction = new DumbAwareAction(LanguageServerBundle.message("language.server.action.remove"), null, IconUtil.getRemoveIcon()) {
             @Override
@@ -139,6 +145,11 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                 boolean enabled = selectedNodes.length > 0 && Stream.of(selectedNodes)
                         .anyMatch(LanguageServerListConfigurable::isUserDefinedLanguageServerDefinition);
                 e.getPresentation().setEnabled(enabled);
+            }
+
+            @Override
+            public @NotNull ActionUpdateThread getActionUpdateThread() {
+                return ActionUpdateThread.BGT;
             }
         };
 
@@ -174,4 +185,5 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         super.disposeUIResources();
         LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(listener);
     }
+
 }
