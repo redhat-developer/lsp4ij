@@ -20,9 +20,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Psi element used to execute a LSP find usages.
+ * Psi element used to execute a "Find Usages".
  * This Psi element contains the offset of the caret editor where the
- * "Find Usages (LSP)" has been triggered.
+ * "Find Usages" has been triggered.
  */
 public class LSPUsageTriggeredPsiElement extends LSPPsiElement {
 

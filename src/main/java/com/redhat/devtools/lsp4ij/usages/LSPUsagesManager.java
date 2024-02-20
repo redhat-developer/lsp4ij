@@ -72,8 +72,10 @@ public class LSPUsagesManager {
                 @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
                 Location ref = locations.get(0);
                 LSPUsageTriggeredPsiElement element = toUsageTriggeredPsiElement(ref, project);
-                element.setLSPReferences(locations);
-                GotoDeclarationAction.startFindUsages(editor, element.getProject(), element, event == null ? null : new RelativePoint(event));
+                if(element != null) {
+                    element.setLSPReferences(locations);
+                    GotoDeclarationAction.startFindUsages(editor, element.getProject(), element, event == null ? null : new RelativePoint(event));
+                }
             }
         }
     }
@@ -83,7 +85,9 @@ public class LSPUsagesManager {
                                                   @NotNull LSPUsagePsiElement.UsageKind kind,
                                                   @NotNull Project project) {
         LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, project, USAGE_ELEMENT_FACTORY);
-        element.setKind(kind);
+        if (element != null) {
+            element.setKind(kind);
+        }
         return element;
     }
 
@@ -92,7 +96,9 @@ public class LSPUsagesManager {
                                                   @NotNull LSPUsagePsiElement.UsageKind kind,
                                                   @NotNull Project project) {
         LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, project, USAGE_ELEMENT_FACTORY);
-        element.setKind(kind);
+        if (element != null) {
+            element.setKind(kind);
+        }
         return element;
     }
 
