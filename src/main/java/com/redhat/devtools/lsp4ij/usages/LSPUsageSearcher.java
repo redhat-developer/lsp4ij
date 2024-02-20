@@ -69,13 +69,15 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         LSPUsageSupport.LSPUsageSupportParams params = new LSPUsageSupport.LSPUsageSupportParams(position);
         CompletableFuture<List<LSPUsagePsiElement>> usagesFuture = usageSupport.getFeatureData(params);
         try {
-            // Wait for done of textDocument/definition, textDocument/references, etc
+            // Wait for completion of textDocument/definition, textDocument/references, etc
             waitUntilDone(usagesFuture);
             if (usagesFuture.isDone()) {
                 // Show result of textDocument/definition, textDocument/references, etc as usage info.
-                List<LSPUsagePsiElement> usages = usagesFuture.getNow(Collections.emptyList());
-                for (LSPUsagePsiElement usage : usages) {
-                    processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(usage))));
+                List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
+                if (usages != null) {
+                    for (LSPUsagePsiElement usage : usages) {
+                        processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(usage))));
+                    }
                 }
             }
         } catch (ExecutionException e) {
