@@ -215,15 +215,17 @@
              - textDocument/references
              - textDocument/implementation
         -->
+        <elementDescriptionProvider
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageElementDescriptionProvider"/>
         <customUsageSearcher
-                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageSearcher" />
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageSearcher"/>
         <usageTargetProvider
                 order="last"
-                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTargetProvider" />
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTargetProvider"/>
         <findUsagesHandlerFactory
-                implementation="com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory" />
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory"/>
         <usageTypeProvider
-                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider" />
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider"/>
 
         <notificationGroup
                 id="Language Server Protocol"
