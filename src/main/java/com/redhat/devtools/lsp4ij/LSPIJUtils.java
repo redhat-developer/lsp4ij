@@ -325,17 +325,21 @@ public class LSPIJUtils {
                 // Language server reports invalid diagnostic, ignore it.
                 return null;
             }
-            // Adjust start / end offset if needed
-            if (start == end) {
-                if (!adjust) {
-                    // No adjustment, the TextRange with start/end offset is invalid
-                    return null;
-                }
-                // Adjust the end offset if the offset is not at the end of the line.
-                int offset = start;
-                if (!isEndOfLine(offset, range.getEnd().getLine(), document)) {
-                    end++;
-                }
+            if (start != end) {
+                return new TextRange(start, end);
+            }
+            if (!adjust) {
+                // No adjustment, the TextRange with start/end offset is invalid
+                return null;
+            }
+            // Select token at current offset, if possible
+            TextRange tokenRange = getTokenRange(document, start);
+            if (tokenRange != null) {
+                return tokenRange;
+            }
+            // Adjust the end offset if the offset is not at the end of the line.
+            if (!isEndOfLine(document, range.getEnd().getLine(), start)) {
+                end++;
             }
             return new TextRange(start, end);
         } catch (IndexOutOfBoundsException e) {
@@ -345,9 +349,43 @@ public class LSPIJUtils {
         }
     }
 
-    private static boolean isEndOfLine(int offset, int line, @NotNull Document document) {
-        int lineEndOffset = document.getLineEndOffset(line);
-        return offset == lineEndOffset;
+    private static boolean isEndOfLine(@NotNull Document document, int line, int offset) {
+        return offset == document.getLineEndOffset(line);
+    }
+    
+    @Nullable
+    public static TextRange getTokenRange(Document document , int offset) {
+        if (offset > 0 && offset >= document.getTextLength()) {
+            offset = document.getTextLength() - 1;
+        }
+        int line = document.getLineNumber(offset);
+        int start = getLeftOffsetOfPart(document, line, offset);
+        int end = getRightOffsetOfPart(document, line, offset);
+        return (start < end)? new TextRange(start, end) : null;
+    }
+
+    private static int getLeftOffsetOfPart(Document document, int line, int offset) {
+        int i = offset;
+        int startLineOffset = document.getLineStartOffset(line);
+        for (; i > startLineOffset; i--) {
+            char c = document.getCharsSequence().charAt(i);
+            if (!Character.isJavaIdentifierPart(c)) {
+                return i == offset ? offset : i + 1;
+            }
+        }
+        return i;
+    }
+
+    private static int getRightOffsetOfPart(Document document, int line, int offset) {
+        int i = offset;
+        int endLineOffset = document.getLineEndOffset(line);
+        for (; i < endLineOffset; i++) {
+            char c = document.getCharsSequence().charAt(i);
+            if (!Character.isJavaIdentifierPart(c)) {
+                return i;
+            }
+        }
+        return i;
     }
 
     public static void applyWorkspaceEdit(WorkspaceEdit edit) {
