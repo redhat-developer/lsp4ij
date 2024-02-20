@@ -88,7 +88,7 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
     }
 
     private static void createAnnotation(Diagnostic diagnostic, Document document, LSPDiagnosticsForServer diagnosticsForServer, AnnotationHolder holder) {
-        // Get the text range from teh given LSP diagnostic range.
+        // Get the text range from the given LSP diagnostic range.
         // Since IJ cannot highlight an error when the start/end range offset are the same
         // the method LSPIJUtils.toTextRange is called with adjust, in other words when start/end range offset are the same:
         // - when the offset is at the end of the line, the method returns a text range with the same  offset,

@@ -24,6 +24,8 @@ import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import static com.redhat.devtools.lsp4ij.LSPIJUtils.getTokenRange;
+
 /**
  * LSP Usage target provider.
  */
@@ -43,39 +45,13 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
         LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, new TextRange(offset > 0 ? offset - 1 : offset, offset));
         // Try to compute a proper name for the target
         Document document = editor.getDocument();
-        if (offset > 0 && offset >= document.getTextLength()) {
-            offset = document.getTextLength() - 1;
-        }
-        int start = getLeftOffsetOfPart(document, offset);
-        int end = getRightOffsetOfPart(document, offset);
-        if (start < end) {
-            String name = document.getText(new TextRange(start, end));
+        TextRange tokenRange = getTokenRange(document, offset);
+        if (tokenRange != null) {
+            String name = document.getText(tokenRange);
             triggeredElement.setName(name);
         }
         UsageTarget target = new PsiElement2UsageTargetAdapter(triggeredElement, true);
         return new UsageTarget[]{target};
-    }
-
-    private static int getLeftOffsetOfPart(Document document, int offset) {
-        int i = offset;
-        for (; i > 0; i--) {
-            char c = document.getCharsSequence().charAt(i);
-            if (!Character.isJavaIdentifierPart(c)) {
-                return i == offset ? offset : i + 1;
-            }
-        }
-        return i;
-    }
-
-    private static int getRightOffsetOfPart(Document document, int offset) {
-        int i = offset;
-        for (; i < document.getTextLength(); i++) {
-            char c = document.getCharsSequence().charAt(i);
-            if (!Character.isJavaIdentifierPart(c)) {
-                return i == offset ? offset : i;
-            }
-        }
-        return i;
     }
 
     @Override
