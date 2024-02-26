@@ -342,6 +342,17 @@ public class LanguageServerItem {
     }
 
     /**
+     * Returns true if the language server can support folding and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support folding and false otherwise.
+     */
+    public static boolean isFoldingSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getFoldingRangeProvider());
+    }
+
+    /**
      * Returns the LSP {@link TextDocumentService} of the language server.
      *
      * @return the LSP {@link TextDocumentService} of the language server.

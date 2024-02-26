@@ -15,6 +15,7 @@ import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.operations.color.LSPColorSupport;
+import com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeSupport;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsSupport;
 import org.jetbrains.annotations.NotNull;
 
@@ -33,11 +34,14 @@ public class LSPFileSupport implements Disposable {
 
     private final LSPColorSupport colorSupport;
 
+    private final LSPFoldingRangeSupport foldingRangeSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
         this.inlayHintsSupport = new LSPInlayHintsSupport(file);
         this.colorSupport = new LSPColorSupport(file);
+        this.foldingRangeSupport = new LSPFoldingRangeSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -48,6 +52,7 @@ public class LSPFileSupport implements Disposable {
         getCodeLensSupport().cancel();
         getInlayHintsSupport().cancel();
         getColorSupport().cancel();
+        getFoldingRangeSupport().cancel();
     }
 
     /**
@@ -75,6 +80,15 @@ public class LSPFileSupport implements Disposable {
      */
     public LSPColorSupport getColorSupport() {
         return colorSupport;
+    }
+
+    /**
+     * Returns the LSP folding range support.
+     *
+     * @return the LSP folding range support.
+     */
+    public LSPFoldingRangeSupport getFoldingRangeSupport() {
+        return foldingRangeSupport;
     }
 
     /**

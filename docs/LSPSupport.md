@@ -51,7 +51,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ❌ [typeHierarchy/supertypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes).
  * ❌ [documentLink/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve).
  * ❌ [codeLens/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_refresh).
- * ❌ [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange).
+ * ✅ [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange)  (see [implementation details](#folding-range))
  * ❌ [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange).
  * ❌ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol).
  * ❌ [textDocument/semanticTokens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).
@@ -237,6 +237,31 @@ If you use another language, you will have to declare `codeInsight.parameterInfo
 Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing signature help:
 
 ![textDocument/signatureHelp](./images/lsp-support/textDocument_signatureHelp.gif)
+
+#### Folding range
+
+[textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange) is implemented with
+the `lang.foldingBuilder` extension point. By default, LSP4IJ registers the `lang.foldingBuilder` with
+`com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder` class for `TEXT` and `textmate` languages:
+
+```xml
+<!-- LSP textDocument/folding -->
+<lang.foldingBuilder id="LSPFoldingBuilderForText"
+                     language="TEXT"
+                     implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                     order="first"/>
+
+<lang.foldingBuilder id="LSPFoldingBuilderForTextMate"
+                     language="textmate"
+                     implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                     order="first"/>
+```
+
+If you use another language, you will have to declare `lang.foldingBuilder` with your language.
+
+Here is an example with the [Go Language Server](./user-defined-ls/gopls.md) showing folding:
+
+![textDocument/foldingRange](./images/lsp-support/textDocument_foldingRange.gif)
 
 #### Publish Diagnostics
 

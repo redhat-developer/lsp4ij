@@ -197,6 +197,17 @@
                 implementation="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
                 order="first"/>
 
+        <!-- LSP textDocument/folding -->
+        <lang.foldingBuilder id="LSPFoldingBuilderForText"
+                             language="TEXT"
+                             implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                             order="first"/>
+
+        <lang.foldingBuilder id="LSPFoldingBuilderForTextMate"
+                             language="textmate"
+                             implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                             order="first"/>
+
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo
                 id="LSPParameterInfoHandlerForTEXT"

@@ -106,8 +106,8 @@ public class SupportedFeatures {
          SymbolKind.Struct, SymbolKind.TypeParameter, SymbolKind.Variable)));
          textDocumentClientCapabilities.setDocumentSymbol(documentSymbol);
          **/
-        // TODO : support textDocument/foldingRange
-        // textDocumentClientCapabilities.setFoldingRange(new FoldingRangeCapabilities());
+        // FoldingRange support
+        textDocumentClientCapabilities.setFoldingRange(new FoldingRangeCapabilities());
         // TODO : support textDocument/formatting
         // textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
 

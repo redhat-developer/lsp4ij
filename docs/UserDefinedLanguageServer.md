@@ -78,5 +78,6 @@ The `Template combo-box` provides some `language servers templates`, pre-filled 
 ![New Language Server with Template](./images/user-defined-ls/NewLanguageServerWithTemplate.png)
 
  * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
+ * [Go Language Server](./user-defined-ls/gopls.md) 
  * [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
  * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
