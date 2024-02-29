@@ -27,9 +27,9 @@ to configure language servers debugging and tracing:
 
 ## Actions
 
-### Reformat Code
+### Formatting
 
-The LSP formatting support can be done with the standard `Reformat Code` menu.
+The LSP formatting support can be done with the standard `Reformat Code` and `Reformat File` actions.
 
 ### Find Usages
 

@@ -13,10 +13,10 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
-import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import org.jetbrains.annotations.NotNull;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,8 +26,11 @@ import java.util.List;
  */
 public class UserDefinedStreamConnectionProvider extends ProcessStreamConnectionProvider {
 
-    public UserDefinedStreamConnectionProvider(String commandLine, @NotNull Project project) {
+    private final @NotNull UserDefinedLanguageServerDefinition serverDefinition;
+
+    public UserDefinedStreamConnectionProvider(String commandLine, @NotNull UserDefinedLanguageServerDefinition serverDefinition) {
         super.setCommands(createCommands(commandLine));
+        this.serverDefinition = serverDefinition;
     }
 
     private List<String> createCommands(String commandLine) {
@@ -58,5 +61,10 @@ public class UserDefinedStreamConnectionProvider extends ProcessStreamConnection
             commandPart.setLength(0);
         }
         return commands;
+    }
+
+    @Override
+    public Object getInitializationOptions(URI rootUri) {
+        return serverDefinition.getLanguageServerInitializationOptions();
     }
 }

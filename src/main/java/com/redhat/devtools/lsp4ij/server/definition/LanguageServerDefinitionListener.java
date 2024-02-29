@@ -22,7 +22,7 @@ import java.util.Collection;
  */
 public interface LanguageServerDefinitionListener {
 
-    public class LanguageServerAddedEvent {
+    class LanguageServerAddedEvent {
 
         public final Collection<LanguageServerDefinition> serverDefinitions;
 
@@ -31,7 +31,7 @@ public interface LanguageServerDefinitionListener {
         }
     }
 
-    public class LanguageServerRemovedEvent {
+    class LanguageServerRemovedEvent {
 
         public final Collection<LanguageServerDefinition> serverDefinitions;
 
@@ -40,7 +40,7 @@ public interface LanguageServerDefinitionListener {
         }
     }
 
-    public class LanguageServerChangedEvent {
+    class LanguageServerChangedEvent {
 
         public final LanguageServerDefinition serverDefinition;
 
@@ -50,13 +50,15 @@ public interface LanguageServerDefinitionListener {
 
         public final boolean mappingsChanged;
         public final boolean configurationChanged;
+        public final boolean initializationOptionsContentChanged;
 
-        public LanguageServerChangedEvent(@NotNull LanguageServerDefinition serverDefinition, boolean nameChanged, boolean commandChanged, boolean mappingsChanged, boolean configurationContentChanged) {
+        public LanguageServerChangedEvent(@NotNull LanguageServerDefinition serverDefinition, boolean nameChanged, boolean commandChanged, boolean mappingsChanged, boolean configurationContentChanged, boolean initializationOptionsContentChanged) {
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
             this.mappingsChanged = mappingsChanged;
             this.configurationChanged = configurationContentChanged;
+            this.initializationOptionsContentChanged = initializationOptionsContentChanged;
         }
     }
     void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event);

@@ -65,7 +65,7 @@ public class LanguageServiceAccessor implements Disposable {
         }
 
         @Override
-        public void handleChanged(LanguageServerChangedEvent event) {
+        public void handleChanged(@NotNull LanguageServerChangedEvent event) {
             if (event.commandChanged || event.mappingsChanged) {
                 // Stop all servers where command or mappings has changed
                 List<LanguageServerWrapper> serversToStop = startedServers

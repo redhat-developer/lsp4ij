@@ -34,20 +34,22 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     private String name;
     private String commandLine;
-
     private String configurationContent;
     private Object configuration;
+    private String initializationOptionsContent;
+    private Object initializationOptions;
 
-    public UserDefinedLanguageServerDefinition(@NotNull String id, @NotNull String label, String description, String commandLine, String configurationContent) {
+    public UserDefinedLanguageServerDefinition(@NotNull String id, @NotNull String label, String description, String commandLine, String configurationContent, String initializationOptionsContent) {
         super(id, label, description, true, null, false);
         this.name = label;
         this.commandLine = commandLine;
         this.configurationContent = configurationContent;
+        this.initializationOptionsContent = initializationOptionsContent;
     }
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        return new UserDefinedStreamConnectionProvider(commandLine, project);
+        return new UserDefinedStreamConnectionProvider(commandLine, this);
     }
 
     @Override
@@ -76,22 +78,40 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.configuration = null;
     }
 
+    public String getInitializationOptionsContent() {
+        return initializationOptionsContent;
+    }
+
+    public void setInitializationOptionsContent(String initializationOptionsContent) {
+        this.initializationOptionsContent = initializationOptionsContent;
+        this.initializationOptions = null;
+    }
+
     public Object getLanguageServerConfiguration() {
         if (configuration == null && configurationContent != null && !configurationContent.isEmpty()) {
             try {
                 configuration = JsonParser.parseReader(new StringReader(configurationContent));
-            }
-            catch(Exception e) {
+            } catch (Exception e) {
                 LOGGER.error("Error while parsing JSON configuration for the language server '" + id + "'", e);
             }
         }
         return configuration;
     }
 
+    public Object getLanguageServerInitializationOptions() {
+        if (initializationOptions == null && initializationOptionsContent != null && !initializationOptionsContent.isEmpty()) {
+            try {
+                initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
+            } catch (Exception e) {
+                LOGGER.error("Error while parsing JSON Initialization Options for the language server '" + id + "'", e);
+            }
+        }
+        return initializationOptions;
+    }
+
     @Override
     public @NotNull String getDisplayName() {
         return name;
     }
-
 
 }

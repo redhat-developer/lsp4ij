@@ -136,6 +136,11 @@ public class NewLanguageServerDialog extends DialogWrapper {
         var configuration = this.languageServerPanel.getConfiguration();
         configuration.setText(template.getConfiguration() != null ? template.getConfiguration() : "");
         configuration.setCaretPosition(0);
+
+        // Update initialize options
+        var initializationOptions = this.languageServerPanel.getInitializationOptionsWidget();
+        initializationOptions.setText(template.getInitializationOptions() != null ? template.getInitializationOptions() : "");
+        initializationOptions.setCaretPosition(0);
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
@@ -202,7 +207,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String serverName = this.languageServerPanel.getServerName().getText();
         String commandLine = this.languageServerPanel.getCommandLine().getText();
         String configuration = this.languageServerPanel.getConfiguration().getText();
-        UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId, serverName, "", commandLine, configuration);
+        String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
+        UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId, serverName, "", commandLine, configuration, initializationOptions);
         LanguageServersRegistry.getInstance().addServerDefinition(definition, mappingSettings);
 
     }

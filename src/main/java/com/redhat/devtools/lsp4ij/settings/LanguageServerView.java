@@ -158,6 +158,15 @@ public class LanguageServerView implements Disposable {
         configuration.setCaretPosition(0);
     }
 
+    public String getInitializationOptionsContent() {
+        return languageServerPanel.getInitializationOptionsWidget().getText();
+    }
+
+    public void setInitializationOptionsContent(String initializationOptionsContent) {
+        var initializationOptions = languageServerPanel.getInitializationOptionsWidget();
+        initializationOptions.setText(initializationOptionsContent);
+        initializationOptions.setCaretPosition(0);
+    }
 
     @Override
     public void dispose() {
