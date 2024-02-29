@@ -39,8 +39,8 @@ public class SupportedFeatures {
                         CodeActionKind.RefactorExtract, CodeActionKind.RefactorInline,
                         CodeActionKind.RefactorRewrite, CodeActionKind.Source,
                         CodeActionKind.SourceOrganizeImports))),
-                true);
-        codeAction.setDataSupport(true);
+                Boolean.TRUE);
+        codeAction.setDataSupport(Boolean.TRUE);
         codeAction.setResolveSupport(new CodeActionResolveSupportCapabilities(List.of("edit")));
         textDocumentClientCapabilities.setCodeAction(codeAction);
 
@@ -73,7 +73,7 @@ public class SupportedFeatures {
         signatureHelpCapabilities.setSignatureInformation(signatureInformationCapabilities);
         textDocumentClientCapabilities.setSignatureHelp(signatureHelpCapabilities);
 
-        // Declaration  support
+        // Declaration support
         final var declarationCapabilities = new DeclarationCapabilities();
         declarationCapabilities.setLinkSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setDeclaration(declarationCapabilities);
@@ -106,10 +106,13 @@ public class SupportedFeatures {
          SymbolKind.Struct, SymbolKind.TypeParameter, SymbolKind.Variable)));
          textDocumentClientCapabilities.setDocumentSymbol(documentSymbol);
          **/
+
         // FoldingRange support
         textDocumentClientCapabilities.setFoldingRange(new FoldingRangeCapabilities());
-        // TODO : support textDocument/formatting
-        // textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
+
+        // Formatting support
+        textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
+        textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities(Boolean.TRUE));
 
         // Hover support
         final var hoverCapabilities = new HoverCapabilities();
@@ -146,7 +149,6 @@ public class SupportedFeatures {
     public static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
         final var workspaceClientCapabilities = new WorkspaceClientCapabilities();
         workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
-        // TODO
         // workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
         workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
         // TODO
@@ -161,6 +163,8 @@ public class SupportedFeatures {
         // editCapabilities.setFailureHandling(FailureHandlingKind.Undo);
         workspaceClientCapabilities.setWorkspaceEdit(editCapabilities);
         workspaceClientCapabilities.setDidChangeWatchedFiles(new DidChangeWatchedFilesCapabilities(Boolean.TRUE));
+
+        workspaceClientCapabilities.setDidChangeConfiguration(new DidChangeConfigurationCapabilities(Boolean.TRUE));
 
         // Refresh support for InlayHint
         workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));

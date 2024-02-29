@@ -27,6 +27,10 @@ to configure language servers debugging and tracing:
 
 ## Actions
 
+### Reformat Code
+
+The LSP formatting support can be done with the standard `Reformat Code` menu.
+
 ### Find Usages
 
 The following LSP features are integrated with the standard `Find Usages` menu (provided they're supported by the underlying language server): 

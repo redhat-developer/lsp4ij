@@ -10,13 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import com.intellij.openapi.progress.ProcessCanceledException;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import com.intellij.openapi.progress.ProcessCanceledException;
-import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 /**
  * LSP cancellation support hosts the list of LSP requests to cancel when a
@@ -24,56 +24,58 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
  * up, etc)
  *
  * @see <a href=
- *      "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest">https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest</a>
+ * "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest">https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest</a>
  */
 public class CancellationSupport implements CancelChecker {
 
-	private final List<CompletableFuture<?>> futuresToCancel;
+    private final List<CompletableFuture<?>> futuresToCancel;
 
-	private boolean cancelled;
+    private boolean cancelled;
 
-	public CancellationSupport() {
-		this.futuresToCancel = new CopyOnWriteArrayList<>();
-		this.cancelled = false;
-	}
+    public CancellationSupport() {
+        this.futuresToCancel = new CopyOnWriteArrayList<>();
+        this.cancelled = false;
+    }
 
-	public <T> CompletableFuture<T> execute(CompletableFuture<T> future) {
-		if (cancelled) {
-			future.cancel(true);
-			throw new ProcessCanceledException();
-		} else {
-			this.futuresToCancel.add(future);
-		}
-		return future;
-	}
+    public <T> CompletableFuture<T> execute(CompletableFuture<T> future) {
+        if (cancelled) {
+            if (!future.isDone()) {
+                future.cancel(true);
+            }
+            throw new ProcessCanceledException();
+        } else {
+            this.futuresToCancel.add(future);
+        }
+        return future;
+    }
 
-	/**
-	 * Cancel all LSP requests.
-	 */
-	public void cancel() {
-		if (cancelled) {
-			return;
-		}
-		this.cancelled = true;
-		for (CompletableFuture<?> futureToCancel : futuresToCancel) {
-			if (!futureToCancel.isDone()) {
-				futureToCancel.cancel(true);
-			}
-		}
-		futuresToCancel.clear();
-	}
+    /**
+     * Cancel all LSP requests.
+     */
+    public void cancel() {
+        if (cancelled) {
+            return;
+        }
+        this.cancelled = true;
+        for (CompletableFuture<?> futureToCancel : futuresToCancel) {
+            if (!futureToCancel.isDone()) {
+                futureToCancel.cancel(true);
+            }
+        }
+        futuresToCancel.clear();
+    }
 
-	@Override
-	public void checkCanceled() {
-		// When LSP requests are called (ex : 'textDocument/completion') the LSP
-		// response
-		// items are used to compose some UI item (ex : LSP CompletionItem are translate
-		// to IJ LookupElement fo).
-		// If the cancel occurs after the call of those LSP requests, the component
-		// which uses the LSP responses
-		// can call checkCanceled to stop the UI creation.
-		if (cancelled) {
-			throw new CancellationException();
-		}
-	}
+    @Override
+    public void checkCanceled() {
+        // When LSP requests are called (ex : 'textDocument/completion') the LSP
+        // response
+        // items are used to compose some UI item (ex : LSP CompletionItem are translate
+        // to IJ LookupElement fo).
+        // If the cancel occurs after the call of those LSP requests, the component
+        // which uses the LSP responses
+        // can call checkCanceled to stop the UI creation.
+        if (cancelled) {
+            throw new CancellationException();
+        }
+    }
 }

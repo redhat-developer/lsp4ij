@@ -219,6 +219,14 @@
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler"/>
 
+        <!-- LSP textDocument/formatting + textDocument/rangeFormatting request support -->
+        <formattingService
+                id="LSPFormattingOnlyService"
+                implementation="com.redhat.devtools.lsp4ij.operations.formatting.LSPFormattingOnlyService"/>
+        <formattingService
+                id="LSPFormattingAndRangeBothService"
+                implementation="com.redhat.devtools.lsp4ij.operations.formatting.LSPFormattingAndRangeBothService"/>
+
         <!-- LSP Find Usages (LSP) support shows:
              - textDocument/declaration
              - textDocument/definition

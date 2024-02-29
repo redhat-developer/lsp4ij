@@ -42,7 +42,7 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
     public AbstractLSPFeatureSupport(@NotNull PsiFile file) {
         this(file, true);
     }
-    
+
     public AbstractLSPFeatureSupport(@NotNull PsiFile file, boolean cancelWhenFileModified) {
         this.file = file;
         this.modificationStamp = -1;
