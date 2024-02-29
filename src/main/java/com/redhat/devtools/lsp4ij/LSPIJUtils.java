@@ -14,10 +14,8 @@ import com.intellij.lang.Language;
 import com.intellij.lang.LanguageUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.EditorFactory;
-import com.intellij.openapi.editor.RangeMarker;
+import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.editor.*;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -269,29 +267,6 @@ public class LSPIJUtils {
         return lineStartOffset + start.getCharacter();
     }
 
-    /**
-     * Returns the offset of the line identation.
-     *
-     * @param start    the LSP position start.
-     * @param document the document.
-     * @return the offset of the line identation.
-     * @throws IndexOutOfBoundsException
-     */
-    public static int getLineIndentOffset(Position start, int tabSize, Document document) throws IndexOutOfBoundsException {
-        int lineStartOffset = document.getLineStartOffset(start.getLine());
-        int lineEndOffset = document.getLineEndOffset(start.getLine());
-        int offset = lineStartOffset;
-        for (int current = lineStartOffset; current <= lineEndOffset; current++) {
-            char c = document.getText().charAt(current);
-            if (Character.isWhitespace(c)) {
-                offset += (c == '\t') ? tabSize : 1;
-            } else {
-                break;
-            }
-        }
-        return offset;
-    }
-
     public static Position toPosition(int offset, Document document) {
         int line = document.getLineNumber(offset);
         int lineStart = document.getLineStartOffset(line);
@@ -358,8 +333,6 @@ public class LSPIJUtils {
                 }
                 // Adjust the end offset if the offset is not at the end of the line.
                 int offset = start;
-                int lineStartOffset = document.getLineStartOffset(range.getEnd().getLine());
-                int lineEndOffset = document.getLineEndOffset(range.getEnd().getLine());
                 if (!isEndOfLine(offset, range.getEnd().getLine(), document)) {
                     end++;
                 }
@@ -614,9 +587,12 @@ public class LSPIJUtils {
         marker.dispose();
     }
 
-
     public static void applyEdits(Editor editor, Document document, List<TextEdit> edits) {
-        ApplicationManager.getApplication().runWriteAction(() -> edits.forEach(edit -> applyEdit(editor, edit, document)));
+        if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+            edits.forEach(edit -> applyEdit(editor, edit, document));
+        } else {
+            WriteAction.run(() -> edits.forEach(edit -> applyEdit(editor, edit, document)));
+        }
     }
 
     public static boolean hasCapability(final Either<Boolean, ? extends Object> eitherCapability) {
@@ -624,6 +600,25 @@ public class LSPIJUtils {
             return false;
         }
         return eitherCapability.isRight() || (eitherCapability.isLeft() && eitherCapability.getLeft());
+    }
+
+    /**
+     * Get the tab size for the given editor.
+     */
+    public static int getTabSize(Editor editor) {
+        Project project = editor.getProject();
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return editor.getSettings().getTabSize(project);
+        }
+        return ReadAction.compute(() -> editor.getSettings().getTabSize(project));
+    }
+
+    public static boolean isInsertSpaces(Editor editor) {
+        Project project = editor.getProject();
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return !editor.getSettings().isUseTabCharacter(project);
+        }
+        return ReadAction.compute(() -> !editor.getSettings().isUseTabCharacter(project));
     }
 
     /**
@@ -651,5 +646,4 @@ public class LSPIJUtils {
         }
         return project.getName();
     }
-
 }

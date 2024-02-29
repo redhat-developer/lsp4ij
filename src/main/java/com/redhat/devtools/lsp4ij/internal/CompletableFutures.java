@@ -70,7 +70,7 @@ public class CompletableFutures {
         CompletableFuture<Void> allFutures = cancellationSupport
                 .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
         return allFutures.thenApply(Void -> {
-            List<T> mergedDataList = new ArrayList<>();
+            List<T> mergedDataList = new ArrayList<>(futures.size());
             for (CompletableFuture<List<T>> dataListFuture : futures) {
                 var data = dataListFuture.join();
                 if (data != null) {

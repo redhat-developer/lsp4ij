@@ -140,6 +140,24 @@ public class LanguageServerItem {
     }
 
     /**
+     * Returns true if the language server can support formatting and false otherwise.
+     *
+     * @return true if the language server can support formatting and false otherwise.
+     */
+    public boolean isDocumentFormattingSupported() {
+        return isDocumentFormattingSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support range formatting and false otherwise.
+     *
+     * @return true if the language server can support range formatting and false otherwise.
+     */
+    public boolean isDocumentRangeFormattingSupported() {
+        return isDocumentRangeFormattingSupported(getServerCapabilities());
+    }
+
+    /**
      * Returns true if the language server can support resolve code action and false otherwise.
      *
      * @param serverCapabilities the server capabilities.
@@ -350,6 +368,28 @@ public class LanguageServerItem {
     public static boolean isFoldingSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
                 LSPIJUtils.hasCapability(serverCapabilities.getFoldingRangeProvider());
+    }
+
+    /**
+     * Returns true if the language server can support formatting and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support formatting and false otherwise.
+     */
+    public static boolean isDocumentFormattingSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getDocumentFormattingProvider());
+    }
+
+    /**
+     * Returns true if the language server can support range formatting and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support range formatting and false otherwise.
+     */
+    public static boolean isDocumentRangeFormattingSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                LSPIJUtils.hasCapability(serverCapabilities.getDocumentRangeFormattingProvider());
     }
 
     /**
