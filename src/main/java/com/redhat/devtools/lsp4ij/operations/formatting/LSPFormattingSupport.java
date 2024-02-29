@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
@@ -65,7 +66,7 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
     }
 
     private static void handleError(@NotNull AsyncFormattingRequest formattingRequest, Throwable error) {
-        if (error instanceof ProcessCanceledException) {
+        if (error instanceof ProcessCanceledException || error instanceof CancellationException) {
             // Ignore the error
             formattingRequest.onTextReady(formattingRequest.getDocumentText());
         } else {

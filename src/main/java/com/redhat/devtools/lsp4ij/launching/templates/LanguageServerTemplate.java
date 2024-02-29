@@ -61,6 +61,7 @@ public class LanguageServerTemplate {
     private String description;
 
     private String configuration;
+    private String initializationOptions;
 
     public String getId() {
         return id;
@@ -123,7 +124,7 @@ public class LanguageServerTemplate {
             return null;
         }
         String docPath = getId() + "/README.md";
-        String docContent = loadDocContent(docPath);
+        String docContent = loadTemplateResourceContent(docPath);
         if (docContent == null) {
             description = "";
         } else {
@@ -146,16 +147,31 @@ public class LanguageServerTemplate {
             return null;
         }
         String configurationPath = getId() + "/settings.json";
-        String configurationContent = loadDocContent(configurationPath);
+        String configurationContent = loadTemplateResourceContent(configurationPath);
         configuration = configurationContent != null ? configurationContent : "";
         return configuration;
     }
 
-    private static String loadDocContent(@NotNull String docPath) {
-        try (Reader reader = LanguageServerTemplateManager.loadTemplateReader(docPath)) {
+
+    public String getInitializationOptions() {
+        if (initializationOptions != null) {
+            return initializationOptions.isEmpty() ? null : initializationOptions;
+        }
+        String id = getId();
+        if (id == null) {
+            return null;
+        }
+        String initializationOptionsPath = getId() + "/initializationOptions.json";
+        String initializationOptionsContent = loadTemplateResourceContent(initializationOptionsPath);
+        initializationOptions = initializationOptionsContent != null ? initializationOptionsContent : "";
+        return initializationOptions;
+    }
+
+    private static String loadTemplateResourceContent(@NotNull String resourcePath) {
+        try (Reader reader = LanguageServerTemplateManager.loadTemplateReader(resourcePath)) {
             return reader != null ? StreamUtil.readText(reader) : null;
         } catch (Exception e) {
-            LOGGER.warn("Error while loading language server template documentation '" + docPath + "'", e);
+            LOGGER.warn("Error while loading language server template resource '" + resourcePath + "'", e);
         }
         return null;
     }

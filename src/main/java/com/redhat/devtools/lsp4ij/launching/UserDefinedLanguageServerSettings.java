@@ -113,9 +113,10 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String configurationContent;
 
+        private String initializationOptionsContent;
+
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
-
         public String getServerId() {
             return serverId;
         }
@@ -154,6 +155,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setConfigurationContent(String configurationContent) {
             this.configurationContent = configurationContent;
+        }
+
+        public String getInitializationOptionsContent() {
+            return initializationOptionsContent;
+        }
+
+        public void setInitializationOptionsContent(String initializationOptionsContent) {
+            this.initializationOptionsContent = initializationOptionsContent;
         }
     }
 

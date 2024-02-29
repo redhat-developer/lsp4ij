@@ -54,6 +54,8 @@ public class LanguageServerPanel {
 
     private LanguageServerConfigurationWidget configurationWidget;
 
+    private LanguageServerInitializationOptionsWidget initializationOptionsWidget;
+
     public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode) {
         createUI(builder, description, mode);
     }
@@ -67,7 +69,7 @@ public class LanguageServerPanel {
         // Mappings tab
         addMappingsTab(tabbedPane, mode);
         if (mode != EditionMode.EDIT_EXTENSION) {
-            // Configuration tab
+            // Configuration tab to fill LSP Configuration + LSP Initialize Options
             addConfigurationTab(tabbedPane);
         }
         // Debug tab
@@ -110,8 +112,8 @@ public class LanguageServerPanel {
     private void addConfigurationTab(JBTabbedPane tabbedPane) {
         FormBuilder configurationTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.configuration"), false);
         createConfigurationField(configurationTab);
+        createInitializationOptionsTabField(configurationTab);
     }
-
 
     private static FormBuilder addTab(JBTabbedPane tabbedPane, String tabTitle) {
         return addTab(tabbedPane, tabTitle, true);
@@ -149,6 +151,13 @@ public class LanguageServerPanel {
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), scrollPane, true);
     }
 
+    private void createInitializationOptionsTabField(FormBuilder builder) {
+        initializationOptionsWidget = new LanguageServerInitializationOptionsWidget();
+        JBScrollPane scrollPane = new JBScrollPane(initializationOptionsWidget);
+        scrollPane.setMinimumSize(new Dimension(JBUIScale.scale(600), JBUIScale.scale(100)));
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.initializationOptions"), scrollPane, true);
+    }
+
     public JBTextField getServerName() {
         return serverName;
     }
@@ -163,6 +172,10 @@ public class LanguageServerPanel {
 
     public LanguageServerConfigurationWidget getConfiguration() {
         return configurationWidget;
+    }
+
+    public LanguageServerInitializationOptionsWidget getInitializationOptionsWidget() {
+        return initializationOptionsWidget;
     }
 
     public JBCheckBox getDebugSuspendCheckBox() {

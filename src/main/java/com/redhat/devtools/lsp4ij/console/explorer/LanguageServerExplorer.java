@@ -82,7 +82,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         }
 
         @Override
-        public void handleChanged(LanguageServerChangedEvent event) {
+        public void handleChanged(@NotNull LanguageServerChangedEvent event) {
             if (event.nameChanged) {
                 // A server definition name has changed, rename the proper tree node label of the explorer
                 DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();

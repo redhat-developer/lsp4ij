@@ -68,7 +68,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         }
 
         @Override
-        public void handleChanged(LanguageServerChangedEvent event) {
+        public void handleChanged(@NotNull LanguageServerChangedEvent event) {
             // Do nothing
         }
     };

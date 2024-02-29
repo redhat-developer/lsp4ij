@@ -53,18 +53,32 @@ public class UserDefinedLanguageListener implements LanguageServerLifecycleListe
 
     @Override
     public void handleChanged(@NotNull LanguageServerChangedEvent event) {
-        if (event.configurationChanged && event.serverDefinition == serverDefinition) {
-            // Case 2: configuration has changed:
-            // Try to get the user defined configuration and
-            // push it with 'workspaceService/didChangeConfiguration' to the all started language servers
-            // which matches the server definition.
-            LanguageServiceAccessor.getInstance(project)
-                    .getStartedServers()
-                    .forEach(ls -> {
-                        if (ls.serverDefinition == serverDefinition) {
-                            didChangeConfiguration(ls);
-                        }
-                    });
+        if (event.serverDefinition == serverDefinition) {
+            if (event.initializationOptionsContentChanged) {
+                // initializationOption has changed:
+                // Try to get the user defined initializationOption and
+                // restart all started language servers
+                // which matches the server definition.
+                LanguageServiceAccessor.getInstance(project)
+                        .getStartedServers()
+                        .forEach(ls -> {
+                            if (ls.serverDefinition == serverDefinition) {
+                                ls.restart();
+                            }
+                        });
+            } else if (event.configurationChanged) {
+                // Case 2: configuration has changed:
+                // Try to get the user defined configuration and
+                // push it with 'workspaceService/didChangeConfiguration' to the all started language servers
+                // which matches the server definition.
+                LanguageServiceAccessor.getInstance(project)
+                        .getStartedServers()
+                        .forEach(ls -> {
+                            if (ls.serverDefinition == serverDefinition) {
+                                didChangeConfiguration(ls);
+                            }
+                        });
+            }
         }
     }
 

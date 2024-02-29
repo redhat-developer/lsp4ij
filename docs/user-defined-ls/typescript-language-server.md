@@ -20,4 +20,4 @@ It will install:
 
 After that you can create the TypeScript Language Server with the [language server template](../UserDefinedLanguageServer.md#using-template):
 
-![TypeScript demo](../images/user-defined-ls/TypeScriptServerDialog.png)
+![TypeScript server dialog](../images/user-defined-ls/TypeScriptServerDialog.png)

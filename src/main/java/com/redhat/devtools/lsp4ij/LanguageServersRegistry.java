@@ -131,7 +131,14 @@ public class LanguageServersRegistry {
                 String serverId = launch.getServerId();
                 List<ServerMapping> mappings = toServerMappings(serverId, launch.getMappings());
                 // Register server definition from settings
-                addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(serverId, launch.getServerName(), "", launch.getCommandLine(), launch.getConfigurationContent()), mappings);
+                addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(
+                        serverId,
+                        launch.getServerName(),
+                        "",
+                        launch.getCommandLine(),
+                        launch.getConfigurationContent(),
+                        launch.getInitializationOptionsContent()),
+                        mappings);
             }
         } catch (Exception e) {
             LOGGER.error("Error while loading user defined language servers from settings", e);
@@ -282,6 +289,7 @@ public class LanguageServersRegistry {
                 settings.setMappings(toServerMappingSettings(mappings));
             }
             settings.setConfigurationContent(definitionFromSettings.getConfigurationContent());
+            settings.setInitializationOptionsContent(definitionFromSettings.getInitializationOptionsContent());
             UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(definition.id, settings);
         }
     }
@@ -381,10 +389,12 @@ public class LanguageServersRegistry {
                                        @Nullable String name,
                                        @Nullable String commandLine,
                                        @NotNull List<ServerMappingSettings> mappings,
-                                       @Nullable String configurationContent) {
+                                       @Nullable String configurationContent,
+                                       @Nullable String initializationOptionsContent) {
         definition.setName(name);
         definition.setCommandLine(commandLine);
         definition.setConfigurationContent(configurationContent);
+        definition.setInitializationOptionsContent(initializationOptionsContent);
 
         // remove associations
         removeAssociationsFor(definition);
@@ -396,15 +406,17 @@ public class LanguageServersRegistry {
         boolean commandChanged = !Objects.equals(settings.getCommandLine(), commandLine);
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
         boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), configurationContent);
+        boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), initializationOptionsContent);
 
         settings.setServerName(name);
         settings.setCommandLine(commandLine);
         settings.setConfigurationContent(configurationContent);
+        settings.setInitializationOptionsContent(initializationOptionsContent);
         settings.setMappings(mappings);
 
-        if (nameChanged || commandChanged || mappingsChanged || configurationContentChanged) {
+        if (nameChanged || commandChanged || mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
-            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(definition, nameChanged, commandChanged, mappingsChanged, configurationContentChanged);
+            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(definition, nameChanged, commandChanged, mappingsChanged, configurationContentChanged, initializationOptionsContentChanged);
             for (LanguageServerDefinitionListener listener : this.listeners) {
                 try {
                     listener.handleChanged(event);

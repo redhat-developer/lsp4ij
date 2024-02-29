@@ -102,8 +102,9 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
             return !(Objects.equals(getDisplayName(), settings.getServerName())
                     && Objects.equals(myView.getCommandLine(), settings.getCommandLine())
                     && Objects.equals(myView.getMappings(), settings.getMappings())
-                    && Objects.equals(myView.getConfigurationContent(), settings.getConfigurationContent()
-            ));
+                    && Objects.equals(myView.getConfigurationContent(), settings.getConfigurationContent())
+                    && Objects.equals(myView.getInitializationOptionsContent(), settings.getInitializationOptionsContent())
+            );
         }
         com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project)
                 .getLanguageServerSettings(languageServerDefinition.id);
@@ -119,7 +120,13 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
     @Override
     public void apply() throws ConfigurationException {
         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition launch) {
-            LanguageServersRegistry.getInstance().updateServerDefinition(launch, getDisplayName(), myView.getCommandLine(), myView.getMappings(), myView.getConfigurationContent());
+            LanguageServersRegistry.getInstance().updateServerDefinition(
+                    launch,
+                    getDisplayName(),
+                    myView.getCommandLine(),
+                    myView.getMappings(),
+                    myView.getConfigurationContent(),
+                    myView.getInitializationOptionsContent());
         } else {
             com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = new com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings();
             settings.setDebugPort(myView.getDebugPort());
@@ -137,6 +144,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
             if (settings != null) {
                 myView.setCommandLine(settings.getCommandLine());
                 myView.setConfigurationContent(settings.getConfigurationContent());
+                myView.setInitializationOptionsContent(settings.getInitializationOptionsContent());
 
                 List<ServerMappingSettings> languageMappings = settings.getMappings()
                         .stream()

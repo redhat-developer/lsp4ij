@@ -14,6 +14,7 @@ import com.google.gson.Gson;
 import com.intellij.openapi.application.ApplicationManager;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,9 +61,9 @@ public class LanguageServerTemplateManager {
         return templates;
     }
 
+    @Nullable
     static Reader loadTemplateReader(@NotNull String path) {
         var is = LanguageServerTemplateManager.class.getClassLoader().getResourceAsStream(TEMPLATES_DIR + "/" + path);
-        assert is != null;
-        return new InputStreamReader(new BufferedInputStream(is));
+        return is !=null? new InputStreamReader(new BufferedInputStream(is)) : null;
     }
 }
