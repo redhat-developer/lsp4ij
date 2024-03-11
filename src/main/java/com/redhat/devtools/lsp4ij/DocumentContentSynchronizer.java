@@ -147,6 +147,10 @@ public class DocumentContentSynchronizer implements DocumentListener {
     private void sendDidChangeEvents() {
         List<TextDocumentContentChangeEvent> events;
         synchronized (changeEvents) {
+            if (changeEvents.isEmpty()) {
+                // Don't send didChange notification with empty contentChanges.
+                return;
+            }
             events = new ArrayList<>(changeEvents);
             changeEvents.clear();
         }
