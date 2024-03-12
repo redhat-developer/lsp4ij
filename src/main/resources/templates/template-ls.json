@@ -196,6 +196,25 @@
           "languageId": "html"
         }
       ]
+    },
+    {
+      "id": "rust-analyzer",
+      "name": "Rust Language Server",
+      "dev": true,
+      "programArgs": {
+        "default": "rust-analyzer"
+      },
+      "fileTypeMappings": [
+        {
+          "fileType": {
+            "name": "Rust",
+            "patterns": [
+              "*.rs"
+            ]
+          },
+          "languageId": "rust"
+        }
+      ]
     }
   ]
 }
