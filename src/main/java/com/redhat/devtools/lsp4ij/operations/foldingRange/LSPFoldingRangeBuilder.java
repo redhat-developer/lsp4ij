@@ -14,11 +14,13 @@ import com.intellij.lang.ASTNode;
 import com.intellij.lang.folding.CustomFoldingBuilder;
 import com.intellij.lang.folding.FoldingDescriptor;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
@@ -49,20 +51,23 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         if (file == null) {
             return;
         }
+
+        // Consume textDocument/foldingRanges
         LSPFoldingRangeSupport foldingRangeSupport = LSPFileSupport.getSupport(file).getFoldingRangeSupport();
-        // Get folding ranges by consuming textDocument/foldingRange
-        CompletableFuture<List<FoldingRange>> future = foldingRangeSupport.getFoldingRanges();
+        CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges();
         try {
-            future.get(2000, TimeUnit.MILLISECONDS);
+            CompletableFutures.waitUntilDone(foldingRangesFuture);
+        } catch (ProcessCanceledException | CancellationException e) {
+            // cancel the LSP requests textDocument/foldingRanges
+            foldingRangeSupport.cancel();
         } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming textDocument/foldingRange", e);
-        } catch (InterruptedException e) {
-            Thread.interrupted();
-        } catch (TimeoutException e) {
-            LOGGER.warn("Timeout for textDocument/foldingRange", e);
+            LOGGER.error("Error while consuming LSP textDocument/foldingRanges requests", e);
+            return;
         }
-        if (isDoneNormally(future)) {
-            List<FoldingRange> foldingRanges = future.getNow(null);
+
+        if (isDoneNormally(foldingRangesFuture)) {
+            // textDocument/foldingRanges has been collected correctly, create list of IJ FoldingDescriptor from LSP FoldingRange list
+            List<FoldingRange> foldingRanges = foldingRangesFuture.getNow(null);
             if (foldingRanges != null) {
                 for (FoldingRange foldingRange : foldingRanges) {
                     int start = getStartOffset(foldingRange, document);

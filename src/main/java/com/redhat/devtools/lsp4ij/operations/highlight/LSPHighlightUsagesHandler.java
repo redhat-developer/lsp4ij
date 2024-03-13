@@ -42,7 +42,7 @@ public class LSPHighlightUsagesHandler extends HighlightUsagesHandlerBase<LSPHig
     public void computeUsages(@NotNull List<? extends LSPHighlightPsiElement> targets) {
         targets.forEach(target ->
         {
-            if (target.getKind() == DocumentHighlightKind.Read) {
+            if (target.getKind() == DocumentHighlightKind.Read || target.getKind() == DocumentHighlightKind.Text) {
                 myReadUsages.add(target.getTextRange());
             } else {
                 myWriteUsages.add(target.getTextRange());

@@ -101,12 +101,14 @@ public class CompletableFutures {
             try {
                 // wait for 25 ms
                 future.get(25, TimeUnit.MILLISECONDS);
-                // check progress canceled
-                ProgressManager.checkCanceled();
-                // No ProcessCanceledException thrown, wait again for 25ms....
             } catch (TimeoutException ignore) {
             } catch (InterruptedException e) {
                 Thread.interrupted();
+            }
+            finally {
+                // check progress canceled
+                ProgressManager.checkCanceled();
+                // No ProcessCanceledException thrown, wait again for 25ms....
             }
         }
     }
