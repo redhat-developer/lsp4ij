@@ -17,6 +17,7 @@ import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.operations.color.LSPColorSupport;
 import com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeSupport;
 import com.redhat.devtools.lsp4ij.operations.formatting.LSPFormattingSupport;
+import com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightSupport;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsSupport;
 import org.jetbrains.annotations.NotNull;
 
@@ -39,6 +40,8 @@ public class LSPFileSupport implements Disposable {
 
     private final LSPFormattingSupport formattingSupport;
 
+    private final LSPHighlightSupport highlightSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -46,6 +49,7 @@ public class LSPFileSupport implements Disposable {
         this.colorSupport = new LSPColorSupport(file);
         this.foldingRangeSupport = new LSPFoldingRangeSupport(file);
         this.formattingSupport = new LSPFormattingSupport(file);
+        this.highlightSupport = new LSPHighlightSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -58,6 +62,7 @@ public class LSPFileSupport implements Disposable {
         getColorSupport().cancel();
         getFoldingRangeSupport().cancel();
         getFormattingSupport().cancel();
+        getHighlightSupport().cancel();
     }
 
     /**
@@ -103,6 +108,15 @@ public class LSPFileSupport implements Disposable {
      */
     public LSPFormattingSupport getFormattingSupport() {
         return formattingSupport;
+    }
+
+    /**
+     * Returns the LSP highlight support.
+     *
+     * @return the LSP highlight support.
+     */
+    public LSPHighlightSupport getHighlightSupport() {
+        return highlightSupport;
     }
 
     /**

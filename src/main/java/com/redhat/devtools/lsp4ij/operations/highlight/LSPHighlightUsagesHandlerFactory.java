@@ -20,27 +20,27 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.DocumentHighlight;
+import org.eclipse.lsp4j.DocumentHighlightKind;
 import org.eclipse.lsp4j.DocumentHighlightParams;
 import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.concurrent.ExecutionException;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
 
 /**
@@ -48,8 +48,7 @@ import java.util.logging.Logger;
  * <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight>LSP 'textDocument/highlight'</a>.
  */
 public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerFactory {
-    private static final Logger LOGGER = Logger.getLogger(LSPHighlightUsagesHandlerFactory.class.getName());
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPHighlightUsagesHandlerFactory.class);
     @Override
     public @Nullable HighlightUsagesHandlerBase createHighlightUsagesHandler(@NotNull Editor editor, @NotNull PsiFile file) {
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
@@ -64,47 +63,46 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         if (file == null) {
             return Collections.emptyList();
         }
-        List<LSPHighlightPsiElement> elements = new ArrayList<>();
-        final CancellationSupport cancellationSupport = new CancellationSupport();
+
+        ProgressManager.checkCanceled();
+
+        // Create DocumentHighlightParams
+        Document document = editor.getDocument();
+        int offset = TargetElementUtil.adjustOffset(psiFile, document, editor.getCaretModel().getOffset());
+        Position position = LSPIJUtils.toPosition(offset, document);
+        DocumentHighlightParams params = new DocumentHighlightParams(LSPIJUtils.toTextDocumentIdentifier(file), position);
+
+        // Consume textDocument/highlight
+        LSPHighlightSupport highlightSupport = LSPFileSupport.getSupport(psiFile).getHighlightSupport();
+        highlightSupport.cancel();
+        CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
         try {
-            Document document = editor.getDocument();
-            int offset = TargetElementUtil.adjustOffset(psiFile, document, editor.getCaretModel().getOffset());
-            Position position = LSPIJUtils.toPosition(offset, document);
-
-            ProgressManager.checkCanceled();
-
-            String uri = LSPIJUtils.toUriAsString(file);
-            TextDocumentIdentifier identifier = new TextDocumentIdentifier(uri);
-            DocumentHighlightParams params = new DocumentHighlightParams(identifier, position);
-            BlockingDeque<DocumentHighlight> highlights = new LinkedBlockingDeque<>();
-
-            CompletableFuture<Void> future = LanguageServiceAccessor.getInstance(editor.getProject())
-                    .getLanguageServers(file, LanguageServerItem::isDocumentHighlightSupported)
-                    .thenAcceptAsync(languageServers ->
-                            cancellationSupport.execute(CompletableFuture.allOf(languageServers.stream()
-                                    .map(languageServer -> cancellationSupport.execute(languageServer.getTextDocumentService().documentHighlight(params)))
-                                    .map(request -> request.thenAcceptAsync(result -> {
-                                        if (result != null) {
-                                            highlights.addAll(result);
-                                        }
-                                    })).toArray(CompletableFuture[]::new))));
-            while (!future.isDone() || !highlights.isEmpty()) {
-                ProgressManager.checkCanceled();
-                DocumentHighlight highlight = highlights.poll(25, TimeUnit.MILLISECONDS);
-                if (highlight != null) {
-                    TextRange textRange = LSPIJUtils.toTextRange(highlight.getRange(), document);
-                    if (textRange != null) {
-                        elements.add(new LSPHighlightPsiElement(psiFile, textRange, highlight.getKind()));
-                    }
-                }
-            }
-        } catch (ProcessCanceledException cancellation) {
-            cancellationSupport.cancel();
-            throw cancellation;
-        } catch (InterruptedException e) {
-            LOGGER.log(Level.WARNING, e, e::getLocalizedMessage);
+            CompletableFutures.waitUntilDone(highlightFuture);
+        } catch (ProcessCanceledException | CancellationException e) {
+            // cancel the LSP requests textDocument/highlight
+            highlightSupport.cancel();
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP textDocument/highlight requests", e);
+            return Collections.emptyList();
         }
-        return elements;
 
+        if (isDoneNormally(highlightFuture)) {
+            // textDocument/highlight has been collected correctly, create list of LSPHighlightPsiElement from LSP DocumentHighlight list
+            List<DocumentHighlight> highlights = highlightFuture.getNow(null);
+            if (highlights != null) {
+                List<LSPHighlightPsiElement> elements = new ArrayList<>();
+                highlights
+                        .forEach(highlight -> {
+                            TextRange textRange = LSPIJUtils.toTextRange(highlight.getRange(), document);
+                            if (textRange != null) {
+                                // According LSP spec, the default highlight kind is DocumentHighlightKind.Text.
+                                DocumentHighlightKind kind = highlight.getKind() != null ? highlight.getKind() : DocumentHighlightKind.Text;
+                                elements.add(new LSPHighlightPsiElement(psiFile, textRange, kind));
+                            }
+                        });
+                return elements;
+            }
+        }
+        return Collections.emptyList();
     }
 }
