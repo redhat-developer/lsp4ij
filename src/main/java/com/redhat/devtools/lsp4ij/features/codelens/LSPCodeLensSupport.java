@@ -93,8 +93,9 @@ public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams
                         return Collections.emptyList();
                     }
                     List<CodeLensData> data = new ArrayList<>();
-                    codeLenses.stream()
-                            .filter(Objects::nonNull)
+                    codeLenses
+                            .stream()
+                            .filter(LSPCodeLensSupport::isValidCodeLens)
                             .forEach(codeLens -> {
                                 CompletableFuture<CodeLens> resolvedCodeLensFuture = null;
                                 if (codeLens.getCommand() == null && languageServer.isResolveCodeLensSupported()) {
@@ -113,4 +114,7 @@ public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams
                 });
     }
 
+    private static boolean isValidCodeLens(CodeLens codeLens) {
+        return Objects.nonNull(codeLens) && Objects.nonNull(codeLens.getRange());
+    }
 }

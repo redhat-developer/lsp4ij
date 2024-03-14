@@ -125,8 +125,10 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
             future.cancel(true);
         }
         future = null;
-        if (cancellationSupport != null) {
-            cancellationSupport.cancel();
+        // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
+        CancellationSupport cancellation = cancellationSupport;
+        if (cancellation != null) {
+            cancellation.cancel();
         }
         cancellationSupport = null;
     }
