@@ -19,7 +19,11 @@ import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActions;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.util.Ranges;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
@@ -34,6 +38,8 @@ import java.util.*;
  * @author Angelo ZERR
  */
 public class LSPDiagnosticsForServer {
+
+    private record DiagnosticData(Range range, List<Diagnostic> diagnostics) {};
 
     private final LanguageServerWrapper languageServerWrapper;
 
@@ -58,18 +64,60 @@ public class LSPDiagnosticsForServer {
         this.diagnostics = toMap(diagnostics, this.diagnostics);
     }
 
-    private Map<Diagnostic, LSPLazyCodeActions> toMap(List<Diagnostic> diagnostics, Map<Diagnostic, LSPLazyCodeActions> existingsDiagnostics) {
+    private Map<Diagnostic, LSPLazyCodeActions> toMap(List<Diagnostic> diagnostics, Map<Diagnostic, LSPLazyCodeActions> existingDiagnostics) {
         Map<Diagnostic, LSPLazyCodeActions> map = new HashMap<>(diagnostics.size());
-        for (Diagnostic diagnostic : diagnostics) {
-            // Get the existing LSP lazy code actions for the current diagnostic
-            LSPLazyCodeActions actions = existingsDiagnostics != null ? existingsDiagnostics.get(diagnostic) : null;
-            if (actions != null) {
-                // cancel the LSP textDocument/codeAction request if needed
-                actions.cancel();
+        // Sort diagnostics by range
+        List<Diagnostic> sortedDiagnostics = diagnostics
+                .stream()
+                .sorted((d1, d2) -> {
+                    if (Ranges.containsRange(d1.getRange(), d2.getRange())) {
+                        return -1;
+                    }
+                    return 1;
+                })
+                .toList();
+        // Group diagnostics by covered range
+        List<DiagnosticData> diagnosticsGroupByCoveredRange = new ArrayList<>();
+        for (Diagnostic diagnostic : sortedDiagnostics) {
+            DiagnosticData data = getDiagnosticWhichCoversTheRange(diagnostic.getRange(), diagnosticsGroupByCoveredRange);
+            if (data != null) {
+                data.diagnostics().add(diagnostic);
+            } else {
+                List<Diagnostic> list = new ArrayList<>();
+                list.add(diagnostic);
+                Position start = diagnostic.getRange().getStart();
+                Position end = diagnostic.getRange().getEnd();
+                data = new DiagnosticData(new Range(new Position(start.getLine(), start.getCharacter()),
+                        new Position(end.getLine(), end.getCharacter())), list);
+                diagnosticsGroupByCoveredRange.add(data);
             }
-            map.put(diagnostic, new LSPLazyCodeActions(diagnostic, file, languageServerWrapper));
+        }
+        // Associate each diagnostic with the list of code actions to load for a given range
+        for (DiagnosticData data : diagnosticsGroupByCoveredRange) {
+            var action = new LSPLazyCodeActions(data.diagnostics(), file, languageServerWrapper);
+            data.diagnostics()
+                    .forEach(d -> {
+                        // Get the existing LSP lazy code actions for the current diagnostic
+                        LSPLazyCodeActions actions = existingDiagnostics != null ? existingDiagnostics.get(d) : null;
+                        if (actions != null) {
+                            // cancel the LSP textDocument/codeAction request if needed
+                            actions.cancel();
+                        }
+                        map.put(d, action);
+                    });
+
         }
         return map;
+    }
+
+    @Nullable
+    private static DiagnosticData getDiagnosticWhichCoversTheRange(Range diagnosticRange, List<DiagnosticData> diagnosticsGroupByCoveredRange) {
+        for (DiagnosticData data : diagnosticsGroupByCoveredRange) {
+            if (Ranges.containsRange(data.range(), diagnosticRange)) {
+                return data;
+            }
+        }
+        return null;
     }
 
     /**

@@ -32,7 +32,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerItem.isCodeActionResolveSupported;
-import static com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActions.NO_CODEACTION_AT_INDEX;
+import static com.redhat.devtools.lsp4ij.operations.codeactions.LSPLazyCodeActions.NO_CODE_ACTION_AT_INDEX;
 
 /**
  * The lazy IJ Quick fix.
@@ -145,7 +145,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     }
 
     private boolean isValidCodeAction() {
-        return action != null && !NO_CODEACTION_AT_INDEX.equals(action);
+        return action != null && !NO_CODE_ACTION_AT_INDEX.equals(action);
     }
 
 }
