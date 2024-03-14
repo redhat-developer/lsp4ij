@@ -55,9 +55,8 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCodeLensProvider.class);
-
-    private static final String LSP_CODE_LENS_PROVIDER_ID = "LSPCodeLensProvider";
-
+    public static final String LSP_CODE_LENS_PROVIDER_ID = "LSPCodeLensProvider";
+    public static final String LSP_CODE_LENS_GROUP_ID = "LSPCodeLens";
     @NotNull
     @Override
     public CodeVisionAnchorKind getDefaultAnchor() {
@@ -70,11 +69,17 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         return LSP_CODE_LENS_PROVIDER_ID;
     }
 
+    @NotNull
+    @Override
+    public String getGroupId() {
+        return LSP_CODE_LENS_GROUP_ID;
+    }
+
     @Nls
     @NotNull
     @Override
     public String getName() {
-        return "LSP CodeLens";
+        return "LSP";
     }
 
     @NotNull
@@ -115,34 +120,54 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             if (data == null) {
                 return CodeVisionState.Companion.getREADY_EMPTY();
             }
-            for (var codeLensData : data) {
-                CodeLens codeLens = codeLensData.codeLens();
-                var resolvedCodeLensFuture = codeLensData.resolvedCodeLensFuture();
-                if (resolvedCodeLensFuture != null && !resolvedCodeLensFuture.isDone()) {
-                    // The resolve code lens future is not finished, wait for...
-                    try {
-                        waitUntilDone(resolvedCodeLensFuture, psiFile);
-                    } catch (CancellationException | ProcessCanceledException e) {
-                        // Do nothing
-                    } catch (ExecutionException e) {
-                        LOGGER.error("Error while consuming LSP 'textDocument/resolveCodeLens' request", e);
+            if (!data.isEmpty()) {
+                // Sort codelens by line number
+                Collections.sort(data, LSPCodeLensProvider::sortCodeLensByLine);
+                // Create IJ CodeVision from LSP CodeLens
+                // As CodeVision cannot support showing several CodeVision entries for the same line, we create
+                // CodeVision entry with different providerId ('LSPCodelensProvider', 'LSPCodelensProvider0', 'LSPCodelensProvider1', etc)
+                CodeLensData previous = null;
+                int nbCodeLensForCurrentLine = -1;
+                for (var codeLensData : data) {
+                    if (previous != null) {
+                        if (getCodeLensLine(previous) == getCodeLensLine(codeLensData)) {
+                            // The current LSP Codelens must be shown in the same line as previous LSP Codelens,
+                            // increment nbCodeLensForCurrentLine to generate the proper providerId LSPCodelensProvider0', 'LSPCodelensProvider1', etc
+                            nbCodeLensForCurrentLine++;
+                        } else {
+                            nbCodeLensForCurrentLine = -1;
+                        }
                     }
-                }
-                if (isDoneNormally(resolvedCodeLensFuture)) {
-                    // The resolve code lens future is finished, use the resolved code lens
-                    CodeLens resolved = resolvedCodeLensFuture.getNow(null);
-                    if (resolved != null) {
-                        codeLens = resolved;
+                    CodeLens codeLens = codeLensData.codeLens();
+                    var resolvedCodeLensFuture = codeLensData.resolvedCodeLensFuture();
+                    if (resolvedCodeLensFuture != null && !resolvedCodeLensFuture.isDone()) {
+                        // The resolve code lens future is not finished, wait for...
+                        try {
+                            waitUntilDone(resolvedCodeLensFuture, psiFile);
+                        } catch (CancellationException | ProcessCanceledException e) {
+                            // Do nothing
+                        } catch (ExecutionException e) {
+                            LOGGER.error("Error while consuming LSP 'textDocument/resolveCodeLens' request", e);
+                        }
                     }
-                }
-                if (codeLens.getCommand() != null) {
-                    // Code lens is valid, create the proper code vision entry and text range.
-                    String text = codeLens.getCommand().getTitle();
-                    if (!StringUtils.isEmpty(text)) {
-                        TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), true);
-                        CodeVisionEntry entry = createCodeVisionEntry(codeLens, codeLensData.languageServer(), project);
-                        result.add(new Pair(textRange, entry));
+                    if (isDoneNormally(resolvedCodeLensFuture)) {
+                        // The resolve code lens future is finished, use the resolved code lens
+                        CodeLens resolved = resolvedCodeLensFuture.getNow(null);
+                        if (resolved != null) {
+                            codeLens = resolved;
+                        }
                     }
+                    if (codeLens.getCommand() != null) {
+                        // Code lens is valid, create the proper code vision entry and text range.
+                        String text = codeLens.getCommand().getTitle();
+                        if (!StringUtils.isEmpty(text)) {
+                            TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), true);
+                            CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, codeLensData.languageServer(), project);
+                            result.add(new Pair(textRange, entry));
+                        }
+                    }
+                    previous = codeLensData;
+
                 }
             }
             // Returns the code visions
@@ -151,21 +176,34 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         return CodeVisionState.NotReady.INSTANCE;
     }
 
+    private static int sortCodeLensByLine(CodeLensData cl1, CodeLensData cl2) {
+        return getCodeLensLine(cl2) - getCodeLensLine(cl1);
+    }
+
+    private static int getCodeLensLine(CodeLensData codeLensData) {
+        return codeLensData.codeLens().getRange().getStart().getLine();
+    }
+
     private static boolean acceptsFile(@Nullable PsiFile psiFile) {
         return LanguageServersRegistry.getInstance().isFileSupported(psiFile);
     }
 
     @NotNull
-    private TextCodeVisionEntry createCodeVisionEntry(@NotNull CodeLens codeLens, @NotNull LanguageServerItem languageServer, @NotNull Project project) {
+    private TextCodeVisionEntry createCodeVisionEntry(@NotNull CodeLens codeLens, int nbCodeLensForCurrentLine, @NotNull LanguageServerItem languageServer, @NotNull Project project) {
         Command command = codeLens.getCommand();
         String text = getCodeLensContent(codeLens);
         String commandId = command.getCommand();
+        // If LSP CodeLens is the  first lens for the current line, we use the same providerId as this LSPCodeLensProvider ('LSPCodeLensProvider)
+        // other we generate a providerId like 'LSPCodeLensProvider0' and as DummyCodeVisionProvider are registered with 'LSPCodeLensProvider0', etc
+        // the code vision entry will be updated correctly
+        // See https://github.com/JetBrains/intellij-community/blob/f18aa7b9d65ab4b03d75a26aaec1e726821dc4d7/platform/lang-impl/src/com/intellij/codeInsight/codeVision/CodeVisionHost.kt#L348
+        String providerId = nbCodeLensForCurrentLine == -1 ? getId() : getId() + nbCodeLensForCurrentLine;
         if (StringUtils.isEmpty(commandId)) {
             // Create a simple text code vision.
-            return new TextCodeVisionEntry(text, this.getId(), null, text, text, Collections.emptyList());
+            return new TextCodeVisionEntry(text, providerId, null, text, text, Collections.emptyList());
         }
         // Code lens defines a command, create a clickable code vsion to execute the command.
-        return new ClickableTextCodeVisionEntry(text, getId(), (e, editor) -> {
+        return new ClickableTextCodeVisionEntry(text, providerId, (e, editor) -> {
             if (languageServer.isResolveCodeLensSupported()) {
                 languageServer.getTextDocumentService()
                         .resolveCodeLens(codeLens)

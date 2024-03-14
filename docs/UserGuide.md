@@ -18,12 +18,36 @@ When a language server is started, several actions are available, like stopping 
 
 ![LSP console actions](./images/LSPConsoleActions.png)
 
-## Language Servers preferences
+## Settings
+
+### Language Servers preferences
 
 The preference page under `Preferences | Languages & Frameworks | Language Servers` allows power users 
-to configure language servers debugging and tracing:
+to configure mappings, language servers debugging and tracing:
 
 ![Language Server preferences](./images/LanguageServerPreferences.png)
+
+The `Mappings` tab shows the file associations with the language server:
+
+![Language Server preferences - Mappings](./images/LanguageServerPreferencesMappings.png)
+
+The `Debug` tab allows to configure language servers debugging and tracing:
+
+![Language Server preferences - Debug](./images/LanguageServerPreferencesDebug.png)
+
+### LSP CodeLens
+
+The standard preference page under `Preferences | Inlay Hints` allows to configure `LSP Codelens`:
+
+![LSP CodeLens settings](./images/LSPCodeLensSettings.png)
+
+You can configure LSP CodeLens on the `Top`:
+
+![LSP CodeLens settings - Top](./images/LSPCodeLensSettingsTop.png)
+
+or configure LSP CodeLens on the `Right`:
+
+![LSP CodeLens settings - Right](./images/LSPCodeLensSettingsRight.png)
 
 ## Actions
 
