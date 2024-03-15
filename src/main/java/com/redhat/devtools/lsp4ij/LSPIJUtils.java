@@ -352,40 +352,50 @@ public class LSPIJUtils {
     private static boolean isEndOfLine(@NotNull Document document, int line, int offset) {
         return offset == document.getLineEndOffset(line);
     }
-    
+
+    /**
+     * Returns the token range from the document at given offset and null otherwise.
+     *
+     * <code><pre>
+     *  - fo|o bar -> [foo]
+     *  - fo|o.bar() -> [foo]
+     *  - foo.b|ar() -> [bar]
+     *  - foo.bar(|) -> null
+     *  - foo  |  bar -> null
+     * </pre></code>
+     *
+     * @param document
+     * @param offset
+     * @return the token range from the document at given offset and null otherwise.
+     */
     @Nullable
-    public static TextRange getTokenRange(Document document , int offset) {
+    public static TextRange getTokenRange(Document document, int offset) {
         if (offset > 0 && offset >= document.getTextLength()) {
             offset = document.getTextLength() - 1;
         }
-        int line = document.getLineNumber(offset);
-        int start = getLeftOffsetOfPart(document, line, offset);
-        int end = getRightOffsetOfPart(document, line, offset);
-        return (start < end)? new TextRange(start, end) : null;
+        int start = getLeftOffsetOfPart(document, offset);
+        int end = getRightOffsetOfPart(document, offset);
+        return (start < end) ? new TextRange(start, end) : null;
     }
 
-    private static int getLeftOffsetOfPart(Document document, int line, int offset) {
-        int i = offset;
-        int startLineOffset = document.getLineStartOffset(line);
-        for (; i > startLineOffset; i--) {
+    private static int getLeftOffsetOfPart(Document document, int offset) {
+        for (int i = offset - 1; i >= 0; i--) {
             char c = document.getCharsSequence().charAt(i);
             if (!Character.isJavaIdentifierPart(c)) {
-                return i == offset ? offset : i + 1;
+                return i + 1;
             }
         }
-        return i;
+        return 0;
     }
 
-    private static int getRightOffsetOfPart(Document document, int line, int offset) {
-        int i = offset;
-        int endLineOffset = document.getLineEndOffset(line);
-        for (; i < endLineOffset; i++) {
+    private static int getRightOffsetOfPart(Document document, int offset) {
+        for (int i = offset; i < document.getTextLength(); i++) {
             char c = document.getCharsSequence().charAt(i);
             if (!Character.isJavaIdentifierPart(c)) {
                 return i;
             }
         }
-        return i;
+        return document.getTextLength();
     }
 
     public static void applyWorkspaceEdit(WorkspaceEdit edit) {
