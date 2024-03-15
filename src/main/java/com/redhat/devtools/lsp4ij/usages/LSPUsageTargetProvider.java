@@ -42,14 +42,19 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
     @NotNull
     private static UsageTarget[] getLSPTargets(@NotNull Editor editor, @NotNull PsiFile file) {
         int offset = editor.getCaretModel().getOffset();
-        LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, new TextRange(offset > 0 ? offset - 1 : offset, offset));
-        // Try to compute a proper name for the target
         Document document = editor.getDocument();
-        TextRange tokenRange = getTokenRange(document, offset);
-        if (tokenRange != null) {
-            String name = document.getText(tokenRange);
-            triggeredElement.setName(name);
+        if (offset < 0 || offset > document.getTextLength()) {
+            return UsageTarget.EMPTY_ARRAY;
         }
+        // Try to get the token range (ex : foo.ba|r() --> foo.[bar]())
+        TextRange tokenRange = getTokenRange(document, offset);
+        if (tokenRange == null) {
+            // Get range only for the offset
+            tokenRange = new TextRange(offset > 0 ? offset - 1 : offset, offset);
+        }
+        LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, tokenRange);
+        // force to compute of the name by using token range
+        triggeredElement.getName();
         UsageTarget target = new PsiElement2UsageTargetAdapter(triggeredElement, true);
         return new UsageTarget[]{target};
     }
