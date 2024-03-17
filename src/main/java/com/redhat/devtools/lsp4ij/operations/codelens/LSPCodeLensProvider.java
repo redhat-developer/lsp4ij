@@ -101,27 +101,31 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         CompletableFuture<List<CodeLensData>> future = getCodeLenses(psiFile);
         try {
             // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future);
+            waitUntilDone(future, psiFile);
         } catch (CancellationException | ProcessCanceledException e) {
             return CodeVisionState.NotReady.INSTANCE;
         } catch (ExecutionException e) {
-            LOGGER.error("Error while collecting LSP CodeLens", e);
+            LOGGER.error("Error while consuming LSP 'textDocument/codeLens' request", e);
+            return CodeVisionState.NotReady.INSTANCE;
         }
         if (isDoneNormally(future)) {
             // All code lenses from all language server are loaded.
             List<Pair<TextRange, CodeVisionEntry>> result = new ArrayList<>();
-            List<CodeLensData> data = future.getNow(Collections.emptyList());
+            List<CodeLensData> data = future.getNow(null);
+            if (data == null) {
+                return CodeVisionState.Companion.getREADY_EMPTY();
+            }
             for (var codeLensData : data) {
                 CodeLens codeLens = codeLensData.codeLens();
                 var resolvedCodeLensFuture = codeLensData.resolvedCodeLensFuture();
                 if (resolvedCodeLensFuture != null && !resolvedCodeLensFuture.isDone()) {
                     // The resolve code lens future is not finished, wait for...
                     try {
-                        waitUntilDone(resolvedCodeLensFuture);
+                        waitUntilDone(resolvedCodeLensFuture, psiFile);
                     } catch (CancellationException | ProcessCanceledException e) {
                         // Do nothing
                     } catch (ExecutionException e) {
-                        LOGGER.error("Error while resolving LSP CodeLens", e);
+                        LOGGER.error("Error while consuming LSP 'textDocument/resolveCodeLens' request", e);
                     }
                 }
                 if (isDoneNormally(resolvedCodeLensFuture)) {

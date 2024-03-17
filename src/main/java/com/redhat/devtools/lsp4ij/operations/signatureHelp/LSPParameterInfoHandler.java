@@ -16,23 +16,23 @@ package com.redhat.devtools.lsp4ij.operations.signatureHelp;
 import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.lang.parameterInfo.*;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP implementation of {@link ParameterInfoHandler} to support
@@ -53,55 +53,37 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
 
     @Override
     public void showParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement, @NotNull CreateParameterInfoContext context) {
-        CancellationSupport cancellationSupport = new CancellationSupport();
-        try {
-            ProgressManager.checkCanceled();
-
-            // 1. Collect signature help asynchronously
-            // Here the popup hint is not shown, the signature help is invoked
-            SignatureHelpParams params = toSignatureHelpParams(context, SignatureHelpTriggerKind.Invoked);
-            BlockingDeque<Pair<SignatureHelp, LanguageServer>> signatureHelps = new LinkedBlockingDeque<>();
-            CompletableFuture<Void> future = collectSignatureHelp(context, params, signatureHelps, cancellationSupport);
-            // 2. Show the popup hint when signature help is ready.
-            future.thenAccept(unused -> {
-                if (cancellationSupport.isCanceled()) {
-                    // The signature help has been canceled, don't show the hint popup
-                    return;
+        // 1. Collect signature help asynchronously
+        // Here the popup hint is not shown, the signature help is invoked
+        SignatureHelpParams params = toSignatureHelpParams(context, SignatureHelpTriggerKind.Invoked);
+        LSPSignatureHelpSupport signatureHelpSupport = LSPFileSupport.getSupport(psiElement.getContainingFile()).getSignatureHelpSupport();
+        signatureHelpSupport.cancel();
+        CompletableFuture<SignatureHelp> future = signatureHelpSupport.getSignatureHelp(params);
+        // 2. Show the popup hint when signature help is ready.
+        future.thenAccept(signatureHelp -> {
+            if (signatureHelp != null) {
+                // Store the current signature help in the Psi element
+                psiElement.setActiveSignatureHelp(signatureHelp);
+                // There is a signature help, display it
+                List<SignatureInformation> signatures = signatureHelp.getSignatures();
+                if (signatures != null && !signatures.isEmpty()) {
+                    context.setItemsToShow(signatures.toArray(new SignatureInformation[0]));
+                    context.showHint(psiElement, context.getOffset(), this);
                 }
-                if (!signatureHelps.isEmpty()) {
-                    // Get the first signature help
-                    SignatureHelp signatureHelp = signatureHelps.getFirst().getFirst();
-                    if (signatureHelp != null) {
-                        // Store the current signature help in the Psi element
-                        psiElement.setActiveSignatureHelp(signatureHelp);
-                        // There is a signature help, display it
-                        List<SignatureInformation> signatures = signatureHelp.getSignatures();
-                        if (signatures != null && !signatures.isEmpty()) {
-                            context.setItemsToShow(signatures.toArray(new SignatureInformation[0]));
-                            context.showHint(psiElement, context.getOffset(), this);
-                        }
-                    }
-                }
-            });
-        } catch (CancellationException e) {
-            // Do nothing
-        } catch (ProcessCanceledException e) {
-            // Cancel all LSP requests
-            cancellationSupport.cancel();
-        }
+            }
+        });
     }
 
     // Methods called when the parameter hint popup is already displayed.
 
     @Override
     public @Nullable LSPSignatureHelperPsiElement findElementForUpdatingParameterInfo(@NotNull UpdateParameterInfoContext context) {
-        PsiElement psiElement = (LSPSignatureHelperPsiElement) context.getParameterOwner();
-        if (psiElement == null || psiElement.getContainingFile() != context.getFile() || !(psiElement instanceof LSPSignatureHelperPsiElement)) {
+        PsiElement psiElement = context.getParameterOwner();
+        if (psiElement == null || psiElement.getContainingFile() != context.getFile() || !(psiElement instanceof LSPSignatureHelperPsiElement psiSignatureHelperElement)) {
             // Should never occur...
             return toLSPSignatureHelperPsiElement(context);
         }
         // Update offset
-        LSPSignatureHelperPsiElement psiSignatureHelperElement = (LSPSignatureHelperPsiElement) psiElement;
         psiSignatureHelperElement.setTextRange(getTextRange(context));
         return psiSignatureHelperElement;
     }
@@ -109,57 +91,46 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
     @Override
     public void updateParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement, @NotNull UpdateParameterInfoContext context) {
         boolean removeHint = false;
-        CancellationSupport cancellationSupport = new CancellationSupport();
+
+        // Here the popup hint not displayed, the signature help
+        // is triggered by the cursor moving or by the document content changing.
+        SignatureHelpParams params = toSignatureHelpParams(context, SignatureHelpTriggerKind.ContentChange);
+        params.getContext().setIsRetrigger(true);
+        params.getContext().setActiveSignatureHelp(psiElement.getActiveSignatureHelp());
+
+        LSPSignatureHelpSupport signatureHelpSupport = LSPFileSupport.getSupport(psiElement.getContainingFile()).getSignatureHelpSupport();
+        signatureHelpSupport.cancel();
+        CompletableFuture<SignatureHelp> future = signatureHelpSupport.getSignatureHelp(params);
+
         try {
-            ProgressManager.checkCanceled();
+            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
+            waitUntilDone(future, psiElement.getContainingFile());
+        } catch (CancellationException | ProcessCanceledException e) {
+            // Do nothing
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/signatureHelp' request", e);
+        }
 
-            // Here the popup hint not displayed, the signature help
-            // is triggered by the cursor moving or by the document content changing.
-            SignatureHelpParams params = toSignatureHelpParams(context, SignatureHelpTriggerKind.ContentChange);
-            params.getContext().setIsRetrigger(true);
-            params.getContext().setActiveSignatureHelp(psiElement.getActiveSignatureHelp());
+        if (isDoneNormally(future)) {
+            SignatureHelp activeSignatureHelp = future.getNow(null);
+            List<SignatureInformation> signatures = activeSignatureHelp != null ? activeSignatureHelp.getSignatures() : null;
+            if (signatures == null || signatures.isEmpty()) {
+                // No signature helper found, close the popup hint
+                removeHint = true;
+            } else {
+                // A signature help is found
 
-            BlockingDeque<Pair<SignatureHelp, LanguageServer>> signatureHelps = new LinkedBlockingDeque<>();
-            CompletableFuture<Void> future = collectSignatureHelp(context, params, signatureHelps, cancellationSupport);
-
-            ProgressManager.checkCanceled();
-            while (!future.isDone() || !signatureHelps.isEmpty()) {
-                ProgressManager.checkCanceled();
-                Pair<SignatureHelp, LanguageServer> pair = signatureHelps.poll(25, TimeUnit.MILLISECONDS);
-                if (pair != null) {
-                    SignatureHelp activeSignatureHelp = pair.getFirst();
-                    List<SignatureInformation> signatures = activeSignatureHelp != null ? activeSignatureHelp.getSignatures() : null;
-                    if (signatures == null || signatures.isEmpty()) {
-                        // No signature helper found, close the popup hint
-                        removeHint = true;
-                    } else {
-                        // A signature help is found
-
-                        // Update enable/disable of signature
-                        int activateSignature = activeSignatureHelp.getActiveSignature() != null ? activeSignatureHelp.getActiveSignature() : -1;
-                        for (int i = 0; i < signatures.size(); i++) {
-                            context.setUIComponentEnabled(i, activateSignature == -1 || activateSignature == i);
-                        }
-                        // Update the IntelliJ parameter info context to highlight the proper parameter
-                        Integer activeParameter = activeSignatureHelp.getActiveParameter();
-                        context.setCurrentParameter(activeParameter != null ? activeParameter : 0);
-                        // Update the Psi element with the active signature help
-                        psiElement.setActiveSignatureHelp(activeSignatureHelp);
-                    }
+                // Update enable/disable of signature
+                int activateSignature = activeSignatureHelp.getActiveSignature() != null ? activeSignatureHelp.getActiveSignature() : -1;
+                for (int i = 0; i < signatures.size(); i++) {
+                    context.setUIComponentEnabled(i, activateSignature == -1 || activateSignature == i);
                 }
+                // Update the IntelliJ parameter info context to highlight the proper parameter
+                Integer activeParameter = activeSignatureHelp.getActiveParameter();
+                context.setCurrentParameter(activeParameter != null ? activeParameter : 0);
+                // Update the Psi element with the active signature help
+                psiElement.setActiveSignatureHelp(activeSignatureHelp);
             }
-        } catch (ProcessCanceledException e) {
-            // Cancel all LSP requests and close the popup hint
-            cancellationSupport.cancel();
-            removeHint = true;
-        } catch (CancellationException | InterruptedException e) {
-            // Close the popup hint
-            removeHint = true;
-        } catch (Exception e) {
-            // Cancel all LSP requests and close the popup hint
-            cancellationSupport.cancel();
-            removeHint = true;
-            LOGGER.error("Error while consuming 'textDocument/signatureHelp'", e);
         }
         if (removeHint) {
             // Close the popup hint
@@ -244,23 +215,6 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         int start = indexes.getFirst();
         int end = indexes.getSecond();
         return signatureInformation.getLabel().substring(start, end);
-    }
-
-    private CompletableFuture<Void> collectSignatureHelp(@NotNull ParameterInfoContext context,
-                                                         @NotNull SignatureHelpParams params,
-                                                         @NotNull BlockingDeque<Pair<SignatureHelp, LanguageServer>> pairs,
-                                                         @NotNull CancellationSupport cancellationSupport) {
-        return LanguageServiceAccessor.getInstance(context.getProject())
-                .getLanguageServers(context.getFile().getVirtualFile(), LanguageServerItem::isSignatureHelpSupported)
-                .thenComposeAsync(languageServers -> cancellationSupport.execute(
-                        CompletableFuture.allOf(languageServers.stream()
-                                .map(languageServer ->
-                                        cancellationSupport.execute(languageServer.getTextDocumentService().signatureHelp(params))
-                                                .thenAcceptAsync(signatureHelp -> {
-                                                    // textDocument/signatureHelp may return null
-                                                    pairs.add(new Pair<>(signatureHelp, languageServer.getServer()));
-                                                }))
-                                .toArray(CompletableFuture[]::new))));
     }
 
     @NotNull

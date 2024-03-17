@@ -15,10 +15,13 @@ import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.operations.color.LSPColorSupport;
+import com.redhat.devtools.lsp4ij.operations.documentLink.LSPDocumentLinkSupport;
+import com.redhat.devtools.lsp4ij.operations.documentation.LSPHoverSupport;
 import com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeSupport;
 import com.redhat.devtools.lsp4ij.operations.formatting.LSPFormattingSupport;
 import com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightSupport;
 import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsSupport;
+import com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPSignatureHelpSupport;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -42,6 +45,11 @@ public class LSPFileSupport implements Disposable {
 
     private final LSPHighlightSupport highlightSupport;
 
+    private final LSPSignatureHelpSupport signatureHelpSupport;
+
+    private final LSPDocumentLinkSupport documentLinkSupport;
+
+    private final LSPHoverSupport hoverSupport;
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -50,6 +58,9 @@ public class LSPFileSupport implements Disposable {
         this.foldingRangeSupport = new LSPFoldingRangeSupport(file);
         this.formattingSupport = new LSPFormattingSupport(file);
         this.highlightSupport = new LSPHighlightSupport(file);
+        this.signatureHelpSupport = new LSPSignatureHelpSupport(file);
+        this.documentLinkSupport = new LSPDocumentLinkSupport(file);
+        this.hoverSupport = new LSPHoverSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -63,6 +74,9 @@ public class LSPFileSupport implements Disposable {
         getFoldingRangeSupport().cancel();
         getFormattingSupport().cancel();
         getHighlightSupport().cancel();
+        getSignatureHelpSupport().cancel();
+        getDocumentLinkSupport().cancel();
+        getHoverSupport().cancel();
     }
 
     /**
@@ -120,6 +134,33 @@ public class LSPFileSupport implements Disposable {
     }
 
     /**
+     * Returns the LSP signature help support.
+     *
+     * @return the LSP signature help support.
+     */
+    public LSPSignatureHelpSupport getSignatureHelpSupport() {
+        return signatureHelpSupport;
+    }
+
+    /**
+     * Returns the LSP document link support.
+     *
+     * @return the LSP document link support.
+     */
+    public LSPDocumentLinkSupport getDocumentLinkSupport() {
+        return documentLinkSupport;
+    }
+
+    /**
+     * Returns the LSP hover support.
+     *
+     * @return the LSP hover support.
+     */
+    public LSPHoverSupport getHoverSupport() {
+        return hoverSupport;
+    }
+
+    /**
      * Return the existing LSP file support for the given Psi file, or create a new one if necessary.
      *
      * @param file the Psi file.
@@ -151,4 +192,5 @@ public class LSPFileSupport implements Disposable {
     public static boolean hasSupport(@NotNull PsiFile file) {
         return file.getUserData(LSP_FILE_SUPPORT_KEY) != null;
     }
+
 }

@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.operations.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.operations.LSPRequestConstants;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.jetbrains.annotations.NotNull;
@@ -32,10 +33,11 @@ import java.util.concurrent.CompletableFuture;
 import static com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensProvider.getCodeLensContent;
 
 /**
- * LSP codeLens support which loads and caches code lenses by consuming
+ * LSP codeLens support which loads and caches code lenses by consuming:
+ *
  * <ul>
- *     <li>LSP requests textDocument/codeLens</li>
- *     <li>LSP requests resolve/codeLens</li>
+ *     <li>LSP 'textDocument/codeLens' requests</li>
+ *     <li>LSP 'codeLens/resolve' requests</li>
  * </ul>
  */
 public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams, List<CodeLensData>> {
@@ -82,7 +84,9 @@ public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams
     }
 
     private static CompletableFuture<List<CodeLensData>> getCodeLensesFor(CodeLensParams params, LanguageServerItem languageServer, CancellationSupport cancellationSupport) {
-        return cancellationSupport.execute(languageServer.getTextDocumentService().codeLens(params))
+        return cancellationSupport.execute(languageServer
+                        .getTextDocumentService()
+                        .codeLens(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS)
                 .thenApplyAsync(codeLenses -> {
                     if (codeLenses == null) {
                         // textDocument/codeLens may return null
@@ -96,7 +100,9 @@ public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams
                                 if (codeLens.getCommand() == null && languageServer.isResolveCodeLensSupported()) {
                                     // - the codelens has no command, and the language server supports codeLens/resolve
                                     // prepare the future which resolves the codelens.
-                                    resolvedCodeLensFuture = cancellationSupport.execute(languageServer.getTextDocumentService().resolveCodeLens(codeLens));
+                                    resolvedCodeLensFuture = cancellationSupport.execute(languageServer
+                                            .getTextDocumentService()
+                                            .resolveCodeLens(codeLens), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RESOLVE_CODE_LENS);
                                 }
                                 if (getCodeLensContent(codeLens) != null || resolvedCodeLensFuture != null) {
                                     // The codelens content is filled or the codelens must be resolved

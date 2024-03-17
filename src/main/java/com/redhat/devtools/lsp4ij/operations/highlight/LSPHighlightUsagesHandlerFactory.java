@@ -23,7 +23,6 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
 import org.eclipse.lsp4j.DocumentHighlightParams;
@@ -41,6 +40,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 
 /**
@@ -49,6 +49,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
  */
 public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPHighlightUsagesHandlerFactory.class);
+
     @Override
     public @Nullable HighlightUsagesHandlerBase createHighlightUsagesHandler(@NotNull Editor editor, @NotNull PsiFile file) {
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
@@ -72,17 +73,18 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         Position position = LSPIJUtils.toPosition(offset, document);
         DocumentHighlightParams params = new DocumentHighlightParams(LSPIJUtils.toTextDocumentIdentifier(file), position);
 
-        // Consume textDocument/highlight
+        // Consume LSP 'textDocument/documentHighlight' request
         LSPHighlightSupport highlightSupport = LSPFileSupport.getSupport(psiFile).getHighlightSupport();
         highlightSupport.cancel();
         CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
         try {
-            CompletableFutures.waitUntilDone(highlightFuture);
+            waitUntilDone(highlightFuture, psiFile);
         } catch (ProcessCanceledException | CancellationException e) {
-            // cancel the LSP requests textDocument/highlight
+            // cancel the LSP requests textDocument/documentHighlight
             highlightSupport.cancel();
+            return Collections.emptyList();
         } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP textDocument/highlight requests", e);
+            LOGGER.error("Error while consuming LSP 'textDocument/documentHighlight' request", e);
             return Collections.emptyList();
         }
 

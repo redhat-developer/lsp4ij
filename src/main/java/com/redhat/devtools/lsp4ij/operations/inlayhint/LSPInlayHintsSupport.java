@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.operations.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.operations.LSPRequestConstants;
 import org.eclipse.lsp4j.InlayHint;
 import org.eclipse.lsp4j.InlayHintParams;
 import org.jetbrains.annotations.NotNull;
@@ -29,10 +30,11 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * LSP inlayHint support which loads and caches inlay hints by consuming
+ * LSP inlayHint support which loads and caches inlay hints by consuming:
+ *
  * <ul>
- *     <li>LSP requests textDocument/inlayHint</li>
- *     <li>LSP requests resolve/inlayHint</li>
+ *     <li>LSP 'textDocument/inlayHint' requests</li>
+ *     <li>LSP 'inlayHint/resolve' requests</li>
  * </ul>
  */
 public class LSPInlayHintsSupport extends AbstractLSPFeatureSupport<InlayHintParams, List<InlayHintData>> {
@@ -77,7 +79,9 @@ public class LSPInlayHintsSupport extends AbstractLSPFeatureSupport<InlayHintPar
     }
 
     private static CompletableFuture<List<InlayHintData>> getInlayHintsFor(InlayHintParams params, LanguageServerItem languageServer, CancellationSupport cancellationSupport) {
-        return cancellationSupport.execute(languageServer.getTextDocumentService().inlayHint(params))
+        return cancellationSupport.execute(languageServer
+                        .getTextDocumentService()
+                        .inlayHint(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT)
                 .thenApplyAsync(inlayHints -> {
                     if (inlayHints == null) {
                         // textDocument/inlayHint may return null
@@ -91,7 +95,9 @@ public class LSPInlayHintsSupport extends AbstractLSPFeatureSupport<InlayHintPar
                                 if (inlayHint.getLabel() == null && languageServer.isResolveInlayHintSupported()) {
                                     // - the inlayHint has no label, and the language server supports inlayHint/resolve
                                     // prepare the future which resolves the inlayHint.
-                                    resolvedInlayHintFuture = cancellationSupport.execute(languageServer.getTextDocumentService().resolveInlayHint(inlayHint));
+                                    resolvedInlayHintFuture = cancellationSupport.execute(languageServer
+                                            .getTextDocumentService()
+                                            .resolveInlayHint(inlayHint), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RESOLVE_INLAY_HINT);
                                 }
                                 if (inlayHint.getLabel() != null || resolvedInlayHintFuture != null) {
                                     // The inlayHint content is filled or the inlayHint must be resolved

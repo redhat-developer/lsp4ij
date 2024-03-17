@@ -12,8 +12,10 @@ package com.redhat.devtools.lsp4ij.operations.documentation;
 
 import com.intellij.lang.documentation.DocumentationProviderEx;
 import com.intellij.lang.documentation.ExternalDocumentationHandler;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -21,6 +23,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.io.URLUtil;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
@@ -28,11 +31,18 @@ import com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionProposal;
 import org.eclipse.lsp4j.MarkupContent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.awt.*;
 import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 import static com.redhat.devtools.lsp4ij.operations.documentation.MarkdownConverter.toHTML;
 
 /**
@@ -45,10 +55,9 @@ import static com.redhat.devtools.lsp4ij.operations.documentation.MarkdownConver
  */
 public class LSPDocumentationProvider extends DocumentationProviderEx implements ExternalDocumentationHandler {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPDocumentationProvider.class);
 
     private static final Key<Integer> TARGET_OFFSET_KEY = new Key<>(LSPDocumentationProvider.class.getName());
-
-    private static final Key<LSPTextHoverForFile> LSP_HOVER_KEY = new Key<>(LSPTextHoverForFile.class.getName());
 
     @Nullable
     @Override
@@ -76,7 +85,7 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
             if (project.isDisposed()) {
                 return null;
             }
-            Editor editor;
+            Editor editor = null;
             List<MarkupContent> markupContent = null;
             if (element instanceof LSPPsiElementForLookupItem) {
                 // Show documentation for a given completion item in the "documentation popup" (see IJ Completion setting)
@@ -85,22 +94,39 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
                 markupContent = ((LSPPsiElementForLookupItem) element).getDocumentation();
             } else {
                 // Show documentation for a hovered element (LSP textDocument/hover request).
-                if (originalElement == null || !LanguageServersRegistry.getInstance().isFileSupported(originalElement.getContainingFile())) {
+                PsiFile psiFile = originalElement  != null ?  originalElement.getContainingFile() : null;
+                if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
+                    return null;
+                }
+                VirtualFile file = LSPIJUtils.getFile(originalElement);
+                if (file == null) {
+                    return null;
+                }
+                final Document document = LSPIJUtils.getDocument(file);
+                if (document == null) {
                     return null;
                 }
                 editor = LSPIJUtils.editorForElement(originalElement);
-                if (editor != null) {
-                    LSPTextHoverForFile hover = editor.getUserData(LSP_HOVER_KEY);
-                    if (hover == null) {
-                        hover = new LSPTextHoverForFile(editor);
-                        editor.putUserData(LSP_HOVER_KEY, hover);
-                    }
-                    int targetOffset = getTargetOffset(originalElement);
-                    markupContent = hover.getHoverContent(originalElement, targetOffset, editor);
+                int targetOffset = getTargetOffset(originalElement);
+                LSPHoverSupport hoverSupport = LSPFileSupport.getSupport(element.getContainingFile()).getHoverSupport();
+                CompletableFuture<List<MarkupContent>> hoverFuture = hoverSupport.getHover(targetOffset, document);
+
+                try {
+                    waitUntilDone(hoverFuture, psiFile);
+                } catch (ProcessCanceledException | CancellationException e) {
+                    // cancel the LSP requests textDocument/hover
+                    hoverSupport.cancel();
+                } catch (ExecutionException e) {
+                    LOGGER.error("Error while consuming LSP 'textDocument/hover' request", e);
+                }
+
+                if (isDoneNormally(hoverFuture)) {
+                    // textDocument/hover has been collected correctly
+                    markupContent = hoverFuture.getNow(null);
                 }
             }
 
-            if (editor == null || markupContent == null || markupContent.isEmpty()) {
+            if (markupContent == null || markupContent.isEmpty()) {
                 return null;
             }
             String s = markupContent
@@ -173,12 +199,12 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
     }
 
 
-    public static String styleHtml(Editor editor, String htmlBody) {
+    public static String styleHtml(@Nullable Editor editor, String htmlBody) {
         if (htmlBody == null || htmlBody.isEmpty()) {
             return htmlBody;
         }
-        Color background = editor.getColorsScheme().getDefaultBackground();
-        Color foreground = editor.getColorsScheme().getDefaultForeground();
+        Color background = editor != null ? editor.getColorsScheme().getDefaultBackground() : null;
+        Color foreground = editor != null ? editor.getColorsScheme().getDefaultForeground() : null;
 
         StringBuilder html = new StringBuilder("<html><head><style TYPE='text/css'>html { ");
         if (background != null) {

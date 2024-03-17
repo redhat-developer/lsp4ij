@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.operations.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.operations.LSPRequestConstants;
 import org.eclipse.lsp4j.DocumentColorParams;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,9 +29,10 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * LSP color support which loads and caches color information by consuming
+ * LSP color support which loads and caches color information by consuming:
+ *
  * <ul>
- *     <li>LSP requests textDocument/colorInformation</li>
+ *     <li>LSP 'textDocument/documentColor' requests</li>
  * </ul>
  */
 public class LSPColorSupport extends AbstractLSPFeatureSupport<DocumentColorParams, List<ColorData>> {
@@ -46,7 +48,8 @@ public class LSPColorSupport extends AbstractLSPFeatureSupport<DocumentColorPara
     }
 
     @Override
-    protected CompletableFuture<List<ColorData>> doLoad(DocumentColorParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<ColorData>> doLoad(@NotNull DocumentColorParams params,
+                                                        @NotNull CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return getColors(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
     }
@@ -62,23 +65,26 @@ public class LSPColorSupport extends AbstractLSPFeatureSupport<DocumentColorPara
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have color capability
                     if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedStage(Collections.emptyList());
+                        return CompletableFuture.completedFuture(Collections.emptyList());
                     }
 
-                    // Collect list of textDocument/colorInformation future for each language servers
+                    // Collect list of textDocument/documentColor future for each language servers
                     List<CompletableFuture<List<ColorData>>> colorInformationPerServerFutures = languageServers
                             .stream()
                             .map(languageServer -> getColorsFor(params, languageServer, cancellationSupport))
                             .toList();
 
-                    // Merge list of textDocument/colorInformation future in one future which return the list of color information
+                    // Merge list of textDocument/documentColor future in one future which return the list of color information
                     return CompletableFutures.mergeInOneFuture(colorInformationPerServerFutures, cancellationSupport);
-
                 });
     }
 
-    private static CompletableFuture<List<ColorData>> getColorsFor(DocumentColorParams params, LanguageServerItem languageServer, CancellationSupport cancellationSupport) {
-        return cancellationSupport.execute(languageServer.getTextDocumentService().documentColor(params))
+    private static CompletableFuture<List<ColorData>> getColorsFor(@NotNull DocumentColorParams params,
+                                                                   @NotNull LanguageServerItem languageServer,
+                                                                   @NotNull CancellationSupport cancellationSupport) {
+        return cancellationSupport.execute(languageServer
+                        .getTextDocumentService()
+                        .documentColor(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR)
                 .thenApplyAsync(colorInformation -> {
                     if (colorInformation == null) {
                         // textDocument/colorInformation may return null

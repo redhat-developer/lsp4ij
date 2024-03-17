@@ -20,7 +20,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
@@ -28,9 +27,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP folding range builder.
@@ -52,16 +54,17 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
             return;
         }
 
-        // Consume textDocument/foldingRanges
+        // Consume LSP 'textDocument/foldingRanges' request
         LSPFoldingRangeSupport foldingRangeSupport = LSPFileSupport.getSupport(file).getFoldingRangeSupport();
         CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges();
         try {
-            CompletableFutures.waitUntilDone(foldingRangesFuture);
+            waitUntilDone(foldingRangesFuture, file);
         } catch (ProcessCanceledException | CancellationException e) {
             // cancel the LSP requests textDocument/foldingRanges
             foldingRangeSupport.cancel();
+            return;
         } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP textDocument/foldingRanges requests", e);
+            LOGGER.error("Error while consuming LSP 'textDocument/foldingRanges' request", e);
             return;
         }
 

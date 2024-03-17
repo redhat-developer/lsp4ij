@@ -17,6 +17,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.operations.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.operations.LSPRequestConstants;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightParams;
 import org.jetbrains.annotations.NotNull;
@@ -28,9 +29,10 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * LSP highlight support which loads and caches highlight by consuming
+ * LSP highlight support which loads and caches highlight by consuming:
+ *
  * <ul>
- *     <li>LSP requests textDocument/highlight</li>
+ *     <li>LSP 'textDocument/documentHighlight' requests</li>
  * </ul>
  */
 public class LSPHighlightSupport extends AbstractLSPFeatureSupport<DocumentHighlightParams, List<DocumentHighlight>> {
@@ -60,7 +62,7 @@ public class LSPHighlightSupport extends AbstractLSPFeatureSupport<DocumentHighl
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have documentHighlights capability
                     if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedStage(Collections.emptyList());
+                        return CompletableFuture.completedFuture(Collections.emptyList());
                     }
 
                     // Collect list of textDocument/highlights future for each language servers
@@ -77,7 +79,9 @@ public class LSPHighlightSupport extends AbstractLSPFeatureSupport<DocumentHighl
     private static CompletableFuture<List<? extends org.eclipse.lsp4j.DocumentHighlight>> getHighlightsFor(@NotNull DocumentHighlightParams params,
                                                                                                            @NotNull LanguageServerItem languageServer,
                                                                                                            @NotNull CancellationSupport cancellationSupport) {
-        return cancellationSupport.execute(languageServer.getTextDocumentService().documentHighlight(params))
+        return cancellationSupport.execute(languageServer
+                        .getTextDocumentService()
+                        .documentHighlight(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT)
                 .thenApplyAsync(highlights -> {
                     if (highlights == null) {
                         // textDocument/highlight may return null

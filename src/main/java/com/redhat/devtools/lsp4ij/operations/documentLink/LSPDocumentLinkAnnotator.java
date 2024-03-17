@@ -20,111 +20,75 @@ import com.intellij.openapi.editor.DefaultLanguageHighlighterColors;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.*;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import org.eclipse.lsp4j.DocumentLink;
-import org.eclipse.lsp4j.DocumentLinkParams;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Intellij {@link ExternalAnnotator} implementation which collect LSP document links and display them with underline style.
  */
-public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<LSPVirtualFileData>, List<LSPVirtualFileData>> {
+public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<DocumentLinkData>, List<DocumentLinkData>> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPDocumentLinkAnnotator.class);
 
     @Nullable
     @Override
-    public List<LSPVirtualFileData> collectInformation(@NotNull PsiFile psiFile, @NotNull Editor editor, boolean hasErrors) {
+    public List<DocumentLinkData> collectInformation(@NotNull PsiFile psiFile, @NotNull Editor editor, boolean hasErrors) {
         if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
-            return Collections.emptyList();
+            return null;
         }
-        Document document = editor.getDocument();
-        VirtualFile file = LSPIJUtils.getFile(document);
-        if (file == null) {
-            return Collections.emptyList();
-        }
-        List<LSPVirtualFileData> datas = new ArrayList<>();
-        final CancellationSupport cancellationSupport = new CancellationSupport();
+        // Consume LSP 'textDocument/documentLink' request
+        LSPDocumentLinkSupport documentLinkSupport = LSPFileSupport.getSupport(psiFile).getDocumentLinkSupport();
+        documentLinkSupport.cancel();
+        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks();
         try {
-            ProgressManager.checkCanceled();
-
-            URI uri = LSPIJUtils.toUri(file);
-            DocumentLinkParams params = new DocumentLinkParams(LSPIJUtils.toTextDocumentIdentifier(uri));
-
-            Project project = editor.getProject();
-            BlockingDeque<Pair<List<DocumentLink>, LanguageServerWrapper>> documentLinks = new LinkedBlockingDeque<>();
-            CompletableFuture<Void> future = LanguageServiceAccessor.getInstance(project).getLanguageServers(file,
-                            LanguageServerItem::isDocumentLinkSupported)
-                    .thenAcceptAsync(languageServers ->
-                            cancellationSupport.execute(CompletableFuture.allOf(languageServers.stream()
-                                    .map(languageServer -> Pair.pair(
-                                            cancellationSupport.execute(languageServer.getTextDocumentService().documentLink(params))
-                                            , languageServer.getServerWrapper()))
-                                    .map(request -> request.getFirst().thenAcceptAsync(result -> {
-                                        if (result != null) {
-                                            documentLinks.add(Pair.pair(result, request.getSecond()));
-                                        }
-                                    })).toArray(CompletableFuture[]::new))));
-            while (!future.isDone() || !documentLinks.isEmpty()) {
-                ProgressManager.checkCanceled();
-                Pair<List<DocumentLink>, LanguageServerWrapper> links = documentLinks.poll(25, TimeUnit.MILLISECONDS);
-                if (links != null) {
-                    LSPVirtualFileData data = links.getSecond().getLSPVirtualFileData(uri);
-                    if (data != null) {
-                        data.updateDocumentLink(links.getFirst());
-                        datas.add(data);
-                    }
-                }
-            }
-        } catch (ProcessCanceledException cancellation) {
-            cancellationSupport.cancel();
-            throw cancellation;
-        } catch (InterruptedException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-            Thread.currentThread().interrupt();
+            waitUntilDone(documentLinkFuture, psiFile);
+        } catch (ProcessCanceledException | CancellationException e) {
+            // cancel the LSP requests textDocument/documentLink
+            documentLinkSupport.cancel();
+            return null;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/documentLink' request", e);
+            return null;
         }
-        return datas;
+
+        if (isDoneNormally(documentLinkFuture)) {
+            return documentLinkFuture.getNow(null);
+        }
+        return null;
     }
 
     @Override
-    public @Nullable List<LSPVirtualFileData> doAnnotate(List<LSPVirtualFileData> wrapper) {
-        return wrapper;
+    public @Nullable List<DocumentLinkData> doAnnotate(List<DocumentLinkData> documentLinks) {
+        return documentLinks;
     }
 
     @Override
-    public void apply(@NotNull PsiFile file, @NotNull List<LSPVirtualFileData> datas, @NotNull AnnotationHolder holder) {
-        if (datas.isEmpty()) {
+    public void apply(@NotNull PsiFile file, @NotNull List<DocumentLinkData> documentLinks, @NotNull AnnotationHolder holder) {
+        if (documentLinks == null || documentLinks.isEmpty()) {
             return;
         }
         Document document = LSPIJUtils.getDocument(file.getVirtualFile());
-        for (var data : datas) {
-            var documentLinkPerServer = data.getDocumentLinkForServer();
-            for (var documentLink : documentLinkPerServer.getDocumentLinks()) {
-                TextRange range = LSPIJUtils.toTextRange(documentLink.getRange(), document);
-                holder.newSilentAnnotation(HighlightInfoType.HIGHLIGHTED_REFERENCE_SEVERITY)
-                        .range(range)
-                        .textAttributes(DefaultLanguageHighlighterColors.HIGHLIGHTED_REFERENCE)
-                        .create();
-            }
+        for (var documentLink : documentLinks) {
+            TextRange range = LSPIJUtils.toTextRange(documentLink.documentLink().getRange(), document);
+            holder.newSilentAnnotation(HighlightInfoType.HIGHLIGHTED_REFERENCE_SEVERITY)
+                    .range(range)
+                    .textAttributes(DefaultLanguageHighlighterColors.HIGHLIGHTED_REFERENCE)
+                    .create();
         }
     }
 }
