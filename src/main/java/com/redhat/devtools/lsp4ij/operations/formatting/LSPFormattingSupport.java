@@ -22,8 +22,8 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.operations.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.operations.LSPRequestConstants;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,6 +36,8 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Abstract class for LSP formatting and range formatting.
@@ -50,7 +52,7 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
         LSPFormattingParams params = new LSPFormattingParams(editor, textRange);
         CompletableFuture<List<? extends TextEdit>> formatFuture = this.getFeatureData(params);
         try {
-            CompletableFutures.waitUntilDone(formatFuture);
+            waitUntilDone(formatFuture, getFile());
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             handleError(formattingRequest, cause);
@@ -58,7 +60,7 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
         }
         try {
             List<? extends TextEdit> edits = formatFuture.getNow(null);
-            String formatted = applyEdits(editor.getDocument(), edits);
+            String formatted = edits != null ? applyEdits(editor.getDocument(), edits) : formattingRequest.getDocumentText();
             formattingRequest.onTextReady(formatted);
         } catch (Exception e) {
             handleError(formattingRequest, e);
@@ -134,12 +136,16 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
                     if (isRangeFormatting && languageServer.isDocumentRangeFormattingSupported()) {
                         // Range formatting
                         DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.editor(), params.textRange());
-                        return cancellationSupport.execute(languageServer.getTextDocumentService().rangeFormatting(lspParams));
+                        return cancellationSupport.execute(languageServer
+                                .getTextDocumentService()
+                                .rangeFormatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING);
                     }
 
                     // Full document formatting
                     DocumentFormattingParams lspParams = createDocumentFormattingParams(params.editor());
-                    return cancellationSupport.execute(languageServer.getTextDocumentService().formatting(lspParams));
+                    return cancellationSupport.execute(languageServer
+                            .getTextDocumentService()
+                            .formatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_FORMATTING);
                 });
     }
 

@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.operations.LSPRequestConstants;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -88,8 +89,14 @@ public class LSPCompletionContributor extends CompletionContributor {
                     .thenComposeAsync(languageServers -> cancellationSupport.execute(
                             CompletableFuture.allOf(languageServers.stream()
                                     .map(languageServer ->
-                                            cancellationSupport.execute(languageServer.getServer().getTextDocumentService().completion(params))
-                                                    .thenAcceptAsync(completion -> proposals.add(new Pair<>(completion, languageServer))))
+                                            cancellationSupport.execute(languageServer.getServer()
+                                                            .getTextDocumentService()
+                                                            .completion(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_COMPLETION)
+                                                    .thenAcceptAsync(completion -> {
+                                                        if (completion != null) {
+                                                            proposals.add(new Pair<>(completion, languageServer));
+                                                        }
+                                                    }))
                                     .toArray(CompletableFuture[]::new))));
 
             ProgressManager.checkCanceled();

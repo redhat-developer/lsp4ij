@@ -18,29 +18,43 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
-import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.DocumentLink;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * {@link GotoDeclarationHandler} implementation used to open LSP document link with CTrl+Click.
  */
 public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHandler {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPDocumentLinkGotoDeclarationHandler.class);
+
     @Override
     public PsiElement @Nullable [] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
-        if (!LanguageServersRegistry.getInstance().isFileSupported(sourceElement.getContainingFile())) {
+        PsiFile psiFile = sourceElement.getContainingFile();
+        if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return PsiElement.EMPTY_ARRAY;
         }
         Document document = editor.getDocument();
@@ -51,47 +65,58 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
             return PsiElement.EMPTY_ARRAY;
         }
 
-        URI fileUri = LSPIJUtils.toUri(file);
-        Collection<LSPDocumentLinkForServer> allLinks = getAllDocumentLink(fileUri, project);
-        if (allLinks.isEmpty()) {
-            return PsiElement.EMPTY_ARRAY;
+        LSPDocumentLinkSupport documentLinkSupport = LSPFileSupport.getSupport(psiFile).getDocumentLinkSupport();
+        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks();
+        try {
+            waitUntilDone(documentLinkFuture, psiFile);
+        } catch (ProcessCanceledException | CancellationException e) {
+            // cancel the LSP requests textDocument/documentLink
+            documentLinkSupport.cancel();
+            return null;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/documentLink' request", e);
+            return null;
         }
-        // The file has some LSP document links
-        for (LSPDocumentLinkForServer links : allLinks) {
-            for (DocumentLink documentLink : links.getDocumentLinks()) {
-                TextRange range = LSPIJUtils.toTextRange(documentLink.getRange(), document);
-                if (range.contains(offset)) {
-                    // The Ctrl+Click has been done in a LSP document link,try to open the document.
-                    final String target = documentLink.getTarget();
-                    if (target != null && !target.isEmpty()) {
-                        VirtualFile targetFile = LSPIJUtils.findResourceFor(target);
-                        if (targetFile == null) {
-                            // The LSP document link file doesn't exist, open a file dialog
-                            // which asks if user want to create the file.
-                            // At this step we cannot open a dialog directly, we need to open the dialog
-                            // with invoke later.
-                            ApplicationManager.getApplication().invokeLater(() -> {
-                                int result = Messages.showYesNoDialog(LanguageServerBundle.message("lsp.create.file.confirm.dialog.message", target),
-                                        LanguageServerBundle.message("lsp.create.file.confirm.dialog.title"), Messages.getQuestionIcon());
-                                if (result == Messages.YES) {
-                                    try {
-                                        // Create file
-                                        VirtualFile newFile = LSPIJUtils.createFile(target);
-                                        if (newFile != null) {
-                                            // Open it in an editor
-                                            LSPIJUtils.openInEditor(newFile, null, project);
+
+        if (isDoneNormally(documentLinkFuture)) {
+            List<DocumentLinkData> documentLinks = documentLinkFuture.getNow(null);
+            if (documentLinks != null) {
+                for (DocumentLinkData documentLinkData : documentLinks) {
+                    DocumentLink documentLink = documentLinkData.documentLink();
+                    TextRange range = LSPIJUtils.toTextRange(documentLink.getRange(), document);
+                    if (range.contains(offset)) {
+                        // The Ctrl+Click has been done in a LSP document link,try to open the document.
+                        final String target = documentLink.getTarget();
+                        if (target != null && !target.isEmpty()) {
+                            VirtualFile targetFile = LSPIJUtils.findResourceFor(target);
+                            if (targetFile == null) {
+                                // The LSP document link file doesn't exist, open a file dialog
+                                // which asks if user want to create the file.
+                                // At this step we cannot open a dialog directly, we need to open the dialog
+                                // with invoke later.
+                                ApplicationManager.getApplication().invokeLater(() -> {
+                                    int result = Messages.showYesNoDialog(LanguageServerBundle.message("lsp.create.file.confirm.dialog.message", target),
+                                            LanguageServerBundle.message("lsp.create.file.confirm.dialog.title"), Messages.getQuestionIcon());
+                                    if (result == Messages.YES) {
+                                        try {
+                                            // Create file
+                                            VirtualFile newFile = LSPIJUtils.createFile(target);
+                                            if (newFile != null) {
+                                                // Open it in an editor
+                                                LSPIJUtils.openInEditor(newFile, null, project);
+                                            }
+                                        } catch (IOException e) {
+                                            Messages.showErrorDialog(LanguageServerBundle.message("lsp.create.file.error.dialog.message", target, e.getMessage()),
+                                                    LanguageServerBundle.message("lsp.create.file.error.dialog.title"));
                                         }
-                                    } catch (IOException e) {
-                                        Messages.showErrorDialog(LanguageServerBundle.message("lsp.create.file.error.dialog.message", target, e.getMessage()),
-                                                LanguageServerBundle.message("lsp.create.file.error.dialog.title"));
                                     }
-                                }
-                            });
-                            // Return an empty result here.
-                            // If user accepts to create the file, the open is done after the creation of teh file.
-                            return PsiElement.EMPTY_ARRAY;
+                                });
+                                // Return an empty result here.
+                                // If user accepts to create the file, the open is done after the creation of teh file.
+                                return PsiElement.EMPTY_ARRAY;
+                            }
+                            return new PsiElement[]{PsiManager.getInstance(project).findFile(targetFile)};
                         }
-                        return new PsiElement[]{PsiManager.getInstance(project).findFile(targetFile)};
                     }
                 }
             }
@@ -99,16 +124,4 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         return PsiElement.EMPTY_ARRAY;
     }
 
-    private Collection<LSPDocumentLinkForServer> getAllDocumentLink(URI fileUri, Project project) {
-        Collection<LSPDocumentLinkForServer> links = new ArrayList<>();
-        LanguageServiceAccessor.getInstance(project)
-                .getStartedServers()
-                .forEach(ls -> {
-                    LSPVirtualFileData data = ls.getLSPVirtualFileData(fileUri);
-                    if (data != null) {
-                        links.add(data.getDocumentLinkForServer());
-                    }
-                });
-        return links;
-    }
 }

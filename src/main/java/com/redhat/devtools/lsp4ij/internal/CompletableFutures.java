@@ -15,16 +15,15 @@ package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.psi.PsiFile;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 /**
@@ -87,28 +86,48 @@ public class CompletableFutures {
      * @param future the completable future.
      * @return true if the given {@link CompletableFuture} is done normally and false otherwise.
      */
-    public static boolean isDoneNormally(CompletableFuture<?> future) {
+    public static boolean isDoneNormally(@Nullable CompletableFuture<?> future) {
         return future != null && future.isDone() && !future.isCancelled() && !future.isCompletedExceptionally();
+    }
+
+    public static void waitUntilDone(@NotNull CompletableFuture<?> future) throws ExecutionException, ProcessCanceledException {
+        waitUntilDone(future, null);
     }
 
     /**
      * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
      *
      * @param future the future to wait.
+     * @param file
      */
-    public static void waitUntilDone(CompletableFuture<?> future) throws ExecutionException, ProcessCanceledException {
+    public static void waitUntilDone(@NotNull CompletableFuture<?> future,
+                                     @Nullable PsiFile file) throws ExecutionException, ProcessCanceledException {
+        final long modificationStamp = file != null ? file.getModificationStamp() : -1;
         while (!future.isDone()) {
             try {
+                // check progress canceled
+                ProgressManager.checkCanceled();
+                // check psi file
+                if (file != null) {
+                    if (modificationStamp != file.getModificationStamp()) {
+                        throw new CancellationException("Psi file has changed.");
+                    }
+                }
                 // wait for 25 ms
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
+                // Ignore timeout
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof CancellationException ce) {
+                    throw ce;
+                }
+                if (cause instanceof ProcessCanceledException pce) {
+                    throw pce;
+                }
+                throw e;
             } catch (InterruptedException e) {
                 Thread.interrupted();
-            }
-            finally {
-                // check progress canceled
-                ProgressManager.checkCanceled();
-                // No ProcessCanceledException thrown, wait again for 25ms....
             }
         }
     }

@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.operations.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.operations.LSPRequestConstants;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -82,7 +83,9 @@ public class LSPUsageSupport extends AbstractLSPFeatureSupport<LSPUsageSupport.L
                         // Collect declarations
                         if (ls.isDeclarationSupported()) {
                             allFutures.add(
-                                    cancellationSupport.execute(ls.getTextDocumentService().declaration(declarationParams))
+                                    cancellationSupport.execute(ls
+                                                    .getTextDocumentService()
+                                                    .declaration(declarationParams), ls, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
                                             .handle(reportUsages(project, LSPUsagePsiElement.UsageKind.declarations))
                             );
                         }
@@ -90,7 +93,9 @@ public class LSPUsageSupport extends AbstractLSPFeatureSupport<LSPUsageSupport.L
                         // Collect definitions
                         if (ls.isDefinitionSupported()) {
                             allFutures.add(
-                                    cancellationSupport.execute(ls.getTextDocumentService().definition(definitionParams))
+                                    cancellationSupport.execute(ls
+                                                    .getTextDocumentService()
+                                                    .definition(definitionParams), ls, LSPRequestConstants.TEXT_DOCUMENT_DEFINITION)
                                             .handle(reportUsages(project, LSPUsagePsiElement.UsageKind.definitions))
                             );
                         }
@@ -98,7 +103,9 @@ public class LSPUsageSupport extends AbstractLSPFeatureSupport<LSPUsageSupport.L
                         // Collect type definitions
                         if (ls.isTypeDefinitionSupported()) {
                             allFutures.add(
-                                    cancellationSupport.execute(ls.getTextDocumentService().typeDefinition(typeDefinitionParams))
+                                    cancellationSupport.execute(ls
+                                                    .getTextDocumentService()
+                                                    .typeDefinition(typeDefinitionParams), ls, LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION)
                                             .handle(reportUsages(project, LSPUsagePsiElement.UsageKind.typeDefinitions))
                             );
                         }
@@ -106,7 +113,9 @@ public class LSPUsageSupport extends AbstractLSPFeatureSupport<LSPUsageSupport.L
                         // Collect references
                         if (ls.isReferencesSupported()) {
                             allFutures.add(
-                                    cancellationSupport.execute(ls.getTextDocumentService().references(referenceParams))
+                                    cancellationSupport.execute(ls
+                                                    .getTextDocumentService()
+                                                    .references(referenceParams), ls, LSPRequestConstants.TEXT_DOCUMENT_REFERENCES)
                                             .handle(reportUsages2(project, LSPUsagePsiElement.UsageKind.references))
                             );
                         }
@@ -114,7 +123,9 @@ public class LSPUsageSupport extends AbstractLSPFeatureSupport<LSPUsageSupport.L
                         // Collect implementation
                         if (ls.isImplementationSupported()) {
                             allFutures.add(
-                                    cancellationSupport.execute(ls.getTextDocumentService().implementation(implementationParams))
+                                    cancellationSupport.execute(ls
+                                                    .getTextDocumentService()
+                                                    .implementation(implementationParams), ls, LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION)
                                             .handle(reportUsages(project, LSPUsagePsiElement.UsageKind.implementations))
                             );
                         }
@@ -126,7 +137,7 @@ public class LSPUsageSupport extends AbstractLSPFeatureSupport<LSPUsageSupport.L
                 });
     }
 
-    private static BiFunction<? super List<? extends Location>, Throwable,? extends List<LSPUsagePsiElement>> reportUsages2(
+    private static BiFunction<? super List<? extends Location>, Throwable, ? extends List<LSPUsagePsiElement>> reportUsages2(
             Project project,
             LSPUsagePsiElement.UsageKind usageKind) {
         return (locations, error) -> {

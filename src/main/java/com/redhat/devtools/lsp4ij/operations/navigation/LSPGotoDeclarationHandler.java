@@ -64,7 +64,9 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
                                             languageServers
                                                     .stream()
                                                     .map(server ->
-                                                            cancellationSupport.execute(server.getTextDocumentService().definition(params))
+                                                            cancellationSupport.execute(server
+                                                                            .getTextDocumentService()
+                                                                            .definition(params), server, "Definition")
                                                                     .thenAcceptAsync(definitions -> targets.addAll(toElements(project, definitions))))
                                                     .toArray(CompletableFuture[]::new))))
                     .get(1_000, TimeUnit.MILLISECONDS);

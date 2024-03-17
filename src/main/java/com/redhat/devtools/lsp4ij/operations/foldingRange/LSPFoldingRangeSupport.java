@@ -29,9 +29,10 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * LSP foldingRange support which loads and caches folding ranges by consuming
+ * LSP foldingRange support which loads and caches folding ranges by consuming:
+ *
  * <ul>
- *     <li>LSP requests textDocument/foldingRange</li>
+ *     <li>LSP 'textDocument/foldingRange' requests</li>
  * </ul>
  */
 public class LSPFoldingRangeSupport extends AbstractLSPFeatureSupport<FoldingRangeRequestParams, List<FoldingRange>> {
@@ -80,7 +81,7 @@ public class LSPFoldingRangeSupport extends AbstractLSPFeatureSupport<FoldingRan
     private static CompletableFuture<List<FoldingRange>> getFoldingRangesFor(FoldingRangeRequestParams params,
                                                                              LanguageServerItem languageServer,
                                                                              CancellationSupport cancellationSupport) {
-        return cancellationSupport.execute(languageServer.getTextDocumentService().foldingRange(params))
+        return cancellationSupport.execute(languageServer.getTextDocumentService().foldingRange(params), languageServer, "CodeLens")
                 .thenApplyAsync(foldingRanges -> {
                     if (foldingRanges == null) {
                         // textDocument/foldingRange may return null

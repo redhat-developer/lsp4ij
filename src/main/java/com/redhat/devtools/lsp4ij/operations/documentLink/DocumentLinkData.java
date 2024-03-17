@@ -8,18 +8,18 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.operations.color;
+package com.redhat.devtools.lsp4ij.operations.documentLink;
 
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import org.eclipse.lsp4j.ColorInformation;
+import org.eclipse.lsp4j.DocumentLink;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * LSP Color data.
+ * LSP document link data.
  *
- * @param color               the LSP color information
- * @param languageServer         the language server which has created the color information.
+ * @param documentLink               the LSP document link
+ * @param languageServer         the language server which has created the document link.
  */
-record ColorData(@NotNull ColorInformation color,
-                 @NotNull LanguageServerItem languageServer) {
+record DocumentLinkData(@NotNull DocumentLink documentLink,
+                        @NotNull LanguageServerItem languageServer) {
 }
