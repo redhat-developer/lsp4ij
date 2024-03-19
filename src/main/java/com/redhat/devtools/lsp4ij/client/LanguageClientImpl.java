@@ -20,7 +20,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
-import com.redhat.devtools.lsp4ij.operations.diagnostics.LSPDiagnosticHandler;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;

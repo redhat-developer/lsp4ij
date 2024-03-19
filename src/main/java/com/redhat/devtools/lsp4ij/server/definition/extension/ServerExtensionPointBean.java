@@ -36,7 +36,7 @@ import java.util.ResourceBundle;
  * <pre>
  *   <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
  *     <server id="myLanguageServerId"
- *         label="My Language Server"
+ *         name="My Language Server"
  *         factoryClass="my.language.server.MyLanguageServerFactory">
  *     <description><![CDATA[
  *      Some description written in HTML to display it in LSP consoles and Language Servers settings.
@@ -61,25 +61,25 @@ public class ServerExtensionPointBean extends BaseKeyedLazyInstance<LanguageServ
     public String id;
 
     /**
-     * This attribute specifies the resource bundle that contains the specified {@link #labelKey} / {@link #descriptionKey}.
-     * This is another way to specify the {@link #label server label} / {@link #description server description}.
+     * This attribute specifies the resource bundle that contains the specified {@link #nameKey} / {@link #descriptionKey}.
+     * This is another way to specify the {@link #name server label} / {@link #description server description}.
      */
     @Attribute("bundle")
     public String bundle;
 
     /**
      * This attribute specifies the resource key in the specified {@link #bundle}.
-     * This is another way to specify the {@link #label server label}.
+     * This is another way to specify the {@link #name server name}.
      */
-    @Attribute("labelKey")
+    @Attribute("nameKey")
     @Nls(capitalization = Nls.Capitalization.Title)
-    public String labelKey;
+    public String nameKey;
 
     /**
      * The language server label displayed on the LSP console and Language Servers preferences.
      */
-    @Attribute("label")
-    public String label;
+    @Attribute("name")
+    public String name;
 
     /**
      * This attribute specifies the resource key in the specified {@link #bundle}.
@@ -133,15 +133,15 @@ public class ServerExtensionPointBean extends BaseKeyedLazyInstance<LanguageServ
     }
 
     @NotNull
-    public String getLabel() {
-        if (label != null) {
-            return label;
+    public String getName() {
+        if (name != null) {
+            return name;
         }
-        label = getLocalizedString(bundle, labelKey);
-        if (label == null) {
-            label = id;
+        name = getLocalizedString(bundle, nameKey);
+        if (name == null) {
+            name = id;
         }
-        return label;
+        return name;
     }
 
     @Nullable

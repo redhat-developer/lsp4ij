@@ -186,7 +186,7 @@ referencing your `my.language.server.MyLanguageServerFactory`:
 
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
     <server id="myLanguageServerId"
-            label="My Language Server"
+            name="My Language Server"
             factoryClass="my.language.server.MyLanguageServerFactory">
         <description><![CDATA[
         Some description written in HTML to display it in the LSP consoles view and Language Servers settings.
@@ -355,7 +355,7 @@ you'll need to add a special mapping between that language and LSP4IJ, in your p
 
 <lang.documentationProvider
         language="MyLanguage"
-        implementationClass="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
+        implementationClass="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
         order="first"/>
 ```
 

@@ -39,7 +39,7 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
     private Icon icon;
 
     public ExtensionLanguageServerDefinition(ServerExtensionPointBean element) {
-        super(element.id, element.getLabel(), element.getDescription(), element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit);
+        super(element.id, element.getName(), element.getDescription(), element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit);
         this.extension = element;
     }
 

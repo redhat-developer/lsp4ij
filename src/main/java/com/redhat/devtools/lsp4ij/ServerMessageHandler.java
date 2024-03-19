@@ -28,7 +28,7 @@ import org.eclipse.lsp4j.ShowMessageRequestParams;
 import javax.swing.Icon;
 import java.util.concurrent.CompletableFuture;
 
-import static com.redhat.devtools.lsp4ij.operations.documentation.MarkdownConverter.toHTML;
+import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter.toHTML;
 
 public class ServerMessageHandler {
     private ServerMessageHandler() {

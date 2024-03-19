@@ -94,8 +94,9 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
 
     @Override
     public boolean isModified() {
+        String languageServerId = languageServerDefinition.getId();
         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
-            UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerDefinition.id);
+            UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
             if (settings == null) {
                 return true;
             }
@@ -107,7 +108,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
             );
         }
         com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project)
-                .getLanguageServerSettings(languageServerDefinition.id);
+                .getLanguageServerSettings(languageServerId);
         if (settings == null) {
             return true;
         }
@@ -119,6 +120,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
 
     @Override
     public void apply() throws ConfigurationException {
+        String languageServerId = languageServerDefinition.getId();
         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition launch) {
             LanguageServersRegistry.getInstance().updateServerDefinition(
                     launch,
@@ -132,15 +134,16 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
             settings.setDebugPort(myView.getDebugPort());
             settings.setDebugSuspend(myView.isDebugSuspend());
             settings.setServerTrace(myView.getServerTrace());
-            com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).setLanguageServerSettings(languageServerDefinition.id, settings);
+            com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).setLanguageServerSettings(languageServerId, settings);
         }
     }
 
     @Override
     public void reset() {
+        String languageServerId = languageServerDefinition.getId();
         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
             // User defined language server
-            UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerDefinition.id);
+            UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
             if (settings != null) {
                 myView.setCommandLine(settings.getCommandLine());
                 myView.setConfigurationContent(settings.getConfigurationContent());
@@ -168,7 +171,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
             // Language server from extension point
             ServerTrace serverTrace = ServerTrace.off;
             com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project)
-                    .getLanguageServerSettings(languageServerDefinition.id);
+                    .getLanguageServerSettings(languageServerId);
             if (settings != null) {
                 myView.setDebugPort(settings.getDebugPort());
                 myView.setDebugSuspend(settings.isDebugSuspend());
@@ -177,7 +180,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
                 }
                 myView.setServerTrace(serverTrace);
             }
-            List<LanguageServerFileAssociation> mappings = LanguageServersRegistry.getInstance().findLanguageServerDefinitionFor(languageServerDefinition.id);
+            List<LanguageServerFileAssociation> mappings = LanguageServersRegistry.getInstance().findLanguageServerDefinitionFor(languageServerId);
 
             List<ServerMappingSettings> languageMappings = mappings
                     .stream()
