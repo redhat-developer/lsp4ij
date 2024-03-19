@@ -342,7 +342,7 @@ public class LanguageServerWrapper implements Disposable {
                         }
 
                         // Throws the CannotStartProcessException exception if process is not alive.
-                        // This usecase comes for instance when the start process command fails (not a valid start command)
+                        // This use case comes for instance when the start process command fails (not a valid start command)
                         lspStreamProvider.ensureIsAlive();
                         return null;
                     }).thenRun(() -> {
