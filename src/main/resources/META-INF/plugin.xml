@@ -90,7 +90,7 @@
     <depends>com.redhat.devtools.intellij.telemetry</depends>
 
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-    <idea-version since-build="231"/>
+    <idea-version since-build="231.*"/>
 
     <!-- LSP extension points -->
     <extensionPoints>
@@ -196,10 +196,14 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
                 order="first"/>
         -->
-        <documentationProvider
+        <platform.backend.documentation.targetProvider
+                id="LSPDocumentationTargetProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTargetProvider"
+                order="first"/>
+        <!--<documentationProvider
                 id="LSPTextHover"
                 implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
-                order="first"/>
+                order="first"/>-->
 
         <!-- LSP textDocument/folding -->
         <lang.foldingBuilder id="LSPFoldingBuilderForText"
