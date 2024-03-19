@@ -18,12 +18,17 @@ import com.intellij.codeInsight.completion.LookupElementListPresenter;
 import com.intellij.codeInsight.lookup.*;
 import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.TemplateManager;
+import com.intellij.model.Pointer;
+import com.intellij.model.Symbol;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorModificationUtil;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.platform.backend.documentation.DocumentationResult;
+import com.intellij.platform.backend.documentation.DocumentationTarget;
+import com.intellij.platform.backend.presentation.TargetPresentation;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
@@ -44,6 +49,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
+import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHTML;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 import static com.redhat.devtools.lsp4ij.ui.IconMapper.getIcon;
@@ -51,7 +57,7 @@ import static com.redhat.devtools.lsp4ij.ui.IconMapper.getIcon;
 /**
  * LSP completion lookup element.
  */
-public class LSPCompletionProposal extends LookupElement {
+public class LSPCompletionProposal extends LookupElement implements Pointer<LSPCompletionProposal>, Symbol, DocumentationTarget {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
 
     private final CompletionItem item;
@@ -434,29 +440,6 @@ public class LSPCompletionProposal extends LookupElement {
         }
     }
 
-    public MarkupContent getDocumentation() {
-        if (item.getDocumentation() == null && supportResolveCompletion) {
-            // The LSP completion item 'documentation' is not filled, try to resolve it
-            // As documentation is computed in a Thread it should not impact performance.
-            CompletionItem resolved = getResolvedCompletionItem();
-            if (resolved != null) {
-                item.setDocumentation(resolved.getDocumentation());
-            }
-        }
-        return getDocumentation(item.getDocumentation());
-    }
-
-    private static MarkupContent getDocumentation(Either<String, MarkupContent> documentation) {
-        if (documentation == null) {
-            return null;
-        }
-        if (documentation.isLeft()) {
-            String content = documentation.getLeft();
-            return new MarkupContent(MarkupKind.PLAINTEXT, content);
-        }
-        return documentation.getRight();
-    }
-
     /**
      * Returns the resolved completion item and null otherwise.
      *
@@ -584,4 +567,64 @@ public class LSPCompletionProposal extends LookupElement {
     }
 
 
+    @Override
+    public @Nullable LSPCompletionProposal dereference() {
+        return this;
+    }
+
+    @Override
+    public @NotNull Pointer<LSPCompletionProposal> createPointer() {
+        return Pointer.hardPointer(this);
+    }
+
+    @Nullable
+    @Override
+    public DocumentationResult computeDocumentation() {
+        var documentation = item.getDocumentation();
+        if (documentation != null) {
+            MarkupContent content = getDocumentation(documentation);
+            return DocumentationResult.documentation(convertToHTML(content, editor));
+        } else if (supportResolveCompletion) {
+            if (resolvedCompletionItemFuture != null && resolvedCompletionItemFuture.isDone()) {
+                CompletionItem resolved = getResolvedCompletionItem();
+                if (resolved != null) {
+                    item.setDocumentation(resolved.getDocumentation());
+                }
+                MarkupContent content = getDocumentation(documentation);
+                return DocumentationResult.documentation(convertToHTML(content, editor));
+            } else {
+                DocumentationResult.asyncDocumentation(() -> {
+                    // The LSP completion item 'documentation' is not filled, try to resolve it
+                    // As documentation is computed in a Thread it should not impact performance.
+                    CompletionItem resolved = getResolvedCompletionItem();
+                    if (resolved != null) {
+                        item.setDocumentation(resolved.getDocumentation());
+                    }
+                    MarkupContent content = getDocumentation(documentation);
+                    return DocumentationResult.documentation(convertToHTML(content, editor));
+                });
+            }
+        }
+        return null;
+    }
+
+    private static MarkupContent getDocumentation(Either<String, MarkupContent> documentation) {
+        if (documentation == null) {
+            return null;
+        }
+        if (documentation.isLeft()) {
+            String content = documentation.getLeft();
+            return new MarkupContent(MarkupKind.PLAINTEXT, content);
+        }
+        return documentation.getRight();
+    }
+
+
+    @NotNull
+    @Override
+    public TargetPresentation computePresentation() {
+        return TargetPresentation
+                .builder(getItem().getLabel())
+                .presentation();
+    }
 }
