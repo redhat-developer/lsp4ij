@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.StreamUtil;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.operations.documentation.MarkdownConverter;
+import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

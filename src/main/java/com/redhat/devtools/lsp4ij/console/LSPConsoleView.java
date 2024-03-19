@@ -107,7 +107,7 @@ public class LSPConsoleView extends ConsoleViewImpl {
      * @return true if language server settings is configured with "verbose" level trace for the language server and false otherwise.
      */
     private boolean canApplyFolding() {
-        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(serverDefinition.id);
+        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(serverDefinition.getId());
         if (settings == null) {
             return false;
         }

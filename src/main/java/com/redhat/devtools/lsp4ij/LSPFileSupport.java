@@ -13,15 +13,15 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensSupport;
-import com.redhat.devtools.lsp4ij.operations.color.LSPColorSupport;
-import com.redhat.devtools.lsp4ij.operations.documentLink.LSPDocumentLinkSupport;
-import com.redhat.devtools.lsp4ij.operations.documentation.LSPHoverSupport;
-import com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeSupport;
-import com.redhat.devtools.lsp4ij.operations.formatting.LSPFormattingSupport;
-import com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightSupport;
-import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsSupport;
-import com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPSignatureHelpSupport;
+import com.redhat.devtools.lsp4ij.features.codelens.LSPCodeLensSupport;
+import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
+import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
+import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
+import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeSupport;
+import com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingSupport;
+import com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightSupport;
+import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSupport;
+import com.redhat.devtools.lsp4ij.features.signatureHelp.LSPSignatureHelpSupport;
 import org.jetbrains.annotations.NotNull;
 
 /**

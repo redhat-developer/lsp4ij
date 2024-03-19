@@ -25,8 +25,8 @@ import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.operations.color.LSPColorProvider;
-import com.redhat.devtools.lsp4ij.operations.inlayhint.LSPInlayHintsProvider;
+import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
+import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
@@ -159,9 +159,7 @@ public class LanguageServersRegistry {
         // the language received in InlayHintProviders
         // is "textmate" / "TEXT" language, we add them to support
         // LSP codeLens, inlayHint, color for a file which is not linked to a language.
-        for (var simpleLanguage : SimpleLanguageUtils.getSupportedSimpleLanguages()) {
-            distinctLanguages.add(simpleLanguage);
-        }
+        distinctLanguages.addAll(SimpleLanguageUtils.getSupportedSimpleLanguages());
         // When a file is not linked to a language (just with a file type) and not linked to a textmate,
         // the language received in InlayHintProviders is plain/text, we add it to support
         // LSP inlayHint, color for a file which is not linked to a language.
@@ -189,9 +187,7 @@ public class LanguageServersRegistry {
             message.append("'");
         } else if (mapping instanceof ServerFileNamePatternMapping fileNamePatternMapping) {
             message.append("file name pattern '");
-            message.append(fileNamePatternMapping.getFileNamePatterns()
-                    .stream()
-                    .collect(Collectors.joining(",")));
+            message.append(String.join(",", fileNamePatternMapping.getFileNamePatterns()));
             message.append("'");
         }
         message.append(" not available");
@@ -213,7 +209,7 @@ public class LanguageServersRegistry {
 
     public List<LanguageServerFileAssociation> findLanguageServerDefinitionFor(final @NotNull String serverId) {
         return fileAssociations.stream()
-                .filter(mapping -> serverId.equals(mapping.getServerDefinition().id))
+                .filter(mapping -> serverId.equals(mapping.getServerDefinition().getId()))
                 .collect(Collectors.toList());
     }
 
@@ -261,28 +257,30 @@ public class LanguageServersRegistry {
         return serverDefinitions.values();
     }
 
-    public void addServerDefinition(@NotNull LanguageServerDefinition definition, @Nullable List<ServerMappingSettings> mappings) {
-        addServerDefinitionWithoutNotification(definition, toServerMappings(definition.id, mappings));
+    public void addServerDefinition(@NotNull LanguageServerDefinition serverDefinition, @Nullable List<ServerMappingSettings> mappings) {
+        String languageServerId = serverDefinition.getId();
+        addServerDefinitionWithoutNotification(serverDefinition, toServerMappings(languageServerId, mappings));
         updateInlayHintsProviders();
-        LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(Collections.singleton(definition));
+        LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(Collections.singleton(serverDefinition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
                 listener.handleAdded(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition is added of the language server '" + definition.id + "'", e);
+                LOGGER.error("Error while server definition is added of the language server '" + languageServerId + "'", e);
             }
         }
     }
 
 
-    private void addServerDefinitionWithoutNotification(@NotNull LanguageServerDefinition definition, @NotNull List<ServerMapping> mappings) {
-        serverDefinitions.put(definition.id, definition);
+    private void addServerDefinitionWithoutNotification(@NotNull LanguageServerDefinition serverDefinition, @NotNull List<ServerMapping> mappings) {
+        String languageServerId = serverDefinition.getId();
+        serverDefinitions.put(languageServerId, serverDefinition);
         // Update associations
-        updateAssociations(definition, mappings);
+        updateAssociations(serverDefinition, mappings);
         // Update settings
-        if (definition instanceof UserDefinedLanguageServerDefinition definitionFromSettings) {
+        if (serverDefinition instanceof UserDefinedLanguageServerDefinition definitionFromSettings) {
             UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = new UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings();
-            settings.setServerId(definitionFromSettings.id);
+            settings.setServerId(languageServerId);
             settings.setServerName(definitionFromSettings.getDisplayName());
             settings.setCommandLine(definitionFromSettings.getCommandLine());
             if (mappings != null) {
@@ -290,7 +288,7 @@ public class LanguageServersRegistry {
             }
             settings.setConfigurationContent(definitionFromSettings.getConfigurationContent());
             settings.setInitializationOptionsContent(definitionFromSettings.getInitializationOptionsContent());
-            UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(definition.id, settings);
+            UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
         }
     }
 
@@ -321,9 +319,9 @@ public class LanguageServersRegistry {
                 .collect(Collectors.toList());
     }
 
-    private static List<ServerMapping> toServerMappings(String serverId, List<ServerMappingSettings> mappingSettings) {
+    private static List<ServerMapping> toServerMappings(String serverId, @Nullable List<ServerMappingSettings> mappingSettings) {
         List<ServerMapping> mappings = new ArrayList<>();
-        if (!mappingSettings.isEmpty()) {
+        if (mappingSettings!= null && !mappingSettings.isEmpty()) {
             for (var mapping : mappingSettings) {
                 String languageId = mapping.getLanguageId();
                 String mappingLanguage = mapping.getLanguage();
@@ -356,22 +354,23 @@ public class LanguageServersRegistry {
         return mappings;
     }
 
-    public void removeServerDefinition(LanguageServerDefinition definition) {
+    public void removeServerDefinition(@NotNull LanguageServerDefinition serverDefinition) {
+        String languageServerId = serverDefinition.getId();
         // remove server
-        serverDefinitions.remove(definition.id);
+        serverDefinitions.remove(languageServerId);
         // remove associations
-        removeAssociationsFor(definition);
+        removeAssociationsFor(serverDefinition);
 
         updateInlayHintsProviders();
         // Update settings
-        UserDefinedLanguageServerSettings.getInstance().removeServerDefinition(definition.id);
+        UserDefinedLanguageServerSettings.getInstance().removeServerDefinition(languageServerId);
         // Notifications
-        LanguageServerDefinitionListener.LanguageServerRemovedEvent event = new LanguageServerDefinitionListener.LanguageServerRemovedEvent(Collections.singleton(definition));
+        LanguageServerDefinitionListener.LanguageServerRemovedEvent event = new LanguageServerDefinitionListener.LanguageServerRemovedEvent(Collections.singleton(serverDefinition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
                 listener.handleRemoved(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition is removed of the language server '" + definition.id + "'", e);
+                LOGGER.error("Error while server definition is removed of the language server '" + languageServerId + "'", e);
             }
         }
     }
@@ -385,23 +384,24 @@ public class LanguageServersRegistry {
     }
 
 
-    public void updateServerDefinition(@NotNull UserDefinedLanguageServerDefinition definition,
+    public void updateServerDefinition(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
                                        @Nullable String name,
                                        @Nullable String commandLine,
                                        @NotNull List<ServerMappingSettings> mappings,
                                        @Nullable String configurationContent,
                                        @Nullable String initializationOptionsContent) {
-        definition.setName(name);
-        definition.setCommandLine(commandLine);
-        definition.setConfigurationContent(configurationContent);
-        definition.setInitializationOptionsContent(initializationOptionsContent);
+        String languageServerId = serverDefinition.getId();
+        serverDefinition.setName(name);
+        serverDefinition.setCommandLine(commandLine);
+        serverDefinition.setConfigurationContent(configurationContent);
+        serverDefinition.setInitializationOptionsContent(initializationOptionsContent);
 
         // remove associations
-        removeAssociationsFor(definition);
+        removeAssociationsFor(serverDefinition);
         // Update associations
-        updateAssociations(definition, toServerMappings(definition.id, mappings));
+        updateAssociations(serverDefinition, toServerMappings(languageServerId, mappings));
 
-        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(definition.id);
+        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
         boolean nameChanged = !Objects.equals(settings.getServerName(), name);
         boolean commandChanged = !Objects.equals(settings.getCommandLine(), commandLine);
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
@@ -416,12 +416,12 @@ public class LanguageServersRegistry {
 
         if (nameChanged || commandChanged || mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
-            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(definition, nameChanged, commandChanged, mappingsChanged, configurationContentChanged, initializationOptionsContentChanged);
+            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(serverDefinition, nameChanged, commandChanged, mappingsChanged, configurationContentChanged, initializationOptionsContentChanged);
             for (LanguageServerDefinitionListener listener : this.listeners) {
                 try {
                     listener.handleChanged(event);
                 } catch (Exception e) {
-                    LOGGER.error("Error while server definition has changed of the language server '" + definition.id + "'", e);
+                    LOGGER.error("Error while server definition has changed of the language server '" + languageServerId + "'", e);
                 }
             }
         }

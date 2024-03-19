@@ -14,7 +14,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.operations.diagnostics.LSPDiagnosticsForServer;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsForServer;
 import org.eclipse.lsp4j.Diagnostic;
 
 import java.util.List;

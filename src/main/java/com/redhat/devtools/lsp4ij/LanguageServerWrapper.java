@@ -225,15 +225,15 @@ public class LanguageServerWrapper implements Disposable {
         this.initialPath = initialPath;
         this.serverDefinition = serverDefinition;
         this.connectedDocuments = new HashMap<>();
-        String projectName = sanitize((project != null && project.getName() != null && !serverDefinition.isSingleton) ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
-        String dispatcherThreadNameFormat = "LS-" + serverDefinition.id + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
+        String projectName = sanitize((project != null && project.getName() != null && !serverDefinition.isSingleton()) ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
+        String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
         this.dispatcher = Executors
                 .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(dispatcherThreadNameFormat).build());
 
         // Executor service passed through to the LSP4j layer when we attempt to start the LS. It will be used
         // to create a listener that sits on the input stream and processes inbound messages (responses, or server-initiated
         // requests).
-        String listenerThreadNameFormat = "LS-" + serverDefinition.id + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
+        String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
         this.listener = Executors
                 .newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(listenerThreadNameFormat).build());
         udateStatus(ServerStatus.none);
@@ -415,7 +415,7 @@ public class LanguageServerWrapper implements Disposable {
                         if (e instanceof CannotStartProcessException) {
                             serverError = (CannotStartProcessException) e;
                         } else {
-                            serverError = new CannotStartServerException("Error while starting language server '" + serverDefinition.id + "' (pid=" + getCurrentProcessId() + ")", e);
+                            serverError = new CannotStartServerException("Error while starting language server '" + serverDefinition.getId() + "' (pid=" + getCurrentProcessId() + ")", e);
                         }
                         initializeFuture.completeExceptionally(serverError);
                         getLanguageServerLifecycleManager().onError(this, e);
@@ -502,10 +502,10 @@ public class LanguageServerWrapper implements Disposable {
                     stop();
                 } catch (Throwable t) {
                     //Need to catch time task exceptions, or it will cancel the timer
-                    LOGGER.error("Failed to stop language server " + LanguageServerWrapper.this.serverDefinition.id, t);
+                    LOGGER.error("Failed to stop language server " + LanguageServerWrapper.this.serverDefinition.getId(), t);
                 }
             }
-        }, TimeUnit.SECONDS.toMillis(this.serverDefinition.lastDocumentDisconnectedTimeout));
+        }, TimeUnit.SECONDS.toMillis(this.serverDefinition.getLastDocumentDisconnectedTimeout()));
     }
 
     /**
@@ -634,11 +634,11 @@ public class LanguageServerWrapper implements Disposable {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         } catch (TimeoutException ex) {
-            String message = "Timeout error while shutdown the language server '" + serverDefinition.id + "'";
+            String message = "Timeout error while shutdown the language server '" + serverDefinition.getId() + "'";
             LOGGER.warn(message, ex);
             throw new Exception(message, ex);
         } catch (Exception ex) {
-            String message = "Error while shutdown the language server '" + serverDefinition.id + "'";
+            String message = "Error while shutdown the language server '" + serverDefinition.getId() + "'";
             LOGGER.warn(message, ex);
             throw new Exception(message, ex);
         }
@@ -648,7 +648,7 @@ public class LanguageServerWrapper implements Disposable {
         try {
             languageServerInstance.exit();
         } catch (Exception ex) {
-            String message = "Error while exit the language server '" + serverDefinition.id + "'";
+            String message = "Error while exit the language server '" + serverDefinition.getId() + "'";
             LOGGER.error(message, ex);
             throw new Exception(message, ex);
         }
@@ -680,7 +680,7 @@ public class LanguageServerWrapper implements Disposable {
             return true;
         }
 
-        return serverDefinition.isSingleton;
+        return serverDefinition.isSingleton();
     }
 
     /**
@@ -744,7 +744,7 @@ public class LanguageServerWrapper implements Disposable {
             synchronizer.documentClosed();
         }
         if (stopIfNoOpenedFiles && this.connectedDocuments.isEmpty()) {
-            if (this.serverDefinition.lastDocumentDisconnectedTimeout != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
+            if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
                 removeStopTimer(true);
                 startStopTimer();
             } else {
@@ -1050,7 +1050,7 @@ public class LanguageServerWrapper implements Disposable {
         if (file != null && file.exists()) {
             return true;
         }
-        return serverDefinition.isSingleton;
+        return serverDefinition.isSingleton();
     }
 
     private LanguageServerLifecycleManager getLanguageServerLifecycleManager() {

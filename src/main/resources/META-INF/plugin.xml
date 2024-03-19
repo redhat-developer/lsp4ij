@@ -145,43 +145,43 @@
         <externalAnnotator
                 id="LSPDiagnosticAnnotator"
                 language=""
-                implementationClass="com.redhat.devtools.lsp4ij.operations.diagnostics.LSPDiagnosticAnnotator"/>
+                implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
 
         <!-- LSP textDocument/completion request support -->
         <completion.contributor
                 id="LSPCompletionContributor"
                 language="any"
-                implementationClass="com.redhat.devtools.lsp4ij.operations.completion.LSPCompletionContributor"
+                implementationClass="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor"
                 order="first"/>
 
         <!-- LSP textDocument/definition request support -->
         <gotoDeclarationHandler
                 id="LSPGotoDeclarationHandler"
-                implementation="com.redhat.devtools.lsp4ij.operations.navigation.LSPGotoDeclarationHandler"/>
+                implementation="com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler"/>
 
         <!-- LSP textDocument/documentLink request support -->
         <externalAnnotator
                 id="LSPDocumentLinkAnnotator"
                 language=""
-                implementationClass="com.redhat.devtools.lsp4ij.operations.documentLink.LSPDocumentLinkAnnotator"/>
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkAnnotator"/>
         <gotoDeclarationHandler
                 id="LSPDocumentLinkGotoDeclarationHandler"
-                implementation="com.redhat.devtools.lsp4ij.operations.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
+                implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
 
         <!-- LSP textDocument/documentHighlight request support -->
         <highlightUsagesHandlerFactory
                 id="LSPHighlightUsagesHandlerFactory"
-                implementation="com.redhat.devtools.lsp4ij.operations.highlight.LSPHighlightUsagesHandlerFactory"/>
+                implementation="com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightUsagesHandlerFactory"/>
 
         <!-- LSP textDocument/codeLens request support -->
         <codeInsight.codeVisionProvider
                 id="LSPCodeLensProvider"
-                implementation="com.redhat.devtools.lsp4ij.operations.codelens.LSPCodeLensProvider"/>
+                implementation="com.redhat.devtools.lsp4ij.features.codelens.LSPCodeLensProvider"/>
 
         <!-- LSP textDocument/inlayHint + textDocument/colorInformation requests support -->
         <codeInsight.inlayProviderFactory
                 id="LSPInlayHintProvidersFactory"
-                implementation="com.redhat.devtools.lsp4ij.operations.LSPInlayHintProvidersFactory"/>
+                implementation="com.redhat.devtools.lsp4ij.features.LSPInlayHintProvidersFactory"/>
 
         <!-- LSP textDocument/hover request support -->
         <!-- This hover support works only if there are no language which defines a 'lang.documentationProvider'. In case if it exists a
@@ -189,43 +189,43 @@
 
             <lang.documentationProvider
                 language="MyLanguage"
-                implementationClass="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
                 order="first"/>
         -->
         <documentationProvider
                 id="LSPTextHover"
-                implementation="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
                 order="first"/>
 
         <!-- LSP textDocument/folding -->
         <lang.foldingBuilder id="LSPFoldingBuilderForText"
                              language="TEXT"
-                             implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                             implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
                              order="first"/>
 
         <lang.foldingBuilder id="LSPFoldingBuilderForTextMate"
                              language="textmate"
-                             implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                             implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
                              order="first"/>
 
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo
                 id="LSPParameterInfoHandlerForTEXT"
                 language="TEXT"
-                implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler"/>
+                implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 
         <codeInsight.parameterInfo
                 id="LSPParameterInfoHandlerForTextMate"
                 language="textmate"
-                implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler"/>
+                implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 
         <!-- LSP textDocument/formatting + textDocument/rangeFormatting request support -->
         <formattingService
                 id="LSPFormattingOnlyService"
-                implementation="com.redhat.devtools.lsp4ij.operations.formatting.LSPFormattingOnlyService"/>
+                implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingOnlyService"/>
         <formattingService
                 id="LSPFormattingAndRangeBothService"
-                implementation="com.redhat.devtools.lsp4ij.operations.formatting.LSPFormattingAndRangeBothService"/>
+                implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingAndRangeBothService"/>
 
         <!-- LSP Find Usages (LSP) support shows:
              - textDocument/declaration

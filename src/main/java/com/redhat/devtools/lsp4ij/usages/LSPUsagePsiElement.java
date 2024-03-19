@@ -12,7 +12,7 @@ package com.redhat.devtools.lsp4ij.usages;
 
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.operations.LSPPsiElement;
+import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import org.jetbrains.annotations.NotNull;
 
 /**

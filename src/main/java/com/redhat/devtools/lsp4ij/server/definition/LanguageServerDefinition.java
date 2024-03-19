@@ -40,14 +40,14 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
-    public final @NotNull
+    private final @NotNull
     String id;
-    public final @NotNull
-    String label;
-    public final boolean isSingleton;
-    public final String description;
-    public final int lastDocumentDisconnectedTimeout;
-    public final boolean supportsLightEdit;
+    private final @NotNull
+    String name;
+    private final boolean isSingleton;
+    private final String description;
+    private final int lastDocumentDisconnectedTimeout;
+    private final boolean supportsLightEdit;
     private final @NotNull
     Map<Language, String> languageIdLanguageMappings;
     private final @NotNull
@@ -56,9 +56,9 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
 
-    public LanguageServerDefinition(@NotNull String id, @NotNull String label, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, boolean supportsLightEdit) {
+    public LanguageServerDefinition(@NotNull String id, @NotNull String name, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, boolean supportsLightEdit) {
         this.id = id;
-        this.label = label;
+        this.name = name;
         this.description = description;
         this.isSingleton = isSingleton;
         this.lastDocumentDisconnectedTimeout = lastDocumentDisconnectedTimeout != null && lastDocumentDisconnectedTimeout > 0 ? lastDocumentDisconnectedTimeout : DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT;
@@ -69,6 +69,47 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
         setEnabled(true);
     }
 
+    /**
+     * Returns the language server id.
+     *
+     * @return the language server id.
+     */
+    @NotNull
+    public String getId() {
+        return id;
+    }
+
+    /**
+     * Returns the language server display name.
+     *
+     * @return the language server display name.
+     */
+    @NotNull
+    public String getDisplayName() {
+        return name != null ? name : id;
+    }
+
+    /**
+     * Returns the language server description.
+     *
+     * @return the language server description.
+     */
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Returns true if the language server is a singleton and false otherwise.
+     *
+     * @return true if the language server is a singleton and false otherwise.
+     */
+    public boolean isSingleton() {
+        return isSingleton;
+    }
+
+    public int getLastDocumentDisconnectedTimeout() {
+        return lastDocumentDisconnectedTimeout;
+    }
 
     /**
      * Returns true if the language server definition is enabled and false otherwise.
@@ -117,11 +158,6 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
             }
         }
         return null;
-    }
-
-    @NotNull
-    public String getDisplayName() {
-        return label != null ? label : id;
     }
 
     @Override

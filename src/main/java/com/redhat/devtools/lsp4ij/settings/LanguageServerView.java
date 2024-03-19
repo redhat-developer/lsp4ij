@@ -47,7 +47,7 @@ public class LanguageServerView implements Disposable {
 
     public LanguageServerView(LanguageServerDefinition languageServerDefinition) {
         boolean isLaunchConfiguration = languageServerDefinition instanceof UserDefinedLanguageServerDefinition;
-        JComponent descriptionPanel = createDescription(languageServerDefinition.description.trim());
+        JComponent descriptionPanel = createDescription(languageServerDefinition.getDescription());
         JPanel settingsPanel = createSettings(descriptionPanel, isLaunchConfiguration);
         if (!isLaunchConfiguration) {
             TitledBorder title = IdeBorderFactory.createTitledBorder(languageServerDefinition.getDisplayName());
@@ -79,7 +79,11 @@ public class LanguageServerView implements Disposable {
         JPanel titledComponent = UI.PanelFactory.grid().createPanel();
         titledComponent.setMinimumSize(JBUI.emptySize());
         titledComponent.setPreferredSize(JBUI.emptySize());
-        if (description != null && !description.isBlank()) {
+        if (description == null) {
+            description = "";
+        }
+        description = description.trim();
+        if (!description.isBlank()) {
             titledComponent = UI.PanelFactory.panel(titledComponent)
                     .withComment(description)
                     .resizeX(true)

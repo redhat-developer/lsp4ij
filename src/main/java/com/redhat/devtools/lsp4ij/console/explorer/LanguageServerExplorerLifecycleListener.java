@@ -57,7 +57,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             return;
         }
         LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
-        ServerTrace serverTrace = getServerTrace(explorer.getProject(), languageServer.serverDefinition.id);
+        ServerTrace serverTrace = getServerTrace(explorer.getProject(), languageServer.serverDefinition.getId());
         if (serverTrace == ServerTrace.off) {
             return;
         }

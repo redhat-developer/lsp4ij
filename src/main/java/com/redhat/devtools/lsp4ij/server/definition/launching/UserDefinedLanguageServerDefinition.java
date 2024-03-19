@@ -92,7 +92,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
             try {
                 configuration = JsonParser.parseReader(new StringReader(configurationContent));
             } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON configuration for the language server '" + id + "'", e);
+                LOGGER.error("Error while parsing JSON configuration for the language server '" + getId() + "'", e);
             }
         }
         return configuration;
@@ -103,7 +103,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
             try {
                 initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
             } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON Initialization Options for the language server '" + id + "'", e);
+                LOGGER.error("Error while parsing JSON Initialization Options for the language server '" + getId() + "'", e);
             }
         }
         return initializationOptions;

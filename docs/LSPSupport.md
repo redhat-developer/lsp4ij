@@ -151,10 +151,11 @@ This problem occurs for instance with `Properties` and `JAVA` languages which ha
 To fix this issue for the `JAVA` language, you need to declare in your `plugin.xml`:
 
 ```xml 
-<lang.documentationProvider 
-  language="JAVA"
-  implementationClass="com.redhat.devtools.lsp4ij.operations.documentation.LSPDocumentationProvider" 
-  order="first"/>
+
+<lang.documentationProvider
+        language="JAVA"
+        implementationClass="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
+        order="first"/>
 ```
 
 By default, LSP4IJ can support LSP hover when the file is associated with a `TextMate` grammar, but if your file
@@ -168,7 +169,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 #### CodeLens
 
 [textDocument/codeLens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens) is implemented with the `codeInsight.codeVisionProvider` extension point.
-As LSP4IJ registers [LSPCodeLensProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/codelens/LSPCodeLensProvider.java) 
+As LSP4IJ registers [LSPCodeLensProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/codelens/LSPCodeLensProvider.java) 
 for all languages associated with a language server, it works out-of-the-box.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls), which shows REST services URL with codeLens:
@@ -178,8 +179,8 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 #### InlayHint
 
 [textDocument/inlayHint](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint) is implemented with the `codeInsight.inlayProvider` extension point.
-LSP4IJ registers [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/inlayhint/LSPInlayHintsProvider.java) for all languages associated with a language server with
-[LSPInlayHintProvidersFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/LSPInlayHintProvidersFactory.java), so it works out-of-the-box.
+LSP4IJ registers [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/inlayhint/LSPInlayHintsProvider.java) for all languages associated with a language server with
+[LSPInlayHintProvidersFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/LSPInlayHintProvidersFactory.java), so it works out-of-the-box.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing the parameter's Java type as inlay hint:
 
@@ -188,8 +189,8 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 #### DocumentColor
 
 [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) is implemented with the `codeInsight.inlayProvider` extension point.
-LSP4IJ registers [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/inlayhint/LSPInlayHintsProvider.java) for all languages associated with a language server with
-[LSPInlayHintProvidersFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/operations/LSPInlayHintProvidersFactory.java), so it works out-of-the-box.
+LSP4IJ registers [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/inlayhint/LSPInlayHintsProvider.java) for all languages associated with a language server with
+[LSPInlayHintProvidersFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/LSPInlayHintProvidersFactory.java), so it works out-of-the-box.
 
 Here is an example with the [CSS language server](https://github.com/microsoft/vscode-css-languageservice) showing the color's declaration with a colored square:
 
@@ -217,19 +218,19 @@ It doesn't resolve:
 
 [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp) is implemented with
 the `codeInsight.parameterInfo` extension point. By default, LSP4IJ registers the `codeInsight.parameterInfo` with 
-`com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler` class for `TEXT` and `textmate` languages:
+`com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler` class for `TEXT` and `textmate` languages:
 
 ```xml
 <!-- LSP textDocument/signatureHelp -->
 <codeInsight.parameterInfo
-    id="LSPParameterInfoHandlerForTEXT"
-    language="TEXT"
-    implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler" />
+        id="LSPParameterInfoHandlerForTEXT"
+        language="TEXT"
+        implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 
 <codeInsight.parameterInfo
-        id="LSPParameterInfoHandlerForTextMate"
-        language="textmate"
-        implementationClass="com.redhat.devtools.lsp4ij.operations.signatureHelp.LSPParameterInfoHandler" />
+id="LSPParameterInfoHandlerForTextMate"
+language="textmate"
+implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 ```
 
 If you use another language, you will have to declare `codeInsight.parameterInfo` with your language.
@@ -242,18 +243,18 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 
 [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange) is implemented with
 the `lang.foldingBuilder` extension point. By default, LSP4IJ registers the `lang.foldingBuilder` with
-`com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder` class for `TEXT` and `textmate` languages:
+`com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder` class for `TEXT` and `textmate` languages:
 
 ```xml
 <!-- LSP textDocument/folding -->
 <lang.foldingBuilder id="LSPFoldingBuilderForText"
                      language="TEXT"
-                     implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                     implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
                      order="first"/>
 
 <lang.foldingBuilder id="LSPFoldingBuilderForTextMate"
                      language="textmate"
-                     implementationClass="com.redhat.devtools.lsp4ij.operations.foldingRange.LSPFoldingRangeBuilder"
+                     implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
                      order="first"/>
 ```
 
