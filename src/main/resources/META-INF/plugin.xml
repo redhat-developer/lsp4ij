@@ -86,7 +86,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends optional="true">com.redhat.devtools.intellij.telemetry</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-    <idea-version since-build="231"/>
+    <idea-version since-build="232.*"/>
 
     <!-- LSP extension points -->
     <extensionPoints>
@@ -186,17 +186,9 @@
                 implementation="com.redhat.devtools.lsp4ij.features.LSPInlayHintProvidersFactory"/>
 
         <!-- LSP textDocument/hover request support -->
-        <!-- This hover support works only if there are no language which defines a 'lang.documentationProvider'. In case if it exists a
-             'lang.documentationProvider' for the language, you need to declare in your plugin.xml
-
-            <lang.documentationProvider
-                language="MyLanguage"
-                implementationClass="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
-                order="first"/>
-        -->
-        <documentationProvider
-                id="LSPTextHover"
-                implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
+        <platform.backend.documentation.targetProvider
+                id="LSPDocumentationTargetProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTargetProvider"
                 order="first"/>
 
         <!-- LSP textDocument/folding -->
