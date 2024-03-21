@@ -55,7 +55,7 @@ public class LanguageServiceAccessor implements Disposable {
             // Dispose all servers which are removed
             List<LanguageServerWrapper> serversToDispose = startedServers
                     .stream()
-                    .filter(server -> event.serverDefinitions.contains(server.serverDefinition))
+                    .filter(server -> event.serverDefinitions.contains(server.getServerDefinition()))
                     .collect(Collectors.toList());
             serversToDispose.forEach(LanguageServerWrapper::dispose);
             // Remove all servers which are removed from the cache
@@ -70,7 +70,7 @@ public class LanguageServiceAccessor implements Disposable {
                 // Stop all servers where command or mappings has changed
                 List<LanguageServerWrapper> serversToStop = startedServers
                         .stream()
-                        .filter(server -> event.serverDefinition.equals(server.serverDefinition))
+                        .filter(server -> event.serverDefinition.equals(server.getServerDefinition()))
                         .collect(Collectors.toList());
                 serversToStop.forEach(LanguageServerWrapper::stop);
             }
@@ -231,7 +231,7 @@ public class LanguageServiceAccessor implements Disposable {
                 boolean useExistingServer = false;
                 // Loop for started language servers
                 for (var startedServer : startedServers) {
-                    if (startedServer.serverDefinition.equals(serverDefinition)
+                    if (startedServer.getServerDefinition().equals(serverDefinition)
                             && startedServer.canOperate(file)) {
                         // A started language server match the file, use it
                         matchedServers.add(startedServer);
@@ -392,7 +392,7 @@ public class LanguageServiceAccessor implements Disposable {
 
         synchronized (startedServers) {
             for (LanguageServerWrapper startedWrapper : getStartedLSWrappers(file)) {
-                if (startedWrapper.serverDefinition.equals(serverDefinition)) {
+                if (startedWrapper.getServerDefinition().equals(serverDefinition)) {
                     wrapper = startedWrapper;
                     break;
                 }
@@ -466,7 +466,7 @@ public class LanguageServiceAccessor implements Disposable {
 
     public Optional<LanguageServerDefinition> resolveServerDefinition(LanguageServer languageServer) {
         synchronized (startedServers) {
-            return startedServers.stream().filter(wrapper -> languageServer.equals(wrapper.getServer())).findFirst().map(wrapper -> wrapper.serverDefinition);
+            return startedServers.stream().filter(wrapper -> languageServer.equals(wrapper.getServer())).findFirst().map(wrapper -> wrapper.getServerDefinition());
         }
     }
 

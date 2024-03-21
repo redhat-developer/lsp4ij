@@ -74,7 +74,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
 
     @Override
     public void invoke(@NotNull Project project, Editor editor, PsiFile file) throws IncorrectOperationException {
-        String serverId = getLanguageServerWrapper().serverDefinition.getId();
+        String serverId = getLanguageServerWrapper().getServerDefinition().getId();
         if (codeAction != null) {
             if (codeAction.getEdit() == null && codeAction.getCommand() == null
                     && isCodeActionResolveSupported(getLanguageServerWrapper().getServerCapabilities())) {

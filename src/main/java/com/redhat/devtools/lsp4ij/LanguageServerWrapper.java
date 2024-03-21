@@ -58,7 +58,7 @@ import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClien
  */
 public class LanguageServerWrapper implements Disposable {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerWrapper.class);//$NON-NLS-1$
+    private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerWrapper.class);
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
@@ -166,7 +166,7 @@ public class LanguageServerWrapper implements Disposable {
     private MessageBusConnection messageBusConnection;
 
     @NotNull
-    public final LanguageServerDefinition serverDefinition;
+    private final LanguageServerDefinition serverDefinition;
     @Nullable
     protected final Project initialProject;
     @NotNull
@@ -1106,5 +1106,14 @@ public class LanguageServerWrapper implements Disposable {
 
     public int getMaxNumberOfRestartAttempts() {
         return MAX_NUMBER_OF_RESTART_ATTEMPTS;
+    }
+
+    /**
+     * Returns the language server definition.
+     * @return the language server definition.
+     */
+    @NotNull
+    public LanguageServerDefinition getServerDefinition() {
+        return serverDefinition;
     }
 }

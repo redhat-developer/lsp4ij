@@ -82,7 +82,7 @@ public class ServerMessageHandler {
 
         ApplicationManager.getApplication().invokeLater(() -> {
             MessageActionItem result = new MessageActionItem();
-            int dialogResult = Messages.showIdeaMessageDialog(null, params.getMessage(), wrapper.serverDefinition.getDisplayName(), options, 0, Messages.getInformationIcon(), null);
+            int dialogResult = Messages.showIdeaMessageDialog(null, params.getMessage(), wrapper.getServerDefinition().getDisplayName(), options, 0, Messages.getInformationIcon(), null);
             if (dialogResult != -1) {
                 result.setTitle(options[dialogResult]);
             }

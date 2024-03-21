@@ -80,6 +80,11 @@ public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams
 
                     // Merge list of textDocument/codelens future in one future which return the list of code lenses
                     return CompletableFutures.mergeInOneFuture(codeLensPerServerFutures, cancellationSupport);
+                })
+                .thenApply(codeLensData -> {
+                    // Sort codelens by line number
+                    codeLensData.sort(LSPCodeLensProvider::sortCodeLensByLine);
+                    return codeLensData;
                 });
     }
 

@@ -10,8 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.PortField;
+import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
@@ -20,6 +23,7 @@ import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 
@@ -38,7 +42,7 @@ import java.awt.*;
  */
 public class LanguageServerPanel {
 
-    public static enum EditionMode {
+    public enum EditionMode {
         NEW_USER_DEFINED,
         EDIT_USER_DEFINED,
         EDIT_EXTENSION;
@@ -48,10 +52,10 @@ public class LanguageServerPanel {
     private CommandLineWidget commandLine;
     private ServerMappingsPanel mappingsPanel;
 
+    private final ComboBox<ErrorReportingKind> errorReportingKindCombo = new ComboBox<>(new DefaultComboBoxModel<>(ErrorReportingKind.values()));
+    private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
-    private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
-
     private LanguageServerConfigurationWidget configurationWidget;
 
     private LanguageServerInitializationOptionsWidget initializationOptionsWidget;
@@ -101,12 +105,48 @@ public class LanguageServerPanel {
             return;
         }
         FormBuilder debugTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.debug"));
+
+        // Error reporting kind
+        createErrorReportingCombo(debugTab);
+
+        // Server trace
+        debugTab.addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox);
+
         if (mode == EditionMode.EDIT_EXTENSION) {
+            // Debug port + suspend
             debugTab
                     .addLabeledComponent(LanguageServerBundle.message("language.server.debug.port"), debugPortField)
                     .addComponent(debugSuspendCheckBox);
         }
-        debugTab.addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox);
+    }
+
+    private void createErrorReportingCombo(FormBuilder builder) {
+
+        errorReportingKindCombo.setRenderer(SimpleListCellRenderer.create((label, value, index) -> {
+            String text = LanguageServerBundle.message("language.server.error.reporting.none");
+            if (value != null) {
+                switch (value) {
+                    case as_notification ->
+                            text = LanguageServerBundle.message("language.server.error.reporting.as_notification");
+                    case in_log -> text = LanguageServerBundle.message("language.server.error.reporting.in_log");
+                }
+            }
+            label.setText(text);
+        }));
+
+        var helpLabel = ContextHelpLabel.createWithLink("",
+                LanguageServerBundle.message("language.server.error.reporting.context.help.tooltip"),
+                LanguageServerBundle.message("language.server.error.reporting.context.help.link"),
+                () -> {
+                    BrowserUtil.browse("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage");
+                });
+
+        JPanel panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+        panel.add(errorReportingKindCombo, BorderLayout.CENTER);
+        panel.add(helpLabel, BorderLayout.EAST);
+
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.error.reporting"), panel);
     }
 
     private void addConfigurationTab(JBTabbedPane tabbedPane) {
@@ -188,5 +228,9 @@ public class LanguageServerPanel {
 
     public ComboBox<ServerTrace> getServerTraceComboBox() {
         return serverTraceComboBox;
+    }
+
+    public ComboBox<ErrorReportingKind> getErrorReportingKindCombo() {
+        return errorReportingKindCombo;
     }
 }

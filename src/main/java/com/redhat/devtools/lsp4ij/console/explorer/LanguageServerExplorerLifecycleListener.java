@@ -57,7 +57,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             return;
         }
         LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
-        ServerTrace serverTrace = getServerTrace(explorer.getProject(), languageServer.serverDefinition.getId());
+        ServerTrace serverTrace = getServerTrace(explorer.getProject(), languageServer.getServerDefinition().getId());
         if (serverTrace == ServerTrace.off) {
             return;
         }
@@ -108,7 +108,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         DefaultMutableTreeNode top = (DefaultMutableTreeNode) tree.getModel().getRoot();
         for (int i = 0; i < top.getChildCount(); i++) {
             LanguageServerTreeNode node = (LanguageServerTreeNode) top.getChildAt(i);
-            if (node.getServerDefinition().equals(languageServer.serverDefinition)) {
+            if (node.getServerDefinition().equals(languageServer.getServerDefinition())) {
                 return node;
             }
         }

@@ -158,7 +158,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 add(createDetailPanel((LanguageServerTreeNode) key), NAME_VIEW_DETAIL);
                 showDetail();
             } else if (key instanceof LanguageServerProcessTreeNode) {
-                consoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().serverDefinition, project);
+                consoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
                 JComponent consoleComponent = consoleView.getComponent();
                 Disposer.register(LSPConsoleToolWindowPanel.this, consoleView);
                 add(consoleComponent, NAME_VIEW_CONSOLE);
