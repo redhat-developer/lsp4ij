@@ -42,7 +42,7 @@ public class UserDefinedLanguageListener implements LanguageServerLifecycleListe
 
     @Override
     public void handleStatusChanged(LanguageServerWrapper languageServer) {
-        if (languageServer.getServerStatus() == ServerStatus.started && languageServer.serverDefinition == serverDefinition) {
+        if (languageServer.getServerStatus() == ServerStatus.started && languageServer.getServerDefinition() == serverDefinition) {
             // Case 1: Language server is started:
             // Try to get the user defined configuration and
             // push it with 'workspaceService/didChangeConfiguration' to the language server.
@@ -62,7 +62,7 @@ public class UserDefinedLanguageListener implements LanguageServerLifecycleListe
                 LanguageServiceAccessor.getInstance(project)
                         .getStartedServers()
                         .forEach(ls -> {
-                            if (ls.serverDefinition == serverDefinition) {
+                            if (ls.getServerDefinition() == serverDefinition) {
                                 ls.restart();
                             }
                         });
@@ -74,7 +74,7 @@ public class UserDefinedLanguageListener implements LanguageServerLifecycleListe
                 LanguageServiceAccessor.getInstance(project)
                         .getStartedServers()
                         .forEach(ls -> {
-                            if (ls.serverDefinition == serverDefinition) {
+                            if (ls.getServerDefinition() == serverDefinition) {
                                 didChangeConfiguration(ls);
                             }
                         });

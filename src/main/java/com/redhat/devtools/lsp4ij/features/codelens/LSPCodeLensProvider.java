@@ -38,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -121,8 +120,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                 return CodeVisionState.Companion.getREADY_EMPTY();
             }
             if (!data.isEmpty()) {
-                // Sort codelens by line number
-                Collections.sort(data, LSPCodeLensProvider::sortCodeLensByLine);
+                // At this step codelens are sorted by line number
                 // Create IJ CodeVision from LSP CodeLens
                 // As CodeVision cannot support showing several CodeVision entries for the same line, we create
                 // CodeVision entry with different providerId ('LSPCodelensProvider', 'LSPCodelensProvider0', 'LSPCodelensProvider1', etc)
@@ -163,7 +161,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         if (!StringUtils.isEmpty(text)) {
                             TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), true);
                             CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, codeLensData.languageServer(), project);
-                            result.add(new Pair(textRange, entry));
+                            result.add(new Pair<>(textRange, entry));
                         }
                     }
                     previous = codeLensData;
@@ -176,7 +174,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         return CodeVisionState.NotReady.INSTANCE;
     }
 
-    private static int sortCodeLensByLine(CodeLensData cl1, CodeLensData cl2) {
+    static int sortCodeLensByLine(CodeLensData cl1, CodeLensData cl2) {
         return getCodeLensLine(cl2) - getCodeLensLine(cl1);
     }
 
@@ -223,7 +221,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
 
     private static CompletableFuture<List<CodeLensData>> getCodeLenses(@NotNull PsiFile psiFile) {
         LSPCodeLensSupport codeLensSupport = LSPFileSupport.getSupport(psiFile).getCodeLensSupport();
-        CompletableFuture<List<CodeLensData>> future = null;
+        CompletableFuture<List<CodeLensData>> future;
         try {
             future = codeLensSupport.getCodeLenses();
         } catch (CancellationException e) {
@@ -242,7 +240,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
     @NotNull
     @Override
     public List<CodeVisionRelativeOrdering> getRelativeOrderings() {
-        return Arrays.asList(new CodeVisionRelativeOrdering.CodeVisionRelativeOrderingBefore("lsp"));
+        return List.of(new CodeVisionRelativeOrdering.CodeVisionRelativeOrderingBefore("lsp"));
     }
 
     static String getCodeLensContent(CodeLens codeLens) {

@@ -106,6 +106,27 @@ The LSP4IJ plugin collects anonymous [usage data](USAGE_DATA.md) and sends it to
 
 File a bug in [GitHub Issues](https://github.com/redhat-developer/lsp4ij/issues).
 
+You can have 2 kinds of errors:
+
+ * an error from LSP4IJ, in this case, the error will be reported in the standard IntelliJ log.
+ * an error coming from the language server.
+
+For the second case, you can customize the error reporting with the `Debug / Error reporting` combo box 
+by opening the `Languages & Frameworks / Language Servers` preferences:
+
+![Error reporting combo box](./docs/images/troubleshooting/LanguageServerErrorReportingSetting.png)
+
+You can select:
+ * `None` : in this case the language server error will be ignored.
+ * `In notification` (default value) : in this case the language server error appear as a `notification`:
+![Error in notification](./docs/images/troubleshooting/LanguageServerErrorInNotification.png)
+ * `In log` : in this case the language server error will be logged in the standard `IntelliJ log`:
+![Error in log](./docs/images/troubleshooting/LanguageServerErrorInLog.png)
+
+You can see this error's details in the [LSP Consoles view](./docs/UserGuide.md#lsp-console) (by setting the `Debug / Trace` combo box in `verbose`):
+
+![Detail error in LSP console](./docs/images/troubleshooting/LanguageServerInLSPConsole.png)
+
 ## License
 
 Eclipse Public License 2.0.

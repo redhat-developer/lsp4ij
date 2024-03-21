@@ -78,6 +78,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private ServerTrace serverTrace;
 
+        private ErrorReportingKind errorReportingKind;
+
         public String getDebugPort() {
             return debugPort;
         }
@@ -100,6 +102,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setServerTrace(ServerTrace serverTrace) {
             this.serverTrace = serverTrace;
+        }
+
+        public ErrorReportingKind getReportErrorKind() {
+            return errorReportingKind;
+        }
+
+        public void setReportErrorKind(ErrorReportingKind errorReportingKind) {
+            this.errorReportingKind = errorReportingKind;
         }
     }
 

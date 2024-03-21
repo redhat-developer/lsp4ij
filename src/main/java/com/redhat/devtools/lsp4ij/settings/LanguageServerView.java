@@ -33,6 +33,8 @@ import java.util.List;
  * UI settings view to configure a given language server:
  *
  * <ul>
+ *     <li>Report language server error kind (None, In Notification, In Log)</li>
+ *     <li>Server trace</li>
  *     <li>Debug port</li>
  *     <li>Suspend and wait for a debugger?</li>
  * </ul>
@@ -131,13 +133,20 @@ public class LanguageServerView implements Disposable {
         languageServerPanel.getServerTraceComboBox().setSelectedItem(serverTrace);
     }
 
+    public ErrorReportingKind getReportErrorKind() {
+        return (ErrorReportingKind) languageServerPanel.getErrorReportingKindCombo().getSelectedItem();
+    }
+
+    public void setReportErrorKind(ErrorReportingKind errorReportingKind) {
+        languageServerPanel.getErrorReportingKindCombo().setSelectedItem(errorReportingKind);
+    }
+
     public String getCommandLine() {
         return languageServerPanel.getCommandLine().getText();
     }
 
     public void setCommandLine(String commandLine) {
         languageServerPanel.getCommandLine().setText(commandLine);
-
     }
 
     public void setLanguageMappings(@NotNull List<ServerMappingSettings> mappings) {

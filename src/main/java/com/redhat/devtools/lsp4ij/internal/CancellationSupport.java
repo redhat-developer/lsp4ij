@@ -11,8 +11,11 @@
 package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
+import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
@@ -21,6 +24,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -39,6 +44,8 @@ import java.util.function.BiFunction;
  */
 public class CancellationSupport implements CancelChecker {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(CancellationSupport.class);
+
     private final List<CompletableFuture<?>> futuresToCancel;
 
     private boolean cancelled;
@@ -52,8 +59,8 @@ public class CancellationSupport implements CancelChecker {
      * Add the given future to the list of the futures to cancel (when CancellationSupport.cancel() is called)
      *
      * @param future the future to cancel when CancellationSupport.cancel() is called
+     * @param <T>    the result type of the future.
      * @return the future to execute.
-     * @param <T> the result type of the future.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future) {
         return execute(future, null, null);
@@ -62,11 +69,11 @@ public class CancellationSupport implements CancelChecker {
     /**
      * Add the given future to the list of the futures to cancel (when CancellationSupport.cancel() is called)
      *
-     * @param future the future to cancel when CancellationSupport.cancel() is called.
+     * @param future         the future to cancel when CancellationSupport.cancel() is called.
      * @param languageServer the language server which have created the LSP future and null otherwise.
-     * @param featureName the LSP feature name (ex: textDocument/completion) and null otherwise.
+     * @param featureName    the LSP feature name (ex: textDocument/completion) and null otherwise.
+     * @param <T>            the result type of the future.
      * @return the future to execute.
-     * @param <T> the result type of the future.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
                                             @Nullable LanguageServerItem languageServer,
@@ -98,9 +105,21 @@ public class CancellationSupport implements CancelChecker {
                     // Don't show cancelled error
                     return null;
                 }
-                // Show LSP error (ResponseErrorException) in an IJ notification
-                MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
-                ServerMessageHandler.showMessage(languageServer.getServerWrapper().serverDefinition.getDisplayName() + " (" + featureName + ")", messageParams);
+                ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
+                String languageServerName = languageServer.getServerWrapper().getServerDefinition().getDisplayName();
+                switch (errorReportingKind) {
+                    case as_notification -> {
+                        // Show LSP error (ResponseErrorException) in an IJ notification
+                        MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
+                        ServerMessageHandler.showMessage(languageServerName + " (" + featureName + ")", messageParams);
+                    }
+                    case in_log ->
+                            // Show LSP error in the log
+                            LOGGER.error("Error while consuming '" + featureName + "' with language server '" + languageServerName + "'", error);
+                    default -> {
+                        // Do nothing
+                    }
+                }
                 // return null as result instead of throwing the ResponseErrorException error
                 // to avoid breaking the LSP request result of another language server (when file is associated to several language servers)
                 return null;
@@ -114,6 +133,25 @@ public class CancellationSupport implements CancelChecker {
             // Return the result
             return result;
         };
+    }
+
+    /**
+     * Returns the error reporting kind for the given language server.
+     *
+     * @param languageServer the language server.
+     * @return the error reporting kind for the given language server.
+     */
+    @NotNull
+    private static ErrorReportingKind getReportErrorKind(@NotNull LanguageServerItem languageServer) {
+        String languageServerId = languageServer.getServerWrapper().getServerDefinition().getId();
+        ErrorReportingKind errorReportingKind = null;
+        Project project = languageServer.getServerWrapper().getProject();
+        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = project != null ? UserDefinedLanguageServerSettings.getInstance(project)
+                .getLanguageServerSettings(languageServerId) : null;
+        if (settings != null) {
+            errorReportingKind = settings.getReportErrorKind();
+        }
+        return errorReportingKind != null ? errorReportingKind : ErrorReportingKind.as_notification;
     }
 
     private static boolean isRequestCancelled(ResponseErrorException responseErrorException) {
