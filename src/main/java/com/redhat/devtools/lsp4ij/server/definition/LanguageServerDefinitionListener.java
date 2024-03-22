@@ -61,6 +61,7 @@ public interface LanguageServerDefinitionListener {
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;
         }
     }
+
     void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event);
 
     void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event);

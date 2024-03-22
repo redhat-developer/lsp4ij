@@ -20,4 +20,8 @@ public enum ServerTrace {
     off, // don't show any messages
     messages, // show only message without detail
     verbose; // show message with detail
+
+    public static ServerTrace getDefaultValue() {
+        return off;
+    }
 }

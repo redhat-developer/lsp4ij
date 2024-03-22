@@ -59,18 +59,20 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         @Override
         public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
             // Some server definitions has been added, add them from the explorer
-            DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+            DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
             DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
             for (var serverDefinition : event.serverDefinitions) {
                 root.add(new LanguageServerTreeNode(serverDefinition));
             }
             treeModel.reload(root);
+            // Select the new language server node
+            selectAndExpand((DefaultMutableTreeNode) root.getChildAt(root.getChildCount() - 1));
         }
 
         @Override
         public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
             // Some server definitions has been removed, remove them from the explorer
-            DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+            DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
             DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
             for (var serverDefinition : event.serverDefinitions) {
                 LanguageServerTreeNode node = findNodeForServer(serverDefinition, root);
@@ -79,13 +81,17 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                 }
             }
             treeModel.reload(root);
+            if (root.getChildCount() > 0) {
+                // Select first language server node
+                selectAndExpand((DefaultMutableTreeNode) root.getChildAt(0));
+            }
         }
 
         @Override
         public void handleChanged(@NotNull LanguageServerChangedEvent event) {
             if (event.nameChanged) {
                 // A server definition name has changed, rename the proper tree node label of the explorer
-                DefaultTreeModel treeModel = (DefaultTreeModel)tree.getModel();
+                DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
                 DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
                 LanguageServerTreeNode node = findNodeForServer(event.serverDefinition, root);
                 if (node != null) {
@@ -284,5 +290,14 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                         listener.handleError(ls, serverError);
                     }
                 });
+    }
+
+    /**
+     * Returns true if the command of the given language server node is editing and false otherwise.
+     *
+     * @return true if the command of the given language server node is editing and false otherwise.
+     */
+    public boolean isEditingCommand(LanguageServerTreeNode serverNode) {
+        return panel.isEditingCommand(serverNode);
     }
 }

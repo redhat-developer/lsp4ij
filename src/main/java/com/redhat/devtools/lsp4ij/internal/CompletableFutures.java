@@ -117,7 +117,7 @@ public class CompletableFutures {
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
                 // Ignore timeout
-            } catch (ExecutionException e) {
+            } catch (ExecutionException | CompletionException e) {
                 Throwable cause = e.getCause();
                 if (cause instanceof CancellationException ce) {
                     throw ce;

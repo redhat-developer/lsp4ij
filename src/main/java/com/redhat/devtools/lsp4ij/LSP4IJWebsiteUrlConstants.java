@@ -8,17 +8,14 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.settings;
+package com.redhat.devtools.lsp4ij;
 
 /**
- * Language server error reporting kind.
+ * LSP4IJ Url documentation
+ *
+ * @see <a href="https://github.com/redhat-developer/lsp4ij">LSP4IJ</a>
  */
-public enum ErrorReportingKind {
-    none, // ignore language server errors
-    as_notification, // report error in an IJ notification
-    in_log; // report error in the log
+public class LSP4IJWebsiteUrlConstants {
 
-    public static ErrorReportingKind getDefaultValue() {
-        return as_notification;
-    }
+    public static final String FEEDBACK_URL = "https://github.com/redhat-developer/lsp4ij#feedback";
 }

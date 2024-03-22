@@ -141,12 +141,11 @@ public class LanguageServerPanel {
                     BrowserUtil.browse("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage");
                 });
 
-        JPanel panel = new JPanel();
-        panel.setLayout(new BorderLayout());
-        panel.add(errorReportingKindCombo, BorderLayout.CENTER);
-        panel.add(helpLabel, BorderLayout.EAST);
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panel.add(errorReportingKindCombo);
+        panel.add(helpLabel);
 
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.error.reporting"), panel);
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.error.reporting"), panel, 0);
     }
 
     private void addConfigurationTab(JBTabbedPane tabbedPane) {
@@ -161,7 +160,7 @@ public class LanguageServerPanel {
 
     @NotNull
     private static FormBuilder addTab(JBTabbedPane tabbedPane, String tabTitle, boolean addToTop) {
-        FormBuilder builder = new FormBuilder();
+        FormBuilder builder = FormBuilder.createFormBuilder();
         var tabPanel = new BorderLayoutPanel();
         if (addToTop) {
             tabPanel.addToTop(builder.getPanel());

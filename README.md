@@ -28,6 +28,12 @@ LSP4IJ also provides:
 
 ![LSP console](./docs/images/LSPConsole.png)
 
+If you select the language server node, you can configure it the same way as in the [Language Servers preferences page](./docs/UserGuide.md#language-servers-preferences)
+
+![LSP language server detail](./docs/images/LSPLanguageServerDetail.png)
+
+and use the left toolbar to `Apply` or `Reset` the settings.
+
 * a [Language Servers preferences page](./docs/UserGuide.md#language-servers-preferences) to configure the LSP trace level, the debug port to use to debug language server:
 
 ![Language Server preferences](./docs/images/LanguageServerPreferences.png)
@@ -120,6 +126,10 @@ You can select:
  * `None` : in this case the language server error will be ignored.
  * `In notification` (default value) : in this case the language server error appear as a `notification`:
 ![Error in notification](./docs/images/troubleshooting/LanguageServerErrorInNotification.png)
+ The error notification shows 3 possible actions:
+   * `Disable error reporting` : sets the error reporting to `None`.
+   * `Report error in Log` : sets the error reporting to `In log`. 
+   * `Open LSP4IJ documentation` : opens this documentation. 
  * `In log` : in this case the language server error will be logged in the standard `IntelliJ log`:
 ![Error in log](./docs/images/troubleshooting/LanguageServerErrorInLog.png)
 

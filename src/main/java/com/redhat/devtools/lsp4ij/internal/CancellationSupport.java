@@ -10,14 +10,20 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import com.intellij.icons.AllIcons;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
-import org.eclipse.lsp4j.MessageParams;
-import org.eclipse.lsp4j.MessageType;
+import com.redhat.devtools.lsp4ij.settings.actions.DisableLanguageServerErrorAction;
+import com.redhat.devtools.lsp4ij.settings.actions.OpenUrlAction;
+import com.redhat.devtools.lsp4ij.settings.actions.ReportErrorInLogAction;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
@@ -37,7 +43,7 @@ import java.util.function.BiFunction;
 /**
  * LSP cancellation support hosts the list of LSP requests to cancel when a
  * process is canceled (ex: when completion is re-triggered, when hover is give
- * up, etc)
+ * up, etc.)
  *
  * @see <a href=
  * "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest">https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest</a>
@@ -98,32 +104,21 @@ public class CancellationSupport implements CancelChecker {
     }
 
     @NotNull
-    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@Nullable LanguageServerItem languageServer, @Nullable String featureName) {
+    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@NotNull LanguageServerItem languageServer, @Nullable String featureName) {
         return (result, error) -> {
             if (error instanceof ResponseErrorException responseErrorException) {
                 if (isRequestCancelled(responseErrorException)) {
                     // Don't show cancelled error
                     return null;
                 }
-                ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
-                String languageServerName = languageServer.getServerWrapper().getServerDefinition().getDisplayName();
-                switch (errorReportingKind) {
-                    case as_notification -> {
-                        // Show LSP error (ResponseErrorException) in an IJ notification
-                        MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
-                        ServerMessageHandler.showMessage(languageServerName + " (" + featureName + ")", messageParams);
-                    }
-                    case in_log ->
-                            // Show LSP error in the log
-                            LOGGER.error("Error while consuming '" + featureName + "' with language server '" + languageServerName + "'", error);
-                    default -> {
-                        // Do nothing
-                    }
-                }
+            }
+            if (error instanceof ResponseErrorException) {
+                handleLanguageServerError(languageServer, featureName, error);
                 // return null as result instead of throwing the ResponseErrorException error
                 // to avoid breaking the LSP request result of another language server (when file is associated to several language servers)
                 return null;
-            } else if (error != null) {
+            }
+            if (error != null) {
                 if (error instanceof RuntimeException) {
                     throw (RuntimeException) error;
                 }
@@ -133,6 +128,36 @@ public class CancellationSupport implements CancelChecker {
             // Return the result
             return result;
         };
+    }
+
+    private static void handleLanguageServerError(@NotNull LanguageServerItem languageServer,
+                                                  @Nullable String featureName,
+                                                  @NotNull Throwable error) {
+        ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
+        switch (errorReportingKind) {
+            case as_notification -> // Show LSP error (ResponseErrorException) in an IJ notification
+                    showNotificationError(languageServer, featureName, error);
+            case in_log -> {
+                // Show LSP error in the log
+                String languageServerName = languageServer.getServerWrapper().getServerDefinition().getDisplayName();
+                LOGGER.error("Error while consuming '" + featureName + "' with language server '" + languageServerName + "'", error);
+            }
+            default -> {
+                // Do nothing
+            }
+        }
+    }
+
+    private static void showNotificationError(@NotNull LanguageServerItem languageServer, @Nullable String featureName, Throwable error) {
+        String languageServerName = languageServer.getServerWrapper().getServerDefinition().getDisplayName();
+        String title = languageServerName + " (" + featureName + ")";
+        String content = error.getMessage();
+        Notification notification = new Notification(LanguageServerBundle.message("language.server.protocol.groupId"), title, content, NotificationType.ERROR);
+        notification.addAction(new DisableLanguageServerErrorAction(notification, languageServer));
+        notification.addAction(new ReportErrorInLogAction(notification, languageServer));
+        notification.addAction(new OpenUrlAction(LSP4IJWebsiteUrlConstants.FEEDBACK_URL));
+        notification.setIcon(AllIcons.General.Error);
+        Notifications.Bus.notify(notification);
     }
 
     /**
@@ -149,9 +174,9 @@ public class CancellationSupport implements CancelChecker {
         UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = project != null ? UserDefinedLanguageServerSettings.getInstance(project)
                 .getLanguageServerSettings(languageServerId) : null;
         if (settings != null) {
-            errorReportingKind = settings.getReportErrorKind();
+            errorReportingKind = settings.getErrorReportingKind();
         }
-        return errorReportingKind != null ? errorReportingKind : ErrorReportingKind.as_notification;
+        return errorReportingKind != null ? errorReportingKind : ErrorReportingKind.getDefaultValue();
     }
 
     private static boolean isRequestCancelled(ResponseErrorException responseErrorException) {
