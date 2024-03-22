@@ -109,7 +109,7 @@ public class LSPDocumentationProvider extends DocumentationProviderEx implements
                 editor = LSPIJUtils.editorForElement(originalElement);
                 int targetOffset = getTargetOffset(originalElement);
                 LSPHoverSupport hoverSupport = LSPFileSupport.getSupport(element.getContainingFile()).getHoverSupport();
-                CompletableFuture<List<MarkupContent>> hoverFuture = hoverSupport.getHover(targetOffset, document);
+                CompletableFuture<List<MarkupContent>> hoverFuture = null; //hoverSupport.getHover(targetOffset, document);
 
                 try {
                     waitUntilDone(hoverFuture, psiFile);

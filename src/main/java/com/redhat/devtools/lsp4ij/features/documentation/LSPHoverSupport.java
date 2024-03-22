@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  *     <li>LSP 'textDocument/hover' requests</li>
  * </ul>
  */
-public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List<MarkupContent>> {
+public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List<Hover>> {
 
     private Integer previousOffset;
 
@@ -47,7 +47,7 @@ public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List
         super(file);
     }
 
-    public CompletableFuture<List<MarkupContent>> getHover(int offset, Document document) {
+    public CompletableFuture<List<Hover>> getHover(int offset, Document document) {
         if (previousOffset != null && previousOffset != offset) {
             // Cancel previous hover (without setting previousOffset to null)
             cancel();
@@ -58,12 +58,12 @@ public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List
     }
 
     @Override
-    protected CompletableFuture<List<MarkupContent>> doLoad(HoverParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<Hover>> doLoad(HoverParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return getHover(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<MarkupContent>> getHover(@NotNull VirtualFile file,
+    private static @NotNull CompletableFuture<List<Hover>> getHover(@NotNull VirtualFile file,
                                                                             @NotNull Project project,
                                                                             @NotNull HoverParams params,
                                                                             @NotNull CancellationSupport cancellationSupport) {
@@ -78,7 +78,7 @@ public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List
                     }
 
                     // Collect list of textDocument/hover future for each language servers
-                    List<CompletableFuture<MarkupContent>> hoverPerServerFutures = languageServers
+                    List<CompletableFuture<Hover>> hoverPerServerFutures = languageServers
                             .stream()
                             .map(languageServer -> getHoverFor(params, languageServer, cancellationSupport))
                             .toList();
@@ -88,13 +88,13 @@ public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List
                 });
     }
 
-    public static @NotNull CompletableFuture<List<MarkupContent>> mergeInOneFuture(@NotNull List<CompletableFuture<MarkupContent>> futures,
+    public static @NotNull CompletableFuture<List<Hover>> mergeInOneFuture(@NotNull List<CompletableFuture<Hover>> futures,
                                                                                    @NotNull CancellationSupport cancellationSupport) {
         CompletableFuture<Void> allFutures = cancellationSupport
                 .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
         return allFutures.thenApply(Void -> {
-            List<MarkupContent> mergedDataList = new ArrayList<>(futures.size());
-            for (CompletableFuture<MarkupContent> dataListFuture : futures) {
+            List<Hover> mergedDataList = new ArrayList<>(futures.size());
+            for (CompletableFuture<Hover> dataListFuture : futures) {
                 var data = dataListFuture.join();
                 if (data != null) {
                     mergedDataList.add(data);
@@ -104,13 +104,13 @@ public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List
         });
     }
 
-    private static CompletableFuture<MarkupContent> getHoverFor(@NotNull HoverParams params,
+    private static CompletableFuture<Hover> getHoverFor(@NotNull HoverParams params,
                                                                 @NotNull LanguageServerItem languageServer,
                                                                 @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .hover(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_HOVER)
-                .thenApplyAsync(LSPHoverSupport::getHoverString);
+                        .hover(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_HOVER);
+                //.thenApplyAsync(LSPHoverSupport::getHoverString);
     }
 
     private static @Nullable MarkupContent getHoverString(Hover hover) {
