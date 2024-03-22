@@ -383,13 +383,23 @@ public class LanguageServersRegistry {
         fileAssociations.removeAll(mappingsToRemove);
     }
 
-
     public void updateServerDefinition(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
+                                                                                              @Nullable String name,
+                                                                                              @Nullable String commandLine,
+                                                                                              @NotNull List<ServerMappingSettings> mappings,
+                                                                                              @Nullable String configurationContent,
+                                                                                              @Nullable String initializationOptionsContent) {
+        updateServerDefinition(serverDefinition, name, commandLine, mappings, configurationContent, initializationOptionsContent, true);
+    }
+
+    @Nullable
+    public LanguageServerDefinitionListener.LanguageServerChangedEvent updateServerDefinition(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
                                        @Nullable String name,
                                        @Nullable String commandLine,
                                        @NotNull List<ServerMappingSettings> mappings,
                                        @Nullable String configurationContent,
-                                       @Nullable String initializationOptionsContent) {
+                                       @Nullable String initializationOptionsContent,
+                                       boolean notify) {
         String languageServerId = serverDefinition.getId();
         serverDefinition.setName(name);
         serverDefinition.setCommandLine(commandLine);
@@ -417,12 +427,20 @@ public class LanguageServersRegistry {
         if (nameChanged || commandChanged || mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(serverDefinition, nameChanged, commandChanged, mappingsChanged, configurationContentChanged, initializationOptionsContentChanged);
-            for (LanguageServerDefinitionListener listener : this.listeners) {
-                try {
-                    listener.handleChanged(event);
-                } catch (Exception e) {
-                    LOGGER.error("Error while server definition has changed of the language server '" + languageServerId + "'", e);
-                }
+            if (notify) {
+                handleChangeEvent(event);
+            }
+            return event;
+        }
+        return null;
+    }
+
+    public void handleChangeEvent(LanguageServerDefinitionListener.LanguageServerChangedEvent event) {
+        for (LanguageServerDefinitionListener listener : this.listeners) {
+            try {
+                listener.handleChanged(event);
+            } catch (Exception e) {
+                LOGGER.error("Error while server definition has changed of the language server '" + event.serverDefinition.getId() + "'", e);
             }
         }
     }

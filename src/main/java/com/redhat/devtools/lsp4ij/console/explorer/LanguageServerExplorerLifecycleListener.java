@@ -100,7 +100,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         if (settings != null) {
             serverTrace = settings.getServerTrace();
         }
-        return serverTrace != null ? serverTrace : ServerTrace.off;
+        return serverTrace != null ? serverTrace : ServerTrace.getDefaultValue();
     }
 
     private LanguageServerTreeNode findLanguageServerTreeNode(LanguageServerWrapper languageServer) {
@@ -145,7 +145,8 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
                 if (serverStatusChanged) {
                     node.setServerStatus(status);
                 }
-                if (select) {
+                if (select && !explorer.isEditingCommand(serverNode)) {
+                    // The LSP console is selected only if the command used to start the language server is not editing.
                     explorer.selectAndExpand(node);
                 }
             });

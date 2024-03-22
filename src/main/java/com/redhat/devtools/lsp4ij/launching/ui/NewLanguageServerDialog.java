@@ -63,7 +63,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     protected @Nullable JComponent createCenterPanel() {
-        FormBuilder builder = new FormBuilder();
+        FormBuilder builder = FormBuilder
+                .createFormBuilder();
 
         // Template combo
         createTemplateCombo(builder);
@@ -80,8 +81,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
     }
 
     private void createTemplateCombo(FormBuilder builder) {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.X_AXIS));
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         templateCombo.setRenderer(new SimpleListCellRenderer<LanguageServerTemplate>() {
             @Override
             public void customize(@NotNull JList list,

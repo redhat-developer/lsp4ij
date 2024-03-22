@@ -13,21 +13,31 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings;
 
+import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.fileTypes.FileNameMatcher;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.project.Project;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * UI settings view to configure a given language server:
@@ -41,13 +51,27 @@ import java.util.List;
  */
 public class LanguageServerView implements Disposable {
 
+    private final LanguageServerNameProvider languageServerNameProvider;
+
+    public interface LanguageServerNameProvider {
+        String getDisplayName();
+    }
+
     private final JPanel myMainPanel;
+    private final LanguageServerDefinition languageServerDefinition;
+    private final Project project;
 
     private LanguageServerPanel languageServerPanel;
 
     private ServerMappingsPanel mappingPanel;
 
-    public LanguageServerView(LanguageServerDefinition languageServerDefinition) {
+    public LanguageServerView(@NotNull LanguageServerDefinition languageServerDefinition,
+                              @Nullable LanguageServerNameProvider languageServerNameProvider,
+                              @NotNull Project project
+    ) {
+        this.languageServerDefinition = languageServerDefinition;
+        this.languageServerNameProvider = languageServerNameProvider;
+        this.project = project;
         boolean isLaunchConfiguration = languageServerDefinition instanceof UserDefinedLanguageServerDefinition;
         JComponent descriptionPanel = createDescription(languageServerDefinition.getDescription());
         JPanel settingsPanel = createSettings(descriptionPanel, isLaunchConfiguration);
@@ -60,8 +84,203 @@ public class LanguageServerView implements Disposable {
         this.myMainPanel = wrapper;
     }
 
+    /**
+     * Returns true if there are some modification in the UI fields and false otherwise.
+     *
+     * @return true if there are some modification in the UI fields and false otherwise.
+     */
+    public boolean isModified() {
+        String languageServerId = languageServerDefinition.getId();
+        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
+            com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+            if (settings == null) {
+                return true;
+            }
+            if (!(isEquals(getDisplayName(), settings.getServerName())
+                    && isEquals(this.getCommandLine(), settings.getCommandLine())
+                    && Objects.equals(this.getMappings(), settings.getMappings())
+                    && isEquals(this.getConfigurationContent(), settings.getConfigurationContent())
+                    && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent()))) {
+                return true;
+            }
+        }
+        com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project)
+                .getLanguageServerSettings(languageServerId);
+        if (settings == null) {
+            // There is no settings, check if the view is filled with default value
+            return !(!this.isDebugSuspend()
+                    && StringUtils.isEmpty(this.getDebugPort())
+                    && isEquals(this.getServerTrace(), ServerTrace.getDefaultValue())
+                    && isEquals(this.getReportErrorKind(), ErrorReportingKind.getDefaultValue()));
+        }
+        if (!(languageServerDefinition instanceof UserDefinedLanguageServerDefinition)) {
+            if (!(isEquals(this.getDebugPort(), settings.getDebugPort())
+                    && this.isDebugSuspend() == settings.isDebugSuspend())) {
+                return true;
+            }
+        }
+        return !(isEquals(this.getServerTrace(), settings.getServerTrace()) &&
+                isEquals(this.getReportErrorKind(), settings.getErrorReportingKind()));
+    }
+
+    static boolean isEquals(String s1, String s2) {
+        // the comparison between null and "" should return true
+        s1 = s1 == null ? "" : s1;
+        s2 = s2 == null ? "" : s2;
+        return Objects.equals(s1, s2);
+    }
+
+    static boolean isEquals(ServerTrace st1, ServerTrace st2) {
+        // the comparison between null and default value trace should return true
+        st1 = st1 == null ? ServerTrace.getDefaultValue() : st1;
+        st2 = st2 == null ? ServerTrace.getDefaultValue() : st2;
+        return Objects.equals(st1, st2);
+    }
+
+    static boolean isEquals(ErrorReportingKind k1, ErrorReportingKind k2) {
+        // the comparison between null and default value error reporting kind should return true
+        k1 = k1 == null ? ErrorReportingKind.getDefaultValue() : k1;
+        k2 = k2 == null ? ErrorReportingKind.getDefaultValue() : k2;
+        return Objects.equals(k1, k2);
+    }
+
+    /**
+     * Update the UI from the registered language server definition + settings.
+     */
+    public void reset() {
+        String languageServerId = languageServerDefinition.getId();
+
+        // Commons settings (user defined language server + extension point)
+        com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project)
+                .getLanguageServerSettings(languageServerId);
+        final ErrorReportingKind errorReportingKind = settings != null && settings.getErrorReportingKind() != null ? settings.getErrorReportingKind() : ErrorReportingKind.as_notification;
+        final ServerTrace serverTrace = settings != null && settings.getServerTrace() != null ? settings.getServerTrace() : ServerTrace.off;
+        this.setReportErrorKind(errorReportingKind);
+        this.setServerTrace(serverTrace);
+
+        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
+            // User defined language server
+            com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings userDefinedLanguageServerSettings = com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+            if (userDefinedLanguageServerSettings != null) {
+                this.setCommandLine(userDefinedLanguageServerSettings.getCommandLine());
+                this.setConfigurationContent(userDefinedLanguageServerSettings.getConfigurationContent());
+                this.setInitializationOptionsContent(userDefinedLanguageServerSettings.getInitializationOptionsContent());
+
+                List<ServerMappingSettings> languageMappings = userDefinedLanguageServerSettings.getMappings()
+                        .stream()
+                        .filter(mapping -> !StringUtils.isEmpty(mapping.getLanguage()))
+                        .collect(Collectors.toList());
+                this.setLanguageMappings(languageMappings);
+
+                List<ServerMappingSettings> fileTypeMappings = userDefinedLanguageServerSettings.getMappings()
+                        .stream()
+                        .filter(mapping -> !StringUtils.isEmpty(mapping.getFileType()))
+                        .collect(Collectors.toList());
+                this.setFileTypeMappings(fileTypeMappings);
+
+                List<ServerMappingSettings> fileNamePatternMappings = userDefinedLanguageServerSettings.getMappings()
+                        .stream()
+                        .filter(mapping -> mapping.getFileNamePatterns() != null)
+                        .collect(Collectors.toList());
+                this.setFileNamePatternMappings(fileNamePatternMappings);
+            }
+        } else {
+            // Language server from extension point
+            if (settings != null) {
+                this.setDebugPort(settings.getDebugPort());
+                this.setDebugSuspend(settings.isDebugSuspend());
+            }
+            List<LanguageServerFileAssociation> mappings = LanguageServersRegistry.getInstance().findLanguageServerDefinitionFor(languageServerId);
+            List<ServerMappingSettings> languageMappings = mappings
+                    .stream()
+                    .filter(mapping -> mapping.getLanguage() != null)
+                    .map(mapping -> {
+                        Language language = mapping.getLanguage();
+                        String languageId = mapping.getLanguageId();
+                        return ServerMappingSettings.createLanguageMappingSettings(language.getID(), languageId);
+                    })
+                    .collect(Collectors.toList());
+            this.setLanguageMappings(languageMappings);
+
+            List<ServerMappingSettings> fileTypeMappings = mappings
+                    .stream()
+                    .filter(mapping -> mapping.getFileType() != null)
+                    .map(mapping -> {
+                        FileType fileType = mapping.getFileType();
+                        String languageId = mapping.getLanguageId();
+                        return ServerMappingSettings.createFileTypeMappingSettings(fileType.getName(), languageId);
+                    })
+                    .collect(Collectors.toList());
+            this.setFileTypeMappings(fileTypeMappings);
+
+            List<ServerMappingSettings> fileNamePatternMappings = mappings
+                    .stream()
+                    .filter(mapping -> mapping.getFileNameMatchers() != null)
+                    .map(mapping -> {
+                        List<FileNameMatcher> matchers = mapping.getFileNameMatchers();
+                        String languageId = mapping.getLanguageId();
+                        return ServerMappingSettings.createFileNamePatternsMappingSettings(matchers.
+                                stream()
+                                .map(FileNameMatcher::getPresentableString)
+                                .toList(), languageId);
+                    })
+                    .collect(Collectors.toList());
+            this.setFileNamePatternMappings(fileNamePatternMappings);
+        }
+    }
+
+    /**
+     * Update the proper language server settings and language server definition from the UI fields.
+     */
+    public void apply() {
+        String languageServerId = languageServerDefinition.getId();
+
+        // Update commons settings
+        com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = new com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings();
+        settings.setServerTrace(getServerTrace());
+        settings.setErrorReportingKind(getReportErrorKind());
+
+        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition launch) {
+            // Register settings and server definition without firing events
+            var settingsChangedEvent = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings
+                    .getInstance(project)
+                    .updateSettings(languageServerId, settings, false);
+            // Update user-defined language server settings
+            var serverChangedEvent = LanguageServersRegistry.getInstance()
+                    .updateServerDefinition(
+                            launch,
+                            getDisplayName(),
+                            getCommandLine(),
+                            getMappings(),
+                            getConfigurationContent(),
+                            getInitializationOptionsContent(),
+                            false);
+            if (settingsChangedEvent != null) {
+                // Settings has changed, fire the event
+                com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings
+                        .getInstance(project)
+                        .handleChanged(settingsChangedEvent);
+            }
+            if (serverChangedEvent != null) {
+                // Server definition has changed, fire the event
+                LanguageServersRegistry.getInstance().handleChangeEvent(serverChangedEvent);
+            }
+        } else {
+            // Update user-defined language server settings
+            settings.setDebugPort(getDebugPort());
+            settings.setDebugSuspend(isDebugSuspend());
+            com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project)
+                    .updateSettings(languageServerId, settings);
+        }
+    }
+
+    private String getDisplayName() {
+        return languageServerNameProvider != null ? languageServerNameProvider.getDisplayName() : languageServerDefinition.getDisplayName();
+    }
+
     private JPanel createSettings(JComponent description, boolean launchingServerDefinition) {
-        FormBuilder builder = FormBuilder.createFormBuilder()
+        FormBuilder builder = FormBuilder
+                .createFormBuilder()
                 .setFormLeftIndent(10);
         this.languageServerPanel = new LanguageServerPanel(builder,
                 description,
@@ -183,11 +402,19 @@ public class LanguageServerView implements Disposable {
 
     @Override
     public void dispose() {
-
     }
 
     public List<ServerMappingSettings> getMappings() {
         return mappingPanel.getAllMappings();
     }
 
+
+    /**
+     * Returns true if the command is editing and false otherwise.
+     *
+     * @return true if the command is editing and false otherwise.
+     */
+    public boolean isEditingCommand() {
+        return languageServerPanel.getCommandLine() != null && languageServerPanel.getCommandLine().hasFocus();
+    }
 }
