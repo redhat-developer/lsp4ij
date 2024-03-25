@@ -23,14 +23,12 @@ import com.intellij.ui.treeStructure.Tree;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
-import com.redhat.devtools.lsp4ij.console.explorer.actions.CopyStartServerCommandAction;
-import com.redhat.devtools.lsp4ij.console.explorer.actions.PauseServerAction;
-import com.redhat.devtools.lsp4ij.console.explorer.actions.RestartServerAction;
-import com.redhat.devtools.lsp4ij.console.explorer.actions.StopServerAction;
+import com.redhat.devtools.lsp4ij.console.explorer.actions.*;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -186,7 +184,15 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                 if (path != null) {
                     DefaultActionGroup group = null;
                     Object node = path.getLastPathComponent();
-                    if (node instanceof LanguageServerProcessTreeNode processTreeNode) {
+                    if (node instanceof LanguageServerTreeNode serverTreeNode) {
+                        // Compute popup menu actions for Language Server node
+                        LanguageServerDefinition languageServerDefinition = serverTreeNode.getServerDefinition();
+                        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
+                            group = new DefaultActionGroup();
+                            group.add(new DeleteServerAction(languageServerDefinition));
+                        }
+                    } else if (node instanceof LanguageServerProcessTreeNode processTreeNode) {
+                        // Compute popup menu actions for Language Server process node
                         switch (processTreeNode.getServerStatus()) {
                             case starting:
                             case started:
