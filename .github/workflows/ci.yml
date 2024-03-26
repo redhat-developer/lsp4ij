@@ -48,3 +48,10 @@ jobs:
         with:
           name: tests-result
           path: ${{ github.workspace }}/build/reports/tests
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: redhat-developer/lsp4ij
+          files: ${{ github.workspace }}/build/reports/kover/report.xml
