@@ -13,11 +13,12 @@ package com.redhat.devtools.lsp4ij.features.completion;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
 
 /**
- * Completion test by emulating LSP textDocument/completion response from the typescript-language-server.
+ * Completion tests by emulating LSP 'textDocument/completion' responses
+ * from the typescript-language-server.
  */
 public class TypeScriptCompletionTest extends LSPCompletionFixtureTestCase {
 
-    public void testCompletionWithNewText() {
+    public void testCompletionWithTextEdit() {
         // 1. Test completion items result
         assertCompletion("test.ts",
                 "''.<caret>", """                
