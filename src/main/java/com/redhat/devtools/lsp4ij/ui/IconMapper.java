@@ -33,11 +33,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class IconMapper {
 
-    // Copied from IntelliJ icons. To be removed once the minimal supported version of IDEA is > 213
-    // See https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/util/ui/src/com/intellij/icons/AllIcons.java#L415
-    // Original https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/icons/src/nodes/template.svg
-    public static final @NotNull Icon Template = load("images/nodes/template.svg");
-
     // Copied from IntelliJ icons. To be removed once the minimal supported version of IDEA is > 232
     // See https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/util/ui/src/com/intellij/icons/ExpUiIcons.java#L226
     // Original light https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/icons/src/expui/fileTypes/text.svg
@@ -96,7 +91,7 @@ public class IconMapper {
             try {
                 Color decodedColor = java.awt.Color.decode(key);
                 return new ColorIcon(ICON_SIZE, decodedColor, true);
-            } catch (Exception e) {
+            } catch (Exception ignored) {
                 //ignore error
             }
             return AllIcons.Nodes.EmptyNode;
@@ -114,7 +109,7 @@ public class IconMapper {
 
         switch (kind) {
             case Snippet:
-                return Template;
+                return AllIcons.Nodes.Template;
             case Text:
                 return Text;
             case Constructor:
