@@ -13,6 +13,7 @@ plugins {
     alias(libs.plugins.gradleIntelliJPlugin) // Gradle IntelliJ Plugin
     alias(libs.plugins.changelog) // Gradle Changelog Plugin
     alias(libs.plugins.testLogger) // Nice test logs
+    alias(libs.plugins.kover) // Gradle Kover Plugin
     jacoco // Code coverage
 }
 
@@ -143,6 +144,15 @@ tasks.register<Test>("integrationTest") {
     classpath = sourceSets["integrationTest"].runtimeClasspath
     outputs.upToDateWhen { false }
     mustRunAfter(tasks["test"])
+}
+
+// Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
+koverReport {
+    defaults {
+        xml {
+            onCheck = true
+        }
+    }
 }
 
 tasks {
