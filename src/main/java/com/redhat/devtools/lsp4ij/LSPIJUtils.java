@@ -262,9 +262,34 @@ public class LSPIJUtils {
         return ReadAction.compute(() -> ProjectFileIndex.getInstance(project).getModuleForFile(file, false));
     }
 
-    public static int toOffset(Position start, Document document) throws IndexOutOfBoundsException {
-        int lineStartOffset = document.getLineStartOffset(start.getLine());
-        return lineStartOffset + start.getCharacter();
+    /**
+     * Returns a valid offset from the given position in the given document even if position is invalid.
+     *
+     * <ul>
+     *     <li>If a line number is negative, it defaults to 0.</li>
+     *     <li>If a line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.</li>
+     *     <li>If the character value is greater than the line length it defaults back to the line length</li>
+     * </ul>
+     *
+     * @param position the LSP position.
+     * @param document the IJ document.
+     * @return a valid offset from the given position in the given document.
+     */
+    public static int toOffset(@NotNull Position position, @NotNull Document document) {
+        // Adjust position line/character according to this comment https://github.com/microsoft/vscode-languageserver-node/blob/ed3cd0f78c1495913bda7318ace2be7f968008af/textDocument/src/main.ts#L26
+        int line = position.getLine();
+        if (line < 0) {
+            // If a line number is negative, it defaults to 0.
+            line = 0;
+        } else {
+            // If a line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
+            line = Math.min(line, document.getLineCount() - 1);
+        }
+        int lineStartOffset = document.getLineStartOffset(line);
+        int lineEndOffset = document.getLineEndOffset(line);
+        int offset = lineStartOffset + position.getCharacter();
+        // If the character value is greater than the line length it defaults back to the line length
+        return Math.min(offset, lineEndOffset);
     }
 
     public static Position toPosition(int offset, Document document) {
@@ -653,7 +678,7 @@ public class LSPIJUtils {
     /**
      * Get the tab size for the given editor.
      */
-    public static int getTabSize(Editor editor) {
+    public static int getTabSize(@NotNull Editor editor) {
         Project project = editor.getProject();
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return editor.getSettings().getTabSize(project);
@@ -661,7 +686,7 @@ public class LSPIJUtils {
         return ReadAction.compute(() -> editor.getSettings().getTabSize(project));
     }
 
-    public static boolean isInsertSpaces(Editor editor) {
+    public static boolean isInsertSpaces(@NotNull Editor editor) {
         Project project = editor.getProject();
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return !editor.getSettings().isUseTabCharacter(project);

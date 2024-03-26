@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 import com.intellij.formatting.service.AsyncDocumentFormattingService;
 import com.intellij.formatting.service.AsyncFormattingRequest;
 import com.intellij.lang.LanguageFormatting;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
@@ -33,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Abstract class for LSP {@link AsyncDocumentFormattingService} implementation.
  */
-public  abstract class AbstractLSPFormattingService extends AsyncDocumentFormattingService {
+public abstract class AbstractLSPFormattingService extends AsyncDocumentFormattingService {
 
     @Nullable
     @Override
@@ -76,7 +77,9 @@ public  abstract class AbstractLSPFormattingService extends AsyncDocumentFormatt
             formattingSupport = LSPFileSupport.getSupport(psiFile).getFormattingSupport();
             formattingSupport.cancel();
             Editor[] editors = LSPIJUtils.editorsForFile(psiFile.getVirtualFile(), psiFile.getProject());
-            formattingSupport.format(editors.length > 0 ? editors[0] : null, formattingRange, formattingRequest);
+            Editor editor = editors.length > 0 ? editors[0] : null;
+            Document document = editor != null ? editor.getDocument() : LSPIJUtils.getDocument(psiFile.getVirtualFile());
+            formattingSupport.format(document, editor, formattingRange, formattingRequest);
         }
 
         @Override

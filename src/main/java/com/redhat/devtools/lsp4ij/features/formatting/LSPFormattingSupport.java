@@ -48,8 +48,13 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
         super(file);
     }
 
-    public void format(@Nullable Editor editor, @Nullable TextRange textRange, @NotNull AsyncFormattingRequest formattingRequest) {
-        LSPFormattingParams params = new LSPFormattingParams(editor, textRange);
+    public void format(@NotNull Document document,
+                       @Nullable Editor editor,
+                       @Nullable TextRange textRange,
+                       @NotNull AsyncFormattingRequest formattingRequest) {
+        Integer tabSize = editor != null ? LSPIJUtils.getTabSize(editor) : null;
+        Boolean insertSpaces = editor != null ? LSPIJUtils.isInsertSpaces(editor) : null;
+        LSPFormattingParams params = new LSPFormattingParams(tabSize, insertSpaces, textRange, document);
         CompletableFuture<List<? extends TextEdit>> formatFuture = this.getFeatureData(params);
         try {
             waitUntilDone(formatFuture, getFile());
@@ -135,14 +140,14 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
 
                     if (isRangeFormatting && languageServer.isDocumentRangeFormattingSupported()) {
                         // Range formatting
-                        DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.editor(), params.textRange());
+                        DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.tabSize(), params.insertSpaces(), params.textRange(), params.document());
                         return cancellationSupport.execute(languageServer
                                 .getTextDocumentService()
                                 .rangeFormatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING);
                     }
 
                     // Full document formatting
-                    DocumentFormattingParams lspParams = createDocumentFormattingParams(params.editor());
+                    DocumentFormattingParams lspParams = createDocumentFormattingParams(params.tabSize(), params.insertSpaces());
                     return cancellationSupport.execute(languageServer
                             .getTextDocumentService()
                             .formatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_FORMATTING);
@@ -164,29 +169,33 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
         return languageServers.get(0);
     }
 
-    private @NotNull DocumentFormattingParams createDocumentFormattingParams(@Nullable Editor editor) {
+    private @NotNull DocumentFormattingParams createDocumentFormattingParams(Integer tabSize, Boolean insertSpaces) {
         DocumentFormattingParams params = new DocumentFormattingParams();
         params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(getFile().getVirtualFile()));
         FormattingOptions options = new FormattingOptions();
-        if (editor != null) {
-            options.setTabSize(LSPIJUtils.getTabSize(editor));
-            options.setInsertSpaces(LSPIJUtils.isInsertSpaces(editor));
+        if (tabSize != null) {
+            options.setTabSize(tabSize);
+        }
+        if (insertSpaces != null) {
+            options.setInsertSpaces(insertSpaces);
         }
         params.setOptions(options);
         return params;
     }
 
-    private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(@Nullable Editor editor, @NotNull TextRange textRange) {
+    private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(Integer tabSize, Boolean insertSpaces, @NotNull TextRange textRange, Document document) {
         DocumentRangeFormattingParams params = new DocumentRangeFormattingParams();
         params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(getFile().getVirtualFile()));
         FormattingOptions options = new FormattingOptions();
-        if (editor != null) {
-            options.setTabSize(LSPIJUtils.getTabSize(editor));
-            options.setInsertSpaces(LSPIJUtils.isInsertSpaces(editor));
+        if (tabSize != null) {
+            options.setTabSize(tabSize);
+        }
+        if (insertSpaces != null) {
+            options.setInsertSpaces(insertSpaces);
         }
         params.setOptions(options);
-        if (editor != null) {
-            Range range = LSPIJUtils.toRange(textRange, editor.getDocument());
+        if (document != null) {
+            Range range = LSPIJUtils.toRange(textRange, document);
             params.setRange(range);
         }
         return params;
