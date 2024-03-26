@@ -41,6 +41,8 @@ public class IconMapperTest {
         String color = "#FFFFFF";
 
         CompletionItem item = new CompletionItem();
+        assertNull(getIcon(item), "No kind should return no icon");
+
         item.setKind(CompletionItemKind.Color);
 
         //Test string documentation
