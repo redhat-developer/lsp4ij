@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Simple conventional changelog
         uses: lstocchi/simple-conventional-changelog@13071c09073f5deddf03d44d9af6a8b0f81ef227 #0.0.11
         id: changelog
