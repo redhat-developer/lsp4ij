@@ -283,7 +283,7 @@ public class LSPIJUtils {
             line = 0;
         } else {
             // If a line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
-            line = Math.min(line, document.getLineCount() - 1);
+            line = Math.min(line, document.getLineCount() > 0 ? document.getLineCount() -1 : 0);
         }
         int lineStartOffset = document.getLineStartOffset(line);
         int lineEndOffset = document.getLineEndOffset(line);
