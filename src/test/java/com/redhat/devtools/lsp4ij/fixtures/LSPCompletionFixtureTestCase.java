@@ -35,6 +35,9 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
                                     @NotNull String editorContentText,
                                     @NotNull String jsonCompletionList,
                                     @NotNull String... expectedItems) {
+        if (jsonCompletionList.trim().startsWith("[")) {
+            jsonCompletionList = "{\"items\":" + jsonCompletionList + "}";
+        }
         assertCompletion(fileName, editorContentText, JSONUtils.getLsp4jGson().fromJson(jsonCompletionList, CompletionList.class), expectedItems);
     }
 

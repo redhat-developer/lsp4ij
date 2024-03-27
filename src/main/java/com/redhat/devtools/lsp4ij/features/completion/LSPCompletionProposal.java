@@ -261,9 +261,25 @@ public class LSPCompletionProposal extends LookupElement {
         }
         try {
             if (textEdit == null) {
+                // ex:
+                // {
+                //    "label": "let",
+                //    "kind": 15,
+                //    "detail": "Insert let",
+                //    "insertText": "(let [${1:binding} ${2:value}])",
+                //    "insertTextFormat": 2
+
                 insertText = getInsertText();
-                Position start = LSPIJUtils.toPosition(this.bestOffset, document);
-                Position end = LSPIJUtils.toPosition(offset, document); // need 2 distinct objects
+                int startOffset = this.bestOffset;
+                int endOffset = offset;
+                // Try to get the text range to replace it.
+                // foo.b|ar --> foo.[bar]
+                TextRange textRange = LSPIJUtils.getTokenRange(document, this.initialOffset);
+                if (textRange != null) {
+                    startOffset = textRange.getStartOffset();
+                }
+                Position start = LSPIJUtils.toPosition(startOffset, document);
+                Position end = LSPIJUtils.toPosition(endOffset, document); // need 2 distinct objects
                 textEdit = new TextEdit(new Range(start, end), insertText);
             } else if (offset > this.initialOffset) {
                 // characters were added after completion was activated
