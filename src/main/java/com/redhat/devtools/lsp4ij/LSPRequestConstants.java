@@ -8,18 +8,24 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features;
+package com.redhat.devtools.lsp4ij;
 
 /**
  * LSP request constants.
  */
 public class LSPRequestConstants {
 
+    // workspace/* LSP requests
+    public static final String WORKSPACE_EXECUTE_COMMAND = "workspace/executeCommand";
+
+    // textDocument/* LSP requests
+
     public static final String TEXT_DOCUMENT_DECLARATION = "textDocument/declaration";
     public static final String TEXT_DOCUMENT_DEFINITION = "textDocument/definition";
     public static final String TEXT_DOCUMENT_DOCUMENT_LINK = "textDocument/documentLink";
     public static final String TEXT_DOCUMENT_FOLDING_RANGE = "textDocument/foldingRange";
     public static final String TEXT_DOCUMENT_TYPE_DEFINITION = "textDocument/typeDefinition";
+    public static final String TEXT_DOCUMENT_CODE_ACTION = "textDocument/codeAction";
     public static final String TEXT_DOCUMENT_CODE_LENS = "textDocument/codeLens";
     public static final String TEXT_DOCUMENT_RESOLVE_CODE_LENS = "textDocument/resolveCodelens";
     public static final String TEXT_DOCUMENT_HOVER = "textDocument/hover";
