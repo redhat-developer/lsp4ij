@@ -31,7 +31,7 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
     private long modificationStamp;
 
     // true if the future must be canceled when the Psi file is modified and false otherwise.
-    private boolean cancelWhenFileModified;
+    private final boolean cancelWhenFileModified;
 
     // The current LSP requests for all language servers applying to a given Psi file
     private @Nullable CompletableFuture<Result> future;
@@ -121,10 +121,11 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * Cancel all LSP requests.
      */
     public void cancel() {
-        if (future != null && !future.isDone()) {
+        var future = this.future;
+        if (future != null && !future.isCancelled() && !future.isDone()) {
             future.cancel(true);
         }
-        future = null;
+        this.future = null;
         // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
         CancellationSupport cancellation = cancellationSupport;
         if (cancellation != null) {
