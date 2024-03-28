@@ -11,18 +11,17 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.vfs.*;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
@@ -62,107 +61,6 @@ public class LanguageServerWrapper implements Disposable {
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
-    class Listener implements FileEditorManagerListener, VirtualFileListener {
-
-        @Override
-        public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
-            if (initialProject != null && !Objects.equals(source.getProject(), initialProject)) {
-                // The file has been closed from another project,don't send textDocument/didClose
-                return;
-            }
-            // Manage textDocument/didClose
-            URI uri = LSPIJUtils.toUri(file);
-            if (uri != null) {
-                try {
-                    // Disconnect the given file from the current language servers
-                    disconnect(uri, !isDisposed());
-                } catch (Exception e) {
-                    LOGGER.warn("Error while disconnecting the file '" + uri + "' from all language servers", e);
-                }
-            }
-        }
-
-        @Override
-        public void propertyChanged(@NotNull VirtualFilePropertyEvent event) {
-            if (event.getPropertyName().equals(VirtualFile.PROP_NAME) && event.getOldValue() instanceof String) {
-                // A file (Test1.java) has been renamed (to Test2.java) by using Refactor / Rename from IJ
-
-                // 1. Send a textDocument/didClose for the renamed file (Test1.java)
-                URI oldFileUri = didClose(event.getFile().getParent(), (String) event.getOldValue());
-                URI newFileUri = LSPIJUtils.toUri(event.getFile());
-                // 2. Send a workspace/didChangeWatchedFiles
-                didChangeWatchedFiles(fe(oldFileUri, FileChangeType.Deleted),
-                        fe(newFileUri, FileChangeType.Created));
-            }
-        }
-
-        @Override
-        public void contentsChanged(@NotNull VirtualFileEvent event) {
-            URI uri = LSPIJUtils.toUri(event.getFile());
-            if (uri != null) {
-                LSPVirtualFileData documentListener = connectedDocuments.get(uri);
-                if (documentListener != null) {
-                    // 1. Send a textDocument/didSave for the saved file
-                    documentListener.getSynchronizer().documentSaved();
-                }
-                // 2. Send a workspace/didChangeWatchedFiles
-                didChangeWatchedFiles(fe(uri, FileChangeType.Changed));
-            }
-        }
-
-        @Override
-        public void fileCreated(@NotNull VirtualFileEvent event) {
-            URI uri = LSPIJUtils.toUri(event.getFile());
-            if (uri != null) {
-                // 2. Send a workspace/didChangeWatchedFiles
-                didChangeWatchedFiles(fe(uri, FileChangeType.Created));
-            }
-        }
-
-        @Override
-        public void fileDeleted(@NotNull VirtualFileEvent event) {
-            URI uri = LSPIJUtils.toUri(event.getFile());
-            if (uri != null) {
-                // 2. Send a workspace/didChangeWatchedFiles
-                didChangeWatchedFiles(fe(uri, FileChangeType.Deleted));
-            }
-        }
-
-        @Override
-        public void fileMoved(@NotNull VirtualFileMoveEvent event) {
-            // A file (foo.Test1.java) has been moved (to bar1.Test1.java)
-
-            // 1. Send a textDocument/didClose for the moved file (foo.Test1.java)
-            URI oldFileUri = didClose(event.getOldParent(), event.getFileName());
-            URI newFileUri = LSPIJUtils.toUri(event.getFile());
-            // 2. Send a workspace/didChangeWatchedFiles
-            didChangeWatchedFiles(fe(oldFileUri, FileChangeType.Deleted),
-                    fe(newFileUri, FileChangeType.Created));
-        }
-
-        private FileEvent fe(URI uri, FileChangeType type) {
-            return new FileEvent(uri.toASCIIString(), type);
-        }
-
-        private @NotNull URI didClose(VirtualFile virtualParentFile, String fileName) {
-            File parent = VfsUtilCore.virtualToIoFile(virtualParentFile);
-            URI uri = LSPIJUtils.toUri(new File(parent, fileName));
-            if (isConnectedTo(uri)) {
-                disconnect(uri, false);
-            }
-            return uri;
-        }
-
-        private void didChangeWatchedFiles(FileEvent... changes) {
-            LanguageServerWrapper.this.sendNotification(ls -> {
-                DidChangeWatchedFilesParams params = new DidChangeWatchedFilesParams(Arrays.asList(changes));
-                ls.getWorkspaceService()
-                        .didChangeWatchedFiles(params);
-            });
-        }
-    }
-
-    private Listener fileBufferListener = new Listener();
     private MessageBusConnection messageBusConnection;
 
     @NotNull
@@ -203,9 +101,10 @@ public class LanguageServerWrapper implements Disposable {
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
      */
-    private @NotNull
+    private final @NotNull
     Map<String, Runnable> dynamicRegistrations = new HashMap<>();
     private boolean initiallySupportsWorkspaceFolders = false;
+    private final LSPFileListener fileListener = new LSPFileListener(this);
 
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
@@ -335,8 +234,7 @@ public class LanguageServerWrapper implements Disposable {
                         // As process can be stopped, we loose pid and command lines information
                         // when server is stopped, we store them here.
                         // to display them in the Language server explorer even if process is killed.
-                        if (lspStreamProvider instanceof ProcessStreamConnectionProvider) {
-                            ProcessStreamConnectionProvider provider = (ProcessStreamConnectionProvider) lspStreamProvider;
+                        if (lspStreamProvider instanceof ProcessStreamConnectionProvider provider) {
                             this.currentProcessId = provider.getPid();
                             this.currentProcessCommandLines = provider.getCommands();
                         }
@@ -388,9 +286,7 @@ public class LanguageServerWrapper implements Disposable {
                         serverError = null;
                         serverCapabilities = res.getCapabilities();
                         this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
-                    }).thenRun(() -> {
-                        this.languageServer.initialized(new InitializedParams());
-                    }).thenRun(() -> {
+                    }).thenRun(() -> this.languageServer.initialized(new InitializedParams())).thenRun(() -> {
                         final List<URI> toReconnect = filesToReconnect;
                         initializeFuture.thenRunAsync(() -> {
                             for (URI fileToReconnect : toReconnect) {
@@ -403,8 +299,8 @@ public class LanguageServerWrapper implements Disposable {
                         });
 
                         messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
-                        messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileBufferListener);
-                        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkVirtualFileListenerAdapter(fileBufferListener));
+                        messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
+                        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkVirtualFileListenerAdapter(fileListener));
 
                         udateStatus(ServerStatus.started);
                         getLanguageServerLifecycleManager().onStatusChanged(this);
@@ -440,7 +336,7 @@ public class LanguageServerWrapper implements Disposable {
         initParams.setTrace(this.lspStreamProvider.getTrace(rootURI));
 
         if (initialProject != null) {
-            var folders = Arrays.asList(LSPIJUtils.toWorkspaceFolder(initialProject));
+            var folders = List.of(LSPIJUtils.toWorkspaceFolder(initialProject));
             initParams.setWorkspaceFolders(folders);
         }
 
@@ -735,7 +631,7 @@ public class LanguageServerWrapper implements Disposable {
         disconnect(path, true);
     }
 
-    private void disconnect(URI path, boolean stopIfNoOpenedFiles) {
+    void disconnect(URI path, boolean stopIfNoOpenedFiles) {
         LSPVirtualFileData data = this.connectedDocuments.remove(path);
         if (data != null) {
             // Remove the listener from the old document stored in synchronizer
@@ -907,7 +803,8 @@ public class LanguageServerWrapper implements Disposable {
     public void registerCapability(RegistrationParams params) {
         initializeFuture.thenRun(() -> {
             params.getRegistrations().forEach(reg -> {
-                if ("workspace/didChangeWorkspaceFolders".equals(reg.getMethod())) { //$NON-NLS-1$
+                if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
+                    // register 'workspace/didChangeWorkspaceFolders' capability
                     assert serverCapabilities != null :
                             "Dynamic capability registration failed! Server not yet initialized?"; //$NON-NLS-1$
                     if (initiallySupportsWorkspaceFolders) {
@@ -920,16 +817,33 @@ public class LanguageServerWrapper implements Disposable {
                         addRegistration(reg, () -> setWorkspaceFoldersEnablement(false));
                         setWorkspaceFoldersEnablement(true);
                     }
-                } else if ("workspace/executeCommand".equals(reg.getMethod())) { //$NON-NLS-1$
-                    Gson gson = new Gson(); // TODO? retrieve the GSon used by LS
-                    ExecuteCommandOptions executeCommandOptions = gson.fromJson((JsonObject) reg.getRegisterOptions(),
-                            ExecuteCommandOptions.class);
-                    List<String> newCommands = executeCommandOptions.getCommands();
-                    if (!newCommands.isEmpty()) {
-                        addRegistration(reg, () -> unregisterCommands(newCommands));
-                        registerCommands(newCommands);
+                } else if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WATCHED_FILES.equals(reg.getMethod())) {
+                    // register 'workspace/didChangeWatchedFiles' capability
+                    try {
+                        DidChangeWatchedFilesRegistrationOptions options = JSONUtils.getLsp4jGson()
+                                .fromJson((JsonObject) reg.getRegisterOptions(),
+                                        DidChangeWatchedFilesRegistrationOptions.class);
+                        fileListener.setFileSystemWatchers(options.getWatchers());
+                        addRegistration(reg, () -> fileListener.setFileSystemWatchers(null));
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
                     }
-                } else if ("textDocument/formatting".equals(reg.getMethod())) { //$NON-NLS-1$
+                } else if (LSPRequestConstants.WORKSPACE_EXECUTE_COMMAND.equals(reg.getMethod())) {
+                    // register 'workspace/executeCommand' capability
+                    try {
+                        ExecuteCommandOptions executeCommandOptions = JSONUtils.getLsp4jGson()
+                                .fromJson((JsonObject) reg.getRegisterOptions(),
+                                        ExecuteCommandOptions.class);
+                        List<String> newCommands = executeCommandOptions.getCommands();
+                        if (!newCommands.isEmpty()) {
+                            addRegistration(reg, () -> unregisterCommands(newCommands));
+                            registerCommands(newCommands);
+                        }
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting 'workspace/executeCommand' capability", e);
+                    }
+                } else if (LSPRequestConstants.TEXT_DOCUMENT_FORMATTING.equals(reg.getMethod())) {
+                    // register 'textDocument/formatting' capability
                     final Either<Boolean, DocumentFormattingOptions> documentFormattingProvider = serverCapabilities.getDocumentFormattingProvider();
                     if (documentFormattingProvider == null || documentFormattingProvider.isLeft()) {
                         serverCapabilities.setDocumentFormattingProvider(Boolean.TRUE);
@@ -938,7 +852,8 @@ public class LanguageServerWrapper implements Disposable {
                         serverCapabilities.setDocumentFormattingProvider(documentFormattingProvider.getRight());
                         addRegistration(reg, () -> serverCapabilities.setDocumentFormattingProvider(documentFormattingProvider));
                     }
-                } else if ("textDocument/rangeFormatting".equals(reg.getMethod())) { //$NON-NLS-1$
+                } else if (LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING.equals(reg.getMethod())) {
+                    // register 'textDocument/rangeFormatting' capability
                     final Either<Boolean, DocumentRangeFormattingOptions> documentRangeFormattingProvider = serverCapabilities.getDocumentRangeFormattingProvider();
                     if (documentRangeFormattingProvider == null || documentRangeFormattingProvider.isLeft()) {
                         serverCapabilities.setDocumentRangeFormattingProvider(Boolean.TRUE);
@@ -947,7 +862,8 @@ public class LanguageServerWrapper implements Disposable {
                         serverCapabilities.setDocumentRangeFormattingProvider(documentRangeFormattingProvider.getRight());
                         addRegistration(reg, () -> serverCapabilities.setDocumentRangeFormattingProvider(documentRangeFormattingProvider));
                     }
-                } else if ("textDocument/codeAction".equals(reg.getMethod())) { //$NON-NLS-1$
+                } else if (LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION.equals(reg.getMethod())) {
+                    // register 'textDocument/codeAction' capability
                     final Either<Boolean, CodeActionOptions> beforeRegistration = serverCapabilities.getCodeActionProvider();
                     serverCapabilities.setCodeActionProvider(Boolean.TRUE);
                     addRegistration(reg, () -> serverCapabilities.setCodeActionProvider(beforeRegistration));
@@ -1047,7 +963,7 @@ public class LanguageServerWrapper implements Disposable {
         if (this.initialProject == null && this.connectedDocuments.isEmpty()) {
             return true;
         }
-        if (file != null && file.exists()) {
+        if (file.exists()) {
             return true;
         }
         return serverDefinition.isSingleton();
@@ -1110,10 +1026,12 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * Returns the language server definition.
+     *
      * @return the language server definition.
      */
     @NotNull
     public LanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
+
 }

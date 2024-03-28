@@ -54,7 +54,12 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
         }
         LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, tokenRange);
         // force to compute of the name by using token range
-        triggeredElement.getName();
+        try {
+            triggeredElement.getName();
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
         UsageTarget target = new PsiElement2UsageTargetAdapter(triggeredElement, true);
         return new UsageTarget[]{target};
     }
