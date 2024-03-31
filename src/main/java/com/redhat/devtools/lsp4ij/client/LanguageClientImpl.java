@@ -19,13 +19,14 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
-import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
+import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
+import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -45,8 +46,12 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     private Runnable didChangeConfigurationListener;
 
+    @NotNull
+    private final LSPProgressManager progressManager;
+
     public LanguageClientImpl(Project project) {
         this.project = project;
+        progressManager = new LSPProgressManager();
     }
 
     public Project getProject() {
@@ -57,6 +62,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         this.server = server;
         this.wrapper = wrapper;
         this.diagnosticHandler = new LSPDiagnosticHandler(wrapper);
+        this.progressManager.connect(server, wrapper);
     }
 
     protected final LanguageServer getLanguageServer() {
@@ -112,7 +118,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     public CompletableFuture<List<WorkspaceFolder>> workspaceFolders() {
         Project project = wrapper.getProject();
         if (project != null) {
-            List<WorkspaceFolder> folders = Arrays.asList(LSPIJUtils.toWorkspaceFolder(project));
+            List<WorkspaceFolder> folders = List.of(LSPIJUtils.toWorkspaceFolder(project));
             return CompletableFuture.completedFuture(folders);
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
@@ -140,8 +146,19 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     @Override
+    public CompletableFuture<Void> createProgress(WorkDoneProgressCreateParams params) {
+        return progressManager.createProgress(params);
+    }
+
+    @Override
+    public void notifyProgress(ProgressParams params) {
+        progressManager.notifyProgress(params);
+    }
+
+    @Override
     public void dispose() {
         this.disposed = true;
+        this.progressManager.dispose();
     }
 
     public boolean isDisposed() {

@@ -2,6 +2,13 @@
 
 The current implementation of `LSP4IJ` does not yet fully adhere to the LSP (Language Server Protocol) specification. This section provides an overview of the supported LSP features for IntelliJ:
 
+## Base support
+
+Current state of [Base protocol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#baseProtocol) support:
+
+* ✅ [$/cancelRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#cancelRequest).
+* ✅ [$/progress](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress) (see [implementation details](#progress-support))
+
 ## Text Document Synchronization
 
 Current state of [Text Document Synchronization](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_synchronization) support:
@@ -94,11 +101,17 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
  * ✅ [window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest).
  * ❌ [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage).
  * ❌ [window/showDocument](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument).
- * ❌ [window/workDoneProgress/create](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_workDoneProgress_create).
- * ❌ [window/workDoneProgress/cancel](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_workDoneProgress_cancel).
  * ❌ [telemetry/event](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#telemetry_event).
 
 ## Implementation details
+
+#### Progress support
+
+[$/progress](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress) is implemented with `Background Tasks`.
+
+Here a sample with [Rust Analyzer](https://rust-analyzer.github.io/):
+
+![$/progress](./images/lsp-support/progress.png)
 
 #### Go to Definition
 
