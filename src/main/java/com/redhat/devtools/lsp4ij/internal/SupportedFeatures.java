@@ -175,7 +175,11 @@ public class SupportedFeatures {
     public static WindowClientCapabilities getWindowClientCapabilities() {
         final var windowClientCapabilities = new WindowClientCapabilities();
         //windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
-        //windowClientCapabilities.setWorkDoneProgress(true);
+        /**
+         * LSP4IJ supports server initiated progress using the
+         * `window/workDoneProgress/create` request.
+         */
+        windowClientCapabilities.setWorkDoneProgress(true);
         //windowClientCapabilities.setShowMessage(new WindowShowMessageRequestCapabilities());
         return windowClientCapabilities;
     }
