@@ -109,7 +109,7 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
 
 [$/progress](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress) is implemented with `Background Tasks`.
 
-Here a sample with [Rust Analyzer](https://rust-analyzer.github.io/):
+Here a sample with [Eclipse JDT Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls):
 
 ![$/progress](./images/lsp-support/progress.png)
 
