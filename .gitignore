@@ -7,3 +7,4 @@ out
 .DS_Store
 intellij-community-tmp
 bin/
+hs_err_pid*.log
