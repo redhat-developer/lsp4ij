@@ -59,12 +59,7 @@ public class LSPProgressManager implements Disposable {
     public CompletableFuture<Void> createProgress(final @NotNull WorkDoneProgressCreateParams params) {
         if (!isDisposed()) {
             String token = getToken(params.getToken());
-            LSPProgressInfo progress = progressMap.get(token);
-            if (progress != null) {
-                // An LSP progress already exists with this token, cancel it.
-                progress.cancel();
-            }
-            progressMap.put(token, new LSPProgressInfo(token));
+            getOrCreateProgressInfo(token);
         }
         return CompletableFuture.completedFuture(null);
     }
@@ -72,8 +67,8 @@ public class LSPProgressManager implements Disposable {
     private void createTask(LSPProgressInfo progressInfo) {
         String token = progressInfo.getToken();
         if (isProgressAlive(progressInfo)) {
-            // The progress has been done, cancelled, or the manager has been disposed,
-            // /don't create background task.
+            // The progress has been done, cancelled, or the manager has been disposed.
+            // --> don't create background task.
             progressMap.remove(token);
             return;
         }
@@ -90,7 +85,7 @@ public class LSPProgressManager implements Disposable {
                             // The user has clicked on cancel icon of the progress bar.
                             progressMap.remove(token);
                             if (languageServer != null) {
-                                // Cancel the LSP progress on language server side..
+                                // Cancel the LSP progress on language server side.
                                 final var workDoneProgressCancelParams = new WorkDoneProgressCancelParams();
                                 workDoneProgressCancelParams.setToken(token);
                                 languageServer.cancelProgress(workDoneProgressCancelParams);
@@ -109,7 +104,7 @@ public class LSPProgressManager implements Disposable {
                         }
                         if (progressNotification != null) {
                             WorkDoneProgressKind kind = progressNotification.getKind();
-                            switch(kind) {
+                            switch (kind) {
                                 case begin -> // 'begin' has been notified
                                         begin((WorkDoneProgressBegin) progressNotification, indicator);
                                 case report -> // 'report' has been notified
@@ -157,36 +152,64 @@ public class LSPProgressManager implements Disposable {
      * @param params the {@link ProgressParams} used for the progress notification
      */
     public void notifyProgress(final @NotNull ProgressParams params) {
-        if (isDisposed()) {
+        if (params.getValue() == null || params.getToken() == null || isDisposed()) {
+            return;
+        }
+        var value = params.getValue();
+        if (value.isRight()) {
+            // TODO: Partial Result Progress
+            // https://microsoft.github.io/language-server-protocol/specifications/specification-current/#partialResults
+            return;
+        }
+
+        if (!value.isLeft()) {
+            return;
+        }
+
+        // Work Done Progress
+        // https://microsoft.github.io/language-server-protocol/specifications/specification-current/#workDoneProgress
+        WorkDoneProgressNotification progressNotification = value.getLeft();
+        WorkDoneProgressKind kind = progressNotification.getKind();
+        if (kind == null) {
             return;
         }
         String token = getToken(params.getToken());
         LSPProgressInfo progress = progressMap.get(token);
         if (progress == null) {
-            // may happen if the server does not wait on the return value of the future of createProgress
-            return;
-        }
-        var value = params.getValue();
-        if (value == null || !value.isLeft()) {
-            return;
-        }
-        WorkDoneProgressNotification progressNotification = value.getLeft();
-        if (progressNotification != null) {
-            // Add the progress notification
-            progress.addProgressNotification(progressNotification);
-            switch (progressNotification.getKind()) {
-                case begin -> {
-                    // 'begin' progress
-                    WorkDoneProgressBegin begin = (WorkDoneProgressBegin) progressNotification;
-                    progress.setTitle(begin.getTitle());
-                    progress.setCancellable(begin.getCancellable() != null && begin.getCancellable());
-                    // The IJ task is created on 'begin' and not on 'create' to initialize
-                    // the Task with the 'begin' title.
-                    createTask(progress);
-                }
-                case end -> progress.setDone(true);
+            // The server is not spec-compliant and reports progress using server-initiated progress but didn't
+            // call window/workDoneProgress/create beforehand. In that case, we check the 'kind' field of the
+            // progress data. If the 'kind' field is 'begin', we set up a progress reporter anyway.
+            if (kind != WorkDoneProgressKind.begin) {
+                return;
             }
+            progress = getOrCreateProgressInfo(token);
         }
+
+        // Add the progress notification
+        progress.addProgressNotification(progressNotification);
+        switch (progressNotification.getKind()) {
+            case begin -> {
+                // 'begin' progress
+                WorkDoneProgressBegin begin = (WorkDoneProgressBegin) progressNotification;
+                progress.setTitle(begin.getTitle());
+                progress.setCancellable(begin.getCancellable() != null && begin.getCancellable());
+                // The IJ task is created on 'begin' and not on 'create' to initialize
+                // the Task with the 'begin' title.
+                createTask(progress);
+            }
+            case end -> progress.setDone(true);
+        }
+    }
+
+    @NotNull
+    private synchronized LSPProgressInfo getOrCreateProgressInfo(String token) {
+        LSPProgressInfo progress = progressMap.get(token);
+        if (progress != null) {
+            return progress;
+        }
+        progress = new LSPProgressInfo(token);
+        progressMap.put(token, progress);
+        return progress;
     }
 
     private static String getToken(Either<String, Integer> token) {
