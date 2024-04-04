@@ -90,7 +90,7 @@ public class LanguageServiceAccessor implements Disposable {
 
     @NotNull
     public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
-                                                                          Predicate<ServerCapabilities> filter) {
+                                                                          @Nullable Predicate<ServerCapabilities> filter) {
         URI uri = LSPIJUtils.toUri(file);
         if (uri == null) {
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -160,11 +160,13 @@ public class LanguageServiceAccessor implements Disposable {
      * {@code capabilitesPredicate} does not test positive for the server's
      * capabilities, {@code null} is returned.
      */
-    public CompletableFuture<LanguageServer> getInitializedLanguageServer(VirtualFile file,
-                                                                          LanguageServerDefinition lsDefinition, Predicate<ServerCapabilities> capabilitiesPredicate)
+    public CompletableFuture<LanguageServer> getInitializedLanguageServer(@NotNull VirtualFile file,
+                                                                          @NotNull Project project,
+                                                                          @NotNull LanguageServerDefinition lsDefinition,
+                                                                          Predicate<ServerCapabilities> capabilitiesPredicate)
             throws IOException {
         URI initialPath = LSPIJUtils.toUri(file);
-        LanguageServerWrapper wrapper = getLSWrapperForConnection(file, lsDefinition, initialPath);
+        LanguageServerWrapper wrapper = getLSWrapperForConnection(file, project,lsDefinition, initialPath);
         if (wrapper != null && capabilitiesComply(wrapper, capabilitiesPredicate)) {
             wrapper.connect(file);
             return wrapper.getInitializedServer();
@@ -382,8 +384,10 @@ public class LanguageServiceAccessor implements Disposable {
         return mapping.match(file, fileProject);
     }
 
-    private LanguageServerWrapper getLSWrapperForConnection(VirtualFile file,
-                                                            LanguageServerDefinition serverDefinition, URI initialPath) throws IOException {
+    private LanguageServerWrapper getLSWrapperForConnection(@NotNull VirtualFile file,
+                                                            @NotNull Project project,
+                                                            LanguageServerDefinition serverDefinition,
+                                                            URI initialPath) throws IOException {
         if (!serverDefinition.isEnabled()) {
             // don't return a language server wrapper for the given server definition
             return null;
@@ -398,7 +402,7 @@ public class LanguageServiceAccessor implements Disposable {
                 }
             }
             if (wrapper == null) {
-                wrapper = new LanguageServerWrapper(serverDefinition, initialPath);
+                wrapper = new LanguageServerWrapper(project, serverDefinition, initialPath);
                 wrapper.start();
             }
 

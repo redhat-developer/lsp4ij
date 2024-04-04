@@ -172,6 +172,33 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         }
     }
 
+    /**
+     * Returns the refactoring on file operation kind.
+     *
+     * <p>
+     * By default this methode returns {@link RefactoringOnFileOperationsKind#interactive}.
+     * </p>
+     *
+     * @return the refactoring on file operation kind.
+     */
+    @NotNull
+    public RefactoringOnFileOperationsKind getRefactoringOnFileOperationsKind() {
+        try {
+            return RefactoringOnFileOperationsKind.valueOf(myState.refactoringOnFileOperations);
+        } catch (Exception e) {
+            return RefactoringOnFileOperationsKind.interactive;
+        }
+    }
+
+    /**
+     * Update the refactoring on file operation kind settings.
+     *
+     * @param kind refactoring on file operation kind.
+     */
+    public void setRefactoringOnFileOperationsKind(@NotNull RefactoringOnFileOperationsKind kind) {
+        myState.refactoringOnFileOperations = kind.name();
+    }
+
     public static class LanguageServerDefinitionSettings {
 
         private String debugPort;
@@ -223,6 +250,11 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         @Tag("state")
         @XCollection
         public Map<String, LanguageServerDefinitionSettings> myState = new TreeMap<>();
+
+        /**
+         * @see {@link RefactoringOnFileOperationsKind}
+         */
+        public String refactoringOnFileOperations = RefactoringOnFileOperationsKind.interactive.name();
 
         MyState() {
         }

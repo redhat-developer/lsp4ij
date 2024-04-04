@@ -19,6 +19,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.actions.DisableLanguageServerErrorAction;
@@ -69,7 +70,7 @@ public class CancellationSupport implements CancelChecker {
      * @return the future to execute.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future) {
-        return execute(future, null, null);
+        return execute(future, (LanguageServerItem) null, null);
     }
 
     /**
@@ -83,6 +84,21 @@ public class CancellationSupport implements CancelChecker {
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
                                             @Nullable LanguageServerItem languageServer,
+                                            @Nullable String featureName) {
+        return execute(future, languageServer != null ? languageServer.getServerWrapper() : null, featureName);
+    }
+
+    /**
+     * Add the given future to the list of the futures to cancel (when CancellationSupport.cancel() is called)
+     *
+     * @param future         the future to cancel when CancellationSupport.cancel() is called.
+     * @param languageServer the language server which have created the LSP future and null otherwise.
+     * @param featureName    the LSP feature name (ex: textDocument/completion) and null otherwise.
+     * @param <T>            the result type of the future.
+     * @return the future to execute.
+     */
+    public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
+                                            @Nullable LanguageServerWrapper languageServer,
                                             @Nullable String featureName) {
         if (cancelled) {
             if (!future.isDone()) {
@@ -104,7 +120,7 @@ public class CancellationSupport implements CancelChecker {
     }
 
     @NotNull
-    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@NotNull LanguageServerItem languageServer, @Nullable String featureName) {
+    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@NotNull LanguageServerWrapper languageServer, @Nullable String featureName) {
         return (result, error) -> {
             if (error instanceof ResponseErrorException responseErrorException) {
                 if (isRequestCancelled(responseErrorException)) {
@@ -130,7 +146,7 @@ public class CancellationSupport implements CancelChecker {
         };
     }
 
-    private static void handleLanguageServerError(@NotNull LanguageServerItem languageServer,
+    private static void handleLanguageServerError(@NotNull LanguageServerWrapper languageServer,
                                                   @Nullable String featureName,
                                                   @NotNull Throwable error) {
         ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
@@ -139,7 +155,7 @@ public class CancellationSupport implements CancelChecker {
                     showNotificationError(languageServer, featureName, error);
             case in_log -> {
                 // Show LSP error in the log
-                String languageServerName = languageServer.getServerWrapper().getServerDefinition().getDisplayName();
+                String languageServerName = languageServer.getServerDefinition().getDisplayName();
                 LOGGER.error("Error while consuming '" + featureName + "' with language server '" + languageServerName + "'", error);
             }
             default -> {
@@ -148,13 +164,13 @@ public class CancellationSupport implements CancelChecker {
         }
     }
 
-    private static void showNotificationError(@NotNull LanguageServerItem languageServer, @Nullable String featureName, Throwable error) {
-        String languageServerName = languageServer.getServerWrapper().getServerDefinition().getDisplayName();
+    private static void showNotificationError(@NotNull LanguageServerWrapper serverWrapper, @Nullable String featureName, Throwable error) {
+        String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
         String title = languageServerName + " (" + featureName + ")";
         String content = error.getMessage();
         Notification notification = new Notification(LanguageServerBundle.message("language.server.protocol.groupId"), title, content, NotificationType.ERROR);
-        notification.addAction(new DisableLanguageServerErrorAction(notification, languageServer));
-        notification.addAction(new ReportErrorInLogAction(notification, languageServer));
+        notification.addAction(new DisableLanguageServerErrorAction(notification, serverWrapper));
+        notification.addAction(new ReportErrorInLogAction(notification, serverWrapper));
         notification.addAction(new OpenUrlAction(LSP4IJWebsiteUrlConstants.FEEDBACK_URL));
         notification.setIcon(AllIcons.General.Error);
         Notifications.Bus.notify(notification);
@@ -167,10 +183,10 @@ public class CancellationSupport implements CancelChecker {
      * @return the error reporting kind for the given language server.
      */
     @NotNull
-    private static ErrorReportingKind getReportErrorKind(@NotNull LanguageServerItem languageServer) {
-        String languageServerId = languageServer.getServerWrapper().getServerDefinition().getId();
+    private static ErrorReportingKind getReportErrorKind(@NotNull LanguageServerWrapper languageServer) {
+        String languageServerId = languageServer.getServerDefinition().getId();
         ErrorReportingKind errorReportingKind = null;
-        Project project = languageServer.getServerWrapper().getProject();
+        Project project = languageServer.getProject();
         UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = project != null ? UserDefinedLanguageServerSettings.getInstance(project)
                 .getLanguageServerSettings(languageServerId) : null;
         if (settings != null) {

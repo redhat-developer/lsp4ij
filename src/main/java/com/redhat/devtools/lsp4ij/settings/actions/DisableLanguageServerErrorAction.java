@@ -15,7 +15,6 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
@@ -26,11 +25,11 @@ import org.jetbrains.annotations.NotNull;
  */
 public class DisableLanguageServerErrorAction extends AnAction {
 
-    private final LanguageServerItem languageServer;
+    private final LanguageServerWrapper languageServer;
     private final Notification notification;
 
     public DisableLanguageServerErrorAction(@NotNull Notification notification,
-                                            @NotNull LanguageServerItem languageServer) {
+                                            @NotNull LanguageServerWrapper languageServer) {
         super(LanguageServerBundle.message("action.language.server.error.reporting.disable.text"));
         this.notification = notification;
         this.languageServer = languageServer;
@@ -38,11 +37,10 @@ public class DisableLanguageServerErrorAction extends AnAction {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        LanguageServerWrapper serverWrapper = languageServer.getServerWrapper();
-        UserDefinedLanguageServerSettings manager = UserDefinedLanguageServerSettings.getInstance(serverWrapper.getProject());
-        manager.updateSettings(serverWrapper.getServerDefinition().getId(),
+        UserDefinedLanguageServerSettings manager = UserDefinedLanguageServerSettings.getInstance(languageServer.getProject());
+        manager.updateSettings(languageServer.getServerDefinition().getId(),
                 new UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings()
-                .setErrorReportingKind(ErrorReportingKind.none));
+                        .setErrorReportingKind(ErrorReportingKind.none));
         notification.expire();
     }
 

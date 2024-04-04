@@ -10,10 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.CodeActionOptions;
+import org.eclipse.lsp4j.InlayHintRegistrationOptions;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
+import org.eclipse.lsp4j.services.WorkspaceService;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -392,6 +395,14 @@ public class LanguageServerItem {
                 LSPIJUtils.hasCapability(serverCapabilities.getDocumentRangeFormattingProvider());
     }
 
+
+    public static boolean isWillRenameFilesSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getWorkspace() != null &&
+                serverCapabilities.getWorkspace().getFileOperations() != null &&
+                serverCapabilities.getWorkspace().getFileOperations().getWillRename() != null;
+    }
+
     /**
      * Returns the LSP {@link TextDocumentService} of the language server.
      *
@@ -399,6 +410,15 @@ public class LanguageServerItem {
      */
     public TextDocumentService getTextDocumentService() {
         return getServer().getTextDocumentService();
+    }
+
+    /**
+     * Returns the LSP {@link WorkspaceService} of the language server.
+     *
+     * @return the LSP {@link WorkspaceService} of the language server.
+     */
+    public WorkspaceService getWorkspaceService() {
+        return getServer().getWorkspaceService();
     }
 
 }

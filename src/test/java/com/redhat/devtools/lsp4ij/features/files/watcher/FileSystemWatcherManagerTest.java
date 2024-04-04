@@ -8,15 +8,18 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.filewatchers;
+package com.redhat.devtools.lsp4ij.features.files.watcher;
 
 import com.intellij.openapi.util.SystemInfo;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.junit.Test;
 
 import java.net.URI;
 
+import static com.redhat.devtools.lsp4ij.URIFactory.getBaseDir;
+import static com.redhat.devtools.lsp4ij.URIFactory.getBaseUri;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -637,16 +640,4 @@ public class FileSystemWatcherManagerTest {
         manager.setFileSystemWatchers(options.getWatchers());
     }
 
-    private static String getBaseUri() {
-        return (SystemInfo.isWindows ? "file:///" : "file://") + getBaseDir();
-    }
-
-    private static String getBaseDir() {
-        String baseDir = System.getProperty("user.home")
-                .replace('\\', '/');
-        if (!baseDir.endsWith("/")) {
-            return baseDir + "/";
-        }
-        return baseDir;
-    }
 }

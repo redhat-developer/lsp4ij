@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.filewatchers;
+package com.redhat.devtools.lsp4ij.features.files;
 
 import org.junit.Test;
 
@@ -21,7 +21,7 @@ import static org.junit.Assert.assertArrayEquals;
 /**
  * Test with pattern expansion.
 **/
-public class PathPatternMatcherTest {
+public class PathPatternMatcher_expandPatternsTest {
 
     @Test
     public void noExpansion() {

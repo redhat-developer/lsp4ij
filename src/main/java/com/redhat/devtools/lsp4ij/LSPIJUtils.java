@@ -283,7 +283,7 @@ public class LSPIJUtils {
             line = 0;
         } else {
             // If a line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
-            line = Math.min(line, document.getLineCount() > 0 ? document.getLineCount() -1 : 0);
+            line = Math.min(line, document.getLineCount() > 0 ? document.getLineCount() - 1 : 0);
         }
         int lineStartOffset = document.getLineStartOffset(line);
         int lineEndOffset = document.getLineEndOffset(line);
@@ -423,33 +423,34 @@ public class LSPIJUtils {
         return document.getTextLength();
     }
 
-    public static void applyWorkspaceEdit(WorkspaceEdit edit) {
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit) {
         applyWorkspaceEdit(edit, null);
     }
 
-    public static void applyWorkspaceEdit(WorkspaceEdit edit, String label) {
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                          @Nullable String label) {
+        applyWorkspaceEdit(edit, label, null);
+    }
+
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                          @Nullable String label,
+                                          @Nullable Map<String /* file uri */, Document> documentProvider) {
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
-                    VirtualFile file = findResourceFor(change.getLeft().getTextDocument().getUri());
-                    if (file != null) {
-                        Document document = getDocument(file);
-                        if (document != null) {
-                            applyWorkspaceEdit(document, change.getLeft().getEdits());
-                        }
+                    Document document = findDocument(change.getLeft().getTextDocument().getUri(), documentProvider);
+                    if (document != null) {
+                        applyWorkspaceEdit(document, change.getLeft().getEdits());
                     }
                 } else if (change.isRight()) {
                     ResourceOperation resourceOperation = change.getRight();
                     if (resourceOperation instanceof CreateFile) {
                         CreateFile createOperation = (CreateFile) resourceOperation;
-                        VirtualFile targetFile = findResourceFor(createOperation.getUri());
-                        if (targetFile != null && createOperation.getOptions() != null) {
-                            if (!createOperation.getOptions().getIgnoreIfExists()) {
-                                Document document = getDocument(targetFile);
-                                if (document != null) {
-                                    TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
-                                    applyWorkspaceEdit(document, Collections.singletonList(textEdit));
-                                }
+                        if (createOperation.getOptions() != null && !createOperation.getOptions().getIgnoreIfExists()) {
+                            Document document = findDocument(createOperation.getUri(), documentProvider);
+                            if (document != null) {
+                                TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
+                                applyWorkspaceEdit(document, Collections.singletonList(textEdit));
                             }
                         } else {
                             try {
@@ -488,10 +489,18 @@ public class LSPIJUtils {
                         applyWorkspaceEdit(document, change.getValue());
                     }
                 }
-
             }
-
         }
+    }
+
+    private static Document findDocument(@NotNull String fileUri,
+                                         @Nullable Map<String /* file uri */, Document> documentProvider) {
+        Document document = documentProvider != null ? documentProvider.get(fileUri) : null;
+        if (document != null) {
+            return document;
+        }
+        VirtualFile file = findResourceFor(fileUri);
+        return file != null ? getDocument(file) : null;
     }
 
     /**

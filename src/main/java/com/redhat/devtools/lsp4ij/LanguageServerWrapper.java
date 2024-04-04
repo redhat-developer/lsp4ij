@@ -65,7 +65,7 @@ public class LanguageServerWrapper implements Disposable {
 
     @NotNull
     private final LanguageServerDefinition serverDefinition;
-    @Nullable
+    @NotNull
     protected final Project initialProject;
     @NotNull
     protected Map<URI, LSPVirtualFileData> connectedDocuments;
@@ -104,27 +104,25 @@ public class LanguageServerWrapper implements Disposable {
     private final @NotNull
     Map<String, Runnable> dynamicRegistrations = new HashMap<>();
     private boolean initiallySupportsWorkspaceFolders = false;
-    private final LSPFileListener fileListener = new LSPFileListener(this);
+    private LSPFileListener fileListener = new LSPFileListener(this);
 
     /* Backwards compatible constructor */
-    public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
+    public LanguageServerWrapper(@NotNull Project project,
+                                 @NotNull LanguageServerDefinition serverDefinition) {
         this(project, serverDefinition, null);
-    }
-
-    public LanguageServerWrapper(@NotNull LanguageServerDefinition serverDefinition, @Nullable URI initialPath) {
-        this(null, serverDefinition, initialPath);
     }
 
     /**
      * Unified private constructor to set sensible defaults in all cases
      */
-    private LanguageServerWrapper(@Nullable Project project, @NotNull LanguageServerDefinition serverDefinition,
-                                  @Nullable URI initialPath) {
+    public LanguageServerWrapper(@NotNull Project project,
+                                 @NotNull LanguageServerDefinition serverDefinition,
+                                 @Nullable URI initialPath) {
         this.initialProject = project;
         this.initialPath = initialPath;
         this.serverDefinition = serverDefinition;
         this.connectedDocuments = new HashMap<>();
-        String projectName = sanitize((project != null && project.getName() != null && !serverDefinition.isSingleton()) ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
+        String projectName = sanitize(project.getName() != null && !serverDefinition.isSingleton() ? "@" + project.getName() : "");  //$NON-NLS-1$//$NON-NLS-2$
         String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
         this.dispatcher = Executors
                 .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(dispatcherThreadNameFormat).build());
@@ -151,6 +149,7 @@ public class LanguageServerWrapper implements Disposable {
         return name.replace("%", "");
     }
 
+    @NotNull
     public Project getProject() {
         return initialProject;
     }
@@ -299,6 +298,7 @@ public class LanguageServerWrapper implements Disposable {
                         });
 
                         messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
+                        fileListener.setServerCapabilities(serverCapabilities);
                         messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
                         messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkVirtualFileListenerAdapter(fileListener));
 
@@ -631,7 +631,7 @@ public class LanguageServerWrapper implements Disposable {
         disconnect(path, true);
     }
 
-    void disconnect(URI path, boolean stopIfNoOpenedFiles) {
+    public void disconnect(URI path, boolean stopIfNoOpenedFiles) {
         LSPVirtualFileData data = this.connectedDocuments.remove(path);
         if (data != null) {
             // Remove the listener from the old document stored in synchronizer

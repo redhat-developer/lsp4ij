@@ -175,9 +175,9 @@
 
         <!-- LSP textDocument/codeLens request support -->
         <codeInsight.codeVisionProviderFactory
-                implementation="com.redhat.devtools.lsp4ij.features.codelens.DummyCodeVisionProviderFactory" />
+                implementation="com.redhat.devtools.lsp4ij.features.codelens.DummyCodeVisionProviderFactory"/>
         <config.codeVisionGroupSettingProvider
-            implementation="com.redhat.devtools.lsp4ij.features.codelens.LSPCodeLensSettingsProvider" />
+                implementation="com.redhat.devtools.lsp4ij.features.codelens.LSPCodeLensSettingsProvider"/>
         <codeInsight.codeVisionProvider
                 id="LSPCodeLensProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.codelens.LSPCodeLensProvider"/>
@@ -250,6 +250,13 @@
         <usageTypeProvider
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider"/>
 
+        <!-- willRenameFiles support -->
+        <renamePsiElementProcessor
+                implementation="com.redhat.devtools.lsp4ij.refactoring.LSPRenamePsiElementProcessor"
+                order="last"/>
+        <qualifiedNameProvider
+                implementation="com.redhat.devtools.lsp4ij.refactoring.LSPQualifiedNameProvider" />
+
         <notificationGroup
                 id="Language Server Protocol"
                 displayType="BALLOON"
@@ -265,9 +272,10 @@
                 class="com.redhat.devtools.lsp4ij.commands.editor.ShowReferencesAction"/>
     </actions>
 
-    <!-- LSP consoles -->
+    <!-- LSP4IJ preferences -->
     <extensions defaultExtensionNs="com.intellij">
 
+        <!-- The preference root "Language Servers"-->
         <projectConfigurable
                 groupId="language"
                 id="LanguageServers"
@@ -275,20 +283,33 @@
                 nonDefaultProject="true"
                 key="language.servers"
                 instance="com.redhat.devtools.lsp4ij.settings.LanguageServerListConfigurable"/>
+
+        <!-- The preference "Refactoring"-->
+        <projectConfigurable
+                groupId="LanguageServers"
+                id="LanguageServersRefactoring"
+                bundle="messages.LanguageServerBundle"
+                nonDefaultProject="true"
+                key="language.servers.refactoring"
+                instance="com.redhat.devtools.lsp4ij.settings.ui.refactoring.LanguageServerRefactoringConfigurable"/>
+
         <projectService
                 id="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"
                 serviceImplementation="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"/>
+
+    </extensions>
+
+    <!-- LSP consoles -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- LSP consoles tool window -->
         <toolWindow
                 id="Language Servers"
                 anchor="bottom"
                 factoryClass="com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowFactory"
                 canCloseContents="false"
                 icon="AllIcons.Webreferences.Server"/>
-
     </extensions>
-
-    <!-- Launch configuration Language servers -->
-
+    <!-- LSP consoles actions to start, stop, etc language servers -->
     <actions resource-bundle="messages.LanguageServerBundle">
         <action
                 id="lsp.console.explorer.restart"

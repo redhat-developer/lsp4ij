@@ -14,7 +14,10 @@
 package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
@@ -127,9 +130,26 @@ public class CompletableFutures {
                 }
                 throw e;
             } catch (InterruptedException e) {
-                Thread.interrupted();
+                Thread.currentThread().interrupt();
             }
         }
+    }
+
+    public static void waitUntilDoneWithBackgroundTask(@NotNull CompletableFuture<?> future,
+                                                                          @NotNull String title,
+                                                                          @NotNull Project project) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, title, true) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                    while (!future.isDone()) {
+
+                        if (indicator.isCanceled()) {
+                            // The user has clicked on cancel icon of the progress bar.
+                            future.cancel(true);
+                        }
+                    }
+            }
+        });
     }
 
 }
