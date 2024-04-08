@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.codelens;
+package com.redhat.devtools.lsp4ij.features.codeLens;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-import static com.redhat.devtools.lsp4ij.features.codelens.LSPCodeLensProvider.getCodeLensContent;
+import static com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider.getCodeLensContent;
 
 /**
  * LSP codeLens support which loads and caches code lenses by consuming:

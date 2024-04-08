@@ -11,7 +11,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.codeactions;
+package com.redhat.devtools.lsp4ij.features.codeAction;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.util.IntentionFamilyName;
@@ -23,35 +23,41 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.CodeAction;
+import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerItem.isCodeActionResolveSupported;
-import static com.redhat.devtools.lsp4ij.features.codeactions.LSPLazyCodeActions.NO_CODE_ACTION_AT_INDEX;
 
 /**
- * The lazy IJ Quick fix.
+ * The lazy IJ Quick fix / Intention.
  */
 public class LSPLazyCodeActionIntentionAction implements IntentionAction {
 
-    private final LSPLazyCodeActions lazyCodeActions;
+    private LSPLazyCodeActionProvider lazyCodeActions;
 
     private final int index;
-    private Either<Command, CodeAction> action;
+    private Either<CodeActionData, Boolean> action;
     private CodeAction codeAction;
 
     private String title;
     private Command command;
     private String familyName;
 
-    public LSPLazyCodeActionIntentionAction(LSPLazyCodeActions lazyCodeActions, int index) {
-        this.lazyCodeActions = lazyCodeActions;
+    public LSPLazyCodeActionIntentionAction(int index) {
         this.index = index;
+        this.familyName = LanguageServerBundle.message("lsp.intention.code.action.kind.empty");
+    }
+
+    public void setLazyCodeActions(LSPLazyCodeActionProvider lazyCodeActions) {
+        action = null;
+        this.lazyCodeActions = lazyCodeActions;
     }
 
     @Override
@@ -116,7 +122,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     }
 
     private LanguageServerWrapper getLanguageServerWrapper() {
-        return lazyCodeActions.getLanguageServerWrapper();
+        return action.getLeft().languageServer();
     }
 
     @Override
@@ -125,6 +131,9 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     }
 
     private void loadCodeActionIfNeeded() {
+        if (lazyCodeActions == null) {
+            return;
+        }
         if (action != null) {
             // The LSP code action has been already loaded.
             return;
@@ -132,10 +141,11 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         // Try to get the LSP code action from the given indes
         this.action = lazyCodeActions.getCodeActionAt(index);
         if (isValidCodeAction()) {
+            var action = this.action.getLeft().codeAction();
             if (action.isRight()) {
                 codeAction = action.getRight();
                 title = action.getRight().getTitle();
-                familyName = StringUtils.isNotBlank(codeAction.getKind()) ? codeAction.getKind() : "LSP QuickFix";
+                familyName = getFamilyName(codeAction);
             } else if (action.isLeft()) {
                 command = action.getLeft();
                 title = command.getTitle();
@@ -144,8 +154,34 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         }
     }
 
+    @NotNull
+    private static String getFamilyName(@NotNull CodeAction codeAction) {
+        String kind = codeAction.getKind();
+        if (StringUtils.isNotBlank(kind)) {
+            switch (kind) {
+                case CodeActionKind.QuickFix :
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.quickfix");
+                case CodeActionKind.Refactor:
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.refactor");
+                case CodeActionKind.RefactorExtract:
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.refactor.extract");
+                case CodeActionKind.RefactorInline:
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.refactor.inline");
+                case CodeActionKind.RefactorRewrite:
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.refactor.rewrite");
+                case CodeActionKind.Source:
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.source");
+                case CodeActionKind.SourceFixAll:
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.source.fixAll");
+                case CodeActionKind.SourceOrganizeImports:
+                    return LanguageServerBundle.message("lsp.intention.code.action.kind.source.organizeImports");
+            }
+        }
+        return LanguageServerBundle.message("lsp.intention.code.action.kind.empty");
+    }
+
     private boolean isValidCodeAction() {
-        return action != null && !NO_CODE_ACTION_AT_INDEX.equals(action);
+        return action != null && action.isLeft();
     }
 
 }

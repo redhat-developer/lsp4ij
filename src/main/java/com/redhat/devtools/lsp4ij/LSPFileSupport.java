@@ -13,7 +13,8 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.features.codelens.LSPCodeLensSupport;
+import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCodeActionSupport;
+import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
@@ -50,6 +51,9 @@ public class LSPFileSupport implements Disposable {
     private final LSPDocumentLinkSupport documentLinkSupport;
 
     private final LSPHoverSupport hoverSupport;
+
+    private final LSPIntentionCodeActionSupport intentionCodeActionSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -61,6 +65,7 @@ public class LSPFileSupport implements Disposable {
         this.signatureHelpSupport = new LSPSignatureHelpSupport(file);
         this.documentLinkSupport = new LSPDocumentLinkSupport(file);
         this.hoverSupport = new LSPHoverSupport(file);
+        this.intentionCodeActionSupport = new LSPIntentionCodeActionSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -77,6 +82,7 @@ public class LSPFileSupport implements Disposable {
         getSignatureHelpSupport().cancel();
         getDocumentLinkSupport().cancel();
         getHoverSupport().cancel();
+        getIntentionCodeActionSupport().cancel();
     }
 
     /**
@@ -158,6 +164,15 @@ public class LSPFileSupport implements Disposable {
      */
     public LSPHoverSupport getHoverSupport() {
         return hoverSupport;
+    }
+
+    /**
+     * Returns the LSP code action support.
+     *
+     * @return the LSP code action support.
+     */
+    public LSPIntentionCodeActionSupport getIntentionCodeActionSupport() {
+        return intentionCodeActionSupport;
     }
 
     /**

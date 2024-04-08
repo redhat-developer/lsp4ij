@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.codelens;
+package com.redhat.devtools.lsp4ij.features.codeLens;
 
 import com.intellij.codeInsight.codeVision.settings.CodeVisionGroupSettingProvider;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
