@@ -80,7 +80,7 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      *
      * @return true if the current LSP requests is valid and false otherwise.
      */
-    private boolean isValidLSPFuture() {
+    protected boolean isValidLSPFuture() {
         return future != null && !future.isCompletedExceptionally() && checkFileValid();
     }
 

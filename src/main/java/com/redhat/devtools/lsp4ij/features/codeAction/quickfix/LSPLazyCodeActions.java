@@ -11,22 +11,25 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.codeactions;
+package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
+import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
+import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -34,16 +37,14 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
- * This class returns 10 IJ {@link LSPLazyCodeActionIntentionAction} which does nothing. It loads the LSP code actions
+ * This class returns 20 IJ {@link LSPLazyCodeActionIntentionAction} which does nothing. It loads the LSP code actions
  * for the given diagnostic only when user triggers the quick fixes for the diagnostic.
  *
  * @author Angelo ZERR
  */
-public class LSPLazyCodeActions {
+public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
 
-    public static final Either<Command, CodeAction> NO_CODE_ACTION_AT_INDEX = Either.forLeft(new Command());
-
-    private static final int NB_LAZY_CODE_ACTIONS = 10;
+    private static final int NB_LAZY_CODE_ACTIONS = 20;
 
     // The diagnostic
     private final List<Diagnostic> diagnostics;
@@ -58,16 +59,18 @@ public class LSPLazyCodeActions {
     private final List<LSPLazyCodeActionIntentionAction> codeActions;
 
     // LSP code actions request used to load code action for the diagnostic.
-    private CompletableFuture<List<Either<Command, CodeAction>>> lspCodeActionRequest = null;
+    private CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
 
-    public LSPLazyCodeActions(List<Diagnostic> diagnostics, VirtualFile file, LanguageServerWrapper languageServerWrapper) {
+    public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
+                              @NotNull VirtualFile file,
+                              @NotNull LanguageServerWrapper languageServerWrapper) {
         this.diagnostics = diagnostics;
         this.file = file;
         this.languageServerWrapper = languageServerWrapper;
-        // Create 10 lazy IJ quick fixes which does nothing (IntentAction#isAvailable returns false)
+        // Create 20 lazy IJ quick fixes which does nothing (IntentAction#isAvailable returns false)
         codeActions = new ArrayList<>(NB_LAZY_CODE_ACTIONS);
         for (int i = 0; i < NB_LAZY_CODE_ACTIONS; i++) {
-            codeActions.add(new LSPLazyCodeActionIntentionAction(this, i));
+            codeActions.add(new LSPQuickFixIntentionAction(this, i));
         }
     }
 
@@ -77,26 +80,26 @@ public class LSPLazyCodeActions {
      * @param index the code action index.
      * @return the LSP CodeAction for the given index and null otherwise.
      */
-    public @Nullable Either<Command, CodeAction> getCodeActionAt(int index) {
-        List<Either<Command, CodeAction>> codeActions = getOrLoadCodeActions();
+    @Override
+    public @Nullable Either<CodeActionData, Boolean> getCodeActionAt(int index) {
+        List<CodeActionData> codeActions = getOrLoadCodeActions();
         if (codeActions != null) {
             if (codeActions.size() > index) {
                 // The LSP code actions are loaded and it matches the given index
-                return codeActions.get(index);
+                return Either.forLeft(codeActions.get(index));
             }
-            return NO_CODE_ACTION_AT_INDEX;
+            return Either.forRight(Boolean.FALSE);
         }
         return null;
     }
 
-    @Nullable
-    private List<Either<Command, CodeAction>> getOrLoadCodeActions() {
+    private List<CodeActionData> getOrLoadCodeActions() {
         if (lspCodeActionRequest == null) {
             // Create LSP textDocument/codeAction request
             lspCodeActionRequest = loadCodeActionsFor(diagnostics);
         }
         // Get the response of the LSP textDocument/codeAction request.
-        List<Either<Command, CodeAction>> codeActions = null;
+        List<CodeActionData> codeActions = null;
         try {
             waitUntilDone(lspCodeActionRequest);
             if (isDoneNormally(lspCodeActionRequest)) {
@@ -115,7 +118,7 @@ public class LSPLazyCodeActions {
      * @param diagnostics the LSP diagnostic.
      * @return list of Intellij {@link IntentionAction} which are used to create Intellij QuickFix.
      */
-    private CompletableFuture<List<Either<Command, CodeAction>>> loadCodeActionsFor(List<Diagnostic> diagnostics) {
+    private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(List<Diagnostic> diagnostics) {
         return CompletableFutures
                 .computeAsyncCompose(cancelChecker -> languageServerWrapper
                         .getInitializedServer()
@@ -130,7 +133,22 @@ public class LSPLazyCodeActions {
                                     .thenApply(codeActions -> {
                                         // Code action are collected here
                                         cancelChecker.checkCanceled();
-                                        return Objects.requireNonNullElse(codeActions, Collections.emptyList());
+                                        if (codeActions == null || codeActions.isEmpty()) {
+                                            return Collections.emptyList();
+                                        }
+                                        return codeActions
+                                                .stream()
+                                                .filter(ca -> {
+                                                    if (ca.isRight()) {
+                                                        CodeAction codeAction = ca.getRight();
+                                                        return codeAction.getKind() == null ||
+                                                                codeAction.getKind().isEmpty() ||
+                                                                CodeActionKind.QuickFix.equals(codeAction.getKind());
+                                                    }
+                                                    return true;
+                                                })
+                                                .map(ca -> new CodeActionData(ca, languageServerWrapper))
+                                                .toList();
                                     });
                         }));
     }
@@ -150,8 +168,8 @@ public class LSPLazyCodeActions {
         params.setRange(range);
 
         CodeActionContext context = new CodeActionContext(diagnostics);
-        // TODO: Collect only 'quickfix' code actions when other code actions could appear in some refactoring menu
-        // context.setOnly(Collections.singletonList(CodeActionKind.QuickFix));
+        // Collect only 'quickfix' code actions, the other code actions will appear in the Refactoring menu
+        context.setOnly(Collections.singletonList(CodeActionKind.QuickFix));
         context.setTriggerKind(CodeActionTriggerKind.Automatic);
         params.setContext(context);
         return params;
