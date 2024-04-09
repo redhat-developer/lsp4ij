@@ -9,7 +9,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.filewatchers;
+package com.redhat.devtools.lsp4ij.features.files;
 
 import java.net.URI;
 import java.nio.file.FileSystems;

@@ -69,3 +69,11 @@ The following LSP features are integrated with the standard `Find Usages` menu (
 
 
 ![Find Usages result](./images/find-usages/FindUsagesResult.png)
+
+### Refactoring
+
+#### On file operation
+
+If the language server can support [workspace/willRenameFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles), when a file is
+renamed inside IntelliJ IDEA, LSP4IJ can consume it and applies the `WorkspaceEdit`
+to apply some refactoring.

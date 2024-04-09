@@ -127,7 +127,7 @@ public class CompletableFutures {
                 }
                 throw e;
             } catch (InterruptedException e) {
-                Thread.interrupted();
+                Thread.currentThread().interrupt();
             }
         }
     }

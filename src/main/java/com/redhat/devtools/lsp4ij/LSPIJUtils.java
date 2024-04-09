@@ -423,11 +423,12 @@ public class LSPIJUtils {
         return document.getTextLength();
     }
 
-    public static void applyWorkspaceEdit(WorkspaceEdit edit) {
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit) {
         applyWorkspaceEdit(edit, null);
     }
 
-    public static void applyWorkspaceEdit(WorkspaceEdit edit, String label) {
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                          @Nullable String label) {
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
