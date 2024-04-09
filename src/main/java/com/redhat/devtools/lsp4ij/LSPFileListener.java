@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.vfs.*;
-import com.redhat.devtools.lsp4ij.features.filewatchers.FileSystemWatcherManager;
+import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -171,4 +171,5 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     public void setFileSystemWatchers(List<FileSystemWatcher> fileSystemWatchers) {
         fileSystemWatcherManager.setFileSystemWatchers(fileSystemWatchers);
     }
+
 }

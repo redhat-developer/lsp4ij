@@ -17,6 +17,9 @@ public class LSPRequestConstants {
 
     // workspace/* LSP requests
     public static final String WORKSPACE_EXECUTE_COMMAND = "workspace/executeCommand";
+    public static final String WORKSPACE_WILL_CREATE_FILES = "workspace/willCreateFiles";
+    public static final String WORKSPACE_WILL_DELETE_FILES = "workspace/willDeleteFiles";
+    public static final String WORKSPACE_WILL_RENAME_FILES = "workspace/willRenameFiles";
 
     // textDocument/* LSP requests
 

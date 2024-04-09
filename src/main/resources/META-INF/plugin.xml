@@ -250,6 +250,11 @@
         <usageTypeProvider
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider"/>
 
+        <!-- willRenameFiles support -->
+        <renamePsiElementProcessor
+                implementation="com.redhat.devtools.lsp4ij.features.refactoring.LSPRenamePsiElementProcessor"
+                order="last"/>
+
         <!-- Code Action support-->
         <intentionAction>
             <bundleName>messages.LanguageServerBundle</bundleName>
@@ -442,5 +447,10 @@
                 topic="com.intellij.openapi.project.ProjectManagerListener"
                 class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
     </applicationListeners>
+
+    <projectListeners>
+        <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"
+                  class="com.redhat.devtools.lsp4ij.features.refactoring.LSPRefactoringListener" />
+    </projectListeners>
 
 </idea-plugin>

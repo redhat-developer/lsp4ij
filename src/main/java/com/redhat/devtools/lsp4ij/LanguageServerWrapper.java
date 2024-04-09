@@ -23,8 +23,10 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
+import com.intellij.psi.PsiFile;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.internal.SupportedFeatures;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
@@ -65,7 +67,7 @@ public class LanguageServerWrapper implements Disposable {
 
     @NotNull
     private final LanguageServerDefinition serverDefinition;
-    @Nullable
+    @NotNull
     protected final Project initialProject;
     @NotNull
     protected Map<URI, LSPVirtualFileData> connectedDocuments;
@@ -106,25 +108,24 @@ public class LanguageServerWrapper implements Disposable {
     private boolean initiallySupportsWorkspaceFolders = false;
     private final LSPFileListener fileListener = new LSPFileListener(this);
 
+    private FileOperationsManager fileOperationsManager;
+
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
         this(project, serverDefinition, null);
     }
 
-    public LanguageServerWrapper(@NotNull LanguageServerDefinition serverDefinition, @Nullable URI initialPath) {
-        this(null, serverDefinition, initialPath);
-    }
-
     /**
      * Unified private constructor to set sensible defaults in all cases
      */
-    private LanguageServerWrapper(@Nullable Project project, @NotNull LanguageServerDefinition serverDefinition,
-                                  @Nullable URI initialPath) {
+    public LanguageServerWrapper(@NotNull Project project,
+                                 @NotNull LanguageServerDefinition serverDefinition,
+                                 @Nullable URI initialPath) {
         this.initialProject = project;
         this.initialPath = initialPath;
         this.serverDefinition = serverDefinition;
         this.connectedDocuments = new HashMap<>();
-        String projectName = sanitize((project != null && project.getName() != null && !serverDefinition.isSingleton()) ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
+        String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
         String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
         this.dispatcher = Executors
                 .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(dispatcherThreadNameFormat).build());
@@ -136,12 +137,11 @@ public class LanguageServerWrapper implements Disposable {
         this.listener = Executors
                 .newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(listenerThreadNameFormat).build());
         udateStatus(ServerStatus.none);
-        if (project != null) {
-            // When project is disposed, we dispose the language server
-            // But the language server should be disposed before because when project is closing
-            // We do that to be sure that language server is disposed.
-            Disposer.register(project, this);
-        }
+
+        // When project is disposed, we dispose the language server
+        // But the language server should be disposed before because when project is closing
+        // We do that to be sure that language server is disposed.
+        Disposer.register(project, this);
     }
 
     /**
@@ -151,6 +151,7 @@ public class LanguageServerWrapper implements Disposable {
         return name.replace("%", "");
     }
 
+    @NotNull
     public Project getProject() {
         return initialProject;
     }
@@ -287,9 +288,8 @@ public class LanguageServerWrapper implements Disposable {
                         serverCapabilities = res.getCapabilities();
                         this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                     }).thenRun(() -> this.languageServer.initialized(new InitializedParams())).thenRun(() -> {
-                        final List<URI> toReconnect = filesToReconnect;
                         initializeFuture.thenRunAsync(() -> {
-                            for (URI fileToReconnect : toReconnect) {
+                            for (URI fileToReconnect : filesToReconnect) {
                                 try {
                                     connect(fileToReconnect);
                                 } catch (IOException e) {
@@ -301,6 +301,9 @@ public class LanguageServerWrapper implements Disposable {
                         messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
                         messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
                         messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkVirtualFileListenerAdapter(fileListener));
+
+                        fileOperationsManager = new FileOperationsManager(this);
+                        fileOperationsManager.setServerCapabilities(serverCapabilities);
 
                         udateStatus(ServerStatus.started);
                         getLanguageServerLifecycleManager().onStatusChanged(this);
@@ -335,10 +338,8 @@ public class LanguageServerWrapper implements Disposable {
         initParams.setClientInfo(getClientInfo());
         initParams.setTrace(this.lspStreamProvider.getTrace(rootURI));
 
-        if (initialProject != null) {
-            var folders = List.of(LSPIJUtils.toWorkspaceFolder(initialProject));
-            initParams.setWorkspaceFolders(folders);
-        }
+        var folders = List.of(LSPIJUtils.toWorkspaceFolder(initialProject));
+        initParams.setWorkspaceFolders(folders);
 
         // no then...Async future here as we want this chain of operation to be sequential and "atomic"-ish
         return languageServer.initialize(initParams);
@@ -347,12 +348,11 @@ public class LanguageServerWrapper implements Disposable {
     @Nullable
     private URI getRootURI() {
         final Project project = this.initialProject;
-        if (project != null && !project.isDisposed()) {
+        if (!project.isDisposed()) {
             return LSPIJUtils.toUri(project);
         }
 
-        final URI path = this.initialPath;
-        if (path != null) {
+        if (this.initialPath != null) {
             File projectDirectory = new File(initialPath);
             if (projectDirectory.isFile()) {
                 projectDirectory = projectDirectory.getParentFile();
@@ -631,7 +631,7 @@ public class LanguageServerWrapper implements Disposable {
         disconnect(path, true);
     }
 
-    void disconnect(URI path, boolean stopIfNoOpenedFiles) {
+    public void disconnect(URI path, boolean stopIfNoOpenedFiles) {
         LSPVirtualFileData data = this.connectedDocuments.remove(path);
         if (data != null) {
             // Remove the listener from the old document stored in synchronizer
@@ -686,11 +686,11 @@ public class LanguageServerWrapper implements Disposable {
     @Deprecated
     @Nullable
     public LanguageServer getServer() {
-        CompletableFuture<LanguageServer> languagServerFuture = getInitializedServer();
+        CompletableFuture<LanguageServer> languageServerFuture = getInitializedServer();
         if (ApplicationManager.getApplication().isDispatchThread()) { // UI Thread
             return this.languageServer;
         } else {
-            return languagServerFuture.join();
+            return languageServerFuture.join();
         }
     }
 
@@ -708,20 +708,6 @@ public class LanguageServerWrapper implements Disposable {
             return CompletableFuture.completedFuture(null);
         }
         if (initializeFuture != null && !this.initializeFuture.isDone()) {
-            /*if (ApplicationManager.getApplication().isDispatchThread()) { // UI Thread
-                try {
-                    ProgressManager.getInstance().run(new Task.WithResult<Void, Exception>(null, Messages.initializeLanguageServer_job, false) {
-                        @Override
-                        protected Void compute(@NotNull ProgressIndicator indicator) throws Exception {
-                            indicator.setText("Waiting for server " + LanguageServerWrapper.this.serverDefinition.id + " to be started");
-                            initializeFuture.join();
-                            return null;
-                        }
-                    });
-                } catch (Exception e) {
-                    LOGGER.error(e.getLocalizedMessage(), e);
-                }
-            }*/
             return initializeFuture.thenApply(r -> this.languageServer);
         }
         return CompletableFuture.completedFuture(this.languageServer);
@@ -942,14 +928,11 @@ public class LanguageServerWrapper implements Disposable {
 
     int getVersion(VirtualFile file) {
         if (file != null) {
-            URI uri = LSPIJUtils.toUri(file);
-            if (uri != null) {
-                LSPVirtualFileData data = connectedDocuments.get(LSPIJUtils.toUri(file));
-                if (data != null) {
-                    var synchronizer = data.getSynchronizer();
-                    if (synchronizer != null) {
-                        return synchronizer.getVersion();
-                    }
+            LSPVirtualFileData data = connectedDocuments.get(LSPIJUtils.toUri(file));
+            if (data != null) {
+                var synchronizer = data.getSynchronizer();
+                if (synchronizer != null) {
+                    return synchronizer.getVersion();
                 }
             }
         }
@@ -960,7 +943,7 @@ public class LanguageServerWrapper implements Disposable {
         if (this.isConnectedTo(LSPIJUtils.toUri(file))) {
             return true;
         }
-        if (this.initialProject == null && this.connectedDocuments.isEmpty()) {
+        if (this.connectedDocuments.isEmpty()) {
             return true;
         }
         if (file.exists()) {
@@ -971,7 +954,7 @@ public class LanguageServerWrapper implements Disposable {
 
     private LanguageServerLifecycleManager getLanguageServerLifecycleManager() {
         Project project = initialProject;
-        if (project == null || project.isDisposed()) {
+        if (project.isDisposed()) {
             return NullLanguageServerLifecycleManager.INSTANCE;
         }
         return LanguageServerLifecycleManager.getInstance(project);
@@ -1034,4 +1017,29 @@ public class LanguageServerWrapper implements Disposable {
         return serverDefinition;
     }
 
+    /**
+     * Returns true if the given file support the 'workspace/willRenameFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/willRenameFiles' and false otherwise.
+     */
+    public boolean isWillRenameFilesSupported(PsiFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        return fileOperationsManager.canWillRenameFiles(LSPIJUtils.toUri(file), file.isDirectory());
+    }
+
+    /**
+     * Returns true if the given file support the 'workspace/didRenameFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/didRenameFiles' and false otherwise.
+     */
+    public boolean isDidRenameFilesSupported(PsiFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        return fileOperationsManager.canDidRenameFiles(LSPIJUtils.toUri(file), file.isDirectory());
+    }
 }

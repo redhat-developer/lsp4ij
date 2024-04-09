@@ -10,10 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import org.eclipse.lsp4j.*;
+import com.intellij.psi.PsiFile;
+import org.eclipse.lsp4j.CodeActionOptions;
+import org.eclipse.lsp4j.InlayHintRegistrationOptions;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
+import org.eclipse.lsp4j.services.WorkspaceService;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -171,7 +175,7 @@ public class LanguageServerItem {
                 return caProvider.getLeft();
             } else if (caProvider.isRight()) {
                 CodeActionOptions options = caProvider.getRight();
-                return options.getResolveProvider() != null && options.getResolveProvider().booleanValue();
+                return options.getResolveProvider() != null && options.getResolveProvider();
             }
         }
         return false;
@@ -187,7 +191,7 @@ public class LanguageServerItem {
         if (serverCapabilities != null &&
                 serverCapabilities.getCompletionProvider() != null &&
                 serverCapabilities.getCompletionProvider().getResolveProvider() != null) {
-            return serverCapabilities.getCompletionProvider().getResolveProvider().booleanValue();
+            return serverCapabilities.getCompletionProvider().getResolveProvider();
         }
         return false;
     }
@@ -224,7 +228,7 @@ public class LanguageServerItem {
         if (serverCapabilities != null &&
                 serverCapabilities.getCodeLensProvider() != null &&
                 serverCapabilities.getCodeLensProvider().getResolveProvider() != null) {
-            return serverCapabilities.getCodeLensProvider().getResolveProvider().booleanValue();
+            return serverCapabilities.getCodeLensProvider().getResolveProvider();
         }
         return false;
     }
@@ -243,7 +247,7 @@ public class LanguageServerItem {
                 return inlayHintProvider.getLeft();
             } else if (inlayHintProvider.isRight()) {
                 InlayHintRegistrationOptions options = inlayHintProvider.getRight();
-                return options.getResolveProvider() != null && options.getResolveProvider().booleanValue();
+                return options.getResolveProvider() != null && options.getResolveProvider();
             }
         }
         return false;
@@ -420,6 +424,18 @@ public class LanguageServerItem {
         return false;
     }
 
+
+    public boolean isWillRenameFilesSupported(PsiFile file) {
+        return serverWrapper.isWillRenameFilesSupported(file);
+    }
+
+    public static boolean isWillRenameFilesSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getWorkspace() != null &&
+                serverCapabilities.getWorkspace().getFileOperations() != null &&
+                serverCapabilities.getWorkspace().getFileOperations().getWillRename() != null;
+    }
+
     /**
      * Returns the LSP {@link TextDocumentService} of the language server.
      *
@@ -427,6 +443,15 @@ public class LanguageServerItem {
      */
     public TextDocumentService getTextDocumentService() {
         return getServer().getTextDocumentService();
+    }
+
+    /**
+     * Returns the LSP {@link WorkspaceService} of the language server.
+     *
+     * @return the LSP {@link WorkspaceService} of the language server.
+     */
+    public WorkspaceService getWorkspaceService() {
+        return getServer().getWorkspaceService();
     }
 
 }

@@ -8,8 +8,9 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.filewatchers;
+package com.redhat.devtools.lsp4ij.features.files.watcher;
 
+import com.redhat.devtools.lsp4ij.features.files.PathPatternMatcher;
 import org.eclipse.lsp4j.FileSystemWatcher;
 import org.eclipse.lsp4j.RelativePattern;
 import org.eclipse.lsp4j.WatchKind;

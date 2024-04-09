@@ -15,7 +15,6 @@ package com.redhat.devtools.lsp4ij.internal;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -35,7 +34,7 @@ public class SupportedFeatures {
 
         // Code Action support
         final var codeAction = new CodeActionCapabilities(new CodeActionLiteralSupportCapabilities(
-                new CodeActionKindCapabilities(Arrays.asList(CodeActionKind.QuickFix, CodeActionKind.Refactor,
+                new CodeActionKindCapabilities(List.of(CodeActionKind.QuickFix, CodeActionKind.Refactor,
                         CodeActionKind.RefactorExtract, CodeActionKind.RefactorInline,
                         CodeActionKind.RefactorRewrite, CodeActionKind.Source,
                         CodeActionKind.SourceOrganizeImports))),
@@ -56,7 +55,7 @@ public class SupportedFeatures {
         // Completion support
         final var completionItemCapabilities = new CompletionItemCapabilities(Boolean.TRUE);
         completionItemCapabilities
-                .setDocumentationFormat(Arrays.asList(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
+                .setDocumentationFormat(List.of(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
         completionItemCapabilities.setInsertTextModeSupport(new CompletionItemInsertTextModeSupportCapabilities(List.of(InsertTextMode.AsIs, InsertTextMode.AdjustIndentation)));
 
         completionItemCapabilities.setResolveSupport(new CompletionItemResolveSupportCapabilities(List.of("documentation" /*, "detail", "additionalTextEdits" */)));
@@ -116,7 +115,7 @@ public class SupportedFeatures {
 
         // Hover support
         final var hoverCapabilities = new HoverCapabilities();
-        hoverCapabilities.setContentFormat(Arrays.asList(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
+        hoverCapabilities.setContentFormat(List.of(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
         textDocumentClientCapabilities.setHover(hoverCapabilities);
 
         // References support
@@ -148,22 +147,47 @@ public class SupportedFeatures {
 
     public static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
         final var workspaceClientCapabilities = new WorkspaceClientCapabilities();
+
+        // Apply edit support
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit
         workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
+
+        // TODO
         // workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
+
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#executeCommandClientCapabilities
         workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
         // TODO
         // workspaceClientCapabilities.setSymbol(new SymbolCapabilities(Boolean.TRUE));
         workspaceClientCapabilities.setWorkspaceFolders(Boolean.TRUE);
+
+        // Workspace edit support
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceEditClientCapabilities
         WorkspaceEditCapabilities editCapabilities = new WorkspaceEditCapabilities();
         editCapabilities.setDocumentChanges(Boolean.TRUE);
-        // TODO
-        // editCapabilities.setResourceOperations(Arrays.asList(ResourceOperationKind.Create,
-        //		ResourceOperationKind.Delete, ResourceOperationKind.Rename));
-        // TODO
+        editCapabilities.setResourceOperations(List.of(
+                ResourceOperationKind.Create,
+                ResourceOperationKind.Delete,
+                ResourceOperationKind.Rename));
         // editCapabilities.setFailureHandling(FailureHandlingKind.Undo);
         workspaceClientCapabilities.setWorkspaceEdit(editCapabilities);
+
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#didChangeWatchedFilesClientCapabilities
         workspaceClientCapabilities.setDidChangeWatchedFiles(new DidChangeWatchedFilesCapabilities(Boolean.TRUE));
 
+        // File operations support
+        FileOperationsWorkspaceCapabilities fileOperationsWorkspaceCapabilities = new FileOperationsWorkspaceCapabilities();
+        fileOperationsWorkspaceCapabilities.setDynamicRegistration(Boolean.TRUE);
+        //fileOperationsWorkspaceCapabilities.setWillCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
+        //fileOperationsWorkspaceCapabilities.setDidCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles
+        //fileOperationsWorkspaceCapabilities.setWillDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
+        //fileOperationsWorkspaceCapabilities.setDidDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles
+        fileOperationsWorkspaceCapabilities.setWillRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
+        fileOperationsWorkspaceCapabilities.setDidRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles
+        workspaceClientCapabilities.setFileOperations(fileOperationsWorkspaceCapabilities);
+        
+        // DidChangeConfiguration support
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#didChangeConfigurationClientCapabilities
         workspaceClientCapabilities.setDidChangeConfiguration(new DidChangeConfigurationCapabilities(Boolean.TRUE));
 
         // Refresh support for InlayHint

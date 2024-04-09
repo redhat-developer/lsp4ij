@@ -8,10 +8,11 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.filewatchers;
+package com.redhat.devtools.lsp4ij.features.files;
 
 import com.intellij.openapi.util.SystemInfo;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.junit.Test;
 

@@ -144,16 +144,16 @@ public class CommandExecutor {
 
     }
 
-    private static CompletableFuture<LanguageServer> getLanguageServerForCommand(Project project,
-                                                                                 Command command,
-                                                                                 URI documentUri, LanguageServerDefinition languageServerDefinition) throws IOException {
+    private static CompletableFuture<LanguageServer> getLanguageServerForCommand(@NotNull Project project,
+                                                                                 @NotNull Command command,
+                                                                                 @Nullable URI documentUri,
+                                                                                 @NotNull LanguageServerDefinition languageServerDefinition) throws IOException {
         VirtualFile file = LSPIJUtils.findResourceFor(documentUri);
         if (file == null) {
             return null;
         }
         return LanguageServiceAccessor.getInstance(project)
-                //TODO pass documentUri instead of document, but looks like that implies non-trivial refactoring
-                .getInitializedLanguageServer(file, languageServerDefinition, serverCapabilities -> {
+                .getInitializedLanguageServer(file, project, languageServerDefinition, serverCapabilities -> {
                     ExecuteCommandOptions provider = serverCapabilities.getExecuteCommandProvider();
                     return provider != null && provider.getCommands().contains(command.getCommand());
                 });
@@ -217,29 +217,6 @@ public class CommandExecutor {
             contextBuilder.add(CommonDataKeys.EDITOR, editor);
         }
         return contextBuilder.build();
-    }
-
-    private static void ensureArgumentsIsInProperClassloader(Command command, ClassLoader classLoader) {
-        List<Object> arguments = command.getArguments();
-        if (arguments == null || arguments.isEmpty()) {
-            return;
-        }
-        for (int i = 0; i < arguments.size(); i++) {
-            Object arg = arguments.get(i);
-            if (arg instanceof JsonElement elt) {
-                // At this step, JsonElement is an instance coming from the LSP4IJ plugin class loader.
-                // If external plugin which consumes LSP4IJ and declare a gson dependency, it will have
-                // ClasCastException error which command arguments will be used.
-                // In this case, JsonElement requires to be updated by creating a new JsonElement with the external plugin class loader.
-                Object newElt = JSONUtils.getJsonElementFromClassloader(elt, classLoader);
-                if (newElt != null) {
-                    arguments.set(i, newElt);
-                } else {
-                    // Here, the JsonElement class loader should be valid, no need to create new instances of JsonElement.
-                    return;
-                }
-            }
-        }
     }
 
     // TODO consider using Entry/SimpleEntry instead

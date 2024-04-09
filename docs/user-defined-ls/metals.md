@@ -20,6 +20,6 @@ To enable Scala language support in your IDE, you can integrate [Scala Language 
 
    ![Meta LS template mappings](../images/user-defined-ls/MetaLSTemplateMappings.png)
 
-7. **Click OK** to apply the changes. You should now have Clojure language support enabled in your IDE, with the Clojure LSP integrated.
+7. **Click OK** to apply the changes. You should now have Scala language support enabled in your IDE, with the Metals integrated.
 
    ![Meta LS in LSP Console](../images/user-defined-ls/MetaLSInLSPConsole.png)
