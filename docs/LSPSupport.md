@@ -98,7 +98,7 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
 Current state of [Window Features]( https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#windowFeatures) support
 
  * ✅ [window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage). (see [implementation details](#show-message))
- * ✅ [window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest).
+ * ✅ [window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest) (see [implementation details](#show-message-request))
  * ❌ [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage).
  * ❌ [window/showDocument](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument).
  * ❌ [telemetry/event](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#telemetry_event).
@@ -326,3 +326,30 @@ Here is an example with [Rust Analyzer](https://rust-analyzer.github.io/) report
 is rendered as: 
 
 ![window/showMessage](./images/lsp-support/window_showMessage.png)
+
+## Show Message Request
+
+[window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest) is supported.
+
+Here is an example with [Scala Language Server (MetaLS)](./user-defined-ls/metals.md) reporting a message request:
+
+```json
+{
+  "actions": [
+    {
+      "title": "Create .scalafmt.conf"
+    },
+    {
+      "title": "Run anyway"
+    },
+    {
+      "title": "Not now"
+    }
+  ],
+  "type": 1,
+  "message": "No .scalafmt.conf file detected. How would you like to proceed:"
+}
+```
+is rendered as:
+
+![window/showMessageRequest](./images/lsp-support/window_showMessageRequest.png)
