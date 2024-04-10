@@ -1,0 +1,41 @@
+{
+  "serverVersion": "1.2.2",
+  "serverProperties": [
+    "-Xmx1G"
+  ],
+  "coursierMirror": "",
+  "ammoniteJvmProperties": [],
+  "excludedPackages": [],
+  "showInferredType": "false",
+  "showImplicitArguments": false,
+  "showImplicitConversionsAndClasses": false,
+  "javaHome": "",
+  "sbtScript": "",
+  "millScript": "",
+  "mavenScript": "",
+  "gradleScript": "",
+  "scalafmtConfigPath": "",
+  "scalafixConfigPath": "",
+  "scalafixRulesDependencies": [],
+  "bloopVersion": "",
+  "bloopJvmProperties": [],
+  "bloopSbtAlreadyInstalled": true,
+  "customRepositories": [],
+  "superMethodLensesEnabled": true,
+  "enableStripMarginOnTypeFormatting": true,
+  "enableIndentOnPaste": false,
+  "verboseCompilation": true,
+  "enableSemanticHighlighting": true,
+  "testUserInterface": "Test Explorer",
+  "customProjectRoot": "",
+  "fallbackScalaVersion": "automatic",
+  "javaFormat": {
+    "eclipseConfigPath": "",
+    "eclipseProfile": ""
+  },
+  "scalaCliLauncher": "",
+  "suggestLatestUpgrade": false,
+  "trace": {
+    "server": "verbose"
+  }
+}
