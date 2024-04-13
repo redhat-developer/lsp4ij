@@ -14,14 +14,13 @@
 package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.features.codeAction.quickfix.LSPLazyCodeActions;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
-import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.util.Ranges;
 import org.jetbrains.annotations.Nullable;
 
@@ -150,8 +149,7 @@ public class LSPDiagnosticsForServer {
             // We cannot use here languageServerWrapper.getServerCapabilities() otherwise it will restart the language server.
             return false;
         }
-        ServerCapabilities serverCapabilities = languageServerWrapper.getServerCapabilities();
-        return serverCapabilities != null && LSPIJUtils.hasCapability(serverCapabilities.getCodeActionProvider());
+        return LanguageServerItem.isCodeActionSupported(languageServerWrapper.getServerCapabilities());
     }
 
 }

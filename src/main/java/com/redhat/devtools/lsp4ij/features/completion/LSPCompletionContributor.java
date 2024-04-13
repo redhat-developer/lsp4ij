@@ -200,13 +200,8 @@ public class LSPCompletionContributor extends CompletionContributor {
     }
 
     private static CompletableFuture<List<LanguageServerItem>> initiateLanguageServers(@NotNull VirtualFile file, @NotNull Project project) {
-        return LanguageServiceAccessor.getInstance(project).getLanguageServers(file,
-                capabilities -> {
-                    CompletionOptions provider = capabilities.getCompletionProvider();
-                    if (provider != null) {
-                        return true;
-                    }
-                    return false;
-                });
+        return LanguageServiceAccessor
+                .getInstance(project)
+                .getLanguageServers(file,LanguageServerItem::isCompletionSupported);
     }
 }

@@ -130,10 +130,11 @@ public class SupportedFeatures {
         // textDocumentClientCapabilities.setOnTypeFormatting(null); // TODO
         // TODO : support textDocument/rangeFormatting
         // textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities());
-        // TODO : support textDocument/rename
-        //final var renameCapabilities = new RenameCapabilities();
-        //renameCapabilities.setPrepareSupport(true);
-        //textDocumentClientCapabilities.setRename(renameCapabilities);
+
+        // textDocument/rename support
+        final var renameCapabilities = new RenameCapabilities();
+        renameCapabilities.setPrepareSupport(true);
+        textDocumentClientCapabilities.setRename(renameCapabilities);
 
         // Synchronization support
         textDocumentClientCapabilities
