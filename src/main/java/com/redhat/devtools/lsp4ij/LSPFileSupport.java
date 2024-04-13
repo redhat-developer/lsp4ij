@@ -22,6 +22,8 @@ import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeSupport;
 import com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingSupport;
 import com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightSupport;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSupport;
+import com.redhat.devtools.lsp4ij.features.rename.LSPPrepareRenameSupport;
+import com.redhat.devtools.lsp4ij.features.rename.LSPRenameSupport;
 import com.redhat.devtools.lsp4ij.features.signatureHelp.LSPSignatureHelpSupport;
 import org.jetbrains.annotations.NotNull;
 
@@ -54,6 +56,10 @@ public class LSPFileSupport implements Disposable {
 
     private final LSPIntentionCodeActionSupport intentionCodeActionSupport;
 
+    private final LSPPrepareRenameSupport prepareRenameSupport;
+
+    private final LSPRenameSupport renameSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -66,6 +72,8 @@ public class LSPFileSupport implements Disposable {
         this.documentLinkSupport = new LSPDocumentLinkSupport(file);
         this.hoverSupport = new LSPHoverSupport(file);
         this.intentionCodeActionSupport = new LSPIntentionCodeActionSupport(file);
+        this.prepareRenameSupport = new LSPPrepareRenameSupport(file);
+        this.renameSupport = new LSPRenameSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -83,6 +91,8 @@ public class LSPFileSupport implements Disposable {
         getDocumentLinkSupport().cancel();
         getHoverSupport().cancel();
         getIntentionCodeActionSupport().cancel();
+        getPrepareRenameSupport().cancel();
+        getRenameSupport().cancel();
     }
 
     /**
@@ -174,6 +184,25 @@ public class LSPFileSupport implements Disposable {
     public LSPIntentionCodeActionSupport getIntentionCodeActionSupport() {
         return intentionCodeActionSupport;
     }
+
+    /**
+     * Returns the LSP prepare rename support.
+     *
+     * @return the LSP prepare rename support.
+     */
+    public LSPPrepareRenameSupport getPrepareRenameSupport() {
+        return prepareRenameSupport;
+    }
+
+    /**
+     * Returns the LSP prepare rename support.
+     *
+     * @return the LSP prepare rename support.
+     */
+    public LSPRenameSupport getRenameSupport() {
+        return renameSupport;
+    }
+
 
     /**
      * Return the existing LSP file support for the given Psi file, or create a new one if necessary.

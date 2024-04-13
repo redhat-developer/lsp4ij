@@ -12,7 +12,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.psi.PsiFile;
 import org.eclipse.lsp4j.CodeActionOptions;
-import org.eclipse.lsp4j.InlayHintRegistrationOptions;
+import org.eclipse.lsp4j.RenameOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -162,23 +162,14 @@ public class LanguageServerItem {
     }
 
     /**
-     * Returns true if the language server can support resolve code action and false otherwise.
+     * Returns true if the language server can support completion and false otherwise.
      *
      * @param serverCapabilities the server capabilities.
-     * @return true if the language server can support resolve code action and false otherwise.
+     * @return true if the language server can support completion and false otherwise.
      */
-    public static boolean isCodeActionResolveSupported(@Nullable ServerCapabilities serverCapabilities) {
-        if (serverCapabilities != null) {
-            Either<Boolean, CodeActionOptions> caProvider = serverCapabilities.getCodeActionProvider();
-            if (caProvider.isLeft()) {
-                // It is wrong, but we need to parse the registerCapability
-                return caProvider.getLeft();
-            } else if (caProvider.isRight()) {
-                CodeActionOptions options = caProvider.getRight();
-                return options.getResolveProvider() != null && options.getResolveProvider();
-            }
-        }
-        return false;
+    public static boolean isCompletionSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getCompletionProvider() != null;
     }
 
     /**
@@ -188,12 +179,8 @@ public class LanguageServerItem {
      * @return true if the language server can support resolve completion and false otherwise.
      */
     public static boolean isResolveCompletionSupported(@Nullable ServerCapabilities serverCapabilities) {
-        if (serverCapabilities != null &&
-                serverCapabilities.getCompletionProvider() != null &&
-                serverCapabilities.getCompletionProvider().getResolveProvider() != null) {
-            return serverCapabilities.getCompletionProvider().getResolveProvider();
-        }
-        return false;
+        var completionProvider = serverCapabilities != null ? serverCapabilities.getCompletionProvider() : null;
+        return completionProvider != null && hasCapability(completionProvider.getResolveProvider());
     }
 
     /**
@@ -225,32 +212,8 @@ public class LanguageServerItem {
      * @return true if the language server can support resolve code lens and false otherwise.
      */
     public static boolean isResolveCodeLensSupported(@Nullable ServerCapabilities serverCapabilities) {
-        if (serverCapabilities != null &&
-                serverCapabilities.getCodeLensProvider() != null &&
-                serverCapabilities.getCodeLensProvider().getResolveProvider() != null) {
-            return serverCapabilities.getCodeLensProvider().getResolveProvider();
-        }
-        return false;
-    }
-
-    /**
-     * Returns true if the language server can support resolve inlay hint and false otherwise.
-     *
-     * @param serverCapabilities the server capabilities.
-     * @return true if the language server can support resolve inlay hint and false otherwise.
-     */
-    public static boolean isResolveInlayHintSupported(@Nullable ServerCapabilities serverCapabilities) {
-        if (serverCapabilities != null) {
-            Either<Boolean, InlayHintRegistrationOptions> inlayHintProvider = serverCapabilities.getInlayHintProvider();
-            if (inlayHintProvider.isLeft()) {
-                // It is wrong, but we need to parse the registerCapability
-                return inlayHintProvider.getLeft();
-            } else if (inlayHintProvider.isRight()) {
-                InlayHintRegistrationOptions options = inlayHintProvider.getRight();
-                return options.getResolveProvider() != null && options.getResolveProvider();
-            }
-        }
-        return false;
+        var codeLensProvider = serverCapabilities != null ? serverCapabilities.getCodeLensProvider() : null;
+        return codeLensProvider != null && hasCapability(codeLensProvider.getResolveProvider());
     }
 
     /**
@@ -261,7 +224,21 @@ public class LanguageServerItem {
      */
     public static boolean isInlayHintSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                serverCapabilities.getInlayHintProvider() != null;
+                hasCapability(serverCapabilities.getInlayHintProvider());
+    }
+
+    /**
+     * Returns true if the language server can support resolve inlay hint and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support resolve inlay hint and false otherwise.
+     */
+    public static boolean isResolveInlayHintSupported(@Nullable ServerCapabilities serverCapabilities) {
+        var inlayHintProvider = serverCapabilities != null ? serverCapabilities.getInlayHintProvider() : null;
+        if (inlayHintProvider != null && inlayHintProvider.isRight()) {
+            return hasCapability(inlayHintProvider.getRight().getResolveProvider());
+        }
+        return false;
     }
 
     /**
@@ -272,7 +249,7 @@ public class LanguageServerItem {
      */
     public static boolean isColorSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getColorProvider());
+                hasCapability(serverCapabilities.getColorProvider());
     }
 
     /**
@@ -283,7 +260,7 @@ public class LanguageServerItem {
      */
     public static boolean isDeclarationSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getDeclarationProvider());
+                hasCapability(serverCapabilities.getDeclarationProvider());
     }
 
     /**
@@ -294,7 +271,7 @@ public class LanguageServerItem {
      */
     public static boolean isDefinitionSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getDefinitionProvider());
+                hasCapability(serverCapabilities.getDefinitionProvider());
     }
 
     /**
@@ -305,7 +282,7 @@ public class LanguageServerItem {
      */
     public static boolean isTypeDefinitionSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getTypeDefinitionProvider());
+                hasCapability(serverCapabilities.getTypeDefinitionProvider());
     }
 
     /**
@@ -316,7 +293,7 @@ public class LanguageServerItem {
      */
     public static boolean isDocumentHighlightSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getDocumentHighlightProvider());
+                hasCapability(serverCapabilities.getDocumentHighlightProvider());
     }
 
     /**
@@ -338,7 +315,7 @@ public class LanguageServerItem {
      */
     public static boolean isHoverSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getHoverProvider());
+                hasCapability(serverCapabilities.getHoverProvider());
     }
 
     /**
@@ -349,7 +326,7 @@ public class LanguageServerItem {
      */
     public static boolean isReferencesSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getReferencesProvider());
+                hasCapability(serverCapabilities.getReferencesProvider());
     }
 
     /**
@@ -360,7 +337,7 @@ public class LanguageServerItem {
      */
     public static boolean isImplementationSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getImplementationProvider());
+                hasCapability(serverCapabilities.getImplementationProvider());
     }
 
     /**
@@ -371,7 +348,7 @@ public class LanguageServerItem {
      */
     public static boolean isFoldingSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getFoldingRangeProvider());
+                hasCapability(serverCapabilities.getFoldingRangeProvider());
     }
 
     /**
@@ -382,7 +359,7 @@ public class LanguageServerItem {
      */
     public static boolean isDocumentFormattingSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getDocumentFormattingProvider());
+                hasCapability(serverCapabilities.getDocumentFormattingProvider());
     }
 
     /**
@@ -393,7 +370,7 @@ public class LanguageServerItem {
      */
     public static boolean isDocumentRangeFormattingSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-                LSPIJUtils.hasCapability(serverCapabilities.getDocumentRangeFormattingProvider());
+                hasCapability(serverCapabilities.getDocumentRangeFormattingProvider());
     }
 
     /**
@@ -412,18 +389,58 @@ public class LanguageServerItem {
      * @return true if the language server can support code action and false otherwise.
      */
     public static boolean isCodeActionSupported(@Nullable ServerCapabilities serverCapabilities) {
-        if (serverCapabilities != null) {
-            Either<Boolean, CodeActionOptions> caProvider = serverCapabilities.getCodeActionProvider();
-            if (caProvider.isLeft()) {
-                return caProvider.getLeft();
-            } else if (caProvider.isRight()) {
-                CodeActionOptions options = caProvider.getRight();
-                return options != null;
-            }
+        return serverCapabilities != null &&
+            hasCapability(serverCapabilities.getCodeActionProvider());
+    }
+
+    /**
+     * Returns true if the language server can support resolve code action and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support resolve code action and false otherwise.
+     */
+    public static boolean isCodeActionResolveSupported(@Nullable ServerCapabilities serverCapabilities) {
+        Either<Boolean, CodeActionOptions> codeActionProvider = serverCapabilities != null ? serverCapabilities.getCodeActionProvider() : null;
+        if (codeActionProvider != null && codeActionProvider.isRight()) {
+            return hasCapability(codeActionProvider.getRight().getResolveProvider());
         }
         return false;
     }
 
+
+    /**
+     * Returns true if the language server can support rename and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support rename and false otherwise.
+     */
+    public static boolean isRenameSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                hasCapability(serverCapabilities.getRenameProvider());
+    }
+
+    /**
+     * Returns true if the language server can support prepare rename and false otherwise.
+     *
+     * @return true if the language server can support prepare rename and false otherwise.
+     */
+    public  boolean isPrepareRenameSupported() {
+        return isPrepareRenameSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support prepare rename and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support prepare rename and false otherwise.
+     */
+    public static boolean isPrepareRenameSupported(@Nullable ServerCapabilities serverCapabilities) {
+        Either<Boolean, RenameOptions> renameProvider = serverCapabilities != null ? serverCapabilities.getRenameProvider() : null;
+        if (renameProvider != null && renameProvider.isRight()) {
+            return hasCapability(renameProvider.getRight().getPrepareProvider());
+        }
+        return false;
+    }
 
     public boolean isWillRenameFilesSupported(PsiFile file) {
         return serverWrapper.isWillRenameFilesSupported(file);
@@ -454,4 +471,14 @@ public class LanguageServerItem {
         return getServer().getWorkspaceService();
     }
 
+    private static boolean hasCapability(final Either<Boolean, ?> eitherCapability) {
+        if (eitherCapability == null) {
+            return false;
+        }
+        return eitherCapability.isRight() || hasCapability(eitherCapability.getLeft());
+    }
+
+    private static boolean hasCapability(Boolean capability) {
+        return capability != null && capability;
+    }
 }

@@ -250,6 +250,12 @@
         <usageTypeProvider
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider"/>
 
+        <!-- LSP textDocument/rename request support -->
+        <renameHandler
+                id="LSPRenameHandler"
+                implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
+                order="first"/>
+
         <!-- willRenameFiles support -->
         <renamePsiElementProcessor
                 implementation="com.redhat.devtools.lsp4ij.features.refactoring.LSPRenamePsiElementProcessor"

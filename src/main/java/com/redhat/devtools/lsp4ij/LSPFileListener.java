@@ -65,7 +65,11 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
         if (event.getPropertyName().equals(VirtualFile.PROP_NAME) && event.getOldValue() instanceof String) {
             // A file (Test1.java) has been renamed (to Test2.java) by using Refactor / Rename from IJ
 
+            // See "Renaming a document" specification
+            // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didRename
+
             // 1. Send a textDocument/didClose for the renamed file (Test1.java)
+            // According to the spec: "Document renames should be signaled to a server sending a document close notification with the document’s old name"
             URI oldFileUri = didClose(event.getFile().getParent(), (String) event.getOldValue());
 
             // 2. Send a workspace/didChangeWatchedFiles

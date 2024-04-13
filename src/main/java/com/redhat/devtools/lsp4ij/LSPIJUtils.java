@@ -669,13 +669,6 @@ public class LSPIJUtils {
         }
     }
 
-    public static boolean hasCapability(final Either<Boolean, ? extends Object> eitherCapability) {
-        if (eitherCapability == null) {
-            return false;
-        }
-        return eitherCapability.isRight() || (eitherCapability.isLeft() && eitherCapability.getLeft());
-    }
-
     /**
      * Get the tab size for the given editor.
      */
