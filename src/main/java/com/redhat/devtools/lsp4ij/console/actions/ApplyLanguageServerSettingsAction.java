@@ -15,6 +15,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.ui.popup.BalloonBuilder;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
@@ -24,7 +25,6 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import org.jetbrains.annotations.NotNull;
 
-import javax.swing.*;
 import java.awt.*;
 
 /**
@@ -100,6 +100,6 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         RelativePoint displayPoint = new RelativePoint(applyComponent, point);
 
         // Use invokeLater to prevent the balloon from resizing when it is shown
-        SwingUtilities.invokeLater(() -> balloon.show(displayPoint, Balloon.Position.above));
+        ApplicationManager.getApplication().invokeLater(() -> balloon.show(displayPoint, Balloon.Position.above));
     }
 }
