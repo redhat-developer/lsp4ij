@@ -419,10 +419,20 @@ public class LanguageServerView implements Disposable {
         return languageServerPanel.getCommandLine() != null && languageServerPanel.getCommandLine().hasFocus();
     }
 
+    /**
+     * Tells whether the save tip balloon has been shown for this language server view
+     *
+     * @return true if save tip has been shown, else false
+     */
     public boolean isSaveTipShown() {
-        return isSaveTipShown;
+        return this.isSaveTipShown;
     }
 
+    /**
+     * Set the value of isSaveTipShown variable, enabling or preventing the save tip balloon from showing
+     *
+     * @param isSaveTipShown true if shown and false if it hasn't been shown
+     */
     public void isSaveTipShown(boolean isSaveTipShown) {
         this.isSaveTipShown = isSaveTipShown;
     }
