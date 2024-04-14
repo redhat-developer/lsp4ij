@@ -82,7 +82,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
         Balloon balloon = builder.createBalloon();
 
-        // This is a bit nicer looking, but it would be nice not to rely on correct positions
+        // This is a bit nicer looking, but I think the current is better, because it does not rely on the positions
         // ActionToolbarImpl asd = (ActionToolbarImpl) languageServerView.getComponent().getComponent(1);
 
         ActionToolbarImpl actionToolbarComponent = null;
@@ -98,7 +98,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         }
         Component applyComponent = actionToolbarComponent.getComponent(0);
 
-        // Move the position by 1/2 of the component width, the icon is not centered
+        // Move the position by 1/2 of the component width, because the icon is not centered
         Point point = new Point(applyComponent.getWidth()/2 ,0);
         RelativePoint displayPoint = new RelativePoint(applyComponent, point);
 
