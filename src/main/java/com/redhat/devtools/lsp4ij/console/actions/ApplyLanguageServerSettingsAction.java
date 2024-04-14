@@ -73,7 +73,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
     private void showBalloon() {
         languageServerView.isSaveTipShown(true);
-        JBLabel jbPanel = new JBLabel("Press here to save the changes");
+        JBLabel jbPanel = new JBLabel(LanguageServerBundle.message("action.lsp.detail.apply.balloon"));
 
         BalloonBuilder builder = JBPopupFactory.getInstance()
                 .createBalloonBuilder(jbPanel)
