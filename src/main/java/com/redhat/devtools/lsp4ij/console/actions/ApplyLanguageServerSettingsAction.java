@@ -77,7 +77,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
         BalloonBuilder builder = JBPopupFactory.getInstance()
                 .createBalloonBuilder(jbPanel)
-                .setFadeoutTime(800)
+                .setFadeoutTime(800) // How many ms the balloon is shown for
                 .setHideOnAction(false);
 
         Balloon balloon = builder.createBalloon();
