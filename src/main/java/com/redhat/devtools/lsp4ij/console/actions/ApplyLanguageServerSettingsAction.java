@@ -14,9 +14,18 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
+import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.ui.popup.BalloonBuilder;
+import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.ui.awt.RelativePoint;
+import com.intellij.ui.components.JBLabel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import org.jetbrains.annotations.NotNull;
+
+import javax.swing.*;
+import java.awt.*;
 
 /**
  * Action to update the proper language server settings and language server definition
@@ -24,6 +33,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ApplyLanguageServerSettingsAction extends AnAction {
 
+    public static final String ACTION_TOOLBAR_COMPONENT_NAME = "ActionToolbarComponent";
     private final LanguageServerView languageServerView;
     public ApplyLanguageServerSettingsAction(LanguageServerView languageServerView) {
         this.languageServerView = languageServerView;
@@ -41,11 +51,58 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
     @Override
     public void update(@NotNull AnActionEvent e) {
-        e.getPresentation().setEnabled(languageServerView.isModified());
+        boolean modified = languageServerView.isModified();
+        boolean isShown = languageServerView.isSaveTipShown();
+
+        // Only show the tooltip once per configuration change
+        if (modified && !isShown) {
+            showBalloon();
+        }
+        // If configuration is returned to match the unmodified state, reset the tooltip to be shown again
+        if (!modified) {
+            languageServerView.isSaveTipShown(false);
+        }
+
+        e.getPresentation().setEnabled(modified);
     }
 
     @Override
     public @NotNull ActionUpdateThread getActionUpdateThread() {
         return ActionUpdateThread.BGT;
+    }
+
+    private void showBalloon() {
+        languageServerView.isSaveTipShown(true);
+        JBLabel jbPanel = new JBLabel("Press here to save the changes");
+
+        BalloonBuilder builder = JBPopupFactory.getInstance()
+                .createBalloonBuilder(jbPanel)
+                .setFadeoutTime(800)
+                .setHideOnAction(false);
+
+        Balloon balloon = builder.createBalloon();
+
+        // This is a bit nicer looking, but it would be nice not to rely on correct positions
+        // ActionToolbarImpl asd = (ActionToolbarImpl) languageServerView.getComponent().getComponent(1);
+
+        ActionToolbarImpl actionToolbarComponent = null;
+        var components = languageServerView.getComponent().getComponents();
+        for (Component component : components) {
+            if (ACTION_TOOLBAR_COMPONENT_NAME.equals(component.getName())) {
+                actionToolbarComponent = (ActionToolbarImpl) component;
+            }
+        }
+
+        if (actionToolbarComponent == null) {
+            return;
+        }
+        Component applyComponent = actionToolbarComponent.getComponent(0);
+
+        // Move the position by 1/2 of the component width, the icon is not centered
+        Point point = new Point(applyComponent.getWidth()/2 ,0);
+        RelativePoint displayPoint = new RelativePoint(applyComponent, point);
+
+        // Use invokeLater to prevent the balloon from resizing when it is shown
+        SwingUtilities.invokeLater(() -> balloon.show(displayPoint, Balloon.Position.above));
     }
 }

@@ -60,6 +60,7 @@ public class LanguageServerView implements Disposable {
     private final JPanel myMainPanel;
     private final LanguageServerDefinition languageServerDefinition;
     private final Project project;
+    private boolean isSaveTipShown = false;
 
     private LanguageServerPanel languageServerPanel;
 
@@ -416,5 +417,13 @@ public class LanguageServerView implements Disposable {
      */
     public boolean isEditingCommand() {
         return languageServerPanel.getCommandLine() != null && languageServerPanel.getCommandLine().hasFocus();
+    }
+
+    public boolean isSaveTipShown() {
+        return isSaveTipShown;
+    }
+
+    public void isSaveTipShown(boolean isSaveTipShown) {
+        this.isSaveTipShown = isSaveTipShown;
     }
 }
