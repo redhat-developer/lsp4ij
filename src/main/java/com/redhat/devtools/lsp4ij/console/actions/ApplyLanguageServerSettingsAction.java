@@ -82,9 +82,6 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
         Balloon balloon = builder.createBalloon();
 
-        // This is a bit nicer looking, but I think the current is better, because it does not rely on the positions
-        // ActionToolbarImpl asd = (ActionToolbarImpl) languageServerView.getComponent().getComponent(1);
-
         ActionToolbarImpl actionToolbarComponent = null;
         var components = languageServerView.getComponent().getComponents();
         for (Component component : components) {
