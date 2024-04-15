@@ -43,7 +43,9 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
     private static UsageTarget[] getLSPTargets(@NotNull Editor editor, @NotNull PsiFile file) {
         int offset = editor.getCaretModel().getOffset();
         Document document = editor.getDocument();
-        if (offset < 0 || offset > document.getTextLength()) {
+        if (offset < 0 ||
+                offset > document.getTextLength() ||
+                offset > file.getTextLength() /* PsiFile and document could have different contents */) {
             return UsageTarget.EMPTY_ARRAY;
         }
         // Try to get the token range (ex : foo.ba|r() --> foo.[bar]())
@@ -54,12 +56,7 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
         }
         LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, tokenRange);
         // force to compute of the name by using token range
-        try {
-            triggeredElement.getName();
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-        }
+        triggeredElement.getName();
         UsageTarget target = new PsiElement2UsageTargetAdapter(triggeredElement, true);
         return new UsageTarget[]{target};
     }
