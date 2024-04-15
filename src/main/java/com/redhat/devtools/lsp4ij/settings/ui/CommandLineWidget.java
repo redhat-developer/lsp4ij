@@ -13,14 +13,26 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.ui.DocumentAdapter;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBFont;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import org.jetbrains.annotations.NotNull;
+
+import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.event.DocumentEvent;
+import java.awt.*;
 
 /**
  * Command line widget used to fill the command to start a language server.
  */
 public class CommandLineWidget extends JBTextArea {
+    private boolean isValid = true;
+    private String errorMessage = "Not Valid!";
+    private Border normalBorder;
 
     public CommandLineWidget() {
         super(5, 0);
@@ -28,5 +40,39 @@ public class CommandLineWidget extends JBTextArea {
         super.setWrapStyleWord(true);
         super.setFont(JBFont.regular());
         super.getEmptyText().setText(LanguageServerBundle.message("language.server.command.emptyText"));
+        this.normalBorder = this.getBorder();
+        this.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(@NotNull final DocumentEvent e){
+                validateInput();
+            }
+        });
+    }
+
+    private void validateInput() {
+        if (getText().isBlank()) {
+            isValid = false;
+            setErrorBorder();
+        } else {
+            isValid = true;
+            setNormalBorder();
+        }
+    }
+
+    private void setNormalBorder() {
+        this.setBorder(normalBorder);
+        this.setToolTipText(null);
+    }
+
+    private void setErrorBorder() {
+        this.setBorder(BorderFactory.createLineBorder(JBColor.RED));
+        this.setToolTipText(errorMessage);
+    }
+
+    public ValidationInfo getValidationInfo() {
+        if (!isValid) {
+            return new ValidationInfo(errorMessage, this);
+        }
+        return null;
     }
 }

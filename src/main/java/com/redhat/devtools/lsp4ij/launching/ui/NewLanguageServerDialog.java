@@ -189,11 +189,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private ValidationInfo validateCommand() {
         var commandLine = this.languageServerPanel.getCommandLine();
-        if (commandLine.getText().isBlank()) {
-            String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
-            return new ValidationInfo(errorMessage, commandLine);
-        }
-        return null;
+        return commandLine.getValidationInfo();
     }
 
 
