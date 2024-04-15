@@ -24,8 +24,11 @@ import com.intellij.ui.components.JBLabel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
+import java.util.Arrays;
+import java.util.Optional;
 
 /**
  * Action to update the proper language server settings and language server definition
@@ -71,6 +74,10 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         return ActionUpdateThread.BGT;
     }
 
+    /**
+     * Create and show a balloon to draw attention to the save button when modifying
+     * configurations in the LSP console
+     */
     private void showBalloon() {
         languageServerView.isSaveTipShown(true);
         JBLabel jbPanel = new JBLabel(LanguageServerBundle.message("action.lsp.detail.apply.balloon"));
@@ -82,18 +89,15 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
         Balloon balloon = builder.createBalloon();
 
-        ActionToolbarImpl actionToolbarComponent = null;
         var components = languageServerView.getComponent().getComponents();
-        for (Component component : components) {
-            if (ACTION_TOOLBAR_COMPONENT_NAME.equals(component.getName())) {
-                actionToolbarComponent = (ActionToolbarImpl) component;
-            }
-        }
+        Optional<Component> actionToolbarComponent = Arrays.stream(components)
+                .filter(c -> ACTION_TOOLBAR_COMPONENT_NAME.equals(c.getName()))
+                .findFirst();
 
-        if (actionToolbarComponent == null) {
+        if (actionToolbarComponent.isEmpty()) {
             return;
         }
-        Component applyComponent = actionToolbarComponent.getComponent(0);
+        Component applyComponent = ((ActionToolbarImpl) actionToolbarComponent.get()).getComponent(0);
 
         // Move the position by 1/2 of the component width, because the icon is not centered
         Point point = new Point(applyComponent.getWidth()/2 ,0);
