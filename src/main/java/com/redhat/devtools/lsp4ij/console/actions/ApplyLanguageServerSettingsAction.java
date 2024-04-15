@@ -40,6 +40,8 @@ import java.util.Optional;
 public class ApplyLanguageServerSettingsAction extends AnAction {
     public static final String ACTION_TOOLBAR_COMPONENT_NAME = "ActionToolbarComponent";
     private final LanguageServerView languageServerView;
+    private Balloon saveTipBalloon;
+
     public ApplyLanguageServerSettingsAction(LanguageServerView languageServerView) {
         this.languageServerView = languageServerView;
         final String message = LanguageServerBundle.message("action.lsp.detail.apply.text");
@@ -91,10 +93,11 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
         BalloonBuilder builder = JBPopupFactory.getInstance()
                 .createBalloonBuilder(jbPanel)
-                .setFadeoutTime(1200) // How many ms the balloon is shown for
+                .setFadeoutTime(1600) // How many ms the balloon is shown for
                 .setHideOnAction(false);
 
-        Balloon balloon = builder.createBalloon();
+        // Have an instance reference to hide the balloon with the button
+        this.saveTipBalloon = builder.createBalloon();
 
         var components = languageServerView.getComponent().getComponents();
         Optional<Component> actionToolbarComponent = Arrays.stream(components)
@@ -111,7 +114,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         RelativePoint displayPoint = new RelativePoint(applyComponent, point);
 
         // Use invokeLater to prevent the balloon from resizing when it is shown
-        ApplicationManager.getApplication().invokeLater(() -> balloon.show(displayPoint, Balloon.Position.above));
+        ApplicationManager.getApplication().invokeLater(() -> this.saveTipBalloon.show(displayPoint, Balloon.Position.above));
     }
 
     /**
@@ -119,13 +122,16 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
      * @param project necessary for updating the settings
      * @return the created JBPanel
      */
-    private static @NotNull JBPanel<JBPanel> createBalloonPanel(Project project) {
+    private @NotNull JBPanel<JBPanel> createBalloonPanel(Project project) {
         var jbPanel = new JBPanel<>();
         jbPanel.setLayout(new BoxLayout(jbPanel, BoxLayout.Y_AXIS));
         JBLabel jbLabel = new JBLabel(LanguageServerBundle.message("action.lsp.detail.apply.balloon"));
         JButton jButton = new JButton(LanguageServerBundle.message("action.lsp.detail.apply.balloon.disable"));
 
-        jButton.addActionListener(e -> UserDefinedLanguageServerSettings.getInstance(project).isSaveTipBalloonDisabled(true));
+        jButton.addActionListener(e -> {
+            UserDefinedLanguageServerSettings.getInstance(project).isSaveTipBalloonDisabled(true);
+            this.saveTipBalloon.hide();
+        });
 
         jbPanel.add(jbLabel);
         jbPanel.add(jButton);
