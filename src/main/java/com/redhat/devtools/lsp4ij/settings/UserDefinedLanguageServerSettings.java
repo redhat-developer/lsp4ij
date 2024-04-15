@@ -172,6 +172,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         }
     }
 
+    public boolean isSaveTipBalloonDisabled() {
+        return this.myState.isSaveTipBalloonDisabled;
+    }
+
+    public void isSaveTipBalloonDisabled(boolean value) {
+        this.myState.isSaveTipBalloonDisabled = value;
+    }
+
     public static class LanguageServerDefinitionSettings {
 
         private String debugPort;
@@ -227,6 +235,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         MyState() {
         }
 
+        private boolean isSaveTipBalloonDisabled = false;
     }
 
     /**

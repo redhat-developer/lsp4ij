@@ -23,11 +23,13 @@ import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBLabel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
+import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -35,7 +37,6 @@ import java.util.Optional;
  * from the UI language server view fields.
  */
 public class ApplyLanguageServerSettingsAction extends AnAction {
-
     public static final String ACTION_TOOLBAR_COMPONENT_NAME = "ActionToolbarComponent";
     private final LanguageServerView languageServerView;
     public ApplyLanguageServerSettingsAction(LanguageServerView languageServerView) {
@@ -56,9 +57,9 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
     public void update(@NotNull AnActionEvent e) {
         boolean modified = languageServerView.isModified();
         boolean isShown = languageServerView.isSaveTipShown();
-
+        boolean isSaveTipBalloonDisabled = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(Objects.requireNonNull(e.getProject())).isSaveTipBalloonDisabled();
         // Only show the tooltip once per configuration change
-        if (modified && !isShown) {
+        if (modified && !isShown && !isSaveTipBalloonDisabled) {
             showBalloon();
         }
         // If configuration is returned to match the unmodified state, reset the tooltip to be shown again
