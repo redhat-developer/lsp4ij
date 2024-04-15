@@ -172,10 +172,19 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         }
     }
 
+    /**
+     * Tells whether the user has disabled the save tip balloon from showing
+     * @return true if the balloon is disabled and not shown, false otherwise
+     */
     public boolean isSaveTipBalloonDisabled() {
         return this.myState.isSaveTipBalloonDisabled;
     }
 
+    /**
+     * Sets the value if the save tip balloon should be shown
+     * There is no way to set this value to false at the moment, it can only be disabled
+     * @param value true if the balloon should be disabled and not shown, false if it should be shown
+     */
     public void isSaveTipBalloonDisabled(boolean value) {
         this.myState.isSaveTipBalloonDisabled = value;
     }
