@@ -75,7 +75,11 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
             for (var serverDefinition : event.serverDefinitions) {
                 LanguageServerTreeNode node = findNodeForServer(serverDefinition, root);
                 if (node != null) {
+                    // Remove the language server definition from the tree
                     root.remove(node);
+                    // Remove the detail, console panel (on the right) of the language server
+                    removeConsolePanel(node);
+
                 }
             }
             treeModel.reload(root);
@@ -266,6 +270,15 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
     public void showError(LanguageServerProcessTreeNode processTreeNode, Throwable exception) {
         panel.showError(processTreeNode, exception);
+    }
+
+    /**
+     * Remove the detail, console panel of the given language server tree node.
+     *
+     * @param serverTreeNode the language server tree node.
+     */
+    public void removeConsolePanel(LanguageServerTreeNode serverTreeNode) {
+        panel.removeConsolePanel(serverTreeNode);
     }
 
     public DefaultTreeModel getTreeModel() {

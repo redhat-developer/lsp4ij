@@ -125,6 +125,18 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     }
 
     /**
+     * Remove the detail, console panel of the given language server tree node.
+     *
+     * @param serverTreeNode the language server tree node.
+     */
+    public void removeConsolePanel(LanguageServerTreeNode serverTreeNode) {
+        if (consoles == null || isDisposed()) {
+            return;
+        }
+        consoles.dispose(serverTreeNode);
+    }
+
+    /**
      * A card-panel that displays panels for each language server instances.
      */
     private class ConsolesPanel extends CardLayoutPanel<DefaultMutableTreeNode, DefaultMutableTreeNode, ConsoleContentPanel> {
@@ -151,6 +163,25 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         protected void dispose(DefaultMutableTreeNode key, ConsoleContentPanel value) {
             if (value != null) {
                 value.dispose();
+            }
+        }
+
+        /**
+         * Remove the detail, console panel of the given language server tree node.
+         *
+         * @param key the language server or process tree node.
+         */
+        public void dispose(@NotNull DefaultMutableTreeNode key) {
+            var value = super.getValue(key, false);
+            if (value != null) {
+                // Remove the detail panel of the language server
+                value.dispose();
+            }
+            // Remove the console panel of the language server (processes)
+            for (int i = 0; i <  key.getChildCount(); i++) {
+                if (key.getChildAt(i) instanceof DefaultMutableTreeNode treeNode) {
+                    dispose(treeNode);
+                }
             }
         }
     }
