@@ -58,7 +58,11 @@ public class SupportedFeatures {
                 .setDocumentationFormat(List.of(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
         completionItemCapabilities.setInsertTextModeSupport(new CompletionItemInsertTextModeSupportCapabilities(List.of(InsertTextMode.AsIs, InsertTextMode.AdjustIndentation)));
 
-        completionItemCapabilities.setResolveSupport(new CompletionItemResolveSupportCapabilities(List.of("documentation" /*, "detail", "additionalTextEdits" */)));
+        completionItemCapabilities.setResolveSupport(new CompletionItemResolveSupportCapabilities(
+                List.of(
+                        "documentation" ,
+                        "detail",
+                        "additionalTextEdits" )));
         CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
         completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
         textDocumentClientCapabilities.setCompletion(completionCapabilities);

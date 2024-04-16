@@ -14,36 +14,33 @@ import com.intellij.codeInsight.completion.CompletionContributor;
 import com.intellij.codeInsight.completion.CompletionParameters;
 import com.intellij.codeInsight.completion.CompletionResultSet;
 import com.intellij.codeInsight.completion.PrioritizedLookupElement;
-import com.intellij.codeInsight.lookup.LookupElement;
-import com.intellij.codeInsight.lookup.LookupElementBuilder;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutionException;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP completion contributor.
@@ -65,65 +62,44 @@ public class LSPCompletionContributor extends CompletionContributor {
 
         Editor editor = parameters.getEditor();
         Document document = editor.getDocument();
-        Project project = psiFile.getProject();
         int offset = parameters.getOffset();
-        URI uri = LSPIJUtils.toUri(file);
+
+        // Get LSP completion items from cache or create them
+        LSPCompletionParams params = new LSPCompletionParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document), offset);
+        CompletableFuture<List<CompletionData>> future = LSPFileSupport.getSupport(psiFile)
+                .getCompletionSupport()
+                .getCompletions(params);
+        try {
+            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
+            waitUntilDone(future, psiFile);
+        } catch (CancellationException | ProcessCanceledException e) {
+            return;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/completion' request", e);
+            return;
+        }
 
         ProgressManager.checkCanceled();
-
-        final CancellationSupport cancellationSupport = new CancellationSupport();
-        try {
-            CompletableFuture<List<LanguageServerItem>> completionLanguageServersFuture = initiateLanguageServers(file, project);
-            cancellationSupport.execute(completionLanguageServersFuture);
-            ProgressManager.checkCanceled();
-
-            /*
-             process the responses out of the completable loop as it may cause deadlock if user is typing
-             more characters as toProposals will require as read lock that this thread already have and
-             async processing is occuring on a separate thread.
-             */
-            CompletionParams params = LSPIJUtils.toCompletionParams(uri, offset, document);
-            BlockingDeque<Pair<Either<List<CompletionItem>, CompletionList>, LanguageServerItem>> proposals = new LinkedBlockingDeque<>();
-
-            CompletableFuture<Void> future = completionLanguageServersFuture
-                    .thenComposeAsync(languageServers -> cancellationSupport.execute(
-                            CompletableFuture.allOf(languageServers.stream()
-                                    .map(languageServer ->
-                                            cancellationSupport.execute(languageServer.getServer()
-                                                            .getTextDocumentService()
-                                                            .completion(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_COMPLETION)
-                                                    .thenAcceptAsync(completion -> {
-                                                        if (completion != null) {
-                                                            proposals.add(new Pair<>(completion, languageServer));
-                                                        }
-                                                    }))
-                                    .toArray(CompletableFuture[]::new))));
-
-            ProgressManager.checkCanceled();
-            while (!future.isDone() || !proposals.isEmpty()) {
-                ProgressManager.checkCanceled();
-                Pair<Either<List<CompletionItem>, CompletionList>, LanguageServerItem> pair = proposals.poll(25, TimeUnit.MILLISECONDS);
-                if (pair != null) {
-                    Either<List<CompletionItem>, CompletionList> completion = pair.getFirst();
-                    if (completion != null) {
-                        CompletionPrefix completionPrefix = new CompletionPrefix(offset, document);
-                        addCompletionItems(psiFile, editor, completionPrefix, pair.getFirst(), pair.getSecond(), result, cancellationSupport);
-                    }
+        if (isDoneNormally(future)) {
+            List<CompletionData> data = future.getNow(Collections.emptyList());
+            if (!data.isEmpty()) {
+                CompletionPrefix completionPrefix = new CompletionPrefix(offset, document);
+                for(var item : data) {
+                    ProgressManager.checkCanceled();
+                    addCompletionItems(psiFile, editor, completionPrefix, item.completion(), item.languageServer(), result);
                 }
             }
-        } catch (ProcessCanceledException cancellation) {
-            cancellationSupport.cancel();
-            throw cancellation;
-        } catch (RuntimeException | InterruptedException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-            result.addElement(createErrorProposal(offset, e));
         }
     }
 
     private static final CompletionItemComparator completionProposalComparator = new CompletionItemComparator();
 
-    private void addCompletionItems(PsiFile file, Editor editor, CompletionPrefix completionPrefix, Either<List<CompletionItem>,
-            CompletionList> completion, LanguageServerItem languageServer, @NotNull CompletionResultSet result, CancellationSupport cancellationSupport) {
+    private void addCompletionItems(@NotNull PsiFile file,
+                                    @NotNull Editor editor,
+                                    @NotNull CompletionPrefix completionPrefix,
+                                    @NotNull Either<List<CompletionItem>, CompletionList> completion,
+                                    @NotNull LanguageServerItem languageServer,
+                                    @NotNull CompletionResultSet result) {
         CompletionItemDefaults itemDefaults = null;
         List<CompletionItem> items = new ArrayList<>();
         if (completion.isLeft()) {
@@ -145,7 +121,7 @@ public class LSPCompletionContributor extends CompletionContributor {
                 // Invalid completion Item, ignore it
                 continue;
             }
-            cancellationSupport.checkCanceled();
+            ProgressManager.checkCanceled();
             // Create lookup item
             var lookupItem = createLookupItem(file, editor, completionPrefix.getCompletionOffset(), item, itemDefaults, languageServer);
 
@@ -166,15 +142,19 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
-    private static LSPCompletionProposal createLookupItem(PsiFile file, Editor editor, int offset,
-                                                          CompletionItem item,
-                                                          CompletionItemDefaults itemDefaults, LanguageServerItem languageServer) {
+    private static LSPCompletionProposal createLookupItem(@NotNull PsiFile file,
+                                                          @NotNull Editor editor,
+                                                          int offset,
+                                                          @NotNull CompletionItem item,
+                                                          @Nullable CompletionItemDefaults itemDefaults,
+                                                          @NotNull LanguageServerItem languageServer) {
         // Update text edit range with item defaults if needed
         updateWithItemDefaults(item, itemDefaults);
         return new LSPCompletionProposal(file, editor, offset, item, languageServer);
     }
 
-    private static void updateWithItemDefaults(CompletionItem item, CompletionItemDefaults itemDefaults) {
+    private static void updateWithItemDefaults(@NotNull CompletionItem item,
+                                               @Nullable CompletionItemDefaults itemDefaults) {
         if (itemDefaults == null) {
             return;
         }
@@ -194,14 +174,4 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
-
-    private static LookupElement createErrorProposal(int offset, Exception ex) {
-        return LookupElementBuilder.create("Error while computing completion", "");
-    }
-
-    private static CompletableFuture<List<LanguageServerItem>> initiateLanguageServers(@NotNull VirtualFile file, @NotNull Project project) {
-        return LanguageServiceAccessor
-                .getInstance(project)
-                .getLanguageServers(file,LanguageServerItem::isCompletionSupported);
-    }
 }

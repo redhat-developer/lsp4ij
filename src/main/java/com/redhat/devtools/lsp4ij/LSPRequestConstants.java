@@ -44,6 +44,7 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_SIGNATURE_HELP = "textDocument/signatureHelp";
     public static final String TEXT_DOCUMENT_PREPARE_RENAME = "textDocument/prepareRename";
     public static final String TEXT_DOCUMENT_RENAME = "textDocument/rename";
+    public static final String TEXT_DOCUMENT_DOCUMENT_COMPLETION = "textDocument/completion";
 
     private LSPRequestConstants() {
 
