@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -28,7 +29,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -99,7 +99,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPFeatureSupport<Cod
                         return Collections.emptyList();
                     }
                     return codeActions.stream()
-                            .filter(Objects::nonNull)
+                            .filter(LSPIntentionCodeActionSupport::isValidCodeAction)
                             .map(codeAction -> new CodeActionData(codeAction, languageServer.getServerWrapper()))
                             .toList();
                 });
@@ -124,5 +124,22 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPFeatureSupport<Cod
             }
         }
         return null;
+    }
+
+    /**
+     * Returns true if the given code action is valid and false otherwise.
+     *
+     * @param codeAction the code action.
+     * @return true if the given code action is valid and false otherwise.
+     */
+    private static boolean isValidCodeAction(@Nullable Either<org.eclipse.lsp4j.Command, org.eclipse.lsp4j.CodeAction> codeAction) {
+        if (codeAction == null) {
+            return false;
+        }
+        if (codeAction.isRight()) {
+            // For IJ intention, 'quickfix' code action must be filtered.
+            return !CodeActionKind.QuickFix.equals(codeAction.getRight().getKind());
+        }
+        return true;
     }
 }
