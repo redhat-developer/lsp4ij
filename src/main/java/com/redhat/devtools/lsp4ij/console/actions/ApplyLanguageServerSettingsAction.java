@@ -17,12 +17,17 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.MessageType;
 import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.ui.popup.BalloonBuilder;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
+import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
@@ -93,7 +98,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
         BalloonBuilder builder = JBPopupFactory.getInstance()
                 .createBalloonBuilder(jbPanel)
-                .setFadeoutTime(1600) // How many ms the balloon is shown for
+                .setFadeoutTime(10000) // How many ms the balloon is shown for
                 .setHideOnAction(false);
 
         // Have an instance reference to hide the balloon with the button
@@ -125,16 +130,16 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
     private @NotNull JBPanel<JBPanel> createBalloonPanel(Project project) {
         var jbPanel = new JBPanel<>();
         jbPanel.setLayout(new BoxLayout(jbPanel, BoxLayout.Y_AXIS));
-        JBLabel jbLabel = new JBLabel(LanguageServerBundle.message("action.lsp.detail.apply.balloon"));
-        JButton jButton = new JButton(LanguageServerBundle.message("action.lsp.detail.apply.balloon.disable"));
-
-        jButton.addActionListener(e -> {
+        // For some reason the HyperlinkLabel is indented by a single space
+        JBLabel jbLabel = new JBLabel(" " + LanguageServerBundle.message("action.lsp.detail.apply.balloon"));
+        HyperlinkLabel hyperlinkLabel = new HyperlinkLabel(LanguageServerBundle.message("action.lsp.detail.apply.balloon.disable"));
+        hyperlinkLabel.addHyperlinkListener(e -> {
             UserDefinedLanguageServerSettings.getInstance(project).showSaveTipOnConfigurationChange(false);
             this.saveTipBalloon.hide();
         });
 
         jbPanel.add(jbLabel);
-        jbPanel.add(jButton);
+        jbPanel.add(hyperlinkLabel);
         return jbPanel;
     }
 }
