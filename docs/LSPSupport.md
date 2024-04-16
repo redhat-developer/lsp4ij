@@ -42,14 +42,13 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) (see [implementation details](#completion-item-resolve))
  * ✅ [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp) (see [implementation details](#signature-help))
  * ✅ [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) (see [implementation details](#publish-diagnostics))
- * ✅ [textDocument/definition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition)
  * ✅ [textDocument/codeAction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction) (see [implementation details](#codeAction))
  * ✅ [codeAction/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve)
  * ✅ [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) (see [implementation details](#documentColor))
  * ❌ [textDocument/colorPresentation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation).
- * ✅ [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration).
- * ✅ [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition).
- * ✅ [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation).
+ * ✅ [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) (see [implementation details](#declaration))
+ * ✅ [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) (see [implementation details](#type-definition))
+ * ✅ [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) (see [implementation details](#implementation))
  * ✅ [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) (see [implementation details](#references))
  * ❌ [textDocument/prepareCallHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy).
  * ❌ [textDocument/incomingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls).
@@ -117,13 +116,57 @@ Here a sample with [Eclipse JDT Language Server](https://github.com/eclipse-jdtl
 
 It is also called via [Find Usages](./UserGuide.md#find-usages) to show definitions.
 
+#### References
+
+The [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is consumed with:
+
+* the `Navigate / LSP Reference(s)` global menu.
+* or with the `Go To/ LSP Reference(s)` editor menu.
+
+![textDocument/references menu](./images/lsp-support/textDocument_references_menu.png)
+
+This menu action either opens the reference in a popup or navigates to the reference if there are several references:
+
+![textDocument/implementation popup](./images/lsp-support/textDocument_references_popup.png)
+
+[textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is used too via [Find Usages](./UserGuide.md#find-usages) to show references.
+
+#### Implementation
+
+The [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is consumed with:
+
+* the `Navigate / LSP Implementation(s)` global menu.
+* or with the `Go To/ LSP Implementation(s)` editor menu.
+
+![textDocument/implementation menu](./images/lsp-support/textDocument_implementation_menu.png)
+
+This menu action either opens the implementation in a popup or navigates to the implementation if there are several implementations:
+
+![textDocument/implementation popup](./images/lsp-support/textDocument_implementation_popup.png)
+
+[textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is too used via [Find Usages](./UserGuide.md#find-usages) to show implementations.
+
 #### Type definition
 
-[textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is used via [Find Usages](./UserGuide.md#find-usages) to show Type definitions.
+The [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is consumed with:
+
+ * the `Navigate / LSP Type Definition(s)` global menu.
+ * or with the `Go To/ Type Definition(s)` editor menu.
+
+This menu action either opens the type definition in a popup or navigates to the type definition if there are several type definitions:
+
+[textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is used too via [Find Usages](./UserGuide.md#find-usages) to show Type definitions.
 
 #### Declaration
 
-[textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is used via [Find Usages](./UserGuide.md#find-usages) to show declarations.
+The [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is consumed with:
+
+ * the `Navigate / LSP Declaration(s)` global menu.
+ * or with the `Go To/ Declaration(s)` editor menu.
+
+This menu action either opens the declaration in a popup or navigates to the declaration if there are several declarations:
+
+[textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is used too via [Find Usages](./UserGuide.md#find-usages) to show declarations.
 
 #### Document Highlight
 
@@ -294,14 +337,6 @@ declared with the `renameHandler` extension point.
 Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing rename of function name:
 
 ![textDocument/rename](./images/lsp-support/textDocument_rename.gif)
-
-#### References
-
-[textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is used via [Find Usages](./UserGuide.md#find-usages) to show references.   
-
-#### Implementation
-
-[textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is used via [Find Usages](./UserGuide.md#find-usages) to show implementations.
 
 #### Formatting
 

@@ -17,15 +17,19 @@ import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCode
 import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionSupport;
+import com.redhat.devtools.lsp4ij.features.declaration.LSPDeclarationSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
 import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeSupport;
 import com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingSupport;
 import com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightSupport;
+import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSupport;
+import com.redhat.devtools.lsp4ij.features.references.LSPReferenceSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPPrepareRenameSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPRenameSupport;
 import com.redhat.devtools.lsp4ij.features.signatureHelp.LSPSignatureHelpSupport;
+import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -63,6 +67,14 @@ public class LSPFileSupport implements Disposable {
 
     private final LSPCompletionSupport completionSupport;
 
+    private final LSPImplementationSupport implementationSupport;
+
+    private final LSPReferenceSupport referenceSupport;
+
+    private final LSPDeclarationSupport declarationSupport;
+
+    private final LSPTypeDefinitionSupport typeDefinitionSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -78,6 +90,10 @@ public class LSPFileSupport implements Disposable {
         this.prepareRenameSupport = new LSPPrepareRenameSupport(file);
         this.renameSupport = new LSPRenameSupport(file);
         this.completionSupport = new LSPCompletionSupport(file);
+        this.implementationSupport = new LSPImplementationSupport(file);
+        this.referenceSupport = new LSPReferenceSupport(file);
+        this.declarationSupport = new LSPDeclarationSupport(file);
+        this.typeDefinitionSupport = new LSPTypeDefinitionSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -98,6 +114,10 @@ public class LSPFileSupport implements Disposable {
         getPrepareRenameSupport().cancel();
         getRenameSupport().cancel();
         getCompletionSupport().cancel();
+        getImplementationSupport().cancel();
+        getReferenceSupport().cancel();
+        getDeclarationSupport().cancel();
+        getTypeDefinitionSupport().cancel();
     }
 
     /**
@@ -215,6 +235,42 @@ public class LSPFileSupport implements Disposable {
      */
     public LSPCompletionSupport getCompletionSupport() {
         return completionSupport;
+    }
+
+    /**
+     * Returns the LSP implementation support.
+     *
+     * @return the LSP implementation support.
+     */
+    public LSPImplementationSupport getImplementationSupport() {
+        return implementationSupport;
+    }
+
+    /**
+     * Returns the LSP reference support.
+     *
+     * @return the LSP reference support.
+     */
+    public LSPReferenceSupport getReferenceSupport() {
+        return referenceSupport;
+    }
+
+    /**
+     * Returns the LSP declaration support.
+     *
+     * @return the LSP declaration support.
+     */
+    public LSPDeclarationSupport getDeclarationSupport() {
+        return declarationSupport;
+    }
+
+    /**
+     * Returns the LSP typeDefinition support.
+     *
+     * @return the LSP typeDefinition support.
+     */
+    public LSPTypeDefinitionSupport getTypeDefinitionSupport() {
+        return typeDefinitionSupport;
     }
 
     /**

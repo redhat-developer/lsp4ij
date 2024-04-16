@@ -21,6 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.awt.RelativePoint;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
@@ -54,11 +55,12 @@ public class LSPUsagesManager {
     // Show references, implementation, etc in Popup
 
     public void findShowUsagesInPopup(@NotNull List<Location> locations,
+                                      @NotNull LSPUsageType usageType,
                                       @NotNull DataContext dataContext,
                                       @Nullable MouseEvent event) {
         switch (locations.size()) {
             case 0: {
-                showNoUsage(dataContext);
+                showNoUsage(usageType, dataContext);
                 break;
             }
             case 1: {
@@ -108,14 +110,33 @@ public class LSPUsagesManager {
         return LSPPsiElementFactory.toPsiElement(location, project, USAGE_TRIGGERED_ELEMENT_FACTORY);
     }
 
-    private void showNoUsage(DataContext dataContext) {
+    private void showNoUsage(@NotNull LSPUsageType usageType, DataContext dataContext) {
         @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
-        @NotNull String message = "Cannot search for references from this location.\nPlace the caret on the element to find references for and try again."; //FindBundle.message("find.no.usages.at.cursor.error")
+        @NotNull String key = getNoUsageMessageKey(usageType);
+        String message = LanguageServerBundle.message(key);
         if (editor == null) {
             Messages.showMessageDialog(project, message, CommonBundle.getErrorTitle(), Messages.getErrorIcon());
         } else {
             HintManager.getInstance().showErrorHint(editor, message);
         }
+    }
+
+    private String getNoUsageMessageKey(LSPUsageType usageType) {
+        switch (usageType) {
+            case Declarations -> {
+                return "no.usage.type.declarations";
+            }
+            case TypeDefinitions -> {
+                return "no.usage.type.typeDefinitions";
+            }
+            case Implementations -> {
+                return "no.usage.type.implementations";
+            }
+            case References -> {
+                return "no.usage.type.references";
+            }
+        }
+        return null;
     }
 
     private static void openLocation(@NotNull Location location, @NotNull Project project) {

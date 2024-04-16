@@ -383,6 +383,46 @@
 
     </extensions>
 
+    <!-- Actions to execute LSP features Find Implementation, etc -->
+    <actions>
+
+        <action id="LSP.GotoDeclaration"
+                class="com.redhat.devtools.lsp4ij.features.declaration.LSPGoToDeclarationAction"
+                text="LSP Declaration(s)"
+                description="Find all declarations of the element at cursor if any.">
+            <keyboard-shortcut first-keystroke="control alt Z" keymap="$default"/>
+        </action>
+        <action id="LSP.GotoTypeDefinition"
+                class="com.redhat.devtools.lsp4ij.features.typeDefinition.LSPGoToTypeDefinitionAction"
+                text="LSP Type Definition(s)"
+                description="Find all type definitions of the element at cursor if any.">
+            <keyboard-shortcut first-keystroke="control alt E" keymap="$default"/>
+        </action>
+        <action id="LSP.GotoImplementation"
+                class="com.redhat.devtools.lsp4ij.features.implementation.LSPGoToImplementationAction"
+                text="LSP Implementation(s)"
+                description="Find all implementations of the element at cursor if any.">
+            <keyboard-shortcut first-keystroke="control alt G" keymap="$default"/>
+        </action>
+        <action id="LSP.GotoReference"
+                class="com.redhat.devtools.lsp4ij.features.references.LSPGoToReferenceAction"
+                text="LSP Reference(s)"
+                description="Find all references of the element at cursor if any.">
+            <keyboard-shortcut first-keystroke="control alt H" keymap="$default"/>
+        </action>
+
+        <group>
+            <add-to-group group-id="EditorPopupMenu.GoTo" anchor="first"/>
+            <add-to-group group-id="GoToMenu" anchor="before" relative-to-action="GotoDeclaration"/>
+            <reference ref="LSP.GotoImplementation"/>
+            <reference ref="LSP.GotoReference"/>
+            <reference ref="LSP.GotoDeclaration"/>
+            <reference ref="LSP.GotoTypeDefinition"/>
+            <separator/>
+        </group>
+
+    </actions>
+
     <!-- Common LSP Client actions  -->
     <actions>
         <!-- Reuse VS Code action ids while waiting for standardization of LSP commands https://github.com/microsoft/language-server-protocol/issues/788 -->
