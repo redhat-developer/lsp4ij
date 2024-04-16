@@ -41,6 +41,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
     public static final String ACTION_TOOLBAR_COMPONENT_NAME = "ActionToolbarComponent";
     private final LanguageServerView languageServerView;
     private Balloon saveTipBalloon;
+    private boolean hasSaveTipBalloonShown = false;
 
     public ApplyLanguageServerSettingsAction(LanguageServerView languageServerView) {
         this.languageServerView = languageServerView;
@@ -59,18 +60,18 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
     @Override
     public void update(@NotNull AnActionEvent e) {
         boolean modified = languageServerView.isModified();
-        boolean isShown = languageServerView.isSaveTipShown();
         var project = e.getProject();
 
         if (project != null) {
-            boolean isSaveTipBalloonDisabled = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).isSaveTipBalloonDisabled();
+            boolean showSaveTipOnConfigurationChange = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).showSaveTipOnConfigurationChange();
             // Only show the tooltip once per configuration change
-            if (modified && !isShown && !isSaveTipBalloonDisabled) {
+            if (modified && !hasSaveTipBalloonShown && showSaveTipOnConfigurationChange) {
+                hasSaveTipBalloonShown = true;
                 showBalloon(project);
             }
             // If configuration is returned to match the unmodified state, reset the tooltip to be shown again
             if (!modified) {
-                languageServerView.isSaveTipShown(false);
+                hasSaveTipBalloonShown = false;
             }
         }
 
@@ -88,7 +89,6 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
      * @param project passed on to the panel creation to create the button's action listener
      */
     private void showBalloon(@NotNull Project project) {
-        languageServerView.isSaveTipShown(true);
         var jbPanel = createBalloonPanel(project);
 
         BalloonBuilder builder = JBPopupFactory.getInstance()
@@ -129,7 +129,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         JButton jButton = new JButton(LanguageServerBundle.message("action.lsp.detail.apply.balloon.disable"));
 
         jButton.addActionListener(e -> {
-            UserDefinedLanguageServerSettings.getInstance(project).isSaveTipBalloonDisabled(true);
+            UserDefinedLanguageServerSettings.getInstance(project).showSaveTipOnConfigurationChange(false);
             this.saveTipBalloon.hide();
         });
 
