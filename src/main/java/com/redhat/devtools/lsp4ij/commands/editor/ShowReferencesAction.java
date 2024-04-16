@@ -18,6 +18,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.commands.LSPCommand;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandAction;
+import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LSPUsagesManager;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
@@ -85,7 +86,7 @@ public class ShowReferencesAction extends LSPCommandAction {
         }
         DataContext dataContext = e.getDataContext();
         // Call "Find Usages" in popup mode.
-        LSPUsagesManager.getInstance(project).findShowUsagesInPopup(locations, dataContext, (MouseEvent) e.getInputEvent());
+        LSPUsagesManager.getInstance(project).findShowUsagesInPopup(locations, LSPUsageType.References, dataContext, (MouseEvent) e.getInputEvent());
     }
 
     @Override
