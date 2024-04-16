@@ -16,20 +16,22 @@ import com.intellij.codeInsight.completion.CompletionInitializationContext;
 import com.intellij.codeInsight.completion.InsertionContext;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupElementPresentation;
+import com.intellij.codeInsight.lookup.LookupElementRenderer;
 import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.TemplateManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorModificationUtil;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetIndentOptions;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -40,11 +42,12 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 import static com.redhat.devtools.lsp4ij.ui.IconMapper.getIcon;
 
 /**
@@ -62,7 +65,7 @@ public class LSPCompletionProposal extends LookupElement {
     private int bestOffset;
     private final Editor editor;
     private final LanguageServerItem languageServer;
-    private String documentation;
+    private CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
     public LSPCompletionProposal(PsiFile file, Editor editor, int offset, CompletionItem item, LanguageServerItem languageServer) {
         this.file = file;
@@ -246,6 +249,25 @@ public class LSPCompletionProposal extends LookupElement {
         }
     }
 
+    @Override
+    public @Nullable LookupElementRenderer<? extends LookupElement> getExpensiveRenderer() {
+        if(item.getDetail() == null && supportResolveCompletion) {
+            // The LSP completion item 'detail' is not filled, try to resolve it
+            // inside getExpensiveRenderer() which should not impact performance.
+            CompletionItem resolved = getResolvedCompletionItem();
+            if (resolved != null && resolved.getDetail() != null) {
+                item.setDetail(resolved.getDetail());
+
+                return new LookupElementRenderer<LookupElement>() {
+                    @Override
+                    public void renderElement(LookupElement element, LookupElementPresentation presentation) {
+                        LSPCompletionProposal.this.renderElement(presentation);
+                    }
+                };
+            }
+        }
+        return null;
+    }
     protected void apply(Document document, char trigger, int stateMask, int offset) {
         String insertText = null;
         Either<TextEdit, InsertReplaceEdit> eitherTextEdit = item.getTextEdit();
@@ -316,6 +338,13 @@ public class LSPCompletionProposal extends LookupElement {
             }
 
             List<TextEdit> additionalEdits = item.getAdditionalTextEdits();
+            if (additionalEdits == null && supportResolveCompletion) {
+                // The LSP completion item 'additionalEdits' is not filled, try to resolve it.
+                CompletionItem resolved = getResolvedCompletionItem();
+                if (resolved != null) {
+                    additionalEdits = resolved.getAdditionalTextEdits();
+                }
+            }
             if (additionalEdits != null && !additionalEdits.isEmpty()) {
                 List<TextEdit> allEdits = new ArrayList<>();
                 allEdits.add(textEdit);
@@ -341,12 +370,8 @@ public class LSPCompletionProposal extends LookupElement {
     private void executeCustomCommand(@NotNull Command command, URI documentUri) {
         Project project = editor.getProject();
         // Execute custom command of the completion item.
-        LanguageServiceAccessor.getInstance(project)
-                .resolveServerDefinition(languageServer.getServer()).map(definition -> definition.getId())
-                .ifPresent(id -> {
-                    CommandExecutor.executeCommand(command, documentUri, project, id);
-                });
-
+        String languageServerId = languageServer.getServerWrapper().getServerDefinition().getId();
+        CommandExecutor.executeCommand(command, documentUri, project, languageServerId);
     }
 
     public @Nullable Range getTextEditRange() {
@@ -421,23 +446,11 @@ public class LSPCompletionProposal extends LookupElement {
 
     public MarkupContent getDocumentation() {
         if (item.getDocumentation() == null && supportResolveCompletion) {
-            try {
-                CompletionItem resolved = languageServer.getServer()
-                        .getTextDocumentService()
-                        .resolveCompletionItem(item)
-                        .get(1000, TimeUnit.MILLISECONDS);
-                if (resolved != null) {
-                    item.setDocumentation(resolved.getDocumentation());
-                }
-            } catch (ExecutionException e) {
-                if (!(e.getCause() instanceof CancellationException)) {
-                    LOGGER.warn(e.getLocalizedMessage(), e);
-                }
-            } catch (TimeoutException e) {
-                LOGGER.warn(e.getLocalizedMessage(), e);
-            } catch (InterruptedException e) {
-                LOGGER.warn(e.getLocalizedMessage(), e);
-                Thread.currentThread().interrupt();
+            // The LSP completion item 'documentation' is not filled, try to resolve it
+            // As documentation is computed in a Thread it should not impact performance.
+            CompletionItem resolved = getResolvedCompletionItem();
+            if (resolved != null) {
+                item.setDocumentation(resolved.getDocumentation());
             }
         }
         return getDocumentation(item.getDocumentation());
@@ -452,5 +465,33 @@ public class LSPCompletionProposal extends LookupElement {
             return new MarkupContent(MarkupKind.PLAINTEXT, content);
         }
         return documentation.getRight();
+    }
+
+    /**
+     * Returns the resolved completion item and null otherwise.
+     *
+     * @return the resolved completion item and null otherwise.
+     */
+    private CompletionItem getResolvedCompletionItem() {
+        if (resolvedCompletionItemFuture == null) {
+            resolvedCompletionItemFuture = languageServer.getServer()
+                    .getTextDocumentService()
+                    .resolveCompletionItem(item);
+        }
+        try {
+            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
+            waitUntilDone(resolvedCompletionItemFuture, file);
+        } catch (CancellationException | ProcessCanceledException e) {
+            return null;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'completionItem/resolve' request", e);
+            return null;
+        }
+
+        ProgressManager.checkCanceled();
+        if (isDoneNormally(resolvedCompletionItemFuture)) {
+            return resolvedCompletionItemFuture.getNow(null);
+        }
+        return null;
     }
 }

@@ -60,7 +60,8 @@ public class CompletionPrefix {
      * @param item          the completion item.
      * @return the proper prefix from the given text range and label/filterText defined in the given completion item and null otherwise.
      */
-    public @Nullable String getPrefixFor(@NotNull Range textEditRange, CompletionItem item) {
+    public @Nullable String getPrefixFor(@NotNull Range textEditRange,
+                                         @NotNull CompletionItem item) {
         // Try to get the computed prefix from the cache
         String prefix = prefixCache.get(textEditRange);
         if (prefix == null && !prefixCache.containsKey(textEditRange)) {
@@ -101,7 +102,7 @@ public class CompletionPrefix {
         return prefix;
     }
 
-    private static String getAccurateFilterText(CompletionItem item) {
+    private static String getAccurateFilterText(@NotNull CompletionItem item) {
         String filterText = item.getFilterText();
         if (StringUtils.isBlank(filterText)) {
             return null;

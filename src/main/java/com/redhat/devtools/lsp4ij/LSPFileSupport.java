@@ -16,6 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCodeActionSupport;
 import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
+import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
 import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeSupport;
@@ -60,6 +61,8 @@ public class LSPFileSupport implements Disposable {
 
     private final LSPRenameSupport renameSupport;
 
+    private final LSPCompletionSupport completionSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -74,6 +77,7 @@ public class LSPFileSupport implements Disposable {
         this.intentionCodeActionSupport = new LSPIntentionCodeActionSupport(file);
         this.prepareRenameSupport = new LSPPrepareRenameSupport(file);
         this.renameSupport = new LSPRenameSupport(file);
+        this.completionSupport = new LSPCompletionSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -93,6 +97,7 @@ public class LSPFileSupport implements Disposable {
         getIntentionCodeActionSupport().cancel();
         getPrepareRenameSupport().cancel();
         getRenameSupport().cancel();
+        getCompletionSupport().cancel();
     }
 
     /**
@@ -203,6 +208,14 @@ public class LSPFileSupport implements Disposable {
         return renameSupport;
     }
 
+    /**
+     * Returns the LSP completion support.
+     *
+     * @return the LSP completion support.
+     */
+    public LSPCompletionSupport getCompletionSupport() {
+        return completionSupport;
+    }
 
     /**
      * Return the existing LSP file support for the given Psi file, or create a new one if necessary.

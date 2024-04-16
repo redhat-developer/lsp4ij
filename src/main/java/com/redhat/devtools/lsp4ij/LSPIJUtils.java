@@ -623,14 +623,6 @@ public class LSPIJUtils {
         return EditorFactory.getInstance().getEditors(document, project);
     }
 
-    public static CompletionParams toCompletionParams(URI fileUri, int offset, Document document) {
-        Position start = toPosition(offset, document);
-        CompletionParams param = new CompletionParams();
-        param.setPosition(start);
-        param.setTextDocument(toTextDocumentIdentifier(fileUri));
-        return param;
-    }
-
     public static TextDocumentIdentifier toTextDocumentIdentifier(VirtualFile file) {
         return toTextDocumentIdentifier(toUri(file));
     }
