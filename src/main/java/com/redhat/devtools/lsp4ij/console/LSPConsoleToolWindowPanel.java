@@ -332,6 +332,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         ActionToolbar tb = ActionManager.getInstance().createActionToolbar("LSP Detail", myToolbarActions, false);
         tb.setTargetComponent(detailComponent);
         tb.getComponent().setBorder(JBUI.Borders.merge(tb.getComponent().getBorder(), JBUI.Borders.customLine(OnePixelDivider.BACKGROUND, 0, 0, 0, 1), true));
+        tb.getComponent().setName(ApplyLanguageServerSettingsAction.ACTION_TOOLBAR_COMPONENT_NAME);
         detailComponent.add(tb.getComponent(), BorderLayout.WEST);
     }
 

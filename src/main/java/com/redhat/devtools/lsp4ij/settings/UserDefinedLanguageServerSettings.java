@@ -172,6 +172,23 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         }
     }
 
+    /**
+     * Tells whether the save tip balloon is shown when changing language server configuration
+     * @return true if the balloon should be shown, false otherwise
+     */
+    public boolean showSaveTipOnConfigurationChange() {
+        return this.myState.showSaveTipOnConfigurationChange;
+    }
+
+    /**
+     * Sets the value if the save tip balloon should be shown on language server configuration change
+     * There is no way to set this value to true at the moment, it can only be disabled
+     * @param value true if the balloon should be shown, false otherwise
+     */
+    public void showSaveTipOnConfigurationChange(boolean value) {
+        this.myState.showSaveTipOnConfigurationChange = value;
+    }
+
     public static class LanguageServerDefinitionSettings {
 
         private String debugPort;
@@ -227,6 +244,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         MyState() {
         }
 
+        private boolean showSaveTipOnConfigurationChange = true;
     }
 
     /**
