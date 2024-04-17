@@ -76,7 +76,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
             }
         }
 
-        e.getPresentation().setEnabled(modified);
+        e.getPresentation().setEnabled(modified && languageServerView.isValid());
     }
 
     @Override
