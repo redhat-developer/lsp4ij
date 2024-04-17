@@ -14,19 +14,16 @@
 package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.openapi.ui.ValidationInfo;
-import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBFont;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import org.jetbrains.annotations.NotNull;
 
 import javax.swing.border.Border;
-import javax.swing.event.DocumentEvent;
 
 /**
  * Command line widget used to fill the command to start a language server.
  */
-public class CommandLineWidget extends JBTextArea {
+public class CommandLineWidget extends JBTextArea implements ValidatableConsoleWidget {
     private boolean isValid = true;
     private final String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
     private final Border normalBorder;
@@ -38,27 +35,18 @@ public class CommandLineWidget extends JBTextArea {
         super.setFont(JBFont.regular());
         super.getEmptyText().setText(LanguageServerBundle.message("language.server.command.emptyText"));
         this.normalBorder = this.getBorder();
-        this.getDocument().addDocumentListener(new DocumentAdapter() {
-            @Override
-            protected void textChanged(@NotNull final DocumentEvent e){
-                validateInput();
-            }
-        });
-        validateInput();
+        addListeners(this);
     }
 
-    private void validateInput() {
+    @Override
+    public void validateInput() {
         if (getText().isBlank()) {
             isValid = false;
-            ValidatableConsoleWidget.setErrorBorder(this);
+            setErrorBorder(this);
         } else {
             isValid = true;
-            setNormalBorder();
+            this.setBorder(normalBorder);
         }
-    }
-
-    private void setNormalBorder() {
-        this.setBorder(normalBorder);
     }
 
     public ValidationInfo getValidationInfo() {
