@@ -14,30 +14,24 @@ import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.ide.TitledHandler;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.refactoring.rename.RenameHandler;
 import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import java.util.concurrent.TimeoutException;
 
 /**
  * LSP rename handler which:
@@ -48,8 +42,6 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  * </ul>
  */
 public class LSPRenameHandler implements RenameHandler, TitledHandler {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(LSPRenameHandler.class);
 
     @Override
     public void invoke(@NotNull Project project, Editor editor, PsiFile psiFile, DataContext dataContext) {
@@ -66,40 +58,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         final Position position = LSPIJUtils.toPosition(offset, document);
 
         // Step 1: consume the LSP 'textDocument/prepareRename' request
-        List<PrepareRenameResultData> prepareRenamesResult = prepareRename(textDocument, position, offset, document, psiFile);
-        if (prepareRenamesResult.isEmpty()) {
-            // Show "The element can't be renamed." hint error in the editor
-            HintManager.getInstance().showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.cannot.be.renamed.error"));
-            return;
-        }
 
-        // Here we have collected premare rename result for each language server which support the rename capability.
-        // Step 2: open the LSP rename dialog to consume the LSP 'textDocument/rename' request when OK is done.
-
-        // Create rename parameters
-        LSPRenameParams renameParams = createRenameParams(prepareRenamesResult, textDocument, position);
-
-        // Open the LSP rename dialog
-        LSPRenameRefactoringDialog dialog = new LSPRenameRefactoringDialog(renameParams, psiFile, editor);
-        dialog.show();
-    }
-
-    /**
-     * Returns for each language servers associated with the file and which supports 'renamed' capability the prepare rename information.
-     *
-     * @param textDocument teh text document.
-     * @param position     the position.
-     * @param offset       the offset.
-     * @param document     the document.
-     * @param psiFile      the Psi file.
-     * @return for each language servers associated with the file and which supports 'renamed' capability the prepare rename information.
-     */
-    @NotNull
-    private static List<PrepareRenameResultData> prepareRename(@NotNull TextDocumentIdentifier textDocument,
-                                                               @NotNull Position position,
-                                                               int offset,
-                                                               @NotNull Document document,
-                                                               @NotNull PsiFile psiFile) {
         // Get the text range and placeholder of the LSP rename with 'textDocument/prepareRename'.
         // If the language server doesn't support prepare rename capability,
         // the support returns a prepare rename result by using token strategy.
@@ -107,19 +66,44 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         CompletableFuture<List<PrepareRenameResultData>> future = LSPFileSupport.getSupport(psiFile)
                 .getPrepareRenameSupport()
                 .getPrepareRenameResult(prepareRenameParams);
-        try {
-            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
-        } catch (CancellationException | ProcessCanceledException e) {
-            return Collections.emptyList();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/prepareRename' request", e);
-            return Collections.emptyList();
-        }
-        if (isDoneNormally(future)) {
-            return future.getNow(Collections.emptyList());
-        }
-        return Collections.emptyList();
+
+        // As invoke method is invoked in EDT Thread,
+        // com.redhat.devtools.lsp4ij.internal.CompletableFutures#waitUntilDone
+        // cannot be used to avoid freezing IJ, in this case the result future
+        // is collected when future is ready.
+        future.handle((prepareRenamesResult, error) -> {
+            if (error != null) {
+                // Handle error
+                if (CancellationUtil.isRequestCancelledException(error)) {
+                    // Don't show cancelled error
+                    return error;
+                }
+                // The language server throws an error while preparing rename, display it as hint in the editor
+                showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.prepare.error", error.getMessage()));
+                return error;
+            }
+            if (prepareRenamesResult.isEmpty()) {
+                // Show "The element can't be renamed." hint error in the editor
+                showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.cannot.be.renamed.error"));
+                return prepareRenamesResult;
+            }
+
+            // Here we have collected premare rename result for each language server which support the rename capability.
+            // Step 2: open the LSP rename dialog to consume the LSP 'textDocument/rename' request when OK is done.
+            ApplicationManager.getApplication()
+                    .invokeLater(() -> {
+
+                        // Create rename parameters
+                        LSPRenameParams renameParams = createRenameParams(prepareRenamesResult, textDocument, position);
+
+                        // Open the LSP rename dialog
+                        LSPRenameRefactoringDialog dialog = new LSPRenameRefactoringDialog(renameParams, psiFile, editor);
+                        dialog.show();
+                    });
+
+            return prepareRenamesResult;
+        });
+
     }
 
     @NotNull
@@ -162,14 +146,27 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
                     .getLanguageServers(file.getVirtualFile(), LanguageServerItem::isRenameSupported)
                     .get(200, TimeUnit.MILLISECONDS)
                     .isEmpty();
+        } catch (TimeoutException e) {
+            // Show "Rename... is not available during language servers starting."
+            showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.language.server.not.ready"));
         } catch (Exception e) {
-            return false;
+
         }
+        return false;
     }
 
     @Override
     public String getActionTitle() {
         return LanguageServerBundle.message("lsp.refactor.rename.symbol.handler.title");
+    }
+
+    static void showErrorHint(@NotNull Editor editor, @NotNull String text) {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            HintManager.getInstance().showErrorHint(editor, text);
+        } else {
+            ApplicationManager.getApplication()
+                    .invokeLater(() -> HintManager.getInstance().showErrorHint(editor, text));
+        }
     }
 
 }

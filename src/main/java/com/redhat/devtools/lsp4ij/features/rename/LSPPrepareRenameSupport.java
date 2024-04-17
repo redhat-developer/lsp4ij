@@ -106,7 +106,8 @@ public class LSPPrepareRenameSupport extends AbstractLSPFeatureSupport<LSPPrepar
                                                                                          @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .prepareRename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME)
+                        .prepareRename(params), languageServer.getServerWrapper(), LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME,
+                        false /* if prepare name throws an error, the error must not be displayed as notification but as hint in the editor  */)
                 .thenApplyAsync(prepareRename -> {
                     PrepareRenameResultData result = getPrepareRenameResultData(defaultPrepareRenameResultProvider, languageServer, prepareRename);
                     return result!= null ? List.of(result) : Collections.emptyList();

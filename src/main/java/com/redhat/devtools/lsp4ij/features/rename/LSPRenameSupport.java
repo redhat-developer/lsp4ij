@@ -18,7 +18,9 @@ import com.redhat.devtools.lsp4ij.features.refactoring.WorkspaceEditData;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.RenameParams;
+import org.eclipse.lsp4j.WorkspaceEdit;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -69,15 +71,37 @@ public class LSPRenameSupport extends AbstractLSPFeatureSupport<LSPRenameParams,
                                                                            @NotNull LanguageServerItem languageServer,
                                                                            @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
-                        .getTextDocumentService()
-                        .rename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RENAME)
+                                .getTextDocumentService()
+                                .rename(params), languageServer.getServerWrapper(), LSPRequestConstants.TEXT_DOCUMENT_RENAME,
+                        false /* if rename throws an error, the error must not be displayed as notification but as hint in the editor  */)
                 .thenApplyAsync(workspaceEdit -> {
-                    if (workspaceEdit == null) {
-                        // textDocument/workspaceEdit may return null
-                        return Collections.emptyList();
+                    if (isValidWorkspaceEdit(workspaceEdit)) {
+                        return List.of(new WorkspaceEditData(workspaceEdit, languageServer));
                     }
-                    return List.of(new WorkspaceEditData(workspaceEdit, languageServer));
+                    return Collections.emptyList();
                 });
+    }
+
+    /**
+     * Returns true if the given workspace edit is valid and false otherwise.
+     *
+     * @param workspaceEdit the workspace edit.
+     * @return true if the given workspace edit is valid and false otherwise.
+     */
+    private static boolean isValidWorkspaceEdit(@Nullable WorkspaceEdit workspaceEdit) {
+        if (workspaceEdit == null) {
+            return false;
+        }
+        if (workspaceEdit.getChanges() != null && !workspaceEdit.getChanges().isEmpty()) {
+            return true;
+        }
+        if (workspaceEdit.getDocumentChanges() != null && !workspaceEdit.getDocumentChanges().isEmpty()) {
+            return true;
+        }
+        if (workspaceEdit.getChangeAnnotations() != null && !workspaceEdit.getChangeAnnotations().isEmpty()) {
+            return true;
+        }
+        return false;
     }
 
 

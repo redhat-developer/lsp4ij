@@ -88,18 +88,26 @@ public class CancellationSupport implements CancelChecker {
         return execute(future, languageServer != null ? languageServer.getServerWrapper() : null, featureName);
     }
 
+    public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
+                                            @Nullable LanguageServerWrapper languageServer,
+                                            @Nullable String featureName) {
+        return execute(future, languageServer, featureName, true);
+    }
+
     /**
      * Add the given future to the list of the futures to cancel (when CancellationSupport.cancel() is called)
      *
      * @param future         the future to cancel when CancellationSupport.cancel() is called.
      * @param languageServer the language server which have created the LSP future and null otherwise.
      * @param featureName    the LSP feature name (ex: textDocument/completion) and null otherwise.
+     * @param handleLanguageServerError true if the error coming from language server are caught and displayed as notification, log, ignore and false otherwise.
      * @param <T>            the result type of the future.
      * @return the future to execute.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
                                             @Nullable LanguageServerWrapper languageServer,
-                                            @Nullable String featureName) {
+                                            @Nullable String featureName,
+                                            boolean handleLanguageServerError) {
         if (cancelled) {
             if (!future.isDone()) {
                 future.cancel(true);
@@ -113,14 +121,16 @@ public class CancellationSupport implements CancelChecker {
                 // Handle the LSP request result to show LSP error (ResponseErrorException) in an IJ notification
                 // In this error case, the future will return null as result instead of throwing the ResponseErrorException error
                 // to avoid breaking the LSP request result of another language server (when file is associated to several language servers)
-                future = future.handle(handleLSPFeatureResult(languageServer, featureName));
+                future = future.handle(handleLSPFeatureResult(languageServer, featureName, handleLanguageServerError));
             }
         }
         return future;
     }
 
     @NotNull
-    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@NotNull LanguageServerWrapper languageServer, @Nullable String featureName) {
+    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@NotNull LanguageServerWrapper languageServer,
+                                                                          @Nullable String featureName,
+                                                                          boolean handleLanguageServerError) {
         return (result, error) -> {
             if (error instanceof ResponseErrorException responseErrorException) {
                 if (isRequestCancelled(responseErrorException)) {
@@ -128,7 +138,7 @@ public class CancellationSupport implements CancelChecker {
                     return null;
                 }
             }
-            if (error instanceof ResponseErrorException) {
+            if (handleLanguageServerError && error instanceof ResponseErrorException) {
                 handleLanguageServerError(languageServer, featureName, error);
                 // return null as result instead of throwing the ResponseErrorException error
                 // to avoid breaking the LSP request result of another language server (when file is associated to several language servers)
@@ -187,15 +197,15 @@ public class CancellationSupport implements CancelChecker {
         String languageServerId = languageServer.getServerDefinition().getId();
         ErrorReportingKind errorReportingKind = null;
         Project project = languageServer.getProject();
-        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = project != null ? UserDefinedLanguageServerSettings.getInstance(project)
-                .getLanguageServerSettings(languageServerId) : null;
+        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project)
+                        .getLanguageServerSettings(languageServerId);
         if (settings != null) {
             errorReportingKind = settings.getErrorReportingKind();
         }
         return errorReportingKind != null ? errorReportingKind : ErrorReportingKind.getDefaultValue();
     }
 
-    private static boolean isRequestCancelled(ResponseErrorException responseErrorException) {
+    public static boolean isRequestCancelled(ResponseErrorException responseErrorException) {
         ResponseError responseError = responseErrorException.getResponseError();
         return responseError != null
                 && responseError.getCode() == ResponseErrorCode.RequestCancelled.getValue();

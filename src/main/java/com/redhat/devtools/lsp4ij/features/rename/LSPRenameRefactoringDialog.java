@@ -30,8 +30,6 @@ import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.util.Collections;
@@ -50,8 +48,6 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  * adapted for LSP.
  */
 class LSPRenameRefactoringDialog extends RefactoringDialog {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(LSPRenameRefactoringDialog.class);
 
     @NotNull
     private final LSPRenameParams renameParams;
@@ -87,14 +83,14 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
 
     private void createNewNameComponent() {
         myNameSuggestionsField = new NameSuggestionsField(new String[]{renameParams.getNewName()}, myProject, FileTypes.PLAIN_TEXT, editor);
-        myNameChangedListener = () -> validateButtons();
+        myNameChangedListener = this::validateButtons;
         myNameSuggestionsField.addDataChangedListener(myNameChangedListener);
     }
 
     @Override
     protected void doAction() {
         renameParams.setNewName(getNewName());
-        doRename(renameParams, psiFile);
+        doRename(renameParams, psiFile, editor);
         close(DialogWrapper.OK_EXIT_CODE);
     }
 
@@ -142,11 +138,13 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
 
     /**
      * Consume LSP 'textDocument/rename' request and apply the {@link org.eclipse.lsp4j.WorkspaceEdit}.
+     *
      * @param renameParams the rename parameters.
-     * @param psiFile the Psi file.
+     * @param psiFile      the Psi file.
      */
     private static void doRename(@NotNull LSPRenameParams renameParams,
-                                 @NotNull PsiFile psiFile) {
+                                 @NotNull PsiFile psiFile,
+                                 @NotNull Editor editor) {
 
         CompletableFuture<List<WorkspaceEditData>> future = LSPFileSupport.getSupport(psiFile)
                 .getRenameSupport()
@@ -158,18 +156,21 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
         } catch (CancellationException | ProcessCanceledException e) {
             return;
         } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/rename' request", e);
+            // The language server throws an error, display it as hint in the editor
+            Throwable error = e.getCause();
+            LSPRenameHandler.showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.process.error", error.getMessage()));
             return;
         }
 
         if (CompletableFutures.isDoneNormally(future)) {
             List<WorkspaceEditData> workspaceEdits = future.getNow(Collections.emptyList());
-            if (!workspaceEdits.isEmpty()) {
-                WriteCommandAction.runWriteCommandAction(psiFile.getProject(), () -> {
-                    workspaceEdits.forEach(workspaceEditData -> {
-                        LSPIJUtils.applyWorkspaceEdit(workspaceEditData.edit());
-                    });
-                });
+            if (workspaceEdits.isEmpty()) {
+                // Show "The element can't be renamed." hint error in the editor
+                LSPRenameHandler.showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.cannot.be.renamed.error"));
+            } else {
+                // Apply the rename from the LSP WorkspaceEdit list
+                WriteCommandAction
+                        .runWriteCommandAction(psiFile.getProject(), () -> workspaceEdits.forEach(workspaceEditData -> LSPIJUtils.applyWorkspaceEdit(workspaceEditData.edit())));
             }
         }
     }
