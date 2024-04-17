@@ -15,6 +15,7 @@ import com.intellij.openapi.util.TextRange;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
@@ -34,10 +35,18 @@ class DefaultPrepareRenameResultProvider implements Function<LanguageServerItem,
         this.prepareRenameParams = prepareRenameParams;
     }
 
+    @Nullable
     @Override
     public PrepareRenameResultData apply(LanguageServerItem languageServerItem) {
         if (textRange == null) {
             getTextRange();
+        }
+        if (textRange == null) {
+            // Invalid text range
+            // ex: the rename is done in spaces or an empty file
+            return null;
+        }
+        if (placeholder == null) {
             placeholder = getDocument().getText(textRange);
         }
         return new PrepareRenameResultData(textRange, placeholder, languageServerItem);
