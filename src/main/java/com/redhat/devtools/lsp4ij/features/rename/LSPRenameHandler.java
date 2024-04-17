@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.rename;
 
+import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.ide.TitledHandler;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
@@ -67,6 +68,8 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         // Step 1: consume the LSP 'textDocument/prepareRename' request
         List<PrepareRenameResultData> prepareRenamesResult = prepareRename(textDocument, position, offset, document, psiFile);
         if (prepareRenamesResult.isEmpty()) {
+            // Show "The element can't be renamed." hint error in the editor
+            HintManager.getInstance().showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.cannot.be.renamed.error"));
             return;
         }
 

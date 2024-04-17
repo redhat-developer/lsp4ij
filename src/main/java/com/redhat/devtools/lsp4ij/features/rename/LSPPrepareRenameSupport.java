@@ -80,10 +80,19 @@ public class LSPPrepareRenameSupport extends AbstractLSPFeatureSupport<LSPPrepar
                     List<CompletableFuture<List<PrepareRenameResultData>>> prepareRenamePerServerFutures = new ArrayList<>();
                     DefaultPrepareRenameResultProvider defaultPrepareRenameResult = new DefaultPrepareRenameResultProvider(params);
                     for (var languageServer : languageServers) {
+                        CompletableFuture<List<PrepareRenameResultData>> future = null;
                         if (languageServer.isPrepareRenameSupported()) {
-                            prepareRenamePerServerFutures.add(getPrepareRenamesFor(params, defaultPrepareRenameResult, languageServer, cancellationSupport));
+                            future = getPrepareRenamesFor(params, defaultPrepareRenameResult, languageServer, cancellationSupport);
                         } else {
-                            prepareRenamePerServerFutures.add(CompletableFuture.completedFuture(List.of(defaultPrepareRenameResult.apply(languageServer))));
+                            var result = defaultPrepareRenameResult.apply(languageServer);
+                            if (result != null) {
+                                prepareRenamePerServerFutures.add(CompletableFuture.completedFuture(List.of(result)));
+                            }
+                        }
+                        if (future != null) {
+                            // The rename has been done in a valid location
+                            // ex : foo.ba|r(), the prepare rename future is added ('bar' as placeholder)
+                            prepareRenamePerServerFutures.add(future);
                         }
                     }
                     // Merge list of textDocument/prepareRename future in one future which return the list of color information
@@ -100,7 +109,7 @@ public class LSPPrepareRenameSupport extends AbstractLSPFeatureSupport<LSPPrepar
                         .prepareRename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME)
                 .thenApplyAsync(prepareRename -> {
                     PrepareRenameResultData result = getPrepareRenameResultData(defaultPrepareRenameResultProvider, languageServer, prepareRename);
-                    return List.of(result);
+                    return result!= null ? List.of(result) : Collections.emptyList();
                 });
     }
 
@@ -120,6 +129,11 @@ public class LSPPrepareRenameSupport extends AbstractLSPFeatureSupport<LSPPrepar
             }
             var document = defaultPrepareRenameResultProvider.getDocument();
             var textRange = range != null ? LSPIJUtils.toTextRange(range, document) : defaultPrepareRenameResultProvider.getTextRange();
+            if (textRange == null) {
+                // Invalid text range
+                // ex: the rename is done in spaces or an empty file
+                return null;
+            }
             if (placeholder == null) {
                 placeholder = document.getText(textRange);
             }
