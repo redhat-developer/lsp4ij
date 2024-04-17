@@ -19,8 +19,8 @@ import java.awt.event.FocusEvent;
  */
 public interface ValidatableConsoleWidget {
     /**
-     *
-     * @param jComponent
+     * Set a common error border for the widget
+     * @param jComponent interface implementor (e.g. setErrorBorder(this);)
      */
     default void setErrorBorder(JComponent jComponent) {
         Color color = JBColor.red;
@@ -28,6 +28,11 @@ public interface ValidatableConsoleWidget {
         jComponent.setBorder(JBUI.Borders.customLine(color, 1));
     }
 
+    /**
+     * Add listeners that handle input validation. The first instance of validation should run on focus
+     * and then on change
+     * @param jComponent interface implementor (e.g. addListeners(this);)
+     */
     default void addListeners(JComponent jComponent) {
         jComponent.addFocusListener(new FocusAdapter() {
             @Override
@@ -37,21 +42,21 @@ public interface ValidatableConsoleWidget {
             }
         });
 
-        if (jComponent instanceof JBTextField || jComponent instanceof JBTextArea) {
-            DocumentAdapter adapter = new DocumentAdapter() {
-                @Override
-                protected void textChanged(@NotNull DocumentEvent e) {
-                    validateInput();
-                }
-            };
-
-            if (jComponent instanceof JBTextField jbTextField) {
-                jbTextField.getDocument().addDocumentListener(adapter);
-            } else if (jComponent instanceof JBTextArea jbTextArea) {
-                jbTextArea.getDocument().addDocumentListener(adapter);
+        DocumentAdapter adapter = new DocumentAdapter() {
+            @Override
+            protected void textChanged(@NotNull DocumentEvent e) {
+                validateInput();
             }
+        };
+        if (jComponent instanceof JBTextField jbTextField) {
+            jbTextField.getDocument().addDocumentListener(adapter);
+        } else if (jComponent instanceof JBTextArea jbTextArea) {
+            jbTextArea.getDocument().addDocumentListener(adapter);
         }
     }
 
+    /**
+     * Overridable method that implements the field validation
+     */
     void validateInput();
 }
