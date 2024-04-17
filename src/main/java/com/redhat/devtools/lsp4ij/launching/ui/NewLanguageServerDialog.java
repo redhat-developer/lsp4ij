@@ -166,8 +166,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
     @Override
     protected @NotNull List<ValidationInfo> doValidateAll() {
         List<ValidationInfo> validations = new ArrayList<>();
-        addValidationInfo(validateServerName(), validations);
-        addValidationInfo(validateCommand(), validations);
+        addValidationInfo(this.languageServerPanel.getServerName().getValidationInfo(), validations);
+        addValidationInfo(this.languageServerPanel.getCommandLine().getValidationInfo(), validations);
         return validations;
     }
 
@@ -178,15 +178,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
         validations.add((validationInfo));
     }
 
-    private ValidationInfo validateServerName() {
-        var serverName = this.languageServerPanel.getServerName();
-        return serverName.getValidationInfo();
-    }
-
-    private ValidationInfo validateCommand() {
-        var commandLine = this.languageServerPanel.getCommandLine();
-        return commandLine.getValidationInfo();
-    }
 
     @Override
     protected void doOKAction() {
