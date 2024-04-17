@@ -19,17 +19,15 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
-import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.launching.ui.NewLanguageServerDialog;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
@@ -40,11 +38,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
-import javax.swing.event.DocumentEvent;
-import javax.swing.text.JTextComponent;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -57,7 +51,7 @@ import java.util.stream.Collectors;
  *     <li>Suspend and wait for a debugger?</li>
  * </ul>
  */
-public class LanguageServerView implements Disposable {
+public class LanguageServerView extends DialogWrapper implements Disposable {
 
     private final LanguageServerNameProvider languageServerNameProvider;
 
@@ -77,6 +71,8 @@ public class LanguageServerView implements Disposable {
                               @Nullable LanguageServerNameProvider languageServerNameProvider,
                               @NotNull Project project
     ) {
+        super(true);
+        super.setTitle("Doesn't show anywhere");
         this.languageServerDefinition = languageServerDefinition;
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
@@ -90,6 +86,16 @@ public class LanguageServerView implements Disposable {
         JPanel wrapper = JBUI.Panels.simplePanel(settingsPanel);
         wrapper.setBorder(JBUI.Borders.emptyLeft(10));
         this.myMainPanel = wrapper;
+        init();
+        initValidation();
+    }
+
+    /**
+     *
+     * @return
+     */
+    public boolean isValid() {
+        return this.languageServerPanel.getCommandLine().getValidationInfo() == null;
     }
 
     /**
@@ -415,6 +421,16 @@ public class LanguageServerView implements Disposable {
         var initializationOptions = languageServerPanel.getInitializationOptionsWidget();
         initializationOptions.setText(initializationOptionsContent);
         initializationOptions.setCaretPosition(0);
+    }
+
+    @Override
+    protected @Nullable JComponent createCenterPanel() {
+        return myMainPanel;
+    }
+
+    @Override
+    protected @Nullable ValidationInfo doValidate() {
+        return this.languageServerPanel.getCommandLine().getValidationInfo();
     }
 
     @Override

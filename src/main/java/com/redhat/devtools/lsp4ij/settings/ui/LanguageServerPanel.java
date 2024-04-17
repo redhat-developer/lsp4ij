@@ -13,13 +13,10 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.ui.ContextHelpLabel;
-import com.intellij.ui.PortField;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.*;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
-import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.components.BorderLayoutPanel;
@@ -49,7 +46,7 @@ public class LanguageServerPanel {
         EDIT_EXTENSION;
     }
 
-    private JBTextField serverName;
+    private ServerNameWidget serverName;
     private EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private ServerMappingsPanel mappingsPanel;
@@ -176,7 +173,7 @@ public class LanguageServerPanel {
     }
 
     private void createServerNameField(FormBuilder builder) {
-        serverName = new JBTextField();
+        serverName = new ServerNameWidget();
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.serverName"), serverName);
     }
 
@@ -201,7 +198,7 @@ public class LanguageServerPanel {
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.initializationOptions"), scrollPane, true);
     }
 
-    public JBTextField getServerName() {
+    public ServerNameWidget getServerName() {
         return serverName;
     }
 

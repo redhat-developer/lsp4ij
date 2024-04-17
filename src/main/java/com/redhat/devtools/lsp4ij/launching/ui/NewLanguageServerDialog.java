@@ -180,18 +180,13 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private ValidationInfo validateServerName() {
         var serverName = this.languageServerPanel.getServerName();
-        if (serverName.getText().isBlank()) {
-            String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.serverName.must.be.set");
-            return new ValidationInfo(errorMessage, serverName);
-        }
-        return null;
+        return serverName.getValidationInfo();
     }
 
     private ValidationInfo validateCommand() {
         var commandLine = this.languageServerPanel.getCommandLine();
         return commandLine.getValidationInfo();
     }
-
 
     @Override
     protected void doOKAction() {
