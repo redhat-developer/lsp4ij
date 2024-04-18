@@ -11,9 +11,10 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.impl.DocumentImpl;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import org.eclipse.lsp4j.Position;
+
+import static com.redhat.devtools.lsp4ij.LSP4IJAssert.assertOffset;
 
 /**
  * Tests for {@link LSPIJUtils#toOffset(Position, Document)}.
@@ -69,24 +70,5 @@ public class LSPIJUtils_toOffsetTest extends BasePlatformTestCase {
     public void testInvalidPositionWithTwoLine() {
         assertOffset("foo\nbar", 999999, 999999, 7, null);
     }
-
-    public void assertOffset(String content, int line, int character, int expectedOffset, Character expectedChar) {
-        assertOffset(content, new Position(line, character), expectedOffset, expectedChar);
-    }
-
-    public void assertOffset(String content, Position position, int expectedOffset, Character expectedChar) {
-        Document document = new DocumentImpl(content);
-        int actualOffset = LSPIJUtils.toOffset(position, document);
-        assertEquals(expectedOffset, actualOffset);
-        if (expectedChar == null) {
-            assertTrue(expectedOffset == content.length()  /* offset is at the end of the file */
-                    || content.charAt(expectedOffset) == '\n' /* or offset is at the end of line */);
-        } else {
-            // get the character from the given offset
-            Character actualChar = document.getCharsSequence().charAt(expectedOffset);
-            assertEquals(expectedChar, actualChar);
-        }
-    }
-
 
 }

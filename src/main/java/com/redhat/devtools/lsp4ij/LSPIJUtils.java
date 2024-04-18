@@ -15,7 +15,10 @@ import com.intellij.lang.LanguageUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
-import com.intellij.openapi.editor.*;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -283,7 +286,7 @@ public class LSPIJUtils {
             line = 0;
         } else {
             // If a line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
-            line = Math.min(line, document.getLineCount() > 0 ? document.getLineCount() -1 : 0);
+            line = Math.min(line, document.getLineCount() > 0 ? document.getLineCount() - 1 : 0);
         }
         int lineStartOffset = document.getLineStartOffset(line);
         int lineEndOffset = document.getLineEndOffset(line);
@@ -437,43 +440,22 @@ public class LSPIJUtils {
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
-                    VirtualFile file = findResourceFor(change.getLeft().getTextDocument().getUri());
+                    var textDocumentEdit = change.getLeft();
+                    VirtualFile file = findResourceFor(textDocumentEdit.getTextDocument().getUri());
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyWorkspaceEdit(document, change.getLeft().getEdits());
+                            applyTextEdits(document, textDocumentEdit.getEdits());
                         }
                     }
                 } else if (change.isRight()) {
                     ResourceOperation resourceOperation = change.getRight();
-                    if (resourceOperation instanceof CreateFile) {
-                        CreateFile createOperation = (CreateFile) resourceOperation;
-                        VirtualFile targetFile = findResourceFor(createOperation.getUri());
-                        if (targetFile != null && createOperation.getOptions() != null) {
-                            if (!createOperation.getOptions().getIgnoreIfExists()) {
-                                Document document = getDocument(targetFile);
-                                if (document != null) {
-                                    TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
-                                    applyWorkspaceEdit(document, Collections.singletonList(textEdit));
-                                }
-                            }
-                        } else {
-                            try {
-                                String fileUri = createOperation.getUri();
-                                createFile(fileUri);
-                            } catch (IOException e) {
-                                LOGGER.warn(e.getLocalizedMessage(), e);
-                            }
-                        }
-                    } else if (resourceOperation instanceof DeleteFile) {
-                        try {
-                            VirtualFile resource = findResourceFor(((DeleteFile) resourceOperation).getUri());
-                            if (resource != null) {
-                                resource.delete(null);
-                            }
-                        } catch (IOException e) {
-                            LOGGER.warn(e.getLocalizedMessage(), e);
-                        }
+                    if (resourceOperation instanceof CreateFile createFile) {
+                        applyCreateFile(createFile);
+                    } else if (resourceOperation instanceof DeleteFile deleteFile) {
+                        applyDeleteFile(deleteFile);
+                    } else if (resourceOperation instanceof RenameFile renameFile) {
+                        applyRenameFile(renameFile);
                     }
                 }
             }
@@ -491,12 +473,106 @@ public class LSPIJUtils {
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
-                        applyWorkspaceEdit(document, change.getValue());
+                        applyTextEdits(document, change.getValue());
                     }
                 }
-
             }
+        }
+    }
 
+    private static void applyTextEdits(Document document, List<TextEdit> edits) {
+        edits.sort((b, a) -> {
+            int diff = a.getRange().getStart().getLine() - b.getRange().getStart().getLine();
+            if (diff == 0) {
+                return a.getRange().getStart().getCharacter() - b.getRange().getStart().getCharacter();
+            }
+            return diff;
+        });
+        for (TextEdit edit : edits) {
+            applyTextEdit(document, edit);
+        }
+    }
+
+    private static void applyTextEdit(Document document, TextEdit textEdit) {
+        Range range = textEdit.getRange();
+        if (range == null) {
+            return;
+        }
+        String text = textEdit.getNewText();
+        int start = toOffset(range.getStart(), document);
+        int end = toOffset(range.getEnd(), document);
+
+        if (StringUtils.isEmpty(text)) {
+            document.deleteString(start, end);
+        } else {
+            text = text.replaceAll("\r", "");
+            if (end >= 0) {
+                if (end - start <= 0) {
+                    document.insertString(start, text);
+                } else {
+                    document.replaceString(start, end, text);
+                }
+            } else if (start == 0) {
+                document.setText(text);
+            } else if (start > 0) {
+                document.insertString(start, text);
+            }
+        }
+    }
+
+    private static void applyCreateFile(CreateFile createFile) {
+        VirtualFile targetFile = findResourceFor(createFile.getUri());
+        if (targetFile != null && createFile.getOptions() != null) {
+            if (!createFile.getOptions().getIgnoreIfExists()) {
+                Document document = getDocument(targetFile);
+                if (document != null) {
+                    TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
+                    applyTextEdits(document, Collections.singletonList(textEdit));
+                }
+            }
+        } else {
+            try {
+                String fileUri = createFile.getUri();
+                createFile(fileUri);
+            } catch (IOException e) {
+                LOGGER.warn(e.getLocalizedMessage(), e);
+            }
+        }
+    }
+
+    private static void applyDeleteFile(DeleteFile deleteFile) {
+        try {
+            VirtualFile resource = findResourceFor(deleteFile.getUri());
+            if (resource != null) {
+                // TODO: use deleteFile.getOptions()
+                resource.delete(null);
+            }
+        } catch (IOException e) {
+            LOGGER.warn(e.getLocalizedMessage(), e);
+        }
+    }
+
+    private static void applyRenameFile(RenameFile renameFile) {
+        // "documentChanges": [
+        //  {
+        //    "oldUri": "file://.../foo.clj",
+        //    "newUri": "file://.../bar.clj",
+        //    "kind": "rename"
+        //  }
+        //]
+        try {
+            VirtualFile resource = findResourceFor(renameFile.getOldUri());
+            if (resource != null) {
+                // TODO: use renameFile.getOptions()
+
+                // The IJ rename works only with a file name which is hosted in the same directory
+                // as the old file
+                var path = Paths.get(URI.create(renameFile.getNewUri()));
+                String newFileName = path.toFile().getName();
+                resource.rename(null, newFileName);
+            }
+        } catch (IOException e) {
+            LOGGER.warn(e.getLocalizedMessage(), e);
         }
     }
 
@@ -524,32 +600,6 @@ public class LSPIJUtils {
         FileUtils.createParentDirectories(newFile);
         newFile.createNewFile();
         return VfsUtil.findFileByIoFile(newFile, true);
-    }
-
-    private static void applyWorkspaceEdit(Document document, List<TextEdit> edits) {
-        for (TextEdit edit : edits) {
-            if (edit.getRange() != null) {
-                String text = edit.getNewText();
-                int start = toOffset(edit.getRange().getStart(), document);
-                int end = toOffset(edit.getRange().getEnd(), document);
-                if (StringUtils.isEmpty(text)) {
-                    document.deleteString(start, end);
-                } else {
-                    text = text.replaceAll("\r", "");
-                    if (end >= 0) {
-                        if (end - start <= 0) {
-                            document.insertString(start, text);
-                        } else {
-                            document.replaceString(start, end, text);
-                        }
-                    } else if (start == 0) {
-                        document.setText(text);
-                    } else if (start > 0) {
-                        document.insertString(start, text);
-                    }
-                }
-            }
-        }
     }
 
     public static @Nullable VirtualFile findResourceFor(URI uri) {
