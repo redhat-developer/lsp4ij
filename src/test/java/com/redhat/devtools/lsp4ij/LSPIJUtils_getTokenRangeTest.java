@@ -11,9 +11,9 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.impl.DocumentImpl;
-import com.intellij.openapi.util.TextRange;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+
+import static com.redhat.devtools.lsp4ij.LSP4IJAssert.assertTokenRange;
 
 /**
  * Tests for {@link LSPIJUtils#getTokenRange(Document, int)}.
@@ -70,24 +70,5 @@ public class LSPIJUtils_getTokenRangeTest extends BasePlatformTestCase {
 
     public void testBracket() {
         assertTokenRange("foo.bar(|)", null);
-    }
-
-    private static void assertTokenRange(final String contentWithOffset, String expected) {
-        TextAndOffset textAndOffset = new TextAndOffset(contentWithOffset);
-        String content = textAndOffset.getContent();
-        Document document = new DocumentImpl(content);
-        TextRange textRange = LSPIJUtils.getTokenRange(document, textAndOffset.getOffset());
-        if (expected == null) {
-            assertNull("TextRange should be null", textRange);
-            return;
-        }
-
-        assertNotNull("TextRange should not be null", textRange);
-
-        String startPart = document.getText(new TextRange(0, textRange.getStartOffset()));
-        String rangePart = document.getText(textRange);
-        String endPart = document.getText(new TextRange(textRange.getEndOffset(), content.length()));
-        String actual = startPart + "[" + rangePart + "]" + endPart;
-        assertEquals(expected, actual);
     }
 }
