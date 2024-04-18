@@ -1,5 +1,17 @@
+/*******************************************************************************
+ * Copyright (c) 2024 Red Hat Inc. and others.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *  Mitja Leino <mitja.leino@hotmail.com> - Initial API and implementation
+ *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBTextArea;
@@ -30,7 +42,7 @@ public interface ValidatableConsoleWidget {
 
     /**
      * Add listeners that handle input validation. The first instance of validation should run on focus
-     * and then on change
+     * and then on each change
      * @param jComponent interface implementor (e.g. addListeners(this);)
      */
     default void addListeners(JComponent jComponent) {
@@ -57,6 +69,18 @@ public interface ValidatableConsoleWidget {
 
     /**
      * Overridable method that implements the field validation
+     * Handles updating the style of the component for error/valid
      */
     void validateInput();
+
+    /**
+     * Overridable method that returns a ValidationInfo, is the component is not valid
+     * @return a ValidationInfo element if component validation fails, null if component is valid
+     */
+    ValidationInfo getValidationInfo();
+
+    /**
+     * Overridable method that has to implement the validation check
+     */
+    boolean isValid();
 }

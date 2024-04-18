@@ -21,12 +21,12 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import javax.swing.border.Border;
 
 /**
- * Command line widget used to fill the command to start a language server.
+ * Command line widget used to fill the command to start a language
+ * server when creating a new or modifying an existing LS configuration
  */
 public class CommandLineWidget extends JBTextArea implements ValidatableConsoleWidget {
-    private boolean isValid = true;
     private final String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
-    private final Border normalBorder;
+    private final transient Border normalBorder;
 
     public CommandLineWidget() {
         super(5, 0);
@@ -40,19 +40,23 @@ public class CommandLineWidget extends JBTextArea implements ValidatableConsoleW
 
     @Override
     public void validateInput() {
-        if (getText().isBlank()) {
-            isValid = false;
-            setErrorBorder(this);
-        } else {
-            isValid = true;
+        if (isValid()) {
             this.setBorder(normalBorder);
+        } else {
+            setErrorBorder(this);
         }
     }
 
+    @Override
     public ValidationInfo getValidationInfo() {
-        if (!isValid) {
-            return new ValidationInfo(errorMessage, this);
+        if (isValid()) {
+            return null;
         }
-        return null;
+        return new ValidationInfo(errorMessage, this);
+    }
+
+    @Override
+    public boolean isValid() {
+        return getDocument() != null && !getText().isBlank();
     }
 }

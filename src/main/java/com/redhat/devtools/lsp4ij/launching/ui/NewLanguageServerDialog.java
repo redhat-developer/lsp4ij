@@ -166,8 +166,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
     @Override
     protected @NotNull List<ValidationInfo> doValidateAll() {
         List<ValidationInfo> validations = new ArrayList<>();
-        addValidationInfo(this.languageServerPanel.getServerName().getValidationInfo(), validations);
-        addValidationInfo(this.languageServerPanel.getCommandLine().getValidationInfo(), validations);
+         addValidationInfo(this.languageServerPanel.getCommandLine().getValidationInfo(), validations);
+         addValidationInfo(this.languageServerPanel.getServerName().getValidationInfo(), validations);
         return validations;
     }
 
