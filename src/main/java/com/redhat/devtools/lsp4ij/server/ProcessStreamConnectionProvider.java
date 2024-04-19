@@ -10,12 +10,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server;
 
+import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.List;
 import java.util.Objects;
 
@@ -48,8 +46,7 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
         }
         ProcessBuilder builder = createProcessBuilder();
         try {
-            Process p = builder.start();
-            this.process = p;
+            this.process = builder.start();
         } catch (IOException e) {
             throw new CannotStartProcessException(e);
         }
@@ -57,7 +54,7 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
 
     @Override
     public boolean isAlive() {
-        return process != null ? process.isAlive() : false;
+        return process != null && process.isAlive();
     }
 
     @Override
@@ -77,6 +74,7 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
 
     protected ProcessBuilder createProcessBuilder() {
         ProcessBuilder builder = new ProcessBuilder(getCommands());
+        builder.environment().putAll(EnvironmentUtil.getEnvironmentMap());
         if (getWorkingDirectory() != null) {
             builder.directory(new File(getWorkingDirectory()));
         }
@@ -142,10 +140,9 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
         if (obj == null) {
             return false;
         }
-        if (!(obj instanceof ProcessStreamConnectionProvider)) {
+        if (!(obj instanceof ProcessStreamConnectionProvider other)) {
             return false;
         }
-        ProcessStreamConnectionProvider other = (ProcessStreamConnectionProvider) obj;
         return Objects.equals(this.getCommands(), other.getCommands())
                 && Objects.equals(this.getWorkingDirectory(), other.getWorkingDirectory());
     }
