@@ -952,12 +952,13 @@ public class LanguageServerWrapper implements Disposable {
         return serverDefinition.isSingleton();
     }
 
-    private LanguageServerLifecycleManager getLanguageServerLifecycleManager() {
+    private @NotNull LanguageServerLifecycleManager getLanguageServerLifecycleManager() {
         Project project = initialProject;
         if (project.isDisposed()) {
             return NullLanguageServerLifecycleManager.INSTANCE;
         }
-        return LanguageServerLifecycleManager.getInstance(project);
+        var manager = LanguageServerLifecycleManager.getInstance(project);
+        return manager == null? NullLanguageServerLifecycleManager.INSTANCE : manager;
     }
 
     /**
