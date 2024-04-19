@@ -73,12 +73,12 @@ public class LSPIJUtils_getTokenRangeTest extends BasePlatformTestCase {
     }
 
     private static void assertTokenRange(final String contentWithOffset, String expected) {
-        int offset = contentWithOffset.indexOf('|');
-        String content = contentWithOffset.substring(0, offset) + contentWithOffset.substring(offset + 1);
+        TextAndOffset textAndOffset = new TextAndOffset(contentWithOffset);
+        String content = textAndOffset.getContent();
         Document document = new DocumentImpl(content);
-        TextRange textRange = LSPIJUtils.getTokenRange(document, offset);
+        TextRange textRange = LSPIJUtils.getTokenRange(document, textAndOffset.getOffset());
         if (expected == null) {
-            assertNull("TextRange should be null",textRange);
+            assertNull("TextRange should be null", textRange);
             return;
         }
 
