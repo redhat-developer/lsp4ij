@@ -66,7 +66,10 @@ public class LanguageServiceAccessor implements Disposable {
 
         @Override
         public void handleChanged(@NotNull LanguageServerChangedEvent event) {
-            if (event.commandChanged || event.mappingsChanged) {
+            if (event.commandChanged ||
+                    event.userEnvironmentVariablesChanged ||
+                    event.includeSystemEnvironmentVariablesChanged ||
+                    event.mappingsChanged) {
                 // Restart all servers where command or mappings has changed
                 List<LanguageServerWrapper> serversToRestart = startedServers
                         .stream()
@@ -166,7 +169,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                                           Predicate<ServerCapabilities> capabilitiesPredicate)
             throws IOException {
         URI initialPath = LSPIJUtils.toUri(file);
-        LanguageServerWrapper wrapper = getLSWrapperForConnection(file, project,lsDefinition, initialPath);
+        LanguageServerWrapper wrapper = getLSWrapperForConnection(file, project, lsDefinition, initialPath);
         if (wrapper != null && capabilitiesComply(wrapper, capabilitiesPredicate)) {
             wrapper.connect(file);
             return wrapper.getInitializedServer();

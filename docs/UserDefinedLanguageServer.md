@@ -36,6 +36,21 @@ Here is a sample with the [typescript-language-server](https://github.com/typesc
 
 ![New Language Server Dialog with TypeScript](./images/user-defined-ls/TypeScriptServerDialog.png)
 
+#### Environment variables
+
+The environment variables accessible by the process are populated with 
+[EnvironmentUtil.getEnvironmentMap()](https://github.com/JetBrains/intellij-community/blob/3a527a2c9b56209c09852ba7bc89d80bc31e1c04/platform/util/src/com/intellij/util/EnvironmentUtil.java#L85) 
+which retrieves system variables.
+
+It is possible too to add custom environment variables via the field `Environment variables`:
+
+![Environment Variables](./images/user-defined-ls/EnvironmentVariables.png)
+
+Depending on your OS, the environment variables may not be accessible. To make sure they are accessible, you can fill out the order fields:
+
+* with `Windows OS`: `cmd /c command_to_start_your_ls`
+* with `Linux`, `Mac OS`: `sh -c command_to_start_your_ls`
+
 ### Mappings tab
 
 The `Mappings tab` provides the capability to `associate the language server with the proper files` identified by: 

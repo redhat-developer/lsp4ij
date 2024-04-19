@@ -11,32 +11,49 @@
 package com.redhat.devtools.lsp4ij.server;
 
 import com.intellij.util.EnvironmentUtil;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
  * Process stream connection provider used to start a language server with a process.
  */
 public abstract class ProcessStreamConnectionProvider implements StreamConnectionProvider {
-    private @Nullable
-    Process process;
+    @Nullable
+    private Process process;
+
+    @Nullable
     private List<String> commands;
-    private @Nullable
-    String workingDir;
+
+    @Nullable
+    private String workingDir;
+
+    @Nullable
+    private Map<String, String> userEnvironmentVariables;
+    private boolean includeSystemEnvironmentVariables;
 
     public ProcessStreamConnectionProvider() {
+        this(null);
     }
 
-    public ProcessStreamConnectionProvider(List<String> commands) {
-        this.commands = commands;
+    public ProcessStreamConnectionProvider(@Nullable List<String> commands) {
+        this(commands, null);
     }
 
-    public ProcessStreamConnectionProvider(List<String> commands, String workingDir) {
+    public ProcessStreamConnectionProvider(@Nullable List<String> commands, @Nullable String workingDir) {
+        this(commands, workingDir, null);
+    }
+
+    public ProcessStreamConnectionProvider(@Nullable List<String> commands, @Nullable String workingDir, @Nullable Map<String, String> environment) {
         this.commands = commands;
         this.workingDir = workingDir;
+        this.userEnvironmentVariables = environment;
+        this.includeSystemEnvironmentVariables = true;
     }
 
     @Override
@@ -74,7 +91,15 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
 
     protected ProcessBuilder createProcessBuilder() {
         ProcessBuilder builder = new ProcessBuilder(getCommands());
-        builder.environment().putAll(EnvironmentUtil.getEnvironmentMap());
+        // Add System environment variables
+        if (isIncludeSystemEnvironmentVariables()) {
+            builder.environment().putAll(EnvironmentUtil.getEnvironmentMap());
+        }
+        // Add User environment variables
+        if (getUserEnvironmentVariables() != null) {
+            builder.environment().putAll(getUserEnvironmentVariables());
+        }
+        // Working directory
         if (getWorkingDirectory() != null) {
             builder.directory(new File(getWorkingDirectory()));
         }
@@ -126,13 +151,50 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
         this.commands = commands;
     }
 
-    protected @Nullable
-    String getWorkingDirectory() {
+    @Nullable
+    public String getWorkingDirectory() {
         return workingDir;
     }
 
-    public void setWorkingDirectory(String workingDir) {
+    public void setWorkingDirectory(@Nullable String workingDir) {
         this.workingDir = workingDir;
+    }
+
+    /**
+     * Returns the User environment variables used to start the language server process.
+     *
+     * @return the User environment variables used to start the language server process.
+     */
+    @NotNull
+    public Map<String, String> getUserEnvironmentVariables() {
+        return userEnvironmentVariables != null ? userEnvironmentVariables : Collections.emptyMap();
+    }
+
+    /**
+     * Set the User environment variables used to start the language server process.
+     *
+     * @param userEnvironmentVariables the User environment variables.
+     */
+    public void setUserEnvironmentVariables(Map<String, String> userEnvironmentVariables) {
+        this.userEnvironmentVariables = userEnvironmentVariables;
+    }
+
+    /**
+     * Returns true if System environment variables must be included when language server process starts and false otherwise.
+     *
+     * @return true if System environment variables must be included when language server process starts and false otherwise.
+     */
+    public boolean isIncludeSystemEnvironmentVariables() {
+        return includeSystemEnvironmentVariables;
+    }
+
+    /**
+     * Set true if System environment variables must be included when language server process starts and false otherwise.
+     *
+     * @param includeSystemEnvironmentVariables true if System environment variables must be included when language server process starts and false otherwise.
+     */
+    public void setIncludeSystemEnvironmentVariables(boolean includeSystemEnvironmentVariables) {
+        this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
     }
 
     @Override
@@ -143,19 +205,21 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
         if (!(obj instanceof ProcessStreamConnectionProvider other)) {
             return false;
         }
-        return Objects.equals(this.getCommands(), other.getCommands())
-                && Objects.equals(this.getWorkingDirectory(), other.getWorkingDirectory());
+        return Objects.equals(this.getCommands(), other.getCommands()) &&
+                Objects.equals(this.getWorkingDirectory(), other.getWorkingDirectory()) &&
+                Objects.equals(this.getUserEnvironmentVariables(), other.getUserEnvironmentVariables()) &&
+                this.isIncludeSystemEnvironmentVariables() == other.isIncludeSystemEnvironmentVariables();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.getCommands(), this.getWorkingDirectory());
+        return Objects.hash(this.getCommands(), this.getWorkingDirectory(), this.getUserEnvironmentVariables(), this.isIncludeSystemEnvironmentVariables());
     }
 
     @Override
     public String toString() {
-        return "ProcessStreamConnectionProvider [commands=" + this.getCommands() + ", workingDir=" //$NON-NLS-1$//$NON-NLS-2$
-                + this.getWorkingDirectory() + "]"; //$NON-NLS-1$
+        return "ProcessStreamConnectionProvider [commands=" + this.getCommands() + ", workingDir="
+                + this.getWorkingDirectory() + "]";
     }
 
 }

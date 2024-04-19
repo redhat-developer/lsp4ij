@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.ui.ContextHelpLabel;
@@ -49,6 +50,7 @@ public class LanguageServerPanel {
     }
 
     private JBTextField serverName;
+    private EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private ServerMappingsPanel mappingsPanel;
 
@@ -90,6 +92,8 @@ public class LanguageServerPanel {
             createServerNameField(serverTab);
         }
         if (mode != EditionMode.EDIT_EXTENSION) {
+            environmentVariables = new EnvironmentVariablesComponent();
+            serverTab.addComponent(environmentVariables);
             // Command line
             createCommandLineField(serverTab);
         }
@@ -201,6 +205,10 @@ public class LanguageServerPanel {
         return serverName;
     }
 
+    public EnvironmentVariablesComponent getEnvironmentVariables() {
+        return environmentVariables;
+    }
+
     public CommandLineWidget getCommandLine() {
         return commandLine;
     }
@@ -232,4 +240,5 @@ public class LanguageServerPanel {
     public ComboBox<ErrorReportingKind> getErrorReportingKindCombo() {
         return errorReportingKindCombo;
     }
+
 }

@@ -132,12 +132,14 @@ public class LanguageServersRegistry {
                 List<ServerMapping> mappings = toServerMappings(serverId, launch.getMappings());
                 // Register server definition from settings
                 addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(
-                        serverId,
-                        launch.getServerName(),
-                        "",
-                        launch.getCommandLine(),
-                        launch.getConfigurationContent(),
-                        launch.getInitializationOptionsContent()),
+                                serverId,
+                                launch.getServerName(),
+                                "",
+                                launch.getCommandLine(),
+                                launch.getUserEnvironmentVariables(),
+                                launch.isIncludeSystemEnvironmentVariables(),
+                                launch.getConfigurationContent(),
+                                launch.getInitializationOptionsContent()),
                         mappings);
             }
         } catch (Exception e) {
@@ -283,6 +285,8 @@ public class LanguageServersRegistry {
             settings.setServerId(languageServerId);
             settings.setServerName(definitionFromSettings.getDisplayName());
             settings.setCommandLine(definitionFromSettings.getCommandLine());
+            settings.setUserEnvironmentVariables(definitionFromSettings.getUserEnvironmentVariables());
+            settings.setIncludeSystemEnvironmentVariables(definitionFromSettings.isIncludeSystemEnvironmentVariables());
             if (mappings != null) {
                 settings.setMappings(toServerMappingSettings(mappings));
             }
@@ -321,7 +325,7 @@ public class LanguageServersRegistry {
 
     private static List<ServerMapping> toServerMappings(String serverId, @Nullable List<ServerMappingSettings> mappingSettings) {
         List<ServerMapping> mappings = new ArrayList<>();
-        if (mappingSettings!= null && !mappingSettings.isEmpty()) {
+        if (mappingSettings != null && !mappingSettings.isEmpty()) {
             for (var mapping : mappingSettings) {
                 String languageId = mapping.getLanguageId();
                 String mappingLanguage = mapping.getLanguage();
@@ -383,50 +387,50 @@ public class LanguageServersRegistry {
         fileAssociations.removeAll(mappingsToRemove);
     }
 
-    public void updateServerDefinition(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
-                                                                                              @Nullable String name,
-                                                                                              @Nullable String commandLine,
-                                                                                              @NotNull List<ServerMappingSettings> mappings,
-                                                                                              @Nullable String configurationContent,
-                                                                                              @Nullable String initializationOptionsContent) {
-        updateServerDefinition(serverDefinition, name, commandLine, mappings, configurationContent, initializationOptionsContent, true);
-    }
-
-    @Nullable
-    public LanguageServerDefinitionListener.LanguageServerChangedEvent updateServerDefinition(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
-                                       @Nullable String name,
-                                       @Nullable String commandLine,
-                                       @NotNull List<ServerMappingSettings> mappings,
-                                       @Nullable String configurationContent,
-                                       @Nullable String initializationOptionsContent,
-                                       boolean notify) {
-        String languageServerId = serverDefinition.getId();
-        serverDefinition.setName(name);
-        serverDefinition.setCommandLine(commandLine);
-        serverDefinition.setConfigurationContent(configurationContent);
-        serverDefinition.setInitializationOptionsContent(initializationOptionsContent);
+    public LanguageServerDefinitionListener.@Nullable LanguageServerChangedEvent updateServerDefinition(@NotNull UpdateServerDefinitionRequest request,
+                                                                                                        boolean notify) {
+        String languageServerId = request.serverDefinition().getId();
+        request.serverDefinition().setName(request.name());
+        request.serverDefinition().setCommandLine(request.commandLine());
+        request.serverDefinition().setUserEnvironmentVariables(request.userEnvironmentVariables());
+        request.serverDefinition().setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
+        request.serverDefinition().setConfigurationContent(request.configurationContent());
+        request.serverDefinition().setInitializationOptionsContent(request.initializationOptionsContent());
 
         // remove associations
-        removeAssociationsFor(serverDefinition);
+        removeAssociationsFor(request.serverDefinition());
         // Update associations
-        updateAssociations(serverDefinition, toServerMappings(languageServerId, mappings));
+        updateAssociations(request.serverDefinition(), toServerMappings(languageServerId, request.mappings()));
 
         UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
-        boolean nameChanged = !Objects.equals(settings.getServerName(), name);
-        boolean commandChanged = !Objects.equals(settings.getCommandLine(), commandLine);
-        boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
-        boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), configurationContent);
-        boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), initializationOptionsContent);
+        boolean nameChanged = !Objects.equals(settings.getServerName(), request.name());
+        boolean commandChanged = !Objects.equals(settings.getCommandLine(), request.commandLine());
+        boolean userEnvironmentVariablesChanged = !Objects.equals(settings.getUserEnvironmentVariables(), request.userEnvironmentVariables());
+        boolean includeSystemEnvironmentVariablesChanged = settings.isIncludeSystemEnvironmentVariables() != request.includeSystemEnvironmentVariables();
+        boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), request.mappings());
+        boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
+        boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
 
-        settings.setServerName(name);
-        settings.setCommandLine(commandLine);
-        settings.setConfigurationContent(configurationContent);
-        settings.setInitializationOptionsContent(initializationOptionsContent);
-        settings.setMappings(mappings);
+        settings.setServerName(request.name());
+        settings.setCommandLine(request.commandLine());
+        settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
+        settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
+        settings.setConfigurationContent(request.configurationContent());
+        settings.setInitializationOptionsContent(request.initializationOptionsContent());
+        settings.setMappings(request.mappings());
 
-        if (nameChanged || commandChanged || mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
+        if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
+                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
-            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(serverDefinition, nameChanged, commandChanged, mappingsChanged, configurationContentChanged, initializationOptionsContentChanged);
+            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                    request.serverDefinition(),
+                    nameChanged,
+                    commandChanged,
+                    userEnvironmentVariablesChanged,
+                    includeSystemEnvironmentVariablesChanged,
+                    mappingsChanged,
+                    configurationContentChanged,
+                    initializationOptionsContentChanged);
             if (notify) {
                 handleChangeEvent(event);
             }
@@ -493,4 +497,12 @@ public class LanguageServersRegistry {
         return inlayHintsProviders;
     }
 
+    public static record UpdateServerDefinitionRequest(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
+                                                       @Nullable String name, @Nullable String commandLine,
+                                                       @Nullable Map<String, String> userEnvironmentVariables,
+                                                       boolean includeSystemEnvironmentVariables,
+                                                       @NotNull List<ServerMappingSettings> mappings,
+                                                       @Nullable String configurationContent,
+                                                       @Nullable String initializationOptionsContent) {
+    }
 }
