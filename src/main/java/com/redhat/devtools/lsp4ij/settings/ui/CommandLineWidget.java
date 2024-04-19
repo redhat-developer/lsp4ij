@@ -10,6 +10,7 @@
  *
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
+ *     Mitja Leino <mitja.leino@hotmail.com> - Implement ValidatableConsoleWidget
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 

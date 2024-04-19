@@ -73,7 +73,6 @@ public class LanguageServerView extends DialogWrapper implements Disposable {
                               @NotNull Project project
     ) {
         super(true);
-        super.setTitle("Doesn't show anywhere");
         this.languageServerDefinition = languageServerDefinition;
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
@@ -87,17 +86,6 @@ public class LanguageServerView extends DialogWrapper implements Disposable {
         JPanel wrapper = JBUI.Panels.simplePanel(settingsPanel);
         wrapper.setBorder(JBUI.Borders.emptyLeft(10));
         this.myMainPanel = wrapper;
-        init();
-        initValidation();
-    }
-
-    /**
-     *
-     * @return
-     */
-    public boolean isValid() {
-        return this.languageServerPanel.getCommandLine().isValid()
-                && this.languageServerPanel.getServerName().isValid();
     }
 
     /**
@@ -432,7 +420,7 @@ public class LanguageServerView extends DialogWrapper implements Disposable {
 
     @Override
     protected @Nullable ValidationInfo doValidate() {
-        // Server name is not editable for existing language server
+        // Server name is not editable for existing language servers
         return this.languageServerPanel.getCommandLine().getValidationInfo();
     }
 
