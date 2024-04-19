@@ -17,17 +17,13 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.MessageType;
 import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.ui.popup.BalloonBuilder;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
-import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
-import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
@@ -99,7 +95,8 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         BalloonBuilder builder = JBPopupFactory.getInstance()
                 .createBalloonBuilder(jbPanel)
                 .setFadeoutTime(10000) // How many ms the balloon is shown for
-                .setHideOnAction(false);
+                .setHideOnAction(false)
+                .setDisposable(languageServerView);
 
         // Have an instance reference to hide the balloon with the button
         this.saveTipBalloon = builder.createBalloon();
