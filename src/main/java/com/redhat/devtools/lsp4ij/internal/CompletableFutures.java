@@ -14,12 +14,16 @@
 package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.psi.PsiFile;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +36,8 @@ import java.util.function.Function;
  * @author Angelo ZERR
  */
 public class CompletableFutures {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CompletableFutures.class);
 
     private CompletableFutures() {
 
@@ -62,7 +68,7 @@ public class CompletableFutures {
      * @param futures             the list of futures which return a List<T>.
      * @param cancellationSupport the cancellation support.
      * @param <T>                 the merged futures.
-     * @return
+     * @return the future.
      */
     public static <T> @NotNull CompletableFuture<List<T>> mergeInOneFuture(@NotNull List<CompletableFuture<List<T>>> futures,
                                                                            @NotNull CancellationSupport cancellationSupport) {
@@ -98,7 +104,7 @@ public class CompletableFutures {
      * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
      *
      * @param future the future to wait.
-     * @param file
+     * @param file the Psi file.
      */
     public static void waitUntilDone(@NotNull CompletableFuture<?> future,
                                      @Nullable PsiFile file) throws ExecutionException, ProcessCanceledException {
@@ -130,6 +136,36 @@ public class CompletableFutures {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    /**
+     * Wait in Task (which is cancellable) for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
+     *
+     * @param future the future to wait.
+     * @param title the task title.
+     * @param file the Psi file.
+     */
+    public static void waitUntilDoneAsync(@NotNull CompletableFuture<?> future,
+                                     @NotNull String title,
+                                     @NotNull PsiFile file) {
+
+        ProgressManager.getInstance().run(new Task.Backgroundable(file.getProject(), title, true) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                try {
+                    waitUntilDone(future, file);
+                } catch (CancellationException | ProcessCanceledException e) {
+                    // Do nothing
+                }
+                catch(Exception e) {
+                    // Should never occur
+                    LOGGER.error("Error while executing future '" + title + "'.", e);
+                }
+                finally {
+                    indicator.stop();
+                }
+            }
+        });
     }
 
 }

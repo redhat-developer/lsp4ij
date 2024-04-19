@@ -16,7 +16,6 @@ package com.redhat.devtools.lsp4ij.features.rename;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.FileTypes;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.psi.PsiFile;
 import com.intellij.refactoring.RefactoringBundle;
@@ -26,19 +25,18 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.features.refactoring.WorkspaceEditData;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDoneAsync;
 
 /**
  * LSP rename dialog.
@@ -150,21 +148,27 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                 .getRenameSupport()
                 .getRename(renameParams);
 
-        try {
-            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
-        } catch (CancellationException | ProcessCanceledException e) {
-            return;
-        } catch (ExecutionException e) {
-            // The language server throws an error, display it as hint in the editor
-            Throwable error = e.getCause();
-            LSPRenameHandler.showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.process.error", error.getMessage()));
-            return;
-        }
+        // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
+        // The 'rename' is stopped:
+        // - if user change the editor content
+        // - if it cancels the Task
+        waitUntilDoneAsync(future, LanguageServerBundle.message("lsp.refactor.rename.progress.title", psiFile.getVirtualFile().getName(),renameParams.getNewName()), psiFile);
 
-        if (CompletableFutures.isDoneNormally(future)) {
-            List<WorkspaceEditData> workspaceEdits = future.getNow(Collections.emptyList());
-            if (workspaceEdits.isEmpty()) {
+        future.handle((workspaceEdits, error) -> {
+            if (error != null) {
+                // Handle error
+                if (CancellationUtil.isRequestCancelledException(error)) {
+                    // Don't show cancelled error
+                    return error;
+                }
+                if (error instanceof CompletionException || error instanceof ExecutionException) {
+                    error = error.getCause();
+                }
+                // The language server throws an error, display it as hint in the editor
+                LSPRenameHandler.showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.process.error", error.getMessage()));
+                return null;
+            }
+            if (workspaceEdits == null || workspaceEdits.isEmpty()) {
                 // Show "The element can't be renamed." hint error in the editor
                 LSPRenameHandler.showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.cannot.be.renamed.error"));
             } else {
@@ -172,7 +176,8 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                 WriteCommandAction
                         .runWriteCommandAction(psiFile.getProject(), () -> workspaceEdits.forEach(workspaceEditData -> LSPIJUtils.applyWorkspaceEdit(workspaceEditData.edit())));
             }
-        }
+            return workspaceEdits;
+        });
     }
 
     @Override
