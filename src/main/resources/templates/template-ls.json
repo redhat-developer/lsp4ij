@@ -37,7 +37,8 @@
       "id": "gopls",
       "name": "Go Language Server",
       "programArgs": {
-        "default": "gopls -mode=stdio"
+        "default": "sh -c gopls -mode=stdio",
+        "windows": "gopls -mode=stdio"
       },
       "fileTypeMappings": [
         {
@@ -256,7 +257,8 @@
       "name": "Rust Language Server",
       "dev": true,
       "programArgs": {
-        "default": "rust-analyzer"
+        "default": "sh -c rust-analyzer",
+        "windows": "rust-analyzer"
       },
       "fileTypeMappings": [
         {
