@@ -19,10 +19,12 @@ import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.StringReader;
+import java.util.Map;
 
 /**
  * {@link com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition} implementation to start a
@@ -34,22 +36,33 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     private String name;
     private String commandLine;
+    private Map<String, String> userEnvironmentVariables;
+    private boolean includeSystemEnvironmentVariables;
     private String configurationContent;
     private Object configuration;
     private String initializationOptionsContent;
     private Object initializationOptions;
 
-    public UserDefinedLanguageServerDefinition(@NotNull String id, @NotNull String label, String description, String commandLine, String configurationContent, String initializationOptionsContent) {
-        super(id, label, description, true, null, false);
-        this.name = label;
+    public UserDefinedLanguageServerDefinition(@NotNull String id,
+                                               @NotNull String name,
+                                               @Nullable String description,
+                                               @NotNull String commandLine,
+                                               @NotNull Map<String, String> userEnvironmentVariables,
+                                               boolean includeSystemEnvironmentVariables,
+                                               @Nullable String configurationContent,
+                                               @Nullable String initializationOptionsContent) {
+        super(id, name, description, true, null, false);
+        this.name = name;
         this.commandLine = commandLine;
+        this.userEnvironmentVariables = userEnvironmentVariables;
+        this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
         this.configurationContent = configurationContent;
         this.initializationOptionsContent = initializationOptionsContent;
     }
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        return new UserDefinedStreamConnectionProvider(commandLine, this);
+        return new UserDefinedStreamConnectionProvider(commandLine, userEnvironmentVariables, includeSystemEnvironmentVariables, this);
     }
 
     @Override
@@ -67,6 +80,22 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     public void setCommandLine(String commandLine) {
         this.commandLine = commandLine;
+    }
+
+    public Map<String, String> getUserEnvironmentVariables() {
+        return userEnvironmentVariables;
+    }
+
+    public void setUserEnvironmentVariables(Map<String, String> userEnvironmentVariables) {
+        this.userEnvironmentVariables = userEnvironmentVariables;
+    }
+
+    public boolean isIncludeSystemEnvironmentVariables() {
+        return includeSystemEnvironmentVariables;
+    }
+
+    public void setIncludeSystemEnvironmentVariables(boolean includeSystemEnvironmentVariables) {
+        this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
     }
 
     public String getConfigurationContent() {

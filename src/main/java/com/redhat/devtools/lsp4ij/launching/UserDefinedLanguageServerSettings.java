@@ -111,12 +111,17 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String commandLine;
 
+        private Map<String, String> userEnvironmentVariables;
+
+        private boolean includeSystemEnvironmentVariables = true;
+
         private String configurationContent;
 
         private String initializationOptionsContent;
 
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
+
         public String getServerId() {
             return serverId;
         }
@@ -139,6 +144,43 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setCommandLine(String commandLine) {
             this.commandLine = commandLine;
+        }
+
+        /**
+         * Returns the User environment variables used to start the language server process.
+         *
+         * @return the User environment variables used to start the language server process.
+         */
+        @NotNull
+        public Map<String, String> getUserEnvironmentVariables() {
+            return userEnvironmentVariables != null ? userEnvironmentVariables : Collections.emptyMap();
+        }
+
+        /**
+         * Set the User environment variables used to start the language server process.
+         *
+         * @param userEnvironmentVariables the User environment variables.
+         */
+        public void setUserEnvironmentVariables(Map<String, String> userEnvironmentVariables) {
+            this.userEnvironmentVariables = userEnvironmentVariables;
+        }
+
+        /**
+         * Returns true if System environment variables must be included when language server process starts and false otherwise.
+         *
+         * @return true if System environment variables must be included when language server process starts and false otherwise.
+         */
+        public boolean isIncludeSystemEnvironmentVariables() {
+            return includeSystemEnvironmentVariables;
+        }
+
+        /**
+         * Set true if System environment variables must be included when language server process starts and false otherwise.
+         *
+         * @param includeSystemEnvironmentVariables true if System environment variables must be included when language server process starts and false otherwise.
+         */
+        public void setIncludeSystemEnvironmentVariables(boolean includeSystemEnvironmentVariables) {
+            this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
         }
 
         public List<ServerMappingSettings> getMappings() {

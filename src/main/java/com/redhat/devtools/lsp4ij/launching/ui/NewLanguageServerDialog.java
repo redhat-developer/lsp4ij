@@ -34,6 +34,7 @@ import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -206,9 +207,18 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Register language server and mappings definition
         String serverName = this.languageServerPanel.getServerName().getText();
         String commandLine = this.languageServerPanel.getCommandLine().getText();
+        Map<String, String> userEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().getEnvs();
+        boolean includeSystemEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().isPassParentEnvs();
         String configuration = this.languageServerPanel.getConfiguration().getText();
         String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
-        UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId, serverName, "", commandLine, configuration, initializationOptions);
+        UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
+                serverName,
+                "",
+                commandLine,
+                userEnvironmentVariables ,
+                includeSystemEnvironmentVariables,
+                configuration,
+                initializationOptions);
         LanguageServersRegistry.getInstance().addServerDefinition(definition, mappingSettings);
 
     }

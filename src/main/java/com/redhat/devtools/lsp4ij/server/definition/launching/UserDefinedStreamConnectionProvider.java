@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * {@link ProcessStreamConnectionProvider} implementation to start a the language server with a
@@ -28,8 +29,13 @@ public class UserDefinedStreamConnectionProvider extends ProcessStreamConnection
 
     private final @NotNull UserDefinedLanguageServerDefinition serverDefinition;
 
-    public UserDefinedStreamConnectionProvider(String commandLine, @NotNull UserDefinedLanguageServerDefinition serverDefinition) {
+    public UserDefinedStreamConnectionProvider(@NotNull String commandLine,
+                                               @NotNull Map<String, String> userEnvironmentVariables,
+                                               boolean includeSystemEnvironmentVariables,
+                                               @NotNull UserDefinedLanguageServerDefinition serverDefinition) {
         super.setCommands(createCommands(commandLine));
+        super.setUserEnvironmentVariables(userEnvironmentVariables);
+        super.setIncludeSystemEnvironmentVariables(includeSystemEnvironmentVariables);
         this.serverDefinition = serverDefinition;
     }
 

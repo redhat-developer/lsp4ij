@@ -45,17 +45,26 @@ public interface LanguageServerDefinitionListener {
         public final LanguageServerDefinition serverDefinition;
 
         public final boolean nameChanged;
-
         public final boolean commandChanged;
-
+        public final boolean userEnvironmentVariablesChanged;
+        public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean mappingsChanged;
         public final boolean configurationChanged;
         public final boolean initializationOptionsContentChanged;
 
-        public LanguageServerChangedEvent(@NotNull LanguageServerDefinition serverDefinition, boolean nameChanged, boolean commandChanged, boolean mappingsChanged, boolean configurationContentChanged, boolean initializationOptionsContentChanged) {
+        public LanguageServerChangedEvent(@NotNull LanguageServerDefinition serverDefinition,
+                                          boolean nameChanged,
+                                          boolean commandChanged,
+                                          boolean userEnvironmentVariablesChanged,
+                                          boolean includeSystemEnvironmentVariablesChanged,
+                                          boolean mappingsChanged,
+                                          boolean configurationContentChanged,
+                                          boolean initializationOptionsContentChanged) {
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
+            this.userEnvironmentVariablesChanged = userEnvironmentVariablesChanged;
+            this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.mappingsChanged = mappingsChanged;
             this.configurationChanged = configurationContentChanged;
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;

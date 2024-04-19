@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings;
 
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
@@ -98,9 +99,11 @@ public class LanguageServerView implements Disposable {
             }
             if (!(isEquals(getDisplayName(), settings.getServerName())
                     && isEquals(this.getCommandLine(), settings.getCommandLine())
+                    && Objects.equals(this.getEnvData().getEnvs(), settings.getUserEnvironmentVariables())
+                    && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
                     && Objects.equals(this.getMappings(), settings.getMappings())
                     && isEquals(this.getConfigurationContent(), settings.getConfigurationContent())
-                    && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent()))) {
+                    && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent()))){
                 return true;
             }
         }
@@ -151,7 +154,7 @@ public class LanguageServerView implements Disposable {
         String languageServerId = languageServerDefinition.getId();
 
         // Commons settings (user defined language server + extension point)
-        com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project)
+        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project)
                 .getLanguageServerSettings(languageServerId);
         final ErrorReportingKind errorReportingKind = settings != null && settings.getErrorReportingKind() != null ? settings.getErrorReportingKind() : ErrorReportingKind.as_notification;
         final ServerTrace serverTrace = settings != null && settings.getServerTrace() != null ? settings.getServerTrace() : ServerTrace.off;
@@ -163,6 +166,9 @@ public class LanguageServerView implements Disposable {
             com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings userDefinedLanguageServerSettings = com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
             if (userDefinedLanguageServerSettings != null) {
                 this.setCommandLine(userDefinedLanguageServerSettings.getCommandLine());
+                this.setEnvData(EnvironmentVariablesData.create(
+                        userDefinedLanguageServerSettings.getUserEnvironmentVariables(),
+                        userDefinedLanguageServerSettings.isIncludeSystemEnvironmentVariables()));
                 this.setConfigurationContent(userDefinedLanguageServerSettings.getConfigurationContent());
                 this.setInitializationOptionsContent(userDefinedLanguageServerSettings.getInitializationOptionsContent());
 
@@ -248,13 +254,7 @@ public class LanguageServerView implements Disposable {
             // Update user-defined language server settings
             var serverChangedEvent = LanguageServersRegistry.getInstance()
                     .updateServerDefinition(
-                            launch,
-                            getDisplayName(),
-                            getCommandLine(),
-                            getMappings(),
-                            getConfigurationContent(),
-                            getInitializationOptionsContent(),
-                            false);
+                            new LanguageServersRegistry.UpdateServerDefinitionRequest(launch, getDisplayName(), getCommandLine(), getEnvData().getEnvs(), getEnvData().isPassParentEnvs(), getMappings(), getConfigurationContent(), getInitializationOptionsContent()), false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
                 com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings
@@ -366,6 +366,16 @@ public class LanguageServerView implements Disposable {
 
     public void setCommandLine(String commandLine) {
         languageServerPanel.getCommandLine().setText(commandLine);
+    }
+
+    public void setEnvData(EnvironmentVariablesData envData) {
+        if (envData != null) {
+            languageServerPanel.getEnvironmentVariables().setEnvData(envData);
+        }
+    }
+
+    public @NotNull EnvironmentVariablesData getEnvData() {
+        return languageServerPanel.getEnvironmentVariables().getEnvData();
     }
 
     public void setLanguageMappings(@NotNull List<ServerMappingSettings> mappings) {
