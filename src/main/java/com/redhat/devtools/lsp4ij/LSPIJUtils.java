@@ -292,12 +292,17 @@ public class LSPIJUtils {
         return Math.min(offset, lineEndOffset);
     }
 
-    public static Position toPosition(int offset, Document document) {
+    /**
+     * Returns the LSP position from the given offset in teh given document.
+     * @param offset the offset.
+     * @param document the document.
+     * @return the LSP position from the given offset in teh given document.
+     */
+    @NotNull
+    public static Position toPosition(int offset, @NotNull Document document) {
         int line = document.getLineNumber(offset);
-        int lineStart = document.getLineStartOffset(line);
-        String lineTextBeforeOffset = document.getText(new TextRange(lineStart, offset));
-        int column = lineTextBeforeOffset.length();
-        return new Position(line, column);
+        int character = offset - document.getLineStartOffset(line);
+        return new Position(line, character);
     }
 
     @NotNull
