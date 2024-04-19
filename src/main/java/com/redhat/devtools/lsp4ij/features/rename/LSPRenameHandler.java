@@ -29,9 +29,9 @@ import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDoneAsync;
 
 /**
  * LSP rename handler which:
@@ -63,20 +63,33 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         // If the language server doesn't support prepare rename capability,
         // the support returns a prepare rename result by using token strategy.
         LSPPrepareRenameParams prepareRenameParams = new LSPPrepareRenameParams(textDocument, position, offset, document);
-        CompletableFuture<List<PrepareRenameResultData>> future = LSPFileSupport.getSupport(psiFile)
-                .getPrepareRenameSupport()
-                .getPrepareRenameResult(prepareRenameParams);
+        var prepareRenameSupport = LSPFileSupport.getSupport(psiFile)
+                .getPrepareRenameSupport();
+        // Cancel the previous prepare rename
+        prepareRenameSupport.cancel();
+        CompletableFuture<List<PrepareRenameResultData>> future =
+                prepareRenameSupport.getPrepareRenameResult(prepareRenameParams);
 
         // As invoke method is invoked in EDT Thread,
         // com.redhat.devtools.lsp4ij.internal.CompletableFutures#waitUntilDone
         // cannot be used to avoid freezing IJ, in this case the result future
         // is collected when future is ready.
+
+        // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
+        // The 'prepare rename' is stopped:
+        // - if user change the editor content
+        // - if it cancels the Task
+        waitUntilDoneAsync(future, LanguageServerBundle.message("lsp.refactor.rename.prepare.progress.title", psiFile.getVirtualFile().getName(), offset), psiFile);
+
         future.handle((prepareRenamesResult, error) -> {
             if (error != null) {
                 // Handle error
                 if (CancellationUtil.isRequestCancelledException(error)) {
                     // Don't show cancelled error
                     return error;
+                }
+                if (error instanceof CompletionException || error instanceof ExecutionException) {
+                    error = error.getCause();
                 }
                 // The language server throws an error while preparing rename, display it as hint in the editor
                 showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.prepare.error", error.getMessage()));
@@ -168,5 +181,6 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
                     .invokeLater(() -> HintManager.getInstance().showErrorHint(editor, text));
         }
     }
+
 
 }
