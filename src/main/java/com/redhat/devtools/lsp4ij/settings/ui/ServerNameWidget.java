@@ -38,6 +38,7 @@ public class ServerNameWidget extends JBTextField implements ValidatableConsoleW
         }
     }
 
+    @Override
     public ValidationInfo getValidationInfo() {
         if (isValid()) {
             return null;
