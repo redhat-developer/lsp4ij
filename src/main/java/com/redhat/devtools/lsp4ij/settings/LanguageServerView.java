@@ -34,6 +34,7 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociatio
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
+import com.redhat.devtools.lsp4ij.settings.ui.ValidatableDialog;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -52,7 +53,7 @@ import java.util.stream.Collectors;
  *     <li>Suspend and wait for a debugger?</li>
  * </ul>
  */
-public class LanguageServerView extends DialogWrapper implements Disposable {
+public class LanguageServerView extends ValidatableDialog implements Disposable {
 
     private final LanguageServerNameProvider languageServerNameProvider;
 
@@ -72,7 +73,7 @@ public class LanguageServerView extends DialogWrapper implements Disposable {
                               @Nullable LanguageServerNameProvider languageServerNameProvider,
                               @NotNull Project project
     ) {
-        super(true);
+        super(project);
         this.languageServerDefinition = languageServerDefinition;
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
@@ -288,7 +289,7 @@ public class LanguageServerView extends DialogWrapper implements Disposable {
         this.languageServerPanel = new LanguageServerPanel(builder,
                 description,
                 launchingServerDefinition ? LanguageServerPanel.EditionMode.EDIT_USER_DEFINED :
-                        LanguageServerPanel.EditionMode.EDIT_EXTENSION);
+                        LanguageServerPanel.EditionMode.EDIT_EXTENSION, this);
         this.mappingPanel = languageServerPanel.getMappingsPanel();
         return builder
                 .addComponentFillVertically(new JPanel(), 50)

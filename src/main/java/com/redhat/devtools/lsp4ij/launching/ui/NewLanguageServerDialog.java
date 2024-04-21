@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.launching.ui;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
@@ -25,6 +24,7 @@ import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
+import com.redhat.devtools.lsp4ij.settings.ui.ValidatableDialog;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,7 +40,7 @@ import java.util.UUID;
 /**
  * New language server dialog.
  */
-public class NewLanguageServerDialog extends DialogWrapper {
+public class NewLanguageServerDialog extends ValidatableDialog {
 
     private final ComboBox<LanguageServerTemplate> templateCombo = new ComboBox<>(new DefaultComboBoxModel<>(getLanguageServerTemplates()));
     private final Project project;
@@ -70,7 +70,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Template combo
         createTemplateCombo(builder);
         // Create server name,  command line, mappings, configuration UI
-        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED);
+        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED, this);
 
         // Add validation
         addValidator(this.languageServerPanel.getServerName());
@@ -165,19 +165,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     protected @NotNull List<ValidationInfo> doValidateAll() {
-        List<ValidationInfo> validations = new ArrayList<>();
-        addValidationInfo(this.languageServerPanel.getCommandLine().getValidationInfo(), validations);
-        addValidationInfo(this.languageServerPanel.getServerName().getValidationInfo(), validations);
-        return validations;
+        return languageServerPanel.doValidateAll();
     }
-
-    private void addValidationInfo(ValidationInfo validationInfo, List<ValidationInfo> validations) {
-        if (validationInfo == null) {
-            return;
-        }
-        validations.add((validationInfo));
-    }
-
 
     @Override
     protected void doOKAction() {

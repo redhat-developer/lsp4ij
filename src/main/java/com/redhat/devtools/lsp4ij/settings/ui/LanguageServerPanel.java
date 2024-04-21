@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
@@ -26,7 +27,11 @@ import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Language server panel which show information about language server in several tabs:
@@ -58,8 +63,10 @@ public class LanguageServerPanel {
     private LanguageServerConfigurationWidget configurationWidget;
 
     private LanguageServerInitializationOptionsWidget initializationOptionsWidget;
+    private final ValidatableDialog dialogWrapper;
 
-    public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode) {
+    public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode, ValidatableDialog dialogWrapper) {
+        this.dialogWrapper = dialogWrapper;
         createUI(builder, description, mode);
     }
 
@@ -77,6 +84,13 @@ public class LanguageServerPanel {
         }
         // Debug tab
         addDebugTab(tabbedPane, mode);
+
+        // Add validation
+        var serverName = getServerName();
+        if (serverName != null) {
+            addValidator(serverName);
+        }
+        addValidator(getCommandLine());
     }
 
     private void addServerTab(JBTabbedPane tabbedPane, JComponent description, EditionMode mode) {
@@ -238,4 +252,33 @@ public class LanguageServerPanel {
         return errorReportingKindCombo;
     }
 
+    public @NotNull List<ValidationInfo> doValidateAll() {
+        List<ValidationInfo> validations = new ArrayList<>();
+        var serverName = getServerName();
+        if (serverName != null) {
+            addValidationInfo(serverName.getValidationInfo(), validations);
+        }
+        var commandLine = getCommandLine();
+        if (commandLine != null) {
+            addValidationInfo(commandLine.getValidationInfo(), validations);
+        }
+        return validations;
+    }
+
+    private void addValidationInfo(ValidationInfo validationInfo, List<ValidationInfo> validations) {
+        if (validationInfo == null) {
+            return;
+        }
+        validations.add((validationInfo));
+    }
+
+
+    private void addValidator(JTextComponent textComponent) {
+        textComponent.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(@NotNull DocumentEvent e) {
+                dialogWrapper.refreshValidation();
+            }
+        });
+    }
 }
