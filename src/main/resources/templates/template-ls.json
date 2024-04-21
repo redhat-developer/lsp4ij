@@ -160,7 +160,8 @@
       "id": "typescript-language-server",
       "name": "TypeScript Language Server",
       "programArgs": {
-        "default": "typescript-language-server --stdio"
+        "default": "sh -c \"typescript-language-server --stdio\"",
+        "windows": "typescript-language-server --stdio"
       },
       "fileTypeMappings": [
         {
@@ -201,12 +202,11 @@
     {
       "id": "vscode-css-language-server",
       "name": "CSS Language Server",
-      "runtime": "node",
       "programArgs": {
-        "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
-        "mac": "\"/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
-        "unix": "\"/usr/share/code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
-        "default": "\resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio"
+        "windows": "node \"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
+        "mac": "sh -c \"node '/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\"",
+        "unix": "sh -c \"node '/usr/share/code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\"",
+        "default": "sh -c \"node 'resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\""
       },
       "fileTypeMappings": [
         {
@@ -238,12 +238,11 @@
     {
       "id": "vscode-html-language-server",
       "name": "HTML Language Server",
-      "runtime": "node",
       "programArgs": {
-        "windows": "\"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
-        "mac": "\"/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
-        "unix": "\"/usr/share/code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
-        "default": "\resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio"
+        "windows": "node \"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
+        "mac": "sh -c \"node '/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\"",
+        "unix": "sh -c \"node '/usr/share/code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\"",
+        "default": "sh -c \"node 'resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\""
       },
       "languageMappings": [
         {
