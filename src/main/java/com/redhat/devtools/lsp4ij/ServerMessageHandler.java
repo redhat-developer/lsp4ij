@@ -14,23 +14,29 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.ide.BrowserUtil;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationListener;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
-import org.eclipse.lsp4j.MessageActionItem;
-import org.eclipse.lsp4j.MessageParams;
-import org.eclipse.lsp4j.MessageType;
-import org.eclipse.lsp4j.ShowMessageRequestParams;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import org.eclipse.lsp4j.*;
+import org.jetbrains.annotations.NotNull;
 
-import javax.swing.Icon;
+import javax.swing.*;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter.toHTML;
 
 public class ServerMessageHandler {
+
+    private static final ShowDocumentResult SHOW_DOCUMENT_RESULT_WITH_SUCCESS = new ShowDocumentResult(true);
+
+    public static final ShowDocumentResult SHOW_DOCUMENT_RESULT_WITH_FAILURE = new ShowDocumentResult(false);
+
     private ServerMessageHandler() {
         // this class shouldn't be instantiated
     }
@@ -61,7 +67,8 @@ public class ServerMessageHandler {
 
     /**
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage">window/showMessage</a> specification.
-     * @param title the notification title
+     *
+     * @param title  the notification title
      * @param params the message parameters
      */
     public static void showMessage(String title, MessageParams params) {
@@ -73,21 +80,55 @@ public class ServerMessageHandler {
 
     /**
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest">window/showMessageRequest</a> specification.
+     *
      * @param wrapper the language server wrapper
-     * @param params the message request parameters
+     * @param params  the message request parameters
      */
     public static CompletableFuture<MessageActionItem> showMessageRequest(LanguageServerWrapper wrapper, ShowMessageRequestParams params) {
         String[] options = params.getActions().stream().map(MessageActionItem::getTitle).toArray(String[]::new);
         CompletableFuture<MessageActionItem> future = new CompletableFuture<>();
 
-        ApplicationManager.getApplication().invokeLater(() -> {
-            MessageActionItem result = new MessageActionItem();
-            int dialogResult = Messages.showIdeaMessageDialog(null, params.getMessage(), wrapper.getServerDefinition().getDisplayName(), options, 0, Messages.getInformationIcon(), null);
-            if (dialogResult != -1) {
-                result.setTitle(options[dialogResult]);
-            }
-            future.complete(result);
-        });
+        ApplicationManager.getApplication()
+                .invokeLater(() -> {
+                    MessageActionItem result = new MessageActionItem();
+                    int dialogResult = Messages.showIdeaMessageDialog(null, params.getMessage(), wrapper.getServerDefinition().getDisplayName(), options, 0, Messages.getInformationIcon(), null);
+                    if (dialogResult != -1) {
+                        result.setTitle(options[dialogResult]);
+                    }
+                    future.complete(result);
+                });
+        return future;
+    }
+
+    public static CompletableFuture<ShowDocumentResult> showDocument(@NotNull ShowDocumentParams params,
+                                                                     @NotNull Project project) {
+        String uri = params.getUri();
+        if (StringUtils.isEmpty(uri)) {
+            return CompletableFuture
+                    .completedFuture(SHOW_DOCUMENT_RESULT_WITH_FAILURE);
+        }
+        if (params.getExternal() != null && params.getExternal()) {
+            /**
+             * Indicates to show the resource in an external program.
+             * To show for example <a href="https://www.eclipse.org/">
+             * https://www.eclipse.org/</a>
+             * in the default WEB browser set to {@code true}.
+             */
+            BrowserUtil.browse(params.getUri());
+            return CompletableFuture
+                    .completedFuture(SHOW_DOCUMENT_RESULT_WITH_SUCCESS);
+        }
+        boolean focusEditor = params.getTakeFocus() != null ? params.getTakeFocus() : false;
+        var position = params.getSelection() != null ? params.getSelection().getStart() : null;
+
+        CompletableFuture<ShowDocumentResult> future = new CompletableFuture<>();
+        ApplicationManager.getApplication()
+                .invokeLater(() -> {
+                    if (LSPIJUtils.openInEditor(uri, position, focusEditor, project)) {
+                        future.complete(SHOW_DOCUMENT_RESULT_WITH_SUCCESS);
+                    }
+                    future.complete(SHOW_DOCUMENT_RESULT_WITH_FAILURE);
+                });
         return future;
     }
 }

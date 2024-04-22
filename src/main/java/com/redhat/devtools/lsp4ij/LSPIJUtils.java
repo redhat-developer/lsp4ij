@@ -72,7 +72,8 @@ public class LSPIJUtils {
      * @param project  the project.
      * @return true if the file was opened and false otherwise.
      */
-    public static boolean openInEditor(@Nullable Location location, @NotNull Project project) {
+    public static boolean openInEditor(@Nullable Location location,
+                                       @NotNull Project project) {
         if (location == null) {
             return false;
         }
@@ -87,9 +88,27 @@ public class LSPIJUtils {
      * @param project  the project.
      * @return true if the file was opened and false otherwise.
      */
-    public static boolean openInEditor(@NotNull String fileUri, @Nullable Position position, @NotNull Project project) {
+    public static boolean openInEditor(@NotNull String fileUri,
+                                       @Nullable Position position,
+                                       @NotNull Project project) {
+        return openInEditor(fileUri, position, true, project);
+    }
+
+    /**
+     * Open the given fileUri with the given position in an editor.
+     *
+     * @param fileUri     the file Uri.
+     * @param position    the position.
+     * @param focusEditor true if editor will take the focus and false otherwise.
+     * @param project     the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@NotNull String fileUri,
+                                       @Nullable Position position,
+                                       boolean focusEditor,
+                                       @NotNull Project project) {
         VirtualFile file = findResourceFor(fileUri);
-        return openInEditor(file, position, project);
+        return openInEditor(file, position, focusEditor, project);
     }
 
     /**
@@ -100,7 +119,25 @@ public class LSPIJUtils {
      * @param project  the project.
      * @return true if the file was opened and false otherwise.
      */
-    public static boolean openInEditor(@Nullable VirtualFile file, @Nullable Position position, @NotNull Project project) {
+    public static boolean openInEditor(@Nullable VirtualFile file,
+                                       @Nullable Position position,
+                                       @NotNull Project project) {
+        return openInEditor(file, position, true, project);
+    }
+
+    /**
+     * Open the given file with the given position in an editor.
+     *
+     * @param file        the file.
+     * @param position    the position.
+     * @param focusEditor true if editor will take the focus and false otherwise.
+     * @param project     the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@Nullable VirtualFile file,
+                                       @Nullable Position position,
+                                       boolean focusEditor,
+                                       @NotNull Project project) {
         if (file != null) {
             if (position == null) {
                 return FileEditorManager.getInstance(project).openFile(file, true).length > 0;
@@ -108,7 +145,7 @@ public class LSPIJUtils {
                 Document document = FileDocumentManager.getInstance().getDocument(file);
                 if (document != null) {
                     OpenFileDescriptor desc = new OpenFileDescriptor(project, file, LSPIJUtils.toOffset(position, document));
-                    return FileEditorManager.getInstance(project).openTextEditor(desc, true) != null;
+                    return FileEditorManager.getInstance(project).openTextEditor(desc, focusEditor) != null;
                 }
             }
         }
@@ -297,7 +334,8 @@ public class LSPIJUtils {
 
     /**
      * Returns the LSP position from the given offset in teh given document.
-     * @param offset the offset.
+     *
+     * @param offset   the offset.
      * @param document the document.
      * @return the LSP position from the given offset in teh given document.
      */
