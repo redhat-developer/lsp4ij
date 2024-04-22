@@ -90,7 +90,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
     private void bind(CancellablePromise<ResultOrError<R>> promise) {
         this.nonBlockingReadActionPromise = promise;
         // On error...
-        promise.onError(ex -> {
+        /*promise.onError(ex -> {
             if (ex instanceof ProcessCanceledException || ex instanceof CancellationException) {
                 // Case 2: cancel the completable future
                 super.cancel(true);
@@ -98,7 +98,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                 // Other case..., mark the completable future as error
                 this.completeExceptionally(ex);
             }
-        });
+        });*/
         // On success...
         promise.onSuccess(value -> {
             if (value.error != null) {

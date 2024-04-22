@@ -251,7 +251,7 @@
         <renameHandler
                 id="LSPRenameHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
-                order="first"/>
+                order="last"/>
 
         <!-- willRenameFiles support -->
         <renamePsiElementProcessor

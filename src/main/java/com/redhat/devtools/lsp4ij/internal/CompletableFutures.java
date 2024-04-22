@@ -123,12 +123,6 @@ public class CompletableFutures {
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
                 // Ignore timeout
-            } catch(ProcessCanceledException e) {
-                if (!future.isCancelled()) {
-                    // Case when user click on cancel of progress Task.
-                    future.cancel(true);
-                }
-                throw e;
             } catch (ExecutionException | CompletionException e) {
                 Throwable cause = e.getCause();
                 if (cause instanceof CancellationException ce) {
@@ -161,11 +155,13 @@ public class CompletableFutures {
                 try {
                     waitUntilDone(future, file);
                 } catch (CancellationException | ProcessCanceledException e) {
-                    // Do nothing
+                    if (!future.isCancelled()) {
+                        // Case when user click on cancel of progress Task.
+                        future.cancel(true);
+                    }
                 }
                 catch(Exception e) {
                     // Should never occur
-                    LOGGER.error("Error while executing future '" + title + "'.", e);
                 }
                 finally {
                     indicator.stop();

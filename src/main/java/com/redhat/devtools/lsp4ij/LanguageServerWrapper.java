@@ -850,9 +850,19 @@ public class LanguageServerWrapper implements Disposable {
                     }
                 } else if (LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION.equals(reg.getMethod())) {
                     // register 'textDocument/codeAction' capability
-                    final Either<Boolean, CodeActionOptions> beforeRegistration = serverCapabilities.getCodeActionProvider();
-                    serverCapabilities.setCodeActionProvider(Boolean.TRUE);
-                    addRegistration(reg, () -> serverCapabilities.setCodeActionProvider(beforeRegistration));
+                    try {
+                        final Either<Boolean, CodeActionOptions> beforeRegistration = serverCapabilities.getCodeActionProvider();
+                        CodeActionRegistrationOptions options = JSONUtils.getLsp4jGson()
+                                .fromJson((JsonObject) reg.getRegisterOptions(),
+                                        CodeActionRegistrationOptions.class);
+                        CodeActionOptions codeActionOptions = new CodeActionOptions();
+                        codeActionOptions.setCodeActionKinds(options.getCodeActionKinds());
+                        codeActionOptions.setResolveProvider(options.getResolveProvider());
+                        serverCapabilities.setCodeActionProvider(Either.forRight(codeActionOptions));
+                        addRegistration(reg, () -> serverCapabilities.setCodeActionProvider(beforeRegistration));
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting 'textDocument/codeAction' capability", e);
+                    }
                 }
             });
         });
