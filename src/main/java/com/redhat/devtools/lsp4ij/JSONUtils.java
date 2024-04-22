@@ -13,17 +13,14 @@
 *******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import java.lang.reflect.Method;
-import java.util.HashMap;
-
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.adapters.EitherTypeAdapter;
+import org.jetbrains.annotations.Nullable;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
+import java.lang.reflect.Method;
+import java.util.HashMap;
 
 /**
  * Utilities for working with JSON that has been converted to an Object using Gson.
@@ -135,6 +132,31 @@ public class JSONUtils {
 
 		}
 		return elt;
+	}
+
+	/**
+	 * Returns the Json element by given paths and null otherwise.
+	 * @param root the Json root object.
+	 * @param paths the paths.
+	 * @return the Json element by given paths and null otherwise.
+	 */
+	@Nullable
+	public static JsonElement findByPath(JsonObject root, String[] paths) {
+		if (paths.length == 0) {
+			return root;
+		}
+		JsonObject current = root;
+		for (int i = 0; i < paths.length -1; i++) {
+			Object result = current.get(paths[i]);
+			if (!(result instanceof JsonObject json)) {
+				return null;
+			}
+			current = json;
+		}
+		if (current != null) {
+			return current.get(paths[paths.length -1]);
+		}
+		return null;
 	}
 
 }
