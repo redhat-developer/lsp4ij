@@ -85,6 +85,11 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     @Override
+    public CompletableFuture<ShowDocumentResult> showDocument(ShowDocumentParams params) {
+        return ServerMessageHandler.showDocument(params, getProject());
+    }
+
+    @Override
     public final void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
         this.diagnosticHandler.accept(diagnostics);
     }
