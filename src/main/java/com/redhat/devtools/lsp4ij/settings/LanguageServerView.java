@@ -420,9 +420,8 @@ public class LanguageServerView extends ValidatableDialog implements Disposable 
     }
 
     @Override
-    protected @Nullable ValidationInfo doValidate() {
-        // Server name is not editable for existing language servers
-        return this.languageServerPanel.getCommandLine().getValidationInfo();
+    public @NotNull List<ValidationInfo> doValidateAll() {
+        return languageServerPanel.doValidateAll();
     }
 
     @Override

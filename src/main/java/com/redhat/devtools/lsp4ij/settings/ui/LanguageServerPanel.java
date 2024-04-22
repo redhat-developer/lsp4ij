@@ -254,24 +254,16 @@ public class LanguageServerPanel {
 
     public @NotNull List<ValidationInfo> doValidateAll() {
         List<ValidationInfo> validations = new ArrayList<>();
-        var serverName = getServerName();
-        if (serverName != null) {
-            addValidationInfo(serverName.getValidationInfo(), validations);
+        var serverNameWidget = getServerName();
+        if (serverNameWidget != null) {
+            serverNameWidget.validate(validations);
         }
-        var commandLine = getCommandLine();
-        if (commandLine != null) {
-            addValidationInfo(commandLine.getValidationInfo(), validations);
+        var commandLineWidget = getCommandLine();
+        if (commandLineWidget != null) {
+            commandLineWidget.validate(validations);
         }
         return validations;
     }
-
-    private void addValidationInfo(ValidationInfo validationInfo, List<ValidationInfo> validations) {
-        if (validationInfo == null) {
-            return;
-        }
-        validations.add((validationInfo));
-    }
-
 
     private void addValidator(JTextComponent textComponent) {
         textComponent.getDocument().addDocumentListener(new DocumentAdapter() {

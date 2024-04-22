@@ -16,6 +16,7 @@ import com.intellij.ui.components.JBTextField;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 
 import javax.swing.border.Border;
+import java.util.List;
 
 /**
  * Server name widget that contains the server name when creating a new LS configuration
@@ -26,24 +27,19 @@ public class ServerNameWidget extends JBTextField implements ValidatableConsoleW
 
     public ServerNameWidget() {
         this.originalBorder = this.getBorder();
-        addListeners(this);
     }
 
     @Override
-    public void validateInput() {
-        if (isValid()) {
-            this.setBorder(originalBorder);
-        } else {
+    public void validate(List<ValidationInfo> validations) {
+        boolean isValid = true;
+        if (getDocument() != null && getText().isBlank()) {
             setErrorBorder(this);
+            isValid = false;
+            validations.add(new ValidationInfo(errorMessage, this));
         }
-    }
-
-    @Override
-    public ValidationInfo getValidationInfo() {
-        if (isValid()) {
-            return null;
+        if (isValid) {
+            this.setBorder(originalBorder);
         }
-        return new ValidationInfo(errorMessage, this);
     }
 
     @Override

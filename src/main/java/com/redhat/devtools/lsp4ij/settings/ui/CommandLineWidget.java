@@ -20,6 +20,7 @@ import com.intellij.util.ui.JBFont;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 
 import javax.swing.border.Border;
+import java.util.List;
 
 /**
  * Command line widget used to fill the command to start a language
@@ -36,28 +37,18 @@ public class CommandLineWidget extends JBTextArea implements ValidatableConsoleW
         super.setFont(JBFont.regular());
         super.getEmptyText().setText(LanguageServerBundle.message("language.server.command.emptyText"));
         this.normalBorder = this.getBorder();
-        addListeners(this);
     }
 
     @Override
-    public void validateInput() {
-        if (isValid()) {
-            this.setBorder(normalBorder);
-        } else {
+    public void validate(List<ValidationInfo> validations) {
+        boolean valid = true;
+        if (getDocument() != null && getText().isBlank()) {
             setErrorBorder(this);
+            valid = false;
+            validations.add(new ValidationInfo(errorMessage, this));
         }
-    }
-
-    @Override
-    public ValidationInfo getValidationInfo() {
-        if (isValid()) {
-            return null;
+        if (valid) {
+            this.setBorder(normalBorder);
         }
-        return new ValidationInfo(errorMessage, this);
-    }
-
-    @Override
-    public boolean isValid() {
-        return getDocument() != null && !getText().isBlank();
     }
 }
