@@ -45,9 +45,6 @@ public abstract class AbstractDocumentMatcher implements DocumentMatcher {
         if (ApplicationManager.getApplication().isUnitTestMode()) {
             return false;
         }
-        if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return true;
-        }
         return DumbService.getInstance(project).isDumb();
     }
 }

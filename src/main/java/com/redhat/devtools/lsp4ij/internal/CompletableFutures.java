@@ -22,8 +22,6 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +34,6 @@ import java.util.function.Function;
  * @author Angelo ZERR
  */
 public class CompletableFutures {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(CompletableFutures.class);
 
     private CompletableFutures() {
 
@@ -104,7 +100,7 @@ public class CompletableFutures {
      * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
      *
      * @param future the future to wait.
-     * @param file the Psi file.
+     * @param file   the Psi file.
      */
     public static void waitUntilDone(@NotNull CompletableFuture<?> future,
                                      @Nullable PsiFile file) throws ExecutionException, ProcessCanceledException {
@@ -123,12 +119,6 @@ public class CompletableFutures {
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
                 // Ignore timeout
-            } catch(ProcessCanceledException e) {
-                if (!future.isCancelled()) {
-                    // Case when user click on cancel of progress Task.
-                    future.cancel(true);
-                }
-                throw e;
             } catch (ExecutionException | CompletionException e) {
                 Throwable cause = e.getCause();
                 if (cause instanceof CancellationException ce) {
@@ -148,12 +138,12 @@ public class CompletableFutures {
      * Wait in Task (which is cancellable) for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
      *
      * @param future the future to wait.
-     * @param title the task title.
-     * @param file the Psi file.
+     * @param title  the task title.
+     * @param file   the Psi file.
      */
     public static void waitUntilDoneAsync(@NotNull CompletableFuture<?> future,
-                                     @NotNull String title,
-                                     @NotNull PsiFile file) {
+                                          @NotNull String title,
+                                          @NotNull PsiFile file) {
 
         ProgressManager.getInstance().run(new Task.Backgroundable(file.getProject(), title, true) {
             @Override
@@ -161,14 +151,14 @@ public class CompletableFutures {
                 try {
                     waitUntilDone(future, file);
                 } catch (CancellationException | ProcessCanceledException e) {
-                    // Do nothing
-                }
-                catch(Exception e) {
-                    // Should never occur
-                    LOGGER.error("Error while executing future '" + title + "'.", e);
-                }
-                finally {
-                    indicator.stop();
+                    if (!future.isCancelled()) {
+                        // Case when user click on cancel of progress Task.
+                        future.cancel(true);
+                    }
+                } catch (Exception e) {
+                    // Do nothing, error should be handled by the block code
+                    // which consumes the future:
+                    // future.handler((result, error) -> ....
                 }
             }
         });
