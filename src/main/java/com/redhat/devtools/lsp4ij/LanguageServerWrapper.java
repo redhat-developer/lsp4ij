@@ -849,10 +849,27 @@ public class LanguageServerWrapper implements Disposable {
                         addRegistration(reg, () -> serverCapabilities.setDocumentRangeFormattingProvider(documentRangeFormattingProvider));
                     }
                 } else if (LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION.equals(reg.getMethod())) {
-                    // register 'textDocument/codeAction' capability
-                    final Either<Boolean, CodeActionOptions> beforeRegistration = serverCapabilities.getCodeActionProvider();
-                    serverCapabilities.setCodeActionProvider(Boolean.TRUE);
-                    addRegistration(reg, () -> serverCapabilities.setCodeActionProvider(beforeRegistration));
+                    try {
+                        // Get old 'textDocument/codeAction' capability
+                        final Either<Boolean, CodeActionOptions> beforeRegistration = serverCapabilities.getCodeActionProvider();
+
+                        // Register new 'textDocument/codeAction' capability
+                        CodeActionRegistrationOptions options = JSONUtils.getLsp4jGson()
+                                .fromJson((JsonObject) reg.getRegisterOptions(),
+                                        CodeActionRegistrationOptions.class);
+                        CodeActionOptions codeActionOptions = new CodeActionOptions();
+                        codeActionOptions.setCodeActionKinds(options.getCodeActionKinds());
+                        codeActionOptions.setResolveProvider(options.getResolveProvider());
+                        // TODO: manage CodeActionRegistrationOptions#getDocumentSelector()
+                        serverCapabilities.setCodeActionProvider(Either.forRight(codeActionOptions));
+
+                        // Add registration handler to:
+                        // - unregister the new 'textDocument/codeAction' capability
+                        // - register the old 'textDocument/codeAction' capability
+                        addRegistration(reg, () -> serverCapabilities.setCodeActionProvider(beforeRegistration));
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting 'textDocument/codeAction' capability", e);
+                    }
                 }
             });
         });
