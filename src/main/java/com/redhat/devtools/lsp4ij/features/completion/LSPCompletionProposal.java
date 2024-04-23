@@ -61,17 +61,20 @@ public class LSPCompletionProposal extends LookupElement {
     private final PsiFile file;
     private final Boolean supportResolveCompletion;
     private final boolean supportSignatureHelp;
+    private final LSPCompletionContributor completionContributor;
     private int currentOffset;
     private int bestOffset;
     private final Editor editor;
     private final LanguageServerItem languageServer;
     private CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
-    public LSPCompletionProposal(PsiFile file, Editor editor, int offset, CompletionItem item, LanguageServerItem languageServer) {
+    public LSPCompletionProposal(PsiFile file, Editor editor, int offset, CompletionItem item, LanguageServerItem languageServer,
+                                 @NotNull LSPCompletionContributor completionContributor) {
         this.file = file;
         this.item = item;
         this.editor = editor;
         this.languageServer = languageServer;
+        this.completionContributor = completionContributor;
         this.initialOffset = offset;
         this.currentOffset = offset;
         this.bestOffset = getPrefixCompletionStart(editor.getDocument(), offset);
@@ -251,7 +254,12 @@ public class LSPCompletionProposal extends LookupElement {
 
     @Override
     public @Nullable LookupElementRenderer<? extends LookupElement> getExpensiveRenderer() {
-        if(item.getDetail() == null && supportResolveCompletion) {
+        if (!completionContributor.isSelectedItem(this)) {
+            // The lookup item is not selected ignore it
+            return null;
+        }
+        // Here the IJ lookup item is selected.
+        if(needToResolveCompletionDetail()) {
             // The LSP completion item 'detail' is not filled, try to resolve it
             // inside getExpensiveRenderer() which should not impact performance.
             CompletionItem resolved = getResolvedCompletionItem();
@@ -266,8 +274,22 @@ public class LSPCompletionProposal extends LookupElement {
                 };
             }
         }
+        if (item.getDetail() == null) {
+            // The detail cannot be resolved, set empty string to avoid trying to resolve again the completion item
+            item.setDetail("");
+        }
         return null;
     }
+
+    /**
+     * Returns true if the LSP completion item 'detail' must be resolved and false otherwise.
+     *
+     * @return true if the LSP completion item 'detail' must be resolved and false otherwise.
+     */
+    public boolean needToResolveCompletionDetail() {
+        return item.getDetail() == null && supportResolveCompletion;
+    }
+
     protected void apply(Document document, char trigger, int stateMask, int offset) {
         String insertText = null;
         Either<TextEdit, InsertReplaceEdit> eitherTextEdit = item.getTextEdit();
@@ -493,5 +515,12 @@ public class LSPCompletionProposal extends LookupElement {
             return resolvedCompletionItemFuture.getNow(null);
         }
         return null;
+    }
+
+    /**
+     * Marks this LSP completion as selected.
+     */
+    public void selectItem() {
+        completionContributor.selectItem(this);
     }
 }
