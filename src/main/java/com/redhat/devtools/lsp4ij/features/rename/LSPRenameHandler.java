@@ -22,6 +22,8 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.refactoring.rename.RenameHandler;
+import com.intellij.refactoring.rename.RenameHandlerRegistry;
+import com.intellij.refactoring.rename.inplace.MemberInplaceRenameHandler;
 import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
 import org.eclipse.lsp4j.Position;
@@ -37,11 +39,13 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  * LSP rename handler which:
  *
  * <ul>
- *     <li>consumes LSP 'textDocument/prepareRename' request. </li>
- *     <li>consumes LSP 'textDocument/rename' request. </li>
+ *     <li>consumes LSP 'textDocument/prepareRename' requests. </li>
+ *     <li>consumes LSP 'textDocument/rename' requests. </li>
  * </ul>
  */
 public class LSPRenameHandler implements RenameHandler, TitledHandler {
+
+    private boolean searchingRenameHandlers;
 
     @Override
     public void invoke(@NotNull Project project, Editor editor, PsiFile psiFile, DataContext dataContext) {
@@ -61,24 +65,23 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
 
         // Get the text range and placeholder of the LSP rename with 'textDocument/prepareRename'.
         // If the language server doesn't support prepare rename capability,
-        // the support returns a prepare rename result by using token strategy.
+        // the support returns a prepare rename result by using the token strategy.
         LSPPrepareRenameParams prepareRenameParams = new LSPPrepareRenameParams(textDocument, position, offset, document);
-        var prepareRenameSupport = LSPFileSupport.getSupport(psiFile)
-                .getPrepareRenameSupport();
+        var prepareRenameSupport = LSPFileSupport.getSupport(psiFile).getPrepareRenameSupport();
         // Cancel the previous prepare rename
         prepareRenameSupport.cancel();
         CompletableFuture<List<PrepareRenameResultData>> future =
                 prepareRenameSupport.getPrepareRenameResult(prepareRenameParams);
 
-        // As invoke method is invoked in EDT Thread,
+        // As invoke method is invoked in the EDT Thread,
         // com.redhat.devtools.lsp4ij.internal.CompletableFutures#waitUntilDone
-        // cannot be used to avoid freezing IJ, in this case the result future
-        // is collected when future is ready.
+        // cannot be used to avoid freezing IJ, in this case the result Future
+        // is collected when the future is ready.
 
-        // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
+        // Wait until the future is finished and stop waiting if there are some ProcessCanceledExceptions.
         // The 'prepare rename' is stopped:
-        // - if user change the editor content
-        // - if it cancels the Task
+        // - if user changes the editor content
+        // - if they cancel the Task
         waitUntilDoneAsync(future, LanguageServerBundle.message("lsp.refactor.rename.prepare.progress.title", psiFile.getVirtualFile().getName(), offset), psiFile);
 
         future.handle((prepareRenamesResult, error) -> {
@@ -101,8 +104,8 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
                 return prepareRenamesResult;
             }
 
-            // Here we have collected premare rename result for each language server which support the rename capability.
-            // Step 2: open the LSP rename dialog to consume the LSP 'textDocument/rename' request when OK is done.
+            // Here we have collected the prepare rename results for each language server supporting the rename capability.
+            // Step 2: open the LSP rename dialog to consume the LSP 'textDocument/rename' request when OK is pressed.
             ApplicationManager.getApplication()
                     .invokeLater(() -> {
 
@@ -138,6 +141,9 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
 
     @Override
     public boolean isAvailableOnDataContext(@NotNull DataContext dataContext) {
+        if (searchingRenameHandlers) {
+            return false;
+        }
         Project project = CommonDataKeys.PROJECT.getData(dataContext);
         if (project == null || project.isDisposed()) {
             return false;
@@ -152,13 +158,32 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         }
 
         try {
-            // Checks if it exists a language server which is associated to the file and which have the 'rename' capability.
-            // At this step we consider that language servers are started, we wait just for 200ms
+            // Checks if a language server is associated to the file, with the 'rename' capability.
+            // At this step we consider that language servers are started, we just wait for 200ms
             // to avoid freezing the UI
-            return !LanguageServiceAccessor.getInstance(project)
+            if (!LanguageServiceAccessor.getInstance(project)
                     .getLanguageServers(file.getVirtualFile(), LanguageServerItem::isRenameSupported)
                     .get(200, TimeUnit.MILLISECONDS)
-                    .isEmpty();
+                    .isEmpty()) {
+                // There is at least one language server providing rename support for the file.
+                try {
+                    searchingRenameHandlers = true;
+                    // When there are several rename handlers, IJ removes all MemberInplaceRenameHandlers (ex: inline Java field rename)
+                    // See https://github.com/JetBrains/intellij-community/blob/cc10f72bc90a650b8d9d9f0427ae5a56111940dd/platform/lang-impl/src/com/intellij/refactoring/rename/RenameHandlerRegistry.java#L106
+                    // To avoid showing the LSP Rename dialog when a Java field is renamed (which will do nothing)
+                    // We want to show the IJ inline variable rename handler instead of LSP rename dialog.
+                    // So we check none of them is an instance of MemberInplaceRenameHandler,
+                    // in which case, the LSP rename dialog will not be available
+                    return !RenameHandlerRegistry.getInstance()
+                            .getRenameHandlers(dataContext)
+                            .stream()
+                            .allMatch(renameHandler -> renameHandler instanceof MemberInplaceRenameHandler);
+                }
+                finally {
+                    searchingRenameHandlers = false;
+                }
+            }
+            return false;
         } catch (TimeoutException e) {
             // Show "Rename... is not available during language servers starting."
             showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.language.server.not.ready"));
