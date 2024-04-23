@@ -14,6 +14,11 @@ import com.intellij.codeInsight.completion.CompletionContributor;
 import com.intellij.codeInsight.completion.CompletionParameters;
 import com.intellij.codeInsight.completion.CompletionResultSet;
 import com.intellij.codeInsight.completion.PrioritizedLookupElement;
+import com.intellij.codeInsight.lookup.Lookup;
+import com.intellij.codeInsight.lookup.LookupEvent;
+import com.intellij.codeInsight.lookup.LookupListener;
+import com.intellij.codeInsight.lookup.LookupManagerListener;
+import com.intellij.codeInsight.lookup.impl.LookupImpl;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -47,6 +52,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  */
 public class LSPCompletionContributor extends CompletionContributor {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionContributor.class);
+    private LSPCompletionProposal selectedCompletionItem;
 
     @Override
     public void fillCompletionVariants(@NotNull CompletionParameters parameters, @NotNull CompletionResultSet result) {
@@ -84,7 +90,7 @@ public class LSPCompletionContributor extends CompletionContributor {
             List<CompletionData> data = future.getNow(Collections.emptyList());
             if (!data.isEmpty()) {
                 CompletionPrefix completionPrefix = new CompletionPrefix(offset, document);
-                for(var item : data) {
+                for (var item : data) {
                     ProgressManager.checkCanceled();
                     addCompletionItems(psiFile, editor, completionPrefix, item.completion(), item.languageServer(), result);
                 }
@@ -142,15 +148,15 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
-    private static LSPCompletionProposal createLookupItem(@NotNull PsiFile file,
-                                                          @NotNull Editor editor,
-                                                          int offset,
-                                                          @NotNull CompletionItem item,
-                                                          @Nullable CompletionItemDefaults itemDefaults,
-                                                          @NotNull LanguageServerItem languageServer) {
+    private LSPCompletionProposal createLookupItem(@NotNull PsiFile file,
+                                                   @NotNull Editor editor,
+                                                   int offset,
+                                                   @NotNull CompletionItem item,
+                                                   @Nullable CompletionItemDefaults itemDefaults,
+                                                   @NotNull LanguageServerItem languageServer) {
         // Update text edit range with item defaults if needed
         updateWithItemDefaults(item, itemDefaults);
-        return new LSPCompletionProposal(file, editor, offset, item, languageServer);
+        return new LSPCompletionProposal(file, editor, offset, item, languageServer, this);
     }
 
     private static void updateWithItemDefaults(@NotNull CompletionItem item,
@@ -171,6 +177,56 @@ public class LSPCompletionContributor extends CompletionContributor {
                     item.setTextEdit(Either.forRight(new InsertReplaceEdit(itemText, defaultInsertReplaceRange.getInsert(), defaultInsertReplaceRange.getReplace())));
                 }
             }
+        }
+    }
+
+    /**
+     * Marks the given LSP completion item as selected.
+     */
+    public void selectItem(LSPCompletionProposal selectedCompletionItem) {
+        this.selectedCompletionItem = selectedCompletionItem;
+    }
+
+    /**
+     * Returns true if the given LSP completion item is selected and false otherwise.
+     *
+     * @param completionItem the LSP completion item.
+     * @return true if the given LSP completion item is selected and false otherwise.
+     */
+    public boolean isSelectedItem(LSPCompletionProposal completionItem) {
+        return completionItem == this.selectedCompletionItem;
+    }
+
+    /**
+     * LSP lookuk listener to track the selected completion item
+     * and resolve if needed the LSP completionItem to get the detail
+     * only for the selected completion item.
+     */
+    public static class LSPLookupManagerListener implements LookupManagerListener {
+
+        @Override
+        public void activeLookupChanged(@Nullable Lookup oldLookup, @Nullable Lookup newLookup) {
+            if (newLookup == null) {
+                return;
+            }
+            newLookup.addLookupListener(new LookupListener() {
+                @Override
+                public void currentItemChanged(@NotNull LookupEvent event) {
+                    var item = event.getItem();
+                    if (item == null) {
+                        return;
+                    }
+                    if (item.getObject() instanceof LSPCompletionProposal lspCompletionProposal) {
+                        // It is a LSP completion proposal
+                        lspCompletionProposal.selectItem();
+                        if (lspCompletionProposal.needToResolveCompletionDetail()) {
+                            // The LSP completion item requires to resolve completionItem to get the detail
+                            // Refresh the lookup item
+                            ((LookupImpl) newLookup).scheduleItemUpdate(item);
+                        }
+                    }
+                }
+            });
         }
     }
 

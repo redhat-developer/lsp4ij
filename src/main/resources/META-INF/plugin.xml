@@ -172,9 +172,9 @@
 
         <!-- LSP textDocument/codeLens request support -->
         <codeInsight.codeVisionProviderFactory
-                implementation="com.redhat.devtools.lsp4ij.features.codeLens.DummyCodeVisionProviderFactory" />
+                implementation="com.redhat.devtools.lsp4ij.features.codeLens.DummyCodeVisionProviderFactory"/>
         <config.codeVisionGroupSettingProvider
-            implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSettingsProvider" />
+                implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSettingsProvider"/>
         <codeInsight.codeVisionProvider
                 id="LSPCodeLensProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider"/>
@@ -453,7 +453,9 @@
 
     <projectListeners>
         <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"
-                  class="com.redhat.devtools.lsp4ij.features.refactoring.LSPRefactoringListener" />
+                  class="com.redhat.devtools.lsp4ij.features.refactoring.LSPRefactoringListener"/>
+        <listener topic="com.intellij.codeInsight.lookup.LookupManagerListener"
+                  class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener" />
     </projectListeners>
 
 </idea-plugin>
