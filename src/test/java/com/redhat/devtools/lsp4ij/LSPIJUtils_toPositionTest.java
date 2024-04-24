@@ -15,6 +15,8 @@ import com.intellij.openapi.editor.impl.DocumentImpl;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import org.eclipse.lsp4j.Position;
 
+import static com.redhat.devtools.lsp4ij.LSPIJUtils.toPosition;
+
 /**
  * Tests for {@link LSPIJUtils#toPosition(int, Document)}.
  */
@@ -34,15 +36,26 @@ public class LSPIJUtils_toPositionTest extends BasePlatformTestCase {
         assertPosition("bar\nfoo|", 1, 3);
     }
 
-    public static void assertPosition(String contentWithOffset, int expectedLine, int expectedCharacter) {
+    public void test_vscode_invalidOffset() {
+        // See https://github.com/microsoft/vscode-languageserver-node/blob/8e625564b531da607859b8cb982abb7cdb2fbe2e/textDocument/src/test/textdocument.test.ts#L109
+        String str = "Hello World";
+        var document = new DocumentImpl(str);
+
+        // invalid offsets
+        assertEquals(toPosition(-1, document), new Position(0, 0));
+        assertEquals(toPosition(str.length(), document), new Position(0, str.length()));
+        assertEquals(toPosition(str.length() + 3, document), new Position(0, str.length()));
+    }
+
+    private static void assertPosition(String contentWithOffset, int expectedLine, int expectedCharacter) {
         TextAndOffset textAndOffset = new TextAndOffset(contentWithOffset);
         assertPosition(textAndOffset.getContent(), textAndOffset.getOffset(), expectedLine, expectedCharacter);
     }
 
-    public static void assertPosition(String content, int offset, int expectedLine, int expectedCharacter) {
+    private static void assertPosition(String content, int offset, int expectedLine, int expectedCharacter) {
         Document document = new DocumentImpl(content);
         Position expectedPosition = new Position(expectedLine, expectedCharacter);
-        Position actualPosition = LSPIJUtils.toPosition(offset, document);
+        Position actualPosition = toPosition(offset, document);
         assertEquals(expectedPosition, actualPosition);
     }
 }
