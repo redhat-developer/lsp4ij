@@ -84,6 +84,15 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
         return future != null && !future.isCompletedExceptionally() && checkFileValid();
     }
 
+    /**
+     * Returns the current valid LSP request and null otherwise.
+     *
+     * @return the current valid LSP request and null otherwise.
+     */
+    public @Nullable CompletableFuture<Result> getValidLSPFuture() {
+        return isValidLSPFuture() ? future : null;
+    }
+
     private boolean checkFileValid() {
         return !cancelWhenFileModified || this.file.getModificationStamp() == modificationStamp;
     }

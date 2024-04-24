@@ -31,6 +31,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+
 /**
  * LSP code action support which loads and caches code actions by consuming:
  *
@@ -48,7 +50,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPFeatureSupport<Cod
 
     public CompletableFuture<List<CodeActionData>> getCodeActions(CodeActionParams params) {
         if (previousParams != null && !previousParams.equals(params)) {
-            // the caret editor has changed, cancel teh previous load of textDocument/codeAction.
+            // the caret editor has changed, cancel the previous loading of textDocument/codeAction.
             super.cancel();
         }
         previousParams = params;
@@ -113,8 +115,9 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPFeatureSupport<Cod
      */
     @Override
     public @Nullable Either<CodeActionData, Boolean> getCodeActionAt(int index) {
-        if (super.isValidLSPFuture()) {
-            List<CodeActionData> codeActions = getFeatureData(null).getNow(null);
+        var future = super.getValidLSPFuture();
+        if (isDoneNormally(future)) {
+            List<CodeActionData> codeActions = future.getNow(null);
             if (codeActions != null) {
                 if (codeActions.size() > index) {
                     // The LSP code actions are loaded and it matches the given index
