@@ -18,6 +18,7 @@ import com.intellij.util.xmlb.annotations.XCollection;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * File type settings.
@@ -39,7 +40,6 @@ public class FileTypeSettings {
     private List<String> patterns;
 
     public FileTypeSettings() {
-
     }
 
     public FileTypeSettings(@Nullable String name, @Nullable List<String> patterns) {
@@ -57,5 +57,18 @@ public class FileTypeSettings {
 
     public @Nullable List<String> getPatterns() {
         return patterns;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        FileTypeSettings that = (FileTypeSettings) o;
+        return Objects.equals(name, that.name) && Objects.equals(patterns, that.patterns);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, patterns);
     }
 }
