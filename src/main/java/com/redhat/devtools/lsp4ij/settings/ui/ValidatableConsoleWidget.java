@@ -34,5 +34,10 @@ public interface ValidatableConsoleWidget {
         jComponent.setBorder(JBUI.Borders.customLine(color, 1));
     }
 
+    /**
+     * Runs validations on the widget and handles border styling
+     * @param validations the dialog wrapper validation list,
+     *                    adds the validations to the list if there are any errors
+     */
     void validate(List<ValidationInfo> validations);
 }

@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * Mitja Leino <mitja.leino@hotmail.com> - Extend ValidatableDialog for validations
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 

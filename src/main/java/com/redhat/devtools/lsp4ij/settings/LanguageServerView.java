@@ -10,7 +10,7 @@
  *
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
- *     Mitja Leino <mitja.leino@hotmail.com> - Implement DialogWrapper for validations
+ *     Mitja Leino <mitja.leino@hotmail.com> - Extend ValidatableDialog for validations
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings;
 
@@ -20,7 +20,6 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;

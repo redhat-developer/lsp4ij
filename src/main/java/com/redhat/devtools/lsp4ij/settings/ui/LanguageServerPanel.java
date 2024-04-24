@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * Mitja Leino <mitja.leino@hotmail.com> - Add DialogWrapper for validations
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
@@ -86,11 +87,14 @@ public class LanguageServerPanel {
         addDebugTab(tabbedPane, mode);
 
         // Add validation
-        var serverName = getServerName();
-        if (serverName != null) {
-            addValidator(serverName);
+        var serverNameWidget = getServerName();
+        if (serverNameWidget != null) {
+            addValidator(serverNameWidget);
         }
-        addValidator(getCommandLine());
+        var commandLineWidget = getCommandLine();
+        if (commandLineWidget != null) {
+            addValidator(getCommandLine());
+        }
     }
 
     private void addServerTab(JBTabbedPane tabbedPane, JComponent description, EditionMode mode) {

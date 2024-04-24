@@ -16,6 +16,7 @@ import com.intellij.ui.components.JBTextField;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 
 import javax.swing.border.Border;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -31,14 +32,17 @@ public class ServerNameWidget extends JBTextField implements ValidatableConsoleW
 
     @Override
     public void validate(List<ValidationInfo> validations) {
-        boolean isValid = true;
+        List<ValidationInfo> widgetValidations = new ArrayList<>();
+
         if (getDocument() != null && getText().isBlank()) {
-            setErrorBorder(this);
-            isValid = false;
-            validations.add(new ValidationInfo(errorMessage, this));
+            widgetValidations.add(new ValidationInfo(errorMessage, this));
         }
-        if (isValid) {
+
+        if (widgetValidations.isEmpty()) {
             this.setBorder(originalBorder);
+        } else {
+            validations.addAll(widgetValidations);
+            setErrorBorder(this);
         }
     }
 
