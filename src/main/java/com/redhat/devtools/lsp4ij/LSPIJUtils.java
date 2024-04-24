@@ -316,31 +316,34 @@ public class LSPIJUtils {
      * @return a valid offset from the given position in the given document.
      */
     public static int toOffset(@NotNull Position position, @NotNull Document document) {
+        // See https://github.com/microsoft/vscode-languageserver-node/blob/8e625564b531da607859b8cb982abb7cdb2fbe2e/textDocument/src/main.ts#L304
+
         // Adjust position line/character according to this comment https://github.com/microsoft/vscode-languageserver-node/blob/ed3cd0f78c1495913bda7318ace2be7f968008af/textDocument/src/main.ts#L26
         int line = position.getLine();
-        if (line < 0) {
-            // If a line number is negative, it defaults to 0.
-            line = 0;
-        } else {
-            // If a line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
-            line = Math.min(line, document.getLineCount() > 0 ? document.getLineCount() - 1 : 0);
+        if (line >= document.getLineCount()) {
+            // The line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
+            return document.getTextLength();
+        } else if (line < 0) {
+            // The line number is negative, it defaults to 0.
+            return 0;
         }
-        int lineStartOffset = document.getLineStartOffset(line);
-        int lineEndOffset = document.getLineEndOffset(line);
-        int offset = lineStartOffset + position.getCharacter();
+        int lineOffset = document.getLineStartOffset(line);
+        int nextLineOffset = document.getLineEndOffset(line);
         // If the character value is greater than the line length it defaults back to the line length
-        return Math.min(offset, lineEndOffset);
+        return Math.max(Math.min(lineOffset + position.getCharacter(), nextLineOffset), lineOffset);
     }
 
     /**
-     * Returns the LSP position from the given offset in teh given document.
+     * Returns the LSP position from the given offset in the given document.
      *
      * @param offset   the offset.
      * @param document the document.
-     * @return the LSP position from the given offset in teh given document.
+     * @return the LSP position from the given offset in the given document.
      */
     @NotNull
     public static Position toPosition(int offset, @NotNull Document document) {
+        // Adjust offset
+        offset = Math.max(Math.min(offset, document.getTextLength()), 0);
         int line = document.getLineNumber(offset);
         int character = offset - document.getLineStartOffset(line);
         return new Position(line, character);
