@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Language Server mapping settings used by the launch configuration.
@@ -88,5 +89,18 @@ public class ServerMappingSettings {
 
     public void setLanguageId(String languageId) {
         this.languageId = languageId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ServerMappingSettings that = (ServerMappingSettings) o;
+        return Objects.equals(language, that.language) && Objects.equals(fileType, that.fileType) && Objects.equals(languageId, that.languageId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(language, fileType, languageId);
     }
 }
