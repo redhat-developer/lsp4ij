@@ -14,6 +14,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
@@ -90,6 +91,24 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
+
+    public void checkCurrentlyOpenFiles() {
+        VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
+        for (VirtualFile file : files) {
+            getMatchedLanguageServersWrappers(file).thenAccept(wrappers -> {
+                if (wrappers != null) {
+                    for (LanguageServerWrapper wrapper : wrappers) {
+                        try {
+                            wrapper.connect(file);
+                        } catch (IOException ex) {
+                            LOGGER.warn(ex.getLocalizedMessage(), ex);
+                        }
+                        wrapper.getInitializedServer();
+                    }
+                }
+            });
+        }
+    }
 
     @NotNull
     public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
