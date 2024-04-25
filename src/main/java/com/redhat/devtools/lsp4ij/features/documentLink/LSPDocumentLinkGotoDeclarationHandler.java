@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.DocumentLink;
+import org.eclipse.lsp4j.DocumentLinkParams;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +67,8 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         }
 
         LSPDocumentLinkSupport documentLinkSupport = LSPFileSupport.getSupport(psiFile).getDocumentLinkSupport();
-        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks();
+        var params = new DocumentLinkParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
+        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
             waitUntilDone(documentLinkFuture, psiFile);
         } catch (ProcessCanceledException | CancellationException e) {

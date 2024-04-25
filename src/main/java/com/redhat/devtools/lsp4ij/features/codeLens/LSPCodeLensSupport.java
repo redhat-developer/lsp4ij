@@ -13,13 +13,12 @@ package com.redhat.devtools.lsp4ij.features.codeLens;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.jetbrains.annotations.NotNull;
@@ -41,14 +40,12 @@ import static com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider.g
  * </ul>
  */
 public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams, List<CodeLensData>> {
-    private final CodeLensParams params;
 
     public LSPCodeLensSupport(@NotNull PsiFile file) {
         super(file);
-        this.params = new CodeLensParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
     }
 
-    public CompletableFuture<List<CodeLensData>> getCodeLenses() {
+    public CompletableFuture<List<CodeLensData>> getCodeLenses(CodeLensParams params) {
         return super.getFeatureData(params);
     }
 
