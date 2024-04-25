@@ -41,16 +41,15 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
     /**
      * Test LSP completion.
      *
-     * @param fileName           the file name used to match registered language servers.
-     * @param editorContentText  the editor content text.
-     * @param jsonFormatting the LSP CompletionList as JSON string.
-     * @param formattedtext      the expected IJ lookupItem string.
+     * @param fileName       the file name used to match registered language servers.
+     * @param text           the editor content text.
+     * @param formattingTextEdits the formatting TextEdit result of language server.
+     * @param formattedText  the expected formatted text.
      */
     protected void assertFormatting(@NotNull String fileName,
                                     @NotNull String text,
-
                                     @NotNull List<TextEdit> formattingTextEdits,
-    @NotNull String formattedText) {
+                                    @NotNull String formattedText) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(1000);
         MockLanguageServer.INSTANCE.setFormattingTextEdits(formattingTextEdits);
         // Open editor for a given file name and content
@@ -60,7 +59,7 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
         try {
             LanguageServiceAccessor.getInstance(file.getProject())
                     .getLanguageServers(file.getVirtualFile(), null)
-                            .get(5000, TimeUnit.MILLISECONDS);
+                    .get(5000, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             e.printStackTrace();
         }

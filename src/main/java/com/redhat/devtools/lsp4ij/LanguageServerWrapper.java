@@ -588,8 +588,10 @@ public class LanguageServerWrapper implements Disposable {
     private CompletableFuture<LanguageServer> connect(@NotNull URI fileUri) throws IOException {
         removeStopTimer(false);
 
-        if (this.connectedDocuments.containsKey(fileUri)) {
-            return CompletableFuture.completedFuture(languageServer);
+        var existingData = connectedDocuments.get(fileUri);
+        if (existingData != null) {
+            return existingData.getSynchronizer().didOpenFuture
+                    .thenApplyAsync(theVoid -> languageServer);
         }
         start();
         if (this.initializeFuture == null) {
@@ -975,7 +977,7 @@ public class LanguageServerWrapper implements Disposable {
             return NullLanguageServerLifecycleManager.INSTANCE;
         }
         var manager = LanguageServerLifecycleManager.getInstance(project);
-        return manager == null? NullLanguageServerLifecycleManager.INSTANCE : manager;
+        return manager == null ? NullLanguageServerLifecycleManager.INSTANCE : manager;
     }
 
     /**

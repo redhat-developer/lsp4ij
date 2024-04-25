@@ -21,6 +21,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.eclipse.lsp4j.FoldingRange;
+import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -56,7 +57,8 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
         // Consume LSP 'textDocument/foldingRanges' request
         LSPFoldingRangeSupport foldingRangeSupport = LSPFileSupport.getSupport(file).getFoldingRangeSupport();
-        CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges();
+        var params = new FoldingRangeRequestParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
+        CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges(params);
         try {
             waitUntilDone(foldingRangesFuture, file);
         } catch (ProcessCanceledException | CancellationException e) {

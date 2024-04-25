@@ -13,13 +13,12 @@ package com.redhat.devtools.lsp4ij.features.documentLink;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.jetbrains.annotations.NotNull;
 
@@ -36,14 +35,12 @@ import java.util.concurrent.CompletableFuture;
  * </ul>
  */
 public class LSPDocumentLinkSupport extends AbstractLSPFeatureSupport<DocumentLinkParams, List<DocumentLinkData>> {
-    private final DocumentLinkParams params;
 
     public LSPDocumentLinkSupport(@NotNull PsiFile file) {
         super(file);
-        this.params = new DocumentLinkParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
     }
 
-    public CompletableFuture<List<DocumentLinkData>> getDocumentLinks() {
+    public CompletableFuture<List<DocumentLinkData>> getDocumentLinks(DocumentLinkParams params) {
         return super.getFeatureData(params);
     }
 

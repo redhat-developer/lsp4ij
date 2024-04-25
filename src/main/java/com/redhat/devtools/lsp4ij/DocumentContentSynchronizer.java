@@ -43,8 +43,9 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
     private int version = 0;
     private final List<TextDocumentContentChangeEvent> changeEvents;
-    final @NotNull
-    CompletableFuture<Void> didOpenFuture;
+    @NotNull
+    final CompletableFuture<Void> didOpenFuture;
+    private final Object lock = new Object();
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull URI fileUri,
@@ -66,7 +67,22 @@ public class DocumentContentSynchronizer implements DocumentListener {
         didOpenFuture = languageServerWrapper
                 .getInitializedServer()
                 .thenAcceptAsync(ls -> ls.getTextDocumentService()
-                        .didOpen(new DidOpenTextDocumentParams(textDocument)));
+                        .didOpen(new DidOpenTextDocumentParams(textDocument)))
+                .thenRun(() -> {
+                    if (ApplicationManager.getApplication().isUnitTestMode()) {
+                        return;
+                    }
+                    // Wait for 500 ms after to send the didOpen notification
+                    // to be sure that the notification has been sent before
+                    // consuming other LSP request like 'textDocument/codeLens'.
+                    synchronized (lock) {
+                        try {
+                            lock.wait(500);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                });
 
         // Initialize LSP change events
         changeEvents = new ArrayList<>();
@@ -88,7 +104,7 @@ public class DocumentContentSynchronizer implements DocumentListener {
         Project project = languageServer.getProject();
 
         // 1. Try to get the LSP languageId by using language mapping
-        Language language = project != null ? LSPIJUtils.getFileLanguage(file, project) : null;
+        Language language = LSPIJUtils.getFileLanguage(file, project);
         String languageId = languageServer.getLanguageId(language);
         if (languageId != null) {
             return languageId;
@@ -137,10 +153,8 @@ public class DocumentContentSynchronizer implements DocumentListener {
             sendDidChangeEvents();
         } else {
             Project project = languageServerWrapper.getProject();
-            if (project != null) {
-                PsiDocumentManager.getInstance(project)
-                        .performForCommittedDocument(event.getDocument(), this::sendDidChangeEvents);
-            }
+            PsiDocumentManager.getInstance(project)
+                    .performForCommittedDocument(event.getDocument(), this::sendDidChangeEvents);
         }
     }
 

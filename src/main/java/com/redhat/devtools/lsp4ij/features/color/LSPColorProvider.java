@@ -23,6 +23,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPInlayHintsProvider;
 import org.eclipse.lsp4j.Color;
+import org.eclipse.lsp4j.DocumentColorParams;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -47,7 +48,8 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                              @NotNull List<CompletableFuture> pendingFutures) throws InterruptedException {
         // Get LSP color information from cache or create them
         LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
-        CompletableFuture<List<ColorData>> future = colorSupport.getColors();
+        var params = new DocumentColorParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
+        CompletableFuture<List<ColorData>> future = colorSupport.getColors(params);
 
         try {
             List<Pair<Integer, ColorData>> codeLenses = createColorInformation(editor.getDocument(), future);

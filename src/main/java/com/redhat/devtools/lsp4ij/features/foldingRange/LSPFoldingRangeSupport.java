@@ -13,13 +13,12 @@ package com.redhat.devtools.lsp4ij.features.foldingRange;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.jetbrains.annotations.NotNull;
@@ -37,14 +36,12 @@ import java.util.concurrent.CompletableFuture;
  * </ul>
  */
 public class LSPFoldingRangeSupport extends AbstractLSPFeatureSupport<FoldingRangeRequestParams, List<FoldingRange>> {
-    private final FoldingRangeRequestParams params;
 
     public LSPFoldingRangeSupport(@NotNull PsiFile file) {
         super(file);
-        this.params = new FoldingRangeRequestParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
     }
 
-    public CompletableFuture<List<FoldingRange>> getFoldingRanges() {
+    public CompletableFuture<List<FoldingRange>> getFoldingRanges(FoldingRangeRequestParams params) {
         return super.getFeatureData(params);
     }
 

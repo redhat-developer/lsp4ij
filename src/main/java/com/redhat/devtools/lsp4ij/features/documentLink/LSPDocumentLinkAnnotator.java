@@ -25,6 +25,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import org.eclipse.lsp4j.DocumentLinkParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -53,8 +54,9 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<DocumentLin
         }
         // Consume LSP 'textDocument/documentLink' request
         LSPDocumentLinkSupport documentLinkSupport = LSPFileSupport.getSupport(psiFile).getDocumentLinkSupport();
+        var params = new DocumentLinkParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
         documentLinkSupport.cancel();
-        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks();
+        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
             waitUntilDone(documentLinkFuture, psiFile);
         } catch (ProcessCanceledException | CancellationException e) {
@@ -79,16 +81,18 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<DocumentLin
 
     @Override
     public void apply(@NotNull PsiFile file, @NotNull List<DocumentLinkData> documentLinks, @NotNull AnnotationHolder holder) {
-        if (documentLinks == null || documentLinks.isEmpty()) {
+        if (documentLinks.isEmpty()) {
             return;
         }
         Document document = LSPIJUtils.getDocument(file.getVirtualFile());
         for (var documentLink : documentLinks) {
             TextRange range = LSPIJUtils.toTextRange(documentLink.documentLink().getRange(), document);
-            holder.newSilentAnnotation(HighlightInfoType.HIGHLIGHTED_REFERENCE_SEVERITY)
-                    .range(range)
-                    .textAttributes(DefaultLanguageHighlighterColors.HIGHLIGHTED_REFERENCE)
-                    .create();
+            if (range != null) {
+                holder.newSilentAnnotation(HighlightInfoType.HIGHLIGHTED_REFERENCE_SEVERITY)
+                        .range(range)
+                        .textAttributes(DefaultLanguageHighlighterColors.HIGHLIGHTED_REFERENCE)
+                        .create();
+            }
         }
     }
 }

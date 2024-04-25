@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
+import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -221,13 +222,14 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
 
     private static CompletableFuture<List<CodeLensData>> getCodeLenses(@NotNull PsiFile psiFile) {
         LSPCodeLensSupport codeLensSupport = LSPFileSupport.getSupport(psiFile).getCodeLensSupport();
+        var params = new CodeLensParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
         CompletableFuture<List<CodeLensData>> future;
         try {
-            future = codeLensSupport.getCodeLenses();
+            future = codeLensSupport.getCodeLenses(params);
         } catch (CancellationException e) {
             // In some case, the PsiFile is modified and the cancellation support throws a CancellationException
             // get it again...
-            future = codeLensSupport.getCodeLenses();
+            future = codeLensSupport.getCodeLenses(params);
         }
         return future;
     }
