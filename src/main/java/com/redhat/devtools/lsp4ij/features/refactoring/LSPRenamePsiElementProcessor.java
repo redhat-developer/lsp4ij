@@ -75,6 +75,10 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                         .getLanguageServers(file.getVirtualFile(), LanguageServerItem::isWillRenameFilesSupported)
                         .thenComposeAsync(languageServerItems -> {
 
+                            if (languageServerItems.isEmpty()) {
+                                return CompletableFuture.completedFuture(null);
+                            }
+
                             List<CompletableFuture<WorkspaceEditData>> r = languageServerItems
                                     .stream()
                                     .filter(ls -> ls.isWillRenameFilesSupported(file))
@@ -87,7 +91,7 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
 
                             // TODO: we return the WorkspaceEdit of the first language server, what about when there are several
                             // language servers which returns WorkspaceEdit?
-                            return r.isEmpty() ? null : r.get(0);
+                            return r.isEmpty() ? CompletableFuture.completedFuture(null) : r.get(0);
                         });
 
         try {
