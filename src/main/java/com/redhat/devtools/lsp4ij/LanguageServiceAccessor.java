@@ -92,6 +92,9 @@ public class LanguageServiceAccessor implements Disposable {
 
     private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
 
+    /**
+     * Check each file open in the editor and start an LS if matching one is found and is not started yet
+     */
     public void checkCurrentlyOpenFiles() {
         VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
         for (VirtualFile file : files) {
@@ -103,7 +106,7 @@ public class LanguageServiceAccessor implements Disposable {
                         } catch (IOException ex) {
                             LOGGER.warn(ex.getLocalizedMessage(), ex);
                         }
-                        wrapper.getInitializedServer();
+                        wrapper.start();
                     }
                 }
             });
