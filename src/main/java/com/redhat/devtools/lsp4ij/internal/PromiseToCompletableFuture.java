@@ -39,6 +39,7 @@ import java.util.function.Function;
 public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PromiseToCompletableFuture.class);
+    private boolean cancelled;
 
     private class ResultOrError<R> {
 
@@ -54,7 +55,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     private static final int MAX_ATTEMPT = 5;
 
-    private final Function<ProgressIndicator,R> code;
+    private final Function<ProgressIndicator, R> code;
 
     private final String progressTitle;
 
@@ -77,7 +78,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     protected void init() {
         // if indexation is processing and not in Light Edit mode, we need to execute the promise in smart mode
-        var executeInSmartMode =  !LightEdit.owns(project) && DumbService.getInstance(project).isDumb();
+        var executeInSmartMode = !LightEdit.owns(project) && DumbService.getInstance(project).isDumb();
         var promise = nonBlockingReadActionPromise(executeInSmartMode);
         bind(promise);
     }
@@ -91,7 +92,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
         this.nonBlockingReadActionPromise = promise;
         // On error...
         promise.onError(ex -> {
-            if (ex instanceof ProcessCanceledException || ex instanceof CancellationException) {
+            if (ex instanceof CancellationException) {
                 // Case 2: cancel the completable future
                 super.cancel(true);
             } else {
@@ -102,6 +103,9 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
         // On success...
         promise.onSuccess(value -> {
             if (value.error != null) {
+                if (cancelled) {
+                    return;
+                }
                 Exception ex = value.error;
                 // There were an error with IndexNotReadyException or ReadAction.CannotReadException
                 // Case 1: Attempt to retry the start of the promise
@@ -137,7 +141,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                     try {
                         R result = code.apply(indicator);
                         return new ResultOrError<R>(result, null);
-                    } catch (IndexNotReadyException | ReadAction.CannotReadException e) {
+                    } catch (ProcessCanceledException | CancellationException | IndexNotReadyException e) {
                         // When there is any exception, AsyncPromise report a log error.
                         // As we retry to execute the function code 5 times, we don't want to log this error
                         // To do that we catch the error and recreate a new promise on the promise.onSuccess
@@ -164,10 +168,11 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
+        this.cancelled = true;
         if (nonBlockingReadActionPromise != null) {
             // cancel the current promise
             if (!nonBlockingReadActionPromise.isDone()) {
-                nonBlockingReadActionPromise.cancel(mayInterruptIfRunning);
+                nonBlockingReadActionPromise.cancel();
             }
         }
         return super.cancel(mayInterruptIfRunning);
