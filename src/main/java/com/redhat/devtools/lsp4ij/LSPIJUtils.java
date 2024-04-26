@@ -24,6 +24,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
@@ -50,6 +51,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Utilities class for LSP.
@@ -225,9 +227,9 @@ public class LSPIJUtils {
     }
 
     public static @NotNull String toUriAsString(@NotNull VirtualFile file) {
-        String protocol = file.getFileSystem() != null ? file.getFileSystem().getProtocol() : null;
+        String protocol = file.getFileSystem().getProtocol();
         if (JAR_PROTOCOL.equals(protocol) || JRT_PROTOCOL.equals(protocol)) {
-            return VfsUtilCore.convertToURL(file.getUrl()).toExternalForm();
+            return Objects.requireNonNull(VfsUtilCore.convertToURL(file.getUrl())).toExternalForm();
         }
         return toUri(VfsUtilCore.virtualToIoFile(file)).toASCIIString();
     }
@@ -352,7 +354,7 @@ public class LSPIJUtils {
     @NotNull
     public static WorkspaceFolder toWorkspaceFolder(@NotNull Project project) {
         WorkspaceFolder folder = new WorkspaceFolder();
-        folder.setUri(toUri(project).toASCIIString());
+        folder.setUri(Objects.requireNonNull(toUri(project)).toASCIIString());
         folder.setName(project.getName());
         return folder;
     }
@@ -362,8 +364,11 @@ public class LSPIJUtils {
         if (roots.length > 0) {
             return toUri(roots[0]);
         }
-        File file = new File(module.getModuleFilePath()).getParentFile();
-        return file.toURI();
+        VirtualFile moduleDir = ProjectUtil.guessModuleDir(module);
+        if (moduleDir != null) {
+            return toUri(moduleDir);
+        }
+        return toUri(module.getProject());
     }
 
     public static URI toUri(Project project) {
@@ -371,8 +376,15 @@ public class LSPIJUtils {
         if (roots.length > 0) {
             return toUri(roots[0]);
         }
-        File file = new File(project.getProjectFilePath()).getParentFile();
-        return file.toURI();
+        VirtualFile projectDir = ProjectUtil.guessProjectDir(project);
+        if (projectDir == null) {//Most likely when running tests
+            String baseDir = project.getBasePath();
+            if (baseDir == null) {
+                return null;//It's the default project, we're probably screwed
+            }
+            return toUri(new File(baseDir));
+        }
+        return toUri(projectDir);
     }
 
     public static Range toRange(TextRange range, Document document) {
@@ -508,7 +520,7 @@ public class LSPIJUtils {
                     try {
                         file = createFile(fileUri);
                     } catch (Exception e) {
-                        LOGGER.error("Cannot create file '" + fileUri + "'", e);
+                        LOGGER.error("Cannot create file '{}'", fileUri, e);
                     }
                 }
                 if (file != null) {
@@ -657,13 +669,9 @@ public class LSPIJUtils {
             }
         }
         if (uri.contains("%")) {
-            try {
-                // ex : file:///c%3A/Users/azerr/IdeaProjects/untitled7/test.js
-                // the uri must be decoded (ex : file:///c:/Users) otherwise IntelliJ cannot retrieve the virtual file.
-                uri = URLDecoder.decode(uri, StandardCharsets.UTF_8.name());
-            } catch (UnsupportedEncodingException e) {
-                // Do nothing
-            }
+            // ex : file:///c%3A/Users/azerr/IdeaProjects/untitled7/test.js
+            // the uri must be decoded (ex : file:///c:/Users) otherwise IntelliJ cannot retrieve the virtual file.
+            uri = URLDecoder.decode(uri, StandardCharsets.UTF_8);
         }
         return VirtualFileManager.getInstance().findFileByUrl(VfsUtilCore.fixURLforIDEA(uri));
     }
@@ -690,6 +698,9 @@ public class LSPIJUtils {
      * @return the editors which are editing the given virtual file and an empty array otherwise
      */
     public static @NotNull Editor[] editorsForFile(@Nullable VirtualFile file, @NotNull Project project) {
+        if (file == null) {
+            return new Editor[0];
+        }
         return editorsForDocument(getDocument(file), project);
     }
 
