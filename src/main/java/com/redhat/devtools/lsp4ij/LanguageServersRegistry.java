@@ -259,11 +259,11 @@ public class LanguageServersRegistry {
         return serverDefinitions.values();
     }
 
-    public void addServerDefinition(@NotNull LanguageServerDefinition serverDefinition, @Nullable List<ServerMappingSettings> mappings, Project project) {
+    public void addServerDefinition(@NotNull LanguageServerDefinition serverDefinition, @Nullable List<ServerMappingSettings> mappings) {
         String languageServerId = serverDefinition.getId();
         addServerDefinitionWithoutNotification(serverDefinition, toServerMappings(languageServerId, mappings));
         updateInlayHintsProviders();
-        LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(Collections.singleton(serverDefinition), project);
+        LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(Collections.singleton(serverDefinition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
                 listener.handleAdded(event);

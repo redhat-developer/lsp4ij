@@ -18,6 +18,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -93,24 +94,34 @@ public class LanguageServiceAccessor implements Disposable {
     private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
 
     /**
-     * Check each file open in the editor and start an LS if matching one is found and is not started yet
+     * Check each project for open files and start an LS if matching one is found and is not started yet
      */
-    public void checkCurrentlyOpenFiles() {
-        VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
-        for (VirtualFile file : files) {
-            getMatchedLanguageServersWrappers(file).thenAccept(wrappers -> {
-                if (wrappers != null) {
-                    for (LanguageServerWrapper wrapper : wrappers) {
-                        try {
-                            wrapper.connect(file);
-                        } catch (IOException ex) {
-                            LOGGER.warn(ex.getLocalizedMessage(), ex);
-                        }
-                        wrapper.start();
+    public static void checkCurrentlyOpenFiles() {
+        Project[] projects = ProjectManager.getInstance().getOpenProjects();
+        for (Project p : projects) {
+            VirtualFile[] files = FileEditorManager.getInstance(p).getOpenFiles();
+            for (VirtualFile file : files) {
+                getInstance(p).findAndStartLsForFile(file);
+            }
+        }
+    }
+
+    /**
+     * Try to find a ls wrapper for the file and connect the file if one is found
+     * @param file to handle
+     */
+    private void findAndStartLsForFile(VirtualFile file) {
+        getMatchedLanguageServersWrappers(file).thenAccept(wrappers -> {
+            if (wrappers != null) {
+                for (LanguageServerWrapper wrapper : wrappers) {
+                    try {
+                        wrapper.connect(file);
+                    } catch (IOException ex) {
+                        LOGGER.warn(ex.getLocalizedMessage(), ex);
                     }
                 }
-            });
-        }
+            }
+        });
     }
 
     @NotNull
