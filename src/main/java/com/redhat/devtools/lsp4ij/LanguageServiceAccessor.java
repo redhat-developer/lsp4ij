@@ -95,27 +95,36 @@ public class LanguageServiceAccessor implements Disposable {
 
     /**
      * Check each project for open files and start an LS if matching one is found and is not started yet
+     * @param definitions definition of the language server to match to the wrapper
      */
-    public static void checkCurrentlyOpenFiles() {
-        Project[] projects = ProjectManager.getInstance().getOpenProjects();
-        for (Project p : projects) {
-            VirtualFile[] files = FileEditorManager.getInstance(p).getOpenFiles();
-            for (VirtualFile file : files) {
-                getInstance(p).findAndStartLsForFile(file);
+    public static void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
+        if (definitions.isEmpty()) {
+            return;
+        }
+        for (LanguageServerDefinition definition : definitions) {
+            Project[] projects = ProjectManager.getInstance().getOpenProjects();
+            for (Project p : projects) {
+                VirtualFile[] files = FileEditorManager.getInstance(p).getOpenFiles();
+                for (VirtualFile file : files) {
+                    getInstance(p).findAndStartLsForFile(file, definition);
+                }
             }
         }
     }
 
     /**
-     * Try to find a ls wrapper for the file and connect the file if one is found
+     * Try to find a ls wrapper for the file and definition. Connect the file, if a matching one is found
      * @param file to handle
+     * @param definition definition used to match to the wrapper
      */
-    private void findAndStartLsForFile(VirtualFile file) {
+    private void findAndStartLsForFile(VirtualFile file, LanguageServerDefinition definition) {
         getMatchedLanguageServersWrappers(file).thenAccept(wrappers -> {
             if (wrappers != null) {
                 for (LanguageServerWrapper wrapper : wrappers) {
                     try {
-                        wrapper.connect(file);
+                        if (wrapper.getServerDefinition().equals(definition)) {
+                            wrapper.connect(file);
+                        }
                     } catch (IOException ex) {
                         LOGGER.warn(ex.getLocalizedMessage(), ex);
                     }

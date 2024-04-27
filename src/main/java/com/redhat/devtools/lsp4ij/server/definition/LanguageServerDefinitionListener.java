@@ -29,7 +29,7 @@ public interface LanguageServerDefinitionListener {
 
         public LanguageServerAddedEvent(@NotNull Collection<LanguageServerDefinition> serverDefinitions) {
             this.serverDefinitions = serverDefinitions;
-            LanguageServiceAccessor.checkCurrentlyOpenFiles();
+            LanguageServiceAccessor.checkCurrentlyOpenFiles(serverDefinitions);
         }
     }
 
