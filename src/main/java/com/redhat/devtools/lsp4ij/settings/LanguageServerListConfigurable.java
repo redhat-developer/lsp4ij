@@ -21,6 +21,7 @@ import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.MasterDetailsComponent;
 import com.intellij.openapi.util.NlsContexts;
+import com.intellij.openapi.util.NlsSafe;
 import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.IconUtil;
@@ -178,6 +179,11 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     public void reset() {
         reloadTree();
         super.reset();
+    }
+
+    @Override
+    public void selectNodeInTree(@NlsSafe String displayName) {
+        super.selectNodeInTree(displayName);
     }
 
     @Override

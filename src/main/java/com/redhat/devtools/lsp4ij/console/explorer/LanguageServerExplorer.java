@@ -194,6 +194,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
                             group = new DefaultActionGroup();
                             group.add(new DeleteServerAction(languageServerDefinition));
+                            group.add(new EditServerAction(languageServerDefinition));
                         }
                     } else if (node instanceof LanguageServerProcessTreeNode processTreeNode) {
                         // Compute popup menu actions for Language Server process node
