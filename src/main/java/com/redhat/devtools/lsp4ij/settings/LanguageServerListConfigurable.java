@@ -169,7 +169,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     private void reloadTree() {
         UserDefinedLanguageServerSettings settings = UserDefinedLanguageServerSettings.getInstance(project);
-        final String nodeName = settings.getOpenNode();
+        final String nodeName = settings.getOverrideDisplayNodeName();
         boolean nodeIsPresent = false;
         myRoot.removeAllChildren();
         for (LanguageServerDefinition languageServeDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
@@ -182,7 +182,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         ((DefaultTreeModel) myTree.getModel()).reload();
 
         // Reset open node and select the correct node
-        settings.setOpenNode(null);
+        settings.setOverrideDisplayNodeName(null);
         if (nodeIsPresent) {
             ApplicationManager.getApplication().invokeLater(() -> {
                 selectNodeInTree(nodeName);

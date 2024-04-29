@@ -189,12 +189,20 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         this.myState.showSaveTipOnConfigurationChange = value;
     }
 
-    public String getOpenNode() {
-        return this.myState.openNode;
+    /**
+     * Used to open language server settings with specific node. Name of the language server
+     * @return name of the override node, null if no override is set
+     */
+    public String getOverrideDisplayNodeName() {
+        return this.myState.overrideDisplayNodeName;
     }
 
-    public void setOpenNode(String nodeName) {
-        this.myState.openNode = nodeName;
+    /**
+     * Set the node name that needs to be shown when opening language server settings
+     * @param nodeName name of the language server if set, null if no specific node should be set
+     */
+    public void setOverrideDisplayNodeName(String nodeName) {
+        this.myState.overrideDisplayNodeName = nodeName;
     }
 
     public static class LanguageServerDefinitionSettings {
@@ -253,7 +261,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         }
 
         private boolean showSaveTipOnConfigurationChange = true;
-        private String openNode = null;
+        private String overrideDisplayNodeName = null;
     }
 
     /**
