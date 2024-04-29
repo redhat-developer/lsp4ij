@@ -169,13 +169,13 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     private void reloadTree() {
         UserDefinedLanguageServerSettings settings = UserDefinedLanguageServerSettings.getInstance(project);
-        final String nodeName = settings.getOverrideDisplayNodeName();
-        boolean nodeIsPresent = false;
+        final String overrideDisplayNodeName = settings.getOverrideDisplayNodeName();
+        boolean overrideNodeIsPresent = false;
         myRoot.removeAllChildren();
         for (LanguageServerDefinition languageServeDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
-            if (nodeName != null && languageServeDefinition.getDisplayName().equals(nodeName)) {
-                // Set current node if we need to open a specific ls definition
-                nodeIsPresent = true;
+            if (overrideDisplayNodeName != null && languageServeDefinition.getDisplayName().equals(overrideDisplayNodeName)) {
+                // Check that we find a matching language server to pre-select it when opening the settings
+                overrideNodeIsPresent = true;
             }
             addLanguageServerDefinitionNode(languageServeDefinition);
         }
@@ -183,9 +183,9 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
         // Reset open node and select the correct node
         settings.setOverrideDisplayNodeName(null);
-        if (nodeIsPresent) {
+        if (overrideNodeIsPresent) {
             ApplicationManager.getApplication().invokeLater(() -> {
-                selectNodeInTree(nodeName);
+                selectNodeInTree(overrideDisplayNodeName);
                 myTree.updateUI();
                 myTree.repaint();
             });
