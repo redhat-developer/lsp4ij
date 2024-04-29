@@ -162,35 +162,34 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         return serverDefinition instanceof UserDefinedLanguageServerDefinition;
     }
 
-    private MyNode addLanguageServerDefinitionNode(LanguageServerDefinition languageServerDefinition) {
+    private void addLanguageServerDefinitionNode(LanguageServerDefinition languageServerDefinition) {
         MyNode node = new MyNode(new LanguageServerConfigurable(languageServerDefinition, TREE_UPDATER, project));
         addNode(node, myRoot);
-        return node;
     }
 
     private void reloadTree() {
         UserDefinedLanguageServerSettings settings = UserDefinedLanguageServerSettings.getInstance(project);
-        String nodeName = settings.getOpenNode();
+        final String nodeName = settings.getOpenNode();
+        boolean nodeIsPresent = false;
         myRoot.removeAllChildren();
-        MyNode node = null;
         for (LanguageServerDefinition languageServeDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
             if (nodeName != null && languageServeDefinition.getDisplayName().equals(nodeName)) {
                 // Set current node if we need to open a specific ls definition
-                node = addLanguageServerDefinitionNode(languageServeDefinition);
-            } else {
-                addLanguageServerDefinitionNode(languageServeDefinition);
+                nodeIsPresent = true;
             }
+            addLanguageServerDefinitionNode(languageServeDefinition);
         }
         ((DefaultTreeModel) myTree.getModel()).reload();
+
+        // Reset open node and select the correct node
         settings.setOpenNode(null);
-        MyNode finalNode = node;
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (finalNode != null) {
-                selectNodeInTree(finalNode);
+        if (nodeIsPresent) {
+            ApplicationManager.getApplication().invokeLater(() -> {
+                selectNodeInTree(nodeName);
                 myTree.updateUI();
                 myTree.repaint();
-            }
-        });
+            });
+        }
     }
 
     @Override
