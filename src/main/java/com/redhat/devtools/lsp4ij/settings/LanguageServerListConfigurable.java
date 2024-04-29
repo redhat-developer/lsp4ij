@@ -186,8 +186,6 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         if (overrideNodeIsPresent) {
             ApplicationManager.getApplication().invokeLater(() -> {
                 selectNodeInTree(overrideDisplayNodeName);
-                myTree.updateUI();
-                myTree.repaint();
             });
         }
     }
