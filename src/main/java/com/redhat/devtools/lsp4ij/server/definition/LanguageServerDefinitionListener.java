@@ -13,7 +13,6 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition;
 
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -29,7 +28,6 @@ public interface LanguageServerDefinitionListener {
 
         public LanguageServerAddedEvent(@NotNull Collection<LanguageServerDefinition> serverDefinitions) {
             this.serverDefinitions = serverDefinitions;
-            LanguageServiceAccessor.checkCurrentlyOpenFiles(serverDefinitions);
         }
     }
 

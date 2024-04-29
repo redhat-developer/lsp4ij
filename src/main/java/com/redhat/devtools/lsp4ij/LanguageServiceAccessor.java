@@ -49,7 +49,8 @@ public class LanguageServiceAccessor implements Disposable {
 
         @Override
         public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
-            // Do nothing
+            // Check all projects for files that match the added language server and start it if necessary
+            checkCurrentlyOpenFiles(event.serverDefinitions);
         }
 
         @Override
@@ -97,7 +98,7 @@ public class LanguageServiceAccessor implements Disposable {
      * Check each project for open files and start an LS if matching one is found and is not started yet
      * @param definitions definition of the language server to match to the wrapper
      */
-    public static void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
+    private static void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
         if (definitions.isEmpty()) {
             return;
         }
