@@ -16,12 +16,12 @@ package com.redhat.devtools.lsp4ij.settings;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.MasterDetailsComponent;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.openapi.util.NlsSafe;
 import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.IconUtil;
@@ -162,28 +162,43 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         return serverDefinition instanceof UserDefinedLanguageServerDefinition;
     }
 
-    private void addLanguageServerDefinitionNode(LanguageServerDefinition languageServerDefinition) {
+    private MyNode addLanguageServerDefinitionNode(LanguageServerDefinition languageServerDefinition) {
         MyNode node = new MyNode(new LanguageServerConfigurable(languageServerDefinition, TREE_UPDATER, project));
         addNode(node, myRoot);
+        return node;
     }
 
     private void reloadTree() {
+        UserDefinedLanguageServerSettings settings = UserDefinedLanguageServerSettings.getInstance(project);
+        String nodeName = settings.getOpenNode();
+        boolean nodeFound = false;
         myRoot.removeAllChildren();
+        MyNode node = null;
         for (LanguageServerDefinition languageServeDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
-            addLanguageServerDefinitionNode(languageServeDefinition);
+            if (nodeName != null && languageServeDefinition.getDisplayName().equals(nodeName)) {
+                nodeFound = true;
+                node = addLanguageServerDefinitionNode(languageServeDefinition);
+            } else {
+                addLanguageServerDefinitionNode(languageServeDefinition);
+            }
         }
         ((DefaultTreeModel) myTree.getModel()).reload();
+        settings.setOpenNode(null);
+        MyNode finalNode = node;
+        boolean finalNodeFound = nodeFound;
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (finalNode != null && finalNodeFound) {
+                selectNodeInTree(finalNode);
+                myTree.updateUI();
+                myTree.repaint();
+            }
+        });
     }
 
     @Override
     public void reset() {
         reloadTree();
         super.reset();
-    }
-
-    @Override
-    public void selectNodeInTree(@NlsSafe String displayName) {
-        super.selectNodeInTree(displayName);
     }
 
     @Override

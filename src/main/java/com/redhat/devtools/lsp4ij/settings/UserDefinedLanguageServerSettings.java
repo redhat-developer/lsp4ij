@@ -189,6 +189,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         this.myState.showSaveTipOnConfigurationChange = value;
     }
 
+    public String getOpenNode() {
+        return this.myState.openNode;
+    }
+
+    public void setOpenNode(String nodeName) {
+        this.myState.openNode = nodeName;
+    }
+
     public static class LanguageServerDefinitionSettings {
 
         private String debugPort;
@@ -245,6 +253,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         }
 
         private boolean showSaveTipOnConfigurationChange = true;
+        private String openNode = null;
     }
 
     /**
