@@ -171,12 +171,11 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     private void reloadTree() {
         UserDefinedLanguageServerSettings settings = UserDefinedLanguageServerSettings.getInstance(project);
         String nodeName = settings.getOpenNode();
-        boolean nodeFound = false;
         myRoot.removeAllChildren();
         MyNode node = null;
         for (LanguageServerDefinition languageServeDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
             if (nodeName != null && languageServeDefinition.getDisplayName().equals(nodeName)) {
-                nodeFound = true;
+                // Set current node if we need to open a specific ls definition
                 node = addLanguageServerDefinitionNode(languageServeDefinition);
             } else {
                 addLanguageServerDefinitionNode(languageServeDefinition);
@@ -185,9 +184,8 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         ((DefaultTreeModel) myTree.getModel()).reload();
         settings.setOpenNode(null);
         MyNode finalNode = node;
-        boolean finalNodeFound = nodeFound;
         ApplicationManager.getApplication().invokeLater(() -> {
-            if (finalNode != null && finalNodeFound) {
+            if (finalNode != null) {
                 selectNodeInTree(finalNode);
                 myTree.updateUI();
                 myTree.repaint();
