@@ -14,11 +14,16 @@
 package com.redhat.devtools.lsp4ij.client;
 
 
+import com.redhat.devtools.lsp4ij.internal.ResponseErrorExceptionWrapper;
+
 /**
  * Exception thrown when the restart of non blocking read action for a given service is reached.
  */
-public class ExecutionAttemptLimitReachedException extends RuntimeException {
+public class ExecutionAttemptLimitReachedException extends ResponseErrorExceptionWrapper {
+
     public ExecutionAttemptLimitReachedException(String executionName, int limit, Throwable ex) {
         super("Execution attempt limit (" + limit + ") reached to execute '" + executionName + ".", ex);
     }
+
+
 }

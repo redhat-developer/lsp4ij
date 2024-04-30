@@ -97,11 +97,11 @@ public class CancellationSupport implements CancelChecker {
     /**
      * Add the given future to the list of the futures to cancel (when CancellationSupport.cancel() is called)
      *
-     * @param future         the future to cancel when CancellationSupport.cancel() is called.
-     * @param languageServer the language server which have created the LSP future and null otherwise.
-     * @param featureName    the LSP feature name (ex: textDocument/completion) and null otherwise.
+     * @param future                    the future to cancel when CancellationSupport.cancel() is called.
+     * @param languageServer            the language server which have created the LSP future and null otherwise.
+     * @param featureName               the LSP feature name (ex: textDocument/completion) and null otherwise.
      * @param handleLanguageServerError true if the error coming from language server are caught and displayed as notification, log, ignore and false otherwise.
-     * @param <T>            the result type of the future.
+     * @param <T>                       the result type of the future.
      * @return the future to execute.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
@@ -138,8 +138,8 @@ public class CancellationSupport implements CancelChecker {
                     return null;
                 }
             }
-            if (handleLanguageServerError && error instanceof ResponseErrorException) {
-                handleLanguageServerError(languageServer, featureName, error);
+            if (handleLanguageServerError && error instanceof ResponseErrorException responseError) {
+                handleLanguageServerError(languageServer, featureName, responseError);
                 // return null as result instead of throwing the ResponseErrorException error
                 // to avoid breaking the LSP request result of another language server (when file is associated to several language servers)
                 return null;
@@ -158,7 +158,7 @@ public class CancellationSupport implements CancelChecker {
 
     private static void handleLanguageServerError(@NotNull LanguageServerWrapper languageServer,
                                                   @Nullable String featureName,
-                                                  @NotNull Throwable error) {
+                                                  @NotNull ResponseErrorException error) {
         ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
         switch (errorReportingKind) {
             case as_notification -> // Show LSP error (ResponseErrorException) in an IJ notification
@@ -174,7 +174,7 @@ public class CancellationSupport implements CancelChecker {
         }
     }
 
-    private static void showNotificationError(@NotNull LanguageServerWrapper serverWrapper, @Nullable String featureName, Throwable error) {
+    private static void showNotificationError(@NotNull LanguageServerWrapper serverWrapper, @Nullable String featureName, ResponseErrorException error) {
         String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
         String title = languageServerName + " (" + featureName + ")";
         String content = error.getMessage();
@@ -198,7 +198,7 @@ public class CancellationSupport implements CancelChecker {
         ErrorReportingKind errorReportingKind = null;
         Project project = languageServer.getProject();
         UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project)
-                        .getLanguageServerSettings(languageServerId);
+                .getLanguageServerSettings(languageServerId);
         if (settings != null) {
             errorReportingKind = settings.getErrorReportingKind();
         }

@@ -97,7 +97,9 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                 super.cancel(true);
             } else {
                 // Other case..., mark the completable future as error
-                this.completeExceptionally(ex);
+                // to avoid log from LSP4J https://github.com/eclipse-lsp4j/lsp4j/blob/d0757511e66be409ea9c27440e426616e53339e3/org.eclipse.lsp4j.jsonrpc/src/main/java/org/eclipse/lsp4j/jsonrpc/RemoteEndpoint.java#L62
+                // the exception is wrapped to throw an LSP4J ResponseErrorException
+                this.completeExceptionally(new ResponseErrorExceptionWrapper(ex));
             }
         });
         // On success...
