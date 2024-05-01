@@ -64,10 +64,6 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
             // Render of language server process
             LanguageServerProcessTreeNode languageProcessTreeNode = (LanguageServerProcessTreeNode) value;
 
-            // If status is not set, we cannot render the language server
-            if (languageProcessTreeNode.getServerStatus() == null) {
-                return;
-            }
             setIcon(languageProcessTreeNode.getIcon());
             append(languageProcessTreeNode.getDisplayName());
 
