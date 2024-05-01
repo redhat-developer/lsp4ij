@@ -14,9 +14,11 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -47,7 +49,8 @@ public class LanguageServiceAccessor implements Disposable {
 
         @Override
         public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
-            // Do nothing
+            // Check all projects for files that match the added language server and start it if necessary
+            checkCurrentlyOpenFiles(event.serverDefinitions);
         }
 
         @Override
@@ -90,6 +93,46 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
+
+    /**
+     * Check each project for open files and start an LS if matching one is found and is not started yet
+     * @param definitions definition of the language server to match to the wrapper
+     */
+    private void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
+        if (definitions.isEmpty()) {
+            return;
+        }
+        for (LanguageServerDefinition definition : definitions) {
+            Project[] projects = ProjectManager.getInstance().getOpenProjects();
+            for (Project p : projects) {
+                VirtualFile[] files = FileEditorManager.getInstance(p).getOpenFiles();
+                for (VirtualFile file : files) {
+                    findAndStartLsForFile(file, definition);
+                }
+            }
+        }
+    }
+
+    /**
+     * Try to find a ls wrapper for the file and definition. Connect the file, if a matching one is found
+     * @param file to handle
+     * @param definition definition used to match to the wrapper
+     */
+    private void findAndStartLsForFile(VirtualFile file, LanguageServerDefinition definition) {
+        getMatchedLanguageServersWrappers(file).thenAccept(wrappers -> {
+            if (wrappers != null) {
+                for (LanguageServerWrapper wrapper : wrappers) {
+                    try {
+                        if (wrapper.getServerDefinition().equals(definition)) {
+                            wrapper.connect(file);
+                        }
+                    } catch (IOException ex) {
+                        LOGGER.warn(ex.getLocalizedMessage(), ex);
+                    }
+                }
+            }
+        });
+    }
 
     @NotNull
     public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
