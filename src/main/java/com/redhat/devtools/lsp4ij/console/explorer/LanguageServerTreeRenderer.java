@@ -63,7 +63,6 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
         if (value instanceof LanguageServerProcessTreeNode) {
             // Render of language server process
             LanguageServerProcessTreeNode languageProcessTreeNode = (LanguageServerProcessTreeNode) value;
-
             setIcon(languageProcessTreeNode.getIcon());
             append(languageProcessTreeNode.getDisplayName());
 
