@@ -22,6 +22,9 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerListConfigurable;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Edit user defined language server action.
+ */
 public class EditServerAction extends AnAction {
     private final LanguageServerDefinition languageServerDefinition;
 
