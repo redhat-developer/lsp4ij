@@ -38,7 +38,7 @@ public class EditServerAction extends AnAction {
         Project project = e.getProject();
         if (project != null) {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, LanguageServerListConfigurable.class, languageServerListConfigurable -> {
-                languageServerListConfigurable.name = languageServerDefinition.getDisplayName();
+                languageServerListConfigurable.setDisplayNodeName(languageServerDefinition.getDisplayName());
             });
         }
     }

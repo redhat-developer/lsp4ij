@@ -54,7 +54,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     @NonNls
     private static final String ID = "LanguageServers";
-    public String name = null;
+    private String displayNodeName = null;
 
     private final Project project;
     private final LanguageServerDefinitionListener listener = new LanguageServerDefinitionListener() {
@@ -169,26 +169,27 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     }
 
     private void reloadTree() {
-        boolean overrideNodeIsPresent = false;
         myRoot.removeAllChildren();
         for (LanguageServerDefinition languageServerDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
-            if (name != null && languageServerDefinition.getDisplayName().equals(name)) {
-                // Check that we find a matching language server to pre-select it when opening the settings
-                overrideNodeIsPresent = true;
-            }
             addLanguageServerDefinitionNode(languageServerDefinition);
         }
         ((DefaultTreeModel) myTree.getModel()).reload();
 
-        // Reset open node and select the correct node
-        if (overrideNodeIsPresent) {
+        // Select the correct node if name is set, reset name
+        if (displayNodeName != null) {
             ApplicationManager.getApplication().invokeLater(() -> {
-                selectNodeInTree(name);
-                name = null;
+                selectNodeInTree(displayNodeName);
+                displayNodeName = null;
             });
-        } else {
-            name = null;
         }
+    }
+
+    /**
+     * Set the node which should be displayed when opening the setting
+     * @param displayNodeName display name of the language server definition
+     */
+    public void setDisplayNodeName(String displayNodeName) {
+        this.displayNodeName = displayNodeName;
     }
 
     @Override
