@@ -54,6 +54,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     @NonNls
     private static final String ID = "LanguageServers";
+    public String name = null;
 
     private final Project project;
     private final LanguageServerDefinitionListener listener = new LanguageServerDefinitionListener() {
@@ -168,25 +169,25 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     }
 
     private void reloadTree() {
-        UserDefinedLanguageServerSettings settings = UserDefinedLanguageServerSettings.getInstance(project);
-        final String overrideDisplayNodeName = settings.getOverrideDisplayNodeName();
         boolean overrideNodeIsPresent = false;
         myRoot.removeAllChildren();
-        for (LanguageServerDefinition languageServeDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
-            if (overrideDisplayNodeName != null && languageServeDefinition.getDisplayName().equals(overrideDisplayNodeName)) {
+        for (LanguageServerDefinition languageServerDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
+            if (name != null && languageServerDefinition.getDisplayName().equals(name)) {
                 // Check that we find a matching language server to pre-select it when opening the settings
                 overrideNodeIsPresent = true;
             }
-            addLanguageServerDefinitionNode(languageServeDefinition);
+            addLanguageServerDefinitionNode(languageServerDefinition);
         }
         ((DefaultTreeModel) myTree.getModel()).reload();
 
         // Reset open node and select the correct node
-        settings.setOverrideDisplayNodeName(null);
         if (overrideNodeIsPresent) {
             ApplicationManager.getApplication().invokeLater(() -> {
-                selectNodeInTree(overrideDisplayNodeName);
+                selectNodeInTree(name);
+                name = null;
             });
+        } else {
+            name = null;
         }
     }
 

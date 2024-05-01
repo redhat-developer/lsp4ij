@@ -19,7 +19,7 @@ import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.LanguageServerListConfigurable;
 import org.jetbrains.annotations.NotNull;
 
 public class EditServerAction extends AnAction {
@@ -37,10 +37,9 @@ public class EditServerAction extends AnAction {
         // Set up node override for opening the settings page with the correct node selected
         Project project = e.getProject();
         if (project != null) {
-            UserDefinedLanguageServerSettings settings = UserDefinedLanguageServerSettings.getInstance(project);
-            settings.setOverrideDisplayNodeName(languageServerDefinition.getDisplayName());
-            String settingsSelectionPath = "configurable.group.language." + LanguageServerBundle.message("language.servers");
-            ShowSettingsUtil.getInstance().showSettingsDialog(project, settingsSelectionPath);
+            ShowSettingsUtil.getInstance().showSettingsDialog(project, LanguageServerListConfigurable.class, languageServerListConfigurable -> {
+                languageServerListConfigurable.name = languageServerDefinition.getDisplayName();
+            });
         }
     }
 
