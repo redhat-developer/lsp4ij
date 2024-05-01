@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.settings;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
@@ -53,6 +54,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     @NonNls
     private static final String ID = "LanguageServers";
+    private String displayNodeName = null;
 
     private final Project project;
     private final LanguageServerDefinitionListener listener = new LanguageServerDefinitionListener() {
@@ -168,10 +170,26 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     private void reloadTree() {
         myRoot.removeAllChildren();
-        for (LanguageServerDefinition languageServeDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
-            addLanguageServerDefinitionNode(languageServeDefinition);
+        for (LanguageServerDefinition languageServerDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
+            addLanguageServerDefinitionNode(languageServerDefinition);
         }
         ((DefaultTreeModel) myTree.getModel()).reload();
+
+        // Select the correct node if name is set, reset name
+        if (displayNodeName != null) {
+            ApplicationManager.getApplication().invokeLater(() -> {
+                selectNodeInTree(displayNodeName);
+                displayNodeName = null;
+            });
+        }
+    }
+
+    /**
+     * Set the node which should be displayed when opening the setting
+     * @param displayNodeName display name of the language server definition
+     */
+    public void setDisplayNodeName(String displayNodeName) {
+        this.displayNodeName = displayNodeName;
     }
 
     @Override
