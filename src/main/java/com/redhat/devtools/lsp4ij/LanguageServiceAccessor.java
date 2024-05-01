@@ -98,7 +98,7 @@ public class LanguageServiceAccessor implements Disposable {
      * Check each project for open files and start an LS if matching one is found and is not started yet
      * @param definitions definition of the language server to match to the wrapper
      */
-    private static void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
+    private void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
         if (definitions.isEmpty()) {
             return;
         }
@@ -107,7 +107,7 @@ public class LanguageServiceAccessor implements Disposable {
             for (Project p : projects) {
                 VirtualFile[] files = FileEditorManager.getInstance(p).getOpenFiles();
                 for (VirtualFile file : files) {
-                    getInstance(p).findAndStartLsForFile(file, definition);
+                    findAndStartLsForFile(file, definition);
                 }
             }
         }
