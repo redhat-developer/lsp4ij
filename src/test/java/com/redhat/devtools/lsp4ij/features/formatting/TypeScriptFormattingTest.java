@@ -18,6 +18,10 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPFormattingFixtureTestCase;
  */
 public class TypeScriptFormattingTest extends LSPFormattingFixtureTestCase {
 
+    public TypeScriptFormattingTest() {
+        super("*.ts");
+    }
+
     public void testFormatting() {
         // 1. Test completion items result
         assertFormatting("test.ts",

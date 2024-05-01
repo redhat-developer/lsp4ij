@@ -14,6 +14,8 @@
 package com.redhat.devtools.lsp4ij.features.completion;
 
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.CompletionItem;
@@ -35,13 +37,18 @@ public class CompletionPrefix {
     private final int completionOffset;
     private final Position completionPos;
     private final Document document;
-
+    private final PsiElement triggeredPsiElement;
     private final Map<Range, String /* prefix */> prefixCache;
+    private Range wordRange;
 
-    public CompletionPrefix(int completionOffset, Document document) {
+    public CompletionPrefix(int completionOffset,
+                            @NotNull Position completionPos,
+                            @NotNull Document document,
+                            @NotNull PsiElement triggeredPsiElement) {
         this.completionOffset = completionOffset;
+        this.completionPos = completionPos;
         this.document = document;
-        this.completionPos = LSPIJUtils.toPosition(completionOffset, document);
+        this.triggeredPsiElement = triggeredPsiElement;
         this.prefixCache = new HashMap<>();
     }
 
@@ -115,4 +122,14 @@ public class CompletionPrefix {
         return filterText;
     }
 
+    public Range getWordRange() {
+        if (wordRange != null) {
+            return wordRange;
+        }
+        TextRange wordTextRange = LSPIJUtils.getWordRange(triggeredPsiElement, document, completionOffset);
+        if (wordTextRange != null) {
+            this.wordRange = LSPIJUtils.toRange(wordTextRange, document);
+        }
+        return wordRange;
+    }
 }

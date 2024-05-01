@@ -62,13 +62,16 @@ public class LSPCompletionProposal extends LookupElement {
     private final Boolean supportResolveCompletion;
     private final boolean supportSignatureHelp;
     private final LSPCompletionContributor completionContributor;
-    private int currentOffset;
     private int bestOffset;
     private final Editor editor;
     private final LanguageServerItem languageServer;
     private CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
-    public LSPCompletionProposal(PsiFile file, Editor editor, int offset, CompletionItem item, LanguageServerItem languageServer,
+    public LSPCompletionProposal(@NotNull PsiFile file,
+                                 @NotNull Editor editor,
+                                 int offset,
+                                 @NotNull CompletionItem item,
+                                 @NotNull LanguageServerItem languageServer,
                                  @NotNull LSPCompletionContributor completionContributor) {
         this.file = file;
         this.item = item;
@@ -76,7 +79,6 @@ public class LSPCompletionProposal extends LookupElement {
         this.languageServer = languageServer;
         this.completionContributor = completionContributor;
         this.initialOffset = offset;
-        this.currentOffset = offset;
         this.bestOffset = getPrefixCompletionStart(editor.getDocument(), offset);
         this.supportResolveCompletion = languageServer.isResolveCompletionSupported();
         this.supportSignatureHelp = languageServer.isSignatureHelpSupported();
@@ -136,7 +138,6 @@ public class LSPCompletionProposal extends LookupElement {
                 && (template.getSegmentsCount() > 0 // There are some tabstops, e.g. $0, $1
                 || !template.getVariables().isEmpty()); // There are some placeholders, e.g ${1:name}
     }
-
 
     /**
      * Update the insert text with the given new value <code>newText</code>.
@@ -259,7 +260,7 @@ public class LSPCompletionProposal extends LookupElement {
             return null;
         }
         // Here the IJ lookup item is selected.
-        if(needToResolveCompletionDetail()) {
+        if (needToResolveCompletionDetail()) {
             // The LSP completion item 'detail' is not filled, try to resolve it
             // inside getExpensiveRenderer() which should not impact performance.
             CompletionItem resolved = getResolvedCompletionItem();
@@ -305,6 +306,8 @@ public class LSPCompletionProposal extends LookupElement {
         }
         try {
             if (textEdit == null) {
+                // Completion item provides an insertText / label without a text edit:
+
                 // ex:
                 // {
                 //    "label": "let",

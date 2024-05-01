@@ -68,6 +68,18 @@ public class LSPIJUtils_getTokenRangeTest extends BasePlatformTestCase {
         assertTokenRange("\nfoo.bar|()\n", "\nfoo.[bar]()\n");
     }
 
+    public void testProperties() {
+        assertTokenRange("|foo=bar", "[foo]=bar");
+        assertTokenRange("f|oo=bar", "[foo]=bar");
+        assertTokenRange("fo|o=bar", "[foo]=bar");
+        assertTokenRange("foo|=bar", "[foo]=bar");
+
+        assertTokenRange("foo=|bar", "foo=[bar]");
+        assertTokenRange("foo=b|ar", "foo=[bar]");
+        assertTokenRange("foo=ba|r", "foo=[bar]");
+        assertTokenRange("foo=bar|", "foo=[bar]");
+    }
+
     public void testBracket() {
         assertTokenRange("foo.bar(|)", null);
     }

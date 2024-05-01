@@ -52,6 +52,9 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  */
 public class LSPCompletionContributor extends CompletionContributor {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionContributor.class);
+
+    private static final CompletionItemComparator completionProposalComparator = new CompletionItemComparator();
+
     private LSPCompletionProposal selectedCompletionItem;
 
     @Override
@@ -89,7 +92,7 @@ public class LSPCompletionContributor extends CompletionContributor {
         if (isDoneNormally(future)) {
             List<CompletionData> data = future.getNow(Collections.emptyList());
             if (!data.isEmpty()) {
-                CompletionPrefix completionPrefix = new CompletionPrefix(offset, document);
+                CompletionPrefix completionPrefix = new CompletionPrefix(offset, params.getPosition(), document,parameters.getPosition());
                 for (var item : data) {
                     ProgressManager.checkCanceled();
                     addCompletionItems(psiFile, editor, completionPrefix, item.completion(), item.languageServer(), result);
@@ -97,8 +100,6 @@ public class LSPCompletionContributor extends CompletionContributor {
             }
         }
     }
-
-    private static final CompletionItemComparator completionProposalComparator = new CompletionItemComparator();
 
     private void addCompletionItems(@NotNull PsiFile file,
                                     @NotNull Editor editor,
@@ -120,7 +121,7 @@ public class LSPCompletionContributor extends CompletionContributor {
         items.sort(completionProposalComparator);
         int size = items.size();
 
-        //Items now sorted by priority, low index == high priority
+        // Items are now sorted by priority, low index == high priority
         for (int i = 0; i < size; i++) {
             var item = items.get(i);
             if (StringUtils.isBlank(item.getLabel())) {
@@ -129,7 +130,7 @@ public class LSPCompletionContributor extends CompletionContributor {
             }
             ProgressManager.checkCanceled();
             // Create lookup item
-            var lookupItem = createLookupItem(file, editor, completionPrefix.getCompletionOffset(), item, itemDefaults, languageServer);
+            var lookupItem = createLookupItem(file, editor, completionPrefix, item, itemDefaults, languageServer);
 
             var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, size - i);
             // Compute the prefix
@@ -150,13 +151,20 @@ public class LSPCompletionContributor extends CompletionContributor {
 
     private LSPCompletionProposal createLookupItem(@NotNull PsiFile file,
                                                    @NotNull Editor editor,
-                                                   int offset,
+                                                   @NotNull CompletionPrefix completionPrefix,
                                                    @NotNull CompletionItem item,
                                                    @Nullable CompletionItemDefaults itemDefaults,
                                                    @NotNull LanguageServerItem languageServer) {
         // Update text edit range with item defaults if needed
         updateWithItemDefaults(item, itemDefaults);
-        return new LSPCompletionProposal(file, editor, offset, item, languageServer, this);
+        if (item.getTextEdit() == null) {
+            Range wordRange = completionPrefix.getWordRange();
+            if (wordRange != null) {
+                String insertText = StringUtils.isNotBlank(item.getInsertText()) ? item.getInsertText() : item.getLabel();
+                item.setTextEdit(Either.forLeft(new TextEdit(wordRange, insertText)));
+            }
+        }
+        return new LSPCompletionProposal(file, editor, completionPrefix.getCompletionOffset(), item, languageServer, this);
     }
 
     private static void updateWithItemDefaults(@NotNull CompletionItem item,

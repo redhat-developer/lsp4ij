@@ -23,6 +23,10 @@ import java.util.stream.Stream;
  */
 public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
+    public LSPCompletionFixtureTestCase(String... fileNamePatterns) {
+        super(fileNamePatterns);
+    }
+
     /**
      * Test LSP completion.
      *
@@ -60,9 +64,9 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
         // Process completion
         myFixture.completeBasic();
         if (expectedItems == null || expectedItems.length == 0) {
-            assertNull(myFixture.getLookup());
+            assertNull("Completion should be null", myFixture.getLookup());
         } else {
-            assertNotNull(myFixture.getLookup());
+            assertNotNull("Completion should be not null", myFixture.getLookup());
             var actualItems = Stream.of(myFixture.getLookupElements())
                     .map(LookupElement::getLookupString)
                     .toList();

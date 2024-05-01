@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -439,6 +438,23 @@ public class LSPIJUtils {
         return offset == document.getLineEndOffset(line);
     }
 
+    public static TextRange getWordRange(PsiElement element, Document document, int offset) {
+        if (canUsePsiElementAsWord(element)) {
+            return element.getTextRange();
+        }
+        return LSPIJUtils.getTokenRange(document, offset);
+    }
+
+    private static boolean canUsePsiElementAsWord(PsiElement element) {
+        if (element == null || element instanceof PsiFile) {
+            return false;
+        }
+        if (element.getTextRange().equals(element.getContainingFile().getTextRange())) {
+            return false;
+        }
+        return true;
+    }
+
     /**
      * Returns the token range from the document at given offset and null otherwise.
      *
@@ -456,7 +472,7 @@ public class LSPIJUtils {
      */
     @Nullable
     public static TextRange getTokenRange(Document document, int offset) {
-        if (offset > 0 && offset >= document.getTextLength()) {
+        if (offset > document.getTextLength()) {
             offset = document.getTextLength() - 1;
         }
         int start = getLeftOffsetOfPart(document, offset);
