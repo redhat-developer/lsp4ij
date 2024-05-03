@@ -52,7 +52,6 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  */
 public class LSPCompletionContributor extends CompletionContributor {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionContributor.class);
-    private LSPCompletionProposal selectedCompletionItem;
 
     @Override
     public void fillCompletionVariants(@NotNull CompletionParameters parameters, @NotNull CompletionResultSet result) {
@@ -180,25 +179,9 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
-    /**
-     * Marks the given LSP completion item as selected.
-     */
-    public void selectItem(LSPCompletionProposal selectedCompletionItem) {
-        this.selectedCompletionItem = selectedCompletionItem;
-    }
 
     /**
-     * Returns true if the given LSP completion item is selected and false otherwise.
-     *
-     * @param completionItem the LSP completion item.
-     * @return true if the given LSP completion item is selected and false otherwise.
-     */
-    public boolean isSelectedItem(LSPCompletionProposal completionItem) {
-        return completionItem == this.selectedCompletionItem;
-    }
-
-    /**
-     * LSP lookuk listener to track the selected completion item
+     * LSP lookup listener to track the selected completion item
      * and resolve if needed the LSP completionItem to get the detail
      * only for the selected completion item.
      */
@@ -217,12 +200,11 @@ public class LSPCompletionContributor extends CompletionContributor {
                         return;
                     }
                     if (item.getObject() instanceof LSPCompletionProposal lspCompletionProposal) {
-                        // It is a LSP completion proposal
-                        lspCompletionProposal.selectItem();
-                        if (lspCompletionProposal.needToResolveCompletionDetail()) {
+                        // It is an LSP completion proposal
+                        if (newLookup instanceof LookupImpl lookupImpl && lspCompletionProposal.needToResolveCompletionDetail()) {
                             // The LSP completion item requires to resolve completionItem to get the detail
                             // Refresh the lookup item
-                            ((LookupImpl) newLookup).scheduleItemUpdate(item);
+                            lookupImpl.scheduleItemUpdate(item);
                         }
                     }
                 }

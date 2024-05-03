@@ -14,9 +14,8 @@ import com.intellij.codeInsight.AutoPopupController;
 import com.intellij.codeInsight.completion.CodeCompletionHandlerBase;
 import com.intellij.codeInsight.completion.CompletionInitializationContext;
 import com.intellij.codeInsight.completion.InsertionContext;
-import com.intellij.codeInsight.lookup.LookupElement;
-import com.intellij.codeInsight.lookup.LookupElementPresentation;
-import com.intellij.codeInsight.lookup.LookupElementRenderer;
+import com.intellij.codeInsight.completion.LookupElementListPresenter;
+import com.intellij.codeInsight.lookup.*;
 import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.TemplateManager;
 import com.intellij.openapi.editor.Document;
@@ -254,12 +253,12 @@ public class LSPCompletionProposal extends LookupElement {
 
     @Override
     public @Nullable LookupElementRenderer<? extends LookupElement> getExpensiveRenderer() {
-        if (!completionContributor.isSelectedItem(this)) {
+        if (!isSelectedCompletionItem()) {
             // The lookup item is not selected ignore it
             return null;
         }
         // Here the IJ lookup item is selected.
-        if(needToResolveCompletionDetail()) {
+        if (needToResolveCompletionDetail()) {
             // The LSP completion item 'detail' is not filled, try to resolve it
             // inside getExpensiveRenderer() which should not impact performance.
             CompletionItem resolved = getResolvedCompletionItem();
@@ -518,9 +517,16 @@ public class LSPCompletionProposal extends LookupElement {
     }
 
     /**
-     * Marks this LSP completion as selected.
+     * Returns true if the LSP completion item is selected and false otherwise.
+     *
+     * @return true if the LSP completion item is selected and false otherwise.
      */
-    public void selectItem() {
-        completionContributor.selectItem(this);
+    private boolean isSelectedCompletionItem() {
+        Lookup lookup = LookupManager.getActiveLookup(editor);
+        if (lookup instanceof LookupElementListPresenter lookupElementListPresenter) {
+            var selectedItem = lookupElementListPresenter.getCurrentItem() != null ? lookupElementListPresenter.getCurrentItem().getObject() : null;
+            return this == selectedItem;
+        }
+        return false;
     }
 }
