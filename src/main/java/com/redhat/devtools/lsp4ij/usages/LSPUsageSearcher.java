@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.usages;
 
 import com.intellij.find.findUsages.CustomUsageSearcher;
 import com.intellij.find.findUsages.FindUsagesOptions;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.psi.PsiElement;
@@ -61,7 +62,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             }
         }
 
-        // Get position where the "Find USages" has been triggered
+        // Get position where the "Find Usages" has been triggered
         Position position = getPosition(element);
         // Collect textDocument/definition, textDocument/references, etc
         LSPUsageSupport usageSupport = new LSPUsageSupport(element.getContainingFile());
@@ -84,7 +85,14 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         }
     }
 
-    private Position getPosition(PsiElement element) {
+    private static Position getPosition(PsiElement element) {
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return doGetPosition(element);
+        }
+        return ReadAction.compute(() -> doGetPosition(element));
+    }
+
+    private static Position doGetPosition(PsiElement element) {
         Document document = LSPIJUtils.getDocument(element.getContainingFile().getVirtualFile());
         return LSPIJUtils.toPosition(Math.min(element.getTextRange().getStartOffset() + 1, element.getTextRange().getEndOffset()), document);
     }
