@@ -219,12 +219,19 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 The [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) request is implemented to resolve:
 
-* the `documentation` property of a completionItem
+ * the `documentation` property of a completionItem.
 
-It doesn't resolve:
+Here a sample with [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) completion item which resolves and shows `document` when the completion item is selected:
 
- * `detail`
- * `additionalTextEdits`
+![completionItem/resolve/documentation](./images/lsp-support/completionItem_resolve_documentation.png)
+ 
+ * the `detail` property of a completionItem.
+
+Here a sample with [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) completion item which resolves and shows `detail` when the completion item is selected: 
+
+![completionItem/resolve/detail](./images/lsp-support/completionItem_resolve_detail.png)
+
+ * the `additionalTextEdits` property of a completionItem.
 
 #### Signature Help
 
