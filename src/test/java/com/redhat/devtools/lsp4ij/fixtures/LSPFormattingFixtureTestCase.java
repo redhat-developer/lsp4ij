@@ -26,6 +26,10 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
+    public LSPFormattingFixtureTestCase(String... fileNamePatterns) {
+        super(fileNamePatterns);
+    }
+
     private class MyList {
         public List<TextEdit> edits;
     }

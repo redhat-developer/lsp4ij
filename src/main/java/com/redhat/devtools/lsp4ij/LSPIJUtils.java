@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -430,7 +429,7 @@ public class LSPIJUtils {
                 return null;
             }
             // Select token at current offset, if possible
-            TextRange tokenRange = getTokenRange(document, start);
+            TextRange tokenRange = getWordRangeAt(document, start);
             if (tokenRange != null) {
                 return tokenRange;
             }
@@ -451,7 +450,7 @@ public class LSPIJUtils {
     }
 
     /**
-     * Returns the token range from the document at given offset and null otherwise.
+     * Returns the word range from the document at given offset and null otherwise.
      *
      * <code><pre>
      *  - fo|o bar -> [foo]
@@ -463,11 +462,11 @@ public class LSPIJUtils {
      *
      * @param document
      * @param offset
-     * @return the token range from the document at given offset and null otherwise.
+     * @return the word range from the document at given offset and null otherwise.
      */
     @Nullable
-    public static TextRange getTokenRange(Document document, int offset) {
-        if (offset > 0 && offset >= document.getTextLength()) {
+    public static TextRange getWordRangeAt(Document document, int offset) {
+        if (offset > document.getTextLength()) {
             offset = document.getTextLength() - 1;
         }
         int start = getLeftOffsetOfPart(document, offset);

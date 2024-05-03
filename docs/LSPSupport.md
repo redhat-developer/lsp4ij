@@ -39,7 +39,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ❌ [inlayHint/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint_resolve)
  * ✅ [workspace/inlayHint/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlayHint_refresh) 
  * ✅ [textDocument/completion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion) (see [implementation details](#completion-proposals))
- * ✅ [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) 
+ * ✅ [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) (see [implementation details](#completion-item-resolve))
  * ✅ [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp) (see [implementation details](#signature-help))
  * ✅ [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) (see [implementation details](#publish-diagnostics))
  * ✅ [textDocument/definition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition)
@@ -217,11 +217,13 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/completion](./images/lsp-support/textDocument_completion.png)
 
+##### Completion item resolve
+
 The [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) request is implemented to resolve:
 
  * the `documentation` property of a completionItem.
 
-Here a sample with [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) completion item which resolves and shows `document` when the completion item is selected:
+Here a sample with [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) completion item which resolves and shows `documentation` when the completion item is selected:
 
 ![completionItem/resolve/documentation](./images/lsp-support/completionItem_resolve_documentation.png)
  

@@ -14,14 +14,18 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
 
 /**
  * Completion tests by emulating LSP 'textDocument/completion' responses
- * from the clojure-lsp language server.
+ * from the clojure-lsp language server
+ * which returns completion items without text edit.
  */
 public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
 
+    public ClojureCompletionTest() {
+        super("*.clj");
+    }
+
     public void testCompletionWithoutTextEditAndEmptyContent() {
-        // clojure-lsp returns completion items without text edit.
         // 1. Test completion items result
-        assertCompletion("test.ts",
+        assertCompletion("test.clj",
                 "<caret>", """                
                         [
                             {
@@ -45,9 +49,8 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithoutTextEdit() {
-        // clojure-lsp returns completion items without text edit.
         // 1. Test completion items result
-        assertCompletion("test.ts",
+        assertCompletion("test.clj",
                 "let<caret>", """                
                         [
                             {
@@ -71,9 +74,8 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithoutTextEditAndCaretInsideToken() {
-        // clojure-lsp returns completion items without text edit.
         // 1. Test completion items result
-        assertCompletion("test.ts",
+        assertCompletion("test.clj",
                 "le<caret>t", """                
                         [
                             {

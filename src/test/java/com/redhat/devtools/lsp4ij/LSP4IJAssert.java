@@ -49,11 +49,11 @@ public class LSP4IJAssert {
         }
     }
 
-    public static void assertTokenRange(final String contentWithOffset, String expected) {
+    public static void assertWordRangeAt(final String contentWithOffset, String expected) {
         int offset = contentWithOffset.indexOf('|');
         String content = contentWithOffset.substring(0, offset) + contentWithOffset.substring(offset + 1);
         Document document = new DocumentImpl(content);
-        TextRange textRange = LSPIJUtils.getTokenRange(document, offset);
+        TextRange textRange = LSPIJUtils.getWordRangeAt(document, offset);
         if (expected == null) {
             assertNull("TextRange should be null",textRange);
             return;

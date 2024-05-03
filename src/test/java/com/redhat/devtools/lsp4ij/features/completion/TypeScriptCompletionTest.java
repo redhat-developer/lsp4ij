@@ -18,6 +18,10 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
  */
 public class TypeScriptCompletionTest extends LSPCompletionFixtureTestCase {
 
+    public TypeScriptCompletionTest() {
+        super("*.ts");
+    }
+
     public void testCompletionWithTextEdit() {
         // 1. Test completion items result
         assertCompletion("test.ts",
