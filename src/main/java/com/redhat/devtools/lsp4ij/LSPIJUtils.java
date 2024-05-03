@@ -256,9 +256,20 @@ public class LSPIJUtils {
      */
     public static @Nullable PsiFile getPsiFile(@NotNull VirtualFile file, @NotNull Project project) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return PsiManager.getInstance(project).findFile(file);
+            return doGetPsiFile(file, project);
         }
-        return ReadAction.compute(() -> PsiManager.getInstance(project).findFile(file));
+        return ReadAction.compute(() -> doGetPsiFile(file, project));
+    }
+
+    /**
+     * Returns the Psi file corresponding to the virtual file in the given project. Must be called in a Read Action.
+     * @param file    the virtual file.
+     * @param project the project.
+     * @return the Psi file corresponding to the virtual file in the given project.
+     */
+    private static @Nullable PsiFile doGetPsiFile(@NotNull VirtualFile file, @NotNull Project project) {
+        // Prevent PsiManager.findFile from logging a nasty error if file is not valid.
+        return (file.isValid())? PsiManager.getInstance(project).findFile(file) : null;
     }
 
 

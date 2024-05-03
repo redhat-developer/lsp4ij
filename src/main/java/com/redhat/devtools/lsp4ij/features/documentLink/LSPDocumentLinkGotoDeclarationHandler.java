@@ -117,7 +117,7 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                                 // If user accepts to create the file, the open is done after the creation of teh file.
                                 return PsiElement.EMPTY_ARRAY;
                             }
-                            return new PsiElement[]{PsiManager.getInstance(project).findFile(targetFile)};
+                            return new PsiElement[]{ LSPIJUtils.getPsiFile(targetFile, project)};
                         }
                     }
                 }
