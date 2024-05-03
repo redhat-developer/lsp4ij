@@ -18,9 +18,13 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPFormattingFixtureTestCase;
  */
 public class ClojureFormattingTest extends LSPFormattingFixtureTestCase {
 
+    public ClojureFormattingTest() {
+        super("*.clj");
+    }
+
     public void testFormatting() {
         // Test with TextEdit end which is outside the document length (uses of 999999)
-        assertFormatting("test.ts",
+        assertFormatting("test.clj",
                 """                
                         (let
                                             [binding ""])""",

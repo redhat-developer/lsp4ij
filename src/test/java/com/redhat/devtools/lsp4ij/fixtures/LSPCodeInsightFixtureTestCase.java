@@ -26,8 +26,13 @@ import java.util.List;
  */
 public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
 
+    private final String[] fileNamePatterns;
     protected LSPCodeInsightTestFixture myFixture;
     private MockLanguageServerDefinition serverDefinition;
+
+    public LSPCodeInsightFixtureTestCase(String... fileNamePatterns) {
+        this.fileNamePatterns = fileNamePatterns;
+    }
 
     @Override
     protected void setUp() throws Exception {
@@ -54,7 +59,7 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
 
     private void registerServer() {
         serverDefinition = new MockLanguageServerDefinition();
-        List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.ts"), null));
+        List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePatterns), null));
         LanguageServersRegistry.getInstance().addServerDefinition(serverDefinition, mappings);
     }
 

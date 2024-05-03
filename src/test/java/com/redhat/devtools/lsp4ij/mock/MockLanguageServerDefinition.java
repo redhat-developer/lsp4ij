@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class MockLanguageServerDefinition extends LanguageServerDefinition {
     public MockLanguageServerDefinition() {
-        super("id", "name", null, true, 5, true);
+        super("mock-server-id", "name", null, true, 5, true);
     }
 
     @Override

@@ -56,27 +56,36 @@ public class LSPCompletionProposal extends LookupElement {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
 
     private final CompletionItem item;
-    private final int initialOffset;
     private final PsiFile file;
     private final Boolean supportResolveCompletion;
     private final boolean supportSignatureHelp;
     private final LSPCompletionContributor completionContributor;
-    private int currentOffset;
-    private int bestOffset;
+
+    // offset where completion has been triggered
+    // ex : string.charA|
+    private final int completionOffset;
+
+    // offset where prefix completion starts
+    // ex : string.|charA
+    private int prefixStartOffset;
+
     private final Editor editor;
     private final LanguageServerItem languageServer;
     private CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
-    public LSPCompletionProposal(PsiFile file, Editor editor, int offset, CompletionItem item, LanguageServerItem languageServer,
+    public LSPCompletionProposal(@NotNull PsiFile file,
+                                 @NotNull Editor editor,
+                                 int completionOffset,
+                                 @NotNull CompletionItem item,
+                                 @NotNull LanguageServerItem languageServer,
                                  @NotNull LSPCompletionContributor completionContributor) {
         this.file = file;
         this.item = item;
         this.editor = editor;
         this.languageServer = languageServer;
         this.completionContributor = completionContributor;
-        this.initialOffset = offset;
-        this.currentOffset = offset;
-        this.bestOffset = getPrefixCompletionStart(editor.getDocument(), offset);
+        this.completionOffset = completionOffset;
+        this.prefixStartOffset = getPrefixStartOffset(editor.getDocument(), completionOffset);
         this.supportResolveCompletion = languageServer.isResolveCompletionSupported();
         this.supportSignatureHelp = languageServer.isSignatureHelpSupported();
         putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
@@ -148,12 +157,12 @@ public class LSPCompletionProposal extends LookupElement {
      * @param newText the new text (without snippet syntax)
      */
     private void updateInsertTextForTemplateProcessing(String newText) {
-        Either<TextEdit, InsertReplaceEdit> eitherTextEdit = this.item.getTextEdit();
-        if (eitherTextEdit != null) {
-            if (eitherTextEdit.isLeft()) {
-                eitherTextEdit.getLeft().setNewText(newText);
+        Either<TextEdit, InsertReplaceEdit> textEdit = this.item.getTextEdit();
+        if (textEdit != null) {
+            if (textEdit.isLeft()) {
+                textEdit.getLeft().setNewText(newText);
             } else {
-                eitherTextEdit.getRight().setNewText(newText);
+                textEdit.getRight().setNewText(newText);
             }
         } else {
             if (item.getInsertText() != null) {
@@ -167,59 +176,21 @@ public class LSPCompletionProposal extends LookupElement {
      *
      * @return the text content to insert coming from the LSP CompletionItem.
      */
-    protected String getInsertText() {
-        String insertText = this.item.getInsertText();
-        Either<TextEdit, InsertReplaceEdit> eitherTextEdit = this.item.getTextEdit();
-        if (eitherTextEdit != null) {
-            if (eitherTextEdit.isLeft()) {
-                insertText = eitherTextEdit.getLeft().getNewText();
-            } else {
-                insertText = eitherTextEdit.getRight().getNewText();
-            }
-        }
-        if (insertText == null) {
-            insertText = this.item.getLabel();
-        }
-        return insertText;
-    }
-
-    public int getPrefixCompletionStart(Document document, int completionOffset) {
+    private String getInsertText() {
         Either<TextEdit, InsertReplaceEdit> textEdit = this.item.getTextEdit();
         if (textEdit != null) {
             if (textEdit.isLeft()) {
-                try {
-                    return LSPIJUtils.toOffset(this.item.getTextEdit().getLeft().getRange().getStart(), document);
-                } catch (RuntimeException e) {
-                    LOGGER.warn(e.getLocalizedMessage(), e);
-                }
+                return textEdit.getLeft().getNewText();
             } else {
-                try {
-                    return LSPIJUtils.toOffset(this.item.getTextEdit().getRight().getInsert().getStart(), document);
-                } catch (RuntimeException e) {
-                    LOGGER.warn(e.getLocalizedMessage(), e);
-                }
+                return textEdit.getRight().getNewText();
             }
         }
-        String insertText = getInsertText();
-        try {
-            // insertText= 'charAt'
-            // document= "".ch|a
-            // we have to return "".| as offset
 
-            // Search the offset between ["".ch|a]
-            int startOffset = Math.max(0, completionOffset - insertText.length());
-            int endOffset = startOffset + Math.min(insertText.length(), completionOffset);
-            String subDoc = document.getText(new TextRange(startOffset, endOffset)); // "".ch
-            for (int i = 0; i < insertText.length() && i < completionOffset; i++) {
-                String tentativeCommonString = subDoc.substring(i);
-                if (insertText.startsWith(tentativeCommonString)) {
-                    return completionOffset - tentativeCommonString.length();
-                }
-            }
-        } catch (RuntimeException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
+        String insertText = this.item.getInsertText();
+        if (insertText != null) {
+            return insertText;
         }
-        return completionOffset;
+        return this.item.getLabel();
     }
 
     @Override
@@ -313,20 +284,16 @@ public class LSPCompletionProposal extends LookupElement {
                 //    "insertTextFormat": 2
 
                 insertText = getInsertText();
-                int startOffset = this.bestOffset;
+                int startOffset = this.prefixStartOffset;
                 int endOffset = offset;
                 // Try to get the text range to replace it.
                 // foo.b|ar --> foo.[bar]
-                TextRange textRange = LSPIJUtils.getTokenRange(document, this.initialOffset);
-                if (textRange != null) {
-                    startOffset = textRange.getStartOffset();
-                }
                 Position start = LSPIJUtils.toPosition(startOffset, document);
                 Position end = LSPIJUtils.toPosition(endOffset, document); // need 2 distinct objects
                 textEdit = new TextEdit(new Range(start, end), insertText);
-            } else if (offset > this.initialOffset) {
+            } else if (offset > this.completionOffset) {
                 // characters were added after completion was activated
-                int shift = offset - this.initialOffset;
+                int shift = offset - this.completionOffset;
                 textEdit.getRange().getEnd().setCharacter(textEdit.getRange().getEnd().getCharacter() + shift);
             }
             { // workaround https://github.com/Microsoft/vscode/issues/17036
@@ -348,11 +315,11 @@ public class LSPCompletionProposal extends LookupElement {
 
             if (insertText != null) {
                 // try to reuse existing characters after completion location
-                int shift = offset - this.bestOffset;
+                int shift = offset - this.prefixStartOffset;
                 int commonSize = 0;
                 while (commonSize < insertText.length() - shift
                         && document.getTextLength() > offset + commonSize
-                        && document.getText().charAt(this.bestOffset + shift + commonSize) == insertText.charAt(commonSize + shift)) {
+                        && document.getText().charAt(this.prefixStartOffset + shift + commonSize) == insertText.charAt(commonSize + shift)) {
                     commonSize++;
                 }
                 textEdit.getRange().getEnd().setCharacter(textEdit.getRange().getEnd().getCharacter() + commonSize);
@@ -529,4 +496,86 @@ public class LSPCompletionProposal extends LookupElement {
         }
         return false;
     }
+
+    // --------------- Prefix start offset
+
+
+    private int getPrefixStartOffset(@NotNull Document document, int completionOffset) {
+        Either<TextEdit, InsertReplaceEdit> textEdit = this.item.getTextEdit();
+        if (textEdit != null) {
+            // case 1: text edit is defined,
+            // return the range / insert start as prefix completion offset
+            return getPrefixStartOffsetFromTextEdit(document, textEdit);
+        }
+
+        // case 2: text edit is undefined, try to compute the prefix start offset by using insertText
+        String insertText = getInsertText();
+        Integer prefixStartOffset = computePrefixStartFromInsertText(document, completionOffset, insertText);
+        if (prefixStartOffset != null) {
+            return prefixStartOffset;
+        }
+        return completionOffset;
+    }
+
+
+    /**
+     * Returns the defined start prefix offset in the given text edit.
+     * @param document the document
+     * @param textEdit the text edit.
+     * @return
+     */
+    private static int getPrefixStartOffsetFromTextEdit(@NotNull Document document,
+                                                        @NotNull Either<TextEdit, InsertReplaceEdit> textEdit) {
+        if (textEdit.isLeft()) {
+            return LSPIJUtils.toOffset(textEdit.getLeft().getRange().getStart(), document);
+        }
+        return LSPIJUtils.toOffset(textEdit.getRight().getInsert().getStart(), document);
+    }
+
+    @Nullable
+    private Integer computePrefixStartFromInsertText(@NotNull Document document,
+                                                     int completionOffset,
+                                                     String insertText) {
+        // case 2.1: first strategy, we check if the left content of the completion offset
+        // matches the full insertText left content
+        // ex :
+        // insertText= 'foo.bar'
+        // document= {foo.b|}
+        // we have to return {| as prefix start offset
+
+        Integer prefixStartOffset = getPrefixStartOffsetWhichMatchesLeftContent(document, completionOffset, insertText);
+        if (prefixStartOffset != null) {
+            return prefixStartOffset;
+        }
+
+        // case 2.2: second strategy, we collect word range at
+        // ex :
+        // insertText= '(let [${1:binding} ${2:value}])'
+        // document= le
+        // we have to return |le as prefix start offset
+
+        TextRange wordRange = LSPIJUtils.getWordRangeAt(document, completionOffset);
+        if (wordRange != null) {
+            return wordRange.getStartOffset();
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Integer getPrefixStartOffsetWhichMatchesLeftContent(@NotNull Document document,
+                                                                       int completionOffset,
+                                                                       @NotNull String insertText) {
+        int startOffset = Math.max(0, completionOffset - insertText.length());
+        int endOffset = startOffset + Math.min(insertText.length(), completionOffset);
+        String subDoc = document.getText(new TextRange(startOffset, endOffset)); // "".ch
+        for (int i = 0; i < insertText.length() && i < completionOffset; i++) {
+            String tentativeCommonString = subDoc.substring(i);
+            if (insertText.startsWith(tentativeCommonString)) {
+                return completionOffset - tentativeCommonString.length();
+            }
+        }
+        return null;
+    }
+
+
 }

@@ -149,13 +149,13 @@ public class LSPCompletionContributor extends CompletionContributor {
 
     private LSPCompletionProposal createLookupItem(@NotNull PsiFile file,
                                                    @NotNull Editor editor,
-                                                   int offset,
+                                                   int completionOffset,
                                                    @NotNull CompletionItem item,
                                                    @Nullable CompletionItemDefaults itemDefaults,
                                                    @NotNull LanguageServerItem languageServer) {
         // Update text edit range with item defaults if needed
         updateWithItemDefaults(item, itemDefaults);
-        return new LSPCompletionProposal(file, editor, offset, item, languageServer, this);
+        return new LSPCompletionProposal(file, editor, completionOffset, item, languageServer, this);
     }
 
     private static void updateWithItemDefaults(@NotNull CompletionItem item,

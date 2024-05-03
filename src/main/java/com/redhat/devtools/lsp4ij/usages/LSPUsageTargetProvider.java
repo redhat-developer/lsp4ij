@@ -24,7 +24,7 @@ import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import static com.redhat.devtools.lsp4ij.LSPIJUtils.getTokenRange;
+import static com.redhat.devtools.lsp4ij.LSPIJUtils.getWordRangeAt;
 
 /**
  * LSP Usage target provider.
@@ -49,7 +49,7 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
             return UsageTarget.EMPTY_ARRAY;
         }
         // Try to get the token range (ex : foo.ba|r() --> foo.[bar]())
-        TextRange tokenRange = getTokenRange(document, offset);
+        TextRange tokenRange = getWordRangeAt(document, offset);
         if (tokenRange == null) {
             // Get range only for the offset
             tokenRange = new TextRange(offset > 0 ? offset - 1 : offset, offset);
