@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileChooser.*;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWrapper;
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
@@ -66,7 +67,7 @@ public class ExportServerAction extends AnAction {
             String lsName = lsDefinition.getDisplayName();
             ZipEntry entry = new ZipEntry(lsName + "/" + lsName + ".json");
             zos.putNextEntry(entry);
-            zos.write("Hello".getBytes(StandardCharsets.UTF_8));
+            zos.write(lsDefinition.toJsonString().getBytes(StandardCharsets.UTF_8));
             zos.closeEntry();
         }
 

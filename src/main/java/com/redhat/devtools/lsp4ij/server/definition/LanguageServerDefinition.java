@@ -13,6 +13,9 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.Expose;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.lang.Language;
@@ -40,16 +43,20 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
+    @Expose
     private final @NotNull
     String id;
+    @Expose
     private final @NotNull
     String name;
     private final boolean isSingleton;
     private final String description;
     private final int lastDocumentDisconnectedTimeout;
     private final boolean supportsLightEdit;
+    @Expose
     private final @NotNull
     Map<Language, String> languageIdLanguageMappings;
+    @Expose
     private final @NotNull
     Map<FileType, String> languageIdFileTypeMappings;
     @NotNull
@@ -182,4 +189,9 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
         return AllIcons.Webreferences.Server;
     }
 
+    public String toJsonString() {
+        Gson gson = new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create();
+        String jsonString = gson.toJson(this);
+        return jsonString;
+    }
 }
