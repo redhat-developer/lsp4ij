@@ -41,7 +41,8 @@ public class ExportServerAction extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
         FileChooserFactory fileChooserFactory = FileChooserFactory.getInstance();
-        FileSaverDescriptor fileSaverDescriptor = new FileSaverDescriptor("Save LS Definition", "Choose location for the LS definition export");
+        FileSaverDescriptor fileSaverDescriptor = new FileSaverDescriptor(
+                LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"));
         FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
         VirtualFileWrapper fileWrapper = fileSaverDialog.save("export.zip");
 
