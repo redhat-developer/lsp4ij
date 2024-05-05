@@ -5,9 +5,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.fileChooser.FileChooserFactory;
-import com.intellij.openapi.fileChooser.FileSaverDescriptor;
-import com.intellij.openapi.fileChooser.FileSaverDialog;
+import com.intellij.openapi.fileChooser.*;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
@@ -65,7 +63,8 @@ public class ExportServerAction extends AnAction {
         ZipOutputStream zos = new ZipOutputStream(baos);
 
         for (LanguageServerDefinition lsDefinition : languageServerDefinitions) {
-            ZipEntry entry = new ZipEntry(lsDefinition.getDisplayName() + ".json");
+            String lsName = lsDefinition.getDisplayName();
+            ZipEntry entry = new ZipEntry(lsName + "/" + lsName + ".json");
             zos.putNextEntry(entry);
             zos.write("Hello".getBytes(StandardCharsets.UTF_8));
             zos.closeEntry();
