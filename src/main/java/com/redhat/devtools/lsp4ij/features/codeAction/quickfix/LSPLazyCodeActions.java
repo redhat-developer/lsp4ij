@@ -17,7 +17,7 @@ import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
@@ -53,7 +53,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     private final VirtualFile file;
 
     // The language server which has reported the diagnostic
-    private final LanguageServerWrapper languageServerWrapper;
+    private final LanguageServerItem languageServer;
 
     // List of lazy code actions
     private final List<LSPLazyCodeActionIntentionAction> codeActions;
@@ -63,10 +63,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
 
     public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
                               @NotNull VirtualFile file,
-                              @NotNull LanguageServerWrapper languageServerWrapper) {
+                              @NotNull LanguageServerItem languageServer) {
         this.diagnostics = diagnostics;
         this.file = file;
-        this.languageServerWrapper = languageServerWrapper;
+        this.languageServer = languageServer;
         // Create 20 lazy IJ quick fixes which does nothing (IntentAction#isAvailable returns false)
         codeActions = new ArrayList<>(NB_LAZY_CODE_ACTIONS);
         for (int i = 0; i < NB_LAZY_CODE_ACTIONS; i++) {
@@ -119,6 +119,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @return list of Intellij {@link IntentionAction} which are used to create Intellij QuickFix.
      */
     private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(List<Diagnostic> diagnostics) {
+        var languageServerWrapper= languageServer.getServerWrapper();
         return CompletableFutures
                 .computeAsyncCompose(cancelChecker -> languageServerWrapper
                         .getInitializedServer()
@@ -147,7 +148,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                                                     }
                                                     return true;
                                                 })
-                                                .map(ca -> new CodeActionData(ca, languageServerWrapper))
+                                                .map(ca -> new CodeActionData(ca, languageServer))
                                                 .toList();
                                     });
                         }));
@@ -173,15 +174,6 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         context.setTriggerKind(CodeActionTriggerKind.Automatic);
         params.setContext(context);
         return params;
-    }
-
-    /**
-     * Returns the language server which has reported the diagnostic.
-     *
-     * @return the language server which has reported the diagnostic.
-     */
-    public LanguageServerWrapper getLanguageServerWrapper() {
-        return languageServerWrapper;
     }
 
     /**

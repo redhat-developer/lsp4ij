@@ -102,7 +102,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPFeatureSupport<Cod
                     }
                     return codeActions.stream()
                             .filter(LSPIntentionCodeActionSupport::isValidCodeAction)
-                            .map(codeAction -> new CodeActionData(codeAction, languageServer.getServerWrapper()))
+                            .map(codeAction -> new CodeActionData(codeAction, languageServer))
                             .toList();
                 });
     }

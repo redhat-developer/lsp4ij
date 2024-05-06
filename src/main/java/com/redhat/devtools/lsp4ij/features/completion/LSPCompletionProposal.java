@@ -23,12 +23,12 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorModificationUtil;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
+import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetIndentOptions;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
@@ -38,7 +38,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -121,7 +120,7 @@ public class LSPCompletionProposal extends LookupElement {
         // Execute custom command of the completion item if needed
         Command command = item.getCommand();
         if (command != null) {
-            executeCustomCommand(command, LSPIJUtils.toUri(context.getDocument()));
+            executeCustomCommand(command, context.getFile(), context.getEditor(), languageServer);
         }
 
         if (supportSignatureHelp) {
@@ -352,14 +351,17 @@ public class LSPCompletionProposal extends LookupElement {
     /**
      * Execute custom command of the completion item.
      *
-     * @param command
-     * @param documentUri
+     * @param command        the command.
+     * @param file           the Psi file.
+     * @param editor         the editor.
+     * @param languageServer the language server.
      */
-    private void executeCustomCommand(@NotNull Command command, URI documentUri) {
-        Project project = editor.getProject();
+    private static void executeCustomCommand(@NotNull Command command,
+                                             PsiFile file,
+                                             Editor editor,
+                                             LanguageServerItem languageServer) {
         // Execute custom command of the completion item.
-        String languageServerId = languageServer.getServerWrapper().getServerDefinition().getId();
-        CommandExecutor.executeCommand(command, documentUri, project, languageServerId);
+        CommandExecutor.executeCommand(new LSPCommandContext(command, file, editor, languageServer));
     }
 
     public @Nullable Range getTextEditRange() {
@@ -520,6 +522,7 @@ public class LSPCompletionProposal extends LookupElement {
 
     /**
      * Returns the defined start prefix offset in the given text edit.
+     *
      * @param document the document
      * @param textEdit the text edit.
      * @return

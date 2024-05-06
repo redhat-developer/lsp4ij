@@ -11,9 +11,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.psi.PsiFile;
-import org.eclipse.lsp4j.CodeActionOptions;
-import org.eclipse.lsp4j.RenameOptions;
-import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
@@ -390,7 +388,7 @@ public class LanguageServerItem {
      */
     public static boolean isCodeActionSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
-            hasCapability(serverCapabilities.getCodeActionProvider());
+                hasCapability(serverCapabilities.getCodeActionProvider());
     }
 
     /**
@@ -424,7 +422,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support prepare rename and false otherwise.
      */
-    public  boolean isPrepareRenameSupported() {
+    public boolean isPrepareRenameSupported() {
         return isPrepareRenameSupported(getServerCapabilities());
     }
 
@@ -454,6 +452,24 @@ public class LanguageServerItem {
     }
 
     /**
+     * Returns true if the given LSP command is supported by the language server and false otherwise.
+     *
+     * @param command the LSP command.
+     * @return true if the given LSP command is supported by the language server and false otherwise.
+     */
+    public boolean canSupportsCommand(@Nullable Command command) {
+        if (command == null) {
+            return false;
+        }
+        ServerCapabilities serverCapabilities = getServerCapabilities();
+        if (serverCapabilities == null) {
+            return false;
+        }
+        ExecuteCommandOptions provider = serverCapabilities.getExecuteCommandProvider();
+        return provider != null && provider.getCommands().contains(command.getCommand());
+    }
+    
+    /**
      * Returns the LSP {@link TextDocumentService} of the language server.
      *
      * @return the LSP {@link TextDocumentService} of the language server.
@@ -481,4 +497,5 @@ public class LanguageServerItem {
     private static boolean hasCapability(Boolean capability) {
         return capability != null && capability;
     }
+
 }

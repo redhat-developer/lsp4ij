@@ -32,11 +32,10 @@ public class LSPVirtualFileData {
 
     private final DocumentContentSynchronizer synchronizer;
 
-
-    public LSPVirtualFileData(LanguageServerWrapper languageServerWrapper, VirtualFile file, DocumentContentSynchronizer synchronizer) {
+    public LSPVirtualFileData(LanguageServerItem languageServer, VirtualFile file, DocumentContentSynchronizer synchronizer) {
         this.file = file;
         this.synchronizer = synchronizer;
-        this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServerWrapper,file);
+        this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer,file);
     }
 
     /**

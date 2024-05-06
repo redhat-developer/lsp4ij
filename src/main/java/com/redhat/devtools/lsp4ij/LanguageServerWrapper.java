@@ -621,16 +621,12 @@ public class LanguageServerWrapper implements Disposable {
                 DocumentContentSynchronizer synchronizer = new DocumentContentSynchronizer(this, fileUri, document, syncKind);
                 document.addDocumentListener(synchronizer);
 
-                LSPVirtualFileData data = new LSPVirtualFileData(this, file, synchronizer);
+                LSPVirtualFileData data = new LSPVirtualFileData(new LanguageServerItem(languageServer, this), file, synchronizer);
                 LanguageServerWrapper.this.connectedDocuments.put(fileUri, data);
 
                 return synchronizer.didOpenFuture;
             }
         }).thenApply(theVoid -> languageServer);
-    }
-
-    private void disconnect(URI path) {
-        disconnect(path, true);
     }
 
     public void disconnect(URI path, boolean stopIfNoOpenedFiles) {
