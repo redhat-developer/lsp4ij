@@ -10,7 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeAction;
 
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -25,5 +25,5 @@ import org.jetbrains.annotations.NotNull;
 public record CodeActionData(
 
         @NotNull Either<Command, CodeAction> codeAction,
-        @NotNull LanguageServerWrapper languageServer) {
+        @NotNull LanguageServerItem languageServer) {
 }

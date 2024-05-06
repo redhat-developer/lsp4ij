@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
+import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
@@ -57,6 +58,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCodeLensProvider.class);
     public static final String LSP_CODE_LENS_PROVIDER_ID = "LSPCodeLensProvider";
     public static final String LSP_CODE_LENS_GROUP_ID = "LSPCodeLens";
+
     @NotNull
     @Override
     public CodeVisionAnchorKind getDefaultAnchor() {
@@ -161,7 +163,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         String text = codeLens.getCommand().getTitle();
                         if (!StringUtils.isEmpty(text)) {
                             TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), true);
-                            CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, codeLensData.languageServer(), project);
+                            CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, psiFile, codeLensData.languageServer());
                             result.add(new Pair<>(textRange, entry));
                         }
                     }
@@ -188,7 +190,10 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
     }
 
     @NotNull
-    private TextCodeVisionEntry createCodeVisionEntry(@NotNull CodeLens codeLens, int nbCodeLensForCurrentLine, @NotNull LanguageServerItem languageServer, @NotNull Project project) {
+    private TextCodeVisionEntry createCodeVisionEntry(@NotNull CodeLens codeLens,
+                                                      int nbCodeLensForCurrentLine,
+                                                      @NotNull PsiFile psiFile,
+                                                      @NotNull LanguageServerItem languageServer) {
         Command command = codeLens.getCommand();
         String text = getCodeLensContent(codeLens);
         String commandId = command.getCommand();
@@ -203,18 +208,20 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         }
         // Code lens defines a command, create a clickable code vsion to execute the command.
         return new ClickableTextCodeVisionEntry(text, providerId, (e, editor) -> {
+            LSPCommandContext context = new LSPCommandContext(command, psiFile, editor, languageServer)
+                    .setInputEvent(e);
             if (languageServer.isResolveCodeLensSupported()) {
                 languageServer.getTextDocumentService()
                         .resolveCodeLens(codeLens)
                         .thenAcceptAsync(resolvedCodeLens -> {
                                     if (resolvedCodeLens != null) {
                                         UIUtil.invokeLaterIfNeeded(() ->
-                                                CommandExecutor.executeCommandClientSide(command, null, editor, project, null, e));
+                                                CommandExecutor.executeCommand(context));
                                     }
                                 }
                         );
             } else {
-                CommandExecutor.executeCommandClientSide(command, null, editor, project, null, e);
+                CommandExecutor.executeCommand(context);
             }
             return null;
         }, null, text, text, Collections.emptyList());

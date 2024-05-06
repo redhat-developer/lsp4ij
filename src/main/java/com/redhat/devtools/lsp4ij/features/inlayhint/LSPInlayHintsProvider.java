@@ -68,7 +68,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
                             inlayHintsSink.addInlineElement(
                                     offset,
                                     false,
-                                    toPresentation(editor, list, factory, pendingFutures),
+                                    toPresentation(psiFile, editor, list, factory),
                                     false));
         } finally {
             if (!future.isDone()) {
@@ -118,10 +118,10 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
         return new Range(start, end);
     }
 
-    private InlayPresentation toPresentation(@NotNull Editor editor,
+    private InlayPresentation toPresentation(@NotNull PsiFile psiFile,
+                                             @NotNull Editor editor,
                                              @NotNull List<Pair<Integer, InlayHintData>> elements,
-                                             @NotNull PresentationFactory factory,
-                                             @NotNull List<CompletableFuture> toResolve) {
+                                             @NotNull PresentationFactory factory) {
         List<InlayPresentation> presentations = new ArrayList<>();
         elements.forEach(p -> {
             Either<String, List<InlayHintLabelPart>> label = p.second.inlayHint().getLabel();
@@ -130,7 +130,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
             } else {
                 int index = 0;
                 for (InlayHintLabelPart part : label.getRight()) {
-                    InlayPresentation text = createInlayPresentation(editor, factory, p, index, part);
+                    InlayPresentation text = createInlayPresentation(psiFile, editor, factory, p, index, part);
                     if (part.getTooltip() != null && part.getTooltip().isLeft()) {
                         text = factory.withTooltip(part.getTooltip().getLeft(), text);
                     }
@@ -144,6 +144,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
 
     @NotNull
     private InlayPresentation createInlayPresentation(
+            PsiFile psiFile,
             Editor editor,
             PresentationFactory factory,
             Pair<Integer, InlayHintData> p,
@@ -154,7 +155,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
             // InlayHintLabelPart defines a Command, create a clickable inlay hint
             int finalIndex = index;
             text = factory.referenceOnHover(text, (event, translated) ->
-                    executeCommand(p.second.languageServer(), p.second.inlayHint(), finalIndex, event, editor)
+                    executeCommand(psiFile, editor, p.second.languageServer(), p.second.inlayHint(), finalIndex, event)
             );
         }
         return text;
@@ -166,30 +167,32 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
     }
 
     /**
-     * Execute codeLens command.
+     * Execute InlayHint command.
      *
+     * @param psiFile        the Psi file.
+     * @param editor         the editor.
      * @param languageServer the language server.
      * @param inlayHint      the inlay hint.
      * @param index          the inlay part index where the command should be defined.
-     * @param event         the Mouse event.
-     * @param editor        the editor.
+     * @param event          the Mouse event.
      */
-    private void executeCommand(@NotNull LanguageServerItem languageServer,
+    private void executeCommand(@NotNull PsiFile psiFile,
+                                @NotNull Editor editor,
+                                @NotNull LanguageServerItem languageServer,
                                 @NotNull InlayHint inlayHint,
                                 int index,
-                                @Nullable MouseEvent event,
-                                @NotNull Editor editor) {
+                                @Nullable MouseEvent event) {
         if (languageServer.isResolveInlayHintSupported()) {
             languageServer.getTextDocumentService()
                     .resolveInlayHint(inlayHint)
                     .thenAcceptAsync(resolvedInlayHint -> {
                                 if (resolvedInlayHint != null) {
-                                    executeClientCommand(getCommand(resolvedInlayHint, index), editor, event);
+                                    executeCommand(getCommand(resolvedInlayHint, index), psiFile, editor, event, languageServer);
                                 }
                             }
                     );
         } else {
-            executeClientCommand(getCommand(inlayHint, index), editor, event);
+            executeCommand(getCommand(inlayHint, index), psiFile, editor, event, languageServer);
         }
     }
 

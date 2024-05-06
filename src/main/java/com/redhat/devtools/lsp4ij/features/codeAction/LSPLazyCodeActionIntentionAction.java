@@ -24,14 +24,16 @@ import com.intellij.util.DocumentUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
+import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerItem.isCodeActionResolveSupported;
 
@@ -80,48 +82,56 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
 
     @Override
     public void invoke(@NotNull Project project, Editor editor, PsiFile file) throws IncorrectOperationException {
-        String serverId = getLanguageServerWrapper().getServerDefinition().getId();
+        var languageServer = getLanguageServer();
         if (codeAction != null) {
             if (codeAction.getEdit() == null && codeAction.getCommand() == null
-                    && isCodeActionResolveSupported(getLanguageServerWrapper().getServerCapabilities())) {
+                    && isCodeActionResolveSupported(languageServer.getServerCapabilities())) {
                 // Unresolved code action "edit" property. Resolve it.
-                getLanguageServerWrapper().getInitializedServer()
+                languageServer
+                        .getServerWrapper()
+                        .getInitializedServer()
                         .thenApply(ls ->
                                 ls.getTextDocumentService().resolveCodeAction(codeAction)
                                         .thenAccept(resolved -> {
                                             ApplicationManager.getApplication().invokeLater(() -> {
                                                 DocumentUtil.writeInRunUndoTransparentAction(() -> {
-                                                    apply(resolved != null ? resolved : codeAction, project, file, serverId);
+                                                    apply(resolved != null ? resolved : codeAction, file, editor, languageServer);
                                                 });
                                             });
                                         })
                         );
             } else {
-                apply(codeAction, project, file, serverId);
+                apply(codeAction, file, editor, languageServer);
             }
         } else if (command != null) {
-            executeCommand(command, project, file, serverId);
+            executeCommand(command, file, editor, languageServer);
         } else {
             // Should never get here
         }
     }
 
-    private void apply(CodeAction codeaction, @NotNull Project project, PsiFile file, String serverId) {
+    private void apply(@Nullable CodeAction codeaction,
+                       @NotNull PsiFile file,
+                       @NotNull Editor editor,
+                       @NotNull LanguageServerItem languageServerItem) {
         if (codeaction != null) {
             if (codeaction.getEdit() != null) {
                 LSPIJUtils.applyWorkspaceEdit(codeaction.getEdit(), codeaction.getTitle());
             }
             if (codeaction.getCommand() != null) {
-                executeCommand(codeaction.getCommand(), project, file, serverId);
+                executeCommand(codeaction.getCommand(), file, editor, languageServerItem);
             }
         }
     }
 
-    private void executeCommand(Command command, @NotNull Project project, PsiFile file, String serverId) {
-        CommandExecutor.executeCommand(command, LSPIJUtils.toUri(file), project, serverId);
+    private static void executeCommand(@NotNull Command command,
+                                @NotNull PsiFile file,
+                                @NotNull Editor editor,
+                                @NotNull LanguageServerItem languageServer) {
+        CommandExecutor.executeCommand(new LSPCommandContext(command, file, editor, languageServer));
     }
 
-    private LanguageServerWrapper getLanguageServerWrapper() {
+    private LanguageServerItem getLanguageServer() {
         return action.getLeft().languageServer();
     }
 
@@ -159,7 +169,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         String kind = codeAction.getKind();
         if (StringUtils.isNotBlank(kind)) {
             switch (kind) {
-                case CodeActionKind.QuickFix :
+                case CodeActionKind.QuickFix:
                     return LanguageServerBundle.message("lsp.intention.code.action.kind.quickfix");
                 case CodeActionKind.Refactor:
                     return LanguageServerBundle.message("lsp.intention.code.action.kind.refactor");

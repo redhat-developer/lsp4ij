@@ -194,51 +194,6 @@ public class LanguageServiceAccessor implements Disposable {
         disposeAllServers();
     }
 
-    /**
-     * Get the requested language server instance for the given file. Starts the
-     * language server if not already started.
-     *
-     * @param file                  the file for which the initialized LanguageServer shall be returned
-     * @param lsDefinition          the language server definition
-     * @param capabilitiesPredicate a predicate to check capabilities
-     * @return a LanguageServer for the given file, which is defined with provided
-     * server ID and conforms to specified request. If
-     * {@code capabilitesPredicate} does not test positive for the server's
-     * capabilities, {@code null} is returned.
-     */
-    public CompletableFuture<LanguageServer> getInitializedLanguageServer(@NotNull VirtualFile file,
-                                                                          @NotNull Project project,
-                                                                          @NotNull LanguageServerDefinition lsDefinition,
-                                                                          Predicate<ServerCapabilities> capabilitiesPredicate)
-            throws IOException {
-        URI initialPath = LSPIJUtils.toUri(file);
-        LanguageServerWrapper wrapper = getLSWrapperForConnection(file, project, lsDefinition, initialPath);
-        if (wrapper != null && capabilitiesComply(wrapper, capabilitiesPredicate)) {
-            wrapper.connect(file);
-            return wrapper.getInitializedServer();
-        }
-        return null;
-    }
-
-    /**
-     * Checks if the given {@code wrapper}'s capabilities comply with the given
-     * {@code capabilitiesPredicate}.
-     *
-     * @param wrapper               the server that's capabilities are tested with
-     *                              {@code capabilitiesPredicate}
-     * @param capabilitiesPredicate predicate testing the capabilities of {@code wrapper}.
-     * @return The result of applying the capabilities of {@code wrapper} to
-     * {@code capabilitiesPredicate}, or {@code false} if
-     * {@code capabilitiesPredicate == null} or
-     * {@code wrapper.getServerCapabilities() == null}
-     */
-    private static boolean capabilitiesComply(LanguageServerWrapper wrapper,
-                                              Predicate<ServerCapabilities> capabilitiesPredicate) {
-        return capabilitiesPredicate == null
-                || wrapper.getServerCapabilities() == null /* null check is workaround for https://github.com/TypeFox/ls-api/issues/47 */
-                || capabilitiesPredicate.test(wrapper.getServerCapabilities());
-    }
-
     @NotNull
     private CompletableFuture<Collection<LanguageServerWrapper>> getMatchedLanguageServersWrappers(@NotNull VirtualFile file) {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project);
@@ -430,43 +385,6 @@ public class LanguageServiceAccessor implements Disposable {
         return mapping.match(file, fileProject);
     }
 
-    private LanguageServerWrapper getLSWrapperForConnection(@NotNull VirtualFile file,
-                                                            @NotNull Project project,
-                                                            LanguageServerDefinition serverDefinition,
-                                                            URI initialPath) throws IOException {
-        if (!serverDefinition.isEnabled()) {
-            // don't return a language server wrapper for the given server definition
-            return null;
-        }
-        LanguageServerWrapper wrapper = null;
-
-        synchronized (startedServers) {
-            for (LanguageServerWrapper startedWrapper : getStartedLSWrappers(file)) {
-                if (startedWrapper.getServerDefinition().equals(serverDefinition)) {
-                    wrapper = startedWrapper;
-                    break;
-                }
-            }
-            if (wrapper == null) {
-                wrapper = new LanguageServerWrapper(project, serverDefinition, initialPath);
-                wrapper.start();
-            }
-
-            startedServers.add(wrapper);
-        }
-        return wrapper;
-    }
-
-    private List<LanguageServerWrapper> getStartedLSWrappers(
-            VirtualFile file) {
-        return getStartedLSWrappers(wrapper -> wrapper.canOperate(file));
-    }
-
-    private List<LanguageServerWrapper> getStartedLSWrappers(Predicate<LanguageServerWrapper> predicate) {
-        return startedServers.stream().filter(predicate)
-                .collect(Collectors.toList());
-        // TODO multi-root: also return servers which support multi-root?
-    }
 
     /**
      * Gets list of running LS satisfying a capability predicate. This does not
@@ -479,7 +397,7 @@ public class LanguageServiceAccessor implements Disposable {
     public List<LanguageServer> getActiveLanguageServers(Predicate<ServerCapabilities> request) {
         return getLanguageServers(null, request, true);
     }
-
+    
     /**
      * Gets list of LS initialized for given project
      *
@@ -507,17 +425,6 @@ public class LanguageServiceAccessor implements Disposable {
             }
         }
         return serverInfos;
-    }
-
-    public boolean checkCapability(LanguageServer languageServer, Predicate<ServerCapabilities> condition) {
-        return startedServers.stream().filter(wrapper -> wrapper.isActive() && wrapper.getServer() == languageServer)
-                .anyMatch(wrapper -> condition.test(wrapper.getServerCapabilities()));
-    }
-
-    public Optional<LanguageServerDefinition> resolveServerDefinition(LanguageServer languageServer) {
-        synchronized (startedServers) {
-            return startedServers.stream().filter(wrapper -> languageServer.equals(wrapper.getServer())).findFirst().map(wrapper -> wrapper.getServerDefinition());
-        }
     }
 
     @Override

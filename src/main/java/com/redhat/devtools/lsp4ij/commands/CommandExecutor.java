@@ -11,7 +11,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.commands;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
@@ -22,18 +25,17 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.*;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.awt.*;
 import java.awt.event.InputEvent;
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,11 +48,10 @@ import java.util.stream.Stream;
  * This class provides methods to execute LSP {@link Command} instances.
  */
 public class CommandExecutor {
-    private static final Logger LOGGER = LoggerFactory.getLogger(CommandExecutor.class);
 
     public static final DataKey<LSPCommand> LSP_COMMAND = DataKey.create("com.redhat.devtools.lsp4ij.command");
 
-    public static final DataKey<URI> LSP_COMMAND_DOCUMENT_URI = DataKey.create("com.redhat.devtools.lsp4ij.command.documentUri");
+    public static final DataKey<LanguageServerItem> LSP_COMMAND_LANGUAGE_SERVER = DataKey.create("com.redhat.devtools.lsp4ij.command.server");
 
     /**
      * Will execute the given {@code command} either on a language server,
@@ -60,30 +61,35 @@ public class CommandExecutor {
      * the server, nor the client are able to handle the command explicitly, a
      * heuristic method will try to interpret the command locally.
      *
-     * @param command          the LSP Command to be executed. If {@code null} this method will
-     *                         do nothing.
-     * @param documentUri      the URI of the document for which the command was created
-     * @param project          the project.
-     * @param languageServerId the ID of the language server for which the {@code command} is
-     *                         applicable. If {@code null}, the command will not be executed on
-     *                         the language server.
+     * @param context the LSP command context.
      */
-    public static void executeCommand(@Nullable Command command,
-                                      @Nullable URI documentUri,
-                                      @NotNull Project project,
-                                      @Nullable String languageServerId) {
-        if (command == null) {
+    public static void executeCommand(LSPCommandContext context) {
+        Command command = context.getCommand();
+
+        // 1. try to execute command on server side
+        if (executeCommandServerSide(command, context.getPreferredLanguageServer())) {
             return;
         }
-        if (executeCommandServerSide(command, documentUri, project, languageServerId)) {
+
+        VirtualFile file = context.getFile();
+        if (file == null && context.getPsiFile() != null) {
+            file = context.getPsiFile().getVirtualFile();
+        }
+        // 2. try to execute command on client side
+        if (executeCommandClientSide(command,
+                context.getProject(),
+                context.getPsiFile(),
+                file,
+                context.getEditor(),
+                context.getSource(),
+                context.getInputEvent(),
+                context.getPreferredLanguageServer())) {
             return;
         }
-        if (executeCommandClientSide(command, null, null, project, null, null)) {
-            return;
-        }
-        // tentative fallback
-        if (documentUri != null && command.getArguments() != null) {
-            Document document = LSPIJUtils.getDocument(documentUri);
+
+        // 3. tentative fallback
+        if (file != null && command.getArguments() != null) {
+            Document document = LSPIJUtils.getDocument(file);
             if (document != null) {
                 WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), document);
                 LSPIJUtils.applyWorkspaceEdit(edit);
@@ -94,88 +100,71 @@ public class CommandExecutor {
     /**
      * Execute LSP command on server side.
      *
-     * @param command          the LSP Command to be executed. If {@code null} this method will
-     *                         do nothing.
-     * @param documentUri      the URI of the document for which the command was created
-     * @param project          the project.
-     * @param languageServerId the ID of the language server for which the {@code command} is
-     *                         applicable.
+     * @param command        the LSP Command to be executed. If {@code null} this method will
+     *                       do nothing.
+     * @param languageServer the language server for which the {@code command} is
+     *                       applicable.
      * @return true if the LSP command on server side has been executed successfully and false otherwise.
      */
     private static boolean executeCommandServerSide(@NotNull Command command,
-                                                    @Nullable URI documentUri,
-                                                    @NotNull Project project,
-                                                    @Nullable String languageServerId) {
-        if (languageServerId == null) {
+                                                    @NotNull LanguageServerItem languageServer) {
+        CompletableFuture<LanguageServer> languageServerFuture = getLanguageServerForCommand(command, languageServer);
+        if (languageServerFuture == null) {
             return false;
         }
-        LanguageServerDefinition languageServerDefinition = LanguageServersRegistry.getInstance()
-                .getServerDefinition(languageServerId);
-        if (languageServerDefinition == null) {
-            return false;
-        }
-
-        try {
-            CompletableFuture<LanguageServer> languageServerFuture = getLanguageServerForCommand(project, command, documentUri,
-                    languageServerDefinition);
-            if (languageServerFuture == null) {
-                return false;
-            }
-            // Server can handle command
-            languageServerFuture.thenAcceptAsync(server -> {
-                ExecuteCommandParams params = new ExecuteCommandParams();
-                params.setCommand(command.getCommand());
-                params.setArguments(command.getArguments());
-                server.getWorkspaceService().executeCommand(params)
-                        .exceptionally(error -> {
-                            // Language server throws an error when executing a command
-                            // Display it with an IntelliJ notification.
-                            MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
-                            ServerMessageHandler.showMessage(languageServerDefinition.getDisplayName(), messageParams);
-                            return error;
-                        });
-            });
-            return true;
-        } catch (IOException e) {
-            // log and let the code fall through for LSPEclipseUtils to handle
-            LOGGER.warn(e.getLocalizedMessage(), e);
-            return false;
-        }
-
+        // Server can handle command
+        languageServerFuture.thenAcceptAsync(server -> {
+            ExecuteCommandParams params = new ExecuteCommandParams();
+            params.setCommand(command.getCommand());
+            params.setArguments(command.getArguments());
+            server.getWorkspaceService()
+                    .executeCommand(params)
+                    .exceptionally(error -> {
+                        // Language server throws an error when executing a command
+                        // Display it with an IntelliJ notification.
+                        MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
+                        var languageServerDefinition = languageServer.getServerWrapper().getServerDefinition();
+                        ServerMessageHandler.showMessage(languageServerDefinition.getDisplayName(), messageParams);
+                        return error;
+                    });
+        });
+        return true;
     }
 
-    private static CompletableFuture<LanguageServer> getLanguageServerForCommand(@NotNull Project project,
-                                                                                 @NotNull Command command,
-                                                                                 @Nullable URI documentUri,
-                                                                                 @NotNull LanguageServerDefinition languageServerDefinition) throws IOException {
-        VirtualFile file = LSPIJUtils.findResourceFor(documentUri);
-        if (file == null) {
-            return null;
+    @Nullable
+    private static CompletableFuture<LanguageServer> getLanguageServerForCommand(@NotNull Command command,
+                                                                                 @NotNull LanguageServerItem languageServer) {
+
+        if (languageServer.canSupportsCommand(command)) {
+            return languageServer
+                    .getServerWrapper()
+                    .getInitializedServer();
         }
-        return LanguageServiceAccessor.getInstance(project)
-                .getInitializedLanguageServer(file, project, languageServerDefinition, serverCapabilities -> {
-                    ExecuteCommandOptions provider = serverCapabilities.getExecuteCommandProvider();
-                    return provider != null && provider.getCommands().contains(command.getCommand());
-                });
+        return null;
     }
 
     /**
      * Execute LSP command on server side.
      *
-     * @param command     the LSP Command to be executed. If {@code null} this method will
-     *                    do nothing.
-     * @param documentUri the URI of the document for which the command was created
-     * @param editor      the editor.
-     * @param project     the project.
-     * @param source      the component which has triggered the command and null otherwise.
+     * @param command    the LSP Command to be executed. If {@code null} this method will
+     *                   do nothing.
+     * @param project    the project.
+     * @param psiFile    the Psi file.
+     * @param file       the file.
+     * @param editor     the editor.
+     * @param source     the component which has triggered the command and null otherwise.
+     * @param inputEvent the input event.
+     * @param languageServer the language server.
      * @return true if the LSP command on server side has been executed successfully and false otherwise.
      */
-    public static boolean executeCommandClientSide(@NotNull Command command,
-                                                   @Nullable URI documentUri,
-                                                   @Nullable Editor editor,
-                                                   @NotNull Project project,
-                                                   @Nullable Component source,
-                                                   @Nullable InputEvent inputEvent) {
+    private static boolean executeCommandClientSide(@NotNull Command command,
+                                                    @NotNull Project project,
+                                                    @Nullable PsiFile psiFile,
+                                                    @Nullable VirtualFile file,
+                                                    @Nullable Editor editor,
+                                                    @Nullable Component source,
+                                                    @Nullable InputEvent inputEvent,
+                                                    @Nullable LanguageServerItem languageServer) {
         Application workbench = ApplicationManager.getApplication();
         if (workbench == null) {
             return false;
@@ -184,7 +173,7 @@ public class CommandExecutor {
         if (action == null) {
             return false;
         }
-        DataContext dataContext = createDataContext(documentUri, command, action, source, editor, project);
+        DataContext dataContext = createDataContext(file, psiFile, command, action, source, editor, languageServer, project);
         ActionUtil.invokeAction(action, dataContext, ActionPlaces.UNKNOWN, inputEvent, null);
         return true;
     }
@@ -197,11 +186,13 @@ public class CommandExecutor {
         return ActionManager.getInstance().getAction(commandId);
     }
 
-    private static DataContext createDataContext(@Nullable URI documentUri,
+    private static DataContext createDataContext(@Nullable VirtualFile file,
+                                                 @Nullable PsiFile psiFile,
                                                  @NotNull Command command,
                                                  @NotNull AnAction action,
                                                  @Nullable Component source,
                                                  @Nullable Editor editor,
+                                                 @Nullable LanguageServerItem languageServer,
                                                  @NotNull Project project) {
         SimpleDataContext.Builder contextBuilder = SimpleDataContext.builder();
         if (source != null) {
@@ -210,11 +201,17 @@ public class CommandExecutor {
         contextBuilder
                 .add(CommonDataKeys.PROJECT, project)
                 .add(LSP_COMMAND, new LSPCommand(command, action.getClass().getClassLoader()));
-        if (documentUri != null) {
-            contextBuilder.add(LSP_COMMAND_DOCUMENT_URI, documentUri);
+        if (file != null) {
+            contextBuilder.add(CommonDataKeys.VIRTUAL_FILE, file);
+        }
+        if (psiFile != null) {
+            contextBuilder.add(CommonDataKeys.PSI_FILE, psiFile);
         }
         if (editor != null) {
             contextBuilder.add(CommonDataKeys.EDITOR, editor);
+        }
+        if (languageServer != null) {
+            contextBuilder.add(LSP_COMMAND_LANGUAGE_SERVER, languageServer);
         }
         return contextBuilder.build();
     }

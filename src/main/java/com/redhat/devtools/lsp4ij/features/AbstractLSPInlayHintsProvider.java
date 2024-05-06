@@ -19,8 +19,10 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.layout.LCFlags;
 import com.intellij.ui.layout.LayoutKt;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
+import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -157,10 +159,18 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         return true;
     }
 
-    protected void executeClientCommand(@Nullable Command command, @NotNull Editor editor, @Nullable InputEvent event) {
-        if (command != null) {
-            CommandExecutor.executeCommandClientSide(command, null, editor, editor.getProject(), event != null ? (Component) event.getSource() : null, event);
+    protected void executeCommand(@Nullable Command command,
+                                  @NotNull PsiFile file,
+                                  @NotNull Editor editor,
+                                  @Nullable InputEvent event,
+                                  @NotNull LanguageServerItem languageServer) {
+        if (command == null) {
+            return;
         }
+        LSPCommandContext context = new LSPCommandContext(command, file, editor, languageServer)
+                .setSource(event != null ? (Component) event.getSource() : null)
+                        .setInputEvent(event);
+        CommandExecutor.executeCommand(context);
     }
 
     protected abstract void doCollect(@NotNull PsiFile psiFile,

@@ -40,15 +40,15 @@ public class LSPDiagnosticsForServer {
 
     private record DiagnosticData(Range range, List<Diagnostic> diagnostics) {};
 
-    private final LanguageServerWrapper languageServerWrapper;
+    private final LanguageServerItem languageServer;
 
     private final VirtualFile file;
 
     // Map which contains all current diagnostics (as key) and future which load associated quick fixes (as value)
     private Map<Diagnostic, LSPLazyCodeActions> diagnostics;
 
-    public LSPDiagnosticsForServer(LanguageServerWrapper languageServerWrapper, VirtualFile file) {
-        this.languageServerWrapper = languageServerWrapper;
+    public LSPDiagnosticsForServer(LanguageServerItem languageServer, VirtualFile file) {
+        this.languageServer = languageServer;
         this.file = file;
         this.diagnostics = Collections.emptyMap();
     }
@@ -93,7 +93,7 @@ public class LSPDiagnosticsForServer {
         }
         // Associate each diagnostic with the list of code actions to load for a given range
         for (DiagnosticData data : diagnosticsGroupByCoveredRange) {
-            var action = new LSPLazyCodeActions(data.diagnostics(), file, languageServerWrapper);
+            var action = new LSPLazyCodeActions(data.diagnostics(), file, languageServer);
             data.diagnostics()
                     .forEach(d -> {
                         // Get the existing LSP lazy code actions for the current diagnostic
@@ -135,7 +135,7 @@ public class LSPDiagnosticsForServer {
      * @return Intellij quickfixes for the given diagnostic if there available.
      */
     public List<LSPLazyCodeActionIntentionAction> getQuickFixesFor(Diagnostic diagnostic) {
-        boolean codeActionSupported = isCodeActionSupported(languageServerWrapper);
+        boolean codeActionSupported = isCodeActionSupported(languageServer.getServerWrapper());
         if (!codeActionSupported || diagnostics.isEmpty()) {
             return Collections.emptyList();
         }

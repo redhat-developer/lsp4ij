@@ -15,11 +15,10 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.util.ui.EDT;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.net.URI;
 
 /**
  * Abstract IJ {@link AnAction} class to execute an LSP {@link Command}.
@@ -43,13 +42,14 @@ public abstract class LSPCommandAction extends AnAction {
     }
 
     /**
-     * Returns the document URI which performs the action and null otherwise.
+     * Returns the language server which performs the action and null otherwise.
      *
      * @param e the action event.
-     * @return the document URI which performs the action and null otherwise.
+     * @return the language server which performs the action and null otherwise.
      */
-    protected @Nullable URI getDocumentUri(@NotNull AnActionEvent e) {
-        return e.getData(CommandExecutor.LSP_COMMAND_DOCUMENT_URI);
+    @Nullable
+    protected LanguageServerItem getLanguageServer(@NotNull AnActionEvent e) {
+        return e.getData(CommandExecutor.LSP_COMMAND_LANGUAGE_SERVER);
     }
 
     /**
