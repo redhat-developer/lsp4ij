@@ -19,6 +19,7 @@ package com.redhat.devtools.lsp4ij.mock;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.jsonrpc.messages.Either3;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -26,6 +27,7 @@ import org.eclipse.lsp4j.services.NotebookDocumentService;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -129,10 +131,6 @@ public final class MockLanguageServer implements LanguageServer {
 		capabilities.setDocumentHighlightProvider(Boolean.TRUE);
 		capabilities
 				.setExecuteCommandProvider(new ExecuteCommandOptions(Collections.singletonList(SUPPORTED_COMMAND_ID)));
-		RenameOptions prepareRenameProvider = new RenameOptions();
-		prepareRenameProvider.setPrepareProvider(true);
-		Either<Boolean, RenameOptions> renameEither = Either.forRight(prepareRenameProvider);
-		capabilities.setRenameProvider(renameEither);
 		capabilities.setColorProvider(Boolean.TRUE);
 		capabilities.setDocumentSymbolProvider(Boolean.TRUE);
 		capabilities.setLinkedEditingRangeProvider(new LinkedEditingRangeRegistrationOptions());
@@ -224,6 +222,14 @@ public final class MockLanguageServer implements LanguageServer {
 		initializeResult.getCapabilities().setTextDocumentSync(textDocumentSyncOptions);
 
 		this.textDocumentService.setWillSaveWaitUntilCallback(edits);
+	}
+
+	public void setPrepareRenameProcessor(Function<PrepareRenameParams, Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>> prepareRenameProcessor) {
+		this.textDocumentService.setPrepareRenameProcessor(prepareRenameProcessor);
+	}
+
+	public void setRenameProcessor(Function<RenameParams, WorkspaceEdit> renameProcessor) {
+		this.textDocumentService.setRenameProcessor(renameProcessor);
 	}
 
 	public InitializeResult getInitializeResult() {

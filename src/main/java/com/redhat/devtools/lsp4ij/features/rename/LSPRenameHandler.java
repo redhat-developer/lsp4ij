@@ -95,7 +95,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
                     error = error.getCause();
                 }
                 // The language server throws an error while preparing rename, display it as hint in the editor
-                showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.prepare.error", error.getMessage()));
+                showErrorHint(editor, error.getMessage());
                 return error;
             }
             if (prepareRenamesResult.isEmpty()) {
@@ -105,21 +105,39 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
             }
 
             // Here we have collected the prepare rename results for each language server supporting the rename capability.
+
             // Step 2: open the LSP rename dialog to consume the LSP 'textDocument/rename' request when OK is pressed.
-            ApplicationManager.getApplication()
-                    .invokeLater(() -> {
-
-                        // Create rename parameters
-                        LSPRenameParams renameParams = createRenameParams(prepareRenamesResult, textDocument, position);
-
-                        // Open the LSP rename dialog
-                        LSPRenameRefactoringDialog dialog = new LSPRenameRefactoringDialog(renameParams, psiFile, editor);
-                        dialog.show();
-                    });
-
+            var renameRunnable = showDialogAndRename(editor, psiFile, prepareRenamesResult, textDocument, position);
+            if (ApplicationManager.getApplication().isUnitTestMode()) {
+                renameRunnable.run();
+            } else {
+                ApplicationManager
+                        .getApplication()
+                        .invokeLater(renameRunnable);
+            }
             return prepareRenamesResult;
         });
 
+    }
+
+    @NotNull
+    private static Runnable showDialogAndRename(@NotNull Editor editor,
+                                                @NotNull PsiFile psiFile,
+                                                @NotNull List<PrepareRenameResultData> prepareRenamesResult,
+                                                @NotNull TextDocumentIdentifier textDocument,
+                                                @NotNull Position position) {
+        return () -> {
+            // Create rename parameters
+            LSPRenameParams renameParams = createRenameParams(prepareRenamesResult, textDocument, position);
+            // Open the LSP rename dialog
+            if (ApplicationManager.getApplication().isUnitTestMode()) {
+                LSPRenameUnitTestMode.get().showRenameRefactoringDialog(renameParams);
+                LSPRenameRefactoringDialog.doRename(renameParams, psiFile, editor);
+            } else {
+                LSPRenameRefactoringDialog dialog = new LSPRenameRefactoringDialog(renameParams, psiFile, editor);
+                dialog.show();
+            }
+        };
     }
 
     @NotNull
@@ -201,6 +219,10 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
     }
 
     static void showErrorHint(@NotNull Editor editor, @NotNull String text) {
+        if (ApplicationManager.getApplication().isUnitTestMode()) {
+            LSPRenameUnitTestMode.get().showErrorHint(text);
+            return;
+        }
         if (ApplicationManager.getApplication().isDispatchThread()) {
             HintManager.getInstance().showErrorHint(editor, text);
         } else {

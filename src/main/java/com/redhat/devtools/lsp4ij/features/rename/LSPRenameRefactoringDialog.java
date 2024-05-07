@@ -140,9 +140,9 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
      * @param renameParams the rename parameters.
      * @param psiFile      the Psi file.
      */
-    private static void doRename(@NotNull LSPRenameParams renameParams,
-                                 @NotNull PsiFile psiFile,
-                                 @NotNull Editor editor) {
+    static void doRename(@NotNull LSPRenameParams renameParams,
+                         @NotNull PsiFile psiFile,
+                         @NotNull Editor editor) {
 
         CompletableFuture<List<WorkspaceEditData>> future = LSPFileSupport.getSupport(psiFile)
                 .getRenameSupport()
@@ -152,7 +152,8 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
         // The 'rename' is stopped:
         // - if user change the editor content
         // - if it cancels the Task
-        waitUntilDoneAsync(future, LanguageServerBundle.message("lsp.refactor.rename.progress.title", psiFile.getVirtualFile().getName(),renameParams.getNewName()), psiFile);
+        String title = LanguageServerBundle.message("lsp.refactor.rename.progress.title", psiFile.getVirtualFile().getName(), renameParams.getNewName());
+        waitUntilDoneAsync(future, title, psiFile);
 
         future.handle((workspaceEdits, error) -> {
             if (error != null) {
@@ -165,7 +166,7 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                     error = error.getCause();
                 }
                 // The language server throws an error, display it as hint in the editor
-                LSPRenameHandler.showErrorHint(editor, LanguageServerBundle.message("lsp.refactor.rename.process.error", error.getMessage()));
+                LSPRenameHandler.showErrorHint(editor, error.getMessage());
                 return null;
             }
             if (workspaceEdits == null || workspaceEdits.isEmpty()) {

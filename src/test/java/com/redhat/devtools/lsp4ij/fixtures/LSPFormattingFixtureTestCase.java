@@ -43,7 +43,7 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
     }
 
     /**
-     * Test LSP completion.
+     * Test LSP formatting.
      *
      * @param fileName       the file name used to match registered language servers.
      * @param text           the editor content text.
