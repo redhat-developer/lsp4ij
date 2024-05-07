@@ -105,12 +105,12 @@ public class LSPPrepareRenameSupport extends AbstractLSPFeatureSupport<LSPPrepar
                                                                                          @NotNull LanguageServerItem languageServer,
                                                                                          @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
-                        .getTextDocumentService()
-                        .prepareRename(params), languageServer.getServerWrapper(), LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME,
+                                .getTextDocumentService()
+                                .prepareRename(params), languageServer.getServerWrapper(), LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME,
                         false /* if prepare name throws an error, the error must not be displayed as notification but as hint in the editor  */)
                 .thenApplyAsync(prepareRename -> {
                     PrepareRenameResultData result = getPrepareRenameResultData(defaultPrepareRenameResultProvider, languageServer, prepareRename);
-                    return result!= null ? List.of(result) : Collections.emptyList();
+                    return result != null ? List.of(result) : Collections.emptyList();
                 });
     }
 
@@ -118,29 +118,42 @@ public class LSPPrepareRenameSupport extends AbstractLSPFeatureSupport<LSPPrepar
     private static PrepareRenameResultData getPrepareRenameResultData(@NotNull DefaultPrepareRenameResultProvider defaultPrepareRenameResultProvider,
                                                                       @NotNull LanguageServerItem languageServer,
                                                                       @Nullable Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior> prepareRename) {
-        if (prepareRename != null) {
-            Range range = null;
-            String placeholder = null;
-            if (prepareRename.isFirst()) {
-                range = prepareRename.getFirst();
-            } else if (prepareRename.isSecond()) {
-                PrepareRenameResult prepareRenameResult = prepareRename.getSecond();
-                range = prepareRenameResult.getRange();
-                placeholder = prepareRenameResult.getPlaceholder();
-            }
-            var document = defaultPrepareRenameResultProvider.getDocument();
-            var textRange = range != null ? LSPIJUtils.toTextRange(range, document) : defaultPrepareRenameResultProvider.getTextRange();
-            if (textRange == null) {
-                // Invalid text range
-                // ex: the rename is done in spaces or an empty file
-                return null;
-            }
-            if (placeholder == null) {
-                placeholder = document.getText(textRange);
-            }
-            return new PrepareRenameResultData(textRange, placeholder, languageServer);
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename
+
+        if (prepareRename == null) {
+            // The language server supports prepare rename,
+            // and the textDocument/prepareRename returns nothing,
+            // The element cannot be renamed.
+            return null;
         }
-        return defaultPrepareRenameResultProvider.apply(languageServer);
+
+        if (prepareRename.isThird()) {
+            // PrepareRenameDefaultBehavior
+            return defaultPrepareRenameResultProvider.apply(languageServer);
+        }
+
+        Range range = null;
+        String placeholder = null;
+        if (prepareRename.isFirst()) {
+            // Range
+            range = prepareRename.getFirst();
+        } else if (prepareRename.isSecond()) {
+            // PrepareRenameResult
+            PrepareRenameResult prepareRenameResult = prepareRename.getSecond();
+            range = prepareRenameResult.getRange();
+            placeholder = prepareRenameResult.getPlaceholder();
+        }
+        var document = defaultPrepareRenameResultProvider.getDocument();
+        var textRange = range != null ? LSPIJUtils.toTextRange(range, document) : defaultPrepareRenameResultProvider.getTextRange();
+        if (textRange == null) {
+            // Invalid text range
+            // ex: the rename is done in spaces or an empty file
+            return null;
+        }
+        if (placeholder == null) {
+            placeholder = document.getText(textRange);
+        }
+        return new PrepareRenameResultData(textRange, placeholder, languageServer);
     }
 
 
