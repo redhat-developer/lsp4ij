@@ -168,18 +168,20 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
                 // There is at least one language server providing rename support for the file.
                 try {
                     searchingRenameHandlers = true;
+                    var renameHandlers = RenameHandlerRegistry.getInstance().getRenameHandlers(dataContext);
+                    if (renameHandlers.isEmpty()) {
+                        return true;
+                    }
                     // When there are several rename handlers, IJ removes all MemberInplaceRenameHandlers (ex: inline Java field rename)
                     // See https://github.com/JetBrains/intellij-community/blob/cc10f72bc90a650b8d9d9f0427ae5a56111940dd/platform/lang-impl/src/com/intellij/refactoring/rename/RenameHandlerRegistry.java#L106
                     // To avoid showing the LSP Rename dialog when a Java field is renamed (which will do nothing)
                     // We want to show the IJ inline variable rename handler instead of LSP rename dialog.
                     // So we check none of them is an instance of MemberInplaceRenameHandler,
                     // in which case, the LSP rename dialog will not be available
-                    return !RenameHandlerRegistry.getInstance()
-                            .getRenameHandlers(dataContext)
+                    return !renameHandlers
                             .stream()
                             .allMatch(renameHandler -> renameHandler instanceof MemberInplaceRenameHandler);
-                }
-                finally {
+                } finally {
                     searchingRenameHandlers = false;
                 }
             }

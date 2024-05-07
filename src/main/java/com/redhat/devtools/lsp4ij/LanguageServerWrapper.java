@@ -136,7 +136,7 @@ public class LanguageServerWrapper implements Disposable {
         String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
         this.listener = Executors
                 .newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(listenerThreadNameFormat).build());
-        udateStatus(ServerStatus.none);
+        updateStatus(ServerStatus.none);
 
         // When project is disposed, we dispose the language server
         // But the language server should be disposed before because when project is closing
@@ -226,7 +226,7 @@ public class LanguageServerWrapper implements Disposable {
                         initParams.setInitializationOptions(this.lspStreamProvider.getInitializationOptions(rootURI));
 
                         // Starting process...
-                        udateStatus(ServerStatus.starting);
+                        updateStatus(ServerStatus.starting);
                         getLanguageServerLifecycleManager().onStatusChanged(this);
                         this.currentProcessId = null;
                         this.currentProcessCommandLines = null;
@@ -305,7 +305,7 @@ public class LanguageServerWrapper implements Disposable {
                         fileOperationsManager = new FileOperationsManager(this);
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
 
-                        udateStatus(ServerStatus.started);
+                        updateStatus(ServerStatus.started);
                         getLanguageServerLifecycleManager().onStatusChanged(this);
                     }).exceptionally(e -> {
                         if (e instanceof CompletionException) {
@@ -377,19 +377,19 @@ public class LanguageServerWrapper implements Disposable {
             timer.cancel();
             timer = null;
             if (!stopping) {
-                udateStatus(ServerStatus.started);
+                updateStatus(ServerStatus.started);
                 getLanguageServerLifecycleManager().onStatusChanged(this);
             }
         }
     }
 
-    private void udateStatus(ServerStatus serverStatus) {
+    private void updateStatus(ServerStatus serverStatus) {
         this.serverStatus = serverStatus;
     }
 
     private void startStopTimer() {
         timer = new Timer("Stop Language Server Timer"); //$NON-NLS-1$
-        udateStatus(ServerStatus.stopping);
+        updateStatus(ServerStatus.stopping);
         getLanguageServerLifecycleManager().onStatusChanged(this);
         timer.schedule(new TimerTask() {
             @Override
@@ -441,7 +441,7 @@ public class LanguageServerWrapper implements Disposable {
             if (alreadyStopping) {
                 return;
             }
-            udateStatus(ServerStatus.stopping);
+            updateStatus(ServerStatus.stopping);
             getLanguageServerLifecycleManager().onStatusChanged(this);
 
             removeStopTimer(true);
@@ -470,7 +470,7 @@ public class LanguageServerWrapper implements Disposable {
                 Runnable shutdownKillAndStopFutureAndProvider = () -> {
                     shutdownAll(languageServerInstance, provider, serverFuture);
                     this.stopping.set(false);
-                    udateStatus(ServerStatus.stopped);
+                    updateStatus(ServerStatus.stopped);
                     getLanguageServerLifecycleManager().onStatusChanged(this);
                 };
                 CompletableFuture.runAsync(shutdownKillAndStopFutureAndProvider);
@@ -590,7 +590,15 @@ public class LanguageServerWrapper implements Disposable {
 
         var existingData = connectedDocuments.get(fileUri);
         if (existingData != null) {
-            return existingData.getSynchronizer().didOpenFuture
+            var didOpenFuture = existingData.getSynchronizer().didOpenFuture;
+            if (didOpenFuture.isDone()) {
+                // The didOpen has occurred, no need to wait for the didOpen
+                // to return the language server
+                return CompletableFuture.completedFuture(languageServer);
+            }
+            // The didOpen has not occurred, wait for the end of didOpen
+            // to return the language server
+            return didOpenFuture
                     .thenApplyAsync(theVoid -> languageServer);
         }
         start();
