@@ -73,7 +73,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
             DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
             DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
             for (var serverDefinition : event.serverDefinitions) {
-                LanguageServerTreeNode node = findNodeForServer(serverDefinition, root);
+                LanguageServerTreeNode node = findNodeForServer(serverDefinition);
                 if (node != null) {
                     // Remove the language server definition from the tree
                     root.remove(node);
@@ -94,28 +94,29 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
             if (event.nameChanged) {
                 // A server definition name has changed, rename the proper tree node label of the explorer
                 DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
-                DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
-                LanguageServerTreeNode node = findNodeForServer(event.serverDefinition, root);
+                LanguageServerTreeNode node = findNodeForServer(event.serverDefinition);
                 if (node != null) {
                     treeModel.nodeChanged(node);
                 }
             }
         }
+    };
 
-        private static @Nullable LanguageServerTreeNode findNodeForServer(@NotNull LanguageServerDefinition serverDefinition, DefaultMutableTreeNode root) {
-            Enumeration<TreeNode> children = root.children();
-            while (children.hasMoreElements()) {
-                TreeNode child = children.nextElement();
-                if (child instanceof LanguageServerTreeNode serverTreeNode) {
-                    if (serverDefinition.equals(serverTreeNode.getServerDefinition())) {
-                        return serverTreeNode;
-                    }
+
+    public @Nullable LanguageServerTreeNode findNodeForServer(@NotNull LanguageServerDefinition serverDefinition) {
+        DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
+        Enumeration<TreeNode> children = root.children();
+        while (children.hasMoreElements()) {
+            TreeNode child = children.nextElement();
+            if (child instanceof LanguageServerTreeNode serverTreeNode) {
+                if (serverDefinition.equals(serverTreeNode.getServerDefinition())) {
+                    return serverTreeNode;
                 }
             }
-            return null;
         }
-
-    };
+        return null;
+    }
 
     private boolean disposed;
 
@@ -265,8 +266,8 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         return disposed || getProject().isDisposed() || listener.isDisposed();
     }
 
-    public void showMessage(LanguageServerProcessTreeNode processTreeNode, String message) {
-        panel.showMessage(processTreeNode, message);
+    public void showTrace(LanguageServerProcessTreeNode processTreeNode, String message) {
+        panel.showTrace(processTreeNode, message);
     }
 
     public void showError(LanguageServerProcessTreeNode processTreeNode, Throwable exception) {

@@ -122,9 +122,10 @@ public class CommandExecutor {
                     .exceptionally(error -> {
                         // Language server throws an error when executing a command
                         // Display it with an IntelliJ notification.
+                        var languageServerWrapper = languageServer.getServerWrapper();
                         MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
-                        var languageServerDefinition = languageServer.getServerWrapper().getServerDefinition();
-                        ServerMessageHandler.showMessage(languageServerDefinition.getDisplayName(), messageParams);
+                        var languageServerDefinition = languageServerWrapper.getServerDefinition();
+                        ServerMessageHandler.showMessage(languageServerDefinition.getDisplayName(), messageParams, languageServerWrapper.getProject());
                         return error;
                     });
         });
@@ -135,7 +136,7 @@ public class CommandExecutor {
     private static CompletableFuture<LanguageServer> getLanguageServerForCommand(@NotNull Command command,
                                                                                  @NotNull LanguageServerItem languageServer) {
 
-        if (languageServer.canSupportsCommand(command)) {
+        if (languageServer.supportsCommand(command)) {
             return languageServer
                     .getServerWrapper()
                     .getInitializedServer();

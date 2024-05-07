@@ -16,10 +16,7 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.actions.DisableLanguageServerErrorAction;
@@ -176,14 +173,17 @@ public class CancellationSupport implements CancelChecker {
 
     private static void showNotificationError(@NotNull LanguageServerWrapper serverWrapper, @Nullable String featureName, ResponseErrorException error) {
         String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
-        String title = languageServerName + " (" + featureName + ")";
         String content = error.getMessage();
-        Notification notification = new Notification(LanguageServerBundle.message("language.server.protocol.groupId"), title, content, NotificationType.ERROR);
+        Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
+                languageServerName,
+                content,
+                NotificationType.ERROR);
+        notification.setSubtitle(featureName);
         notification.addAction(new DisableLanguageServerErrorAction(notification, serverWrapper));
         notification.addAction(new ReportErrorInLogAction(notification, serverWrapper));
         notification.addAction(new OpenUrlAction(LSP4IJWebsiteUrlConstants.FEEDBACK_URL));
         notification.setIcon(AllIcons.General.Error);
-        Notifications.Bus.notify(notification);
+        Notifications.Bus.notify(notification, serverWrapper.getProject());
     }
 
     /**
