@@ -96,7 +96,7 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
 
  * ✅ [window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage). (see [implementation details](#show-message))
  * ✅ [window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest) (see [implementation details](#show-message-request))
- * ❌ [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage).
+ * ✅ [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage) (see [implementation details](./UserGuide.md#lsp-console))
  * ✅ [window/showDocument](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument).
  * ❌ [telemetry/event](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#telemetry_event).
 
@@ -341,9 +341,13 @@ Here is an example with [Rust Analyzer](https://rust-analyzer.github.io/) report
   "message": "Failed to discover workspace.\nConsider adding the `Cargo.toml` of the workspace to the [`linkedProjects`](https://rust-analyzer.github.io/manual.html#rust-analyzer.linkedProjects) setting.\n\nFailed to load workspaces."
 }
 ```
-is rendered as: 
+is rendered as a `Balloon` notification: 
 
 ![window/showMessage](./images/lsp-support/window_showMessage.png)
+
+You can change the notification behavior of `LSP/window/showMessage` by using the standard UI `Notifications` preferences :
+
+![window/showMessage Notification](./images/lsp-support/window_showMessage_Notification.png)
 
 ## Show Message Request
 
@@ -368,6 +372,10 @@ Here is an example with [Scala Language Server (MetaLS)](./user-defined-ls/metal
   "message": "No .scalafmt.conf file detected. How would you like to proceed:"
 }
 ```
-is rendered as:
+is rendered as a `Sticky balloon` notification:
 
 ![window/showMessageRequest](./images/lsp-support/window_showMessageRequest.png)
+
+You can change the notification behavior of `LSP/window/showMessageRequest` by using the standard UI `Notifications` preferences :
+
+![window/showMessageRequest Notification](./images/lsp-support/window_showMessageRequest_Notification.png)

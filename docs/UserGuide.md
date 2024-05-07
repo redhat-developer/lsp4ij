@@ -12,7 +12,11 @@ The state of the servers is visible, stop and restart is available with a right-
 The communication details between the IDE and the language servers are seen in the "LSP consoles" pane. 
 In verbose mode, the messages can be expanded for more details:
 
-![LSP console messages](./images/LSPConsole.png)
+![LSP console Traces](./images/LSPConsole.png)
+
+If the language server logs messages via [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage), you can see them in the `Logs` tab:
+
+![LSP console Logs](./images/LSPConsole_Logs.png) 
 
 When a language server is started, several actions are available, like stopping the language server or copying the command starting the language server :
 

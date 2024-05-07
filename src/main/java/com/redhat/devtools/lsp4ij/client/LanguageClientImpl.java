@@ -81,7 +81,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public final void showMessage(MessageParams messageParams) {
-        ServerMessageHandler.showMessage(wrapper.getServerDefinition().getDisplayName(), messageParams);
+        ServerMessageHandler.showMessage(wrapper.getServerDefinition().getDisplayName(), messageParams, getProject());
     }
 
     @Override

@@ -15,15 +15,14 @@ package com.redhat.devtools.lsp4ij.console.explorer;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.ServerStatus;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 
-import javax.swing.tree.DefaultMutableTreeNode;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -64,7 +63,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
 
         TracingMessageConsumer tracing = getLSPRequestCacheFor(languageServer);
         String log = tracing.log(message, messageConsumer, serverTrace);
-        invokeLater(() -> showMessage(processTreeNode, log));
+        invokeLater(() -> showTrace(processTreeNode, log));
     }
 
     @Override
@@ -103,20 +102,8 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         return serverTrace != null ? serverTrace : ServerTrace.getDefaultValue();
     }
 
-    private LanguageServerTreeNode findLanguageServerTreeNode(LanguageServerWrapper languageServer) {
-        var tree = explorer.getTree();
-        DefaultMutableTreeNode top = (DefaultMutableTreeNode) tree.getModel().getRoot();
-        for (int i = 0; i < top.getChildCount(); i++) {
-            LanguageServerTreeNode node = (LanguageServerTreeNode) top.getChildAt(i);
-            if (node.getServerDefinition().equals(languageServer.getServerDefinition())) {
-                return node;
-            }
-        }
-        return null;
-    }
-
     private LanguageServerProcessTreeNode updateServerStatus(LanguageServerWrapper languageServer, ServerStatus serverStatus, boolean selectProcess) {
-        LanguageServerTreeNode serverNode = findLanguageServerTreeNode(languageServer);
+        LanguageServerTreeNode serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
         if (serverNode == null) {
             // Should never occur.
             return null;
@@ -154,11 +141,11 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         return processTreeNode;
     }
 
-    private void showMessage(LanguageServerProcessTreeNode processTreeNode, String message) {
+    private void showTrace(LanguageServerProcessTreeNode processTreeNode, String message) {
         if (explorer.isDisposed()) {
             return;
         }
-        explorer.showMessage(processTreeNode, message);
+        explorer.showTrace(processTreeNode, message);
     }
 
     private void showError(LanguageServerProcessTreeNode processTreeNode, Throwable exception) {

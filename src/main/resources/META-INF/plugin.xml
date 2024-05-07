@@ -381,9 +381,13 @@
         </intentionAction>
 
         <notificationGroup
-                id="Language Server Protocol"
-                displayType="BALLOON"
-                hideFromSettings="true"/>
+                id="LSP/window/showMessage"
+                displayType="BALLOON" />
+
+        <notificationGroup
+                id="LSP/window/showMessageRequest"
+                displayType="STICKY_BALLOON" />
+
     </extensions>
 
     <!-- Common LSP Client actions  -->

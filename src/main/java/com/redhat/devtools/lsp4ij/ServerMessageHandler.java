@@ -19,9 +19,14 @@ import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationListener;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.ui.popup.JBPopupListener;
+import com.intellij.openapi.ui.popup.LightweightWindowEvent;
+import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
@@ -33,19 +38,24 @@ import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverte
 
 public class ServerMessageHandler {
 
-    private static final ShowDocumentResult SHOW_DOCUMENT_RESULT_WITH_SUCCESS = new ShowDocumentResult(true);
+    public static final String LSP_WINDOW_SHOW_MESSAGE_GROUP_ID = "LSP/window/showMessage";
+    public static final String LSP_WINDOW_SHOW_MESSAGE_REQUEST_GROUP_ID = "LSP/window/showMessageRequest";
 
-    public static final ShowDocumentResult SHOW_DOCUMENT_RESULT_WITH_FAILURE = new ShowDocumentResult(false);
+    private static final ShowDocumentResult SHOW_DOCUMENT_RESULT_WITH_SUCCESS = new ShowDocumentResult(true);
+    private static final ShowDocumentResult SHOW_DOCUMENT_RESULT_WITH_FAILURE = new ShowDocumentResult(false);
 
     private ServerMessageHandler() {
         // this class shouldn't be instantiated
     }
 
-    private static final String NAME_PATTERN = "%s (%s)"; //$NON-NLS-1$
-
-
-    public static void logMessage(LanguageServerWrapper wrapper, MessageParams params) {
-        //TODO: implements message to console
+    /**
+     * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage">window/logMessage</a> specification.
+     *
+     * @param serverWrapper the language server wrapper
+     * @param params  the message request parameters
+     */
+    public static void logMessage(LanguageServerWrapper serverWrapper, MessageParams params) {
+        LSPConsoleToolWindowPanel.showLog(serverWrapper.getServerDefinition(), params, serverWrapper.getProject() );
     }
 
     private static Icon messageTypeToIcon(MessageType type) {
@@ -68,35 +78,78 @@ public class ServerMessageHandler {
     /**
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage">window/showMessage</a> specification.
      *
-     * @param title  the notification title
-     * @param params the message parameters
+     * @param title   the notification title.
+     * @param params  the message parameters.
+     * @param project the project.
      */
-    public static void showMessage(String title, MessageParams params) {
-        Notification notification = new Notification(LanguageServerBundle.message("language.server.protocol.groupId"), title, toHTML(params.getMessage()), messageTypeToNotificationType(params.getType()));
+    public static void showMessage(@NotNull String title,
+                                   @NotNull MessageParams params,
+                                   @NotNull Project project) {
+        Notification notification = new Notification(LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
+                title,
+                toHTML(params.getMessage()),
+                messageTypeToNotificationType(params.getType()));
         notification.setListener(NotificationListener.URL_OPENING_LISTENER);
         notification.setIcon(messageTypeToIcon(params.getType()));
-        Notifications.Bus.notify(notification);
+        Notifications.Bus.notify(notification, project);
     }
 
     /**
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest">window/showMessageRequest</a> specification.
      *
-     * @param wrapper the language server wrapper
+     * @param serverWrapper the language server wrapper
      * @param params  the message request parameters
      */
-    public static CompletableFuture<MessageActionItem> showMessageRequest(LanguageServerWrapper wrapper, ShowMessageRequestParams params) {
-        String[] options = params.getActions().stream().map(MessageActionItem::getTitle).toArray(String[]::new);
+    public static CompletableFuture<MessageActionItem> showMessageRequest(@NotNull LanguageServerWrapper serverWrapper,
+                                                                          @NotNull ShowMessageRequestParams params) {
         CompletableFuture<MessageActionItem> future = new CompletableFuture<>();
-
         ApplicationManager.getApplication()
                 .invokeLater(() -> {
-                    MessageActionItem result = new MessageActionItem();
-                    int dialogResult = Messages.showIdeaMessageDialog(null, params.getMessage(), wrapper.getServerDefinition().getDisplayName(), options, 0, Messages.getInformationIcon(), null);
-                    if (dialogResult != -1) {
-                        result.setTitle(options[dialogResult]);
+                    String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
+                    String title = params.getMessage();
+                    String content = toHTML(params.getMessage());
+                    final Notification notification = new Notification(
+                            LSP_WINDOW_SHOW_MESSAGE_REQUEST_GROUP_ID,
+                            languageServerName,
+                            content,
+                            messageTypeToNotificationType(params.getType()));
+                    notification.setIcon(messageTypeToIcon(params.getType()));
+                    for (var action : params.getActions()) {
+                        notification.addAction(new AnAction(action.getTitle()) {
+                            @Override
+                            public void actionPerformed(@NotNull AnActionEvent e) {
+                                MessageActionItem result = new MessageActionItem();
+                                result.setTitle(action.getTitle());
+                                future.complete(result);
+                                notification.expire();
+                            }
+
+                            @Override
+                            public @NotNull ActionUpdateThread getActionUpdateThread() {
+                                return ActionUpdateThread.BGT;
+                            }
+                        });
                     }
-                    future.complete(result);
+                    notification.whenExpired(()-> {
+                        if (!future.isDone()) {
+                            future.cancel(true);
+                        }
+                    });
+
+                    Notifications.Bus.notify(notification, serverWrapper.getProject());
+                    var balloon= notification.getBalloon();
+                    if (balloon != null) {
+                        balloon.addListener(new JBPopupListener() {
+                            @Override
+                            public void onClosed(@NotNull LightweightWindowEvent event) {
+                                if (!future.isDone()) {
+                                    future.cancel(true);
+                                }
+                            }
+                        });
+                    }
                 });
+
         return future;
     }
 

@@ -457,7 +457,7 @@ public class LanguageServerItem {
      * @param command the LSP command.
      * @return true if the given LSP command is supported by the language server and false otherwise.
      */
-    public boolean canSupportsCommand(@Nullable Command command) {
+    public boolean supportsCommand(@Nullable Command command) {
         if (command == null) {
             return false;
         }

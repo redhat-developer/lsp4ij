@@ -23,10 +23,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.ui.CardLayoutPanel;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.components.JBScrollPane;
+import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.JBUI;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.console.actions.ApplyLanguageServerSettingsAction;
 import com.redhat.devtools.lsp4ij.console.actions.ResetLanguageServerSettingsAction;
@@ -37,6 +40,8 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettingsListener;
+import org.eclipse.lsp4j.MessageParams;
+import org.eclipse.lsp4j.MessageType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,6 +58,7 @@ import java.util.Set;
  */
 public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements Disposable {
 
+    public static final String LANGUAGE_SERVERS_TOOL_WINDOW_ID = "Language Servers";
     private final Project project;
 
     private LanguageServerExplorer explorer;
@@ -108,7 +114,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         }
         var serverPanel = consoles.getValue(serverNode, false);
         if (serverPanel != null && serverPanel.isShowing()) {
-            LanguageServerView detailView= serverPanel.detailView;
+            LanguageServerView detailView = serverPanel.detailView;
             if (detailView != null && detailView.getComponent().isShowing()) {
                 return detailView.isEditingCommand();
             }
@@ -178,7 +184,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 value.dispose();
             }
             // Remove the console panel of the language server (processes)
-            for (int i = 0; i <  key.getChildCount(); i++) {
+            for (int i = 0; i < key.getChildCount(); i++) {
                 if (key.getChildAt(i) instanceof DefaultMutableTreeNode treeNode) {
                     dispose(treeNode);
                 }
@@ -193,7 +199,9 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         private LanguageServerView detailView;
 
-        private ConsoleView consoleView;
+        private ConsoleView tracesConsoleView;
+
+        private ConsoleView logsConsoleView;
 
         private final Set<UserDefinedLanguageServerSettingsListener> settingsChangeListeners = new HashSet<UserDefinedLanguageServerSettingsListener>();
 
@@ -208,11 +216,19 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 configureDetailToolbar(detailView);
                 showDetail();
             } else if (key instanceof LanguageServerProcessTreeNode) {
-                // Create console view
-                consoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
-                Disposer.register(LSPConsoleToolWindowPanel.this, consoleView);
-                add(consoleView.getComponent(), NAME_VIEW_CONSOLE);
-                configureConsoleToolbar(consoleView);
+                // Create console Traces/Logs views
+                JBTabbedPane tabbedPane = new JBTabbedPane();
+                add(tabbedPane, NAME_VIEW_CONSOLE);
+
+                tracesConsoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
+                Disposer.register(LSPConsoleToolWindowPanel.this, tracesConsoleView);
+                tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.traces.title"), tracesConsoleView.getComponent());
+                configureConsoleToolbar(tracesConsoleView);
+
+                logsConsoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
+                Disposer.register(LSPConsoleToolWindowPanel.this, logsConsoleView);
+                tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.logs.title"), logsConsoleView.getComponent());
+
                 showConsole();
             }
         }
@@ -248,19 +264,29 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             show(NAME_VIEW_DETAIL);
         }
 
-        public void showMessage(String message) {
-            if (consoleView == null) {
+        public void showTrace(String message) {
+            if (tracesConsoleView == null) {
                 return;
             }
-            consoleView.print(message, ConsoleViewContentType.SYSTEM_OUTPUT);
+            tracesConsoleView.print(message, ConsoleViewContentType.SYSTEM_OUTPUT);
         }
 
         public void showError(Throwable exception) {
-            if (consoleView == null) {
+            if (tracesConsoleView == null) {
                 return;
             }
             String stacktrace = getStackTrace(exception);
-            consoleView.print(stacktrace, ConsoleViewContentType.ERROR_OUTPUT);
+            tracesConsoleView.print(stacktrace, ConsoleViewContentType.ERROR_OUTPUT);
+        }
+
+        public void showLog(MessageParams params) {
+            if (logsConsoleView == null) {
+                return;
+            }
+            ConsoleViewContentType contentType = getContentType(params.getType());
+            String message = params.getMessage();
+            message = message + "\n";
+            logsConsoleView.print(message, contentType);
         }
 
         @Override
@@ -274,10 +300,19 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             }
             serverDefinitionListeners.clear();
             super.dispose();
-            if (consoleView != null) {
-                consoleView.dispose();
+            if (tracesConsoleView != null) {
+                tracesConsoleView.dispose();
             }
         }
+    }
+
+    private static ConsoleViewContentType getContentType(MessageType type) {
+        return switch (type) {
+            case Error -> ConsoleViewContentType.LOG_ERROR_OUTPUT;
+            case Info -> ConsoleViewContentType.LOG_INFO_OUTPUT;
+            case Log -> ConsoleViewContentType.LOG_VERBOSE_OUTPUT;
+            case Warning -> ConsoleViewContentType.LOG_WARNING_OUTPUT;
+        };
     }
 
     @Override
@@ -386,13 +421,13 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         return builder.getConsole();
     }
 
-    public void showMessage(LanguageServerProcessTreeNode processTreeNode, String message) {
+    public void showTrace(LanguageServerProcessTreeNode processTreeNode, String message) {
         if (isDisposed()) {
             return;
         }
         var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
         if (consoleOrErrorPanel != null) {
-            consoleOrErrorPanel.showMessage(message);
+            consoleOrErrorPanel.showTrace(message);
         }
     }
 
@@ -406,6 +441,45 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         }
     }
 
+    /**
+     * Show the given message parameters in the tab "Logs" of the LSP console of the given server definition.
+     *
+     * @param serverDefinition the language server definition.
+     * @param params           the message parameters.
+     * @param project          the project.
+     */
+    public static void showLog(@NotNull LanguageServerDefinition serverDefinition,
+                               @NotNull MessageParams params,
+                               @NotNull Project project) {
+        // Get the LSP tool window
+        var toolWindow = ToolWindowManager.getInstance(project).getToolWindow(LANGUAGE_SERVERS_TOOL_WINDOW_ID);
+        if (toolWindow == null) {
+            return;
+        }
+        // Get the panel of the LSP tool window
+        var contentManager = toolWindow.getContentManager();
+        LSPConsoleToolWindowPanel panel = (LSPConsoleToolWindowPanel) contentManager.getContent(0).getComponent();
+        // Show log...
+        panel.showLog(params, serverDefinition);
+    }
+
+    private void showLog(MessageParams params, LanguageServerDefinition serverDefinition) {
+        if (isDisposed()) {
+            return;
+        }
+        LanguageServerTreeNode serverNode = explorer.findNodeForServer(serverDefinition);
+        if (serverNode == null) {
+            return;
+        }
+        var processTreeNode = serverNode.getActiveProcessTreeNode();
+        if (processTreeNode == null) {
+            return;
+        }
+        var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
+        if (consoleOrErrorPanel != null) {
+            consoleOrErrorPanel.showLog(params);
+        }
+    }
 
     /**
      * Configure console toolbar on the right of the console to provide some action like "Scroll to End", "Clean", etc
