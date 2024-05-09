@@ -31,7 +31,9 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
 
             languageMappings.add(language);
         }
-        userDefinedLSDefinitionJson.add("languageMappings", languageMappings);
+        if (!languageMappings.isEmpty()) {
+            userDefinedLSDefinitionJson.add("languageMappings", languageMappings);
+        }
 
         JsonArray fileTypeMappings = new JsonArray();
         for (var fileTypeEntry : src.getFileTypeMappings().entrySet()) {
@@ -85,9 +87,9 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
                 fileTypeMappings.add(fileTypeContainer);
             }
         }
-
-        userDefinedLSDefinitionJson.add("fileTypeMappings", fileTypeMappings);
-
+        if (!fileTypeMappings.isEmpty()) {
+            userDefinedLSDefinitionJson.add("fileTypeMappings", fileTypeMappings);
+        }
 
         return userDefinedLSDefinitionJson;
     }
