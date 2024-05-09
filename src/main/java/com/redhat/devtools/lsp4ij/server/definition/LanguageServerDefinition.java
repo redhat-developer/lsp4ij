@@ -144,6 +144,18 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
         return languageIdLanguageMappings.get(language);
     }
 
+    public Map<Language, String> getLanguageMappings() {
+        return languageIdLanguageMappings;
+    }
+
+    public Map<FileType, String> getFileTypeMappings() {
+        return languageIdFileTypeMappings;
+    }
+
+    public List<Pair<List<FileNameMatcher>, String>> getFilenameMatcherMappings() {
+        return languageIdFileNameMatcherMappings;
+    }
+
     public @Nullable String getLanguageId(FileType fileType) {
         return languageIdFileTypeMappings.get(fileType);
     }

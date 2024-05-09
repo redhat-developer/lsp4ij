@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.google.gson.JsonParser;
+import com.google.gson.annotations.SerializedName;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
@@ -34,6 +35,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);//$NON-NLS-1$
 
+    @SerializedName("displayName")
     private String name;
     private String commandLine;
     private Map<String, String> userEnvironmentVariables;
