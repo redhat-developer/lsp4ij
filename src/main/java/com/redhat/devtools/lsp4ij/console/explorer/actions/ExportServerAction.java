@@ -65,11 +65,9 @@ public class ExportServerAction extends AnAction {
 
     private void printJson() {
         for (LanguageServerDefinition lsDefinition : languageServerDefinitions) {
-            if (lsDefinition instanceof UserDefinedLanguageServerDefinition) {
-                System.out.println("Is user defined!");
-            }
             Gson gson = new GsonBuilder()
                     .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
+                    .setPrettyPrinting()
                     .create();
             String json = gson.toJson(lsDefinition);
             System.out.println(json);
