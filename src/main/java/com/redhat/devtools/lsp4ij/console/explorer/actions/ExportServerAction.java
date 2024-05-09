@@ -73,6 +73,10 @@ public class ExportServerAction extends AnAction {
                     .create();
             String json = gson.toJson(lsDefinition);
             System.out.println(json);
+            String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
+            String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
+            System.out.println("Init: " + initializationOptions);
+            System.out.println("Settings: " + settings);
         }
     }
 
@@ -85,6 +89,8 @@ public class ExportServerAction extends AnAction {
                     .registerTypeAdapter(LanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
                     .create();
             String json = gson.toJson(lsDefinition);
+            String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
+            String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
             String lsName = lsDefinition.getDisplayName();
             ZipEntry entry = new ZipEntry(lsName + "/" + lsName + ".json");
 
