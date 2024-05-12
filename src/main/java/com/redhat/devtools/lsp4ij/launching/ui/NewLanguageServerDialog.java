@@ -13,6 +13,8 @@ package com.redhat.devtools.lsp4ij.launching.ui;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
+import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
@@ -32,6 +34,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -111,7 +114,11 @@ public class NewLanguageServerDialog extends DialogWrapper {
             @Override
             public void onFileChosen(@NotNull VirtualFile virtualFile) {
                 super.onFileChosen(virtualFile);
-                loadFromTemplate(virtualFile);
+                try {
+                    loadFromTemplate(virtualFile);
+                } catch (IOException e) {
+                    Messages.showErrorDialog(project, e.getMessage(), LanguageServerBundle.message("new.language.server.dialog.export.template.error"));
+                }
             }
         });
         panel.add(textFieldWithBrowseButton, BorderLayout.WEST);
@@ -154,11 +161,43 @@ public class NewLanguageServerDialog extends DialogWrapper {
         initializationOptions.setCaretPosition(0);
     }
 
-    private void loadFromTemplate(VirtualFile templateFolder) {
-        // Load the folder
-        // Check that the files exist
-        // Load the files
-        // Parse the contents to the correct fields
+    private void loadFromTemplate(VirtualFile templateFolder) throws IOException {
+        if (!templateFolder.isDirectory()) {
+            throw new IllegalArgumentException("The template folder must be a directory");
+        }
+
+        String template = null;
+        String settings = null;
+        String initializationOptions = null;
+
+        for (VirtualFile file : templateFolder.getChildren()) {
+            if (file.isDirectory()) {
+                continue;
+            }
+            switch (file.getName()) {
+                case "template.json":
+                    template = VfsUtilCore.loadText(file);
+                    break;
+                case "settings.json":
+                    settings = VfsUtilCore.loadText(file);
+                    break;
+                case "initializationOptions.json":
+                    initializationOptions = VfsUtilCore.loadText(file);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (template == null) {
+            throw new IllegalArgumentException("The template.json file is missing or invalid");
+        }
+        if (settings == null) {
+            throw new IllegalArgumentException("The settings.json file is missing or invalid");
+        }
+        if (initializationOptions == null) {
+            throw new IllegalArgumentException("The initializationOptions.json file is missing or invalid");
+        }
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
