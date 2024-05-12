@@ -156,6 +156,9 @@ public class LanguageServerTemplate {
         return configuration;
     }
 
+    public void setConfiguration(String configuration) {
+        this.configuration = configuration;
+    }
 
     public String getInitializationOptions() {
         if (initializationOptions != null) {
@@ -169,6 +172,10 @@ public class LanguageServerTemplate {
         String initializationOptionsContent = loadTemplateResourceContent(initializationOptionsPath);
         initializationOptions = initializationOptionsContent != null ? initializationOptionsContent : "";
         return initializationOptions;
+    }
+
+    public void setInitializationOptions(String initializationOptions) {
+        this.initializationOptions = initializationOptions;
     }
 
     private static String loadTemplateResourceContent(@NotNull String resourcePath) {

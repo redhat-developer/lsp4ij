@@ -204,7 +204,12 @@ public class NewLanguageServerDialog extends DialogWrapper {
         GsonBuilder builder = new GsonBuilder();
         builder.registerTypeAdapter(LanguageServerTemplate.class, new LanguageServerTemplateDeserializer());
         Gson gson = builder.create();
-        loadFromTemplate(gson.fromJson(templateJson, LanguageServerTemplate.class));
+
+        LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
+        template.setConfiguration(settingsJson);
+        template.setInitializationOptions(initializationOptionsJson);
+
+        loadFromTemplate(template);
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
