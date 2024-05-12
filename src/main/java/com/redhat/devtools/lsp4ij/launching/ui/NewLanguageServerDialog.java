@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
@@ -24,6 +26,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateDeserializer;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
@@ -166,9 +169,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
             throw new IllegalArgumentException("The template folder must be a directory");
         }
 
-        String template = null;
-        String settings = null;
-        String initializationOptions = null;
+        String templateJson = null;
+        String settingsJson = null;
+        String initializationOptionsJson = null;
 
         for (VirtualFile file : templateFolder.getChildren()) {
             if (file.isDirectory()) {
@@ -176,28 +179,33 @@ public class NewLanguageServerDialog extends DialogWrapper {
             }
             switch (file.getName()) {
                 case "template.json":
-                    template = VfsUtilCore.loadText(file);
+                    templateJson = VfsUtilCore.loadText(file);
                     break;
                 case "settings.json":
-                    settings = VfsUtilCore.loadText(file);
+                    settingsJson = VfsUtilCore.loadText(file);
                     break;
                 case "initializationOptions.json":
-                    initializationOptions = VfsUtilCore.loadText(file);
+                    initializationOptionsJson = VfsUtilCore.loadText(file);
                     break;
                 default:
                     break;
             }
         }
 
-        if (template == null) {
+        if (templateJson == null) {
             throw new IllegalArgumentException("The template.json file is missing or invalid");
         }
-        if (settings == null) {
+        if (settingsJson == null) {
             throw new IllegalArgumentException("The settings.json file is missing or invalid");
         }
-        if (initializationOptions == null) {
+        if (initializationOptionsJson == null) {
             throw new IllegalArgumentException("The initializationOptions.json file is missing or invalid");
         }
+
+        GsonBuilder builder = new GsonBuilder();
+        builder.registerTypeAdapter(LanguageServerTemplate.class, new LanguageServerTemplateDeserializer());
+        Gson gson = builder.create();
+        loadFromTemplate(gson.fromJson(templateJson, LanguageServerTemplate.class));
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
