@@ -109,10 +109,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
         TextFieldWithBrowseButton textFieldWithBrowseButton = new TextFieldWithBrowseButton();
         FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(false, true,
                 false, false, false, false);
-        textFieldWithBrowseButton.addBrowseFolderListener(
-                LanguageServerBundle.message("new.language.server.dialog.export.template.title"),
-                LanguageServerBundle.message("new.language.server.dialog.export.template.description"),
-                project, fileChooserDescriptor);
+        fileChooserDescriptor.setTitle(LanguageServerBundle.message("new.language.server.dialog.export.template.title"));
+        fileChooserDescriptor.setDescription(LanguageServerBundle.message("new.language.server.dialog.export.template.description"));
+
         textFieldWithBrowseButton.addBrowseFolderListener(new TextBrowseFolderListener(fileChooserDescriptor, project) {
             @Override
             public void onFileChosen(@NotNull VirtualFile virtualFile) {
