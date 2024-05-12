@@ -85,35 +85,32 @@ public class ExportServerAction extends AnAction {
         for (LanguageServerDefinition lsDefinition : languageServerDefinitions) {
             Gson gson = new GsonBuilder()
                     .registerTypeAdapter(LanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
+                    .setPrettyPrinting()
                     .create();
             String json = gson.toJson(lsDefinition);
             String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
             String lsName = lsDefinition.getDisplayName();
 
-            if (settings.isBlank()) {
-                settings = "{}";
-            }
-            if (initializationOptions.isBlank()) {
-                initializationOptions = "{}";
-            }
-
-            ZipEntry templateEntry = new ZipEntry(lsName + "/template.json");
-            zos.putNextEntry(templateEntry);
-            zos.write(json.getBytes(StandardCharsets.UTF_8));
-
-            ZipEntry initializationOptionsEntry = new ZipEntry(lsName + "/initializationOptions.json");
-            zos.putNextEntry(initializationOptionsEntry);
-            zos.write(initializationOptions.getBytes(StandardCharsets.UTF_8));
-
-            ZipEntry settingsEntry = new ZipEntry(lsName + "/settings.json");
-            zos.putNextEntry(settingsEntry);
-            zos.write(settings.getBytes(StandardCharsets.UTF_8));
+            writeToZip(lsName + "/template.json", json, zos);
+            writeToZip(lsName + "/initializationOptions.json", initializationOptions, zos);
+            writeToZip(lsName + "/settings.json", settings, zos);
             zos.closeEntry();
         }
 
         zos.close();
         return baos.toByteArray();
+    }
+
+    private void writeToZip(String filename, String content, ZipOutputStream zos) throws IOException {
+        if (content.isBlank()) {
+            content = "{}";
+        }
+
+        ZipEntry entry = new ZipEntry(filename);
+        zos.putNextEntry(entry);
+        zos.write(content.getBytes(StandardCharsets.UTF_8));
+        zos.closeEntry();
     }
 
     @Override
