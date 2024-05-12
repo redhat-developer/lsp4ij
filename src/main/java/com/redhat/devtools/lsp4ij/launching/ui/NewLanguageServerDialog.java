@@ -10,10 +10,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
+import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComboBox;
-import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.openapi.ui.*;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.util.ui.FormBuilder;
@@ -100,13 +100,23 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         final JButton showInstructionButton = super.createHelpButton(new JBInsets(0,0,0,0));
         showInstructionButton.setText("");
-        templateCombo.addItemListener(event -> {
-            LanguageServerTemplate template = (LanguageServerTemplate) event.getItem();
-            loadFromTemplate(template);
-            showInstructionButton.setEnabled(template.hasDocumentation() && template != LanguageServerTemplate.NONE);
+        TextFieldWithBrowseButton textFieldWithBrowseButton = new TextFieldWithBrowseButton();
+        FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(false, true,
+                false, false, false, false);
+        textFieldWithBrowseButton.addBrowseFolderListener(
+                LanguageServerBundle.message("new.language.server.dialog.export.template.title"),
+                LanguageServerBundle.message("new.language.server.dialog.export.template.description"),
+                project, fileChooserDescriptor);
+        textFieldWithBrowseButton.addBrowseFolderListener(new TextBrowseFolderListener(fileChooserDescriptor, project) {
+            @Override
+            public void onFileChosen(@NotNull VirtualFile virtualFile) {
+                super.onFileChosen(virtualFile);
+                loadFromTemplate(virtualFile);
+            }
         });
-        panel.add(templateCombo, BorderLayout.WEST);
+        panel.add(textFieldWithBrowseButton, BorderLayout.WEST);
 
+        // TODO: Don't use templateCombo to get the instructions
         showInstructionButton.addActionListener(e -> {
             LanguageServerTemplate template = (LanguageServerTemplate) templateCombo.getSelectedItem();
             if (template != null) {
@@ -142,6 +152,13 @@ public class NewLanguageServerDialog extends DialogWrapper {
         var initializationOptions = this.languageServerPanel.getInitializationOptionsWidget();
         initializationOptions.setText(template.getInitializationOptions() != null ? template.getInitializationOptions() : "");
         initializationOptions.setCaretPosition(0);
+    }
+
+    private void loadFromTemplate(VirtualFile templateFolder) {
+        // Load the folder
+        // Check that the files exist
+        // Load the files
+        // Parse the contents to the correct fields
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
