@@ -43,24 +43,24 @@ public class ExportServerAction extends AnAction {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-//        FileChooserFactory fileChooserFactory = FileChooserFactory.getInstance();
-//        FileSaverDescriptor fileSaverDescriptor = new FileSaverDescriptor(
-//                LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"));
-//        FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
-//        VirtualFileWrapper fileWrapper = fileSaverDialog.save("export.zip");
+        FileChooserFactory fileChooserFactory = FileChooserFactory.getInstance();
+        FileSaverDescriptor fileSaverDescriptor = new FileSaverDescriptor(
+                LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"));
+        FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
+        VirtualFileWrapper fileWrapper = fileSaverDialog.save("export.zip");
         printJson();
-//        if (fileWrapper != null) {
-//            VirtualFile virtualFile = fileWrapper.getVirtualFile(true);
-//            if (virtualFile != null) {
-//                ApplicationManager.getApplication().runWriteAction(() -> {
-//                    try {
-//                        virtualFile.setBinaryContent(createZipFromStrings());
-//                    } catch (IOException ex) {
-//                        LOGGER.warn(ex.getLocalizedMessage(), e);
-//                    }
-//                });
-//            }
-//        }
+        if (fileWrapper != null) {
+            VirtualFile virtualFile = fileWrapper.getVirtualFile(true);
+            if (virtualFile != null) {
+                ApplicationManager.getApplication().runWriteAction(() -> {
+                    try {
+                        virtualFile.setBinaryContent(createZipFromStrings());
+                    } catch (IOException ex) {
+                        LOGGER.warn(ex.getLocalizedMessage(), e);
+                    }
+                });
+            }
+        }
     }
 
     private void printJson() {
@@ -90,10 +90,25 @@ public class ExportServerAction extends AnAction {
             String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
             String lsName = lsDefinition.getDisplayName();
-            ZipEntry entry = new ZipEntry(lsName + "/" + lsName + ".json");
 
-            zos.putNextEntry(entry);
+            if (settings.isBlank()) {
+                settings = "{}";
+            }
+            if (initializationOptions.isBlank()) {
+                initializationOptions = "{}";
+            }
+
+            ZipEntry templateEntry = new ZipEntry(lsName + "/template.json");
+            zos.putNextEntry(templateEntry);
             zos.write(json.getBytes(StandardCharsets.UTF_8));
+
+            ZipEntry initializationOptionsEntry = new ZipEntry(lsName + "/initializationOptions.json");
+            zos.putNextEntry(initializationOptionsEntry);
+            zos.write(initializationOptions.getBytes(StandardCharsets.UTF_8));
+
+            ZipEntry settingsEntry = new ZipEntry(lsName + "/settings.json");
+            zos.putNextEntry(settingsEntry);
+            zos.write(settings.getBytes(StandardCharsets.UTF_8));
             zos.closeEntry();
         }
 
