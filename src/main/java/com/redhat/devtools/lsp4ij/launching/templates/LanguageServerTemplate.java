@@ -71,6 +71,10 @@ public class LanguageServerTemplate {
         return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public boolean isDev() {
         return dev;
     }
