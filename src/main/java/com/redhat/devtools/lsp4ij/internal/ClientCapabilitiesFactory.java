@@ -8,7 +8,7 @@
  *
  * Contributors:
  *  Ahmed Hussain (Cocotec Ltd) - initial implementation
- *
+ *  Red Hat Inc. - rename SupportedFeatures to ClientCapabilitiesFactory
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
@@ -18,11 +18,71 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 
 /**
- * LSP client capabilities.
+ * Factory of LSP client capabilities.
  */
-public class SupportedFeatures {
+public class ClientCapabilitiesFactory {
 
-    public static @NotNull TextDocumentClientCapabilities getTextDocumentClientCapabilities() {
+    public static ClientCapabilities create(Object experimental) {
+        return new ClientCapabilities(
+                getWorkspaceClientCapabilities(),
+                getTextDocumentClientCapabilities(),
+                getWindowClientCapabilities(),
+                experimental);
+    }
+
+    private static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
+        final var workspaceClientCapabilities = new WorkspaceClientCapabilities();
+
+        // Apply edit support
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit
+        workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
+
+        // TODO
+        // workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
+
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#executeCommandClientCapabilities
+        workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
+        // TODO
+        // workspaceClientCapabilities.setSymbol(new SymbolCapabilities(Boolean.TRUE));
+        workspaceClientCapabilities.setWorkspaceFolders(Boolean.TRUE);
+
+        // Workspace edit support
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceEditClientCapabilities
+        WorkspaceEditCapabilities editCapabilities = new WorkspaceEditCapabilities();
+        editCapabilities.setDocumentChanges(Boolean.TRUE);
+        editCapabilities.setResourceOperations(List.of(
+                ResourceOperationKind.Create,
+                ResourceOperationKind.Delete,
+                ResourceOperationKind.Rename));
+        // editCapabilities.setFailureHandling(FailureHandlingKind.Undo);
+        workspaceClientCapabilities.setWorkspaceEdit(editCapabilities);
+
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#didChangeWatchedFilesClientCapabilities
+        workspaceClientCapabilities.setDidChangeWatchedFiles(new DidChangeWatchedFilesCapabilities(Boolean.TRUE));
+
+        // File operations support
+        FileOperationsWorkspaceCapabilities fileOperationsWorkspaceCapabilities = new FileOperationsWorkspaceCapabilities();
+        fileOperationsWorkspaceCapabilities.setDynamicRegistration(Boolean.TRUE);
+        //fileOperationsWorkspaceCapabilities.setWillCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
+        //fileOperationsWorkspaceCapabilities.setDidCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles
+        //fileOperationsWorkspaceCapabilities.setWillDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
+        //fileOperationsWorkspaceCapabilities.setDidDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles
+        fileOperationsWorkspaceCapabilities.setWillRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
+        fileOperationsWorkspaceCapabilities.setDidRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles
+        workspaceClientCapabilities.setFileOperations(fileOperationsWorkspaceCapabilities);
+
+        // DidChangeConfiguration support
+        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#didChangeConfigurationClientCapabilities
+        workspaceClientCapabilities.setDidChangeConfiguration(new DidChangeConfigurationCapabilities(Boolean.TRUE));
+
+        // Refresh support for InlayHint
+        workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));
+
+        return workspaceClientCapabilities;
+    }
+
+
+    private static @NotNull TextDocumentClientCapabilities getTextDocumentClientCapabilities() {
         final var textDocumentClientCapabilities = new TextDocumentClientCapabilities();
 
         // Publish diagnostics capabilities
@@ -60,9 +120,9 @@ public class SupportedFeatures {
 
         completionItemCapabilities.setResolveSupport(new CompletionItemResolveSupportCapabilities(
                 List.of(
-                        "documentation" ,
+                        "documentation",
                         "detail",
-                        "additionalTextEdits" )));
+                        "additionalTextEdits")));
         CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
         completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
         textDocumentClientCapabilities.setCompletion(completionCapabilities);
@@ -150,58 +210,7 @@ public class SupportedFeatures {
         return textDocumentClientCapabilities;
     }
 
-    public static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {
-        final var workspaceClientCapabilities = new WorkspaceClientCapabilities();
-
-        // Apply edit support
-        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit
-        workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
-
-        // TODO
-        // workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
-
-        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#executeCommandClientCapabilities
-        workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
-        // TODO
-        // workspaceClientCapabilities.setSymbol(new SymbolCapabilities(Boolean.TRUE));
-        workspaceClientCapabilities.setWorkspaceFolders(Boolean.TRUE);
-
-        // Workspace edit support
-        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceEditClientCapabilities
-        WorkspaceEditCapabilities editCapabilities = new WorkspaceEditCapabilities();
-        editCapabilities.setDocumentChanges(Boolean.TRUE);
-        editCapabilities.setResourceOperations(List.of(
-                ResourceOperationKind.Create,
-                ResourceOperationKind.Delete,
-                ResourceOperationKind.Rename));
-        // editCapabilities.setFailureHandling(FailureHandlingKind.Undo);
-        workspaceClientCapabilities.setWorkspaceEdit(editCapabilities);
-
-        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#didChangeWatchedFilesClientCapabilities
-        workspaceClientCapabilities.setDidChangeWatchedFiles(new DidChangeWatchedFilesCapabilities(Boolean.TRUE));
-
-        // File operations support
-        FileOperationsWorkspaceCapabilities fileOperationsWorkspaceCapabilities = new FileOperationsWorkspaceCapabilities();
-        fileOperationsWorkspaceCapabilities.setDynamicRegistration(Boolean.TRUE);
-        //fileOperationsWorkspaceCapabilities.setWillCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
-        //fileOperationsWorkspaceCapabilities.setDidCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles
-        //fileOperationsWorkspaceCapabilities.setWillDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
-        //fileOperationsWorkspaceCapabilities.setDidDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles
-        fileOperationsWorkspaceCapabilities.setWillRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
-        fileOperationsWorkspaceCapabilities.setDidRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles
-        workspaceClientCapabilities.setFileOperations(fileOperationsWorkspaceCapabilities);
-        
-        // DidChangeConfiguration support
-        // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#didChangeConfigurationClientCapabilities
-        workspaceClientCapabilities.setDidChangeConfiguration(new DidChangeConfigurationCapabilities(Boolean.TRUE));
-
-        // Refresh support for InlayHint
-        workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));
-
-        return workspaceClientCapabilities;
-    }
-
-    public static WindowClientCapabilities getWindowClientCapabilities() {
+    private static WindowClientCapabilities getWindowClientCapabilities() {
         final var windowClientCapabilities = new WindowClientCapabilities();
         windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
         /**
@@ -211,6 +220,7 @@ public class SupportedFeatures {
         windowClientCapabilities.setWorkDoneProgress(true);
         windowClientCapabilities.setShowMessage(new WindowShowMessageRequestCapabilities());
         return windowClientCapabilities;
+
     }
 
 }
