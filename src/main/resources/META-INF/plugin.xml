@@ -84,8 +84,7 @@
     </description>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.redhat.devtools.intellij.telemetry</depends>
-
+    <depends optional="true">com.redhat.devtools.intellij.telemetry</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
     <idea-version since-build="231"/>
 
@@ -119,7 +118,7 @@
 
     <!-- Language Server support -->
     <extensions defaultExtensionNs="com.intellij">
-
+        <backgroundPostStartupActivity implementation="com.redhat.devtools.lsp4ij.internal.LSPPostStartupActivity"/>
         <!-- LSP application services -->
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry"/>
@@ -137,6 +136,8 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.usages.LSPUsagesManager"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
 
         <!-- LSP textDocument/publishDiagnostics notification support -->
         <externalAnnotator

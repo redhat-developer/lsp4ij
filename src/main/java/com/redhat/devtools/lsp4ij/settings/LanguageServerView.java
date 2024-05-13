@@ -254,7 +254,7 @@ public class LanguageServerView implements Disposable {
             // Update user-defined language server settings
             var serverChangedEvent = LanguageServersRegistry.getInstance()
                     .updateServerDefinition(
-                            new LanguageServersRegistry.UpdateServerDefinitionRequest(launch, getDisplayName(), getCommandLine(), getEnvData().getEnvs(), getEnvData().isPassParentEnvs(), getMappings(), getConfigurationContent(), getInitializationOptionsContent()), false);
+                            new LanguageServersRegistry.UpdateServerDefinitionRequest(project, launch, getDisplayName(), getCommandLine(), getEnvData().getEnvs(), getEnvData().isPassParentEnvs(), getMappings(), getConfigurationContent(), getInitializationOptionsContent()), false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
                 com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings

@@ -173,7 +173,8 @@ tasks {
     }
 
     runIde {
-        systemProperties["com.redhat.devtools.intellij.telemetry.mode"] = "disabled"
+        //Use "debug" to send telemetry to dev source at segment.com
+        systemProperties["com.redhat.devtools.intellij.telemetry.mode"] = "debug" // "disabled"
     }
 
     // Configure UI tests plugin

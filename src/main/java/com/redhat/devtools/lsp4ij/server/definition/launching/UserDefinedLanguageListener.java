@@ -50,7 +50,6 @@ public class UserDefinedLanguageListener implements LanguageServerLifecycleListe
         }
     }
 
-
     @Override
     public void handleChanged(@NotNull LanguageServerChangedEvent event) {
         if (event.serverDefinition == serverDefinition) {

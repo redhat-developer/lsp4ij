@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition;
 
+import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -22,25 +23,38 @@ import java.util.Collection;
  */
 public interface LanguageServerDefinitionListener {
 
-    class LanguageServerAddedEvent {
+    abstract class LanguageServerDefinitionEvent {
+        protected final Project project;
+        LanguageServerDefinitionEvent(@NotNull Project project) {
+            this.project = project;
+        }
+
+        public @NotNull Project getProject() {
+            return this.project;
+        }
+    }
+
+    class LanguageServerAddedEvent extends LanguageServerDefinitionEvent {
 
         public final Collection<LanguageServerDefinition> serverDefinitions;
 
-        public LanguageServerAddedEvent(@NotNull Collection<LanguageServerDefinition> serverDefinitions) {
+        public LanguageServerAddedEvent(@NotNull Project project, @NotNull Collection<LanguageServerDefinition> serverDefinitions) {
+            super(project);
             this.serverDefinitions = serverDefinitions;
         }
     }
 
-    class LanguageServerRemovedEvent {
+    class LanguageServerRemovedEvent extends LanguageServerDefinitionEvent {
 
         public final Collection<LanguageServerDefinition> serverDefinitions;
 
-        public LanguageServerRemovedEvent(@NotNull Collection<LanguageServerDefinition> serverDefinitions) {
+        public LanguageServerRemovedEvent(@NotNull Project project, @NotNull Collection<LanguageServerDefinition> serverDefinitions) {
+            super(project);
             this.serverDefinitions = serverDefinitions;
         }
     }
 
-    class LanguageServerChangedEvent {
+    class LanguageServerChangedEvent extends LanguageServerDefinitionEvent {
 
         public final LanguageServerDefinition serverDefinition;
 
@@ -52,7 +66,8 @@ public interface LanguageServerDefinitionListener {
         public final boolean configurationChanged;
         public final boolean initializationOptionsContentChanged;
 
-        public LanguageServerChangedEvent(@NotNull LanguageServerDefinition serverDefinition,
+        public LanguageServerChangedEvent(@NotNull Project project,
+                                          @NotNull LanguageServerDefinition serverDefinition,
                                           boolean nameChanged,
                                           boolean commandChanged,
                                           boolean userEnvironmentVariablesChanged,
@@ -60,6 +75,7 @@ public interface LanguageServerDefinitionListener {
                                           boolean mappingsChanged,
                                           boolean configurationContentChanged,
                                           boolean initializationOptionsContentChanged) {
+            super(project);
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;

@@ -219,7 +219,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 includeSystemEnvironmentVariables,
                 configuration,
                 initializationOptions);
-        LanguageServersRegistry.getInstance().addServerDefinition(definition, mappingSettings);
+        LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
 
     }
 

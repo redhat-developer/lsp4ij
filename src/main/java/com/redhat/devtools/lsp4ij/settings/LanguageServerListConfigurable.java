@@ -136,7 +136,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                 for (var selectedNode : selectedNodes) {
                     if (isUserDefinedLanguageServerDefinition(selectedNode)) {
                         var serverDefinition = ((LanguageServerConfigurable) selectedNode.getConfigurable()).getEditableObject();
-                        LanguageServersRegistry.getInstance().removeServerDefinition(serverDefinition);
+                        LanguageServersRegistry.getInstance().removeServerDefinition(project, serverDefinition);
                     }
                 }
             }

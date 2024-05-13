@@ -106,7 +106,7 @@ Nightly builds are published once a day.
 
 Data and Telemetry
 ==================
-The LSP4IJ plugin collects anonymous [usage data](USAGE_DATA.md) and sends it to Red Hat servers to help improve our products and services. Read our [privacy statement](https://developers.redhat.com/article/tool-data-collection) to learn more. This extension respects the Red Hat Telemetry setting which you can learn more about at [https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting](https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting)
+If the [Red Hat Telemetry](https://github.com/redhat-developer/intellij-redhat-telemetry) plugin is installed, the LSP4IJ plugin will collect anonymous [usage data](USAGE_DATA.md) and send it to Red Hat servers to help improve our products and services. Read our [privacy statement](https://developers.redhat.com/article/tool-data-collection) to learn more. This extension respects the Red Hat Telemetry setting which you can learn more about at [https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting](https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting)
 
 ## Feedback
 

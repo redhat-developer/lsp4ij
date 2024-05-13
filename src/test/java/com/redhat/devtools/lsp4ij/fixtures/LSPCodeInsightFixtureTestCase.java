@@ -60,10 +60,10 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
     private void registerServer() {
         serverDefinition = new MockLanguageServerDefinition();
         List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePatterns), null));
-        LanguageServersRegistry.getInstance().addServerDefinition(serverDefinition, mappings);
+        LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), serverDefinition, mappings);
     }
 
     private void unregisterServer() {
-        LanguageServersRegistry.getInstance().removeServerDefinition(serverDefinition);
+        LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), serverDefinition);
     }
 }
