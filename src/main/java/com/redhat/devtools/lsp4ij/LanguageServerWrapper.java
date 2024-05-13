@@ -27,7 +27,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
-import com.redhat.devtools.lsp4ij.internal.SupportedFeatures;
+import com.redhat.devtools.lsp4ij.internal.ClientCapabilitiesFactory;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
@@ -325,16 +325,8 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private CompletableFuture<InitializeResult> initServer(final URI rootURI) {
-
-        final var workspaceClientCapabilities = SupportedFeatures.getWorkspaceClientCapabilities();
-        final var textDocumentClientCapabilities = SupportedFeatures.getTextDocumentClientCapabilities();
-
-        WindowClientCapabilities windowClientCapabilities = SupportedFeatures.getWindowClientCapabilities();
-        initParams.setCapabilities(new ClientCapabilities(
-                workspaceClientCapabilities,
-                textDocumentClientCapabilities,
-                windowClientCapabilities,
-                lspStreamProvider.getExperimentalFeaturesPOJO()));
+        initParams.setCapabilities(ClientCapabilitiesFactory
+                .create(lspStreamProvider.getExperimentalFeaturesPOJO()));
         initParams.setClientInfo(getClientInfo());
         initParams.setTrace(this.lspStreamProvider.getTrace(rootURI));
 
