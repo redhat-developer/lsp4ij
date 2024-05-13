@@ -64,8 +64,6 @@ public class LanguageServersRegistry {
     }
 
     private void initialize() {
-
-
         // Load language servers / mappings from user extension point
         loadServersAndMappingsFromExtensionPoint();
         // Load language servers / mappings from user settings
@@ -153,7 +151,7 @@ public class LanguageServersRegistry {
         Set<Language> distinctLanguages = fileAssociations
                 .stream()
                 .map(LanguageServerFileAssociation::getLanguage)
-                .filter(language -> language != null)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         // When a file is not linked to a language
         //  - if the file is associated to a textmate to support syntax coloration
@@ -259,11 +257,11 @@ public class LanguageServersRegistry {
         return serverDefinitions.values();
     }
 
-    public void addServerDefinition(@NotNull LanguageServerDefinition serverDefinition, @Nullable List<ServerMappingSettings> mappings) {
+    public void addServerDefinition(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition, @Nullable List<ServerMappingSettings> mappings) {
         String languageServerId = serverDefinition.getId();
         addServerDefinitionWithoutNotification(serverDefinition, toServerMappings(languageServerId, mappings));
         updateInlayHintsProviders();
-        LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(Collections.singleton(serverDefinition));
+        LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(project, Collections.singleton(serverDefinition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
                 listener.handleAdded(event);
@@ -358,7 +356,7 @@ public class LanguageServersRegistry {
         return mappings;
     }
 
-    public void removeServerDefinition(@NotNull LanguageServerDefinition serverDefinition) {
+    public void removeServerDefinition(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
         String languageServerId = serverDefinition.getId();
         // remove server
         serverDefinitions.remove(languageServerId);
@@ -369,7 +367,7 @@ public class LanguageServersRegistry {
         // Update settings
         UserDefinedLanguageServerSettings.getInstance().removeServerDefinition(languageServerId);
         // Notifications
-        LanguageServerDefinitionListener.LanguageServerRemovedEvent event = new LanguageServerDefinitionListener.LanguageServerRemovedEvent(Collections.singleton(serverDefinition));
+        LanguageServerDefinitionListener.LanguageServerRemovedEvent event = new LanguageServerDefinitionListener.LanguageServerRemovedEvent(project, Collections.singleton(serverDefinition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
                 listener.handleRemoved(event);
@@ -383,7 +381,7 @@ public class LanguageServersRegistry {
         List<LanguageServerFileAssociation> mappingsToRemove = fileAssociations
                 .stream()
                 .filter(mapping -> definition.equals(mapping.getServerDefinition()))
-                .collect(Collectors.toList());
+                .toList();
         fileAssociations.removeAll(mappingsToRemove);
     }
 
@@ -423,6 +421,7 @@ public class LanguageServersRegistry {
                 mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                    request.project(),
                     request.serverDefinition(),
                     nameChanged,
                     commandChanged,
@@ -497,12 +496,12 @@ public class LanguageServersRegistry {
         return inlayHintsProviders;
     }
 
-    public static record UpdateServerDefinitionRequest(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
-                                                       @Nullable String name, @Nullable String commandLine,
-                                                       @Nullable Map<String, String> userEnvironmentVariables,
-                                                       boolean includeSystemEnvironmentVariables,
-                                                       @NotNull List<ServerMappingSettings> mappings,
-                                                       @Nullable String configurationContent,
-                                                       @Nullable String initializationOptionsContent) {
+    public record UpdateServerDefinitionRequest(@NotNull Project project, @NotNull UserDefinedLanguageServerDefinition serverDefinition,
+                                                @Nullable String name, @Nullable String commandLine,
+                                                @Nullable Map<String, String> userEnvironmentVariables,
+                                                boolean includeSystemEnvironmentVariables,
+                                                @NotNull List<ServerMappingSettings> mappings,
+                                                @Nullable String configurationContent,
+                                                @Nullable String initializationOptionsContent) {
     }
 }

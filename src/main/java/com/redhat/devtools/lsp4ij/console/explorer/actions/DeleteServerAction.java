@@ -20,6 +20,8 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Objects;
+
 /**
  * Delete (only) user defined language server action.
  */
@@ -41,7 +43,7 @@ public class DeleteServerAction extends AnAction {
                         languageServerDefinition.getDisplayName()),
                 LanguageServerBundle.message("action.lsp.console.explorer.delete.server.confirm.dialog.title"), Messages.getQuestionIcon());
         if (result == Messages.YES) {
-            LanguageServersRegistry.getInstance().removeServerDefinition(languageServerDefinition);
+            LanguageServersRegistry.getInstance().removeServerDefinition(Objects.requireNonNull(e.getProject()), languageServerDefinition);
         }
     }
 
