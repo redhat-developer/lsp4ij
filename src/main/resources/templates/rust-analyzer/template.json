@@ -6,7 +6,6 @@
     "default": "sh -c rust-analyzer",
     "windows": "rust-analyzer"
   },
-  "commandLine": "sh -c rust-analyzer",
   "fileTypeMappings": [
     {
       "fileType": {
