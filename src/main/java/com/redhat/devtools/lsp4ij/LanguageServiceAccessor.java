@@ -14,15 +14,16 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
@@ -30,7 +31,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -96,6 +96,7 @@ public class LanguageServiceAccessor implements Disposable {
 
     /**
      * Check each project for open files and start an LS if matching one is found and is not started yet
+     *
      * @param definitions definition of the language server to match to the wrapper
      */
     private void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
@@ -115,39 +116,42 @@ public class LanguageServiceAccessor implements Disposable {
 
     /**
      * Try to find a ls wrapper for the file and definition. Connect the file, if a matching one is found
-     * @param file to handle
+     *
+     * @param file       to handle
      * @param definition definition used to match to the wrapper
      */
-    private void findAndStartLsForFile(VirtualFile file, LanguageServerDefinition definition) {
-        getMatchedLanguageServersWrappers(file).thenAccept(wrappers -> {
-            if (wrappers != null) {
-                for (LanguageServerWrapper wrapper : wrappers) {
-                    try {
-                        if (wrapper.getServerDefinition().equals(definition)) {
-                            wrapper.connect(file);
-                        }
-                    } catch (IOException ex) {
-                        LOGGER.warn(ex.getLocalizedMessage(), ex);
-                    }
-                }
-            }
-        });
+    private void findAndStartLsForFile(@NotNull VirtualFile file,
+                                       @NotNull LanguageServerDefinition definition) {
+        getLanguageServers(file, null, definition);
     }
 
     @NotNull
     public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
                                                                           @Nullable Predicate<ServerCapabilities> filter) {
+        return getLanguageServers(file, filter, null);
+    }
+
+    @NotNull
+    public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
+                                                                          @Nullable Predicate<ServerCapabilities> filter,
+                                                                          @Nullable LanguageServerDefinition matchServerDefinition) {
         URI uri = LSPIJUtils.toUri(file);
         if (uri == null) {
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
         // Collect started (or not) language servers which matches the given file.
-        CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(file);
+        CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(file, matchServerDefinition);
         if (matchedServers.isDone() && matchedServers.getNow(Collections.emptyList()).isEmpty()) {
             // None language servers matches the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
+
+        // getLanguageServers is generally called with Read Access.
+        // We get the Document instance now, to avoid creating a new Read Action thread to get it from the file.
+        // The document instance is only used when the file is opened, to add
+        // LSP document listener to manage didOpen, didChange, etc.
+        Document document = ApplicationManager.getApplication().isReadAccessAllowed() ? LSPIJUtils.getDocument(file) : null;
 
         // Returns the language servers which match the given file, start them and connect the file to each matched language server
         final List<LanguageServerItem> servers = Collections.synchronizedList(new ArrayList<>());
@@ -158,12 +162,10 @@ public class LanguageServiceAccessor implements Disposable {
                             .map(wrapper ->
                                     wrapper.getInitializedServer()
                                             .thenComposeAsync(server -> {
-                                                if (server != null && wrapper.isEnabled() && (filter == null || filter.test(wrapper.getServerCapabilities()))) {
-                                                    try {
-                                                        return wrapper.connect(file);
-                                                    } catch (IOException ex) {
-                                                        LOGGER.warn(ex.getLocalizedMessage(), ex);
-                                                    }
+                                                if (server != null &&
+                                                        wrapper.isEnabled() &&
+                                                        (filter == null || filter.test(wrapper.getServerCapabilities()))) {
+                                                    return wrapper.connect(file, document);
                                                 }
                                                 return CompletableFuture.completedFuture(null);
                                             }).thenAccept(server -> {
@@ -195,7 +197,9 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     @NotNull
-    private CompletableFuture<Collection<LanguageServerWrapper>> getMatchedLanguageServersWrappers(@NotNull VirtualFile file) {
+    private CompletableFuture<Collection<LanguageServerWrapper>> getMatchedLanguageServersWrappers(
+            @NotNull VirtualFile file,
+            @Nullable LanguageServerDefinition matchServerDefinition) {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             // There are no mapping for the given file
@@ -206,7 +210,14 @@ public class LanguageServiceAccessor implements Disposable {
 
         // Collect sync server definitions
         var serverDefinitions = mappings.getMatched();
-        collectLanguageServersFromDefinition(file, project, serverDefinitions, matchedServers);
+        if (matchServerDefinition != null) {
+            if (!serverDefinitions.contains(matchServerDefinition)) {
+                return CompletableFuture.completedFuture(Collections.emptyList());
+            }
+            collectLanguageServersFromDefinition(file, project, Set.of(matchServerDefinition), matchedServers);
+        } else {
+            collectLanguageServersFromDefinition(file, project, serverDefinitions, matchedServers);
+        }
 
         CompletableFuture<Set<LanguageServerDefinition>> async = mappings.getAsyncMatched();
         if (async != null) {
@@ -397,7 +408,7 @@ public class LanguageServiceAccessor implements Disposable {
     public List<LanguageServer> getActiveLanguageServers(Predicate<ServerCapabilities> request) {
         return getLanguageServers(null, request, true);
     }
-    
+
     /**
      * Gets list of LS initialized for given project
      *

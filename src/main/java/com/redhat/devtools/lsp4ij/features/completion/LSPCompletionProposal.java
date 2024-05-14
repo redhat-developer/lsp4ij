@@ -469,7 +469,7 @@ public class LSPCompletionProposal extends LookupElement {
                     .resolveCompletionItem(item);
         }
         try {
-            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
+            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(resolvedCompletionItemFuture, file);
         } catch (CancellationException | ProcessCanceledException e) {
             return null;

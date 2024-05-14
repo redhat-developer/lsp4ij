@@ -102,8 +102,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                     }
                 } catch (CancellationException e) {
                     // Do nothing
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                 }
                 return false;
             }
@@ -177,6 +175,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                                       @NotNull Editor editor,
                                       @NotNull PresentationFactory factory,
                                       @NotNull InlayHintsSink inlayHintsSink,
-                                      @NotNull List<CompletableFuture> pendingFutures) throws InterruptedException;
+                                      @NotNull List<CompletableFuture> pendingFutures);
 
 }

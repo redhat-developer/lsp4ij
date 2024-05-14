@@ -95,7 +95,7 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                         });
 
         try {
-            // Wait upon the future of LSP 'workspace/willRenameFiles' request
+            // Wait until the future of LSP 'workspace/willRenameFiles' request
             // is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(willRenameFilesFuture, file);
         } catch (CancellationException | ProcessCanceledException e) {
