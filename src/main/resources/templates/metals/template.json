@@ -1,0 +1,21 @@
+{
+  "id": "metals",
+  "name": "Scala Language Server (Metals)",
+  "programArgs": {
+    "windows": "\"${BASE_DIR}/metals.bat\"",
+    "default": "\"${BASE_DIR}/metals\""
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Scala",
+        "patterns": [
+          "*.scala",
+          "*.sbt",
+          "*.sc"
+        ]
+      },
+      "languageId": "scala"
+    }
+  ]
+}

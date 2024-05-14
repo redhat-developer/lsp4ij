@@ -1,0 +1,16 @@
+{
+  "id": "vscode-html-language-server",
+  "name": "HTML Language Server",
+  "programArgs": {
+    "windows": "node \"C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
+    "mac": "sh -c \"node '/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\"",
+    "unix": "sh -c \"node '/usr/share/code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\"",
+    "default": "sh -c \"node 'resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\""
+  },
+  "languageMappings": [
+    {
+      "language": "HTML",
+      "languageId": "html"
+    }
+  ]
+}
