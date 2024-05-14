@@ -44,7 +44,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
@@ -206,13 +205,13 @@ public class LanguageServerWrapper implements Disposable {
                 numberOfRestartAttempts++;
             }
         }
-        final var filesToReconnect = new ArrayList<URI>();
+        final var filesToReconnect = new ArrayList<VirtualFile>();
         if (this.languageServer != null) {
             if (isActive()) {
                 return;
             } else {
                 for (Map.Entry<URI, LSPVirtualFileData> entry : this.connectedDocuments.entrySet()) {
-                    filesToReconnect.add(entry.getKey());
+                    filesToReconnect.add(entry.getValue().getFile());
                 }
                 stop();
             }
@@ -289,12 +288,8 @@ public class LanguageServerWrapper implements Disposable {
                         this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                     }).thenRun(() -> this.languageServer.initialized(new InitializedParams())).thenRun(() -> {
                         initializeFuture.thenRunAsync(() -> {
-                            for (URI fileToReconnect : filesToReconnect) {
-                                try {
-                                    connect(fileToReconnect);
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                }
+                            for (VirtualFile fileToReconnect : filesToReconnect) {
+                                connect(LSPIJUtils.toUri(fileToReconnect), fileToReconnect, null);
                             }
                         });
 
@@ -542,19 +537,6 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-    /**
-     * Connect the given file to the language server.
-     *
-     * @param file the file to connect to the language server
-     * @return null if not connection has happened, a future tracking the connection state otherwise
-     * @throws IOException
-     */
-    public CompletableFuture<@Nullable LanguageServer> connect(VirtualFile file) throws IOException {
-        if (file != null && file.exists()) {
-            return connect(LSPIJUtils.toUri(file));
-        }
-        return CompletableFuture.completedFuture(null);
-    }
 
     /**
      * Check whether this LS is suitable for provided project. Starts the LS if not
@@ -572,61 +554,144 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * To make public when we support non IFiles
+     * Connect the given file Uri to the language server and returns the language server instance when:
      *
-     * @return null if not connection has happened, a future that completes when file is initialized otherwise
-     * @noreference internal so far
+     * <ul>
+     *     <li>language server is initialized</li>
+     *     <li>didOpen for the given file Uri happens</li>
+     * </ul>
+     *
+     * <p>
+     *     In other case (ex : language server initialize future is null, file cannot be retrieved by the given Uri),
+     *     the method return a CompletableFuture which returns null.
+     * </p>
+     *
+     * @param file     the file to connect to the language server
+     * @param document the document of the file and null otherwise. In the null case, the document will be retrieved from the file
+     *                 by using a blocking read action.
+     * @return the completable future with the language server instance or null.
      */
-    private CompletableFuture<LanguageServer> connect(@NotNull URI fileUri) throws IOException {
-        removeStopTimer(false);
-
-        var existingData = connectedDocuments.get(fileUri);
-        if (existingData != null) {
-            var didOpenFuture = existingData.getSynchronizer().didOpenFuture;
-            if (didOpenFuture.isDone()) {
-                // The didOpen has occurred, no need to wait for the didOpen
-                // to return the language server
-                return CompletableFuture.completedFuture(languageServer);
-            }
-            // The didOpen has not occurred, wait for the end of didOpen
-            // to return the language server
-            return didOpenFuture
-                    .thenApplyAsync(theVoid -> languageServer);
+    CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
+                                                        @Nullable Document document) {
+        if (file != null && file.exists()) {
+            return connect(LSPIJUtils.toUri(file), file, document);
         }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /**
+     * Connect the given file Uri to the language server and returns the language server instance when:
+     *
+     * <ul>
+     *     <li>language server is initialized</li>
+     *     <li>didOpen for the given file Uri happens</li>
+     * </ul>
+     *
+     * <p>
+     *     In other case (ex : language server initialize future is null, file cannot be retrieved by the given Uri),
+     *     the method return a CompletableFuture which returns null.
+     * </p>
+     *
+     * @param fileUri          the file Uri to connect to the language server
+     * @param optionalFile     the file which matches the non-nullable file uri and null otherwise. In the null case, the file will be retrieved by the file Uri.
+     * @param optionalDocument the document of the file and null otherwise. In the null case, the document will be retrieved from the file
+     *                         by using a blocking read action.
+     * @return the completable future with the language server instance or null.
+     */
+    private CompletableFuture<LanguageServer> connect(@NotNull URI fileUri,
+                                                      @Nullable VirtualFile optionalFile,
+                                                      @Nullable Document optionalDocument) {
+
+        var ls = getLanguageServerWhenDidOpen(fileUri);
+        if (ls != null) {
+            return ls;
+        }
+
+        // start language server if needed
         start();
+
         if (this.initializeFuture == null) {
+            // The "initialize" future is not initialized, return null as language server.
             return CompletableFuture.completedFuture(null);
         }
-        VirtualFile file = LSPIJUtils.findResourceFor(fileUri);
-        if (file == null) {
+
+        if (optionalFile == null) {
+            optionalFile = LSPIJUtils.findResourceFor(fileUri);
+        }
+        if (optionalFile == null) {
+            // The file cannot be retrieved by the given uri, return null as language server.
             return CompletableFuture.completedFuture(null);
         }
+
+        VirtualFile fileToConnect = optionalFile;
         return initializeFuture.thenComposeAsync(theVoid -> {
+            // Here, the "initialize" future is initialized
+
+            // Check if file is already opened (without synchronized block)
+            var ls2 = getLanguageServerWhenDidOpen(fileUri);
+            if (ls2 != null) {
+                return ls2;
+            }
+
+            // Here the file is not already connected
+            // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
+            Document document = optionalDocument != null ? optionalDocument : LSPIJUtils.getDocument(fileToConnect);
+
             synchronized (connectedDocuments) {
-                if (this.connectedDocuments.containsKey(fileUri)) {
-                    return CompletableFuture.completedFuture(null);
-                }
-                Either<TextDocumentSyncKind, TextDocumentSyncOptions> syncOptions = initializeFuture == null ? null
-                        : this.serverCapabilities.getTextDocumentSync();
-                TextDocumentSyncKind syncKind = null;
-                if (syncOptions != null) {
-                    if (syncOptions.isRight()) {
-                        syncKind = syncOptions.getRight().getChange();
-                    } else if (syncOptions.isLeft()) {
-                        syncKind = syncOptions.getLeft();
-                    }
+                // Check again if file is already opened (within synchronized block)
+                ls2 = getLanguageServerWhenDidOpen(fileUri);
+                if (ls2 != null) {
+                    return ls2;
                 }
 
-                Document document = LSPIJUtils.getDocument(file);
-                DocumentContentSynchronizer synchronizer = new DocumentContentSynchronizer(this, fileUri, document, syncKind);
+                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(fileUri, document);
                 document.addDocumentListener(synchronizer);
-
-                LSPVirtualFileData data = new LSPVirtualFileData(new LanguageServerItem(languageServer, this), file, synchronizer);
+                LSPVirtualFileData data = new LSPVirtualFileData(new LanguageServerItem(languageServer, this), fileToConnect, synchronizer);
                 LanguageServerWrapper.this.connectedDocuments.put(fileUri, data);
 
-                return synchronizer.didOpenFuture;
+                return getLanguageServerWhenDidOpen(synchronizer.didOpenFuture);
             }
-        }).thenApply(theVoid -> languageServer);
+        });
+    }
+
+    @Nullable
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull URI fileUri) {
+        var existingData = connectedDocuments.get(fileUri);
+        if (existingData != null) {
+            // The file is already connected.
+            // returns the language server instance when didOpen happened
+            var didOpenFuture = existingData.getSynchronizer().didOpenFuture;
+            return getLanguageServerWhenDidOpen(didOpenFuture);
+        }
+        return null;
+    }
+
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(CompletableFuture<Void> didOpenFuture) {
+        if (didOpenFuture.isDone()) {
+            // The didOpen has happened, no need to wait for the didOpen
+            // to return the language server
+            return CompletableFuture.completedFuture(languageServer);
+        }
+        // The didOpen has not happened, wait for the end of didOpen
+        // to return the language server
+        return didOpenFuture
+                .thenApplyAsync(theVoid -> languageServer);
+    }
+
+    @NotNull
+    private DocumentContentSynchronizer createDocumentContentSynchronizer(@NotNull URI fileUri,
+                                                                          @NotNull Document document) {
+        Either<TextDocumentSyncKind, TextDocumentSyncOptions> syncOptions = initializeFuture == null ? null
+                : this.serverCapabilities.getTextDocumentSync();
+        TextDocumentSyncKind syncKind = null;
+        if (syncOptions != null) {
+            if (syncOptions.isRight()) {
+                syncKind = syncOptions.getRight().getChange();
+            } else if (syncOptions.isLeft()) {
+                syncKind = syncOptions.getLeft();
+            }
+        }
+        return new DocumentContentSynchronizer(this, fileUri, document, syncKind);
     }
 
     public void disconnect(URI path, boolean stopIfNoOpenedFiles) {

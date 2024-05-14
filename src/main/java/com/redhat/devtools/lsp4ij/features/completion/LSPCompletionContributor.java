@@ -75,7 +75,7 @@ public class LSPCompletionContributor extends CompletionContributor {
                 .getCompletionSupport()
                 .getCompletions(params);
         try {
-            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
+            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiFile);
         } catch (CancellationException | ProcessCanceledException e) {
             return;

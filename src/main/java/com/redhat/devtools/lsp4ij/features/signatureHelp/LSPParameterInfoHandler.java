@@ -103,7 +103,7 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         CompletableFuture<SignatureHelp> future = signatureHelpSupport.getSignatureHelp(params);
 
         try {
-            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
+            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiElement.getContainingFile());
         } catch (CancellationException | ProcessCanceledException e) {
             // Do nothing

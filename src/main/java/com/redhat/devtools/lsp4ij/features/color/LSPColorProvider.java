@@ -16,7 +16,7 @@ import com.intellij.codeInsight.hints.presentation.PresentationFactory;
 import com.intellij.codeInsight.hints.presentation.SequencePresentation;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -25,43 +25,63 @@ import com.redhat.devtools.lsp4ij.features.AbstractLSPInlayHintsProvider;
 import org.eclipse.lsp4j.Color;
 import org.eclipse.lsp4j.DocumentColorParams;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP textDocument/color support.
  */
 public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPColorProvider.class);
+
     @Override
     protected void doCollect(@NotNull PsiFile psiFile,
                              @NotNull Editor editor,
                              @NotNull PresentationFactory factory,
                              @NotNull InlayHintsSink inlayHintsSink,
-                             @NotNull List<CompletableFuture> pendingFutures) throws InterruptedException {
+                             @NotNull List<CompletableFuture> pendingFutures) {
         // Get LSP color information from cache or create them
         LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
         var params = new DocumentColorParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
         CompletableFuture<List<ColorData>> future = colorSupport.getColors(params);
 
         try {
-            List<Pair<Integer, ColorData>> codeLenses = createColorInformation(editor.getDocument(), future);
-            // Render color information
-            codeLenses.stream()
-                    .collect(Collectors.groupingBy(p -> p.first))
-                    .forEach((offset, list) ->
-                            inlayHintsSink.addInlineElement(
-                                    offset,
-                                    false,
-                                    toPresentation(list, factory))
-                    );
+            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
+            waitUntilDone(future, psiFile);
+            if (isDoneNormally(future)) {
+
+                // Collect color information
+                List<Pair<Integer, ColorData>> colors = new ArrayList<>();
+                List<ColorData> data = future.getNow(Collections.emptyList());
+                fillColor(editor.getDocument(), data, colors);
+
+                // Render color information
+                colors.stream()
+                        .collect(Collectors.groupingBy(p -> p.first))
+                        .forEach((offset, list) ->
+                                inlayHintsSink.addInlineElement(
+                                        offset,
+                                        false,
+                                        toPresentation(list, factory))
+                        );
+            }
+        } catch (CancellationException | ProcessCanceledException e) {
+            return;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/color' request", e);
+            return;
         } finally {
             if (!future.isDone()) {
                 // the future which collects all textDocument/colorInformation for all servers is not finished
@@ -69,27 +89,6 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                 pendingFutures.add(future);
             }
         }
-    }
-
-    @NotNull
-    private List<Pair<Integer, ColorData>> createColorInformation(Document document,
-                                                                  CompletableFuture<List<ColorData>> future) throws InterruptedException {
-        List<Pair<Integer, ColorData>> colorInformation = new ArrayList<>();
-        if (future.isDone()) {
-            List<ColorData> data = future.getNow(Collections.emptyList());
-            fillColor(document, data, colorInformation);
-        } else {
-            while (!future.isDone()) {
-                ProgressManager.checkCanceled();
-                try {
-                    List<ColorData> data = future.get(25, TimeUnit.MILLISECONDS);
-                    fillColor(document, data, colorInformation);
-                } catch (TimeoutException | ExecutionException e) {
-                    // Do nothing
-                }
-            }
-        }
-        return colorInformation;
     }
 
     private static void fillColor(Document document, List<ColorData> data, List<Pair<Integer, ColorData>> colors) {

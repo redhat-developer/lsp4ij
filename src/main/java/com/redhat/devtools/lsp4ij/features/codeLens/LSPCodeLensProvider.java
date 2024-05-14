@@ -107,7 +107,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         // Get LSP code lenses from cache or create them
         CompletableFuture<List<CodeLensData>> future = getCodeLenses(psiFile);
         try {
-            // Wait upon the future is finished and stop the wait if there are some ProcessCanceledException.
+            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiFile);
         } catch (CancellationException | ProcessCanceledException e) {
             return CodeVisionState.NotReady.INSTANCE;
