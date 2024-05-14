@@ -12,6 +12,7 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
 
         languageServerTemplate.setName(jsonObject.get("name").getAsString());
         languageServerTemplate.setDefaultProgramArg(jsonObject.get("commandLine").getAsString());
+        // jsonObject.get("programArgs").getAsJsonObject().get("default").getAsString()
 
         return languageServerTemplate;
     }

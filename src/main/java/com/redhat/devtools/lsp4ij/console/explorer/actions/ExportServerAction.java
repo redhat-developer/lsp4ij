@@ -48,7 +48,6 @@ public class ExportServerAction extends AnAction {
                 LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"));
         FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
         VirtualFileWrapper fileWrapper = fileSaverDialog.save("export.zip");
-        printJson();
         if (fileWrapper != null) {
             VirtualFile virtualFile = fileWrapper.getVirtualFile(true);
             if (virtualFile != null) {
@@ -63,28 +62,13 @@ public class ExportServerAction extends AnAction {
         }
     }
 
-    private void printJson() {
-        for (LanguageServerDefinition lsDefinition : languageServerDefinitions) {
-            Gson gson = new GsonBuilder()
-                    .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
-                    .setPrettyPrinting()
-                    .create();
-            String json = gson.toJson(lsDefinition);
-            System.out.println(json);
-            String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
-            String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
-            System.out.println("Init: " + initializationOptions);
-            System.out.println("Settings: " + settings);
-        }
-    }
-
     private byte[] createZipFromStrings() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ZipOutputStream zos = new ZipOutputStream(baos);
 
         for (LanguageServerDefinition lsDefinition : languageServerDefinitions) {
             Gson gson = new GsonBuilder()
-                    .registerTypeAdapter(LanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
+                    .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
                     .setPrettyPrinting()
                     .create();
             String json = gson.toJson(lsDefinition);
