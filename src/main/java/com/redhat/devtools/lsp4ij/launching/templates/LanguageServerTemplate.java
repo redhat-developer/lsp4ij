@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -100,6 +101,13 @@ public class LanguageServerTemplate {
             return args;
         }
         return programArgs.get(DEFAULT_KEY);
+    }
+
+    public void setDefaultProgramArg(String defaultArg) {
+        if (this.programArgs == null) {
+            this.programArgs = new HashMap<>();
+        }
+        this.programArgs.put(DEFAULT_KEY, defaultArg);
     }
 
     public List<ServerMappingSettings> getLanguageMappings() {
