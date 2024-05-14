@@ -250,26 +250,6 @@
           "languageId": "html"
         }
       ]
-    },
-    {
-      "id": "rust-analyzer",
-      "name": "Rust Language Server",
-      "dev": true,
-      "programArgs": {
-        "default": "sh -c rust-analyzer",
-        "windows": "rust-analyzer"
-      },
-      "fileTypeMappings": [
-        {
-          "fileType": {
-            "name": "Rust",
-            "patterns": [
-              "*.rs"
-            ]
-          },
-          "languageId": "rust"
-        }
-      ]
     }
   ]
 }
