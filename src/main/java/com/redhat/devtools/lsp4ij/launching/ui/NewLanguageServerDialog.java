@@ -194,10 +194,10 @@ public class NewLanguageServerDialog extends DialogWrapper {
             throw new IllegalArgumentException("The template.json file is missing or invalid");
         }
         if (settingsJson == null) {
-            throw new IllegalArgumentException("The settings.json file is missing or invalid");
+            settingsJson = "{}";
         }
         if (initializationOptionsJson == null) {
-            throw new IllegalArgumentException("The initializationOptions.json file is missing or invalid");
+            initializationOptionsJson = "{}";
         }
 
         GsonBuilder builder = new GsonBuilder();

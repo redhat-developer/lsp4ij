@@ -117,6 +117,13 @@ public class LanguageServerTemplate {
         return languageMappings;
     }
 
+    public void addLanguageMapping(ServerMappingSettings s) {
+        if (this.languageMappings == null) {
+            this.languageMappings = new ArrayList<>();
+        }
+        this.languageMappings.add(s);
+    }
+
     public List<ServerMappingSettings> getFileTypeMappings() {
         if (fileTypeMappings == null) {
             fileTypeMappings = new ArrayList<>();
