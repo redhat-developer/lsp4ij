@@ -34,9 +34,16 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
 
                 String language = fileType.get("name").getAsString();
                 if (language != null) {
-                    // TODO: This works correctly, but the mapping might be missing?
-                    languageServerTemplate.addLanguageMapping(ServerMappingSettings.createLanguageMappingSettings(language, languageId));
+                    languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileTypeMappingSettings(language, languageId));
                 }
+            }
+        }
+        JsonArray languageMappings = jsonObject.getAsJsonArray("languageMappings");
+        if (languageMappings != null && !languageMappings.isEmpty()) {
+            for (JsonElement language : languageMappings) {
+                String lang = language.getAsJsonObject().get("language").getAsString();
+                String languageId = language.getAsJsonObject().get("languageId").getAsString();
+                languageServerTemplate.addLanguageMapping(ServerMappingSettings.createLanguageMappingSettings(lang, languageId));
             }
         }
 

@@ -15,7 +15,7 @@
   "fileTypeMappings": [
     {
       "fileType": {
-        "name": "Java",
+        "name": "JAVA",
         "patterns": [
           "*.java"
         ]
