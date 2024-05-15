@@ -28,8 +28,15 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
                 for (JsonElement pattern : patternArray) {
                     patterns.add(pattern.getAsString());
                 }
-                ServerMappingSettings serverMappingSettings = ServerMappingSettings.createFileNamePatternsMappingSettings(patterns, languageId);
-                languageServerTemplate.addFileTypeMapping(serverMappingSettings);
+                if (!patterns.isEmpty()) {
+                    languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileNamePatternsMappingSettings(patterns, languageId));
+                }
+
+                String language = fileType.get("name").getAsString();
+                if (language != null) {
+                    // TODO: This works correctly, but the mapping might be missing?
+                    languageServerTemplate.addLanguageMapping(ServerMappingSettings.createLanguageMappingSettings(language, languageId));
+                }
             }
         }
 
