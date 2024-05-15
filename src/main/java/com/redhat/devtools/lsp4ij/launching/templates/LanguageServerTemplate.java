@@ -124,6 +124,13 @@ public class LanguageServerTemplate {
         return fileTypeMappings;
     }
 
+    public void addFileTypeMapping(ServerMappingSettings s) {
+        if (this.fileTypeMappings == null) {
+            this.fileTypeMappings = new ArrayList<>();
+        }
+        this.fileTypeMappings.add(s);
+    }
+
     public boolean hasDocumentation() {
         return getId() != null && (hasDocumentation == null || !hasDocumentation.booleanValue());
     }

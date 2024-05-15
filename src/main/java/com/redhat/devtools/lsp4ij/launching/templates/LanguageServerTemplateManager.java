@@ -40,13 +40,9 @@ public class LanguageServerTemplateManager {
         return ApplicationManager.getApplication().getService(LanguageServerTemplateManager.class);
     }
 
+    // TODO: Remove this
     private LanguageServerTemplateManager() {
         LanguageServerTemplates root = null;
-        try (Reader templateReader = loadTemplateReader("template-ls.json")) {
-            root = new Gson().fromJson(templateReader, LanguageServerTemplates.class);
-        } catch (IOException e) {
-            LOGGER.warn("Failed to load LS templates:", e);
-        }
         if (root != null) {
             templates = root.getTemplates()
                     .stream()
