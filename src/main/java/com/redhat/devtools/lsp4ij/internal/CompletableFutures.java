@@ -150,7 +150,13 @@ public class CompletableFutures {
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
                     waitUntilDone(future, file);
-                } catch (CancellationException | ProcessCanceledException e) {
+                } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                    //TODO delete block when minimum required version is 2024.2
+                    if (!future.isCancelled()) {
+                        // Case when user click on cancel of progress Task.
+                        future.cancel(true);
+                    }
+                } catch (CancellationException e) {
                     if (!future.isCancelled()) {
                         // Case when user click on cancel of progress Task.
                         future.cancel(true);

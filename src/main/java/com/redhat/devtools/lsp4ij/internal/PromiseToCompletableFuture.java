@@ -143,7 +143,10 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                     try {
                         R result = code.apply(indicator);
                         return new ResultOrError<R>(result, null);
-                    } catch (ProcessCanceledException | CancellationException | IndexNotReadyException e) {
+                    } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                        //TODO delete block when minimum required version is 2024.2
+                        return new ResultOrError<R>(null, e);
+                    } catch (CancellationException | IndexNotReadyException e) {
                         // When there is any exception, AsyncPromise report a log error.
                         // As we retry to execute the function code 5 times, we don't want to log this error
                         // To do that we catch the error and recreate a new promise on the promise.onSuccess

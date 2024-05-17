@@ -59,7 +59,11 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<DocumentLin
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
             waitUntilDone(documentLinkFuture, psiFile);
-        } catch (ProcessCanceledException | CancellationException e) {
+        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+            documentLinkSupport.cancel();
+            return null;
+        } catch (CancellationException e) {
             // cancel the LSP requests textDocument/documentLink
             documentLinkSupport.cancel();
             return null;

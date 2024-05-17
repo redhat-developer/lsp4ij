@@ -77,11 +77,11 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                                         toPresentation(list, factory))
                         );
             }
-        } catch (CancellationException | ProcessCanceledException e) {
-            return;
+        } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+        } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/color' request", e);
-            return;
         } finally {
             if (!future.isDone()) {
                 // the future which collects all textDocument/colorInformation for all servers is not finished

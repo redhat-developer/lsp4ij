@@ -98,7 +98,9 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
             // Wait until the future of LSP 'workspace/willRenameFiles' request
             // is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(willRenameFilesFuture, file);
-        } catch (CancellationException | ProcessCanceledException e) {
+        } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+        } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'workspace/willRenameFiles' request", e);
         }
