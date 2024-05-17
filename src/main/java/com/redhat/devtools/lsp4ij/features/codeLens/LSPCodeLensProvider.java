@@ -109,7 +109,10 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiFile);
-        } catch (CancellationException | ProcessCanceledException e) {
+        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+            return CodeVisionState.NotReady.INSTANCE;
+        } catch (CancellationException e) {
             return CodeVisionState.NotReady.INSTANCE;
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/codeLens' request", e);
@@ -145,7 +148,9 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         // The resolve code lens future is not finished, wait for...
                         try {
                             waitUntilDone(resolvedCodeLensFuture, psiFile);
-                        } catch (CancellationException | ProcessCanceledException e) {
+                        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                            //TODO delete block when minimum required version is 2024.2
+                        } catch (CancellationException e) {
                             // Do nothing
                         } catch (ExecutionException e) {
                             LOGGER.error("Error while consuming LSP 'textDocument/resolveCodeLens' request", e);

@@ -61,7 +61,11 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges(params);
         try {
             waitUntilDone(foldingRangesFuture, file);
-        } catch (ProcessCanceledException | CancellationException e) {
+        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+            foldingRangeSupport.cancel();
+            return;
+        } catch (CancellationException e) {
             // cancel the LSP requests textDocument/foldingRanges
             foldingRangeSupport.cancel();
             return;

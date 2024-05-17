@@ -471,7 +471,10 @@ public class LSPCompletionProposal extends LookupElement {
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(resolvedCompletionItemFuture, file);
-        } catch (CancellationException | ProcessCanceledException e) {
+        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+            return null;
+        } catch (CancellationException e) {
             return null;
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'completionItem/resolve' request", e);
