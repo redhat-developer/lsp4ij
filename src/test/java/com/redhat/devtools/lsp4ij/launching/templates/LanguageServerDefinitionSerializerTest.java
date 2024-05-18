@@ -124,7 +124,8 @@ public class LanguageServerDefinitionSerializerTest {
                 ""
         );
         FileTypeManager fileTypeManager = FileTypeManager.getInstance();
-        lsDef.getFileTypeMappings().put(fileTypeManager.getFileTypeByExtension("any"), "Mock");
+        FileType fileType = fileTypeManager.getFileTypeByExtension("any");
+        lsDef.getFileTypeMappings().put(fileType, "Mock");
 
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
@@ -136,7 +137,7 @@ public class LanguageServerDefinitionSerializerTest {
         String fileTypeName = matcher.get("fileType").getAsJsonObject().get("name").getAsString();
         String langId = matcher.get("languageId").getAsString();
 
-        assertEquals("Mock", fileTypeName);
+        assertEquals(fileType.getName(), fileTypeName);
         assertEquals("Mock", langId);
     }
 }
