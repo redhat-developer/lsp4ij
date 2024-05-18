@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * Copyright (c) 2024 Red Hat Inc. and others.
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *  Mitja Leino <mitja.leino@hotmail.com> - Initial API and implementation
+ *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer.actions;
 
 import com.google.gson.Gson;
@@ -25,6 +36,9 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+/**
+ * Export one or more language servers to a zip file.
+ */
 public class ExportServerAction extends AnAction {
     private final List<LanguageServerDefinition> languageServerDefinitions;
     private static final Logger LOGGER = LoggerFactory.getLogger(ExportServerAction.class);
@@ -53,7 +67,7 @@ public class ExportServerAction extends AnAction {
             if (virtualFile != null) {
                 ApplicationManager.getApplication().runWriteAction(() -> {
                     try {
-                        virtualFile.setBinaryContent(createZipFromStrings());
+                        virtualFile.setBinaryContent(createZipFromLanguageServers());
                     } catch (IOException ex) {
                         LOGGER.warn(ex.getLocalizedMessage(), e);
                     }
@@ -62,7 +76,11 @@ public class ExportServerAction extends AnAction {
         }
     }
 
-    private byte[] createZipFromStrings() throws IOException {
+    /**
+     * Creates a zip file by handling each user defined language server definitions
+     * @return zip file as a byte array
+     */
+    private byte[] createZipFromLanguageServers() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ZipOutputStream zos = new ZipOutputStream(baos);
 
@@ -86,6 +104,12 @@ public class ExportServerAction extends AnAction {
         return baos.toByteArray();
     }
 
+    /**
+     * Writes a file (name + content) to a zip output stream
+     * @param filename name of the file to write
+     * @param content file content
+     * @param zos to write the file to
+     */
     private void writeToZip(String filename, String content, ZipOutputStream zos) throws IOException {
         if (content.isBlank()) {
             content = "{}";
