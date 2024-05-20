@@ -40,7 +40,7 @@ public class LanguageServerTemplateManager {
         return ApplicationManager.getApplication().getService(LanguageServerTemplateManager.class);
     }
 
-    // TODO: Remove this
+    // TODO: This should not be necessary anymore. Loading serves from folders
     private LanguageServerTemplateManager() {
         LanguageServerTemplates root = null;
         if (root != null) {
