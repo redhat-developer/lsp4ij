@@ -166,10 +166,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
     }
 
     private void loadFromTemplate(VirtualFile templateFolder) throws IOException {
-        if (!templateFolder.isDirectory()) {
-            throw new IllegalArgumentException("The template folder must be a directory");
-        }
-
         String templateJson = null;
         String settingsJson = null;
         String initializationOptionsJson = null;
