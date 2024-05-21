@@ -12,6 +12,9 @@ package com.redhat.devtools.lsp4ij.launching.ui;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
@@ -191,7 +194,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
         }
 
         if (templateJson == null) {
-            throw new IllegalArgumentException("The template.json file is missing or invalid");
+            // Don't continue, if no template.json is found
+            return;
         }
         if (settingsJson == null) {
             settingsJson = "{}";
