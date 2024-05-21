@@ -164,6 +164,10 @@ public class LanguageServerTemplate {
         return description;
     }
 
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     public String getConfiguration() {
         if (configuration != null) {
             return configuration.isEmpty() ? null : configuration;
