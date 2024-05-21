@@ -10,6 +10,7 @@
  *
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
+ *     Mitja Leino <mitja.leino@hotmail.com> - Render markdown using flexmark and only support close action
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
@@ -23,9 +24,13 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.util.ast.Document;
 
 import javax.swing.*;
 import javax.swing.event.HyperlinkEvent;
+import java.awt.*;
 
 /**
  * Dialog used to show some instructions (install nodejs, etc) which explains
@@ -41,18 +46,37 @@ public class ShowInstructionDialog extends DialogWrapper {
         this.template = template;
         init();
     }
+
     @Override
     protected @Nullable JComponent createCenterPanel() {
         var descriptionBrowser = new DescriptionEditorPane();
         final var descriptionScrollPane = ScrollPaneFactory.createScrollPane(descriptionBrowser);
         descriptionScrollPane.setBorder(null);
-        DescriptionEditorPaneKt.readHTML(descriptionBrowser, template.getDescription());
+
+        // Convert Markdown to HTML
+        Parser parser = Parser.builder().build();
+        HtmlRenderer renderer = HtmlRenderer.builder().build();
+        Document document = parser.parse(template.getDescription());
+        String html = renderer.render(document);
+
+        DescriptionEditorPaneKt.readHTML(descriptionBrowser, html);
         descriptionBrowser.addHyperlinkListener(e -> {
             if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
                 BrowserUtil.browse(e.getURL());
             }
         });
+        descriptionBrowser.setPreferredSize(new Dimension(800, 400));
         return descriptionScrollPane;
     }
 
+    @Override
+    protected Action @NotNull [] createActions() {
+        return new Action[]{getOKAction()};
+    }
+
+    @Override
+    protected void createDefaultActions() {
+        super.createDefaultActions();
+        getOKAction().putValue(Action.NAME, "Close");
+    }
 }
