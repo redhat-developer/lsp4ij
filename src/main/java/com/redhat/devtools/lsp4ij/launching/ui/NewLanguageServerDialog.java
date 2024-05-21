@@ -23,6 +23,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBInsets;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateDeserializer;
@@ -135,7 +136,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         return new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (currentTemplate != null) {
+                if (currentTemplate != null && StringUtils.isNotBlank(currentTemplate.getDescription())) {
                     ShowInstructionDialog dialog = new ShowInstructionDialog(currentTemplate, project);
                     dialog.show();
                 }
@@ -216,12 +217,12 @@ public class NewLanguageServerDialog extends DialogWrapper {
         LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
         template.setConfiguration(settingsJson);
         template.setInitializationOptions(initializationOptionsJson);
-        if (description != null) {
+        if (StringUtils.isNotBlank(description)) {
             template.setDescription(description);
         }
 
         currentTemplate = template;
-        showInstructionButton.setEnabled(!currentTemplate.getDescription().isBlank());
+        showInstructionButton.setEnabled(StringUtils.isNotBlank(currentTemplate.getDescription()));
         loadFromTemplate(template);
     }
 

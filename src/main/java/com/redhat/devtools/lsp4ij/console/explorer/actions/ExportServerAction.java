@@ -22,6 +22,7 @@ import com.intellij.openapi.fileChooser.*;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerDefinitionSerializer;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
@@ -111,7 +112,7 @@ public class ExportServerAction extends AnAction {
      * @param zos to write the file to
      */
     private void writeToZip(String filename, String content, ZipOutputStream zos) throws IOException {
-        if (content.isBlank()) {
+        if (StringUtils.isBlank(content)) {
             content = "{}";
         }
 
