@@ -12,9 +12,6 @@ package com.redhat.devtools.lsp4ij.launching.ui;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.intellij.notification.Notification;
-import com.intellij.notification.NotificationType;
-import com.intellij.notification.Notifications;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
@@ -39,6 +36,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +52,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
     private final Project project;
 
     private LanguageServerPanel languageServerPanel;
+    private LanguageServerTemplate currentTemplate = null;
+    private JButton showInstructionButton = null;
 
     private static LanguageServerTemplate[] getLanguageServerTemplates() {
         List<LanguageServerTemplate> templates = new ArrayList<>();
@@ -106,7 +106,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
             }
         });
 
-        final JButton showInstructionButton = super.createHelpButton(new JBInsets(0,0,0,0));
+        showInstructionButton = super.createHelpButton(new JBInsets(0,0,0,0));
         showInstructionButton.setText("");
         TextFieldWithBrowseButton textFieldWithBrowseButton = new TextFieldWithBrowseButton();
         FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(false, true,
@@ -126,18 +126,21 @@ public class NewLanguageServerDialog extends DialogWrapper {
             }
         });
         panel.add(textFieldWithBrowseButton, BorderLayout.WEST);
-
-        // TODO: Don't use templateCombo to get the instructions
-        showInstructionButton.addActionListener(e -> {
-            LanguageServerTemplate template = (LanguageServerTemplate) templateCombo.getSelectedItem();
-            if (template != null) {
-                ShowInstructionDialog dialog = new ShowInstructionDialog(template, project);
-                dialog.show();
-            }
-        });
-        showInstructionButton.setEnabled(false);
         panel.add(showInstructionButton, BorderLayout.CENTER);
         builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.template"), panel);
+    }
+
+    @Override
+    protected @NotNull Action getHelpAction() {
+        return new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (currentTemplate != null) {
+                    ShowInstructionDialog dialog = new ShowInstructionDialog(currentTemplate, project);
+                    dialog.show();
+                }
+            }
+        };
     }
 
     private void loadFromTemplate(LanguageServerTemplate template) {
@@ -166,23 +169,29 @@ public class NewLanguageServerDialog extends DialogWrapper {
     }
 
     private void loadFromTemplate(VirtualFile templateFolder) throws IOException {
+        currentTemplate = null;
+
         String templateJson = null;
         String settingsJson = null;
         String initializationOptionsJson = null;
+        String description = null;
 
         for (VirtualFile file : templateFolder.getChildren()) {
             if (file.isDirectory()) {
                 continue;
             }
-            switch (file.getName()) {
+            switch (file.getName().toLowerCase()) {
                 case "template.json":
                     templateJson = VfsUtilCore.loadText(file);
                     break;
                 case "settings.json":
                     settingsJson = VfsUtilCore.loadText(file);
                     break;
-                case "initializationOptions.json":
+                case "initializationoptions.json":
                     initializationOptionsJson = VfsUtilCore.loadText(file);
+                    break;
+                case "readme.md":
+                    description = VfsUtilCore.loadText(file);
                     break;
                 default:
                     break;
@@ -207,7 +216,12 @@ public class NewLanguageServerDialog extends DialogWrapper {
         LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
         template.setConfiguration(settingsJson);
         template.setInitializationOptions(initializationOptionsJson);
+        if (description != null) {
+            template.setDescription(description);
+        }
 
+        currentTemplate = template;
+        showInstructionButton.setEnabled(!currentTemplate.getDescription().isBlank());
         loadFromTemplate(template);
     }
 
