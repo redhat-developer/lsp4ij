@@ -43,9 +43,9 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
                     languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileNamePatternsMappingSettings(patterns, languageId));
                 }
 
-                String language = fileType.get("name").getAsString();
+                JsonElement language = fileType.get("name");
                 if (language != null) {
-                    languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileTypeMappingSettings(language, languageId));
+                    languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileTypeMappingSettings(language.getAsString(), languageId));
                 }
             }
         }
