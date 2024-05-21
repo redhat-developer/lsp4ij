@@ -12,11 +12,10 @@ package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.openapi.editor.Editor;
 import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.MarkupKind;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
-
-import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter.toHTML;
 
 /**
  * LSP documentation utilities.
@@ -39,7 +38,10 @@ public class LSPDocumentationHelper {
         if (content == null) {
             return "";
         }
-        return styleHtml(editor, toHTML(content.getValue()));
+        String htmlBody = MarkupKind.MARKDOWN.equals(content.getKind()) ?
+                MarkdownConverter.toHTML(content.getValue()) :
+                content.getValue();
+        return styleHtml(editor, htmlBody);
     }
 
     private static String styleHtml(@Nullable Editor editor, String htmlBody) {
@@ -52,12 +54,12 @@ public class LSPDocumentationHelper {
         StringBuilder html = new StringBuilder("<html><head><style TYPE='text/css'>html { ");
         if (background != null) {
             html.append("background-color: ")
-                    .append(toHTMLrgb(background))
+                    .append(toHTML(background))
                     .append(";");
         }
         if (foreground != null) {
             html.append("color: ")
-                    .append(toHTMLrgb(foreground))
+                    .append(toHTML(foreground))
                     .append(";");
         }
         html
@@ -67,7 +69,7 @@ public class LSPDocumentationHelper {
         return html.toString();
     }
 
-    private static String toHTMLrgb(Color rgb) {
+    private static String toHTML(Color rgb) {
         StringBuilder builder = new StringBuilder(7);
         builder.append('#');
         appendAsHexString(builder, rgb.getRed());
