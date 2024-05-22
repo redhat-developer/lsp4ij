@@ -141,12 +141,12 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
                               boolean waitFor) {
         updateRenameCapabilities(jsonPrepareRenameResponse);
 
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(500);
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(600);
         PsiFile file = myFixture.configureByText(fileName, text);
 
         // Prepare rename response
         if (jsonPrepareRenameResponse != null) {
-            if (jsonPrepareRenameResponse == PREPARE_RENAME_NO_RESULT) {
+            if (PREPARE_RENAME_NO_RESULT.equals(jsonPrepareRenameResponse)) {
                 // Prepare rename should return null.
                 MockLanguageServer.INSTANCE.setPrepareRenameProcessor(params -> null);
             } else if (jsonPrepareRenameResponse.contains("code")) {
@@ -242,7 +242,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
     }
 
     private static void updateRenameCapabilities(@Nullable String jsonPrepareRenameResult) {
-        Either<Boolean, RenameOptions> renameProvider = null;
+        Either<Boolean, RenameOptions> renameProvider;
         if (jsonPrepareRenameResult != null) {
             RenameOptions prepareRenameProvider = new RenameOptions();
             prepareRenameProvider.setPrepareProvider(true);
