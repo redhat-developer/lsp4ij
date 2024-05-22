@@ -140,8 +140,8 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
                               @Nullable String expectedError,
                               boolean waitFor) {
         updateRenameCapabilities(jsonPrepareRenameResponse);
-
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(600);
+        int delay = waitFor ? 100 : 750; // if not waiting for the server, make sure the server is "slow"
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(delay);
         PsiFile file = myFixture.configureByText(fileName, text);
 
         // Prepare rename response

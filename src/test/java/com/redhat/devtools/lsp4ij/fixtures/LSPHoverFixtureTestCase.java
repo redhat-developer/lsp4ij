@@ -60,7 +60,7 @@ public abstract class LSPHoverFixtureTestCase extends LSPCodeInsightFixtureTestC
                                     @NotNull String editorContentText,
                                     @NotNull Hover hover,
                                     @NotNull String expectedHoverContent) {
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(250);
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         MockLanguageServer.INSTANCE.setHover(hover);
         // Open editor for a given file name and content (which declares <caret> to know where the completion is triggered).
         myFixture.configureByText(fileName, editorContentText);

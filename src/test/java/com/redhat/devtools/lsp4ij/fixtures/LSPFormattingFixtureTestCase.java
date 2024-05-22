@@ -54,7 +54,7 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
                                     @NotNull String text,
                                     @NotNull List<TextEdit> formattingTextEdits,
                                     @NotNull String formattedText) {
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         MockLanguageServer.INSTANCE.setFormattingTextEdits(formattingTextEdits);
         // Open editor for a given file name and content
         PsiFile file = myFixture.configureByText(fileName, text);
