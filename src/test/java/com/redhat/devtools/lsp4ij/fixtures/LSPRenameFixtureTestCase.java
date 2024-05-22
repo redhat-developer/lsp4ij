@@ -141,7 +141,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
                               boolean waitFor) {
         updateRenameCapabilities(jsonPrepareRenameResponse);
 
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(1000);
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(450);
         PsiFile file = myFixture.configureByText(fileName, text);
 
         // Prepare rename response
