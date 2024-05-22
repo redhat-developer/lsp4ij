@@ -57,7 +57,7 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
                                     @NotNull String editorContentText,
                                     @NotNull CompletionList completionList,
                                     @NotNull String... expectedItems) {
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(5000);
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
         MockLanguageServer.INSTANCE.setCompletionList(completionList);
         // Open editor for a given file name and content (which declares <caret> to know where the completion is triggered).
         myFixture.configureByText(fileName, editorContentText);
