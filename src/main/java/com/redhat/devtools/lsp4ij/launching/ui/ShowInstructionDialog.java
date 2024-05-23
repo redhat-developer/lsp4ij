@@ -10,7 +10,7 @@
  *
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
- *     Mitja Leino <mitja.leino@hotmail.com> - Render markdown using flexmark and only support close action
+ *     Mitja Leino <mitja.leino@hotmail.com> - Covert markdown to html and only support close action
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
@@ -21,12 +21,12 @@ import com.intellij.profile.codeInspection.ui.DescriptionEditorPane;
 import com.intellij.profile.codeInspection.ui.DescriptionEditorPaneKt;
 import com.intellij.ui.ScrollPaneFactory;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import com.vladsch.flexmark.html.HtmlRenderer;
-import com.vladsch.flexmark.parser.Parser;
-import com.vladsch.flexmark.util.ast.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import javax.swing.event.HyperlinkEvent;
@@ -37,8 +37,8 @@ import java.awt.*;
  * how to use a given template language server.
  */
 public class ShowInstructionDialog extends DialogWrapper {
-
-    private @NotNull  final LanguageServerTemplate template;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ShowInstructionDialog.class);
+    private final @NotNull LanguageServerTemplate template;
 
     protected ShowInstructionDialog(LanguageServerTemplate template, @Nullable Project project) {
         super(project);
@@ -53,13 +53,17 @@ public class ShowInstructionDialog extends DialogWrapper {
         final var descriptionScrollPane = ScrollPaneFactory.createScrollPane(descriptionBrowser);
         descriptionScrollPane.setBorder(null);
 
-        // Convert Markdown to HTML
-        Parser parser = Parser.builder().build();
-        HtmlRenderer renderer = HtmlRenderer.builder().build();
-        Document document = parser.parse(template.getDescription());
-        String html = renderer.render(document);
+        String docContent = template.getDescription();
+        String description;
 
-        DescriptionEditorPaneKt.readHTML(descriptionBrowser, html);
+        try {
+            description = MarkdownConverter.toHTML(docContent);
+        } catch (Exception e) {
+            description = docContent;
+            LOGGER.warn("Error while converting MarkDown language server template documentation to HTML", e);
+        }
+
+        DescriptionEditorPaneKt.readHTML(descriptionBrowser, description);
         descriptionBrowser.addHyperlinkListener(e -> {
             if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
                 BrowserUtil.browse(e.getURL());
