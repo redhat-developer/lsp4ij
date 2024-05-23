@@ -23,6 +23,8 @@ import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateMana
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 
@@ -50,13 +52,21 @@ public class ExportServerAction extends AnAction {
         FileSaverDescriptor fileSaverDescriptor = new FileSaverDescriptor(
                 LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"));
         FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
-        VirtualFileWrapper fileWrapper = fileSaverDialog.save("ls-export.zip");
+
+        String currentDate = getCurrentDate();
+        VirtualFileWrapper fileWrapper = fileSaverDialog.save("ls4ij-export" + currentDate + ".zip");
         if (fileWrapper != null) {
             VirtualFile exportZip = fileWrapper.getVirtualFile(true);
             if (exportZip != null) {
                 LanguageServerTemplateManager.getInstance().exportLsTemplates(exportZip, languageServerDefinitions);
             }
         }
+    }
+
+    private String getCurrentDate() {
+        LocalDate currentDate = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+        return currentDate.format(formatter);
     }
 
     @Override
