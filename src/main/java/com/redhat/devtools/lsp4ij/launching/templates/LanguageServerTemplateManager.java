@@ -41,17 +41,6 @@ import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTempl
  * Language server template manager.
  */
 public class LanguageServerTemplateManager {
-    public static final String LANGUAGE_ID = "languageId";
-    public static final String FILE_TYPE = "fileType";
-    public static final String DEFAULT = "default";
-    public static final String PROGRAM_ARGS = "programArgs";
-    public static final String LANGUAGE = "language";
-    public static final String LANGUAGE_MAPPINGS = "languageMappings";
-    public static final String PATTERNS = "patterns";
-    public static final String FILE_TYPE_MAPPINGS = "fileTypeMappings";
-    public static final String NAME = "name";
-
-
     private final static Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplateManager.class);
 
     private static final String TEMPLATES_DIR = "templates";

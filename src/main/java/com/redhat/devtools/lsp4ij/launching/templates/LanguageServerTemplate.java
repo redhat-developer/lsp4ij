@@ -41,6 +41,17 @@ public class LanguageServerTemplate {
     public static final String SETTINGS = "settings.json";
     public static final String README = "README.md";
 
+
+    public static final String LANGUAGE_ID = "languageId";
+    public static final String FILE_TYPE = "fileType";
+    public static final String DEFAULT = "default";
+    public static final String PROGRAM_ARGS = "programArgs";
+    public static final String LANGUAGE = "language";
+    public static final String LANGUAGE_MAPPINGS = "languageMappings";
+    public static final String PATTERNS = "patterns";
+    public static final String FILE_TYPE_MAPPINGS = "fileTypeMappings";
+    public static final String NAME = "name";
+
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplate.class);
 
     private final String WINDOWS_KEY = "windows";

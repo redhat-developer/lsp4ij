@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Type;
 import java.util.List;
 
-import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager.*;
+import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
 public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDefinedLanguageServerDefinition> {
     @Override
