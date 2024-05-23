@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -76,8 +77,68 @@ public class LanguageServerTemplateManager {
         return is !=null? new InputStreamReader(new BufferedInputStream(is)) : null;
     }
 
-    public void importLsTemplate(VirtualFile templateZip) {
+    @Nullable
+    public LanguageServerTemplate importLsTemplate(@NotNull VirtualFile templateFolder) {
+        try {
+            return createLsTemplate(templateFolder);
+        } catch (IOException ex) {
+            LOGGER.warn(ex.getLocalizedMessage(), ex);
+        }
+        return null;
+    }
 
+    @Nullable
+    public LanguageServerTemplate createLsTemplate(VirtualFile templateFolder) throws IOException {
+        String templateJson = null;
+        String settingsJson = null;
+        String initializationOptionsJson = null;
+        String description = null;
+
+        for (VirtualFile file : templateFolder.getChildren()) {
+            if (file.isDirectory()) {
+                continue;
+            }
+            switch (file.getName()) {
+                case TEMPLATE:
+                    templateJson = VfsUtilCore.loadText(file);
+                    break;
+                case SETTINGS:
+                    settingsJson = VfsUtilCore.loadText(file);
+                    break;
+                case INITIALIZATION_OPTIONS:
+                    initializationOptionsJson = VfsUtilCore.loadText(file);
+                    break;
+                case README:
+                    description = VfsUtilCore.loadText(file);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (templateJson == null) {
+            // Don't continue, if no template.json is found
+            return null;
+        }
+        if (settingsJson == null) {
+            settingsJson = "{}";
+        }
+        if (initializationOptionsJson == null) {
+            initializationOptionsJson = "{}";
+        }
+
+        GsonBuilder builder = new GsonBuilder();
+        builder.registerTypeAdapter(LanguageServerTemplate.class, new LanguageServerTemplateDeserializer());
+        Gson gson = builder.create();
+
+        LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
+        template.setConfiguration(settingsJson);
+        template.setInitializationOptions(initializationOptionsJson);
+        if (StringUtils.isNotBlank(description)) {
+            template.setDescription(description);
+        }
+
+        return template;
     }
 
     public void exportLsTemplates(@NotNull VirtualFile exportZip, @NotNull List<LanguageServerDefinition> lsDefinitions) {

@@ -10,12 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
-import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
@@ -26,7 +23,6 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
-import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateDeserializer;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
@@ -38,13 +34,10 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
 /**
  * New language server dialog.
@@ -121,10 +114,13 @@ public class NewLanguageServerDialog extends DialogWrapper {
             @Override
             public void onFileChosen(@NotNull VirtualFile virtualFile) {
                 super.onFileChosen(virtualFile);
-                try {
-                    loadFromTemplate(virtualFile);
-                } catch (IOException e) {
-                    Messages.showErrorDialog(project, e.getMessage(), LanguageServerBundle.message("new.language.server.dialog.export.template.error"));
+                LanguageServerTemplate template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
+                currentTemplate = template;
+                if (template != null) {
+                    showInstructionButton.setEnabled(StringUtils.isNotBlank(currentTemplate.getDescription()));
+                    loadFromTemplate(template);
+                } else {
+                    showInstructionButton.setEnabled(false);
                 }
             }
         });
@@ -169,63 +165,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
         var initializationOptions = this.languageServerPanel.getInitializationOptionsWidget();
         initializationOptions.setText(template.getInitializationOptions() != null ? template.getInitializationOptions() : "");
         initializationOptions.setCaretPosition(0);
-    }
-
-    private void loadFromTemplate(VirtualFile templateFolder) throws IOException {
-        currentTemplate = null;
-
-        String templateJson = null;
-        String settingsJson = null;
-        String initializationOptionsJson = null;
-        String description = null;
-
-        for (VirtualFile file : templateFolder.getChildren()) {
-            if (file.isDirectory()) {
-                continue;
-            }
-            switch (file.getName()) {
-                case TEMPLATE:
-                    templateJson = VfsUtilCore.loadText(file);
-                    break;
-                case SETTINGS:
-                    settingsJson = VfsUtilCore.loadText(file);
-                    break;
-                case INITIALIZATION_OPTIONS:
-                    initializationOptionsJson = VfsUtilCore.loadText(file);
-                    break;
-                case README:
-                    description = VfsUtilCore.loadText(file);
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        if (templateJson == null) {
-            // Don't continue, if no template.json is found
-            return;
-        }
-        if (settingsJson == null) {
-            settingsJson = "{}";
-        }
-        if (initializationOptionsJson == null) {
-            initializationOptionsJson = "{}";
-        }
-
-        GsonBuilder builder = new GsonBuilder();
-        builder.registerTypeAdapter(LanguageServerTemplate.class, new LanguageServerTemplateDeserializer());
-        Gson gson = builder.create();
-
-        LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
-        template.setConfiguration(settingsJson);
-        template.setInitializationOptions(initializationOptionsJson);
-        if (StringUtils.isNotBlank(description)) {
-            template.setDescription(description);
-        }
-
-        currentTemplate = template;
-        showInstructionButton.setEnabled(StringUtils.isNotBlank(currentTemplate.getDescription()));
-        loadFromTemplate(template);
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
