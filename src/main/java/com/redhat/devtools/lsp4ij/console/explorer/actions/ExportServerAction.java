@@ -37,12 +37,16 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
+
 /**
  * Export one or more language servers to a zip file.
  */
 public class ExportServerAction extends AnAction {
     private final List<LanguageServerDefinition> languageServerDefinitions;
     private static final Logger LOGGER = LoggerFactory.getLogger(ExportServerAction.class);
+
+    private String lsName;
 
     public ExportServerAction(List<LanguageServerDefinition> languageServerDefinitions) {
         this.languageServerDefinitions = languageServerDefinitions;
@@ -90,14 +94,14 @@ public class ExportServerAction extends AnAction {
                     .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
                     .setPrettyPrinting()
                     .create();
-            String json = gson.toJson(lsDefinition);
+            String template = gson.toJson(lsDefinition);
             String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
-            String lsName = lsDefinition.getDisplayName();
+            lsName = lsDefinition.getDisplayName();
 
-            writeToZip(lsName + "/template.json", json, zos);
-            writeToZip(lsName + "/initializationOptions.json", initializationOptions, zos);
-            writeToZip(lsName + "/settings.json", settings, zos);
+            writeToZip(TEMPLATE, template, zos);
+            writeToZip(INITIALIZATION_OPTIONS, initializationOptions, zos);
+            writeToZip(SETTINGS, settings, zos);
             zos.closeEntry();
         }
 
@@ -116,7 +120,7 @@ public class ExportServerAction extends AnAction {
             content = "{}";
         }
 
-        ZipEntry entry = new ZipEntry(filename);
+        ZipEntry entry = new ZipEntry(lsName + "/" + filename);
         zos.putNextEntry(entry);
         zos.write(content.getBytes(StandardCharsets.UTF_8));
         zos.closeEntry();
