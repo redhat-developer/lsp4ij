@@ -20,24 +20,23 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Type;
 import java.util.List;
 
-public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDefinedLanguageServerDefinition> {
-    private static final String LANGUAGE_ID = "languageId";
-    private static final String FILE_TYPE = "fileType";
+import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager.*;
 
+public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDefinedLanguageServerDefinition> {
     @Override
     public JsonElement serialize(UserDefinedLanguageServerDefinition src, Type typeOfSrc, JsonSerializationContext context) {
         JsonObject userDefinedLSDefinitionJson = new JsonObject();
-        userDefinedLSDefinitionJson.addProperty("name", src.getDisplayName());
+        userDefinedLSDefinitionJson.addProperty(NAME, src.getDisplayName());
 
         // User defined ls only supports a single command, defined as default
         JsonObject programArgs = new JsonObject();
-        programArgs.addProperty("default", src.getCommandLine());
-        userDefinedLSDefinitionJson.add("programArgs", programArgs);
+        programArgs.addProperty(DEFAULT, src.getCommandLine());
+        userDefinedLSDefinitionJson.add(PROGRAM_ARGS, programArgs);
 
         JsonArray languageMappings = new JsonArray();
         for (var languageEntry : src.getLanguageMappings().entrySet()) {
             JsonObject language = new JsonObject();
-            language.addProperty("language", languageEntry.getKey().getID());
+            language.addProperty(LANGUAGE, languageEntry.getKey().getID());
             String languageId = languageEntry.getValue();
             if (languageId != null) {
                 language.addProperty(LANGUAGE_ID, languageEntry.getValue());
@@ -46,7 +45,7 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
             languageMappings.add(language);
         }
         if (!languageMappings.isEmpty()) {
-            userDefinedLSDefinitionJson.add("languageMappings", languageMappings);
+            userDefinedLSDefinitionJson.add(LANGUAGE_MAPPINGS, languageMappings);
         }
 
         JsonArray fileTypeMappings = getJsonElements(src);
@@ -64,7 +63,7 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
                         for (var fNameMatcher : filenameMatcherEntry.getFirst()) {
                             patterns.add(fNameMatcher.getPresentableString());
                         }
-                        fileTypeElement.add("patterns", patterns);
+                        fileTypeElement.add(PATTERNS, patterns);
                         filenameMatcher.addProperty(LANGUAGE_ID, filenameMatcherEntry.getSecond());
                     }
                 }
@@ -77,7 +76,7 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
             }
         }
         if (!fileTypeMappings.isEmpty()) {
-            userDefinedLSDefinitionJson.add("fileTypeMappings", fileTypeMappings);
+            userDefinedLSDefinitionJson.add(FILE_TYPE_MAPPINGS, fileTypeMappings);
         }
 
         return userDefinedLSDefinitionJson;
@@ -88,7 +87,7 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
         for (var fileTypeEntry : src.getFileTypeMappings().entrySet()) {
             JsonObject fileTypeContainer = new JsonObject();
             JsonObject fileType = new JsonObject();
-            fileType.addProperty("name", fileTypeEntry.getKey().getName());
+            fileType.addProperty(NAME, fileTypeEntry.getKey().getName());
             fileTypeContainer.add(FILE_TYPE, fileType);
             fileTypeContainer.addProperty(LANGUAGE_ID, fileTypeEntry.getValue());
             fileTypeMappings.add(fileTypeContainer);
@@ -104,7 +103,7 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
         for (var fNameMatcher : filenameMatcherEntry.getFirst()) {
             patterns.add(fNameMatcher.getPresentableString());
         }
-        fileType.add("patterns", patterns);
+        fileType.add(PATTERNS, patterns);
         fileTypeContainer.add(FILE_TYPE, fileType);
         fileTypeContainer.addProperty(LANGUAGE_ID, filenameMatcherEntry.getSecond());
         fileTypeMappings.add(fileTypeContainer);
