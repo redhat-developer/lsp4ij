@@ -88,7 +88,7 @@ public class LanguageServerTemplateManager {
     }
 
     @Nullable
-    public LanguageServerTemplate createLsTemplate(VirtualFile templateFolder) throws IOException {
+    public LanguageServerTemplate createLsTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         String templateJson = null;
         String settingsJson = null;
         String initializationOptionsJson = null;
