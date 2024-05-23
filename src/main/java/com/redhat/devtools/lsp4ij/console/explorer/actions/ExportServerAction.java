@@ -11,44 +11,28 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer.actions;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileChooser.*;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerDefinitionSerializer;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
-import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
 /**
  * Export one or more language servers to a zip file.
  */
 public class ExportServerAction extends AnAction {
     private final List<LanguageServerDefinition> languageServerDefinitions;
-    private static final Logger LOGGER = LoggerFactory.getLogger(ExportServerAction.class);
 
-    private String lsName;
-
-    public ExportServerAction(List<LanguageServerDefinition> languageServerDefinitions) {
+    public ExportServerAction(@NotNull List<LanguageServerDefinition> languageServerDefinitions) {
         this.languageServerDefinitions = languageServerDefinitions;
         if (this.languageServerDefinitions.size() == 1) {
             getTemplatePresentation().setText(LanguageServerBundle.message("action.lsp.console.explorer.export.server.text"));
@@ -66,64 +50,13 @@ public class ExportServerAction extends AnAction {
         FileSaverDescriptor fileSaverDescriptor = new FileSaverDescriptor(
                 LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"));
         FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
-        VirtualFileWrapper fileWrapper = fileSaverDialog.save("export.zip");
+        VirtualFileWrapper fileWrapper = fileSaverDialog.save("ls-export.zip");
         if (fileWrapper != null) {
-            VirtualFile virtualFile = fileWrapper.getVirtualFile(true);
-            if (virtualFile != null) {
-                ApplicationManager.getApplication().runWriteAction(() -> {
-                    try {
-                        virtualFile.setBinaryContent(createZipFromLanguageServers());
-                    } catch (IOException ex) {
-                        LOGGER.warn(ex.getLocalizedMessage(), e);
-                    }
-                });
+            VirtualFile exportZip = fileWrapper.getVirtualFile(true);
+            if (exportZip != null) {
+                LanguageServerTemplateManager.getInstance().exportLsTemplates(exportZip, languageServerDefinitions);
             }
         }
-    }
-
-    /**
-     * Creates a zip file by handling each user defined language server definitions
-     * @return zip file as a byte array
-     */
-    private byte[] createZipFromLanguageServers() throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ZipOutputStream zos = new ZipOutputStream(baos);
-
-        for (LanguageServerDefinition lsDefinition : languageServerDefinitions) {
-            Gson gson = new GsonBuilder()
-                    .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
-                    .setPrettyPrinting()
-                    .create();
-            String template = gson.toJson(lsDefinition);
-            String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
-            String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
-            lsName = lsDefinition.getDisplayName();
-
-            writeToZip(TEMPLATE, template, zos);
-            writeToZip(INITIALIZATION_OPTIONS, initializationOptions, zos);
-            writeToZip(SETTINGS, settings, zos);
-            zos.closeEntry();
-        }
-
-        zos.close();
-        return baos.toByteArray();
-    }
-
-    /**
-     * Writes a file (name + content) to a zip output stream
-     * @param filename name of the file to write
-     * @param content file content
-     * @param zos to write the file to
-     */
-    private void writeToZip(String filename, String content, ZipOutputStream zos) throws IOException {
-        if (StringUtils.isBlank(content)) {
-            content = "{}";
-        }
-
-        ZipEntry entry = new ZipEntry(lsName + "/" + filename);
-        zos.putNextEntry(entry);
-        zos.write(content.getBytes(StandardCharsets.UTF_8));
-        zos.closeEntry();
     }
 
     @Override
