@@ -18,7 +18,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager.*;
+import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
 public class LanguageServerTemplateDeserializer implements JsonDeserializer<LanguageServerTemplate> {
     @Override
