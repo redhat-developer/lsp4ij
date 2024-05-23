@@ -44,6 +44,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
+
 /**
  * New language server dialog.
  */
@@ -181,17 +183,17 @@ public class NewLanguageServerDialog extends DialogWrapper {
             if (file.isDirectory()) {
                 continue;
             }
-            switch (file.getName().toLowerCase()) {
-                case "template.json":
+            switch (file.getName()) {
+                case TEMPLATE:
                     templateJson = VfsUtilCore.loadText(file);
                     break;
-                case "settings.json":
+                case SETTINGS:
                     settingsJson = VfsUtilCore.loadText(file);
                     break;
-                case "initializationoptions.json":
+                case INITIALIZATION_OPTIONS:
                     initializationOptionsJson = VfsUtilCore.loadText(file);
                     break;
-                case "readme.md":
+                case README:
                     description = VfsUtilCore.loadText(file);
                     break;
                 default:

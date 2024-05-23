@@ -36,6 +36,10 @@ public class LanguageServerTemplate {
             return "None";
         }
     };
+    public static final String TEMPLATE = "template.json";
+    public static final String INITIALIZATION_OPTIONS = "initializationOptions.json";
+    public static final String SETTINGS = "settings.json";
+    public static final String README = "README.md";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplate.class);
 
