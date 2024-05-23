@@ -18,24 +18,26 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager.*;
+
 public class LanguageServerTemplateDeserializer implements JsonDeserializer<LanguageServerTemplate> {
     @Override
     public LanguageServerTemplate deserialize(JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
         JsonObject jsonObject = jsonElement.getAsJsonObject();
         LanguageServerTemplate languageServerTemplate = new LanguageServerTemplate();
 
-        languageServerTemplate.setName(jsonObject.get("name").getAsString());
-        JsonObject programArgs = jsonObject.get("programArgs").getAsJsonObject();
+        languageServerTemplate.setName(jsonObject.get(NAME).getAsString());
+        JsonObject programArgs = jsonObject.get(PROGRAM_ARGS).getAsJsonObject();
         if (programArgs != null) {
-            languageServerTemplate.setDefaultProgramArg(programArgs.get("default").getAsString());
+            languageServerTemplate.setDefaultProgramArg(programArgs.get(DEFAULT).getAsString());
         }
-        JsonArray fileTypeMappings = jsonObject.getAsJsonArray("fileTypeMappings");
+        JsonArray fileTypeMappings = jsonObject.getAsJsonArray(FILE_TYPE_MAPPINGS);
         if (fileTypeMappings != null && !fileTypeMappings.isEmpty()) {
             for (JsonElement ftm : fileTypeMappings) {
-                String languageId = ftm.getAsJsonObject().get("languageId").getAsString();
+                String languageId = ftm.getAsJsonObject().get(LANGUAGE_ID).getAsString();
                 List<String> patterns = new ArrayList<>();
-                JsonObject fileType = ftm.getAsJsonObject().getAsJsonObject("fileType");
-                JsonArray patternArray = fileType.getAsJsonArray("patterns");
+                JsonObject fileType = ftm.getAsJsonObject().getAsJsonObject(FILE_TYPE);
+                JsonArray patternArray = fileType.getAsJsonArray(PATTERNS);
                 for (JsonElement pattern : patternArray) {
                     patterns.add(pattern.getAsString());
                 }
@@ -43,17 +45,17 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
                     languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileNamePatternsMappingSettings(patterns, languageId));
                 }
 
-                JsonElement language = fileType.get("name");
+                JsonElement language = fileType.get(NAME);
                 if (language != null) {
                     languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileTypeMappingSettings(language.getAsString(), languageId));
                 }
             }
         }
-        JsonArray languageMappings = jsonObject.getAsJsonArray("languageMappings");
+        JsonArray languageMappings = jsonObject.getAsJsonArray(LANGUAGE_MAPPINGS);
         if (languageMappings != null && !languageMappings.isEmpty()) {
             for (JsonElement language : languageMappings) {
-                String lang = language.getAsJsonObject().get("language").getAsString();
-                String languageId = language.getAsJsonObject().get("languageId").getAsString();
+                String lang = language.getAsJsonObject().get(LANGUAGE).getAsString();
+                String languageId = language.getAsJsonObject().get(LANGUAGE_ID).getAsString();
                 languageServerTemplate.addLanguageMapping(ServerMappingSettings.createLanguageMappingSettings(lang, languageId));
             }
         }
