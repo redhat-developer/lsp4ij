@@ -601,6 +601,7 @@ public class LanguageServerWrapper implements Disposable {
     private CompletableFuture<LanguageServer> connect(@NotNull URI fileUri,
                                                       @Nullable VirtualFile optionalFile,
                                                       @Nullable Document optionalDocument) {
+        removeStopTimer(false);
 
         var ls = getLanguageServerWhenDidOpen(fileUri);
         if (ls != null) {
