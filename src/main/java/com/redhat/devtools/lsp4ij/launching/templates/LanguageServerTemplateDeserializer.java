@@ -34,7 +34,7 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
         JsonArray fileTypeMappings = jsonObject.getAsJsonArray(FILE_TYPE_MAPPINGS_JSON_PROPERTY);
         if (fileTypeMappings != null && !fileTypeMappings.isEmpty()) {
             for (JsonElement ftm : fileTypeMappings) {
-                String languageId = ftm.getAsJsonObject().get(LANGUAGE_ID_JSON_PROPERTY).getAsString();
+                String languageId = ftm.getAsJsonObject().get(LANGUAGE_ID_JSON_PROPERTY) != null ? ftm.getAsJsonObject().get(LANGUAGE_ID_JSON_PROPERTY).getAsString() : null;
                 List<String> patterns = new ArrayList<>();
                 JsonObject fileType = ftm.getAsJsonObject().getAsJsonObject(FILE_TYPE_JSON_PROPERTY);
                 JsonArray patternArray = fileType.getAsJsonArray(PATTERNS_JSON_PROPERTY);
@@ -43,12 +43,12 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
                         patterns.add(pattern.getAsString());
                     }
                 }
-                if (!patterns.isEmpty()) {
+                if (!patterns.isEmpty() && languageId != null) {
                     languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileNamePatternsMappingSettings(patterns, languageId));
                 }
 
                 JsonElement language = fileType.get(NAME_JSON_PROPERTY);
-                if (language != null) {
+                if (language != null && languageId != null) {
                     languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileTypeMappingSettings(language.getAsString(), languageId));
                 }
             }
@@ -56,9 +56,11 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
         JsonArray languageMappings = jsonObject.getAsJsonArray(LANGUAGE_MAPPINGS_JSON_PROPERTY);
         if (languageMappings != null && !languageMappings.isEmpty()) {
             for (JsonElement language : languageMappings) {
-                String lang = language.getAsJsonObject().get(LANGUAGE_JSON_PROPERTY).getAsString();
-                String languageId = language.getAsJsonObject().get(LANGUAGE_ID_JSON_PROPERTY).getAsString();
-                languageServerTemplate.addLanguageMapping(ServerMappingSettings.createLanguageMappingSettings(lang, languageId));
+                String lang = language.getAsJsonObject().get(LANGUAGE_JSON_PROPERTY) != null ? language.getAsJsonObject().get(LANGUAGE_JSON_PROPERTY).getAsString() : null;
+                String languageId = language.getAsJsonObject().get(LANGUAGE_ID_JSON_PROPERTY) != null ? language.getAsJsonObject().get(LANGUAGE_ID_JSON_PROPERTY).getAsString() : null;
+                if (lang != null && languageId != null) {
+                    languageServerTemplate.addLanguageMapping(ServerMappingSettings.createLanguageMappingSettings(lang, languageId));
+                }
             }
         }
 
