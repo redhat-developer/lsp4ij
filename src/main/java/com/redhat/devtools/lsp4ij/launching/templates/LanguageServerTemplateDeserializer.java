@@ -38,8 +38,10 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
                 List<String> patterns = new ArrayList<>();
                 JsonObject fileType = ftm.getAsJsonObject().getAsJsonObject(FILE_TYPE_JSON_PROPERTY);
                 JsonArray patternArray = fileType.getAsJsonArray(PATTERNS_JSON_PROPERTY);
-                for (JsonElement pattern : patternArray) {
-                    patterns.add(pattern.getAsString());
+                if (patternArray != null) {
+                    for (JsonElement pattern : patternArray) {
+                        patterns.add(pattern.getAsString());
+                    }
                 }
                 if (!patterns.isEmpty()) {
                     languageServerTemplate.addFileTypeMapping(ServerMappingSettings.createFileNamePatternsMappingSettings(patterns, languageId));
