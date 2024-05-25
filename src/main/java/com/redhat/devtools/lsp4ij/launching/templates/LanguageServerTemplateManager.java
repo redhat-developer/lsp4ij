@@ -76,6 +76,11 @@ public class LanguageServerTemplateManager {
         return is !=null? new InputStreamReader(new BufferedInputStream(is)) : null;
     }
 
+    /**
+     * Import language server template from a directory
+     * @param templateFolder directory that contains the template files
+     * @return LanguageServerTemplate or null if one couldn't be created
+     */
     @Nullable
     public LanguageServerTemplate importLsTemplate(@NotNull VirtualFile templateFolder) {
         try {
@@ -86,6 +91,12 @@ public class LanguageServerTemplateManager {
         return null;
     }
 
+    /**
+     * Parses the template files to create a LanguageServerTemplate
+     * @param templateFolder directory that contains the template files
+     * @return LanguageServerTemplate or null if one couldn't be created
+     * @throws IOException if an IO error occurs when loading the text from any template file
+     */
     @Nullable
     public LanguageServerTemplate createLsTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         String templateJson = null;
@@ -140,6 +151,11 @@ public class LanguageServerTemplateManager {
         return template;
     }
 
+    /**
+     * Exports one or more language server templates to a zip file
+     * @param exportZip target zip
+     * @param lsDefinitions to export
+     */
     public void exportLsTemplates(@NotNull VirtualFile exportZip, @NotNull List<LanguageServerDefinition> lsDefinitions) {
         ApplicationManager.getApplication().runWriteAction(() -> {
             try {
@@ -153,6 +169,7 @@ public class LanguageServerTemplateManager {
     /**
      * Creates a zip file by handling each user defined language server definitions
      * @return zip file as a byte array
+     * @throws IOException if an IO error occurs when writing to the zip file
      */
     private byte[] createZipFromLanguageServers(@NotNull List<LanguageServerDefinition> lsDefinitions) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
