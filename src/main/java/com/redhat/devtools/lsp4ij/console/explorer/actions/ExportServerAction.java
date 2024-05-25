@@ -12,6 +12,9 @@
 package com.redhat.devtools.lsp4ij.console.explorer.actions;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -58,9 +61,23 @@ public class ExportServerAction extends AnAction {
         if (fileWrapper != null) {
             VirtualFile exportZip = fileWrapper.getVirtualFile(true);
             if (exportZip != null) {
-                LanguageServerTemplateManager.getInstance().exportLsTemplates(exportZip, languageServerDefinitions);
+                int exportedLsCount = LanguageServerTemplateManager.getInstance().exportLsTemplates(exportZip, languageServerDefinitions);
+                Notification notification = getNotification(exportedLsCount);
+                Notifications.Bus.notify(notification);
             }
         }
+    }
+
+    private static @NotNull Notification getNotification(int exportedLsCount) {
+        String title = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.title");
+        String content;
+        if (exportedLsCount == 1) {
+            content = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.message.single");
+        } else {
+            content = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.message.multi", exportedLsCount);
+        }
+        NotificationType type = NotificationType.INFORMATION;
+        return new Notification(title, title, content, type);
     }
 
     private String getCurrentDate() {
