@@ -18,7 +18,6 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -27,7 +26,6 @@ import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 
 import java.io.ByteArrayOutputStream;
-import java.util.AbstractMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
