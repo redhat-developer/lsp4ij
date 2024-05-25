@@ -71,12 +71,15 @@ public class ExportServerAction extends AnAction {
     private static @NotNull Notification getNotification(int exportedLsCount) {
         String title = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.title");
         String content;
-        if (exportedLsCount == 1) {
+        NotificationType type = NotificationType.INFORMATION;
+        if (exportedLsCount == 0) {
+            content = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.message.error");
+            type = NotificationType.ERROR;
+        } else if (exportedLsCount == 1) {
             content = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.message.single");
         } else {
             content = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.message.multi", exportedLsCount);
         }
-        NotificationType type = NotificationType.INFORMATION;
         return new Notification(title, title, content, type);
     }
 
