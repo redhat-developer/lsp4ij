@@ -13,10 +13,12 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -25,6 +27,8 @@ import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 
 import java.io.ByteArrayOutputStream;
+import java.util.AbstractMap;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.io.IOException;
@@ -156,12 +160,15 @@ public class LanguageServerTemplateManager {
      * @param exportZip target zip
      * @param lsDefinitions to export
      */
-    public void exportLsTemplates(@NotNull VirtualFile exportZip, @NotNull List<LanguageServerDefinition> lsDefinitions) {
-        ApplicationManager.getApplication().runWriteAction(() -> {
+    public int exportLsTemplates(@NotNull VirtualFile exportZip, @NotNull List<LanguageServerDefinition> lsDefinitions) {
+        return ApplicationManager.getApplication().runWriteAction((Computable<Integer>) () -> {
             try {
-                exportZip.setBinaryContent(createZipFromLanguageServers(lsDefinitions));
+                SimpleEntry<Integer, byte[]> result = createZipFromLanguageServers(lsDefinitions);
+                exportZip.setBinaryContent(result.getValue());
+                return result.getKey();
             } catch (IOException ex) {
                 LOGGER.warn(ex.getLocalizedMessage(), ex);
+                return 0;
             }
         });
     }
@@ -171,7 +178,8 @@ public class LanguageServerTemplateManager {
      * @return zip file as a byte array
      * @throws IOException if an IO error occurs when writing to the zip file
      */
-    private byte[] createZipFromLanguageServers(@NotNull List<LanguageServerDefinition> lsDefinitions) throws IOException {
+    private SimpleEntry<Integer, byte[]> createZipFromLanguageServers(@NotNull List<LanguageServerDefinition> lsDefinitions) throws IOException {
+        Integer count = 0;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ZipOutputStream zos = new ZipOutputStream(baos);
 
@@ -189,10 +197,11 @@ public class LanguageServerTemplateManager {
             writeToZip(INITIALIZATION_OPTIONS_FILE_NAME, initializationOptions, zos);
             writeToZip(SETTINGS_FILE_NAME, settings, zos);
             zos.closeEntry();
+            count++;
         }
 
         zos.close();
-        return baos.toByteArray();
+        return new SimpleEntry<>(count, baos.toByteArray());
     }
 
     /**
