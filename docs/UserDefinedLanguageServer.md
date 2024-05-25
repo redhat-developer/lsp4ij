@@ -87,23 +87,32 @@ The `Debug tab` is available when you have created the language server definitio
 level Trace used in LSP console.
 
 ### Using template
+Template can be used to quickly create user defined language server pre-filled 
+with server name, command, mappings and potential configurations.
 
-The `Template file selector` can be used to select a directory from the file system to use a pre-existing `language server template`, 
-these templates are pre-filled with server name, command, mappings and potential configuration.
-
-LSP4IJ provided templates are located in `src/main/java/resources/templates`, 
-but you can import templates from any valid directory.
+#### Default template
+The `Template combo-box` provides some default language servers templates (located in templates directory classpath), 
+pre-filled with server name, command, mappings and potential configuration.
 
 If the template folder contains a `README.md` file, you can press the help button to open the instructions.
 
-![New Language Server with Template](./images/user-defined-ls/NewLanguageServerWithTemplate.png)
+![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
- * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
- * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
- * [Go Language Server](./user-defined-ls/gopls.md) 
- * [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
- * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
- * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
+* [Clojure LSP](./user-defined-ls/clojure-lsp.md)
+* [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
+* [Go Language Server](./user-defined-ls/gopls.md)
+* [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
+* [Scala Language Server (Metals)](./user-defined-ls/metals.md)
+* [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
+
+#### Custom template
+
+The `Template file-selector` can be used to select a directory from the file system to load a custom language server template, 
+these templates can be pre-filled with server name, command, mappings and potential configuration.
+
+If the template folder contains a `README.md` file, you can press the help button to open the instructions.
+
+![New Language Server with Custom Template](./images/user-defined-ls/NewLanguageServerWithCustomTemplate.png)
 
 ### Exporting templates
 
@@ -116,8 +125,8 @@ The created zip file contains a separate folder for each language server that ca
 when creating a new language servers.
 
 Each folder contains the following files:
-- template.json
-- settings.json
-- initializationOptions.json
+- `template.json`
+- `settings.json`
+- `initializationOptions.json`
 
 You can also manually add a `README.md` file to the folder to provide instructions for the language server.
