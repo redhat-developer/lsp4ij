@@ -183,9 +183,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private static String getCommandLine(LanguageServerTemplate entry) {
         StringBuilder command = new StringBuilder();
-        if (entry.getRuntime() != null) {
-            command.append(entry.getRuntime());
-        }
         if (entry.getProgramArgs() != null) {
             if (!command.isEmpty()) {
                 command.append(' ');

@@ -27,7 +27,6 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguag
 
 import java.io.*;
 import java.net.URL;
-import java.net.URLDecoder;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.zip.ZipEntry;
@@ -41,7 +40,7 @@ import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTempl
  * Language server template manager.
  */
 public class LanguageServerTemplateManager {
-    private final static Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplateManager.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplateManager.class);
 
     private static final String TEMPLATES_DIR = "templates";
 
@@ -86,12 +85,6 @@ public class LanguageServerTemplateManager {
 
     public List<LanguageServerTemplate> getTemplates() {
         return templates;
-    }
-
-    @Nullable
-    static Reader loadTemplateReader(@NotNull String path) {
-        var is = LanguageServerTemplateManager.class.getClassLoader().getResourceAsStream(TEMPLATES_DIR + "/" + path);
-        return is !=null? new InputStreamReader(new BufferedInputStream(is)) : null;
     }
 
     /**
