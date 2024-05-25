@@ -47,7 +47,7 @@ public class LanguageServerDefinitionSerializerTest {
         JsonObject json = gson.toJsonTree(lsDef).getAsJsonObject();
         assertEquals("lsName", json.get("name").getAsString());
 
-        String defaultArg = json.get(PROGRAM_ARGS).getAsJsonObject().get(DEFAULT).getAsString();
+        String defaultArg = json.get(PROGRAM_ARGS_JSON_PROPERTY).getAsJsonObject().get(DEFAULT_JSON_PROPERTY).getAsString();
         assertEquals("./start.sh", defaultArg);
     }
 
@@ -69,11 +69,11 @@ public class LanguageServerDefinitionSerializerTest {
                 .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
                 .create();
         JsonObject json = gson.toJsonTree(lsDef).getAsJsonObject();
-        assertEquals("lsName", json.get(NAME).getAsString());
+        assertEquals("lsName", json.get(NAME_JSON_PROPERTY).getAsString());
 
-        JsonObject mapping = json.get(LANGUAGE_MAPPINGS).getAsJsonArray().get(0).getAsJsonObject();
-        String language = mapping.get(LANGUAGE).getAsString();
-        String languageId = mapping.get(LANGUAGE_ID).getAsString();
+        JsonObject mapping = json.get(LANGUAGE_MAPPINGS_JSON_PROPERTY).getAsJsonArray().get(0).getAsJsonObject();
+        String language = mapping.get(LANGUAGE_JSON_PROPERTY).getAsString();
+        String languageId = mapping.get(LANGUAGE_ID_JSON_PROPERTY).getAsString();
         assertEquals("", language);
         assertEquals("testing", languageId);
     }
@@ -99,13 +99,13 @@ public class LanguageServerDefinitionSerializerTest {
                 .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
                 .create();
         JsonObject json = gson.toJsonTree(lsDef).getAsJsonObject();
-        assertEquals("lsName", json.get(NAME).getAsString());
+        assertEquals("lsName", json.get(NAME_JSON_PROPERTY).getAsString());
 
-        JsonObject matcher = json.get(FILE_TYPE_MAPPINGS).getAsJsonArray().get(0).getAsJsonObject();
-        JsonArray patterns = matcher.get(FILE_TYPE).getAsJsonObject().get(PATTERNS).getAsJsonArray();
+        JsonObject matcher = json.get(FILE_TYPE_MAPPINGS_JSON_PROPERTY).getAsJsonArray().get(0).getAsJsonObject();
+        JsonArray patterns = matcher.get(FILE_TYPE_JSON_PROPERTY).getAsJsonObject().get(PATTERNS_JSON_PROPERTY).getAsJsonArray();
         String pattern1 = patterns.get(0).getAsString();
         String pattern2 = patterns.get(1).getAsString();
-        String langId = matcher.get(LANGUAGE_ID).getAsString();
+        String langId = matcher.get(LANGUAGE_ID_JSON_PROPERTY).getAsString();
 
         assertEquals("*.rs", pattern1);
         assertEquals("*kt", pattern2);
@@ -132,11 +132,11 @@ public class LanguageServerDefinitionSerializerTest {
                 .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
                 .create();
         JsonObject json = gson.toJsonTree(lsDef).getAsJsonObject();
-        assertEquals("lsName", json.get(NAME).getAsString());
+        assertEquals("lsName", json.get(NAME_JSON_PROPERTY).getAsString());
 
-        JsonObject matcher = json.get(FILE_TYPE_MAPPINGS).getAsJsonArray().get(0).getAsJsonObject();
-        String fileTypeName = matcher.get(FILE_TYPE).getAsJsonObject().get(NAME).getAsString();
-        String langId = matcher.get(LANGUAGE_ID).getAsString();
+        JsonObject matcher = json.get(FILE_TYPE_MAPPINGS_JSON_PROPERTY).getAsJsonArray().get(0).getAsJsonObject();
+        String fileTypeName = matcher.get(FILE_TYPE_JSON_PROPERTY).getAsJsonObject().get(NAME_JSON_PROPERTY).getAsString();
+        String langId = matcher.get(LANGUAGE_ID_JSON_PROPERTY).getAsString();
 
         assertEquals(fileType.getName(), fileTypeName);
         assertEquals("Mock", langId);

@@ -98,16 +98,16 @@ public class LanguageServerTemplateManager {
                 continue;
             }
             switch (file.getName()) {
-                case TEMPLATE:
+                case TEMPLATE_FILE_NAME:
                     templateJson = VfsUtilCore.loadText(file);
                     break;
-                case SETTINGS:
+                case SETTINGS_FILE_NAME:
                     settingsJson = VfsUtilCore.loadText(file);
                     break;
-                case INITIALIZATION_OPTIONS:
+                case INITIALIZATION_OPTIONS_FILE_NAME:
                     initializationOptionsJson = VfsUtilCore.loadText(file);
                     break;
-                case README:
+                case README_FILE_NAME:
                     description = VfsUtilCore.loadText(file);
                     break;
                 default:
@@ -168,9 +168,9 @@ public class LanguageServerTemplateManager {
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
             lsName = lsDefinition.getDisplayName();
 
-            writeToZip(TEMPLATE, template, zos);
-            writeToZip(INITIALIZATION_OPTIONS, initializationOptions, zos);
-            writeToZip(SETTINGS, settings, zos);
+            writeToZip(TEMPLATE_FILE_NAME, template, zos);
+            writeToZip(INITIALIZATION_OPTIONS_FILE_NAME, initializationOptions, zos);
+            writeToZip(SETTINGS_FILE_NAME, settings, zos);
             zos.closeEntry();
         }
 

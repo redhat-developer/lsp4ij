@@ -30,27 +30,26 @@ import java.util.Map;
 public class LanguageServerTemplate {
 
     public static final LanguageServerTemplate NONE = new LanguageServerTemplate() {
-
         @Override
         public String getName() {
             return "None";
         }
     };
-    public static final String TEMPLATE = "template.json";
-    public static final String INITIALIZATION_OPTIONS = "initializationOptions.json";
-    public static final String SETTINGS = "settings.json";
-    public static final String README = "README.md";
 
+    public static final String TEMPLATE_FILE_NAME = "template.json";
+    public static final String INITIALIZATION_OPTIONS_FILE_NAME = "initializationOptions.json";
+    public static final String SETTINGS_FILE_NAME = "settings.json";
+    public static final String README_FILE_NAME = "README.md";
 
-    public static final String LANGUAGE_ID = "languageId";
-    public static final String FILE_TYPE = "fileType";
-    public static final String DEFAULT = "default";
-    public static final String PROGRAM_ARGS = "programArgs";
-    public static final String LANGUAGE = "language";
-    public static final String LANGUAGE_MAPPINGS = "languageMappings";
-    public static final String PATTERNS = "patterns";
-    public static final String FILE_TYPE_MAPPINGS = "fileTypeMappings";
-    public static final String NAME = "name";
+    public static final String LANGUAGE_ID_JSON_PROPERTY = "languageId";
+    public static final String FILE_TYPE_JSON_PROPERTY = "fileType";
+    public static final String DEFAULT_JSON_PROPERTY = "default";
+    public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
+    public static final String LANGUAGE_JSON_PROPERTY = "language";
+    public static final String LANGUAGE_MAPPINGS_JSON_PROPERTY = "languageMappings";
+    public static final String PATTERNS_JSON_PROPERTY = "patterns";
+    public static final String FILE_TYPE_MAPPINGS_JSON_PROPERTY = "fileTypeMappings";
+    public static final String NAME_JSON_PROPERTY = "name";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplate.class);
 
