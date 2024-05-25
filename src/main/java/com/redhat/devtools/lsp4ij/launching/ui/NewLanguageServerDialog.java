@@ -87,7 +87,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private void createTemplateCombo(FormBuilder builder) {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        templateCombo.setRenderer(new SimpleListCellRenderer<LanguageServerTemplate>() {
+        templateCombo.setRenderer(new SimpleListCellRenderer<>() {
             @Override
             public void customize(@NotNull JList list,
                                   @Nullable LanguageServerTemplate value,
@@ -124,8 +124,15 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 }
             }
         });
+        templateCombo.addItemListener(event -> {
+            LanguageServerTemplate template = templateCombo.getItem();
+            currentTemplate = template;
+            showInstructionButton.setEnabled(StringUtils.isNotBlank(template.getDescription()) && template != LanguageServerTemplate.NONE);
+            loadFromTemplate(template);
+        });
         panel.add(textFieldWithBrowseButton, BorderLayout.WEST);
         panel.add(showInstructionButton, BorderLayout.CENTER);
+        panel.add(templateCombo, BorderLayout.EAST);
         builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.template"), panel);
     }
 
