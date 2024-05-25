@@ -14,9 +14,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -25,16 +25,14 @@ import org.slf4j.LoggerFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 
-import java.io.ByteArrayOutputStream;
+import java.io.*;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.io.BufferedInputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.Collections;
 import java.util.List;
 
 import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
@@ -47,7 +45,7 @@ public class LanguageServerTemplateManager {
 
     private static final String TEMPLATES_DIR = "templates";
 
-    private final List<LanguageServerTemplate> templates;
+    private final List<LanguageServerTemplate> templates = new ArrayList<>();
 
     private String lsName;
 
@@ -55,17 +53,35 @@ public class LanguageServerTemplateManager {
         return ApplicationManager.getApplication().getService(LanguageServerTemplateManager.class);
     }
 
-    // TODO: This should not be necessary anymore. Loading serves from folders
+    /**
+     * Loads templates from resources/templates
+     */
     private LanguageServerTemplateManager() {
-        LanguageServerTemplates root = null;
-        if (root != null) {
-            templates = root.getTemplates()
-                    .stream()
-                    .filter(t -> IntelliJPlatformUtils.isDevMode() || !t.isDev())
-                    .toList();
-        } else {
-            templates = Collections.emptyList();
+        VirtualFile templateRoot = getTemplateRoot();
+        if (templateRoot != null) {
+            for (VirtualFile templateDir : templateRoot.getChildren()) {
+                if (templateDir.isDirectory()) {
+                    LanguageServerTemplate template = importLsTemplate(templateDir);
+                    if (template != null) {
+                        templates.add(template);
+                    }
+                }
+            }
         }
+    }
+
+    /**
+     * Load the resources/templates file as a VirtualFile from the jar
+     * @return template root as virtual file or null, if one couldn't be found
+     */
+    @Nullable
+    public VirtualFile getTemplateRoot() {
+        URL url = LanguageServerTemplateManager.class.getClassLoader().getResource(TEMPLATES_DIR);
+        if (url == null) {
+            return null;
+        }
+        String resourcePath = url.getPath().replace("jar:", "").replace("file:", "");
+        return JarFileSystem.getInstance().findFileByPath(resourcePath);
     }
 
     public List<LanguageServerTemplate> getTemplates() {
