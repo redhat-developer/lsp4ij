@@ -130,9 +130,16 @@ public class NewLanguageServerDialog extends DialogWrapper {
             showInstructionButton.setEnabled(StringUtils.isNotBlank(template.getDescription()) && template != LanguageServerTemplate.NONE);
             loadFromTemplate(template);
         });
-        panel.add(textFieldWithBrowseButton, BorderLayout.WEST);
+
+        JLabel defaultTemplateLabel = new JLabel(LanguageServerBundle.message("new.language.server.dialog.export.template.default"));
+        panel.add(defaultTemplateLabel, BorderLayout.WEST);
+        panel.add(templateCombo, BorderLayout.WEST);
+
         panel.add(showInstructionButton, BorderLayout.CENTER);
-        panel.add(templateCombo, BorderLayout.EAST);
+
+        JLabel customTemplateLabel = new JLabel(LanguageServerBundle.message("new.language.server.dialog.export.template.custom"));
+        panel.add(customTemplateLabel, BorderLayout.EAST);
+        panel.add(textFieldWithBrowseButton, BorderLayout.EAST);
         builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.template"), panel);
     }
 
