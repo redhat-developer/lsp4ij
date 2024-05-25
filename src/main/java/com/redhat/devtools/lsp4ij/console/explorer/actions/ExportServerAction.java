@@ -68,6 +68,12 @@ public class ExportServerAction extends AnAction {
         }
     }
 
+    /**
+     * Creates a notification for ls export
+     * @param exportedLsCount count of language servers that were exported.
+     *                        Zero means that there was an error in the export process.
+     * @return notification with the correct type and content
+     */
     private static @NotNull Notification getNotification(int exportedLsCount) {
         String title = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.title");
         String content;
