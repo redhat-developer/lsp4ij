@@ -93,6 +93,8 @@ these templates are pre-filled with server name, command, mappings and potential
 
 Templates are located in `src/main/java/resources/templates`.
 
+If the template folder contains a `README.md` file, you can press the help button to open the instructions.
+
 ![New Language Server with Template](./images/user-defined-ls/NewLanguageServerWithTemplate.png)
 
  * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
