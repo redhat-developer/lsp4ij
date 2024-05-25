@@ -88,7 +88,10 @@ level Trace used in LSP console.
 
 ### Using template
 
-The `Template combo-box` provides some `language servers templates`, pre-filled with server name, command, mappings and potential configuration. 
+The `Template file selector` can be used to select a directory from the file system to use a pre-existing `language servers template`, 
+these templates are pre-filled with server name, command, mappings and potential configuration.
+
+Templates are located in `src/main/java/resources/templates`.
 
 ![New Language Server with Template](./images/user-defined-ls/NewLanguageServerWithTemplate.png)
 
@@ -98,3 +101,13 @@ The `Template combo-box` provides some `language servers templates`, pre-filled 
  * [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
  * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
  * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
+
+### Exporting templates
+
+Users can also export their own language servers to a zip file. This can be done from the LSP console, 
+by selecting one or more language servers and selecting the export option from the context menu.
+
+![Export Language Servers to a Zip](./images/user-defined-ls/ExportUserDefinedLanguageServer.png)
+
+The created zip file contains a separate folder for each language server that can be used as a template 
+when creating a new language servers.
