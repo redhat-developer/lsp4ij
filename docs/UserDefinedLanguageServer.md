@@ -91,7 +91,8 @@ level Trace used in LSP console.
 The `Template file selector` can be used to select a directory from the file system to use a pre-existing `language server template`, 
 these templates are pre-filled with server name, command, mappings and potential configuration.
 
-Templates are located in `src/main/java/resources/templates`.
+LSP4IJ provided templates are located in `src/main/java/resources/templates`, 
+but you can import templates from any valid directory.
 
 If the template folder contains a `README.md` file, you can press the help button to open the instructions.
 
@@ -113,3 +114,10 @@ by selecting one or more language servers and selecting the export option from t
 
 The created zip file contains a separate folder for each language server that can be used as a template 
 when creating a new language servers.
+
+Each folder contains the following files:
+- template.json
+- settings.json
+- initializationOptions.json
+
+You can also manually add a `README.md` file to the folder to provide instructions for the language server.
