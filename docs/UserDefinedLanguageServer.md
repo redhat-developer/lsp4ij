@@ -88,7 +88,7 @@ level Trace used in LSP console.
 
 ### Using template
 
-The `Template file selector` can be used to select a directory from the file system to use a pre-existing `language servers template`, 
+The `Template file selector` can be used to select a directory from the file system to use a pre-existing `language server template`, 
 these templates are pre-filled with server name, command, mappings and potential configuration.
 
 Templates are located in `src/main/java/resources/templates`.
