@@ -57,7 +57,7 @@ public class ExportServerAction extends AnAction {
         FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
 
         String currentDate = getCurrentDate();
-        VirtualFileWrapper fileWrapper = fileSaverDialog.save("ls4ij-export" + currentDate + ".zip");
+        VirtualFileWrapper fileWrapper = fileSaverDialog.save("lsp4ij-export" + currentDate + ".zip");
         if (fileWrapper != null) {
             VirtualFile exportZip = fileWrapper.getVirtualFile(true);
             if (exportZip != null) {
