@@ -10,6 +10,7 @@
  *
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
+ *     Mitja Leino <mitja.leino@hotmail.com> - Extend ValidatableDialog for validations
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings;
 
@@ -19,6 +20,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
@@ -31,13 +33,13 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociatio
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
+import com.redhat.devtools.lsp4ij.settings.ui.ValidatableDialog;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -50,7 +52,7 @@ import java.util.stream.Collectors;
  *     <li>Suspend and wait for a debugger?</li>
  * </ul>
  */
-public class LanguageServerView implements Disposable {
+public class LanguageServerView extends ValidatableDialog implements Disposable {
 
     private final LanguageServerNameProvider languageServerNameProvider;
 
@@ -70,6 +72,7 @@ public class LanguageServerView implements Disposable {
                               @Nullable LanguageServerNameProvider languageServerNameProvider,
                               @NotNull Project project
     ) {
+        super(project);
         this.languageServerDefinition = languageServerDefinition;
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
@@ -285,7 +288,7 @@ public class LanguageServerView implements Disposable {
         this.languageServerPanel = new LanguageServerPanel(builder,
                 description,
                 launchingServerDefinition ? LanguageServerPanel.EditionMode.EDIT_USER_DEFINED :
-                        LanguageServerPanel.EditionMode.EDIT_EXTENSION);
+                        LanguageServerPanel.EditionMode.EDIT_EXTENSION, this);
         this.mappingPanel = languageServerPanel.getMappingsPanel();
         return builder
                 .addComponentFillVertically(new JPanel(), 50)
@@ -408,6 +411,16 @@ public class LanguageServerView implements Disposable {
         var initializationOptions = languageServerPanel.getInitializationOptionsWidget();
         initializationOptions.setText(initializationOptionsContent);
         initializationOptions.setCaretPosition(0);
+    }
+
+    @Override
+    protected @Nullable JComponent createCenterPanel() {
+        return myMainPanel;
+    }
+
+    @Override
+    public @NotNull List<ValidationInfo> doValidateAll() {
+        return languageServerPanel.doValidateAll();
     }
 
     @Override

@@ -7,19 +7,18 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * Mitja Leino <mitja.leino@hotmail.com> - Add DialogWrapper for validations
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.ui.ComboBox;
-import com.intellij.ui.ContextHelpLabel;
-import com.intellij.ui.PortField;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.ui.*;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
-import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.components.BorderLayoutPanel;
@@ -29,7 +28,11 @@ import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Language server panel which show information about language server in several tabs:
@@ -49,7 +52,7 @@ public class LanguageServerPanel {
         EDIT_EXTENSION;
     }
 
-    private JBTextField serverName;
+    private ServerNameWidget serverName;
     private EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private ServerMappingsPanel mappingsPanel;
@@ -61,8 +64,10 @@ public class LanguageServerPanel {
     private LanguageServerConfigurationWidget configurationWidget;
 
     private LanguageServerInitializationOptionsWidget initializationOptionsWidget;
+    private final ValidatableDialog dialogWrapper;
 
-    public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode) {
+    public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode, ValidatableDialog dialogWrapper) {
+        this.dialogWrapper = dialogWrapper;
         createUI(builder, description, mode);
     }
 
@@ -80,6 +85,16 @@ public class LanguageServerPanel {
         }
         // Debug tab
         addDebugTab(tabbedPane, mode);
+
+        // Add validation
+        var serverNameWidget = getServerName();
+        if (serverNameWidget != null) {
+            addValidator(serverNameWidget);
+        }
+        var commandLineWidget = getCommandLine();
+        if (commandLineWidget != null) {
+            addValidator(getCommandLine());
+        }
     }
 
     private void addServerTab(JBTabbedPane tabbedPane, JComponent description, EditionMode mode) {
@@ -176,7 +191,7 @@ public class LanguageServerPanel {
     }
 
     private void createServerNameField(FormBuilder builder) {
-        serverName = new JBTextField();
+        serverName = new ServerNameWidget();
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.serverName"), serverName);
     }
 
@@ -201,7 +216,7 @@ public class LanguageServerPanel {
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.initializationOptions"), scrollPane, true);
     }
 
-    public JBTextField getServerName() {
+    public ServerNameWidget getServerName() {
         return serverName;
     }
 
@@ -241,4 +256,25 @@ public class LanguageServerPanel {
         return errorReportingKindCombo;
     }
 
+    public @NotNull List<ValidationInfo> doValidateAll() {
+        List<ValidationInfo> validations = new ArrayList<>();
+        var serverNameWidget = getServerName();
+        if (serverNameWidget != null) {
+            serverNameWidget.validate(validations);
+        }
+        var commandLineWidget = getCommandLine();
+        if (commandLineWidget != null) {
+            commandLineWidget.validate(validations);
+        }
+        return validations;
+    }
+
+    private void addValidator(JTextComponent textComponent) {
+        textComponent.getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(@NotNull DocumentEvent e) {
+                dialogWrapper.refreshValidation();
+            }
+        });
+    }
 }

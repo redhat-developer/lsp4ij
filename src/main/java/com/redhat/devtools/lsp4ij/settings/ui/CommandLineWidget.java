@@ -10,17 +10,26 @@
  *
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
+ *     Mitja Leino <mitja.leino@hotmail.com> - Implement ValidatableConsoleWidget
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBFont;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 
+import javax.swing.border.Border;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Command line widget used to fill the command to start a language server.
+ * Command line widget used to fill the command to start a language
+ * server when creating a new or modifying an existing LS configuration
  */
-public class CommandLineWidget extends JBTextArea {
+public class CommandLineWidget extends JBTextArea implements ValidatableConsoleWidget {
+    private final String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
+    private final transient Border normalBorder;
 
     public CommandLineWidget() {
         super(5, 0);
@@ -28,5 +37,22 @@ public class CommandLineWidget extends JBTextArea {
         super.setWrapStyleWord(true);
         super.setFont(JBFont.regular());
         super.getEmptyText().setText(LanguageServerBundle.message("language.server.command.emptyText"));
+        this.normalBorder = this.getBorder();
+    }
+
+    @Override
+    public void validate(List<ValidationInfo> validations) {
+        List<ValidationInfo> widgetValidations = new ArrayList<>();
+
+        if (getDocument() != null && getText().isBlank()) {
+            widgetValidations.add(new ValidationInfo(errorMessage, this));
+        }
+
+        if (widgetValidations.isEmpty()) {
+            this.setBorder(normalBorder);
+        } else {
+            validations.addAll(widgetValidations);
+            setErrorBorder(this);
+        }
     }
 }
