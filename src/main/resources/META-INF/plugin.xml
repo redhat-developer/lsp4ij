@@ -381,6 +381,9 @@
                 id="LSP/window/showMessageRequest"
                 displayType="STICKY_BALLOON" />
 
+        <notificationGroup
+                id="LSP4IJ general notifications"
+                displayType="BALLOON" />
     </extensions>
 
     <!-- Actions to execute LSP features Find Implementation, etc -->

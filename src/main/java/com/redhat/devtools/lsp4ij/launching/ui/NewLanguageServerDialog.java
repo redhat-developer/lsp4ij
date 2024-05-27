@@ -10,6 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
@@ -37,10 +40,13 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import static com.redhat.devtools.lsp4ij.LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID;
 
 /**
  * New language server dialog.
@@ -132,7 +138,14 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 if (template == LanguageServerTemplate.NEW_TEMPLATE) {
                     VirtualFile virtualFile = FileChooser.chooseFile(fileChooserDescriptor, project, null);
                     if (virtualFile != null) {
-                        template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
+                        try {
+                            template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
+                            if (template == null) {
+                                showImportErrorNotification(LanguageServerBundle.message("new.language.server.dialog.import.template.error.description"));
+                            }
+                        } catch (IOException ex) {
+                            showImportErrorNotification(ex.getLocalizedMessage());
+                        }
                     }
                     // Reset template to None after trying to import a custom file
                     templateCombo.setItem(LanguageServerTemplate.NONE);
@@ -145,6 +158,13 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 }
             }
         };
+    }
+
+    private void showImportErrorNotification(String message) {
+        Notification notification = new Notification(LSP4IJ_GENERAL_NOTIFICATIONS_ID,
+                LanguageServerBundle.message("new.language.server.dialog.import.template.error.title"),
+                message, NotificationType.ERROR);
+        Notifications.Bus.notify(notification);
     }
 
     /**

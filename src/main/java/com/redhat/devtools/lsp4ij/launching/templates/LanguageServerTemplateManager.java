@@ -60,9 +60,13 @@ public class LanguageServerTemplateManager {
         if (templateRoot != null) {
             for (VirtualFile templateDir : templateRoot.getChildren()) {
                 if (templateDir.isDirectory()) {
-                    LanguageServerTemplate template = importLsTemplate(templateDir);
-                    if (template != null) {
-                        templates.add(template);
+                    try {
+                        LanguageServerTemplate template = importLsTemplate(templateDir);
+                        if (template != null) {
+                            templates.add(template);
+                        }
+                    } catch (IOException ex) {
+                        LOGGER.warn(ex.getLocalizedMessage(), ex);
                     }
                 }
             }
@@ -93,13 +97,8 @@ public class LanguageServerTemplateManager {
      * @return LanguageServerTemplate or null if one couldn't be created
      */
     @Nullable
-    public LanguageServerTemplate importLsTemplate(@NotNull VirtualFile templateFolder) {
-        try {
-            return createLsTemplate(templateFolder);
-        } catch (IOException ex) {
-            LOGGER.warn(ex.getLocalizedMessage(), ex);
-        }
-        return null;
+    public LanguageServerTemplate importLsTemplate(@NotNull VirtualFile templateFolder) throws IOException {
+        return createLsTemplate(templateFolder);
     }
 
     /**
@@ -139,7 +138,7 @@ public class LanguageServerTemplateManager {
 
         if (templateJson == null) {
             // Don't continue, if no template.json is found
-            return null;
+            throw new FileNotFoundException("template.json is required");
         }
         if (settingsJson == null) {
             settingsJson = "{}";
