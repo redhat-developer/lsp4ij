@@ -84,7 +84,16 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
      */
     public void assertApplyCompletionItem(int selectedItemIndex,
                                           @NotNull String expectedEditorContentText) {
+        String expected = expectedEditorContentText;
+        int expectedCaretOffset = expectedEditorContentText.indexOf("<caret>");
+        if (expectedCaretOffset != -1) {
+            expected = expectedEditorContentText.substring(0, expectedCaretOffset) + expectedEditorContentText.substring("<caret>".length() + expectedCaretOffset);
+        }
         myFixture.selectItem(myFixture.getLookupElements()[selectedItemIndex]);
-        assertEquals(expectedEditorContentText, myFixture.getEditor().getDocument().getText());
+        var editor = myFixture.getEditor();
+        assertEquals(expected, editor.getDocument().getText());
+        if (expectedCaretOffset != -1) {
+            assertEquals(expectedCaretOffset, editor.getCaretModel().getOffset());
+        }
     }
 }

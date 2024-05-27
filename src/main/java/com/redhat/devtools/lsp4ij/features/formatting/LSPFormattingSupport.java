@@ -19,16 +19,15 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +36,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
 
+import static com.redhat.devtools.lsp4ij.LSPIJUtils.applyEdits;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
@@ -79,34 +79,6 @@ public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattin
         } else {
             formattingRequest.onError("LSP formatting error", error.getMessage());
         }
-    }
-
-    public static String applyEdits(Document document, List<? extends TextEdit> edits) {
-        String text = document.getText();
-        edits.sort((a, b) -> {
-            int diff = a.getRange().getStart().getLine() - b.getRange().getStart().getLine();
-            if (diff == 0) {
-                return a.getRange().getStart().getCharacter() - b.getRange().getStart().getCharacter();
-            }
-            return diff;
-        });
-        int lastModifiedOffset = 0;
-        List<String> spans = new ArrayList<>(edits.size() + 1);
-        for (TextEdit textEdit : edits) {
-            int startOffset = LSPIJUtils.toOffset(textEdit.getRange().getStart(), document);
-            if (startOffset < lastModifiedOffset) {
-                throw new Error("Overlapping edit");
-            } else if (startOffset > lastModifiedOffset) {
-                spans.add(text.substring(lastModifiedOffset, startOffset));
-            }
-            if (textEdit.getNewText() != null) {
-                spans.add(textEdit.getNewText());
-            }
-            lastModifiedOffset = LSPIJUtils.toOffset(textEdit.getRange().getEnd(), document);
-        }
-        spans.add(text.substring(lastModifiedOffset));
-        //
-        return String.join("", spans);
     }
 
     @Override

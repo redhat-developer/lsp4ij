@@ -45,7 +45,7 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
                           ]"""
                 , "let", "letfn");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "(let [binding value])");
+        assertApplyCompletionItem(0, "(let [binding<caret> value])");
     }
 
     public void testCompletionWithoutTextEdit() {
@@ -70,7 +70,7 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
                           ]"""
                 , "let", "letfn");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "(let [binding value])");
+        assertApplyCompletionItem(0, "(let [binding<caret> value])");
     }
 
     public void testCompletionWithoutTextEditAndCaretInsideToken() {
@@ -95,7 +95,7 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
                           ]"""
                 , "let", "letfn");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "(let [binding value])t");
+        assertApplyCompletionItem(0, "(let [binding<caret> value])t");
     }
 
 }
