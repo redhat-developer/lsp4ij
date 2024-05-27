@@ -52,7 +52,7 @@ public class TypeScriptCompletionTest extends LSPCompletionFixtureTestCase {
                          }"""
                 , "charAt");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "''.charAt");
+        assertApplyCompletionItem(0, "''.charAt<caret>");
     }
 
 }

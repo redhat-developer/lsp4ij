@@ -47,10 +47,7 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Utilities class for LSP.
@@ -65,6 +62,22 @@ public class LSPIJUtils {
     private static final String JAR_SCHEME = JAR_PROTOCOL + ":";
 
     private static final String JRT_SCHEME = JRT_PROTOCOL + ":";
+
+    private static final Comparator<TextEdit> TEXT_EDITS_ASCENDING_COMPARATOR = (a, b) -> {
+        int diff = a.getRange().getStart().getLine() - b.getRange().getStart().getLine();
+        if (diff == 0) {
+            return a.getRange().getStart().getCharacter() - b.getRange().getStart().getCharacter();
+        }
+        return diff;
+    };
+
+    private static final Comparator<TextEdit> TEXT_EDITS_DESCENDING_COMPARATOR = (a, b) -> {
+        int diff = b.getRange().getStart().getLine() - a.getRange().getStart().getLine();
+        if (diff == 0) {
+            return b.getRange().getStart().getCharacter() - a.getRange().getStart().getCharacter();
+        }
+        return diff;
+    };
 
     /**
      * Open the LSP location in an editor.
@@ -749,7 +762,41 @@ public class LSPIJUtils {
         return new TextDocumentIdentifier(uri.toASCIIString());
     }
 
-    public static void applyEdit(Editor editor, TextEdit textEdit, Document document) {
+    public static void applyEdits(Editor editor, Document document, List<TextEdit> edits) {
+        if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+            doApplyEdits(editor, document, edits);
+        } else {
+            WriteAction.run(() -> doApplyEdits(editor, document, edits));
+        }
+    }
+
+    private static void doApplyEdits(Editor editor, Document document, List<TextEdit> edits) {
+        if (edits.isEmpty()) {
+            return;
+        }
+        // Sort text edits
+        edits.sort(TEXT_EDITS_DESCENDING_COMPARATOR);
+        var textEditToUseToUpdateCaret = edits.get(0);
+        Integer current = null;
+        for (var textEdit : edits) {
+            RangeMarker marker = applyEdit(textEdit, document);
+            if (marker != null) {
+                if (current == null) {
+                    current = 0;
+                }
+                if (textEdit == textEditToUseToUpdateCaret) {
+                    current += marker.getEndOffset();
+                } else {
+                    current += (marker.getEndOffset() - marker.getStartOffset());
+                }
+            }
+        }
+        if (current != null) {
+            editor.getCaretModel().moveToOffset(current);
+        }
+    }
+
+    private static RangeMarker applyEdit(TextEdit textEdit, Document document) {
         RangeMarker marker = document.createRangeMarker(LSPIJUtils.toOffset(textEdit.getRange().getStart(), document), LSPIJUtils.toOffset(textEdit.getRange().getEnd(), document));
         marker.setGreedyToRight(true);
         int startOffset = marker.getStartOffset();
@@ -766,17 +813,33 @@ public class LSPIJUtils {
             document.replaceString(startOffset, endOffset, text);
         }
         if (text != null && !text.isEmpty()) {
-            editor.getCaretModel().moveToOffset(marker.getEndOffset());
+            return marker;
         }
         marker.dispose();
+        return null;
     }
 
-    public static void applyEdits(Editor editor, Document document, List<TextEdit> edits) {
-        if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
-            edits.forEach(edit -> applyEdit(editor, edit, document));
-        } else {
-            WriteAction.run(() -> edits.forEach(edit -> applyEdit(editor, edit, document)));
+    public static String applyEdits(Document document, List<? extends TextEdit> edits) {
+        // Sort text edits
+        edits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
+        String text = document.getText();
+        int lastModifiedOffset = 0;
+        List<String> spans = new ArrayList<>(edits.size() + 1);
+        for (TextEdit textEdit : edits) {
+            int startOffset = LSPIJUtils.toOffset(textEdit.getRange().getStart(), document);
+            if (startOffset < lastModifiedOffset) {
+                throw new Error("Overlapping edit");
+            } else if (startOffset > lastModifiedOffset) {
+                spans.add(text.substring(lastModifiedOffset, startOffset));
+            }
+            if (textEdit.getNewText() != null) {
+                spans.add(textEdit.getNewText());
+            }
+            lastModifiedOffset = LSPIJUtils.toOffset(textEdit.getRange().getEnd(), document);
         }
+        spans.add(text.substring(lastModifiedOffset));
+        //
+        return String.join("", spans);
     }
 
     /**

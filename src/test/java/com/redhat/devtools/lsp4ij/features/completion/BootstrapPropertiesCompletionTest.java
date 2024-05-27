@@ -60,7 +60,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
                 "com.ibm.ws.logging.max.files",
                 "com.ibm.ws.logging.max.file.size");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "com.ibm.ws.logging.max.file.size");
+        assertApplyCompletionItem(0, "com.ibm.ws.logging.max.file.size<caret>");
     }
 
     // ------------ Completion on property value
@@ -92,7 +92,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
                 "true",
                 "false");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false");
+        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
     }
 
     public void testCompletionOnPropertyValueWithValueAtEnd() {
@@ -120,7 +120,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
                           ]"""
                 , "false");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false");
+        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
     }
 
     public void testCompletionOnPropertyValueWithValueInsideValue() {
@@ -148,6 +148,6 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
                           ]"""
                 , "false");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false");
+        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
     }
 }

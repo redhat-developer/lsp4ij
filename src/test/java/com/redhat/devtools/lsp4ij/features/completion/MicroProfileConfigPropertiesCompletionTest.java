@@ -62,7 +62,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
                 "config_ordinal",
                 "quarkus.banner.enabled");
         // 2. Test new editor content after applying the second completion item
-        assertApplyCompletionItem(1, "quarkus.banner.enabled=false");
+        assertApplyCompletionItem(1, "quarkus.banner.enabled=false<caret>");
     }
 
     public void testCompletionOnPropertyKeyWithNotEmptyContent() {
@@ -101,7 +101,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
                 ,
                 "quarkus.banner.enabled");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "quarkus.banner.enabled=false");
+        assertApplyCompletionItem(0, "quarkus.banner.enabled=false<caret>");
     }
 
     // ------------ Completion on property value
@@ -173,7 +173,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
                 "false",
                 "true");
         // 2. Test new editor content after applying the second completion item
-        assertApplyCompletionItem(1, "quarkus.banner.enabled=true");
+        assertApplyCompletionItem(1, "quarkus.banner.enabled=true<caret>");
     }
 
     public void testCompletionOnPropertyValueWithNotEmptyContent() {
@@ -242,6 +242,6 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
                 ,
                 "true");
         // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "quarkus.banner.enabled=true");
+        assertApplyCompletionItem(0, "quarkus.banner.enabled=true<caret>");
     }
 }

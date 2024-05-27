@@ -92,7 +92,7 @@ public class QuteCompletionTest extends LSPCompletionFixtureTestCase {
         assertApplyCompletionItem(0, """
                 <ul>
                     {#for item in items}
-                        {item.name}
+                        {item.name}<caret>
                     {/for}
                 </ul>
                 """);
