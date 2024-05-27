@@ -30,6 +30,13 @@ public class LanguageServerTemplate {
         }
     };
 
+    public static final LanguageServerTemplate NEW_TEMPLATE = new LanguageServerTemplate() {
+        @Override
+        public String getName() {
+            return "Add new template...";
+        }
+    };
+
     public static final String TEMPLATE_FILE_NAME = "template.json";
     public static final String INITIALIZATION_OPTIONS_FILE_NAME = "initializationOptions.json";
     public static final String SETTINGS_FILE_NAME = "settings.json";
