@@ -30,6 +30,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import static com.redhat.devtools.lsp4ij.LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID;
+
 
 /**
  * Export one or more language servers to a zip file.
@@ -86,7 +88,7 @@ public class ExportServerAction extends AnAction {
         } else {
             content = LanguageServerBundle.message("action.lsp.console.explorer.export.servers.notification.message.multi", exportedLsCount);
         }
-        return new Notification(title, title, content, type);
+        return new Notification(LSP4IJ_GENERAL_NOTIFICATIONS_ID, title, content, type);
     }
 
     private String getCurrentDate() {
