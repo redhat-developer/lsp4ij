@@ -10,6 +10,7 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguag
 import org.junit.Test;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,7 +45,12 @@ public class LanguageServerTemplateManagerTest {
         File ioFile = new File("src/test/resources/templates/test_template1");
         VirtualFile virtualFile = localFileSystem.refreshAndFindFileByIoFile(ioFile);
         assert virtualFile != null;
-        LanguageServerTemplate template = templateManager.importLsTemplate(virtualFile);
+        LanguageServerTemplate template = null;
+        try {
+            template = templateManager.importLsTemplate(virtualFile);
+        } catch (IOException ex) {
+            fail(ex);
+        }
         assert template != null;
         assertNotNull(template.getDescription());
         assertNotEquals("", template.getDescription());
@@ -67,8 +73,7 @@ public class LanguageServerTemplateManagerTest {
         File ioFile = new File("src/test/resources/templates/test_template2");
         VirtualFile virtualFile = localFileSystem.refreshAndFindFileByIoFile(ioFile);
         assert virtualFile != null;
-        LanguageServerTemplate template = templateManager.importLsTemplate(virtualFile);
-        assertNull(template);
+        assertThrows(IOException.class, () -> templateManager.importLsTemplate(virtualFile));
     }
 
     private void runExport(List<LanguageServerDefinition> templates, int expectedCount) throws IOException {
