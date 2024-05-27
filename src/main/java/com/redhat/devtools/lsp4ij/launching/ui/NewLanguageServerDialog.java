@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
+import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.*;
@@ -34,6 +35,8 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +57,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
     private static LanguageServerTemplate[] getLanguageServerTemplates() {
         List<LanguageServerTemplate> templates = new ArrayList<>();
         templates.add(LanguageServerTemplate.NONE);
+        templates.add(LanguageServerTemplate.NEW_TEMPLATE);
         templates.addAll(LanguageServerTemplateManager.getInstance().getTemplates());
         return templates.toArray(new LanguageServerTemplate[0]);
     }
@@ -104,43 +108,54 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         showInstructionButton = super.createHelpButton(new JBInsets(0,0,0,0));
         showInstructionButton.setText("");
-        TextFieldWithBrowseButton textFieldWithBrowseButton = new TextFieldWithBrowseButton();
+        templateCombo.addItemListener(getTemplateComboListener());
+
+        panel.add(templateCombo, BorderLayout.WEST);
+        panel.add(showInstructionButton, BorderLayout.CENTER);
+        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.template"), panel);
+    }
+
+    /**
+     * Create the template combo listener that handles item selection
+     * @return created ItemListener
+     */
+    private ItemListener getTemplateComboListener() {
         FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(false, true,
                 false, false, false, false);
         fileChooserDescriptor.setTitle(LanguageServerBundle.message("new.language.server.dialog.export.template.title"));
         fileChooserDescriptor.setDescription(LanguageServerBundle.message("new.language.server.dialog.export.template.description"));
 
-        textFieldWithBrowseButton.addBrowseFolderListener(new TextBrowseFolderListener(fileChooserDescriptor, project) {
-            @Override
-            public void onFileChosen(@NotNull VirtualFile virtualFile) {
-                super.onFileChosen(virtualFile);
-                LanguageServerTemplate template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
+        return e -> {
+            // Only trigger listener on selected items to avoid double triggering
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                LanguageServerTemplate template = templateCombo.getItem();
+                if (template == LanguageServerTemplate.NEW_TEMPLATE) {
+                    VirtualFile virtualFile = FileChooser.chooseFile(fileChooserDescriptor, project, null);
+                    if (virtualFile != null) {
+                        template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
+                    }
+                    // Reset template to None after trying to import a custom file
+                    templateCombo.setItem(LanguageServerTemplate.NONE);
+                }
+
                 currentTemplate = template;
+                showInstructionButton.setEnabled(hasValidDescription(template));
                 if (template != null) {
-                    showInstructionButton.setEnabled(StringUtils.isNotBlank(currentTemplate.getDescription()));
                     loadFromTemplate(template);
-                } else {
-                    showInstructionButton.setEnabled(false);
                 }
             }
-        });
-        templateCombo.addItemListener(event -> {
-            LanguageServerTemplate template = templateCombo.getItem();
-            currentTemplate = template;
-            showInstructionButton.setEnabled(StringUtils.isNotBlank(template.getDescription()) && template != LanguageServerTemplate.NONE);
-            loadFromTemplate(template);
-        });
+        };
+    }
 
-        JLabel defaultTemplateLabel = new JLabel(LanguageServerBundle.message("new.language.server.dialog.export.template.default"));
-        panel.add(defaultTemplateLabel, BorderLayout.WEST);
-        panel.add(templateCombo, BorderLayout.WEST);
-
-        panel.add(showInstructionButton, BorderLayout.CENTER);
-
-        JLabel customTemplateLabel = new JLabel(LanguageServerBundle.message("new.language.server.dialog.export.template.custom"));
-        panel.add(customTemplateLabel, BorderLayout.EAST);
-        panel.add(textFieldWithBrowseButton, BorderLayout.EAST);
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.template"), panel);
+    /**
+     * Check that the template is not a placeholder and that it has a valid description
+     * @param template to check
+     * @return true if template is not null, not a placeholder and has a description, else false
+     */
+    private boolean hasValidDescription(@Nullable LanguageServerTemplate template) {
+        return template != null && template != LanguageServerTemplate.NONE
+                && template != LanguageServerTemplate.NEW_TEMPLATE
+                && StringUtils.isNotBlank(template.getDescription());
     }
 
     @Override
