@@ -225,6 +225,8 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         if (isDeprecated()) {
             presentation.setStrikeout(true);
         }
+        var labelDetails = item.getLabelDetails();
+        presentation.setTailText(labelDetails != null ? labelDetails.getDetail() : null);
     }
 
     @Override

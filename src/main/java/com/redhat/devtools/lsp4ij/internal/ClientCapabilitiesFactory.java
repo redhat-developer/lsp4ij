@@ -117,12 +117,13 @@ public class ClientCapabilitiesFactory {
         completionItemCapabilities
                 .setDocumentationFormat(List.of(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
         completionItemCapabilities.setInsertTextModeSupport(new CompletionItemInsertTextModeSupportCapabilities(List.of(InsertTextMode.AsIs, InsertTextMode.AdjustIndentation)));
-
         completionItemCapabilities.setResolveSupport(new CompletionItemResolveSupportCapabilities(
                 List.of(
                         "documentation",
                         "detail",
                         "additionalTextEdits")));
+        completionItemCapabilities.setDeprecatedSupport(Boolean.TRUE);
+        completionItemCapabilities.setLabelDetailsSupport(Boolean.TRUE);
         CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
         completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
         textDocumentClientCapabilities.setCompletion(completionCapabilities);
