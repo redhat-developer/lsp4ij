@@ -331,7 +331,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             }
 
             List<TextEdit> additionalEdits = item.getAdditionalTextEdits();
-            if (additionalEdits == null && supportResolveCompletion) {
+            if ((additionalEdits == null || additionalEdits.isEmpty()) && supportResolveCompletion) {
                 // The LSP completion item 'additionalEdits' is not filled, try to resolve it.
                 CompletionItem resolved = getResolvedCompletionItem();
                 if (resolved != null) {
