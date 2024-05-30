@@ -265,6 +265,11 @@ public class NewLanguageServerDialog extends DialogWrapper {
         return null;
     }
 
+    @Override
+    protected Action @NotNull [] createActions() {
+        return new Action[]{getOKAction(), getCancelAction()};
+    }
+
 
     @Override
     protected void doOKAction() {
