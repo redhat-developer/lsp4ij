@@ -94,8 +94,6 @@ with server name, command, mappings and potential configurations.
 The `Template combo-box` provides some default language servers templates (located in templates directory classpath), 
 pre-filled with server name, command, mappings and potential configuration.
 
-If the template folder contains a `README.md` file, you can press the help button to open the instructions.
-
 ![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
@@ -105,9 +103,12 @@ If the template folder contains a `README.md` file, you can press the help butto
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 
+If the template folder contains a `README.md` file, you can press the help button to open the instructions.
+
 #### Custom template
 
-The `Template file-selector` can be used to select a directory from the file system to load a custom language server template, 
+The `Add new template...` item from the `Template combo-box` can be used to select a directory from 
+the file system to load a custom language server template, 
 these templates can be pre-filled with server name, command, mappings and potential configuration.
 
 If the template folder contains a `README.md` file, you can press the help button to open the instructions.
@@ -116,7 +117,7 @@ If the template folder contains a `README.md` file, you can press the help butto
 
 ### Exporting templates
 
-Users can also export their own language servers to a zip file. This can be done from the LSP console, 
+Users can export their own language servers to a zip file. This can be done from the LSP console, 
 by selecting one or more language servers and selecting the export option from the context menu.
 
 ![Export Language Servers to a Zip](./images/user-defined-ls/ExportUserDefinedLanguageServer.png)
@@ -129,4 +130,4 @@ Each folder contains the following files:
 - `settings.json`
 - `initializationOptions.json`
 
-You can also manually add a `README.md` file to the folder to provide instructions for the language server.
+A `README.md` file to each of the language server folders to provide instructions for the corresponding language server.
