@@ -176,10 +176,10 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
         assertApplyCompletionItem(1, "quarkus.banner.enabled=true<caret>");
     }
 
-    public void testCompletionOnPropertyValueWithNotEmptyContent() {
+    public void testCompletionOnPropertyValueWithNotEmptyContentAt_1_caret() {
         // 1. Test completion items result
         assertCompletion("microprofile-config.properties",
-                "quarkus.banner.enabled=tr<caret>e", """                
+                "quarkus.banner.enabled=t<caret>re", """                
                         {
                                "isIncomplete": false,
                                "items": [
@@ -243,5 +243,143 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
                 "true");
         // 2. Test new editor content after applying the first completion item
         assertApplyCompletionItem(0, "quarkus.banner.enabled=true<caret>");
+    }
+
+    public void testCompletionOnPropertyValueWithNotEmptyContentAt_3_caret() {
+        // 1. Test completion items result
+        assertCompletion("microprofile-config.properties",
+                "quarkus.banner.enabled=tre<caret>", """                
+                        {
+                               "isIncomplete": false,
+                               "items": [
+                                 {
+                                   "label": "false",
+                                   "kind": 12,
+                                   "documentation": {
+                                     "kind": "markdown",
+                                     "value": "**false**\r\n"
+                                   },
+                                   "textEdit": {
+                                     "range": {
+                                       "start": {
+                                         "line": 0,
+                                         "character": 23
+                                       },
+                                       "end": {
+                                         "line": 0,
+                                         "character": 26
+                                       }
+                                     },
+                                     "newText": "false"
+                                   }
+                                 },
+                                 {
+                                   "label": "true",
+                                   "kind": 12,
+                                   "documentation": {
+                                     "kind": "markdown",
+                                     "value": "**true**\r\n"
+                                   },
+                                   "textEdit": {
+                                     "range": {
+                                       "start": {
+                                         "line": 0,
+                                         "character": 23
+                                       },
+                                       "end": {
+                                         "line": 0,
+                                         "character": 26
+                                       }
+                                     },
+                                     "newText": "true"
+                                   }
+                                 }
+                               ],
+                               "itemDefaults": {
+                                 "editRange": {
+                                   "start": {
+                                     "line": 0,
+                                     "character": 0
+                                   },
+                                   "end": {
+                                     "line": 0,
+                                     "character": 26
+                                   }
+                                 }
+                               }
+                             }"""
+                ,
+                "true");
+        // 2. Test new editor content after applying the first completion item
+        assertApplyCompletionItem(0, "quarkus.banner.enabled=true<caret>");
+    }
+
+    public void testCompletionOnPropertyValueWithNotEmptyContent_false_value() {
+        // 1. Test completion items result
+        assertCompletion("microprofile-config.properties",
+                "quarkus.banner.enabled=<caret>false", """                
+                        {
+                               "isIncomplete": false,
+                               "items": [
+                                 {
+                                   "label": "false",
+                                   "kind": 12,
+                                   "documentation": {
+                                     "kind": "markdown",
+                                     "value": "**false**\r\n"
+                                   },
+                                   "textEdit": {
+                                     "range": {
+                                       "start": {
+                                         "line": 0,
+                                         "character": 23
+                                       },
+                                       "end": {
+                                         "line": 0,
+                                         "character": 28
+                                       }
+                                     },
+                                     "newText": "false"
+                                   }
+                                 },
+                                 {
+                                   "label": "true",
+                                   "kind": 12,
+                                   "documentation": {
+                                     "kind": "markdown",
+                                     "value": "**true**\r\n"
+                                   },
+                                   "textEdit": {
+                                     "range": {
+                                       "start": {
+                                         "line": 0,
+                                         "character": 23
+                                       },
+                                       "end": {
+                                         "line": 0,
+                                         "character": 28
+                                       }
+                                     },
+                                     "newText": "true"
+                                   }
+                                 }
+                               ],
+                               "itemDefaults": {
+                                 "editRange": {
+                                   "start": {
+                                     "line": 0,
+                                     "character": 0
+                                   },
+                                   "end": {
+                                     "line": 0,
+                                     "character": 28
+                                   }
+                                 }
+                               }
+                             }"""
+                ,
+                "false", "true");
+        // 2. Test new editor content after applying the first completion item
+        assertApplyCompletionItem(1, "quarkus.banner.enabled=true<caret>");
     }
 }
