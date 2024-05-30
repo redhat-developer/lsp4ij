@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.intellij.openapi.util.SystemInfo;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 
 import java.util.ArrayList;
@@ -33,7 +34,7 @@ public class LanguageServerTemplate {
     public static final LanguageServerTemplate NEW_TEMPLATE = new LanguageServerTemplate() {
         @Override
         public String getName() {
-            return "Add new template...";
+            return LanguageServerBundle.message("new.language.server.dialog.import.template.selection");
         }
     };
 
