@@ -18,7 +18,6 @@ import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
-import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -522,7 +521,7 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyTextEdits(document, textDocumentEdit.getEdits());
+                            applyEdits(null, document, textDocumentEdit.getEdits());
                         }
                     }
                 } else if (change.isRight()) {
@@ -550,49 +549,9 @@ public class LSPIJUtils {
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
-                        applyTextEdits(document, change.getValue());
+                        applyEdits(null, document, change.getValue());
                     }
                 }
-            }
-        }
-    }
-
-    private static void applyTextEdits(Document document, List<TextEdit> edits) {
-        edits.sort((b, a) -> {
-            int diff = a.getRange().getStart().getLine() - b.getRange().getStart().getLine();
-            if (diff == 0) {
-                return a.getRange().getStart().getCharacter() - b.getRange().getStart().getCharacter();
-            }
-            return diff;
-        });
-        for (TextEdit edit : edits) {
-            applyTextEdit(document, edit);
-        }
-    }
-
-    private static void applyTextEdit(Document document, TextEdit textEdit) {
-        Range range = textEdit.getRange();
-        if (range == null) {
-            return;
-        }
-        String text = textEdit.getNewText();
-        int start = toOffset(range.getStart(), document);
-        int end = toOffset(range.getEnd(), document);
-
-        if (StringUtils.isEmpty(text)) {
-            document.deleteString(start, end);
-        } else {
-            text = text.replaceAll("\r", "");
-            if (end >= 0) {
-                if (end - start <= 0) {
-                    document.insertString(start, text);
-                } else {
-                    document.replaceString(start, end, text);
-                }
-            } else if (start == 0) {
-                document.setText(text);
-            } else if (start > 0) {
-                document.insertString(start, text);
             }
         }
     }
@@ -604,7 +563,7 @@ public class LSPIJUtils {
                 Document document = getDocument(targetFile);
                 if (document != null) {
                     TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
-                    applyTextEdits(document, Collections.singletonList(textEdit));
+                    applyEdits(null, document, Collections.singletonList(textEdit));
                 }
             }
         } else {
@@ -762,7 +721,16 @@ public class LSPIJUtils {
         return new TextDocumentIdentifier(uri.toASCIIString());
     }
 
-    public static void applyEdits(Editor editor, Document document, List<TextEdit> edits) {
+    /**
+     * Apply text edits to the given document and move the caret offset of the given editor if needed.
+     *
+     * @param editor   the editor used to update the caret offset after the apply edits and null otherwise.
+     * @param document the document to update.
+     * @param edits    the text edit list to apply to the given document.
+     */
+    public static void applyEdits(@Nullable Editor editor,
+                                  @NotNull Document document,
+                                  @NotNull List<TextEdit> edits) {
         if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
             doApplyEdits(editor, document, edits);
         } else {
@@ -770,58 +738,164 @@ public class LSPIJUtils {
         }
     }
 
-    private static void doApplyEdits(Editor editor, Document document, List<TextEdit> edits) {
+    /**
+     * Apply text edits to the given document and move the caret offset of the given editor if needed.
+     *
+     * <p>
+     * This method is called in Write Action.
+     * </p>
+     *
+     * @param editor   the editor used to update the caret offset after the apply edits and null otherwise.
+     * @param document the document to update.
+     * @param edits    the text edit list to apply to the given document.
+     */
+    private static void doApplyEdits(@Nullable Editor editor,
+                                     @NotNull Document document,
+                                     @NotNull List<TextEdit> edits) {
         if (edits.isEmpty()) {
             return;
         }
         // Sort text edits
-        edits.sort(TEXT_EDITS_DESCENDING_COMPARATOR);
-        var textEditToUseToUpdateCaret = edits.get(0);
-        Integer current = null;
+        if (edits.size() > 1) {
+            edits.sort(TEXT_EDITS_DESCENDING_COMPARATOR);
+        }
+        final int oldCaretOffset = editor != null ? editor.getCaretModel().getOffset() : -1;
+        int newCaretOffset = oldCaretOffset;
+        // Apply each text edit to update the given document and move the caret offset if needed
         for (var textEdit : edits) {
-            RangeMarker marker = applyEdit(textEdit, document);
-            if (marker != null) {
-                if (current == null) {
-                    current = 0;
-                }
-                if (textEdit == textEditToUseToUpdateCaret) {
-                    current += marker.getEndOffset();
-                } else {
-                    current += (marker.getEndOffset() - marker.getStartOffset());
+            Range range = textEdit.getRange();
+            if (range != null) {
+                // Text edit range exists
+                int start = toOffset(range.getStart(), document);
+                int end = toOffset(range.getEnd(), document);
+                if (end >= start) {
+                    // Text edit range is valid, apply the text edit to the document
+                    int increment = applyEdit(start, end, textEdit.getNewText(), document, oldCaretOffset);
+                    if (newCaretOffset != -1) {
+                        // Update the caret offset
+                        newCaretOffset += increment;
+                    }
                 }
             }
         }
-        if (current != null) {
-            editor.getCaretModel().moveToOffset(current);
+        if (newCaretOffset > -1 && oldCaretOffset != newCaretOffset) {
+            // The caret offset must be moved
+            editor.getCaretModel().moveToOffset(newCaretOffset);
         }
     }
 
-    private static RangeMarker applyEdit(TextEdit textEdit, Document document) {
-        RangeMarker marker = document.createRangeMarker(LSPIJUtils.toOffset(textEdit.getRange().getStart(), document), LSPIJUtils.toOffset(textEdit.getRange().getEnd(), document));
-        marker.setGreedyToRight(true);
-        int startOffset = marker.getStartOffset();
-        int endOffset = marker.getEndOffset();
-        String text = textEdit.getNewText();
-        if (text != null) {
-            text = text.replaceAll("\r", "");
+    /**
+     * Apply text edit by updating the given document.
+     *
+     * @param start       the start offset of the text edit.
+     * @param end         the end offset of the text edit.
+     * @param newText     the text to insert/replace and empty or null if delete must be done.
+     * @param document    the document to update.
+     * @param caretOffset the current caret offset and -1 if caret must be not moved.
+     * @return the increment (positive or negative) used to update caret offset.
+     */
+    private static int applyEdit(int start,
+                                 int end,
+                                 @Nullable String newText,
+                                 @NotNull Document document,
+                                 int caretOffset) {
+        if (StringUtils.isEmpty(newText)) {
+            // Delete operation
+
+            // {
+            //  "range": {
+            //    "start": {
+            //      "line": 8,
+            //      "character": 1
+            //    },
+            //    "end": {
+            //      "line": 8,
+            //      "character": 3
+            //    }
+            //  },
+            //  "newText": ""
+            //}
+            document.deleteString(start, end);
+            return -getIncrement(start, end, caretOffset);
         }
-        if (text == null || text.isEmpty()) {
-            document.deleteString(startOffset, endOffset);
-        } else if (endOffset - startOffset <= 0) {
-            document.insertString(startOffset, text);
-        } else {
-            document.replaceString(startOffset, endOffset, text);
+
+        newText = newText.replaceAll("\r", "");
+
+        if (start == end) {
+            // Insert operation
+
+            // {
+            //  "range": {
+            //    "start": {
+            //      "line": 8,
+            //      "character": 3
+            //    },
+            //    "end": {
+            //      "line": 8,
+            //      "character": 3
+            //    }
+            //  },
+            //  "newText": "fmt.Printf(\"s: %v\\n\", s)"
+            //}
+            document.insertString(start, newText);
+            if (start > caretOffset) {
+                // <caret>...<start><end>
+                // The text edit doesn't impact the caret offset
+                return 0;
+            }
+            // <start><end>...<caret>...
+            return newText.length();
         }
-        if (text != null && !text.isEmpty()) {
-            return marker;
-        }
-        marker.dispose();
-        return null;
+
+        // Replace operation
+
+        // {
+        //  "range": {
+        //    "start": {
+        //      "line": 2,
+        //      "character": 7
+        //    },
+        //    "end": {
+        //      "line": 4,
+        //      "character": 1
+        //    }
+        //  },
+        //  "newText": "\"fmt\""
+        //}
+        document.replaceString(start, end, newText);
+        return newText.length() - getIncrement(start, end, caretOffset);
     }
 
-    public static String applyEdits(Document document, List<? extends TextEdit> edits) {
+    private static int getIncrement(int start, int end, int caret) {
+        if (caret == -1) {
+            return 0;
+        }
+        if (start > caret) {
+            // <caret>...<start>foo<end>
+            // The text edit doesn't impact the caret offset
+            return 0;
+        }
+        if (caret > end) {
+            // ...<start>foo<end>...<caret>
+            return end - start;
+        }
+        // ...<start>fo<caret>o<end>...
+        return caret - start;
+    }
+
+    /**
+     * Apply text edits by using the given document without updating and returns the result of the apply text edits.
+     *
+     * @param document the document used to apply text edits without updating it.
+     * @param edits    the text edit list to apply to the given document.
+     * @return the result of the apply text edits.
+     */
+    public static String applyEdits(@NotNull Document document,
+                                    @NotNull List<? extends TextEdit> edits) {
         // Sort text edits
-        edits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
+        if (edits.size() > 1) {
+            edits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
+        }
         String text = document.getText();
         int lastModifiedOffset = 0;
         List<String> spans = new ArrayList<>(edits.size() + 1);

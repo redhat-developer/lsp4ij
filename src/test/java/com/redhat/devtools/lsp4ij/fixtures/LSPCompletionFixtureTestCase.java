@@ -91,9 +91,9 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
         }
         myFixture.selectItem(myFixture.getLookupElements()[selectedItemIndex]);
         var editor = myFixture.getEditor();
-        assertEquals(expected, editor.getDocument().getText());
+        assertEquals("After applying completion, editor content should be equal", expected, editor.getDocument().getText());
         if (expectedCaretOffset != -1) {
-            assertEquals(expectedCaretOffset, editor.getCaretModel().getOffset());
+            assertEquals("After applying completion, caret offset should be equal", expectedCaretOffset, editor.getCaretModel().getOffset());
         }
     }
 }
