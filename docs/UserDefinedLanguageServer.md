@@ -130,4 +130,5 @@ Each folder contains the following files:
 - `settings.json`
 - `initializationOptions.json`
 
-A `README.md` file to each of the language server folders to provide instructions for the corresponding language server.
+A `README.md` file can be added manually to each of the language server folders to provide instructions 
+for the corresponding language server.
