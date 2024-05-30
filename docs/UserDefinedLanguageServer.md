@@ -103,32 +103,35 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 
-If the template folder contains a `README.md` file, you can press the help button to open the instructions.
+If the template directory contains a `README.md` file, you can open the instructions by pressing the help icon.
 
 #### Custom template
 
-The `Add new template...` item from the `Template combo-box` can be used to select a directory from 
+The `Import from custom template...` item from the `Template combo-box` can be used to select a directory from 
 the file system to load a custom language server template, 
 these templates can be pre-filled with server name, command, mappings and potential configuration.
 
-If the template folder contains a `README.md` file, you can press the help button to open the instructions.
+The selected directory contents should match the [custom template structure](#custom-template-structure).
+If the template directory contains a `README.md` file, you can open the instructions by pressing the help icon.
+
+Custom templates can be created by [exporting templates](#exporting-templates).
 
 ![New Language Server with Custom Template](./images/user-defined-ls/NewLanguageServerWithCustomTemplate.png)
 
 ### Exporting templates
 
-Users can export their own language servers to a zip file. This can be done from the LSP console, 
-by selecting one or more language servers and selecting the export option from the context menu.
+Users can export their own language servers to a zip file, where each language server is a separate directory. 
+This can be done from the LSP console, by selecting one or more language servers and selecting the export option from the context menu.
+
+These directories can then be used as a template for a new language server by [importing a custom template](#custom-template).
 
 ![Export Language Servers to a Zip](./images/user-defined-ls/ExportUserDefinedLanguageServer.png)
 
-The created zip file contains a separate folder for each language server that can be used as a template 
-when creating a new language servers.
-
-Each folder contains the following files:
+#### Custom template structure
+By default, each directory contains the following files, but only `template.json` is required.
 - `template.json`
 - `settings.json`
 - `initializationOptions.json`
 
-A `README.md` file can be added manually to each of the language server folders to provide instructions 
+A `README.md` file can be added manually to each of the language server directories to provide instructions 
 for the corresponding language server.
