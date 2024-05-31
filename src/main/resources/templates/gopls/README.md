@@ -4,4 +4,4 @@ You can use the [Go language server](https://pkg.go.dev/golang.org/x/tools/gopls
 
 **go install golang.org/x/tools/gopls@latest**
 
-As the command will add **go** in your OS PATH, you will have to close and reopen your IntelliJ to update this PATH. 
+As the command will add **go** in your OS PATH, you will have to close and reopen your IDE to update this PATH. 
