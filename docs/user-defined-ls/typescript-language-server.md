@@ -1,6 +1,6 @@
 # TypeScript Language Server
 
-You can use the [TypeScript language server](https://github.com/typescript-language-server/typescript-language-server) to benefit with `TypeScript`, `React` and `JavaScript` support:
+You can use the [TypeScript language server](https://github.com/typescript-language-server/typescript-language-server) to benefit from `TypeScript`, `React` and `JavaScript` support:
 
 ![TypeScript demo](../images/user-defined-ls/TypeScriptServerDemo.gif)
 
