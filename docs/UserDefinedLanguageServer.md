@@ -100,6 +100,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Go Language Server](./user-defined-ls/gopls.md)
 * [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
+* [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 

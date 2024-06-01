@@ -11,12 +11,14 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.templates;
 
+import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
@@ -29,7 +31,10 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
         languageServerTemplate.setName(jsonObject.get(NAME_JSON_PROPERTY).getAsString());
         JsonObject programArgs = jsonObject.get(PROGRAM_ARGS_JSON_PROPERTY).getAsJsonObject();
         if (programArgs != null) {
-            languageServerTemplate.setDefaultProgramArg(programArgs.get(DEFAULT_JSON_PROPERTY).getAsString());
+            Gson gson = new Gson();
+            Type mapType = new TypeToken<Map<String, String>>(){}.getType();
+            Map<String, String> programArgsMap = gson.fromJson(programArgs, mapType);
+            languageServerTemplate.setProgramArgs(programArgsMap);
         }
         JsonArray fileTypeMappings = jsonObject.getAsJsonArray(FILE_TYPE_MAPPINGS_JSON_PROPERTY);
         if (fileTypeMappings != null && !fileTypeMappings.isEmpty()) {
