@@ -1,10 +1,9 @@
 {
   "id": "rust-analyzer",
   "name": "Rust Language Server",
-  "dev": true,
   "programArgs": {
-    "default": "sh -c rust-analyzer",
-    "windows": "rust-analyzer"
+    "default": "sh -c ${BASE_DIR}/rust-analyzer",
+    "windows": "${BASE_DIR}/rust-analyzer.exe"
   },
   "fileTypeMappings": [
     {

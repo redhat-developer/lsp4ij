@@ -15,7 +15,6 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -95,11 +94,8 @@ public class LanguageServerTemplate {
         return programArgs.get(DEFAULT_KEY);
     }
 
-    public void setDefaultProgramArg(String defaultArg) {
-        if (this.programArgs == null) {
-            this.programArgs = new HashMap<>();
-        }
-        this.programArgs.put(DEFAULT_KEY, defaultArg);
+    public void setProgramArgs(Map<String, String> programArgs) {
+        this.programArgs = programArgs;
     }
 
     public List<ServerMappingSettings> getLanguageMappings() {
@@ -153,4 +149,5 @@ public class LanguageServerTemplate {
     public void setInitializationOptions(String initializationOptions) {
         this.initializationOptions = initializationOptions;
     }
+
 }
