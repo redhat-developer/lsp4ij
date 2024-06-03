@@ -158,8 +158,8 @@ public class LanguageServerFileAssociation {
      *
      * @return true if the file association is enabled and false otherwise.
      */
-    public boolean isEnabled() {
-        return getServerDefinition().isEnabled();
+    public boolean isEnabled(Project project) {
+        return getServerDefinition().isEnabled(project);
     }
 
     public @NotNull <R> CompletableFuture<Boolean> matchAsync(VirtualFile file, Project project) {

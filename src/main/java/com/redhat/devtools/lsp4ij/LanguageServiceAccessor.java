@@ -106,10 +106,29 @@ public class LanguageServiceAccessor implements Disposable {
         for (LanguageServerDefinition definition : definitions) {
             Project[] projects = ProjectManager.getInstance().getOpenProjects();
             for (Project p : projects) {
-                VirtualFile[] files = FileEditorManager.getInstance(p).getOpenFiles();
-                for (VirtualFile file : files) {
-                    findAndStartLsForFile(file, definition);
+                try {
+                    findAndStartLanguageServerIfNeeded(definition, false, p);
                 }
+                catch(Exception e) {
+                    LOGGER.error("Error while starting language server for the language server '" + definition.getDisplayName() + "'.");
+                }
+            }
+        }
+    }
+
+    public void findAndStartLanguageServerIfNeeded(LanguageServerDefinition definition, boolean forceStart, Project project) {
+        if (forceStart) {
+            // The language server must be started even if there is no open file corresponding to it.
+            LinkedHashSet<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
+            collectLanguageServersFromDefinition(null, project, Set.of(definition), matchedServers);
+            for(var ls : matchedServers) {
+                ls.restart();
+            }
+        } else {
+            // The language server should only be started if there is an open file corresponding to it.
+            VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
+            for (VirtualFile file : files) {
+                findAndStartLsForFile(file, definition);
             }
         }
     }
@@ -239,14 +258,14 @@ public class LanguageServiceAccessor implements Disposable {
      * @param serverDefinitions the server definitions.
      * @param matchedServers    the list to update with get/created language server.
      */
-    private void collectLanguageServersFromDefinition(@NotNull VirtualFile file, @NotNull Project fileProject, @NotNull Set<LanguageServerDefinition> serverDefinitions, @NotNull Set<LanguageServerWrapper> matchedServers) {
+    private void collectLanguageServersFromDefinition(@Nullable VirtualFile file, @NotNull Project fileProject, @NotNull Set<LanguageServerDefinition> serverDefinitions, @NotNull Set<LanguageServerWrapper> matchedServers) {
         synchronized (startedServers) {
             for (var serverDefinition : serverDefinitions) {
                 boolean useExistingServer = false;
                 // Loop for started language servers
                 for (var startedServer : startedServers) {
                     if (startedServer.getServerDefinition().equals(serverDefinition)
-                            && startedServer.canOperate(file)) {
+                            && (file == null || startedServer.canOperate(file))) {
                         // A started language server match the file, use it
                         matchedServers.add(startedServer);
                         useExistingServer = true;
@@ -337,7 +356,7 @@ public class LanguageServiceAccessor implements Disposable {
             // Loop for server/language mapping
             for (LanguageServerFileAssociation mapping : LanguageServersRegistry.getInstance()
                     .findLanguageServerDefinitionFor(currentLanguage, currentFileType, file)) {
-                if (mapping == null || !mapping.isEnabled() || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
+                if (mapping == null || !mapping.isEnabled(project) || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
                     // the mapping is disabled
                     // or the server definition has been already added
                     continue;

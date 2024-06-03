@@ -179,11 +179,11 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void setEnabled(boolean enabled) {
-        this.serverDefinition.setEnabled(enabled);
+        this.serverDefinition.setEnabled(enabled, initialProject);
     }
 
     public boolean isEnabled() {
-        return serverDefinition.isEnabled();
+        return serverDefinition.isEnabled(initialProject);
     }
 
     /**
@@ -372,6 +372,9 @@ public class LanguageServerWrapper implements Disposable {
 
     private void updateStatus(ServerStatus serverStatus) {
         this.serverStatus = serverStatus;
+        if (languageClient != null) {
+            languageClient.handleServerStatusChanged(serverStatus);
+        }
     }
 
     private void startStopTimer() {
