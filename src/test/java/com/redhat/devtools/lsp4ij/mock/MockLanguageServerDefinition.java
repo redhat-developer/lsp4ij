@@ -19,8 +19,15 @@ import org.jetbrains.annotations.NotNull;
  * {@link LanguageServerDefinition} implementation to register the mock language server.
  */
 public class MockLanguageServerDefinition extends LanguageServerDefinition {
+
+    private static final String SERVER_ID = "mock-server-id";
+
     public MockLanguageServerDefinition() {
-        super("mock-server-id", "name", null, true, 5, true);
+        this(SERVER_ID);
+    }
+
+    public MockLanguageServerDefinition(String serverId) {
+        super(serverId, "name", null, true, 5, true);
     }
 
     @Override

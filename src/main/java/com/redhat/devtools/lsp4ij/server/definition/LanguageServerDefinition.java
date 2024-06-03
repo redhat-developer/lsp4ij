@@ -20,6 +20,7 @@ import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
+import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -36,7 +37,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * Base class for Language server definition.
  */
-public abstract class LanguageServerDefinition implements LanguageServerFactory {
+public abstract class LanguageServerDefinition implements LanguageServerFactory, LanguageServerEnablementSupport {
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
@@ -65,7 +66,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
         this.languageIdFileTypeMappings = new ConcurrentHashMap<>();
         this.languageIdFileNameMatcherMappings = new CopyOnWriteArrayList<>();
         this.supportsLightEdit = supportsLightEdit;
-        setEnabled(true);
+        setEnabled(true, null);
     }
 
     /**
@@ -115,16 +116,18 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory 
      *
      * @return true if the language server definition is enabled and false otherwise.
      */
-    public boolean isEnabled() {
+    @Override
+    public boolean isEnabled(@NotNull Project project) {
         return enabled;
     }
 
     /**
      * Set enabled the language server definition.
      *
-     * @param enabled enabled the language server definition.
+     * @param enabled        enabled the language server definition.
+     * @param project
      */
-    public void setEnabled(boolean enabled) {
+    public void setEnabled(boolean enabled, @Nullable Project project) {
         this.enabled = enabled;
     }
 

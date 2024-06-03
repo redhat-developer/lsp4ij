@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.server.definition.extension;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.IconLoader;
+import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -22,6 +23,7 @@ import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +82,31 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
             serverInterface = super.getServerInterface();
         }
         return serverInterface;
+    }
+
+    @Override
+    public boolean isEnabled(@NotNull Project project) {
+        try {
+            var factory = getFactory();
+            if (factory instanceof LanguageServerEnablementSupport languageServerEnablementSupport) {
+                languageServerEnablementSupport.isEnabled(project);
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Exception occurred while getting enabled", e); //$NON-NLS-1$
+        }
+        return true;
+    }
+
+    @Override
+    public void setEnabled(boolean enabled, @Nullable Project project) {
+        try {
+            var factory = getFactory();
+            if (factory instanceof LanguageServerEnablementSupport languageServerEnablementSupport) {
+                languageServerEnablementSupport.setEnabled(enabled, project);
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Exception occurred while setting enabled", e); //$NON-NLS-1$
+        }
     }
 
     private @NotNull LanguageServerFactory getFactory() {

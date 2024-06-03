@@ -177,6 +177,24 @@ If your language server manages custom LSP requests, it is recommended to extend
 You can see a full example
 with [QuteLanguageClient](https://github.com/redhat-developer/intellij-quarkus/blob/main/src/main/java/com/redhat/devtools/intellij/qute/lsp/QuteLanguageClient.java)
 
+## workspace/didChangeConfiguration
+
+If you need to send a `workspace/didChangeConfiguration` with your settings, you can:
+
+ * override and implement `LanguageClientImpl#createSettings()` to create the settings to send
+ * call `LanguageClientImpl#triggerChangeConfiguration()` to send the settings from your custom listener (ex : track the change of your settings)
+
+if you need to send a `workspace/didChangeConfiguration` when server is started, you can override and 
+implement `LanguageClientImpl#handleServerStatusChanged(ServerStatus serverStatus)` like this:
+
+```java
+@Override
+public void handleServerStatusChanged(ServerStatus serverStatus) {
+  if(serverStatus == ServerStatus.started) {
+  triggerChangeConfiguration();    
+}
+```
+
 ## Extension point declaration
 
 The next step is to declare the server in your plugin.xml with the `com.redhat.devtools.lsp4ij.server` extension point
@@ -360,6 +378,82 @@ you'll need to add a special mapping between that language and LSP4IJ, in your p
 ```
 
 See specific [hover implementation details](./LSPSupport.md#hover) for more details.
+
+## Language Server Manager
+
+If you need to `enable/disable` and / or `start/stop` your language server, LSP4IJ provides the [LanguageServerManager](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/LanguageServerManager.java) API which provides this support:
+
+### Enable / Disable
+
+By default, a language server is enabled : in other words, when the IDE starts, LSP4IJ tracks the opened files and starts the matching language servers.
+If you need to manage this `enabled` state programmatically, your [LanguageServerFactory](#languageserverfactory) must implement [LanguageServerEnablementSupport](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/LanguageServerEnablementSupport.java):
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory, LanguageServerEnablementSupport {
+
+    ...
+  
+    @Override
+    public boolean isEnabled(@NotNull Project project) {
+        // Get enabled state from your settings
+      boolean enabled = ...
+      return enabled;
+    }
+
+    @Override
+    public void setEnabled(boolean enabled, Project project) { {
+      // Update enabled state of your settings 
+    }
+  
+}
+```
+
+### Start / Stop
+
+To `start` your language server you can use the [LanguageServerManager](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/LanguageServerManager.java) API.
+
+```java
+Project project = ...
+LanguageServerManager.getInstance(project).start("myLanguageServerId");
+```
+
+Here the language server will only start if there is an open file corresponding to your language server.
+
+You can force the start of the language server with:
+
+```java
+LanguageServerManager.StartOptions options = new LanguageServerManager.StartOptions();
+options.setForceStart(true);
+Project project = ...
+LanguageServerManager.getInstance(project).start("myLanguageServerId", options);
+```
+
+To `stop` your language server you can use the [LanguageServerManager](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/LanguageServerManager.java) API.
+
+```java
+Project project = ...
+LanguageServerManager.getInstance(project).stop("myLanguageServerId");
+```
+
+Here the language server will be stopped and disabled.
+
+If you just want to stop the language server without disabling it, you can write:
+
+```java
+LanguageServerManager.StopOptions options = new LanguageServerManager.StopOptions();
+options.setWillDisable(false);
+Project project = ...
+LanguageServerManager.getInstance(project).stop("myLanguageServerId", options);
+```
 
 ## LSP commands
 

@@ -49,4 +49,5 @@ public interface LanguageServerFactory {
     @NotNull default Class<? extends LanguageServer> getServerInterface() {
         return LanguageServer.class;
     }
+
 }

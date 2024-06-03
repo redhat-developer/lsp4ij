@@ -19,6 +19,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
@@ -195,4 +196,27 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         languageServer.getWorkspaceService().didChangeConfiguration(params);
     }
 
+    /**
+     * Callback invoked when language server status changed.
+     *
+     * Since language client doesn't exist during some status, this callback receives only:
+     *
+     * <ul>
+     *     <li>{@link ServerStatus#stopping}</li>
+     *     <li>{@link ServerStatus#started}</li>
+     * </ul>
+     *
+     * <p>
+     *     This method could be implemented to send 'workspace/didChangeConfiguration' (by calling triggerChangeConfiguration)
+     *     when server is started.
+     *     The implementation must be fast or execute asynchronously to avoid deteriorate startup of language server performance.
+     * </p>
+     *
+     * @param serverStatus server status
+     */
+    public void handleServerStatusChanged(ServerStatus serverStatus) {
+        if(serverStatus == ServerStatus.started) {
+            triggerChangeConfiguration();
+        }
+    }
 }
