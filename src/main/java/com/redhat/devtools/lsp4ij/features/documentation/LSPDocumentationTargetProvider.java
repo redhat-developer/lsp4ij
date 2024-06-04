@@ -13,6 +13,8 @@ package com.redhat.devtools.lsp4ij.features.documentation;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.backend.documentation.DocumentationTarget;
@@ -48,6 +50,10 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
 
     @Override
     public @NotNull List<? extends @NotNull DocumentationTarget> documentationTargets(@NotNull PsiFile psiFile, int offset) {
+        Project project = psiFile.getProject();
+        if (project.isDisposed() || DumbService.isDumb(project)) {
+            return Collections.emptyList();
+        }
         VirtualFile file = LSPIJUtils.getFile(psiFile);
         if (file == null) {
             return Collections.emptyList();
