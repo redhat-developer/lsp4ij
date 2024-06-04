@@ -13,7 +13,6 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -25,6 +24,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.Message;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIfNeeded;
 
 /**
  * Language server listener to refresh the language server explorer according to the server state and fill the LSP console.
@@ -63,7 +64,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
 
         TracingMessageConsumer tracing = getLSPRequestCacheFor(languageServer);
         String log = tracing.log(message, messageConsumer, serverTrace);
-        invokeLater(() -> showTrace(processTreeNode, log));
+        invokeLaterIfNeeded(() -> showTrace(processTreeNode, log));
     }
 
     @Override
@@ -73,7 +74,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             return;
         }
 
-        invokeLater(() -> showError(processTreeNode, exception));
+        invokeLaterIfNeeded(() -> showError(processTreeNode, exception));
     }
 
     private TracingMessageConsumer getLSPRequestCacheFor(LanguageServerWrapper languageServer) {
@@ -125,7 +126,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             final var node = processTreeNode;
             final var status = serverStatus;
             final var select = selectProcess;
-            invokeLater(() -> {
+            invokeLaterIfNeeded(() -> {
                 if (explorer.isDisposed()) {
                     return;
                 }
@@ -163,14 +164,6 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     public void dispose() {
         disposed = true;
         tracingPerServer.clear();
-    }
-
-    private static void invokeLater(Runnable runnable) {
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            runnable.run();
-        } else {
-            ApplicationManager.getApplication().invokeLater(runnable);
-        }
     }
 
 }

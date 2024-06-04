@@ -53,6 +53,8 @@ import java.io.StringWriter;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIfNeeded;
+
 /**
  * LSP consoles
  */
@@ -456,11 +458,13 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (toolWindow == null) {
             return;
         }
-        // Get the panel of the LSP tool window
-        var contentManager = toolWindow.getContentManager();
-        LSPConsoleToolWindowPanel panel = (LSPConsoleToolWindowPanel) contentManager.getContent(0).getComponent();
-        // Show log...
-        panel.showLog(params, serverDefinition);
+        invokeLaterIfNeeded(() -> {
+            // Get the panel of the LSP tool window
+            var contentManager = toolWindow.getContentManager();
+            LSPConsoleToolWindowPanel panel = (LSPConsoleToolWindowPanel) contentManager.getContent(0).getComponent();
+            // Show log...
+            panel.showLog(params, serverDefinition);
+        });
     }
 
     private void showLog(MessageParams params, LanguageServerDefinition serverDefinition) {
