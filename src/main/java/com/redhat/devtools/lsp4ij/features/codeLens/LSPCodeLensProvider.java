@@ -10,16 +10,16 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
-import com.intellij.codeInsight.codeVision.*;
+import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind;
+import com.intellij.codeInsight.codeVision.CodeVisionEntry;
+import com.intellij.codeInsight.codeVision.CodeVisionRelativeOrdering;
 import com.intellij.codeInsight.codeVision.ui.model.ClickableTextCodeVisionEntry;
 import com.intellij.codeInsight.codeVision.ui.model.TextCodeVisionEntry;
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.codeInsight.hints.codeVision.DaemonBoundCodeVisionProvider;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -46,14 +46,13 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import static com.intellij.codeInsight.codeVision.CodeVisionState.Ready;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP textDocument/codeLens support.
  */
-public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
+public class LSPCodeLensProvider implements DaemonBoundCodeVisionProvider {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCodeLensProvider.class);
     public static final String LSP_CODE_LENS_PROVIDER_ID = "LSPCodeLensProvider";
@@ -86,44 +85,37 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
 
     @NotNull
     @Override
-    public CodeVisionState computeCodeVision(@NotNull Editor editor, Void uiData) {
+    public List<Pair<TextRange, CodeVisionEntry>> computeForEditor(@NotNull Editor editor, @NotNull PsiFile file) {
         Project project = editor.getProject();
-        if (project == null) {
-            return CodeVisionState.Companion.getREADY_EMPTY();
+        if (project == null || project.isDisposed()) {
+            return Collections.emptyList();
         }
-        if (DumbService.isDumb(project)) {
-            return CodeVisionState.NotReady.INSTANCE;
-        }
-        VirtualFile file = LSPIJUtils.getFile(editor.getDocument());
-        if (file == null) {
-            return CodeVisionState.Companion.getREADY_EMPTY();
-        }
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-        if (!acceptsFile(psiFile)) {
-            return CodeVisionState.Companion.getREADY_EMPTY();
+        if (!acceptsFile(file)) {
+            return Collections.emptyList();
         }
         // Here PsiFile is associated with some language servers.
 
         // Get LSP code lenses from cache or create them
-        CompletableFuture<List<CodeLensData>> future = getCodeLenses(psiFile);
+        CompletableFuture<List<CodeLensData>> future = getCodeLenses(file);
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            waitUntilDone(future, file);
+        /*} catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
             return CodeVisionState.NotReady.INSTANCE;
         } catch (CancellationException e) {
             return CodeVisionState.NotReady.INSTANCE;
+        */
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/codeLens' request", e);
-            return CodeVisionState.NotReady.INSTANCE;
+            return Collections.emptyList();
         }
         if (isDoneNormally(future)) {
             // All code lenses from all language server are loaded.
             List<Pair<TextRange, CodeVisionEntry>> result = new ArrayList<>();
             List<CodeLensData> data = future.getNow(null);
             if (data == null) {
-                return CodeVisionState.Companion.getREADY_EMPTY();
+                return Collections.emptyList();
             }
             if (!data.isEmpty()) {
                 // At this step codelens are sorted by line number
@@ -147,7 +139,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                     if (resolvedCodeLensFuture != null && !resolvedCodeLensFuture.isDone()) {
                         // The resolve code lens future is not finished, wait for...
                         try {
-                            waitUntilDone(resolvedCodeLensFuture, psiFile);
+                            waitUntilDone(resolvedCodeLensFuture, file);
                         } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                             //TODO delete block when minimum required version is 2024.2
                         } catch (CancellationException e) {
@@ -168,7 +160,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         String text = codeLens.getCommand().getTitle();
                         if (!StringUtils.isEmpty(text)) {
                             TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), true);
-                            CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, psiFile, codeLensData.languageServer());
+                            CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, file, codeLensData.languageServer());
                             result.add(new Pair<>(textRange, entry));
                         }
                     }
@@ -177,9 +169,9 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                 }
             }
             // Returns the code visions
-            return ReadAction.compute(() -> new Ready(result));
+            return result;
         }
-        return CodeVisionState.NotReady.INSTANCE;
+        return Collections.emptyList();
     }
 
     static int sortCodeLensByLine(CodeLensData cl1, CodeLensData cl2) {
@@ -244,11 +236,6 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             future = codeLensSupport.getCodeLenses(params);
         }
         return future;
-    }
-
-    @Override
-    public Void precomputeOnUiThread(@NotNull Editor editor) {
-        return null;
     }
 
     @NotNull

@@ -11,9 +11,8 @@
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind;
-import com.intellij.codeInsight.codeVision.CodeVisionProvider;
 import com.intellij.codeInsight.codeVision.CodeVisionRelativeOrdering;
-import com.intellij.openapi.editor.Editor;
+import com.intellij.codeInsight.hints.codeVision.DaemonBoundCodeVisionProvider;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 
@@ -33,7 +32,7 @@ import java.util.List;
  * here <a href="https://github.com/JetBrains/intellij-community/blob/f18aa7b9d65ab4b03d75a26aaec1e726821dc4d7/platform/lang-impl/src/com/intellij/codeInsight/codeVision/CodeVisionHost.kt#L348">...</a>
  * </p>
  */
-public class DummyCodeVisionProvider implements CodeVisionProvider {
+public class DummyCodeVisionProvider implements DaemonBoundCodeVisionProvider {
 
     private final String id;
     private final List<CodeVisionRelativeOrdering> relativeOrderings;
@@ -71,11 +70,6 @@ public class DummyCodeVisionProvider implements CodeVisionProvider {
     @Override
     public List<CodeVisionRelativeOrdering> getRelativeOrderings() {
         return relativeOrderings;
-    }
-
-    @Override
-    public Object precomputeOnUiThread(@NotNull Editor editor) {
-        return null;
     }
 
     @NotNull

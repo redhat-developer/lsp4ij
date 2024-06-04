@@ -176,7 +176,7 @@
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.DummyCodeVisionProviderFactory"/>
         <config.codeVisionGroupSettingProvider
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSettingsProvider"/>
-        <codeInsight.codeVisionProvider
+        <codeInsight.daemonBoundCodeVisionProvider
                 id="LSPCodeLensProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider"/>
 

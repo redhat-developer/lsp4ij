@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.features.codeLens;
 
 import com.intellij.codeInsight.codeVision.CodeVisionProvider;
 import com.intellij.codeInsight.codeVision.CodeVisionProviderFactory;
+import com.intellij.codeInsight.hints.codeVision.CodeVisionProviderAdapter;
 import com.intellij.openapi.project.Project;
 import kotlin.sequences.Sequence;
 import kotlin.sequences.SequencesKt;
@@ -34,7 +35,7 @@ public class DummyCodeVisionProviderFactory implements CodeVisionProviderFactory
     private CodeVisionProvider<?>[] createDummyProviders(int size) {
         List<CodeVisionProvider<?>> list = new ArrayList<>(size);
         for (int i = 0; i <=size; i++) {
-            list.add(new DummyCodeVisionProvider(i));
+            list.add(new CodeVisionProviderAdapter(new DummyCodeVisionProvider(i)));
         }
         return list.toArray(new CodeVisionProvider<?>[size]);
     }
