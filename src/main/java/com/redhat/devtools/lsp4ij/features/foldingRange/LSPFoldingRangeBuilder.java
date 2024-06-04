@@ -120,4 +120,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     protected boolean isRegionCollapsedByDefault(@NotNull ASTNode node) {
         return false;
     }
+
+    @Override
+    public boolean isDumbAware() {
+        return false;
+    }
 }
