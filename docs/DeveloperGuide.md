@@ -402,7 +402,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory, LanguageS
 
     @Override
     public void setEnabled(boolean enabled, Project project) {
-        // Update enabled state of your settings
+        // Update enabled state from your settings
     }
 
 }
