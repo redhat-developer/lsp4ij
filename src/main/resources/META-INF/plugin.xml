@@ -5,11 +5,29 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.0.2</h3>
+    <ul>
+      <li>Provide an API to enable/disable & start/stop language server</li>
+      <li>Support for syntax coloration for Markdown code block and indented blockquote on hover, completion documentation.</li>
+      <li>Support 'deprecated'/'unnecessary' diagnostic tags</li>
+      <li>Support for LSP 'workspace/configuration'</li>
+      <li>Support for triggered chars in LSP completion support</li>
+      <li>Support for labelDetails in completion</li>
+      <li>Display platform file icons on completion</li>
+      <li>Provides menu for LSP implementation/references/declaration/type definition</li>
+      <li>Export user defined language server</li>
+      <li>Support Macros in the start LS command</li>
+      <li>Improve performance</li>
+      <li>Fixing bugs</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/2?closed=1">changelog</a>.
+
     <h3>0.0.1</h3>
     <ul>
       <li>Initial release</li>
     </ul>    
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/1?closed=1">changelog</a>.
+
   ]]>
     </change-notes>
     <description>
