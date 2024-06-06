@@ -13,7 +13,6 @@ need [to declare dependency in your plugin.xml](https://plugins.jetbrains.com/do
 like this:
 
 ```xml
-
 <idea-plugin>
     ...
 
@@ -190,8 +189,9 @@ implement `LanguageClientImpl#handleServerStatusChanged(ServerStatus serverStatu
 ```java
 @Override
 public void handleServerStatusChanged(ServerStatus serverStatus) {
-  if(serverStatus == ServerStatus.started) {
-  triggerChangeConfiguration();    
+    if (serverStatus == ServerStatus.started) {
+        triggerChangeConfiguration();
+    }
 }
 ```
 
@@ -201,7 +201,6 @@ The next step is to declare the server in your plugin.xml with the `com.redhat.d
 referencing your `my.language.server.MyLanguageServerFactory`:
 
 ```xml
-
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
     <server id="myLanguageServerId"
             name="My Language Server"
@@ -243,7 +242,6 @@ You can use three kinds of mappings:
 Here is a sample snippet to associate the `XML` language with the `myLanguageServerId` server:
 
 ```xml
-
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
 
     <languageMapping language="XML"
@@ -260,7 +258,6 @@ vscode CSS language server) expects the `languageId` to be `css` or `less`.
 To do that, you can declare it with the `languageId` attribute:
 
 ```xml
-
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
 
     <languageMapping language="CSS"
@@ -299,7 +296,6 @@ public class MyDocumentMatcher extends AbstractDocumentMatcher {
 and it must be registered as language mapping, with the `documentMatcher` attribute:
 
 ```xml
-
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
 
     <languageMapping language="XML"
@@ -321,7 +317,6 @@ A good example is if you want to associate the existing `CSS` file type to the
 `CSS language server` in `IntelliJ Community`, which only defines the CSS file type, but not the CSS language.
 
 ```xml
-
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
 
     <fileTypeMapping fileType="CSS"
@@ -349,7 +344,6 @@ the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md
 without breaking existing syntax coloration managed with `TextMate` in `IntelliJ Community`.
 
 ```xml
-
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
 
     <fileNamePatternMapping patterns="*.less;*.scss"
@@ -369,8 +363,7 @@ be declared explicitly in your plugin.xml.
 In case the language server provides hover support for a language already supported by Intellij or another plugin,
 you'll need to add a special mapping between that language and LSP4IJ, in your plugin.xml:
 
-```xml 
-
+```xml
 <lang.documentationProvider
         language="MyLanguage"
         implementationClass="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
@@ -400,20 +393,18 @@ import org.jetbrains.annotations.NotNull;
 
 public class MyLanguageServerFactory implements LanguageServerFactory, LanguageServerEnablementSupport {
 
-    ...
-  
     @Override
     public boolean isEnabled(@NotNull Project project) {
         // Get enabled state from your settings
-      boolean enabled = ...
-      return enabled;
+        boolean enabled = ...
+        return enabled;
     }
 
     @Override
-    public void setEnabled(boolean enabled, Project project) { {
-      // Update enabled state of your settings 
+    public void setEnabled(boolean enabled, Project project) {
+        // Update enabled state of your settings
     }
-  
+
 }
 ```
 
@@ -460,7 +451,7 @@ LanguageServerManager.getInstance(project).stop("myLanguageServerId", options);
 ### LSPCommandAction
 
 If the language server support requires to implement a custom client command, you can extend
-[LSPCommandAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/LSPCommandAction.java) and register it 
+[LSPCommandAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/LSPCommandAction.java) and register it
 in `plugin.xml` with a `standard` action element.
 
 ### Default commands
@@ -469,7 +460,7 @@ LSP4IJ provides default LSP commands that you language servers leverage.
 
 #### editor.action.triggerSuggest
 
-[TriggerSuggestAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/editor/TriggerSuggestAction.java) emulates Visual Studio Code's `editor.action.triggerSuggest` command, 
+[TriggerSuggestAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/editor/TriggerSuggestAction.java) emulates Visual Studio Code's `editor.action.triggerSuggest` command,
 to trigger code completion after selecting a completion item.
 
 This command is used for instance with the [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
@@ -479,10 +470,10 @@ to reopen completion after `applying color completion item`:
 
 #### editor.action.showReferences
 
-[ShowReferencesAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/editor/ShowReferencesAction.java) emulates Visual Studio Code's `editor.action.showReferences` command, 
+[ShowReferencesAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/editor/ShowReferencesAction.java) emulates Visual Studio Code's `editor.action.showReferences` command,
 to show the LSP references in a popup.
 
-This command is used for instance with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) 
+This command is used for instance with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 to open `references/implementations` in a popup when  clicking on a `Codelens` :
 
 ![editor.action.showReferences](./images/commands/ShowReferencesAction.png)
