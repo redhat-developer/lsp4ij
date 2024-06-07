@@ -125,6 +125,8 @@ public class IconMapper {
             case Reference:
             case Variable:
                 return AllIcons.Nodes.Variable;
+            case Struct:
+                return AllIcons.Json.Object;
             case Class:
                 return AllIcons.Nodes.Class;
             case Interface:
@@ -147,7 +149,6 @@ public class IconMapper {
             case TypeParameter:
                 return AllIcons.Nodes.Parameter;
             //No matching icons, no fallback
-            case Struct:
             case Event:
             case Operator:
             case Color:
