@@ -1,6 +1,7 @@
 package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.TestApplicationManager;
@@ -10,7 +11,6 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguag
 import org.junit.Test;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,7 +55,11 @@ public class LanguageServerTemplateManagerTest {
         assertNotNull(template.getDescription());
         assertNotEquals("", template.getDescription());
         assertEquals("Rust Language Server", template.getName());
-        assertEquals("sh -c rust-analyzer", template.getProgramArgs());
+        if (SystemInfo.isWindows) {
+            assertEquals("rust-analyzer", template.getProgramArgs());
+        } else {
+            assertEquals("sh -c rust-analyzer", template.getProgramArgs());
+        }
 
         List<ServerMappingSettings> fileTypeMappings = template.getFileTypeMappings();
         assertEquals(2, fileTypeMappings.size());
