@@ -70,14 +70,20 @@ public class LSPCompletionContributor extends CompletionContributor {
         int offset = parameters.getOffset();
 
         // Get LSP completion items from cache or create them
-        LSPCompletionParams params = new LSPCompletionParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document), offset);
+        boolean autoPopup = parameters.isAutoPopup();
+        LSPCompletionParams params = new LSPCompletionParams(LSPIJUtils.toTextDocumentIdentifier(file),
+                LSPIJUtils.toPosition(offset, document),
+                offset,
+                autoPopup ? getCompletionChar(offset, document) : null,
+                autoPopup);
         CompletableFuture<List<CompletionData>> future = LSPFileSupport.getSupport(psiFile)
                 .getCompletionSupport()
                 .getCompletions(params);
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiFile);
-        } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+        } catch (
+                ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
             return;
         } catch (CancellationException ignore) {
@@ -156,7 +162,7 @@ public class LSPCompletionContributor extends CompletionContributor {
                                                    @NotNull CompletionItem item,
                                                    @Nullable CompletionItemDefaults itemDefaults,
                                                    @NotNull LanguageServerItem languageServer) {
-        // Update text edit range with item defaults if needed
+        // Update text edit range, commitCharacters, ... with item defaults if needed
         updateWithItemDefaults(item, itemDefaults);
         return new LSPCompletionProposal(file, editor, completionOffset, item, languageServer, this);
     }
@@ -166,6 +172,7 @@ public class LSPCompletionContributor extends CompletionContributor {
         if (itemDefaults == null) {
             return;
         }
+        // Update TextEdit with CompletionItemDefaults if needed
         String itemText = item.getTextEditText();
         if (itemDefaults.getEditRange() != null && itemText != null) {
             if (itemDefaults.getEditRange().isLeft()) {
@@ -179,6 +186,22 @@ public class LSPCompletionContributor extends CompletionContributor {
                     item.setTextEdit(Either.forRight(new InsertReplaceEdit(itemText, defaultInsertReplaceRange.getInsert(), defaultInsertReplaceRange.getReplace())));
                 }
             }
+        }
+        // Update data with CompletionItemDefaults if needed
+        if (item.getData() == null) {
+            item.setData(itemDefaults.getData());
+        }
+        // Update InsertTextFormat with CompletionItemDefaults if needed
+        if (item.getInsertTextFormat() == null) {
+            item.setInsertTextFormat(itemDefaults.getInsertTextFormat());
+        }
+        // Update InsertTextMode with CompletionItemDefaults if needed
+        if (item.getInsertTextMode() == null) {
+            item.setInsertTextMode(itemDefaults.getInsertTextMode());
+        }
+        // Update CommitCharacters with CompletionItemDefaults if needed
+        if (item.getCommitCharacters() == null) {
+            item.setCommitCharacters(itemDefaults.getCommitCharacters());
         }
     }
 
@@ -213,6 +236,13 @@ public class LSPCompletionContributor extends CompletionContributor {
                 }
             });
         }
+    }
+
+    private static final String getCompletionChar(int offset, Document document) {
+        if (offset > 0 && offset <= document.getTextLength()) {
+            return String.valueOf(document.getCharsSequence().charAt(offset - 1));
+        }
+        return null;
     }
 
 }

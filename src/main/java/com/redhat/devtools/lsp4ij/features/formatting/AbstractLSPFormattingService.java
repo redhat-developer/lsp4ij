@@ -29,7 +29,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Abstract class for LSP {@link AsyncDocumentFormattingService} implementation.
@@ -120,14 +119,8 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
         }
         // Check if the file can support formatting / range formatting
         Project project = file.getProject();
-        try {
-            return !LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file.getVirtualFile(), this::canSupportFormatting)
-                    .get(200, TimeUnit.MILLISECONDS)
-                    .isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
+        return LanguageServiceAccessor.getInstance(project)
+                .hasAny(file.getVirtualFile(), ls -> canSupportFormatting(ls.getServerCapabilitiesSync()));
     }
 
     private static TextRange getFormattingRange(AsyncFormattingRequest formattingRequest) {
@@ -143,5 +136,5 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
         return textRange;
     }
 
-    protected abstract boolean canSupportFormatting(ServerCapabilities serverCapabilities);
+    protected abstract boolean canSupportFormatting(@Nullable ServerCapabilities serverCapabilities);
 }

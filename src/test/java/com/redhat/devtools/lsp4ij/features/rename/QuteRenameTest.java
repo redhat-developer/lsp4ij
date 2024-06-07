@@ -72,19 +72,6 @@ public class QuteRenameTest extends LSPRenameFixtureTestCase {
                         {/for}""");
     }
 
-    public void testLanguageServerNotReady() {
-        assertRenameWithError("test.html",
-                """                
-                        {<caret>#for item in items}
-                            {item}
-                        {/for}""",
-                null,
-                null,
-                null,
-                LanguageServerBundle.message("lsp.refactor.rename.language.server.not.ready"), // "Rename... is not available during language servers starting."
-                false);
-    }
-
     public void testElementCannotBeRenamed() {
         // As Qute LS doesn't support prepare rename
         // LSP4IJ uses the client word range at strategy to get the prepare rename.

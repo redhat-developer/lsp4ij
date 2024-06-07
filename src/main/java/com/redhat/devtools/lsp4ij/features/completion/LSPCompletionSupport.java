@@ -19,7 +19,8 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import org.eclipse.lsp4j.CompletionParams;
+import org.eclipse.lsp4j.CompletionContext;
+import org.eclipse.lsp4j.CompletionTriggerKind;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
@@ -81,9 +82,11 @@ public class LSPCompletionSupport extends AbstractLSPFeatureSupport<LSPCompletio
                 });
     }
 
-    private static CompletableFuture<List<CompletionData>> getCompletionsFor(@NotNull CompletionParams params,
+    private static CompletableFuture<List<CompletionData>> getCompletionsFor(@NotNull LSPCompletionParams params,
                                                                         @NotNull LanguageServerItem languageServer,
                                                                         @NotNull CancellationSupport cancellationSupport) {
+
+        params.setContext(createCompletionContext(params, languageServer));
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .completion(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COMPLETION)
@@ -94,6 +97,15 @@ public class LSPCompletionSupport extends AbstractLSPFeatureSupport<LSPCompletio
                     }
                     return List.of(new CompletionData(result, languageServer));
                 });
+    }
+
+    private static CompletionContext createCompletionContext(LSPCompletionParams params, LanguageServerItem languageServer) {
+        String completionChar = params.getCompletionChar();
+        if (params.isAutoPopup() &&
+                languageServer.getServerWrapper().isCompletionTriggerCharactersSupported(completionChar)) {
+            return new CompletionContext(CompletionTriggerKind.TriggerCharacter, completionChar);
+        }
+        return new CompletionContext(CompletionTriggerKind.Invoked);
     }
 
 

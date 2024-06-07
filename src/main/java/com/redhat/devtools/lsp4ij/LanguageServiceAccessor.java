@@ -39,6 +39,10 @@ import java.util.stream.Collectors;
 
 /**
  * Language server accessor.
+ * <p>
+ * This class is considered internal and should not be used in other plugins.
+ * <p>
+ * If adopters need to collect some language servers, LSP4IJ must provide an API for that.
  */
 public class LanguageServiceAccessor implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
@@ -108,9 +112,8 @@ public class LanguageServiceAccessor implements Disposable {
             for (Project p : projects) {
                 try {
                     findAndStartLanguageServerIfNeeded(definition, false, p);
-                }
-                catch(Exception e) {
-                    LOGGER.error("Error while starting language server for the language server '" + definition.getDisplayName() + "'.");
+                } catch (Exception e) {
+                    LOGGER.error("Error while starting language server for the language server '" + definition.getDisplayName() + "'.", e);
                 }
             }
         }
@@ -121,7 +124,7 @@ public class LanguageServiceAccessor implements Disposable {
             // The language server must be started even if there is no open file corresponding to it.
             LinkedHashSet<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
             collectLanguageServersFromDefinition(null, project, Set.of(definition), matchedServers);
-            for(var ls : matchedServers) {
+            for (var ls : matchedServers) {
                 ls.restart();
             }
         } else {
@@ -142,6 +145,34 @@ public class LanguageServiceAccessor implements Disposable {
     private void findAndStartLsForFile(@NotNull VirtualFile file,
                                        @NotNull LanguageServerDefinition definition) {
         getLanguageServers(file, null, definition);
+    }
+
+    /**
+     * Returns true if the given file matches one of started language server with the given filter and false otherwise.
+     *
+     * @param file   the file.
+     * @param filter the filter.
+     * @return true if the given file matches one of started language server with the given filter and false otherwise.
+     */
+    @NotNull
+    public boolean hasAny(@NotNull VirtualFile file,
+                          @NotNull Predicate<LanguageServerWrapper> filter) {
+        var startedServers = getStartedServers();
+        if (startedServers.isEmpty()) {
+            return false;
+        }
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project, true);
+        if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
+            return false;
+        }
+        var matched = mappings.getMatched();
+        for (var startedServer : startedServers) {
+            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
+                    matched.contains(startedServer.getServerDefinition()) && filter.test(startedServer)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @NotNull
@@ -207,7 +238,7 @@ public class LanguageServiceAccessor implements Disposable {
      * @return the started servers.
      */
     public Set<LanguageServerWrapper> getStartedServers() {
-        return startedServers;
+        return Collections.unmodifiableSet(startedServers);
     }
 
     public void projectClosing(Project project) {
@@ -219,7 +250,7 @@ public class LanguageServiceAccessor implements Disposable {
     private CompletableFuture<Collection<LanguageServerWrapper>> getMatchedLanguageServersWrappers(
             @NotNull VirtualFile file,
             @Nullable LanguageServerDefinition matchServerDefinition) {
-        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project);
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project, false);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             // There are no mapping for the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -322,9 +353,12 @@ public class LanguageServiceAccessor implements Disposable {
      *
      * @param file        the file.
      * @param fileProject the file project.
+     * @param ignoreMatch true if {@link DocumentMatcher} must be ignored when mapping matches the given file and false otherwise.
      * @return the matched language server definitions for the given file.
      */
-    private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull VirtualFile file, @NotNull Project fileProject) {
+    public MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull VirtualFile file,
+                                                                                @NotNull Project fileProject,
+                                                                                boolean ignoreMatch) {
 
         Set<LanguageServerDefinition> syncMatchedDefinitions = null;
         Set<LanguageServerFileAssociation> asyncMatchedDefinitions = null;
@@ -361,21 +395,28 @@ public class LanguageServiceAccessor implements Disposable {
                     // or the server definition has been already added
                     continue;
                 }
-                if (mapping.shouldBeMatchedAsynchronously(fileProject)) {
-                    // Async mapping
-                    // Mapping must be done asynchronously because the match of DocumentMatcher of the mapping need to be done asynchronously
-                    // This usecase comes from for instance when custom match need to collect classes from the Java project and requires read only action.
-                    if (asyncMatchedDefinitions == null) {
-                        asyncMatchedDefinitions = new HashSet<>();
+                if (ignoreMatch) {
+                    if (syncMatchedDefinitions == null) {
+                        syncMatchedDefinitions = new HashSet<>();
                     }
-                    asyncMatchedDefinitions.add(mapping);
+                    syncMatchedDefinitions.add(mapping.getServerDefinition());
                 } else {
-                    // Sync mapping
-                    if (match(file, fileProject, mapping)) {
-                        if (syncMatchedDefinitions == null) {
-                            syncMatchedDefinitions = new HashSet<>();
+                    if (mapping.shouldBeMatchedAsynchronously(fileProject)) {
+                        // Async mapping
+                        // Mapping must be done asynchronously because the match of DocumentMatcher of the mapping need to be done asynchronously
+                        // This usecase comes from for instance when custom match need to collect classes from the Java project and requires read only action.
+                        if (asyncMatchedDefinitions == null) {
+                            asyncMatchedDefinitions = new HashSet<>();
                         }
-                        syncMatchedDefinitions.add(mapping.getServerDefinition());
+                        asyncMatchedDefinitions.add(mapping);
+                    } else {
+                        // Sync mapping
+                        if (match(file, fileProject, mapping)) {
+                            if (syncMatchedDefinitions == null) {
+                                syncMatchedDefinitions = new HashSet<>();
+                            }
+                            syncMatchedDefinitions.add(mapping.getServerDefinition());
+                        }
                     }
                 }
             }
