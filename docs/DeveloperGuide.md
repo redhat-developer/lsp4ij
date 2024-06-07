@@ -362,19 +362,33 @@ without breaking existing syntax coloration managed with `TextMate` in `IntelliJ
 In general, LSP4IJ maps language server features to specific Intellij APIs. However, in some cases, the mapping needs to
 be declared explicitly in your plugin.xml.
 
-### Hover support
+### Folding support
 
-In case the language server provides hover support for a language already supported by Intellij or another plugin,
-you'll need to add a special mapping between that language and LSP4IJ, in your plugin.xml:
+LSP folding support is implemented via the `lang.foldingBuilder` extension point, which requires binding to an IntelliJ language.
+Your plugin.xml needs to specifically bind LSP4IJ's `LSPFoldingRangeBuilder` to that IntelliJ language:
 
 ```xml
-<lang.documentationProvider
-        language="MyLanguage"
-        implementationClass="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationProvider"
-        order="first"/>
+<!-- LSP textDocument/folding -->
+<lang.foldingBuilder language="MyLanguage"
+                     implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
+                     order="first"/>
 ```
 
-See specific [hover implementation details](./LSPSupport.md#hover) for more details.
+See specific [folding implementation details](./LSPSupport.md#folding-range) for more details.
+
+### Signature help
+
+LSP Signature Help support is implemented via the `codeInsight.parameterInfo` extension point, which requires binding to an IntelliJ language.
+Your plugin.xml needs to specifically bind LSP4IJ's `LSPParameterInfoHandler` to that IntelliJ language:
+
+```xml
+<!-- LSP textDocument/signatureHelp -->
+<codeInsight.parameterInfo
+        language="MyLanguage"
+        implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
+```
+
+See specific [Signature help implementation details](./LSPSupport.md#signature-help) for more details.
 
 ## Language Server Manager
 
