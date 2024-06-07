@@ -369,7 +369,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                                              Editor editor,
                                              LanguageServerItem languageServer) {
         // Execute custom command of the completion item.
-        CommandExecutor.executeCommand(new LSPCommandContext(command, file, editor, languageServer));
+        CommandExecutor.executeCommand(new LSPCommandContext(command, file, LSPCommandContext.ExecutedBy.COMPLETION, editor, languageServer));
     }
 
     public @Nullable Range getTextEditRange() {

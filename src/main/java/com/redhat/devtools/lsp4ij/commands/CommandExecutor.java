@@ -15,7 +15,12 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.intellij.icons.AllIcons;
 import com.intellij.ide.DataManager;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationListener;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
@@ -26,9 +31,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.*;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
@@ -43,6 +46,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
+
+import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter.toHTML;
 
 /**
  * This class provides methods to execute LSP {@link Command} instances.
@@ -62,13 +67,14 @@ public class CommandExecutor {
      * heuristic method will try to interpret the command locally.
      *
      * @param context the LSP command context.
+     * @return true if the command exists on language server / client side and false otherwise.
      */
-    public static void executeCommand(LSPCommandContext context) {
+    public static boolean executeCommand(LSPCommandContext context) {
         Command command = context.getCommand();
 
         // 1. try to execute command on server side
         if (executeCommandServerSide(command, context.getPreferredLanguageServer())) {
-            return;
+            return true;
         }
 
         VirtualFile file = context.getFile();
@@ -84,7 +90,7 @@ public class CommandExecutor {
                 context.getSource(),
                 context.getInputEvent(),
                 context.getPreferredLanguageServer())) {
-            return;
+            return true;
         }
 
         // 3. tentative fallback
@@ -92,9 +98,28 @@ public class CommandExecutor {
             Document document = LSPIJUtils.getDocument(file);
             if (document != null) {
                 WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), document);
-                LSPIJUtils.applyWorkspaceEdit(edit);
+                if (edit != null) {
+                    LSPIJUtils.applyWorkspaceEdit(edit);
+                    return true;
+                }
             }
         }
+        if (context.isShowNotificationError()) {
+            String commandId = context.getCommand().getCommand();
+            var preferredLanguageServer = context.getPreferredLanguageServer();
+            String content = preferredLanguageServer != null ?
+                    toHTML(LanguageServerBundle.message("lsp.command.error.with.ls.content", commandId, preferredLanguageServer.getServerWrapper().getServerDefinition().getDisplayName())):
+                    toHTML(LanguageServerBundle.message("lsp.command.error.without.ls.content", commandId));
+
+            Notification notification = new Notification(LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID,
+                    LanguageServerBundle.message("lsp.command.error.title", commandId),
+                    content,
+                    NotificationType.ERROR);
+            notification.setIcon(AllIcons.General.Error);
+            notification.setListener(NotificationListener.URL_OPENING_LISTENER);
+            Notifications.Bus.notify(notification, context.getProject());
+        }
+        return false;
     }
 
     /**
@@ -147,14 +172,14 @@ public class CommandExecutor {
     /**
      * Execute LSP command on server side.
      *
-     * @param command    the LSP Command to be executed. If {@code null} this method will
-     *                   do nothing.
-     * @param project    the project.
-     * @param psiFile    the Psi file.
-     * @param file       the file.
-     * @param editor     the editor.
-     * @param source     the component which has triggered the command and null otherwise.
-     * @param inputEvent the input event.
+     * @param command        the LSP Command to be executed. If {@code null} this method will
+     *                       do nothing.
+     * @param project        the project.
+     * @param psiFile        the Psi file.
+     * @param file           the file.
+     * @param editor         the editor.
+     * @param source         the component which has triggered the command and null otherwise.
+     * @param inputEvent     the input event.
      * @param languageServer the language server.
      * @return true if the LSP command on server side has been executed successfully and false otherwise.
      */
@@ -234,10 +259,9 @@ public class CommandExecutor {
      * Very empirical and unsafe heuristic to turn unknown command arguments into a
      * workspace edit...
      */
+    @Nullable
     private static WorkspaceEdit createWorkspaceEdit(List<Object> commandArguments, @NotNull Document document) {
-        WorkspaceEdit res = new WorkspaceEdit();
         Map<String, List<TextEdit>> changes = new HashMap<>();
-        res.setChanges(changes);
         URI initialUri = LSPIJUtils.toUri(document);
         Pair<URI, List<TextEdit>> currentEntry = new Pair<>(initialUri, new ArrayList<>());
         commandArguments.stream().flatMap(item -> {
@@ -298,6 +322,17 @@ public class CommandExecutor {
         if (!currentEntry.value.isEmpty()) {
             changes.put(currentEntry.key.toString(), currentEntry.value);
         }
-        return res;
+        if (changes.isEmpty()) {
+            return null;
+        }
+        boolean hasTextEdits = changes.values()
+                .stream()
+                .anyMatch(edits -> edits != null &&  !edits.isEmpty());
+        if (!hasTextEdits) {
+            return null;
+        }
+        WorkspaceEdit workspaceEdit = new WorkspaceEdit();
+        workspaceEdit.setChanges(changes);
+        return workspaceEdit;
     }
 }

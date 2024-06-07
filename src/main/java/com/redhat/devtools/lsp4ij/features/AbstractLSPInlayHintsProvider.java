@@ -165,7 +165,7 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         if (command == null) {
             return;
         }
-        LSPCommandContext context = new LSPCommandContext(command, file, editor, languageServer)
+        LSPCommandContext context = new LSPCommandContext(command, file, LSPCommandContext.ExecutedBy.INLAY_HINT, editor, languageServer)
                 .setSource(event != null ? (Component) event.getSource() : null)
                         .setInputEvent(event);
         CommandExecutor.executeCommand(context);
