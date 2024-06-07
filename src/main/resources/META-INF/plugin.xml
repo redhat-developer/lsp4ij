@@ -148,6 +148,9 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
 
         <!-- LSP textDocument/completion request support -->
+        <typedHandler id="LSPTypedHandlerDelegate"
+                      order="last"
+                      implementation="com.redhat.devtools.lsp4ij.features.completion.LSPTypedHandlerDelegate" />
         <completion.contributor
                 id="LSPCompletionContributor"
                 language="any"

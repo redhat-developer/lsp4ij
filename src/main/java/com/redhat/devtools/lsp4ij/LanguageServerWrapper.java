@@ -817,6 +817,14 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Returns the server capabilities if it is ready and null otherwise.
+     * @return the server capabilities if it is ready and null otherwise.
+     */
+    @Nullable
+    public ServerCapabilities getServerCapabilitiesSync() {
+        return serverCapabilities;
+    }
+    /**
      * @return The language ID that this wrapper is dealing with if defined in the
      * language mapping for the language server
      */
@@ -1126,5 +1134,22 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         return fileOperationsManager.canDidRenameFiles(LSPIJUtils.toUri(file), file.isDirectory());
+    }
+
+    /**
+     * Returns true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
+     *
+     * @param charTyped the current typed character.
+     * @return true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
+     */
+    public boolean isCompletionTriggerCharactersSupported(String charTyped) {
+        if (serverCapabilities == null) {
+            return false;
+        }
+        var triggerCharacters = serverCapabilities.getCompletionProvider() != null ? serverCapabilities.getCompletionProvider().getTriggerCharacters() : null;
+        if (triggerCharacters == null || triggerCharacters.isEmpty()) {
+            return false;
+        }
+        return triggerCharacters.contains(charTyped);
     }
 }

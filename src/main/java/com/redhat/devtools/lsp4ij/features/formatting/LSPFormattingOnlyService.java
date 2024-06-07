@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Set;
@@ -30,7 +31,7 @@ public class LSPFormattingOnlyService extends AbstractLSPFormattingService {
     }
 
     @Override
-    protected boolean canSupportFormatting(ServerCapabilities serverCapabilities) {
+    protected boolean canSupportFormatting(@Nullable ServerCapabilities serverCapabilities) {
         return LanguageServerItem.isDocumentFormattingSupported(serverCapabilities) &&
                 !LanguageServerItem.isDocumentRangeFormattingSupported(serverCapabilities);
     }
