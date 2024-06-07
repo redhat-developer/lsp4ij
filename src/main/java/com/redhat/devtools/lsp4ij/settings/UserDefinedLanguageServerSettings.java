@@ -20,6 +20,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.XCollection;
+import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -28,6 +29,8 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.redhat.devtools.lsp4ij.settings.LanguageServerView.isEquals;
 
@@ -174,6 +177,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
     /**
      * Tells whether the save tip balloon is shown when changing language server configuration
+     *
      * @return true if the balloon should be shown, false otherwise
      */
     public boolean showSaveTipOnConfigurationChange() {
@@ -183,10 +187,31 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
     /**
      * Sets the value if the save tip balloon should be shown on language server configuration change
      * There is no way to set this value to true at the moment, it can only be disabled
+     *
      * @param value true if the balloon should be shown, false otherwise
      */
     public void showSaveTipOnConfigurationChange(boolean value) {
         this.myState.showSaveTipOnConfigurationChange = value;
+    }
+
+    /**
+     * Returns true if notification error must be shown for the executed by command and false otherwise.
+     *
+     * @param executedBy command executed by.
+     * @return true if notification error must be shown for the executed by command and false otherwise.
+     */
+    public boolean isShowNotificationErrorForCommand(LSPCommandContext.ExecutedBy executedBy) {
+        return this.myState.showNotificationErrorForCommand.get(executedBy.name());
+    }
+
+    /**
+     * Set true if notification error must be shown for the executed by command and false otherwise.
+     *
+     * @param executedBy command executed by.
+     * @param enabled    the enabled state.
+     */
+    public void setShowNotificationErrorForCommand(LSPCommandContext.ExecutedBy executedBy, boolean enabled) {
+        this.myState.showNotificationErrorForCommand.put(executedBy.name(), enabled);
     }
 
     public static class LanguageServerDefinitionSettings {
@@ -240,8 +265,11 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         @Tag("state")
         @XCollection
         public Map<String, LanguageServerDefinitionSettings> myState = new TreeMap<>();
+        public Map<String, Boolean> showNotificationErrorForCommand;
 
         MyState() {
+            showNotificationErrorForCommand = Stream.of(LSPCommandContext.ExecutedBy.values())
+                    .collect(Collectors.toMap(s -> s.name(), s -> true));
         }
 
         private boolean showSaveTipOnConfigurationChange = true;

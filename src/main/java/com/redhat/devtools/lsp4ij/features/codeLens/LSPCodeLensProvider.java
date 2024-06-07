@@ -237,7 +237,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         }
         // Code lens defines a command, create a clickable code vsion to execute the command.
         return new ClickableTextCodeVisionEntry(text, providerId, (e, editor) -> {
-            LSPCommandContext context = new LSPCommandContext(command, psiFile, editor, languageServer)
+            LSPCommandContext context = new LSPCommandContext(command, psiFile, LSPCommandContext.ExecutedBy.CODE_LENS, editor, languageServer)
                     .setInputEvent(e);
             if (languageServer.isResolveCodeLensSupported()) {
                 languageServer.getTextDocumentService()

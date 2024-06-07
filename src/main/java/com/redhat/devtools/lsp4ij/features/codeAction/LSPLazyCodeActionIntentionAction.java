@@ -128,7 +128,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
                                 @NotNull PsiFile file,
                                 @NotNull Editor editor,
                                 @NotNull LanguageServerItem languageServer) {
-        CommandExecutor.executeCommand(new LSPCommandContext(command, file, editor, languageServer));
+        CommandExecutor.executeCommand(new LSPCommandContext(command, file, LSPCommandContext.ExecutedBy.CODE_ACTION, editor, languageServer));
     }
 
     private LanguageServerItem getLanguageServer() {
