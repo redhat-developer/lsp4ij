@@ -198,8 +198,9 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     /**
      * Callback invoked when language server status changed.
-     *
+     * <p>
      * Since language client doesn't exist during some status, this callback receives only:
+     * </p>
      *
      * <ul>
      *     <li>{@link ServerStatus#stopping}</li>
@@ -215,8 +216,6 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      * @param serverStatus server status
      */
     public void handleServerStatusChanged(ServerStatus serverStatus) {
-        if(serverStatus == ServerStatus.started) {
-            triggerChangeConfiguration();
-        }
+
     }
 }
