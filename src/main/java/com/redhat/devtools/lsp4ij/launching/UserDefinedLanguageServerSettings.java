@@ -58,17 +58,17 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         myState = state;
     }
 
-    public UserDefinedLanguageServerItemSettings getLaunchConfigSettings(String languageSeverId) {
-        return myState.myState.get(languageSeverId);
+    public UserDefinedLanguageServerItemSettings getLaunchConfigSettings(String languageServerId) {
+        return myState.myState.get(languageServerId);
     }
 
-    public void setLaunchConfigSettings(String languageSeverId, UserDefinedLanguageServerItemSettings settings) {
-        myState.myState.put(languageSeverId, settings);
+    public void setLaunchConfigSettings(String languageServerId, UserDefinedLanguageServerItemSettings settings) {
+        myState.myState.put(languageServerId, settings);
         fireStateChanged();
     }
 
-    public void removeServerDefinition(String languageSeverId) {
-        myState.myState.remove(languageSeverId);
+    public void removeServerDefinition(String languageServerId) {
+        myState.myState.remove(languageServerId);
         fireStateChanged();
     }
 

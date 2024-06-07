@@ -138,12 +138,12 @@ public class LanguageServerManager {
     /**
      * Returns the server status of the given language server id and null otherwise.
      *
-     * @param languageSeverId the language server id.
+     * @param languageServerId the language server id.
      * @return the server status of the given language server id and null otherwise.
      */
     @Nullable
-    public ServerStatus getServerStatus(@NotNull String languageSeverId) {
-        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageSeverId);
+    public ServerStatus getServerStatus(@NotNull String languageServerId) {
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
         if (serverDefinition == null) {
             return null;
         }
@@ -171,20 +171,20 @@ public class LanguageServerManager {
     /**
      * Start the given language server id with default {@link StartOptions#DEFAULT}
      *
-     * @param languageSeverId the language server id to start.
+     * @param languageServerId the language server id to start.
      */
-    public void start(@NotNull String languageSeverId) {
-        start(languageSeverId, StartOptions.DEFAULT);
+    public void start(@NotNull String languageServerId) {
+        start(languageServerId, StartOptions.DEFAULT);
     }
 
     /**
      * Start the given language server id with the given start options.
      *
-     * @param languageSeverId the language server id to start.
+     * @param languageServerId the language server id to start.
      */
-    public void start(@NotNull String languageSeverId,
+    public void start(@NotNull String languageServerId,
                       @NotNull StartOptions options) {
-        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageSeverId);
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
         if (serverDefinition == null) {
             return;
         }
@@ -230,21 +230,21 @@ public class LanguageServerManager {
     /**
      * Stop the given language server id with default {@link StopOptions#DEFAULT}
      *
-     * @param languageSeverId the language server id to stop.
+     * @param languageServerId the language server id to stop.
      */
-    public void stop(@NotNull String languageSeverId) {
-        stop(languageSeverId, StopOptions.DEFAULT);
+    public void stop(@NotNull String languageServerId) {
+        stop(languageServerId, StopOptions.DEFAULT);
     }
 
     /**
      * Stop the given language server id with the given stop options.
      *
-     * @param languageSeverId the language server id to stop.
+     * @param languageServerId the language server id to stop.
      */
 
-    public void stop(@NotNull String languageSeverId,
+    public void stop(@NotNull String languageServerId,
                      @NotNull StopOptions options) {
-        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageSeverId);
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
         if (serverDefinition == null) {
             return;
         }
