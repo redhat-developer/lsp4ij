@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.intellij.openapi.util.SystemInfo;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import org.junit.Test;
 
@@ -54,7 +55,11 @@ public class LanguageServerTemplateDeserializerTest {
             }""".stripIndent();
 
         LanguageServerTemplate template = gson.fromJson(json, LanguageServerTemplate.class);
-        assertEquals("./start.sh", template.getProgramArgs());
+        if (SystemInfo.isWindows) {
+            assertEquals("./start.bat", template.getProgramArgs());
+        } else {
+            assertEquals("./start.sh", template.getProgramArgs());
+        }
         assertEquals("Java LS", template.getName());
 
         ServerMappingSettings langMapping = template.getLanguageMappings().get(0);
