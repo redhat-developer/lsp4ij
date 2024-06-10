@@ -13,8 +13,8 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
-import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import org.eclipse.lsp4j.ConfigurationItem;
 import org.eclipse.lsp4j.ConfigurationParams;
 import org.jetbrains.annotations.NotNull;
@@ -35,15 +35,13 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
     public UserDefinedLanguageClient(@NotNull UserDefinedLanguageServerDefinition serverDefinition, @NotNull Project project) {
         super(project);
         this.serverDefinition = serverDefinition;
-        this.languageServerStartedListener = new UserDefinedLanguageListener(serverDefinition, project);
-        LanguageServerLifecycleManager.getInstance(project).addLanguageServerLifecycleListener(languageServerStartedListener);
+        this.languageServerStartedListener = new UserDefinedLanguageListener(this, project);
         LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(languageServerStartedListener);
     }
 
     @Override
     public void dispose() {
         super.dispose();
-        LanguageServerLifecycleManager.getInstance(getProject()).removeLanguageServerLifecycleListener(languageServerStartedListener);
         LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(languageServerStartedListener);
     }
 
@@ -67,7 +65,7 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
 
 
     private Object findSettings(String[] sections) {
-        var config = serverDefinition.getLanguageServerConfiguration();
+        var config = createSettings();
         if (config instanceof JsonObject json) {
             return findSettings(sections, json);
         }
@@ -84,5 +82,29 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
             current = json;
         }
         return current;
+    }
+
+    @Override
+    protected Object createSettings() {
+        return serverDefinition.getLanguageServerConfiguration();
+    }
+
+    @Override
+    public void handleServerStatusChanged(ServerStatus serverStatus) {
+        if (serverStatus== ServerStatus.started) {
+            // Case 1: Language server is started:
+            // Try to get the user defined configuration and
+            // push it with 'workspaceService/didChangeConfiguration' to the language server.
+            triggerChangeConfiguration();
+        }
+    }
+
+    @Override
+    public void triggerChangeConfiguration() {
+        super.triggerChangeConfiguration();
+    }
+
+    public UserDefinedLanguageServerDefinition getServerDefinition() {
+        return serverDefinition;
     }
 }
