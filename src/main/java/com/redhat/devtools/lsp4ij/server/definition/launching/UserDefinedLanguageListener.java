@@ -11,48 +11,32 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.ServerStatus;
-import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
-import org.eclipse.lsp4j.DidChangeConfigurationParams;
-import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
-import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Listener used to push the user defined configuration to language server with 'workspaceService/didChangeConfiguration' by tracking :
  *
  * <ul>
- *     <li>when a language server is started</li>
  *     <li>when a configuration changes</li>
  * </ul>
  */
-public class UserDefinedLanguageListener implements LanguageServerLifecycleListener, LanguageServerDefinitionListener {
+public class UserDefinedLanguageListener implements LanguageServerDefinitionListener {
 
 
-    private final @NotNull UserDefinedLanguageServerDefinition serverDefinition;
+    private final @NotNull UserDefinedLanguageClient client;
+
     private final @NotNull Project project;
 
-    public UserDefinedLanguageListener(@NotNull UserDefinedLanguageServerDefinition serverDefinition, @NotNull Project project) {
-        this.serverDefinition = serverDefinition;
+    public UserDefinedLanguageListener(UserDefinedLanguageClient client, @NotNull Project project) {
+        this.client = client;
         this.project = project;
     }
 
     @Override
-    public void handleStatusChanged(LanguageServerWrapper languageServer) {
-        if (languageServer.getServerStatus() == ServerStatus.started && languageServer.getServerDefinition() == serverDefinition) {
-            // Case 1: Language server is started:
-            // Try to get the user defined configuration and
-            // push it with 'workspaceService/didChangeConfiguration' to the language server.
-            didChangeConfiguration(languageServer);
-        }
-    }
-
-    @Override
     public void handleChanged(@NotNull LanguageServerChangedEvent event) {
-        if (event.serverDefinition == serverDefinition) {
+        if (event.serverDefinition == client.getServerDefinition()) {
             if (event.initializationOptionsContentChanged) {
                 // initializationOption has changed:
                 // Try to get the user defined initializationOption and
@@ -61,7 +45,7 @@ public class UserDefinedLanguageListener implements LanguageServerLifecycleListe
                 LanguageServiceAccessor.getInstance(project)
                         .getStartedServers()
                         .forEach(ls -> {
-                            if (ls.getServerDefinition() == serverDefinition) {
+                            if (ls.getServerDefinition() == client.getServerDefinition()) {
                                 ls.restart();
                             }
                         });
@@ -70,40 +54,11 @@ public class UserDefinedLanguageListener implements LanguageServerLifecycleListe
                 // Try to get the user defined configuration and
                 // push it with 'workspaceService/didChangeConfiguration' to the all started language servers
                 // which matches the server definition.
-                LanguageServiceAccessor.getInstance(project)
-                        .getStartedServers()
-                        .forEach(ls -> {
-                            if (ls.getServerDefinition() == serverDefinition) {
-                                didChangeConfiguration(ls);
-                            }
-                        });
+                if (event.serverDefinition == client.getServerDefinition()) {
+                    client.triggerChangeConfiguration();
+                }
             }
         }
-    }
-
-    private void didChangeConfiguration(LanguageServerWrapper languageServer) {
-        Object params = serverDefinition.getLanguageServerConfiguration();
-        if (params != null) {
-            languageServer.getInitializedServer()
-                    .thenAccept(ls -> {
-                        ls.getWorkspaceService().didChangeConfiguration(new DidChangeConfigurationParams(params));
-                    });
-        }
-    }
-
-    @Override
-    public void handleLSPMessage(Message message, MessageConsumer consumer, LanguageServerWrapper languageServer) {
-        // Do nothing
-    }
-
-    @Override
-    public void handleError(LanguageServerWrapper languageServer, Throwable exception) {
-        // Do nothing
-    }
-
-    @Override
-    public void dispose() {
-        // Do nothing
     }
 
     @Override

@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client;
 
+import com.google.gson.JsonObject;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
@@ -27,6 +28,7 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -171,6 +173,12 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return disposed || getProject().isDisposed();
     }
 
+    /**
+     * Create the settings to send via 'workspace/didChangeConfiguration' and null otherwise.
+     *
+     * @return the settings to send via 'workspace/didChangeConfiguration' and null otherwise.
+     */
+    @Nullable
     protected Object createSettings() {
         return null;
     }
@@ -190,7 +198,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         }
         Object settings = createSettings();
         if (settings == null) {
-            return;
+            // LSP DidChangeConfigurationParams requires a non null settings
+            settings = new JsonObject();
         }
         DidChangeConfigurationParams params = new DidChangeConfigurationParams(settings);
         languageServer.getWorkspaceService().didChangeConfiguration(params);
@@ -200,7 +209,6 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      * Callback invoked when language server status changed.
      * <p>
      * Since language client doesn't exist during some status, this callback receives only:
-     * </p>
      *
      * <ul>
      *     <li>{@link ServerStatus#stopping}</li>
@@ -216,6 +224,6 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      * @param serverStatus server status
      */
     public void handleServerStatusChanged(ServerStatus serverStatus) {
-
+        
     }
 }

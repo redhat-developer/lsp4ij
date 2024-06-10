@@ -135,7 +135,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     }
 
     public Object getLanguageServerConfiguration() {
-        if (configuration == null && configurationContent != null && !configurationContent.isEmpty()) {
+        if (configuration == null && configurationContent != null && !configurationContent.isBlank()) {
             try {
                 configuration = JsonParser.parseReader(new StringReader(configurationContent));
             } catch (Exception e) {
