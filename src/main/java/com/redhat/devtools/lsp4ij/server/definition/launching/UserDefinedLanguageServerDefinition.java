@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.google.gson.JsonParser;
 import com.google.gson.annotations.SerializedName;
+import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
@@ -64,7 +65,22 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        return new UserDefinedStreamConnectionProvider(commandLine, userEnvironmentVariables, includeSystemEnvironmentVariables, this);
+        String resolvedCommandLine = resolveCommandLine(commandLine, project);
+        return new UserDefinedStreamConnectionProvider(resolvedCommandLine,
+                userEnvironmentVariables,
+                includeSystemEnvironmentVariables,
+                this);
+    }
+
+    /**
+     * Returns the resolved command line with expanded macros.
+     *
+     * @param project the project.
+     * @return the resolved command line with expanded macros.
+     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
+     */
+    public static String resolveCommandLine(@NotNull String commandLine, @NotNull Project project) {
+        return ProgramParametersUtil.expandPathAndMacros(commandLine, null, project);
     }
 
     @Override

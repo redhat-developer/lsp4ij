@@ -9,12 +9,12 @@ The main idea is to:
 
  * install the language server and its requirements(ex : `Node.js` to 
 execute a language server written in JavaScript/TypeScript), 
- * declare the command which starts the language server.
+ * declare the command that starts the language server.
  * associate the language server with the proper files (identified by IntelliJ Language, File Type or file name pattern)
 
 ## New Language Server dialog
 
-To create a new `User-defined language server` you need to open the `New Language Server` dialog, either:
+In order to create a new `User-defined language server`, you need to open the `New Language Server` dialog, either:
 
  * from the menu on the right of the LSP console:
 
@@ -30,7 +30,7 @@ Once you clicked on either of them, the dialog will appear:
 
 ### Server tab
 
-The `Server tab` requires to fill the `server name` and the `command` which will start the language server.
+The `Server tab` requires the `server name` and `command` fields to be set.
 
 Here is a sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
@@ -42,7 +42,7 @@ The environment variables accessible by the process are populated with
 [EnvironmentUtil.getEnvironmentMap()](https://github.com/JetBrains/intellij-community/blob/3a527a2c9b56209c09852ba7bc89d80bc31e1c04/platform/util/src/com/intellij/util/EnvironmentUtil.java#L85) 
 which retrieves system variables.
 
-It is possible too to add custom environment variables via the field `Environment variables`:
+It is also possible to add custom environment variables via the `Environment variables` field:
 
 ![Environment Variables](./images/user-defined-ls/EnvironmentVariables.png)
 
@@ -50,6 +50,21 @@ Depending on your OS, the environment variables may not be accessible. To make s
 
 * with `Windows OS`: `cmd /c command_to_start_your_ls`
 * with `Linux`, `Mac OS`: `sh -c command_to_start_your_ls`
+
+#### Macro syntax
+
+You can use [built-in macros](https://www.jetbrains.com/help/idea/built-in-macros.html) in your command. You could, for instance, store the language server in your project (to share it with your team) 
+and write a command that references it in a portable way to start it.
+
+That command might look like this:
+
+`$PROJECT_DIR$/path/to/your/start/command`
+
+Here is an example with Scala Language Server's `metals.bat` stored at the root of the project:
+
+![Macro syntax](./images/user-defined-ls/Macro.png)
+
+When commands contain macros, their resolved value is visible below the `Command` field.
 
 ### Mappings tab
 
@@ -72,6 +87,14 @@ Here are mappings samples with the [typescript-language-server](https://github.c
 NOTE: it is better to use file name pattern instead of creating custom file type for TypeScript, since by default 
 IntelliJ Community support `TypeScript syntax coloration` with `TextMate`. If you define a file type, you will
 lose syntax coloration.
+
+#### Language ID
+
+When you declare mapping, you can fill the `Language ID` column which is used to declare the LSP [TextDocumentItem#languageId](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem)
+to identify the document on the server side.
+
+For instance the [vscode-css-languageservice](https://github.com/microsoft/vscode-css-languageservice) (used by the vscode CSS language server) expects the `languageId` to be `css` or `less`.
+To do that, you can declare it with the `languageId` attribute:
 
 ### Configuration tab
 
