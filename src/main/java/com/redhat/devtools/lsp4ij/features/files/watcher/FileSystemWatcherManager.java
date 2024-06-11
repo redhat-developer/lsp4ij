@@ -15,13 +15,12 @@ import org.eclipse.lsp4j.FileSystemWatcher;
 import org.eclipse.lsp4j.RelativePattern;
 import org.eclipse.lsp4j.WatchKind;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * LSP file system manager which matches a given URI by using LSP {@link FileSystemWatcher}.
@@ -30,17 +29,49 @@ public class FileSystemWatcherManager {
 
     private static final int WatchKindAny = 7;
 
-    private List<FileSystemWatcher> fileSystemWatchers;
+    private final Map<String, List<FileSystemWatcher>> registry;
+
+    private Set<FileSystemWatcher> fileSystemWatchers;
 
     private Map<Integer, List<PathPatternMatcher>> pathPatternMatchers;
 
+    public FileSystemWatcherManager() {
+        this.registry = new HashMap<>();
+    }
+
     /**
-     * Update the list of LSP file system watchers.
+     * Register the file system watcher list with the given id.
      *
-     * @param fileSystemWatchers list of file system watcher.
+     * @param id       the id.
+     * @param watchers the file system watcher list.
      */
-    public void setFileSystemWatchers(List<FileSystemWatcher> fileSystemWatchers) {
-        this.fileSystemWatchers = fileSystemWatchers;
+    public void registerFileSystemWatchers(String id, List<FileSystemWatcher> watchers) {
+        if (watchers == null) {
+            return;
+        }
+        synchronized (registry) {
+            registry.put(id, watchers);
+            reset();
+        }
+    }
+
+    /**
+     * Unregister the file system watcher list with the given id.
+     * @param id the id.
+     */
+    public void unregisterFileSystemWatchers(String id) {
+        synchronized (registry) {
+            registry.remove(id);
+            reset();
+        }
+    }
+
+    private void reset() {
+        this.fileSystemWatchers = registry
+                .values()
+                .stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toSet());
         pathPatternMatchers = null;
     }
 
@@ -49,7 +80,7 @@ public class FileSystemWatcherManager {
      *
      * @return the list of LSP file system watchers and null otherwise.
      */
-    public List<FileSystemWatcher> getFileSystemWatchers() {
+    public Set<FileSystemWatcher> getFileSystemWatchers() {
         return fileSystemWatchers;
     }
 
@@ -91,12 +122,31 @@ public class FileSystemWatcherManager {
         for (var fileSystemMatcher : fileSystemWatchers) {
             PathPatternMatcher matcher = getPathPatternMatcher(fileSystemMatcher);
             if (matcher != null) {
-                Integer kind = getWatchKind(fileSystemMatcher);
-                List<PathPatternMatcher> matchersForKind = matchers.computeIfAbsent(kind, k -> new ArrayList<>());
-                matchersForKind.add(matcher);
+                Integer kind = fileSystemMatcher.getKind();
+                tryAddingMatcher(matcher, matchers, kind, WatchKind.Create);
+                tryAddingMatcher(matcher, matchers, kind, WatchKind.Change);
+                tryAddingMatcher(matcher, matchers, kind, WatchKind.Delete);
             }
         }
         pathPatternMatchers = matchers;
+    }
+
+    private static void tryAddingMatcher(@NotNull PathPatternMatcher matcher,
+                                         @NotNull Map<Integer, List<PathPatternMatcher>> matchers,
+                                         @Nullable Integer watcherKind,
+                                         int kind) {
+        if (!isWatchKind(watcherKind, kind)) {
+            return;
+        }
+        List<PathPatternMatcher> matchersForKind = matchers.computeIfAbsent(kind, k -> new ArrayList<>());
+        matchersForKind.add(matcher);
+    }
+
+    /**
+     * Checks if the combined value contains a specific kind.
+     */
+    private static boolean isWatchKind(Integer watcherKind, int kind) {
+        return watcherKind == null || (watcherKind & kind) != 0;
     }
 
     @Nullable
@@ -117,14 +167,6 @@ public class FileSystemWatcherManager {
             }
         }
         return null;
-    }
-
-    private static Integer getWatchKind(FileSystemWatcher watcher) {
-        Integer kind = watcher.getKind();
-        if (kind != null && (kind == WatchKind.Create || kind == WatchKind.Change || kind == WatchKind.Delete)) {
-            return kind;
-        }
-        return WatchKindAny;
     }
 
     private boolean match(URI uri, int kind) {

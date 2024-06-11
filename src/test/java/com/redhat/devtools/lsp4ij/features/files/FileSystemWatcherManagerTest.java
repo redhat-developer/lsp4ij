@@ -14,6 +14,7 @@ import com.intellij.openapi.util.SystemInfo;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
+import org.eclipse.lsp4j.WatchKind;
 import org.junit.Test;
 
 import java.net.URI;
@@ -23,19 +24,19 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Test glob pattern with {@link FileSystemWatcherManager}.
- *
+ * <p>
  * The glob pattern to watch relative to the base path. Glob patterns can have
  * the following syntax:
  * - `*` to match one or more characters in a path segment
  * - `?` to match on one character in a path segment
  * - `**` to match any number of path segments, including none
  * - `{}` to group conditions (e.g. `**​/*.{ts,js}` matches all TypeScript
- *   and JavaScript files)
+ * and JavaScript files)
  * - `[]` to declare a range of characters to match in a path segment
- *   (e.g., `example.[0-9]` to match on `example.0`, `example.1`, …)
+ * (e.g., `example.[0-9]` to match on `example.0`, `example.1`, …)
  * - `[!...]` to negate a range of characters to match in a path segment
- *   (e.g., `example.[!0-9]` to match on `example.a`, `example.b`,
- *   but not `example.0`)
+ * (e.g., `example.[!0-9]` to match on `example.a`, `example.b`,
+ * but not `example.0`)
  *
  * @see <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#pattern">LSP Pattern</a>
  */
@@ -107,6 +108,104 @@ public class FileSystemWatcherManagerTest {
         assertNoMatchFile(getBaseUri() + ".settings/bar/foo.prefs"); // file:///C:/.settings/bar/foo.prefs
         assertMatchFile(getBaseUri() + ".settings/foo.prefs"); // file:///C:/.settings/foo.prefs
 
+    }
+
+    @Test
+    public void register_unregister_watchers() {
+        // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
+        String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
+
+        // Register Java watcher
+        String id_java = "watcher-java";
+        registerWatchers(id_java, """
+                {"watchers": [
+                          {
+                            "globPattern": "**/*.java"
+                          }
+                        ]
+                      }
+                """.formatted(baseDir));
+        assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java// Match "**/*.java"
+        assertNoMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.ts
+
+        // Register TypeScript watcher
+        String id_ts = "watcher-ts";
+        registerWatchers(id_ts, """
+                {"watchers": [
+                          {
+                            "globPattern": "**/*.ts"
+                          }
+                        ]
+                      }
+                """.formatted(baseDir));
+        assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java// Match "**/*.java"
+        assertMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.java// Match "**/*.ts"
+
+        // Unregister Java watcher
+        unregisterWatchers(id_java);
+        assertNoMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java
+        assertMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.java// Match "**/*.ts"
+
+        // Unregister TypeScript watcher
+        unregisterWatchers(id_ts);
+        assertNoMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java
+        assertNoMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.ts
+    }
+
+    @Test
+    public void watcherKind() {
+        // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
+        String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
+
+        // Register Java watcher
+        registerWatchers("watcher-kind", """
+                {"watchers": [
+                          {
+                            "globPattern": "**/*.kind_null"
+                          },
+                          {
+                            "globPattern": "**/*.kind_7",
+                            "kind": 7
+                          },
+                          {
+                            "globPattern": "**/*.kind_Create",
+                            "kind": 1
+                          },
+                          {
+                            "globPattern": "**/*.kind_Change",
+                            "kind": 2
+                          },
+                          {
+                            "globPattern": "**/*.kind_Delete",
+                            "kind": 4
+                          }
+                        ]
+                      }
+                """.formatted(baseDir));
+
+        assertMatchFile(getBaseUri() + "foo.kind_null", WatchKind.Create); // file:///C:/foo.king_null// Match "**/*.kind_null"
+        assertMatchFile(getBaseUri() + "foo.kind_null", WatchKind.Change); // file:///C:/foo.king_null// Match "**/*.kind_null"
+        assertMatchFile(getBaseUri() + "foo.kind_null", WatchKind.Delete); // file:///C:/foo.king_null// Match "**/*.kind_null"
+
+        assertMatchFile(getBaseUri() + "foo.kind_7", WatchKind.Create); // file:///C:/foo.kind_7// Match "**/*.kind_7"
+        assertMatchFile(getBaseUri() + "foo.kind_7", WatchKind.Change); // file:///C:/foo.kind_7// Match "**/*.kind_7"
+        assertMatchFile(getBaseUri() + "foo.kind_7", WatchKind.Delete); // file:///C:/foo.kind_7// Match "**/*.kind_7"
+
+        assertMatchFile(getBaseUri() + "foo.kind_Create", WatchKind.Create); // file:///C:/foo.king_null// Match "**/*.kind_Create"
+        assertNoMatchFile(getBaseUri() + "foo.kind_Create", WatchKind.Change); // file:///C:/foo.kind_Create No match
+        assertNoMatchFile(getBaseUri() + "foo.kind_Create", WatchKind.Delete); // file:///C:/foo.kind_Create No match
+
+        assertNoMatchFile(getBaseUri() + "foo.kind_Change", WatchKind.Create); // file:///C:/foo.kind_Change No match
+        assertMatchFile(getBaseUri() + "foo.kind_Change", WatchKind.Change); // file:///C:/foo.king_Change// Match "**/*.kind_Change"
+        assertNoMatchFile(getBaseUri() + "foo.kind_Change", WatchKind.Delete); // file:///C:/foo.kind_Create No match
+
+        assertNoMatchFile(getBaseUri() + "foo.kind_Delete", WatchKind.Create); // file:///C:/foo.kind_Delete No match
+        assertNoMatchFile(getBaseUri() + "foo.kind_Delete", WatchKind.Change); // file:///C:/foo.kind_Delete No match
+        assertMatchFile(getBaseUri() + "foo.kind_Delete", WatchKind.Delete); // file:///C:/foo.king_Delete// Match "**/*.kind_Delete"
+    }
+
+    private void unregisterWatchers(String id) {
+        manager.unregisterFileSystemWatchers(id);
     }
 
     @Test
@@ -419,6 +518,7 @@ public class FileSystemWatcherManagerTest {
         assertNoGlobMatch(p, "something/foo.js");
         assertNoGlobMatch(p, "something/folder/foo.js");
     }
+
     @Test
     public void vscode_brace_expansion() {
         // See https://github.com/microsoft/vscode/blob/e49b522e12d1a55dfe2950af355767c9d5b824aa/src/vs/base/test/common/glob.test.ts#L372C3-L469C39
@@ -521,7 +621,7 @@ public class FileSystemWatcherManagerTest {
         assertNoGlobMatch(p, "prefix/foo.f");
         assertGlobMatch(p, "prefix/foo.js");
     }
-    
+
     @Test
     public void vscode_bracket() {
         // See https://github.com/microsoft/vscode/blob/e49b522e12d1a55dfe2950af355767c9d5b824aa/src/vs/base/test/common/glob.test.ts#L528C3-L580C31
@@ -620,22 +720,34 @@ public class FileSystemWatcherManagerTest {
 
 
     private void assertMatchFile(String fileUri) {
+        assertMatchFile(fileUri, WatchKind.Create);
+    }
+
+    private void assertMatchFile(String fileUri, int kind) {
         URI uri = URI.create(fileUri);
-        boolean matched = manager.isMatchFilePattern(uri, -1);
+        boolean matched = manager.isMatchFilePattern(uri, kind);
         String watchers = JSONUtils.getLsp4jGson().toJson(manager.getFileSystemWatchers());
         assertTrue(watchers + " should match " + fileUri, matched);
     }
 
     private void assertNoMatchFile(String fileUri) {
+        assertNoMatchFile(fileUri, WatchKind.Create);
+    }
+
+    private void assertNoMatchFile(String fileUri, int kind) {
         URI uri = URI.create(fileUri);
-        boolean matched = manager.isMatchFilePattern(uri, -1);
+        boolean matched = manager.isMatchFilePattern(uri, kind);
         String watchers = JSONUtils.getLsp4jGson().toJson(manager.getFileSystemWatchers());
         assertFalse(watchers + " should not match " + fileUri, matched);
     }
 
     private void registerWatchers(String watchers) {
+        registerWatchers("foo", watchers);
+    }
+
+    private void registerWatchers(String id, String watchers) {
         var options = JSONUtils.getLsp4jGson().fromJson(watchers, DidChangeWatchedFilesRegistrationOptions.class);
-        manager.setFileSystemWatchers(options.getWatchers());
+        manager.registerFileSystemWatchers(id, options.getWatchers());
     }
 
     private static String getBaseUri() {
