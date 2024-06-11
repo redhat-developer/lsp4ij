@@ -12,7 +12,9 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.ide.BrowserUtil;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.PortField;
 import com.intellij.ui.SimpleListCellRenderer;
@@ -22,13 +24,17 @@ import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
+import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 
 /**
@@ -42,6 +48,10 @@ import java.awt.*;
  * </ul>
  */
 public class LanguageServerPanel {
+
+    private static final int COMMAND_LENGTH_MAX = 140;
+
+    private final Project project;
 
     public enum EditionMode {
         NEW_USER_DEFINED,
@@ -62,7 +72,8 @@ public class LanguageServerPanel {
 
     private LanguageServerInitializationOptionsWidget initializationOptionsWidget;
 
-    public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode) {
+    public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode, Project project) {
+        this.project = project;
         createUI(builder, description, mode);
     }
 
@@ -184,7 +195,58 @@ public class LanguageServerPanel {
         commandLine = new CommandLineWidget();
         JBScrollPane scrollPane = new JBScrollPane(commandLine);
         scrollPane.setMinimumSize(new Dimension(JBUIScale.scale(600), JBUIScale.scale(100)));
+        JLabel previewCommandLabel = createLabelForComponent("", scrollPane);
+        updatePreviewCommand(commandLine, previewCommandLabel, project);
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.command"), scrollPane, true);
+        builder.addComponent(previewCommandLabel, 0);
+    }
+
+    /**
+     * Update preview command label with expanded macro result if needed.
+     *
+     * @param commandLine         the command line which could contains macro syntax.
+     * @param previewCommandLabel the preview command label.
+     * @param project             the project.
+     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
+     */
+    private static void updatePreviewCommand(@NotNull CommandLineWidget commandLine,
+                                             @NotNull JLabel previewCommandLabel,
+                                             @NotNull Project project) {
+        commandLine.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateLabel(previewCommandLabel);
+            }
+
+            private void updateLabel(JLabel previewCommandLabel) {
+                String preview = UserDefinedLanguageServerDefinition.resolveCommandLine(commandLine.getText(), project);
+                if (preview.equals(commandLine.getText())) {
+                    previewCommandLabel.setToolTipText("");
+                    previewCommandLabel.setText("");
+                } else {
+                    previewCommandLabel.setToolTipText(preview);
+                    String shortPreview = preview.length() > COMMAND_LENGTH_MAX ? preview.substring(0, COMMAND_LENGTH_MAX) + "..." : preview;
+                    previewCommandLabel.setText(shortPreview);
+                }
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateLabel(previewCommandLabel);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateLabel(previewCommandLabel);
+            }
+        });
+    }
+
+
+    private static JLabel createLabelForComponent(@NotNull @NlsContexts.Label String labelText, @NotNull JComponent component) {
+        JLabel label = new JLabel(UIUtil.replaceMnemonicAmpersand(labelText));
+        label.setLabelFor(component);
+        return label;
     }
 
     private void createConfigurationField(FormBuilder builder) {

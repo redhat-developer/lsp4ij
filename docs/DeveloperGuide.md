@@ -250,6 +250,8 @@ Here is a sample snippet to associate the `XML` language with the `myLanguageSer
 </extensions>
 ```
 
+#### Language ID
+
 Some language servers use
 the [TextDocumentItem#languageId](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem)
 field to identify the document on the server side.
@@ -266,6 +268,8 @@ To do that, you can declare it with the `languageId` attribute:
 
 </extensions>
 ```
+
+#### Document Matcher
 
 If the language check is not enough, you can implement a
 custom [DocumentMatcher](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/DocumentMatcher.java).

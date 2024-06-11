@@ -285,7 +285,7 @@ public class LanguageServerView implements Disposable {
         this.languageServerPanel = new LanguageServerPanel(builder,
                 description,
                 launchingServerDefinition ? LanguageServerPanel.EditionMode.EDIT_USER_DEFINED :
-                        LanguageServerPanel.EditionMode.EDIT_EXTENSION);
+                        LanguageServerPanel.EditionMode.EDIT_EXTENSION, project);
         this.mappingPanel = languageServerPanel.getMappingsPanel();
         return builder
                 .addComponentFillVertically(new JPanel(), 50)

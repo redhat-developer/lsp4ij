@@ -84,7 +84,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Template combo
         createTemplateCombo(builder);
         // Create server name,  command line, mappings, configuration UI
-        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED);
+        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED, project);
 
         // Add validation
         addValidator(this.languageServerPanel.getServerName());
