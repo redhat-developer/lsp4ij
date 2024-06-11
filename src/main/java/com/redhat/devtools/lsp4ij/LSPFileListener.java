@@ -172,8 +172,11 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
         return fileSystemWatcherManager.isMatchFilePattern(uri, kind);
     }
 
-    public void setFileSystemWatchers(List<FileSystemWatcher> fileSystemWatchers) {
-        fileSystemWatcherManager.setFileSystemWatchers(fileSystemWatchers);
+    public void registerFileSystemWatchers(String id, List<FileSystemWatcher> watchers) {
+        fileSystemWatcherManager.registerFileSystemWatchers(id, watchers);
     }
 
+    public void unregisterFileSystemWatchers(String id) {
+        fileSystemWatcherManager.unregisterFileSystemWatchers(id);
+    }
 }

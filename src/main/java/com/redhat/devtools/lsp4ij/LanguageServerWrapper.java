@@ -875,8 +875,8 @@ public class LanguageServerWrapper implements Disposable {
                         DidChangeWatchedFilesRegistrationOptions options = JSONUtils.getLsp4jGson()
                                 .fromJson((JsonObject) reg.getRegisterOptions(),
                                         DidChangeWatchedFilesRegistrationOptions.class);
-                        fileListener.setFileSystemWatchers(options.getWatchers());
-                        addRegistration(reg, () -> fileListener.setFileSystemWatchers(null));
+                        fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
+                        addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
                     }
