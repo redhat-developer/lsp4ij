@@ -461,9 +461,11 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         invokeLaterIfNeeded(() -> {
             // Get the panel of the LSP tool window
             var contentManager = toolWindow.getContentManager();
-            LSPConsoleToolWindowPanel panel = (LSPConsoleToolWindowPanel) contentManager.getContent(0).getComponent();
-            // Show log...
-            panel.showLog(params, serverDefinition);
+            var content = contentManager.getContent(0);
+            if (content != null && content.getComponent() instanceof LSPConsoleToolWindowPanel panel) {
+              // Show log...
+              panel.showLog(params, serverDefinition);
+            }
         });
     }
 
