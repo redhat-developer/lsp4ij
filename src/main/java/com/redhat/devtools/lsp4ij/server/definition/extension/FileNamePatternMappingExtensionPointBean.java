@@ -18,6 +18,7 @@ import com.intellij.openapi.extensions.RequiredElement;
 import com.intellij.serviceContainer.BaseKeyedLazyInstance;
 import com.intellij.util.xmlb.annotations.Attribute;
 import com.redhat.devtools.lsp4ij.DocumentMatcher;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.TextDocumentItem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -69,12 +70,15 @@ public class FileNamePatternMappingExtensionPointBean extends BaseKeyedLazyInsta
     public String documentMatcher;
 
     public @NotNull DocumentMatcher getDocumentMatcher() {
-        try {
-            return super.getInstance();
+        if (StringUtils.isNotBlank(documentMatcher)) {
+            try {
+                return super.getInstance();
+            }
+            catch(Exception e) {
+                // Do nothing
+            }
         }
-        catch(Exception e) {
-            return DEFAULT_DOCUMENT_MATCHER;
-        }
+        return DEFAULT_DOCUMENT_MATCHER;
     }
 
     @Override
