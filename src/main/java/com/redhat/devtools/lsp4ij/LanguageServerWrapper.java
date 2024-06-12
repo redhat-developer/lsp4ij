@@ -43,7 +43,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
@@ -218,7 +217,7 @@ public class LanguageServerWrapper implements Disposable {
         }
 
         if (this.initializeFuture == null) {
-            final URI rootURI = getRootURI();
+            final VirtualFile rootURI = getRootURI();
             this.launcherFuture = new CompletableFuture<>();
             this.initializeFuture = CompletableFuture.supplyAsync(() -> {
                         this.lspStreamProvider = serverDefinition.createConnectionProvider(initialProject);
@@ -248,7 +247,7 @@ public class LanguageServerWrapper implements Disposable {
                         initParams.setProcessId(getParentProcessId());
 
                         if (rootURI != null) {
-                            initParams.setRootUri(rootURI.toString());
+                            initParams.setRootUri(LSPIJUtils.toUriAsString(rootURI));
                             initParams.setRootPath(rootURI.getPath());
                         }
 
@@ -319,13 +318,13 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-    private CompletableFuture<InitializeResult> initServer(final URI rootURI) {
+    private CompletableFuture<InitializeResult> initServer(final VirtualFile rootURI) {
         initParams.setCapabilities(ClientCapabilitiesFactory
                 .create(lspStreamProvider.getExperimentalFeaturesPOJO()));
         initParams.setClientInfo(getClientInfo());
         initParams.setTrace(this.lspStreamProvider.getTrace(rootURI));
 
-        var folders = List.of(LSPIJUtils.toWorkspaceFolder(initialProject));
+        var folders = LSPIJUtils.toWorkspaceFolders(initialProject);
         initParams.setWorkspaceFolders(folders);
 
         // no then...Async future here as we want this chain of operation to be sequential and "atomic"-ish
@@ -333,18 +332,10 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     @Nullable
-    private URI getRootURI() {
-        final Project project = this.initialProject;
-        if (!project.isDisposed()) {
-            return LSPIJUtils.toUri(project);
-        }
-
-        if (this.initialPath != null) {
-            File projectDirectory = new File(initialPath);
-            if (projectDirectory.isFile()) {
-                projectDirectory = projectDirectory.getParentFile();
-            }
-            return LSPIJUtils.toUri(projectDirectory);
+    private VirtualFile getRootURI() {
+        var roots = LSPIJUtils.getRoots(getProject());
+        if (roots.size() == 1) {
+            return roots.iterator().next();
         }
         return null;
     }

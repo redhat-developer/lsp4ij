@@ -11,6 +11,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.mock;
 
+import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -21,7 +22,6 @@ import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
-import java.net.URI;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.nio.charset.StandardCharsets;
@@ -109,7 +109,7 @@ public class MockConnectionProvider implements StreamConnectionProvider {
 	public static final Collection<Message> cancellations = new ArrayList<>();
 
 	@Override
-	public void handleMessage(Message message, LanguageServer languageServer, @Nullable URI rootURI) {
+	public void handleMessage(Message message, LanguageServer languageServer, @Nullable VirtualFile rootURI) {
 		if (message.toString().contains("cancelRequest")) {
 			cancellations.add(message);
 		}

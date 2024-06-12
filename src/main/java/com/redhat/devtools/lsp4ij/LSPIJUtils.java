@@ -22,6 +22,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.project.BaseProjectDirectories;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.roots.ModuleRootManager;
@@ -242,7 +243,15 @@ public class LSPIJUtils {
         if (JAR_PROTOCOL.equals(protocol) || JRT_PROTOCOL.equals(protocol)) {
             return Objects.requireNonNull(VfsUtilCore.convertToURL(file.getUrl())).toExternalForm();
         }
-        return toUri(VfsUtilCore.virtualToIoFile(file)).toASCIIString();
+        String uri = toUri(VfsUtilCore.virtualToIoFile(file)).toASCIIString();
+        if (file.isDirectory()) {
+            // For directory case, remove last '/'
+            char last = uri.charAt(uri.length() - 1);
+            if (last == '/' || last == '\\') {
+                return uri.substring(0, uri.length() - 1);
+            }
+        }
+        return uri;
     }
 
     /**
@@ -375,11 +384,16 @@ public class LSPIJUtils {
     }
 
     @NotNull
-    public static WorkspaceFolder toWorkspaceFolder(@NotNull Project project) {
-        WorkspaceFolder folder = new WorkspaceFolder();
-        folder.setUri(Objects.requireNonNull(toUri(project)).toASCIIString());
-        folder.setName(project.getName());
-        return folder;
+    public static List<WorkspaceFolder> toWorkspaceFolders(@NotNull Project project) {
+        Set<VirtualFile> roots = getRoots(project);
+        List<WorkspaceFolder> workspaceFolders = new ArrayList<>(roots.size());
+        for (var root : roots) {
+            WorkspaceFolder folder = new WorkspaceFolder();
+            folder.setUri(Objects.requireNonNull(toUriAsString(root)));
+            folder.setName(root.getName());
+            workspaceFolders.add(folder);
+        }
+        return workspaceFolders;
     }
 
     public static URI toUri(Module module) {
@@ -392,6 +406,18 @@ public class LSPIJUtils {
             return toUri(moduleDir);
         }
         return toUri(module.getProject());
+    }
+
+    /**
+     * Return top-level directories which contain files related to the project.
+     *
+     * @param project the project.
+     *
+     * @return top-level directories which contain files related to the project.
+     */
+    @NotNull
+    public static Set<VirtualFile> getRoots(Project project) {
+        return BaseProjectDirectories.Companion.getBaseDirectories(project);
     }
 
     public static URI toUri(Project project) {
