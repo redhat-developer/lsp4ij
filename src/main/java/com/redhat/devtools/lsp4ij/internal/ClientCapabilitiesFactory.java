@@ -37,8 +37,8 @@ public class ClientCapabilitiesFactory {
         // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit
         workspaceClientCapabilities.setApplyEdit(Boolean.TRUE);
 
-        // TODO
-        // workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
+        // Support for 'workspace/configuration'
+        workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
 
         // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#executeCommandClientCapabilities
         workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
