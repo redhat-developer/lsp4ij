@@ -31,7 +31,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -125,12 +124,9 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<List<WorkspaceFolder>> workspaceFolders() {
-        Project project = wrapper.getProject();
-        if (project != null) {
-            List<WorkspaceFolder> folders = List.of(LSPIJUtils.toWorkspaceFolder(project));
-            return CompletableFuture.completedFuture(folders);
-        }
-        return CompletableFuture.completedFuture(Collections.emptyList());
+        return CompletableFuture.supplyAsync(() -> {
+            return LSPIJUtils.toWorkspaceFolders(project);
+        });
     }
 
     @Override

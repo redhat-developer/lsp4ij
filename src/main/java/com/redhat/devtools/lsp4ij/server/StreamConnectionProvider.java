@@ -10,13 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server;
 
+import com.intellij.openapi.vfs.VirtualFile;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URI;
 
 /**
  * Stream connection provider API used to:
@@ -48,7 +48,7 @@ public interface StreamConnectionProvider {
     /**
      * User provided initialization options.
      */
-    default Object getInitializationOptions(URI rootUri) {
+    default Object getInitializationOptions(VirtualFile rootUri) {
         return null;
     }
 
@@ -74,7 +74,7 @@ public interface StreamConnectionProvider {
      * @return the initial trace level to set
      * @see "https://microsoft.github.io/language-server-protocol/specification#initialize"
      */
-    default String getTrace(URI rootUri) {
+    default String getTrace(VirtualFile rootUri) {
         return "off"; //$NON-NLS-1$
     }
 
@@ -87,7 +87,7 @@ public interface StreamConnectionProvider {
      * @param languageServer the language server receiving/sending the message.
      * @param rootUri        the root Uri.
      */
-    default void handleMessage(Message message, LanguageServer languageServer, URI rootUri) {
+    default void handleMessage(Message message, LanguageServer languageServer, VirtualFile rootUri) {
     }
 
     /**

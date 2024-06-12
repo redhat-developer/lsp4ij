@@ -13,10 +13,10 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import org.jetbrains.annotations.NotNull;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +70,7 @@ public class UserDefinedStreamConnectionProvider extends ProcessStreamConnection
     }
 
     @Override
-    public Object getInitializationOptions(URI rootUri) {
+    public Object getInitializationOptions(VirtualFile rootUri) {
         return serverDefinition.getLanguageServerInitializationOptions();
     }
 }
