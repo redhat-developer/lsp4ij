@@ -495,3 +495,10 @@ This command is used for instance with the [TypeScript Language Server](./user-d
 to open `references/implementations` in a popup when  clicking on a `Codelens` :
 
 ![editor.action.showReferences](./images/commands/ShowReferencesAction.png)
+
+# Workspace Configuration
+
+[workspace/configuration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration) is implemented, but it requires to implement and override:
+
+ * `LanguageClientImpl#createSettings()` which must return a Gson JsonObject of your configuration.
+ * or `LanguageClientImpl#findSettings(String section)` if you don't want to work with GSon JsonObject.

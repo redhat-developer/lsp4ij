@@ -30,6 +30,7 @@ import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -164,13 +165,52 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     @Override
-    public void dispose() {
-        this.disposed = true;
-        this.progressManager.dispose();
+    public CompletableFuture<List<Object>> configuration(ConfigurationParams params) {
+        return CompletableFuture.supplyAsync(() -> {
+            // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration
+            List<Object> settings = new ArrayList<>();
+            for (ConfigurationItem item : params.getItems()) {
+                String section = item.getSection();
+                Object result = findSettings(section);
+                // The result is the configuration setting or null, according to the spec:
+                //  - If a scope URI is provided the client should return the setting scoped to the provided resource.
+                //  - If the client can’t provide a configuration setting for a given scope then null needs to be present in the returned array.
+                settings.add(result);
+            }
+            return settings;
+        });
     }
 
-    public boolean isDisposed() {
-        return disposed || getProject().isDisposed();
+    /**
+     * Returns the settings retrieved by the given section and null otherwise.
+     *
+     * <p>
+     * This method is implemented by default to work with JsonObject ({@link LanguageClientImpl#createSettings()}
+     * must return an instance of {@link JsonObject} but this method can be overridden to return another structure.
+     * </p>
+     *
+     * @param section the section.
+     * @return the settings retrieved by the given section and null otherwise.
+     */
+    protected Object findSettings(String section) {
+        var config = createSettings();
+        if (config instanceof JsonObject json) {
+            String[] sections = section.split("[.]");
+            return findSettings(sections, json);
+        }
+        return null;
+    }
+
+    protected static Object findSettings(String[] sections, JsonObject jsonObject) {
+        JsonObject current = jsonObject;
+        for (String section : sections) {
+            Object result = current.get(section);
+            if (!(result instanceof JsonObject json)) {
+                return null;
+            }
+            current = json;
+        }
+        return current;
     }
 
     /**
@@ -198,7 +238,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         }
         Object settings = createSettings();
         if (settings == null) {
-            // LSP DidChangeConfigurationParams requires a non null settings
+            // LSP DidChangeConfigurationParams requires a non-null settings
             settings = new JsonObject();
         }
         DidChangeConfigurationParams params = new DidChangeConfigurationParams(settings);
@@ -224,6 +264,17 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      * @param serverStatus server status
      */
     public void handleServerStatusChanged(ServerStatus serverStatus) {
-        
+
     }
+
+    @Override
+    public void dispose() {
+        this.disposed = true;
+        this.progressManager.dispose();
+    }
+
+    public boolean isDisposed() {
+        return disposed || getProject().isDisposed();
+    }
+
 }
