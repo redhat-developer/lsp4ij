@@ -56,7 +56,22 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
 
-    public LanguageServerDefinition(@NotNull String id, @NotNull String name, String description, boolean isSingleton, Integer lastDocumentDisconnectedTimeout, boolean supportsLightEdit) {
+    public LanguageServerDefinition(@NotNull String id,
+                                    @NotNull String name,
+                                    String description,
+                                    boolean isSingleton,
+                                    Integer lastDocumentDisconnectedTimeout,
+                                    boolean supportsLightEdit) {
+        this(id, name, description, isSingleton, lastDocumentDisconnectedTimeout, supportsLightEdit, true);
+    }
+
+    protected LanguageServerDefinition(@NotNull String id,
+                                       @NotNull String name,
+                                       String description,
+                                       boolean isSingleton,
+                                       Integer lastDocumentDisconnectedTimeout,
+                                       boolean supportsLightEdit,
+                                       boolean updateEnabled) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -66,7 +81,10 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         this.languageIdFileTypeMappings = new ConcurrentHashMap<>();
         this.languageIdFileNameMatcherMappings = new CopyOnWriteArrayList<>();
         this.supportsLightEdit = supportsLightEdit;
-        setEnabled(true, null);
+        if (updateEnabled) {
+            // Enable by default language server
+            setEnabled(true, null);
+        }
     }
 
     /**
@@ -114,6 +132,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     /**
      * Returns true if the language server definition is enabled and false otherwise.
      *
+     * @param project the project and null otherwise.
      * @return true if the language server definition is enabled and false otherwise.
      */
     @Override
@@ -124,8 +143,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     /**
      * Set enabled the language server definition.
      *
-     * @param enabled        enabled the language server definition.
-     * @param project
+     * @param enabled enabled the language server definition.
+     * @param project the project and null otherwise.
      */
     public void setEnabled(boolean enabled, @Nullable Project project) {
         this.enabled = enabled;

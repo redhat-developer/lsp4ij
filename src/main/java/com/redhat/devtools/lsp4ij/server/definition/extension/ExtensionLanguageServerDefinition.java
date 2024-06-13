@@ -41,8 +41,10 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
     private Icon icon;
 
     public ExtensionLanguageServerDefinition(ServerExtensionPointBean element) {
-        super(element.id, element.getName(), element.getDescription(), element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit);
+        super(element.id, element.getName(), element.getDescription(), element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit, false);
         this.extension = element;
+        // Enable by default language server from plugin
+        super.setEnabled(true, null);
     }
 
     @Override
@@ -89,12 +91,12 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
         try {
             var factory = getFactory();
             if (factory instanceof LanguageServerEnablementSupport languageServerEnablementSupport) {
-                languageServerEnablementSupport.isEnabled(project);
+                return languageServerEnablementSupport.isEnabled(project);
             }
         } catch (Exception e) {
             LOGGER.warn("Exception occurred while getting enabled", e); //$NON-NLS-1$
         }
-        return true;
+        return super.isEnabled(project);
     }
 
     @Override
@@ -103,6 +105,8 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
             var factory = getFactory();
             if (factory instanceof LanguageServerEnablementSupport languageServerEnablementSupport) {
                 languageServerEnablementSupport.setEnabled(enabled, project);
+            } else {
+                super.setEnabled(enabled, project);
             }
         } catch (Exception e) {
             LOGGER.warn("Exception occurred while setting enabled", e); //$NON-NLS-1$
