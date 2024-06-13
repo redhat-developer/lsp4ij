@@ -13,14 +13,15 @@ package com.redhat.devtools.lsp4ij.usages;
 import com.intellij.find.findUsages.PsiElement2UsageTargetAdapter;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.usages.UsageTarget;
 import com.intellij.usages.UsageTargetProvider;
+import com.intellij.usages.UsageTargetUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,12 +32,35 @@ import static com.redhat.devtools.lsp4ij.LSPIJUtils.getWordRangeAt;
  */
 public class LSPUsageTargetProvider implements UsageTargetProvider {
 
+    private static final Key<Boolean> LSP_FIND_USAGES_SEARCHING_KEY = Key.create("lsp.find.usages.searching");
+
     @Override
     public UsageTarget @Nullable [] getTargets(@NotNull Editor editor, @NotNull PsiFile file) {
-        if (!SimpleLanguageUtils.isSupported(file.getLanguage())) {
+        if (!supportLSPFindUsages(editor, file)) {
             return null;
         }
         return getLSPTargets(editor, file);
+    }
+
+    private boolean supportLSPFindUsages(@NotNull Editor editor, @NotNull PsiFile file) {
+        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
+            // The file is not associated to a language server
+            return false;
+        }
+        // Check if there are some UserTarget for the editor/file by excluding the LSPUsageTargetProvider.
+        // If it exists some UserTarget (ex : 'Find Usages' for a language like JAVA),
+        // the LSP Find Usages target is disabled
+        // to avoid overriding the 'Find Usages' of the language (ex: JAVA)
+        Boolean searching = editor.getUserData(LSP_FIND_USAGES_SEARCHING_KEY);
+        if (searching != null) {
+            return false;
+        }
+        try {
+            editor.putUserData(LSP_FIND_USAGES_SEARCHING_KEY, Boolean.TRUE);
+            return UsageTargetUtil.findUsageTargets(editor, file).length == 0;
+        } finally {
+            editor.putUserData(LSP_FIND_USAGES_SEARCHING_KEY, null);
+        }
     }
 
     @NotNull
