@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.codeInsight.intention.IntentionAction;
+import com.intellij.codeInspection.ProblemHighlightType;
 import com.intellij.lang.annotation.AnnotationBuilder;
 import com.intellij.lang.annotation.AnnotationHolder;
 import com.intellij.lang.annotation.ExternalAnnotator;
@@ -28,13 +29,10 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.hint.LSPNavigationLinkHandler;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
-import org.eclipse.lsp4j.Diagnostic;
-import org.eclipse.lsp4j.DiagnosticRelatedInformation;
-import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -114,12 +112,38 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
             builder.afterEndOfLine();
         }
 
+        // Update highlight type from the diagnostic tags
+        ProblemHighlightType highlightType = getProblemHighlightType(diagnostic.getTags());
+        if (highlightType != null) {
+            builder.highlightType(highlightType);
+        }
+
         // Register lazy quick fixes
         List<LSPLazyCodeActionIntentionAction> fixes = diagnosticsForServer.getQuickFixesFor(diagnostic);
         for (IntentionAction fix : fixes) {
             builder.withFix(fix);
         }
         builder.create();
+    }
+
+    /**
+     * Returns the {@link ProblemHighlightType} from the given tags and null otherwise.
+     *
+     * @param tags the diagnostic tags.
+     * @return the {@link ProblemHighlightType} from the given tags and null otherwise.
+     */
+    @Nullable
+    private static ProblemHighlightType getProblemHighlightType(@Nullable List<DiagnosticTag> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return null;
+        }
+        if (tags.contains(DiagnosticTag.Unnecessary)) {
+            return ProblemHighlightType.LIKE_UNUSED_SYMBOL;
+        }
+        if (tags.contains(DiagnosticTag.Deprecated)) {
+            return ProblemHighlightType.LIKE_DEPRECATED;
+        }
+        return null;
     }
 
     /**
@@ -149,7 +173,7 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
                 tooltip.append(")");
             }
         }
-        // Diagnostic related informations
+        // Diagnostic related information
         List<DiagnosticRelatedInformation> informations = diagnostic.getRelatedInformation();
         if (informations != null) {
             tooltip.append("<ul>");

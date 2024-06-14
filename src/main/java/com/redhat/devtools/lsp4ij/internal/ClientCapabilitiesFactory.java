@@ -90,6 +90,8 @@ public class ClientCapabilitiesFactory {
         publishDiagnosticsCapabilities.setDataSupport(Boolean.TRUE);
         publishDiagnosticsCapabilities.setCodeDescriptionSupport(Boolean.TRUE);
         publishDiagnosticsCapabilities.setRelatedInformation(Boolean.TRUE);
+        DiagnosticsTagSupport tagSupport = new DiagnosticsTagSupport(List.of(DiagnosticTag.Unnecessary, DiagnosticTag.Deprecated));
+        publishDiagnosticsCapabilities.setTagSupport(tagSupport);
         textDocumentClientCapabilities.setPublishDiagnostics(publishDiagnosticsCapabilities);
 
         // Code Action support
