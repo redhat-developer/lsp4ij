@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.usages;
 import com.intellij.find.findUsages.FindUsagesHandler;
 import com.intellij.find.findUsages.FindUsagesHandlerFactory;
 import com.intellij.psi.PsiElement;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -23,8 +24,8 @@ public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
     @Override
     public boolean canFindUsages(@NotNull PsiElement element) {
         // Execute the dummy LSP find usage handler to collect references, implementations
-        // with LSPUsageSearcher.
-        return element instanceof LSPUsageTriggeredPsiElement;
+        // with LSPUsageSearcher if file is associated to a language server.
+        return LanguageServersRegistry.getInstance().isFileSupported(element.getContainingFile());
     }
 
     @Override

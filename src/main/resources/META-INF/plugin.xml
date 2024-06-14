@@ -150,7 +150,7 @@
         <!-- LSP textDocument/completion request support -->
         <typedHandler id="LSPTypedHandlerDelegate"
                       order="last"
-                      implementation="com.redhat.devtools.lsp4ij.features.completion.LSPTypedHandlerDelegate" />
+                      implementation="com.redhat.devtools.lsp4ij.features.completion.LSPTypedHandlerDelegate"/>
         <completion.contributor
                 id="LSPCompletionContributor"
                 language="any"
@@ -243,6 +243,7 @@
         <findUsagesHandlerFactory
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory"/>
         <usageTypeProvider
+                order="last"
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider"/>
 
         <!-- LSP textDocument/rename request support -->
@@ -380,15 +381,15 @@
 
         <notificationGroup
                 id="LSP/window/showMessage"
-                displayType="BALLOON" />
+                displayType="BALLOON"/>
 
         <notificationGroup
                 id="LSP/window/showMessageRequest"
-                displayType="STICKY_BALLOON" />
+                displayType="STICKY_BALLOON"/>
 
         <notificationGroup
                 id="LSP4IJ general notifications"
-                displayType="BALLOON" />
+                displayType="BALLOON"/>
     </extensions>
 
     <!-- Actions to execute LSP features Find Implementation, etc -->
@@ -494,13 +495,15 @@
         <listener
                 topic="com.intellij.openapi.project.ProjectManagerListener"
                 class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+        <listener topic="com.intellij.openapi.actionSystem.ex.AnActionListener"
+                  class="com.redhat.devtools.lsp4ij.usages.LSPFindActionTracker"/>
     </applicationListeners>
 
     <projectListeners>
         <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"
                   class="com.redhat.devtools.lsp4ij.features.refactoring.LSPRefactoringListener"/>
         <listener topic="com.intellij.codeInsight.lookup.LookupManagerListener"
-                  class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener" />
+                  class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener"/>
     </projectListeners>
 
 </idea-plugin>

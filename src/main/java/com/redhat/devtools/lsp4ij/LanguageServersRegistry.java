@@ -13,6 +13,8 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.codeInsight.hints.NoSettings;
 import com.intellij.codeInsight.hints.ProviderInfo;
 import com.intellij.lang.Language;
+import com.intellij.lang.findUsages.EmptyFindUsagesProvider;
+import com.intellij.lang.findUsages.LanguageFindUsages;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
@@ -30,6 +32,7 @@ import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.usages.LSPFindUsagesProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -69,7 +72,7 @@ public class LanguageServersRegistry {
         // Load language servers / mappings from user settings
         loadServersAndMappingFromSettings();
 
-        updateInlayHintsProviders();
+        updateLanguages();
     }
 
     private void loadServersAndMappingsFromExtensionPoint() {
@@ -145,9 +148,8 @@ public class LanguageServersRegistry {
         }
     }
 
-    private void updateInlayHintsProviders() {
-        // register LSPInlayHintInlayHintsProvider + LSPCodelensInlayHintsProvider automatically for all languages
-        // which are associated with a language server.
+    private void updateLanguages() {
+
         Set<Language> distinctLanguages = fileAssociations
                 .stream()
                 .map(LanguageServerFileAssociation::getLanguage)
@@ -164,12 +166,35 @@ public class LanguageServersRegistry {
         // the language received in InlayHintProviders is plain/text, we add it to support
         // LSP inlayHint, color for a file which is not linked to a language.
         distinctLanguages.add(PlainTextLanguage.INSTANCE);
+
+        // register LSPInlayHintsProvider + LSPColorProvider automatically
+        // for all languages associated with a language server.
+        updateInlayHintsProviders(distinctLanguages);
+        // register LSPFindUsagesProvider automatically
+        // for all languages associated with a language server.
+        updateFindUsagesProvider(distinctLanguages);
+    }
+
+    private void updateInlayHintsProviders(Set<Language> distinctLanguages) {
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
         LSPColorProvider lspColorProvider = new LSPColorProvider();
         inlayHintsProviders.clear();
         for (Language language : distinctLanguages) {
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspInlayHintsProvider));
             inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspColorProvider));
+        }
+    }
+
+    private void updateFindUsagesProvider(Set<Language> distinctLanguages) {
+        // Associate the LSP find usage provider
+        // for all languages associated with a language server.
+        // and which does not already define a provider for the language.
+        LSPFindUsagesProvider provider = new LSPFindUsagesProvider();
+        for (Language language : distinctLanguages) {
+            var existingProviders = LanguageFindUsages.INSTANCE.allForLanguage(language);
+            if (existingProviders.isEmpty() ||  (existingProviders.size() == 1 && existingProviders.get(0) instanceof EmptyFindUsagesProvider)) {
+                LanguageFindUsages.INSTANCE.addExplicitExtension(language, provider);
+            }
         }
     }
 
@@ -260,7 +285,7 @@ public class LanguageServersRegistry {
     public void addServerDefinition(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition, @Nullable List<ServerMappingSettings> mappings) {
         String languageServerId = serverDefinition.getId();
         addServerDefinitionWithoutNotification(serverDefinition, toServerMappings(languageServerId, mappings));
-        updateInlayHintsProviders();
+        updateLanguages();
         LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(project, Collections.singleton(serverDefinition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
@@ -363,7 +388,7 @@ public class LanguageServersRegistry {
         // remove associations
         removeAssociationsFor(serverDefinition);
 
-        updateInlayHintsProviders();
+        updateLanguages();
         // Update settings
         UserDefinedLanguageServerSettings.getInstance().removeServerDefinition(languageServerId);
         // Notifications
