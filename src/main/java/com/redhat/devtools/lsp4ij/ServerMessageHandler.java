@@ -27,14 +27,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopupListener;
 import com.intellij.openapi.ui.popup.LightweightWindowEvent;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
+import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.util.concurrent.CompletableFuture;
-
-import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter.toHTML;
 
 public class ServerMessageHandler {
 
@@ -87,7 +86,7 @@ public class ServerMessageHandler {
                                    @NotNull Project project) {
         Notification notification = new Notification(LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
                 title,
-                toHTML(params.getMessage()),
+                MarkdownConverter.getInstance(project).toHtml(params.getMessage()),
                 messageTypeToNotificationType(params.getType()));
         notification.setListener(NotificationListener.URL_OPENING_LISTENER);
         notification.setIcon(messageTypeToIcon(params.getType()));
@@ -101,13 +100,14 @@ public class ServerMessageHandler {
      * @param params  the message request parameters
      */
     public static CompletableFuture<MessageActionItem> showMessageRequest(@NotNull LanguageServerWrapper serverWrapper,
-                                                                          @NotNull ShowMessageRequestParams params) {
+                                                                          @NotNull ShowMessageRequestParams params,
+                                                                          @NotNull Project project) {
         CompletableFuture<MessageActionItem> future = new CompletableFuture<>();
         ApplicationManager.getApplication()
                 .invokeLater(() -> {
                     String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
                     String title = params.getMessage();
-                    String content = toHTML(params.getMessage());
+                    String content = MarkdownConverter.getInstance(project).toHtml(params.getMessage());
                     final Notification notification = new Notification(
                             LSP_WINDOW_SHOW_MESSAGE_REQUEST_GROUP_ID,
                             languageServerName,

@@ -58,6 +58,9 @@ public class LanguageServersRegistry {
 
     private final List<LanguageServerFileAssociation> fileAssociations = new ArrayList<>();
 
+    private final Map<String /* languageId (ex : typescript) */,
+            List<String> /* file extensions (ex : ts) */> languageIdFileExtensionsCache = new HashMap<>();
+
     private final Collection<LanguageServerDefinitionListener> listeners = new CopyOnWriteArrayList<>();
 
     private final List<ProviderInfo<? extends Object>> inlayHintsProviders = new ArrayList<>();
@@ -71,7 +74,6 @@ public class LanguageServersRegistry {
         loadServersAndMappingsFromExtensionPoint();
         // Load language servers / mappings from user settings
         loadServersAndMappingFromSettings();
-
         updateLanguages();
     }
 
@@ -192,7 +194,7 @@ public class LanguageServersRegistry {
         LSPFindUsagesProvider provider = new LSPFindUsagesProvider();
         for (Language language : distinctLanguages) {
             var existingProviders = LanguageFindUsages.INSTANCE.allForLanguage(language);
-            if (existingProviders.isEmpty() ||  (existingProviders.size() == 1 && existingProviders.get(0) instanceof EmptyFindUsagesProvider)) {
+            if (existingProviders.isEmpty() || (existingProviders.size() == 1 && existingProviders.get(0) instanceof EmptyFindUsagesProvider)) {
                 LanguageFindUsages.INSTANCE.addExplicitExtension(language, provider);
             }
         }
@@ -258,6 +260,21 @@ public class LanguageServersRegistry {
             @Nullable String languageId = mapping.getLanguageId();
             if (!StringUtils.isEmpty(languageId)) {
                 serverDefinition.registerAssociation(matchers, languageId);
+                // Update the mapping languageId -> file extensions
+                var fileExtensions = languageIdFileExtensionsCache.get(languageId);
+                if (fileExtensions == null) {
+                    fileExtensions = new ArrayList<>();
+                    languageIdFileExtensionsCache.put(languageId, fileExtensions);
+                }
+                fileExtensions.addAll(fileNamePatternMapping
+                        .getFileNamePatterns()
+                        .stream()
+                        .map(fileExtension -> {
+                            int index = fileExtension.indexOf('.');
+                            return index != -1 ? fileExtension.substring(index + 1, fileExtension.length()) : fileExtension;
+                        })
+                        .toList());
+
             }
             fileAssociations.add(new LanguageServerFileAssociation(matchers, serverDefinition, mapping.getDocumentMatcher(), languageId));
         }
@@ -521,12 +538,24 @@ public class LanguageServersRegistry {
         return inlayHintsProviders;
     }
 
-    public record UpdateServerDefinitionRequest(@NotNull Project project, @NotNull UserDefinedLanguageServerDefinition serverDefinition,
+    public record UpdateServerDefinitionRequest(@NotNull Project project,
+                                                @NotNull UserDefinedLanguageServerDefinition serverDefinition,
                                                 @Nullable String name, @Nullable String commandLine,
                                                 @Nullable Map<String, String> userEnvironmentVariables,
                                                 boolean includeSystemEnvironmentVariables,
                                                 @NotNull List<ServerMappingSettings> mappings,
                                                 @Nullable String configurationContent,
                                                 @Nullable String initializationOptionsContent) {
+    }
+
+    /**
+     * Returns the list of supported file extensions (ex: ts) for the given language Id (ex : typescript) and null otherwise.
+     *
+     * @param languageId the language Id (ex : typescript).
+     * @return the list of supported file extensions (ex: ts) for the given language Id (ex : typescript) and null otherwise.
+     */
+    @Nullable
+    public List<String> getFileExtensions(String languageId) {
+        return languageIdFileExtensionsCache.get(languageId);
     }
 }

@@ -192,12 +192,63 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 #### Hover
 
-[textDocument/hover](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover) is implemented with `platform.backend.documentation.targetProvider` 
-extension point to support any language and `textDocument/hover` works out-of-the-box.
+[textDocument/hover](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover) is implemented with the `platform.backend.documentation.targetProvider` 
+extension point, to support any language, making `textDocument/hover` work out-of-the-box for all languages.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing documentation while hovering over an `include` section:
 
 ![textDocument/hover](./images/lsp-support/textDocument_hover.png)
+
+##### Syntax Coloration
+
+LSP4IJ supports `Syntax Coloration` on hover and completion documentation. Here is an example with [Rust Analyzer](https://rust-analyzer.github.io/): 
+
+![textDocument/hover Syntax Coloration](./images/lsp-support/textDocument_hover_syntax_coloration.png)
+
+`Syntax Coloration` is supported in:
+
+ * MarkDown [Fenced Code Block](https://www.markdownguide.org/extended-syntax/#fenced-code-blocks).
+
+  ~~~
+     ```ts
+     const s = "";
+     const c = s.charAt(0);
+     ```
+  ~~~
+   
+ It will apply the `TypeScript TextMate` highlighting, inferred from the `ts` file extension, and will be rendered like:
+
+![textDocument/hover Syntax Coloration Code Block](./images/lsp-support/textDocument_hover_syntax_coloration_codeBlock.png)
+
+ * MarkDown [Indented Blockquote](https://www.markdownguide.org/basic-syntax/#blockquotes-1) (`>` following with `5 spaces`).
+
+  ```
+  >     const s = '';
+  >     const c = s.charAt(0);
+  ```
+
+will use the Syntax coloration which triggers the hover / completion.
+
+![textDocument/hover Syntax Coloration Blockquote](./images/lsp-support/textDocument_hover_syntax_coloration_codeBlock.png)
+
+###### Syntax coloration discovery
+
+The rules to retrieve the proper syntax coloration are:
+
+ * if the code block defines the file extension, LSP4IJ tries to apply a matching TextMate grammar or custom syntax coloration by filename, mimetype.
+ * if the code block defines a language Id (e.g. `typescript`) and the syntax coloration must be retrieved from TextMate, it will use the 
+[fileNamePatterns extension point](./DeveloperGuide.md#file-name-pattern-mapping) or [./UserDefinedLanguageServer.md#mappings-tab](fileNamePattern of User defined language server)
+to find the file extension (e.g. `ts`) associated with the languageId (e.g. `typescript`) 
+  ~~~
+     ```typescript
+     const s = "";
+     const c = s.charAt(0);
+     ```
+  ~~~
+ * if the code block doesn't define the language, or indented blockquotes are used, it will fall back to the syntax coloration from the file in which the hover / completion documentation request was triggered.
+
+If those strategies are insufficient for your needs, please [create an issue](https://github.com/redhat-developer/lsp4ij/issues) to request an extension point 
+for mapping the language and the file extension.
 
 #### CodeLens
 

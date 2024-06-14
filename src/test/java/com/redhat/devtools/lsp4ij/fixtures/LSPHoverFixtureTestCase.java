@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.Hover;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -41,7 +42,7 @@ public abstract class LSPHoverFixtureTestCase extends LSPCodeInsightFixtureTestC
     protected void assertHover(@NotNull String fileName,
                                     @NotNull String editorContentText,
                                     @NotNull String jsonHover,
-                                    @NotNull String expectedHoverContent) {
+                                    @Nullable String expectedHoverContent) {
         assertHover(fileName,
                 editorContentText,
                 JSONUtils.getLsp4jGson().fromJson(jsonHover, Hover.class),
@@ -59,7 +60,7 @@ public abstract class LSPHoverFixtureTestCase extends LSPCodeInsightFixtureTestC
     protected void assertHover(@NotNull String fileName,
                                     @NotNull String editorContentText,
                                     @NotNull Hover hover,
-                                    @NotNull String expectedHoverContent) {
+                                    @Nullable String expectedHoverContent) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         MockLanguageServer.INSTANCE.setHover(hover);
         // Open editor for a given file name and content (which declares <caret> to know where the completion is triggered).
@@ -69,6 +70,10 @@ public abstract class LSPHoverFixtureTestCase extends LSPCodeInsightFixtureTestC
         var file = myFixture.getFile();
         int offset = editor.getCaretModel().getOffset();
         List<? extends @NotNull DocumentationTarget> targets = IdeDocumentationTargetProvider.getInstance(myFixture.getProject()).documentationTargets(editor, file, offset);
+        if (expectedHoverContent == null) {
+            assertTrue("", targets.isEmpty());
+            return;
+        }
         assertSize(1, targets);
 
         DocumentationTarget target = targets.get(0);
@@ -76,6 +81,7 @@ public abstract class LSPHoverFixtureTestCase extends LSPCodeInsightFixtureTestC
         DocumentationData documentationData = (DocumentationData) documentationResult;
 
         String actual = documentationData.getHtml();
+
         assertEquals("", expectedHoverContent, actual);
 
     }

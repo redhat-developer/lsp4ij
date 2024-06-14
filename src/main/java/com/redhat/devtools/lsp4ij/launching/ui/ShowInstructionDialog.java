@@ -39,9 +39,11 @@ import java.awt.*;
 public class ShowInstructionDialog extends DialogWrapper {
     private static final Logger LOGGER = LoggerFactory.getLogger(ShowInstructionDialog.class);
     private final @NotNull LanguageServerTemplate template;
+    private final @NotNull Project project;
 
-    protected ShowInstructionDialog(LanguageServerTemplate template, @Nullable Project project) {
+    protected ShowInstructionDialog(LanguageServerTemplate template, @NotNull Project project) {
         super(project);
+        this.project = project;
         super.setTitle(LanguageServerBundle.message("template.show.instruction.dialog.title", template.getName()));
         this.template = template;
         init();
@@ -57,7 +59,7 @@ public class ShowInstructionDialog extends DialogWrapper {
         String description;
 
         try {
-            description = MarkdownConverter.toHTML(docContent);
+            description = MarkdownConverter.getInstance(project).toHtml(docContent);
         } catch (Exception e) {
             description = docContent;
             LOGGER.warn("Error while converting MarkDown language server template documentation to HTML", e);
