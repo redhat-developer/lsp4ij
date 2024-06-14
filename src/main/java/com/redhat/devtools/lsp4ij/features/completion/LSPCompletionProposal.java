@@ -49,7 +49,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
-import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHTML;
+import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHtml;
+import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 import static com.redhat.devtools.lsp4ij.ui.IconMapper.getIcon;
@@ -584,16 +585,22 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     public DocumentationResult computeDocumentation() {
         var documentation = item.getDocumentation();
         if (documentation != null) {
-            MarkupContent content = getDocumentation(documentation);
-            return DocumentationResult.documentation(convertToHTML(content, editor));
+            var contents = getValidMarkupContents(item);
+            if (contents.isEmpty()) {
+                return null;
+            }
+            return DocumentationResult.documentation(convertToHtml(contents, file));
         } else if (supportResolveCompletion) {
             if (resolvedCompletionItemFuture != null && resolvedCompletionItemFuture.isDone()) {
                 CompletionItem resolved = getResolvedCompletionItem();
                 if (resolved != null) {
                     item.setDocumentation(resolved.getDocumentation());
                 }
-                MarkupContent content = getDocumentation(documentation);
-                return DocumentationResult.documentation(convertToHTML(content, editor));
+                var contents = getValidMarkupContents(item);
+                if (contents.isEmpty()) {
+                    return null;
+                }
+                return DocumentationResult.documentation(convertToHtml(contents, file));
             } else {
                 DocumentationResult.asyncDocumentation(() -> {
                     // The LSP completion item 'documentation' is not filled, try to resolve it
@@ -602,25 +609,16 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                     if (resolved != null) {
                         item.setDocumentation(resolved.getDocumentation());
                     }
-                    MarkupContent content = getDocumentation(documentation);
-                    return DocumentationResult.documentation(convertToHTML(content, editor));
+                    var contents = getValidMarkupContents(item);
+                    if (contents.isEmpty()) {
+                        return null;
+                    }
+                    return DocumentationResult.documentation(convertToHtml(contents, file));
                 });
             }
         }
         return null;
     }
-
-    private static MarkupContent getDocumentation(Either<String, MarkupContent> documentation) {
-        if (documentation == null) {
-            return null;
-        }
-        if (documentation.isLeft()) {
-            String content = documentation.getLeft();
-            return new MarkupContent(MarkupKind.PLAINTEXT, content);
-        }
-        return documentation.getRight();
-    }
-
 
     @NotNull
     @Override

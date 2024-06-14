@@ -23,6 +23,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.eclipse.lsp4j.Hover;
+import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,6 +37,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
@@ -84,7 +86,7 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
                 Editor editor = LSPIJUtils.editorForElement(psiFile);
                 return hovers
                         .stream()
-                        .map(hover -> toDocumentTarget(hover, document, editor))
+                        .map(hover -> toDocumentTarget(hover, document, psiFile))
                         .filter(Objects::nonNull)
                         .toList();
             }
@@ -96,12 +98,16 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
     @Nullable
     private static DocumentationTarget toDocumentTarget(@Nullable Hover hover,
                                                         @NotNull Document document,
-                                                        @Nullable Editor editor) {
+                                                        @NotNull PsiFile file) {
         if (hover == null) {
             return null;
         }
+        List<MarkupContent> contents = getValidMarkupContents(hover);
+        if (contents.isEmpty()) {
+            return null;
+        }
         String presentationText = getPresentationText(hover, document);
-        return new LSPDocumentationTarget(hover, presentationText, editor);
+        return new LSPDocumentationTarget(contents, presentationText, file);
     }
 
     private static String getPresentationText(@NotNull Hover hover, @NotNull Document document) {
@@ -112,4 +118,6 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
         }
         return null;
     }
+
+
 }

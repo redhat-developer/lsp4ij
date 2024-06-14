@@ -27,6 +27,8 @@ import java.util.List;
 public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
 
     private final String[] fileNamePatterns;
+    private String languageId;
+
     protected LSPCodeInsightTestFixture myFixture;
     private MockLanguageServerDefinition serverDefinition;
 
@@ -57,9 +59,13 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
         }
     }
 
+    public void setLanguageId(String languageId) {
+        this.languageId = languageId;
+    }
+
     private void registerServer() {
         serverDefinition = new MockLanguageServerDefinition();
-        List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePatterns), null));
+        List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePatterns), languageId));
         LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), serverDefinition, mappings);
     }
 

@@ -10,12 +10,16 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentation;
 
-import com.intellij.openapi.editor.Editor;
-import org.eclipse.lsp4j.MarkupContent;
-import org.eclipse.lsp4j.MarkupKind;
+import com.intellij.openapi.project.Project;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import org.eclipse.lsp4j.*;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.awt.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * LSP documentation utilities.
@@ -26,63 +30,114 @@ public class LSPDocumentationHelper {
 
     }
 
+    public static @NotNull List<MarkupContent> getValidMarkupContents(@Nullable CompletionItem completionItem) {
+        if (completionItem == null) {
+            // textDocument/completion may return null
+            return Collections.emptyList();
+        }
+        var documentation = completionItem.getDocumentation();
+        if (documentation == null) {
+            return Collections.emptyList();
+        }
+        if (documentation.isLeft()) {
+            String value = documentation.getLeft();
+            if (!isValidContent(value)) {
+                return Collections.emptyList();
+            }
+            return List.of(new MarkupContent(MarkupKind.PLAINTEXT, value));
+        } else if (documentation.isRight()) {
+            MarkupContent content = documentation.getRight();
+            if (!isValidContent(content)) {
+                return Collections.emptyList();
+            }
+            return List.of(content);
+        }
+        return Collections.emptyList();
+    }
+
+    public static @NotNull List<MarkupContent> getValidMarkupContents(@Nullable Hover hover) {
+        if (hover == null) {
+            // textDocument/hover may return null
+            return Collections.emptyList();
+        }
+        var hoverContents = hover.getContents();
+        if (hoverContents == null) {
+            return Collections.emptyList();
+        }
+        if (hoverContents.isLeft()) {
+            var contents = hoverContents.getLeft();
+            if (contents == null || contents.isEmpty()) {
+                return Collections.emptyList();
+            }
+            return contents.stream()
+                    .map(content -> {
+                        if (content.isLeft()) {
+                            String value = content.getLeft();
+                            if (!isValidContent(value)) {
+                                return null;
+                            }
+                            return new MarkupContent(MarkupKind.MARKDOWN, value);
+                        } else if (content.isRight()) {
+                            MarkedString markedString = content.getRight();
+                            if (!isValidContent(markedString)) {
+                                return null;
+                            }
+                            String value = markedString.getValue();
+                            String language = markedString.getLanguage() != null && !markedString.getLanguage().isEmpty() ?
+                                    markedString.getLanguage() :
+                                    null;
+                            if (language == null) {
+                                return new MarkupContent(MarkupKind.MARKDOWN, value);
+                            }
+                            value = String.format("```%s%n%s%n```", language, value);
+                            return new MarkupContent(MarkupKind.MARKDOWN, value);
+                        }
+                        return null;
+                    })
+                    .filter(Objects::nonNull)
+                    .toList();
+        } else if (hoverContents.isRight()){
+            MarkupContent content = hoverContents.getRight();
+            if (isValidContent(content)) {
+                return List.of(content);
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    private static boolean isValidContent(@Nullable MarkedString content) {
+        return content != null && isValidContent(content.getValue());
+    }
+
+    private static boolean isValidContent(@Nullable MarkupContent content) {
+        return content != null && isValidContent(content.getValue());
+    }
+
+    private static boolean isValidContent(@Nullable String value) {
+        return value != null && StringUtils.isNotBlank(value);
+    }
+
     /**
      * Convert the given LSP markup content to an HTML string and an empty string otherwise.
      *
-     * @param content
-     * @param editor
+     * @param contents the markup contents.
+     * @param file the file which has triggered the hover / completion documentation.
      * @return the converted HTML of the LSP markup content and an empty string otherwise.
      */
-    public static String convertToHTML(@Nullable MarkupContent content,
-                                       @Nullable Editor editor) {
-        if (content == null) {
-            return "";
+    public static String convertToHtml(@NotNull List<MarkupContent> contents,
+                                       @NotNull PsiFile file) {
+        Project project = file.getProject();
+        StringBuilder htmlBody = new StringBuilder();
+        for (int i = 0; i < contents.size(); i++) {
+            if (i > 0) {
+                htmlBody.append("<hr />");
+            }
+            MarkupContent content = contents.get(i);
+            htmlBody.append(MarkupKind.MARKDOWN.equals(content.getKind()) ?
+                    MarkdownConverter.getInstance(project).toHtml(content.getValue(), file) :
+                    content.getValue());
         }
-        String htmlBody = MarkupKind.MARKDOWN.equals(content.getKind()) ?
-                MarkdownConverter.toHTML(content.getValue()) :
-                content.getValue();
-        return styleHtml(editor, htmlBody);
+        return htmlBody.toString();
     }
 
-    private static String styleHtml(@Nullable Editor editor, String htmlBody) {
-        if (htmlBody == null || htmlBody.isEmpty()) {
-            return htmlBody;
-        }
-        Color background = editor != null ? editor.getColorsScheme().getDefaultBackground() : null;
-        Color foreground = editor != null ? editor.getColorsScheme().getDefaultForeground() : null;
-
-        StringBuilder html = new StringBuilder("<html><head><style TYPE='text/css'>html { ");
-        if (background != null) {
-            html.append("background-color: ")
-                    .append(toHTML(background))
-                    .append(";");
-        }
-        if (foreground != null) {
-            html.append("color: ")
-                    .append(toHTML(foreground))
-                    .append(";");
-        }
-        html
-                .append(" }</style></head><body>")
-                .append(htmlBody)
-                .append("</body></html>");
-        return html.toString();
-    }
-
-    private static String toHTML(Color rgb) {
-        StringBuilder builder = new StringBuilder(7);
-        builder.append('#');
-        appendAsHexString(builder, rgb.getRed());
-        appendAsHexString(builder, rgb.getGreen());
-        appendAsHexString(builder, rgb.getBlue());
-        return builder.toString();
-    }
-
-    private static void appendAsHexString(StringBuilder buffer, int intValue) {
-        String hexValue = Integer.toHexString(intValue);
-        if (hexValue.length() == 1) {
-            buffer.append('0');
-        }
-        buffer.append(hexValue);
-    }
 }

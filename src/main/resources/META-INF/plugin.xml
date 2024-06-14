@@ -84,6 +84,7 @@
     </description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends optional="true">org.jetbrains.plugins.textmate</depends>
     <depends optional="true">com.redhat.devtools.intellij.telemetry</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
     <idea-version since-build="232.*"/>
@@ -140,6 +141,8 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.usages.LSPUsagesManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter"/>
 
         <!-- LSP textDocument/publishDiagnostics notification support -->
         <externalAnnotator

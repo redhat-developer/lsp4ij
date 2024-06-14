@@ -32,6 +32,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
@@ -46,8 +47,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
-
-import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter.toHTML;
 
 /**
  * This class provides methods to execute LSP {@link Command} instances.
@@ -105,11 +104,12 @@ public class CommandExecutor {
             }
         }
         if (context.isShowNotificationError()) {
+            Project project = context.getProject();
             String commandId = context.getCommand().getCommand();
             var preferredLanguageServer = context.getPreferredLanguageServer();
             String content = preferredLanguageServer != null ?
-                    toHTML(LanguageServerBundle.message("lsp.command.error.with.ls.content", commandId, preferredLanguageServer.getServerWrapper().getServerDefinition().getDisplayName())):
-                    toHTML(LanguageServerBundle.message("lsp.command.error.without.ls.content", commandId));
+                    MarkdownConverter.getInstance(project).toHtml(LanguageServerBundle.message("lsp.command.error.with.ls.content", commandId, preferredLanguageServer.getServerWrapper().getServerDefinition().getDisplayName())):
+                    MarkdownConverter.getInstance(project).toHtml(LanguageServerBundle.message("lsp.command.error.without.ls.content", commandId));
 
             Notification notification = new Notification(LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID,
                     LanguageServerBundle.message("lsp.command.error.title", commandId),

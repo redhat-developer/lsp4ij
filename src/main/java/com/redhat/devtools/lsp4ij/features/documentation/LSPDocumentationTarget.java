@@ -11,39 +11,33 @@
 package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.model.Pointer;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.platform.backend.documentation.DocumentationResult;
 import com.intellij.platform.backend.documentation.DocumentationTarget;
 import com.intellij.platform.backend.presentation.TargetPresentation;
-import org.eclipse.lsp4j.Hover;
-import org.eclipse.lsp4j.MarkedString;
+import com.intellij.psi.PsiFile;
 import org.eclipse.lsp4j.MarkupContent;
-import org.eclipse.lsp4j.MarkupKind;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
-import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHTML;
+import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHtml;
 
 /**
  * LSP {@link DocumentationTarget} implementation.
  */
 public class LSPDocumentationTarget implements DocumentationTarget {
 
-    private final Hover hover;
+    private final List<MarkupContent> contents;
     private final String presentationText;
-    private final Editor editor;
+    private final PsiFile file;
 
-    public LSPDocumentationTarget(@NotNull Hover hover,
+    public LSPDocumentationTarget(List<MarkupContent> contents,
                                   String presentationText,
-                                  @Nullable Editor editor) {
-        this.hover = hover;
+                                  @NotNull PsiFile file) {
+        this.contents = contents;
         this.presentationText = presentationText;
-        this.editor = editor;
+        this.file = file;
     }
 
     @NotNull
@@ -57,7 +51,7 @@ public class LSPDocumentationTarget implements DocumentationTarget {
     @Nullable
     @Override
     public DocumentationResult computeDocumentation() {
-        return DocumentationResult.documentation(toHTMLHover(hover, editor));
+        return DocumentationResult.documentation(convertToHtml(contents, file));
     }
 
     @NotNull
@@ -66,49 +60,4 @@ public class LSPDocumentationTarget implements DocumentationTarget {
         return Pointer.hardPointer(this);
     }
 
-    private String toHTMLHover(Hover hover, Editor editor) {
-        MarkupContent content = getHoverString(hover);
-        return convertToHTML(content, editor);
-    }
-
-    private static @Nullable MarkupContent getHoverString(Hover hover) {
-        if (hover == null) {
-            // textDocument/hover may return null
-            return null;
-        }
-        Either<List<Either<String, MarkedString>>, MarkupContent> hoverContent = hover.getContents();
-        if (hoverContent == null) {
-            return null;
-        }
-        if (hoverContent.isLeft()) {
-            List<Either<String, MarkedString>> contents = hoverContent.getLeft();
-            if (contents == null || contents.isEmpty()) {
-                return null;
-            }
-            String s = contents.stream()
-                    .map(content -> {
-                        if (content.isLeft()) {
-                            return content.getLeft();
-                        } else if (content.isRight()) {
-                            MarkedString markedString = content.getRight();
-                            // TODO this won't work fully until markup parser will support syntax
-                            // highlighting but will help display
-                            // strings with language tags, e.g. without it things after <?php tag aren't
-                            // displayed
-                            if (markedString.getLanguage() != null && !markedString.getLanguage().isEmpty()) {
-                                return String.format("```%s%n%s%n```", markedString.getLanguage(), markedString.getValue()); //$NON-NLS-1$
-                            } else {
-                                return markedString.getValue();
-                            }
-                        } else {
-                            return ""; //$NON-NLS-1$
-                        }
-                    })
-                    .filter(((Predicate<String>) String::isEmpty).negate())
-                    .collect(Collectors.joining("\n\n"));
-            return new MarkupContent(MarkupKind.PLAINTEXT, s);
-        } else {
-            return hoverContent.getRight();
-        }
-    }
 }

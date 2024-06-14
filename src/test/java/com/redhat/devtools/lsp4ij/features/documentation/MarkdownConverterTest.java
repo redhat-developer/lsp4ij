@@ -13,21 +13,22 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentation;
 
-import org.junit.Test;
-
-import static com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter.toHTML;
-import static org.junit.Assert.*;
+import com.intellij.lang.Language;
+import com.intellij.lang.xml.XMLLanguage;
+import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Test Markdown conversion to HTML
  */
-public class MarkdownConverterTest {
+public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
 
-    @Test
-    public void tablesConversion() {
+    public void testTablesConversion() {
+
         String markdown = """
                 Does something, `somewhere`:
-                
+                                
                 |                    |                    |
                 |--------------------|--------------------|
                 | Row One - Cell One | Row One - Cell Two |
@@ -46,71 +47,16 @@ public class MarkdownConverterTest {
                 </tbody>
                 </table>
                 """;
-        assertEquals(html, toHTML(markdown));
+        assertEquals(html, toHtml(markdown));
     }
 
-    @Test
-    public void linksConversion() {
+    public void testLinksConversion() {
         String markdown = "Here is a link [example](https://example.com)";
         String html = "<p>Here is a link <a href=\"https://example.com\">example</a></p>\n";
-        assertEquals(html, toHTML(markdown));
+        assertEquals(html, toHtml(markdown));
     }
 
-    @Test
-    public void codeBlockConversion() {
-        String markdown = """
-                Here's some java code:
-                
-                ```java
-                    @Test
-                    public void linksConversion() {
-                        String markdown = "Here is a link [example](https://example.com)";
-                        String html = "<p>Here is a link <a href=\\"https://example.com\\">example</a></p>\\n";
-                        assertEquals(html, convert(markdown));
-                    }
-                ```
-                """;
-        String html = """
-                <p>Here's some java code:</p>
-                <pre><code class="language-java">    @Test
-                    public void linksConversion() {
-                        String markdown = &quot;Here is a link [example](https://example.com)&quot;;
-                        String html = &quot;&lt;p&gt;Here is a link &lt;a href=\\&quot;https://example.com\\&quot;&gt;example&lt;/a&gt;&lt;/p&gt;\\n&quot;;
-                        assertEquals(html, convert(markdown));
-                    }
-                </code></pre>
-                """;
-        assertEquals(html, toHTML(markdown));
-
-        markdown = """
-                Here's some XML code:
-                
-                ```xml
-                <?xml version="1.0" encoding="UTF-8"?>
-                <note>
-                  <to>Angelo</to>
-                  <from>Fred</from>
-                  <heading>Tests</heading>
-                  <body>I wrote them!</body>
-                </note>
-                ```
-                """;
-        html = """
-                <p>Here's some XML code:</p>
-                <pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
-                &lt;note&gt;
-                  &lt;to&gt;Angelo&lt;/to&gt;
-                  &lt;from&gt;Fred&lt;/from&gt;
-                  &lt;heading&gt;Tests&lt;/heading&gt;
-                  &lt;body&gt;I wrote them!&lt;/body&gt;
-                &lt;/note&gt;
-                </code></pre>
-                """;
-        assertEquals(html, toHTML(markdown));
-    }
-
-    @Test
-    public void listsConversion() {
+    public void testListsConversion() {
         String markdown = """
                  *  Coffee
                  *  Tea
@@ -123,23 +69,21 @@ public class MarkdownConverterTest {
                 <li>Milk</li>
                 </ul>
                 """;
-        assertEquals(html, toHTML(markdown));
-    }
-    
-    @Test
-    public void miscellaneousConversions() {
-        assertEquals("<p>This <em>is</em> <code>my code</code></p>\n", toHTML("This _is_ `my code`"));
-        assertEquals("<p>The <code>&lt;project&gt;</code> element is the root of the descriptor.</p>\n", toHTML("The `<project>` element is the root of the descriptor."));
-        assertEquals("<h1>Hey Man</h1>\n", toHTML("# Hey Man #"));
-        assertEquals("<p>ONLY_THIS_TEXT</p>\n", toHTML("ONLY_THIS_TEXT"));
-        assertEquals("<p>This is<br />\n<strong>bold</strong></p>\n", toHTML("""
-                                                                                      This is
-                                                                                      **bold**
-                                                                                      """));
+        assertEquals(html, toHtml(markdown));
     }
 
-    @Test
-    public void multiLineConversion() {
+    public void testMiscellaneousConversions() {
+        assertEquals("<p>This <em>is</em> <code>my code</code></p>\n", toHtml("This _is_ `my code`"));
+        assertEquals("<p>The <code>&lt;project&gt;</code> element is the root of the descriptor.</p>\n", toHtml("The `<project>` element is the root of the descriptor."));
+        assertEquals("<h1>Hey Man</h1>\n", toHtml("# Hey Man #"));
+        assertEquals("<p>ONLY_THIS_TEXT</p>\n", toHtml("ONLY_THIS_TEXT"));
+        assertEquals("<p>This is<br />\n<strong>bold</strong></p>\n", toHtml("""
+                This is
+                **bold**
+                """));
+    }
+
+    public void testMultiLineConversion() {
         String markdown = """
                 multi
                 line
@@ -153,11 +97,11 @@ public class MarkdownConverterTest {
                 <code>HTML</code><br />
                 stuff</p>
                 """;
-        assertEquals(html, toHTML(markdown));
+        assertEquals(html, toHtml(markdown));
 
         markdown = """
                 multi
-                
+                                
                 line `HTML` stuff
                 """;
 
@@ -165,6 +109,160 @@ public class MarkdownConverterTest {
                 <p>multi</p>
                 <p>line <code>HTML</code> stuff</p>
                 """;
-        assertEquals(html, toHTML(markdown));
+        assertEquals(html, toHtml(markdown));
+    }
+
+    public void testSimpleCodeBlockConversion() {
+        String markdown = """
+                Here's some java code:
+                                
+                ```my-java
+                    @Test
+                    public void linksConversion() {
+                        String markdown = "Here is a link [example](https://example.com)";
+                        String html = "<p>Here is a link <a href=\\"https://example.com\\">example</a></p>\\n";
+                        assertEquals(html, convert(markdown));
+                    }
+                ```
+                """;
+        String html = """
+                <p>Here's some java code:</p>
+                <pre><code>    @Test
+                    public void linksConversion() {
+                        String markdown = &quot;Here is a link [example](https://example.com)&quot;;
+                        String html = &quot;&lt;p&gt;Here is a link &lt;a href=\\&quot;https://example.com\\&quot;&gt;example&lt;/a&gt;&lt;/p&gt;\\n&quot;;
+                        assertEquals(html, convert(markdown));
+                    }
+                </code></pre>
+                """;
+        assertEquals(html, toHtml(markdown));
+
+        markdown = """
+                Here's some XML code:
+                                
+                ```my-xml
+                <?xml version="1.0" encoding="UTF-8"?>
+                <note>
+                  <to>Angelo</to>
+                  <from>Fred</from>
+                  <heading>Tests</heading>
+                  <body>I wrote them!</body>
+                </note>
+                ```
+                """;
+        html = """
+                <p>Here's some XML code:</p>
+                <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+                &lt;note&gt;
+                  &lt;to&gt;Angelo&lt;/to&gt;
+                  &lt;from&gt;Fred&lt;/from&gt;
+                  &lt;heading&gt;Tests&lt;/heading&gt;
+                  &lt;body&gt;I wrote them!&lt;/body&gt;
+                &lt;/note&gt;
+                </code></pre>
+                """;
+        assertEquals(html, toHtml(markdown));
+    }
+
+    public void testXmlHighlightCodeBlockConversion() {
+        // Test with XML syntax coloration which uses a custom lexer (not TextMate)
+        String markdown = """
+                Here's some XML code:
+                                
+                ```xml
+                <?xml version="1.0" encoding="UTF-8"?>
+                <note>
+                  <to>Angelo</to>
+                  <from>Fred</from>
+                  <heading>Tests</heading>
+                  <body>I wrote them!</body>
+                </note>
+                ```
+                """;
+        String html = """
+                <p>Here's some XML code:</p>
+                <pre><span style="font-style:italic;">&lt;?</span><span style="color:#0000ff;font-weight:bold;">xml&#32;version</span><span style="color:#008000;font-weight:bold;">="1.0"&#32;</span><span style="color:#0000ff;font-weight:bold;">encoding</span><span style="color:#008000;font-weight:bold;">="UTF-8"</span><span style="font-style:italic;">?&gt;<br></span><span style="">&lt;</span><span style="color:#000080;font-weight:bold;">note</span><span style="">&gt;</span><span style=""><br></span><span style="">&#32;&#32;</span><span style="">&lt;</span><span style="color:#000080;font-weight:bold;">to</span><span style="">&gt;</span><span style="">Angelo</span><span style="">&lt;/</span><span style="color:#000080;font-weight:bold;">to</span><span style="">&gt;</span><span style=""><br></span><span style="">&#32;&#32;</span><span style="">&lt;</span><span style="color:#000080;font-weight:bold;">from</span><span style="">&gt;</span><span style="">Fred</span><span style="">&lt;/</span><span style="color:#000080;font-weight:bold;">from</span><span style="">&gt;</span><span style=""><br></span><span style="">&#32;&#32;</span><span style="">&lt;</span><span style="color:#000080;font-weight:bold;">heading</span><span style="">&gt;</span><span style="">Tests</span><span style="">&lt;/</span><span style="color:#000080;font-weight:bold;">heading</span><span style="">&gt;</span><span style=""><br></span><span style="">&#32;&#32;</span><span style="">&lt;</span><span style="color:#000080;font-weight:bold;">body</span><span style="">&gt;</span><span style="">I&#32;wrote&#32;them!</span><span style="">&lt;/</span><span style="color:#000080;font-weight:bold;">body</span><span style="">&gt;</span><span style=""><br></span><span style="">&lt;/</span><span style="color:#000080;font-weight:bold;">note</span><span style="">&gt;</span></pre>
+                """;
+
+        assertEquals(html, toHtml(markdown));
+    }
+
+    public void testTypeScriptHighlightCodeBlockConversion() {
+        // Test with TypeScript syntax coloration which uses TextMate
+        String markdown = """
+                Here's some TypeScript code:
+                                
+                ```ts
+                const s = '';
+                ```
+                """;
+        String html = """
+                <p>Here's some TypeScript code:</p>
+                <pre><span style="color:#000080;font-weight:bold;">const&#32;</span><span style="">s&#32;</span><span style="color:#000080;font-weight:bold;">=&#32;</span><span style="color:#008000;font-weight:bold;">''</span><span style="">;<br></span></pre>
+                """;
+
+        assertEquals(html, toHtml(markdown));
+    }
+
+    public void testTypeScriptHighlightBlockquoteConversion() {
+        // When blockquote is not indented, the syntax coloration is not applied (like vscode)
+        String markdown = """
+                Here's some TypeScript code:
+                                
+                > const s = '';
+                """;
+        String html = """
+                <p>Here's some TypeScript code:</p>
+                <blockquote>
+                <p>const s = '';</p>
+                </blockquote>
+                """;
+
+        assertEquals(html, toHtml(markdown, null, "test.ts"));
+    }
+
+    public void testTypeScriptHighlightIndentedBlockquoteWithFileNameConversion() {
+        // When blockquote is indented, the syntax coloration is applied (like vscode)
+        // Test with TypeScript syntax coloration which uses TextMate
+        String markdown = """
+                Here's some TypeScript code:
+                                
+                >     const s = '';
+                """;
+        String html = """
+                <p>Here's some TypeScript code:</p>
+                <blockquote>
+                <pre><span style="color:#000080;font-weight:bold;">const&#32;</span><span style="">s&#32;</span><span style="color:#000080;font-weight:bold;">=&#32;</span><span style="color:#008000;font-weight:bold;">''</span><span style="">;<br></span></pre>
+                </blockquote>
+                """;
+
+        assertEquals(html, toHtml(markdown, null, "test.ts"));
+    }
+
+    public void testXmlHighlightIndentedBlockquoteWithLanguageConversion() {
+        // When blockquote is indented, the syntax coloration is applied (like vscode)
+        // Test with TypeScript syntax coloration which uses TextMate
+        // Test with XML syntax coloration which uses a custom lexer (not TextMate)
+        String markdown = """
+                Here's some XML code:
+                                
+                >     <?xml version="1.0" encoding="UTF-8"?>
+                """;
+        String html = """
+                <p>Here's some XML code:</p>
+                <blockquote>
+                <pre><span style="font-style:italic;">&lt;?</span><span style="color:#0000ff;font-weight:bold;">xml&#32;version</span><span style="color:#008000;font-weight:bold;">="1.0"&#32;</span><span style="color:#0000ff;font-weight:bold;">encoding</span><span style="color:#008000;font-weight:bold;">="UTF-8"</span><span style="font-style:italic;">?&gt;</span></pre>
+                </blockquote>
+                """;
+
+        assertEquals(html, toHtml(markdown, XMLLanguage.INSTANCE, null));
+    }
+
+    private String toHtml(String markdown) {
+        return MarkdownConverter.getInstance(myFixture.getProject()).toHtml(markdown);
+    }
+
+    private String toHtml(@NotNull String markdown, @Nullable Language language, @Nullable String fileName) {
+        return MarkdownConverter.getInstance(myFixture.getProject()).toHtml(markdown,language, fileName);
     }
 }

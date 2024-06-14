@@ -79,7 +79,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public final CompletableFuture<MessageActionItem> showMessageRequest(ShowMessageRequestParams requestParams) {
-        return ServerMessageHandler.showMessageRequest(wrapper, requestParams);
+        return ServerMessageHandler.showMessageRequest(wrapper, requestParams, getProject());
     }
 
     @Override

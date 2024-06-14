@@ -20,6 +20,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
 
     public TypeScriptHoverTest() {
         super("*.ts");
+        super.setLanguageId("typescript"); // Used to retrieve the TextMate TypeScript (used in Markdown code block), because TextMate are retrieved by file extension.
     }
 
     public void testHoverAsPlaintext() {
@@ -47,8 +48,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                 }   
                         """,
                 """
-                        <html><head><style TYPE='text/css'>html { background-color: #ffffff;color: #000000; }</style></head><body>
-                        ```typescript\n(method) String.charAt(pos: number): string\n```\nReturns the character at the specified index.\n\n*@param* `pos` — The zero-based index of the desired character.</body></html>"""
+                        \n```typescript\n(method) String.charAt(pos: number): string\n```\nReturns the character at the specified index.\n\n*@param* `pos` — The zero-based index of the desired character."""
         );
     }
 
@@ -77,11 +77,88 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                 }   
                         """,
                 """
-                        <html><head><style TYPE='text/css'>html { background-color: #ffffff;color: #000000; }</style></head><body><pre><code class="language-typescript">(method) String.charAt(pos: number): string
-                        </code></pre>
+                        <pre><span style="">(</span><span style="">method)&#32;String.charAt(pos:&#32;number):&#32;string<br></span></pre>
                         <p>Returns the character at the specified index.</p>
                         <p><em>@param</em> <code>pos</code> — The zero-based index of the desired character.</p>
-                        </body></html>"""
+                        """
         );
     }
+
+    public void testNoHoverWithEmptyContents() {
+        assertHover("test.ts",
+                """
+                        const s = "";
+                        s.c<caret>harAt(0);
+                        """,
+                """
+                                {
+                                    "contents": []     
+                                }  
+                        """,
+                null
+        );
+
+        assertHover("test.ts",
+                """
+                        const s = "";
+                        s.c<caret>harAt(0);
+                        """,
+                """
+                                {
+                                    "contents": {}     
+                                }  
+                        """,
+                null
+        );
+    }
+
+    public void testNoHoverWithInvalidMarkupContent() {
+        assertHover("test.ts",
+                """
+                        const s = "";
+                        s.c<caret>harAt(0);
+                        """,
+                """
+                                {
+                                  "contents": {
+                                    "kind": "markdown",
+                                    "value": ""
+                                  },
+                                  "range": {
+                                    "start": {
+                                      "line": 1,
+                                      "character": 2
+                                    },
+                                    "end": {
+                                      "line": 1,
+                                      "character": 8
+                                    }
+                                  }
+                                }  
+                        """,
+                null
+        );
+    }
+
+    public void testNoHoverWithInvalidMarkedString() {
+        assertHover("test.ts",
+                """
+                        const s = "";
+                        s.c<caret>harAt(0);
+                        """,
+                """
+                        {
+                            "contents": [
+                                 {
+                                     "language": "java",
+                                     "value": ""
+                                 },
+                                 ""
+                            ]
+                        }  
+                        """,
+                null
+        );
+    }
+
 }
