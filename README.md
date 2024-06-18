@@ -53,6 +53,7 @@ Here are some projects that use LSP4IJ:
 
  * [Quarkus Tools for IntelliJ](https://github.com/redhat-developer/intellij-quarkus)
  * [Inga for IntelliJ](https://github.com/seachicken/intellij-inga)
+ * [IntelliJ SumnekoLua](https://github.com/CppCXY/Intellij-SumnekoLua)
 
 ## Requirements
 
