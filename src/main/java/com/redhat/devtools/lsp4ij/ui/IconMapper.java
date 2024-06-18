@@ -14,6 +14,9 @@
 package com.redhat.devtools.lsp4ij.ui;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.FileTypeManager;
+import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.util.ui.ColorIcon;
 import org.eclipse.lsp4j.CompletionItem;
@@ -27,6 +30,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static com.intellij.util.PathUtil.getFileExtension;
 
 /**
  * Maps LSP4J kinds to Intellij Icons. See the <a href="https://jetbrains.design/intellij/resources/icons_list/" target="_blank">JetBrains icon list</a> for reference.
@@ -54,10 +59,34 @@ public class IconMapper {
             return null;
         }
         Icon icon = null;
-        if (item.getKind() == CompletionItemKind.Color) {
+        if (item.getKind() == CompletionItemKind.File) {
+            icon = getFileIcon(item);
+        } else if (item.getKind() == CompletionItemKind.Color) {
             icon = getColorIcon(item);
         }
         return icon == null? getIcon(item.getKind()) : icon;
+    }
+
+    private static Icon getFileIcon(CompletionItem item) {
+        FileType fileType = getFileType(item.getLabel());
+        if (fileType == null) {
+            fileType = getFileType(item.getDetail());
+        }
+        return fileType == null? null: fileType.getIcon();
+    }
+
+    private static FileType getFileType(String fileOrPathName){
+        if (fileOrPathName == null || fileOrPathName.isBlank()) {
+            return null;
+        }
+        String extension = getFileExtension(fileOrPathName);
+        if (extension != null) {
+            FileType fileType = FileTypeManager.getInstance().getFileTypeByExtension(extension);
+            if (!UnknownFileType.INSTANCE.equals(fileType)) {
+                return fileType;
+            }
+        }
+        return null;
     }
 
     private static Icon getColorIcon(@NotNull CompletionItem item) {
