@@ -257,11 +257,13 @@
         <elementDescriptionProvider
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageElementDescriptionProvider"/>
         <customUsageSearcher
+                order="last"
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageSearcher"/>
         <usageTargetProvider
                 order="last"
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTargetProvider"/>
         <findUsagesHandlerFactory
+                order="last, before default"
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory"/>
         <usageTypeProvider
                 order="last"
