@@ -180,9 +180,7 @@ public class SyntaxColorationCodeBlockRenderer implements NodeRenderer {
             // Case 2: Try to highlight code block with TextMate
             if (!(HAS_TEXTMATE_SUPPORT && TextMateHighlighterHelper.highlightWithTextMate(code, language , this.fileName, html))) {
                 // Case 3 : no highlight
-                html.withAttr().tag("code");
                 html.text(node.getContentChars());
-                html.tag("/code");
             }
         }
         html.tag("/pre").closePre();
