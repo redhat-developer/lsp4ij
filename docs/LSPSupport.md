@@ -323,12 +323,21 @@ the `codeInsight.parameterInfo` extension point. By default, LSP4IJ registers th
         implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 
 <codeInsight.parameterInfo
-id="LSPParameterInfoHandlerForTextMate"
-language="textmate"
-implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
+        id="LSPParameterInfoHandlerForTextMate"
+        language="textmate"
+        implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 ```
 
 If you use another language, you will have to declare `codeInsight.parameterInfo` with your language.
+To override the IDE's default behaviour, use `order="first"`:
+
+```xml
+<codeInsight.parameterInfo
+        id="YourID"
+        language="YourLanguage"
+        order="first"
+        implementationClass="YourClass"/>
+```
 
 Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing signature help:
 
