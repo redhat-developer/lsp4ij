@@ -329,7 +329,8 @@ the `codeInsight.parameterInfo` extension point. By default, LSP4IJ registers th
 ```
 
 If you use another language, you will have to declare `codeInsight.parameterInfo` with your language.
-To override the IDE's default behaviour, use `order="first"`:
+If `codeInsight.parameterInfo` for the language is already defined by another plugin or the IDE,
+you can use `order="first"` to gain priority:
 
 ```xml
 <codeInsight.parameterInfo
