@@ -60,4 +60,7 @@ public class LSPDocumentationTarget implements DocumentationTarget {
         return Pointer.hardPointer(this);
     }
 
+    public PsiFile getFile() {
+        return file;
+    }
 }

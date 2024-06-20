@@ -28,6 +28,7 @@ import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.*;
 import com.intellij.psi.PsiElement;
@@ -48,6 +49,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Utilities class for LSP.
@@ -62,6 +64,10 @@ public class LSPIJUtils {
     private static final String JAR_SCHEME = JAR_PROTOCOL + ":";
 
     private static final String JRT_SCHEME = JRT_PROTOCOL + ":";
+
+    public static final String HASH_SEPARATOR = "#";
+
+    private static final String ENCODED_HASH_SEPARATOR = "%23";
 
     private static final Comparator<TextEdit> TEXT_EDITS_ASCENDING_COMPARATOR = (a, b) -> {
         int diff = a.getRange().getStart().getLine() - b.getRange().getStart().getLine();
@@ -121,8 +127,119 @@ public class LSPIJUtils {
                                        @Nullable Position position,
                                        boolean focusEditor,
                                        @NotNull Project project) {
+        return openInEditor(fileUri, position, focusEditor, false, project);
+    }
+
+    /**
+     * Open the given fileUrl in an editor.
+     *
+     * <p>
+     *     the following syntax is supported for fileUrl:
+     *     <ul>
+     *         <li>file:///C:/Users/username/foo.txt</li>
+     *         <li>C:/Users/username/foo.txt</li>
+     *         <li>file:///C:/Users/username/foo.txt#L1:5</li>
+     *     </ul>
+     * </p>
+     * @param fileUri the file Uri to open.
+     * @param position    the position.
+     * @param focusEditor true if editor will take the focus and false otherwise.
+     * @param createFileIfNeeded true if file must be created if doesn't exist and false otherwise.
+     * @param project the project.
+     * @return true if file Url can be opened and false otherwise.
+     */
+    public static boolean openInEditor(@NotNull String fileUri,
+                                       @Nullable Position position,
+                                       boolean focusEditor,
+                                       boolean createFileIfNeeded,
+                                       @NotNull Project project) {
+        if (position == null) {
+            // Try to get position information from the fileUri
+            // ex :
+            // - file:///c:/Users/azerr/Downloads/simpleTest/simpleTest/yes.lua#L2
+            // - file:///c:/Users/azerr/Downloads/simpleTest/simpleTest/yes.lua#L2:5
+            // - file:///c%3A/Users/azerr/Downloads/simpleTest/simpleTest/yes.lua%23L2
+            String findHash = HASH_SEPARATOR;
+            int hashIndex = fileUri.lastIndexOf(findHash);
+            if (hashIndex == -1) {
+                findHash = ENCODED_HASH_SEPARATOR;
+                hashIndex = fileUri.lastIndexOf(findHash);
+            }
+            boolean hasPosition = hashIndex > 0 && hashIndex != fileUri.length() - 1;
+            if (hasPosition) {
+                position = toPosition(fileUri.substring(hashIndex + findHash.length()));
+                fileUri = fileUri.substring(0, hashIndex);
+            }
+        }
         VirtualFile file = findResourceFor(fileUri);
+        if (file == null && createFileIfNeeded) {
+            // The file doesn't exist,
+            // open a dialog to confirm the creation of the file.
+            final String uri = fileUri;
+            if (ApplicationManager.getApplication().isDispatchThread()) {
+                return createFileAndOpenInEditor(uri, project);
+            } else {
+                AtomicBoolean result = new AtomicBoolean(false);
+                ApplicationManager.getApplication().invokeAndWait(() -> {
+                    result.set(createFileAndOpenInEditor(uri, project));
+                });
+                return result.get();
+            }
+        }
         return openInEditor(file, position, focusEditor, project);
+    }
+
+    private static boolean createFileAndOpenInEditor(@NotNull String fileUri, @NotNull Project project) {
+        int result = Messages.showYesNoDialog(LanguageServerBundle.message("lsp.create.file.confirm.dialog.message", fileUri),
+                LanguageServerBundle.message("lsp.create.file.confirm.dialog.title"), Messages.getQuestionIcon());
+        if (result == Messages.YES) {
+            try {
+                // Create file
+                VirtualFile newFile = LSPIJUtils.createFile(fileUri);
+                if (newFile != null) {
+                    // Open it in an editor
+                    return LSPIJUtils.openInEditor(newFile, null, project);
+                }
+            } catch (Exception e) {
+                Messages.showErrorDialog(LanguageServerBundle.message("lsp.create.file.error.dialog.message", fileUri, e.getMessage()),
+                        LanguageServerBundle.message("lsp.create.file.error.dialog.title"));
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Convert position String 'L1:2' to an LSP {@link Position} and null otherwise.
+     *
+     * @param positionString the position string (ex: 'L1:2')
+     *
+     * @return position String 'L1:2' to an LSP {@link Position} and null otherwise.
+     */
+    private static Position toPosition(String positionString) {
+        if (positionString == null || positionString.isEmpty()) {
+            return null;
+        }
+        if (positionString.charAt(0) != 'L') {
+            return null;
+        }
+        positionString = positionString.substring(1, positionString.length());
+        String[] positions = positionString.split(":");
+        if (positions.length == 0) {
+            return null;
+        }
+        int line = toInt(0, positions) - 1; // Line numbers should be 1-based
+        int character = toInt(1, positions);
+        return new Position(line, character);
+    }
+
+    private static int toInt(int index, String[] positions) {
+        if (index < positions.length) {
+            try {
+                return Integer.valueOf(positions[index]);
+            } catch (Exception e) {
+            }
+        }
+        return 0;
     }
 
     /**
@@ -153,17 +270,34 @@ public class LSPIJUtils {
                                        boolean focusEditor,
                                        @NotNull Project project) {
         if (file != null) {
-            if (position == null) {
-                return FileEditorManager.getInstance(project).openFile(file, true).length > 0;
+            final Document document = position != null ? LSPIJUtils.getDocument(file) : null;
+            if (ApplicationManager.getApplication().isDispatchThread()) {
+                return doOpenInEditor(file, position, document, focusEditor, project);
             } else {
-                Document document = FileDocumentManager.getInstance().getDocument(file);
-                if (document != null) {
-                    OpenFileDescriptor desc = new OpenFileDescriptor(project, file, LSPIJUtils.toOffset(position, document));
-                    return FileEditorManager.getInstance(project).openTextEditor(desc, focusEditor) != null;
-                }
+                AtomicBoolean result = new AtomicBoolean(false);
+                ApplicationManager.getApplication().invokeAndWait(() -> {
+                    result.set(doOpenInEditor(file, position, document, focusEditor, project));
+                });
+                return result.get();
             }
         }
         return false;
+    }
+
+    private static boolean doOpenInEditor(@NotNull VirtualFile file,
+                                          @Nullable Position position,
+                                          @Nullable Document document,
+                                          boolean focusEditor,
+                                          @NotNull Project project) {
+        if (position == null) {
+            return FileEditorManager.getInstance(project).openFile(file, true).length > 0;
+        } else {
+            if (document != null) {
+                OpenFileDescriptor desc = new OpenFileDescriptor(project, file, LSPIJUtils.toOffset(position, document));
+                return FileEditorManager.getInstance(project).openTextEditor(desc, focusEditor) != null;
+            }
+            return false;
+        }
     }
 
     /**
@@ -412,7 +546,6 @@ public class LSPIJUtils {
      * Return top-level directories which contain files related to the project.
      *
      * @param project the project.
-     *
      * @return top-level directories which contain files related to the project.
      */
     @NotNull

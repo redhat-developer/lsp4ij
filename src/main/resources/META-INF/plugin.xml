@@ -216,6 +216,9 @@
                 id="LSPDocumentationTargetProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTargetProvider"
                 order="first"/>
+        <platform.backend.documentation.linkHandler
+                id="LSPDocumentationLinkHandler"
+                implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationLinkHandler" />
 
         <!-- LSP textDocument/folding -->
         <lang.foldingBuilder id="LSPFoldingBuilderForText"

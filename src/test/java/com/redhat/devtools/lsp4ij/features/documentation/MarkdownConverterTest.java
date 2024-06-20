@@ -19,6 +19,8 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.file.Path;
+
 /**
  * Test Markdown conversion to HTML
  */
@@ -77,7 +79,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
         assertEquals("<p>The <code>&lt;project&gt;</code> element is the root of the descriptor.</p>\n", toHtml("The `<project>` element is the root of the descriptor."));
         assertEquals("<h1>Hey Man</h1>\n", toHtml("# Hey Man #"));
         assertEquals("<p>ONLY_THIS_TEXT</p>\n", toHtml("ONLY_THIS_TEXT"));
-        assertEquals("<p>This is<br />\n<strong>bold</strong></p>\n", toHtml("""
+        assertEquals("<p>This is\n<strong>bold</strong></p>\n", toHtml("""
                 This is
                 **bold**
                 """));
@@ -92,9 +94,9 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
                 """;
 
         String html = """
-                <p>multi<br />
-                line<br />
-                <code>HTML</code><br />
+                <p>multi
+                line
+                <code>HTML</code>
                 stuff</p>
                 """;
         assertEquals(html, toHtml(markdown));
@@ -218,7 +220,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
                 </blockquote>
                 """;
 
-        assertEquals(html, toHtml(markdown, null, "test.ts"));
+        assertEquals(html, toHtml(markdown, null, null, "test.ts"));
     }
 
     public void testTypeScriptHighlightIndentedBlockquoteWithFileNameConversion() {
@@ -236,7 +238,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
                 </blockquote>
                 """;
 
-        assertEquals(html, toHtml(markdown, null, "test.ts"));
+        assertEquals(html, toHtml(markdown, null, null, "test.ts"));
     }
 
     public void testXmlHighlightIndentedBlockquoteWithLanguageConversion() {
@@ -255,14 +257,29 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
                 </blockquote>
                 """;
 
-        assertEquals(html, toHtml(markdown, XMLLanguage.INSTANCE, null));
+        assertEquals(html, toHtml(markdown, null, XMLLanguage.INSTANCE, null));
+    }
+
+    public void testTypeScriptWithLinksInsideParagraph() {
+        String markdown = "\n```typescript\nfunction foo(): void\n```\nSome content...\n\u003e and some links:\n [bar.ts](bar.ts#L2:2)\n [lsp4ij](https://github.com/redhat-developer/lsp4ij)";
+        String html = "<pre><span style=\"color:#000080;font-weight:bold;\">function&#32;</span><span style=\"\">foo()</span><span style=\"color:#000080;font-weight:bold;\">:&#32;</span><span style=\"font-style:italic;\">void<br></span></pre>\n" +
+                "<p>Some content...</p>\n" +
+                "<blockquote>\n" +
+                "<p>and some links:\n" +
+                "<a href=\"bar.ts#L2:2\">bar.ts</a>\n" +
+                "<a href=\"https://github.com/redhat-developer/lsp4ij\">lsp4ij</a></p>\n" +
+                "</blockquote>\n";
+        assertEquals(html, toHtml(markdown, null, null, "test.ts"));
     }
 
     private String toHtml(String markdown) {
         return MarkdownConverter.getInstance(myFixture.getProject()).toHtml(markdown);
     }
 
-    private String toHtml(@NotNull String markdown, @Nullable Language language, @Nullable String fileName) {
-        return MarkdownConverter.getInstance(myFixture.getProject()).toHtml(markdown,language, fileName);
+    private String toHtml(@NotNull String markdown,
+                          @Nullable Path baseDir,
+                          @Nullable Language language,
+                          @Nullable String fileName) {
+        return MarkdownConverter.getInstance(myFixture.getProject()).toHtml(markdown, baseDir, language, fileName);
     }
 }
