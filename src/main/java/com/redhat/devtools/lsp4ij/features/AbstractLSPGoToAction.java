@@ -126,6 +126,6 @@ public abstract class AbstractLSPGoToAction extends AnAction {
 
     @Override
     public final @NotNull ActionUpdateThread getActionUpdateThread() {
-        return ActionUpdateThread.EDT;
+        return ActionUpdateThread.BGT;
     }
 }
