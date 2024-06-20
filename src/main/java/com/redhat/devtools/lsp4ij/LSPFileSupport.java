@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCodeActionSupport;
 import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
@@ -30,13 +31,15 @@ import com.redhat.devtools.lsp4ij.features.rename.LSPPrepareRenameSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPRenameSupport;
 import com.redhat.devtools.lsp4ij.features.signatureHelp.LSPSignatureHelpSupport;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * LSP file support stored in the opened {@link PsiFile} with key "lsp.file.support"
  * which manages and caches LSP codeLens, inlayHint, color futures.
  */
-public class LSPFileSupport implements Disposable {
+@ApiStatus.Internal
+public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private static final Key<LSPFileSupport> LSP_FILE_SUPPORT_KEY = Key.create("lsp.file.support");
     private final PsiFile file;
@@ -118,6 +121,13 @@ public class LSPFileSupport implements Disposable {
         getReferenceSupport().cancel();
         getDeclarationSupport().cancel();
         getTypeDefinitionSupport().cancel();
+        var map = getUserMap();
+        for(var key : map.getKeys()) {
+            var value = map.get(key);
+            if (value instanceof Disposable disposable) {
+                disposable.dispose();
+            }
+        }
     }
 
     /**
@@ -306,4 +316,7 @@ public class LSPFileSupport implements Disposable {
         return file.getUserData(LSP_FILE_SUPPORT_KEY) != null;
     }
 
+    public PsiFile getFile() {
+        return file;
+    }
 }

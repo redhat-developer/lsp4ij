@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.documentation;
+package com.redhat.devtools.lsp4ij.features.documentation.markdown;
 
 import com.intellij.lang.Language;
 import com.intellij.openapi.editor.highlighter.EditorHighlighter;
@@ -17,6 +17,8 @@ import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.editor.richcopy.SyntaxInfoBuilder;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.TokenType;
+import com.redhat.devtools.lsp4ij.features.documentation.LightQuickDocHighlightingHelper;
+import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.vladsch.flexmark.ast.FencedCodeBlock;
@@ -24,8 +26,10 @@ import com.vladsch.flexmark.ast.IndentedCodeBlock;
 import com.vladsch.flexmark.html.HtmlWriter;
 import com.vladsch.flexmark.html.renderer.NodeRenderer;
 import com.vladsch.flexmark.html.renderer.NodeRendererContext;
+import com.vladsch.flexmark.html.renderer.NodeRendererFactory;
 import com.vladsch.flexmark.html.renderer.NodeRenderingHandler;
 import com.vladsch.flexmark.util.ast.ContentNode;
+import com.vladsch.flexmark.util.data.DataHolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -54,10 +58,10 @@ public class SyntaxColorationCodeBlockRenderer implements NodeRenderer {
 
     private final String fileName;
 
-    public SyntaxColorationCodeBlockRenderer(Project project, Language fileLanguage, String fileName) {
-        this.project = project;
-        this.fileLanguage = fileLanguage;
-        this.fileName = fileName;
+    public SyntaxColorationCodeBlockRenderer(DataHolder options) {
+        this.project = MarkdownConverter.PROJECT_CONTEXT.get(options);
+        this.fileLanguage = MarkdownConverter.LANGUAGE_CONTEXT.get(options);
+        this.fileName = MarkdownConverter.FILE_NAME_CONTEXT.get(options);
     }
 
     @Override
@@ -208,5 +212,11 @@ public class SyntaxColorationCodeBlockRenderer implements NodeRenderer {
         }
     }
 
+    public static class Factory implements NodeRendererFactory {
+        @Override
+        public NodeRenderer apply(DataHolder options) {
+            return new SyntaxColorationCodeBlockRenderer(options);
+        }
+    }
 }
 

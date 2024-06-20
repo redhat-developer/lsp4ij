@@ -176,7 +176,7 @@ public class ServerMessageHandler {
 
         CompletableFuture<ShowDocumentResult> future = new CompletableFuture<>();
         ApplicationManager.getApplication()
-                .invokeLater(() -> {
+                .executeOnPooledThread(() -> {
                     if (LSPIJUtils.openInEditor(uri, position, focusEditor, project)) {
                         future.complete(SHOW_DOCUMENT_RESULT_WITH_SUCCESS);
                     }

@@ -14,21 +14,17 @@
 package com.redhat.devtools.lsp4ij.features.documentLink;
 
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationHandler;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.DocumentLinkParams;
@@ -36,7 +32,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -71,7 +66,8 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
             waitUntilDone(documentLinkFuture, psiFile);
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+        } catch (
+                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
             documentLinkSupport.cancel();
             return null;
@@ -100,28 +96,12 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                                 // which asks if user want to create the file.
                                 // At this step we cannot open a dialog directly, we need to open the dialog
                                 // with invoke later.
-                                ApplicationManager.getApplication().invokeLater(() -> {
-                                    int result = Messages.showYesNoDialog(LanguageServerBundle.message("lsp.create.file.confirm.dialog.message", target),
-                                            LanguageServerBundle.message("lsp.create.file.confirm.dialog.title"), Messages.getQuestionIcon());
-                                    if (result == Messages.YES) {
-                                        try {
-                                            // Create file
-                                            VirtualFile newFile = LSPIJUtils.createFile(target);
-                                            if (newFile != null) {
-                                                // Open it in an editor
-                                                LSPIJUtils.openInEditor(newFile, null, project);
-                                            }
-                                        } catch (IOException e) {
-                                            Messages.showErrorDialog(LanguageServerBundle.message("lsp.create.file.error.dialog.message", target, e.getMessage()),
-                                                    LanguageServerBundle.message("lsp.create.file.error.dialog.title"));
-                                        }
-                                    }
-                                });
+                                LSPIJUtils.openInEditor(target, null, true, true, project);
                                 // Return an empty result here.
-                                // If user accepts to create the file, the open is done after the creation of teh file.
+                                // If user accepts to create the file, the open is done after the creation of the file.
                                 return PsiElement.EMPTY_ARRAY;
                             }
-                            return new PsiElement[]{ LSPIJUtils.getPsiFile(targetFile, project)};
+                            return new PsiElement[]{LSPIJUtils.getPsiFile(targetFile, project)};
                         }
                     }
                 }
