@@ -47,6 +47,10 @@ You can find more documentation in:
 
 <!-- Plugin description end -->
 
+## Articles
+
+ * [Meet LSP4IJ, a new LSP Client for JetBrains-based IDEs](https://idetools.dev/blog/lsp4ij-announcement/)
+
 ## Who is using LSP4IJ?
 
 Here are some projects that use LSP4IJ:
