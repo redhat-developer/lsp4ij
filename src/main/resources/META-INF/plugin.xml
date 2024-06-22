@@ -133,6 +133,14 @@
                 beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
+
+        <!-- Semantic tokens colors provider extension point -->
+        <extensionPoint
+                name="semanticTokensColorsProvider"
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean">
+            <with attribute="class" implements="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider"/>
+        </extensionPoint>
+
     </extensionPoints>
 
     <!-- Language Server support -->
@@ -218,7 +226,7 @@
                 order="first"/>
         <platform.backend.documentation.linkHandler
                 id="LSPDocumentationLinkHandler"
-                implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationLinkHandler" />
+                implementation="com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationLinkHandler"/>
 
         <!-- LSP textDocument/folding -->
         <lang.foldingBuilder id="LSPFoldingBuilderForText"
@@ -249,6 +257,13 @@
         <formattingService
                 id="LSPFormattingAndRangeBothService"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingAndRangeBothService"/>
+
+        <!-- LSP textDocument/semanticTokens request support -->
+        <highlightVisitor
+                id="LSPRainbowVisitor"
+                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensRainbowVisitor"/>
+        <colorSettingsPage
+                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
 
         <!-- LSP Find Usages (LSP) support shows:
              - textDocument/declaration
@@ -486,6 +501,23 @@
                 factoryClass="com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowFactory"
                 canCloseContents="false"
                 icon="AllIcons.Webreferences.Server"/>
+
+    </extensions>
+
+    <!-- Semantic Tokens Inspector -->
+    <extensions defaultExtensionNs="com.intellij">
+
+        <projectService
+                id="com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorManager"
+                serviceImplementation="com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorManager"/>
+
+        <toolWindow
+                id="Semantic Tokens Inspector"
+                anchor="bottom"
+                factoryClass="com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorToolWindowFactory"
+                canCloseContents="true"
+                doNotActivateOnStart="true"
+                icon="AllIcons.General.InspectionsEye"/>
 
     </extensions>
 

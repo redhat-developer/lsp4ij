@@ -78,6 +78,9 @@ public class ClientCapabilitiesFactory {
         // Refresh support for InlayHint
         workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));
 
+        // Refresh support for SemanticTokens
+        workspaceClientCapabilities.setSemanticTokens(new SemanticTokensWorkspaceCapabilities(Boolean.TRUE));
+
         return workspaceClientCapabilities;
     }
 
@@ -96,9 +99,13 @@ public class ClientCapabilitiesFactory {
 
         // Code Action support
         final var codeAction = new CodeActionCapabilities(new CodeActionLiteralSupportCapabilities(
-                new CodeActionKindCapabilities(List.of(CodeActionKind.QuickFix, CodeActionKind.Refactor,
-                        CodeActionKind.RefactorExtract, CodeActionKind.RefactorInline,
-                        CodeActionKind.RefactorRewrite, CodeActionKind.Source,
+                new CodeActionKindCapabilities(List.of(
+                        CodeActionKind.QuickFix,
+                        CodeActionKind.Refactor,
+                        CodeActionKind.RefactorExtract,
+                        CodeActionKind.RefactorInline,
+                        CodeActionKind.RefactorRewrite,
+                        CodeActionKind.Source,
                         CodeActionKind.SourceOrganizeImports))),
                 Boolean.TRUE);
         codeAction.setDataSupport(Boolean.TRUE);
@@ -202,6 +209,51 @@ public class ClientCapabilitiesFactory {
         final var renameCapabilities = new RenameCapabilities();
         renameCapabilities.setPrepareSupport(true);
         textDocumentClientCapabilities.setRename(renameCapabilities);
+
+        // textDocument/semanticTokens
+        var semanticTokensCapabilities = new SemanticTokensCapabilities();
+        semanticTokensCapabilities.setTokenTypes(List.of(
+                SemanticTokenTypes.Namespace,
+                SemanticTokenTypes.Type,
+                SemanticTokenTypes.Class,
+                SemanticTokenTypes.Enum,
+                SemanticTokenTypes.Interface,
+                SemanticTokenTypes.Struct,
+                SemanticTokenTypes.TypeParameter,
+                SemanticTokenTypes.Parameter,
+                SemanticTokenTypes.Variable,
+                SemanticTokenTypes.Property,
+                SemanticTokenTypes.EnumMember,
+                SemanticTokenTypes.Event,
+                SemanticTokenTypes.Function,
+                SemanticTokenTypes.Method,
+                SemanticTokenTypes.Macro,
+                SemanticTokenTypes.Keyword,
+                SemanticTokenTypes.Modifier,
+                SemanticTokenTypes.Comment,
+                SemanticTokenTypes.String,
+                SemanticTokenTypes.Number,
+                SemanticTokenTypes.Regexp,
+                SemanticTokenTypes.Operator,
+                SemanticTokenTypes.Decorator,
+                "label"
+        ));
+        semanticTokensCapabilities.setTokenModifiers(List.of(
+                SemanticTokenModifiers.Declaration,
+                SemanticTokenModifiers.Definition,
+                SemanticTokenModifiers.Readonly,
+                SemanticTokenModifiers.Static
+                /*"deprecated",
+                "abstract",
+                "async",
+                "modification",
+                "documentation",
+                "defaultLibrary"*/
+        ));
+        semanticTokensCapabilities.setServerCancelSupport(Boolean.TRUE);
+        var semanticTokensClientCapabilitiesRequests = new SemanticTokensClientCapabilitiesRequests(Boolean.TRUE, Boolean.FALSE);
+        semanticTokensCapabilities.setRequests(semanticTokensClientCapabilitiesRequests);
+        textDocumentClientCapabilities.setSemanticTokens(semanticTokensCapabilities);
 
         // Synchronization support
         textDocumentClientCapabilities

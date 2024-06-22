@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -62,9 +63,12 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             return;
         }
 
-        TracingMessageConsumer tracing = getLSPRequestCacheFor(languageServer);
-        String log = tracing.log(message, messageConsumer, serverTrace);
-        invokeLaterIfNeeded(() -> showTrace(processTreeNode, log));
+        ApplicationManager.getApplication()
+                .executeOnPooledThread(() -> {
+                    TracingMessageConsumer tracing = getLSPRequestCacheFor(languageServer);
+                    String log = tracing.log(message, messageConsumer, serverTrace);
+                    invokeLaterIfNeeded(() -> showTrace(processTreeNode, log));
+                });
     }
 
     @Override

@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -405,6 +406,16 @@ public class LanguageServerItem {
         return false;
     }
 
+    /**
+     * Returns true if the language server can support semantic tokens and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support semantic tokens and false otherwise.
+     */
+    public static boolean isSemanticTokensSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                serverCapabilities.getSemanticTokensProvider() != null;
+    }
 
     /**
      * Returns true if the language server can support rename and false otherwise.
@@ -498,4 +509,7 @@ public class LanguageServerItem {
         return capability != null && capability;
     }
 
+    public SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
+        return getServerWrapper().getServerDefinition().getSemanticTokensColorsProvider();
+    }
 }

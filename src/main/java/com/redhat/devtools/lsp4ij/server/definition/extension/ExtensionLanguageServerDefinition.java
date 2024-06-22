@@ -18,6 +18,7 @@ import com.intellij.openapi.util.IconLoader;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -40,7 +41,7 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
 
     private Icon icon;
 
-    public ExtensionLanguageServerDefinition(ServerExtensionPointBean element) {
+    public ExtensionLanguageServerDefinition(@NotNull ServerExtensionPointBean element) {
         super(element.id, element.getName(), element.getDescription(), element.singleton, element.lastDocumentDisconnectedTimeout, element.supportsLightEdit, false);
         this.extension = element;
         // Enable by default language server from plugin
@@ -142,5 +143,10 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
             }
         }
         return super.getIcon();
+    }
+
+    @Override
+    public SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
+        return super.getSemanticTokensColorsProvider();
     }
 }

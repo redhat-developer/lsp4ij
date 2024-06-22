@@ -484,10 +484,13 @@ public class LSPIJUtils {
      * @return a valid offset from the given position in the given document.
      */
     public static int toOffset(@NotNull Position position, @NotNull Document document) {
+        return toOffset(position.getLine(), position.getCharacter(), document);
+    }
+
+    public static int toOffset(int line, int character, @NotNull Document document) {
         // See https://github.com/microsoft/vscode-languageserver-node/blob/8e625564b531da607859b8cb982abb7cdb2fbe2e/textDocument/src/main.ts#L304
 
         // Adjust position line/character according to this comment https://github.com/microsoft/vscode-languageserver-node/blob/ed3cd0f78c1495913bda7318ace2be7f968008af/textDocument/src/main.ts#L26
-        int line = position.getLine();
         if (line >= document.getLineCount()) {
             // The line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
             return document.getTextLength();
@@ -498,7 +501,7 @@ public class LSPIJUtils {
         int lineOffset = document.getLineStartOffset(line);
         int nextLineOffset = document.getLineEndOffset(line);
         // If the character value is greater than the line length it defaults back to the line length
-        return Math.max(Math.min(lineOffset + position.getCharacter(), nextLineOffset), lineOffset);
+        return Math.max(Math.min(lineOffset + character, nextLineOffset), lineOffset);
     }
 
     /**
@@ -953,7 +956,7 @@ public class LSPIJUtils {
      * @param caretOffset the current caret offset and -1 if caret must be not moved.
      * @return the increment (positive or negative) used to update caret offset.
      */
-    private static int applyEdit(int start,
+    public static int applyEdit(int start,
                                  int end,
                                  @Nullable String newText,
                                  @NotNull Document document,

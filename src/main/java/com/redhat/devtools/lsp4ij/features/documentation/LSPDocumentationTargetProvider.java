@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
@@ -83,7 +82,6 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
             // textDocument/hover has been collected correctly
             List<Hover> hovers = hoverFuture.getNow(null);
             if (hovers != null) {
-                Editor editor = LSPIJUtils.editorForElement(psiFile);
                 return hovers
                         .stream()
                         .map(hover -> toDocumentTarget(hover, document, psiFile))

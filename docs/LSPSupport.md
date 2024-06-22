@@ -58,7 +58,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange)  (see [implementation details](#folding-range))
  * ❌ [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange).
  * ❌ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol).
- * ❌ [textDocument/semanticTokens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).
+ * ✅ [textDocument/semanticTokens (experimental)](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens) (see [implementation details](#semantic-tokens))
  * ❌ [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue).
  * ❌ [workspace/inlineValue/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh).
  * ❌ [textDocument/moniker](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker).
@@ -455,3 +455,73 @@ is rendered as a `Sticky balloon` notification:
 You can change the notification behavior of `LSP/window/showMessageRequest` by using the standard UI `Notifications` preferences :
 
 ![window/showMessageRequest Notification](./images/lsp-support/window_showMessageRequest_Notification.png)
+
+#### Semantic Tokens
+
+Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to enable support for semantic tokens.
+
+The semantic tokens support:
+
+ * uses only [textDocument/semanticTokens/full](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest) LSP request.
+ * uses the [IntelliJ Semantic Highlighting support](https://plugins.jetbrains.com/docs/intellij/syntax-highlighting-and-error-highlighting.html#semantic-highlighting) 
+by implementing [RainbowVisitor](https://github.com/JetBrains/intellij-community/blob/master/platform/analysis-impl/src/com/intellij/codeInsight/daemon/RainbowVisitor.java)
+with the [LSPSemanticTokensRainbowVisitor](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/LSPSemanticTokensRainbowVisitor.java) class.
+ * Use [SemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/SemanticTokensColorsProvider.java) API to get TextAttributesKey from tokenType, tokenModifiers.
+ * By default, LSP4IJ, uses the [DefaultSemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/DefaultSemanticTokensColorsProvider.java)
+but you can use your own provider with the [semanticTokensColorsProvider extension point](./DeveloperGuide.md#semantic-tokens-colors-provider). 
+ 
+##### DefaultSemanticTokensColorsProvider
+
+The following table lists the currently predefined mappings:
+
+ * the `Semantic token types` column shows the standard LSP Semantic token types. 
+ * the `Semantic modifiers types` column shows the standard LSP Semantic modifier types. 
+ * the `SemanticTokensHighlightingColors` column defines the `TextAttributesKey` constants declared in the LSP4IJ `SemanticTokensHighlightingColors` class.
+ * the `DefaultLanguageHighlighterColors` column defines the standard `TextAttributesKey` used by IntelliJ that `SemanticTokensHighlightingColors` inherits.
+
+| Semantic token types | Semantic modifier types | SemanticTokensHighlightingColors | (inherited from) DefaultLanguageHighlighterColors |
+|----------------------|------------------------|----------------------------------|---------------------------------------------------|
+| namespace            | definition             | NAMESPACE_DECLARATION            | CLASS_NAME                                        |
+| namespace            | declaration            | NAMESPACE_DECLARATION            | CLASS_NAME                                        |
+| namespace            |                        | NAMESPACE                        | CLASS_REFERENCE                                   |
+| class                | definition             | CLASS_DECLARATION                | CLASS_NAME                                        |
+| class                | declaration            | CLASS_DECLARATION                | CLASS_NAME                                        |
+| class                |                        | CLASS                            | CLASS_REFERENCE                                   |
+| enum                 |                        | ENUM                             | CLASS_NAME                                        |
+| interface            |                        | INTERFACE                        | INTERFACE_NAME                                    |
+| struct               |                        | STRUCT                           | CLASS_NAME                                        |
+| typeParameter        |                        | TYPE_PARAMETER                   | PARAMETER                                         |
+| type                 |                        | TYPE                             | CLASS_NAME                                        |
+| parameter            |                        | PARAMETER                        | PARAMETER                                         |
+| variable             | static + readonly      | STATIC_READONLY_VARIABLE         | CONSTANT                                          |
+| variable             | static                 | STATIC_VARIABLE                  | STATIC_FIELD                                      |
+| variable             | readonly               | READONLY_VARIABLE                | LOCAL_VARIABLE                                    |
+| variable             |                        | VARIABLE                         | REASSIGNED_LOCAL_VARIABLE                         |
+| property             | static + readonly      | STATIC_READONLY_PROPERTY         | CONSTANT                                          |
+| property             | static                 | STATIC_PROPERTY                  | STATIC_FIELD                                      |
+| property             | readonly               | READONLY_PROPERTY                | INSTANCE_FIELD                                    |
+| property             |                        | PROPERTY                         | INSTANCE_FIELD                                    |
+| enumMember           |                        | ENUM_MEMBER                      | STATIC_FIELD                                      |
+| decorator            |                        | DECORATOR                        | METADATA                                          |
+| event                |                        | EVENT                            | PREDEFINED_SYMBOL                                 |
+| function             | definition             | FUNCTION_DECLARATION             | FUNCTION_DECLARATION                              |
+| function             | declaration            | FUNCTION_DECLARATION             | FUNCTION_DECLARATION                              |
+| function             |                        | FUNCTION                         | FUNCTION_CALL                                     |
+| method               | definition             | METHOD_DECLARATION               | FUNCTION_DECLARATION                              |
+| method               | declaration            | METHOD_DECLARATION               | FUNCTION_DECLARATION                              |
+| method               | static                 | STATIC_METHOD                    | STATIC_METHOD                                     |
+| method               |                        | METHOD                           | FUNCTION_CALL                                     |
+| macro                |                        | MACRO                            | KEYWORD                                           |
+| label                |                        | LABEL                            | LABEL                                             |
+| comment              |                        | COMMENT                          | LINE_COMMENT                                      |
+| string               |                        | STRING                           | STRING                                            |
+| keyword              |                        | KEYWORD                          | KEYWORD                                           |
+| number               |                        | NUMBER                           | NUMBER                                            |
+| regexp               |                        | REGEXP                           | VALID_STRING_ESCAPE                               |
+| modifier             |                        | MODIFIER                         | KEYWORD                                           |
+| operator             |                        | OPERATOR                         | OPERATION_SIGN                                    |
+
+If you need other mapping:
+
+ * if you think it is a generic mapping, please create a contribution to define a new `SemanticTokensHighlightingColors` constants
+ * if the mapping is specific to your language, use the [semanticTokensColorsProvider extension point](./DeveloperGuide.md#semantic-tokens-colors-provider) to define your own provider and mapping.

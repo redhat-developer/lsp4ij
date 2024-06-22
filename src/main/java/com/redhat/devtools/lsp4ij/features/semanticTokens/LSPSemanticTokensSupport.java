@@ -1,0 +1,100 @@
+/*******************************************************************************
+ * Copyright (c) 2024 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at http://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+package com.redhat.devtools.lsp4ij.features.semanticTokens;
+
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import org.eclipse.lsp4j.SemanticTokensLegend;
+import org.eclipse.lsp4j.SemanticTokensParams;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * LSP semanticTokens support which loads and caches semantic tokens by consuming:
+ *
+ * <ul>
+ *     <li>LSP 'textDocument/semanticTokens' requests</li>
+ * </ul>
+ */
+public class LSPSemanticTokensSupport extends AbstractLSPFeatureSupport<SemanticTokensParams, SemanticTokensData> {
+
+    public LSPSemanticTokensSupport(@NotNull PsiFile file) {
+        super(file);
+    }
+
+    public CompletableFuture<SemanticTokensData> getSemanticTokens(SemanticTokensParams params) {
+        return super.getFeatureData(params);
+    }
+
+    @Override
+    protected CompletableFuture<SemanticTokensData> doLoad(SemanticTokensParams params, CancellationSupport cancellationSupport) {
+        PsiFile file = super.getFile();
+        return getSemanticTokens(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+    }
+
+    private static @NotNull CompletableFuture<SemanticTokensData> getSemanticTokens(@NotNull VirtualFile file,
+                                                                                    @NotNull Project project,
+                                                                                    @NotNull SemanticTokensParams params,
+                                                                                    @NotNull CancellationSupport cancellationSupport) {
+
+        return LanguageServiceAccessor.getInstance(project)
+                .getLanguageServers(file, LanguageServerItem::isSemanticTokensSupported)
+                .thenComposeAsync(languageServers -> {
+                    // Here languageServers is the list of language servers which matches the given file
+                    // and which have folding range capability
+                    if (languageServers.isEmpty()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+
+                    // Collect list of textDocument/semanticTokens future for each language servers
+                    List<CompletableFuture<SemanticTokensData>> semanticTokensPerServerFutures = languageServers
+                            .stream()
+                            .map(languageServer -> getSemanticTokensFor(params, languageServer, cancellationSupport))
+                            .filter(Objects::nonNull)
+                            .toList();
+
+                    // Merge list of textDocument/foldingRange future in one future which return the list of folding ranges
+                    return semanticTokensPerServerFutures.get(0); //CompletableFutures.mergeInOneFuture(semanticTokensPerServerFutures, cancellationSupport);
+                });
+    }
+
+    private static CompletableFuture<SemanticTokensData> getSemanticTokensFor(SemanticTokensParams params,
+                                                                              LanguageServerItem languageServer,
+                                                                              CancellationSupport cancellationSupport) {
+        return cancellationSupport.execute(languageServer
+                        .getTextDocumentService()
+                        .semanticTokensFull(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL)
+                .thenApplyAsync(semanticTokens -> {
+                    if (semanticTokens == null) {
+                        // textDocument/semanticTokens/full may return null
+                        return null;
+                    }
+                    return new SemanticTokensData(semanticTokens, getLegend(languageServer), languageServer.getSemanticTokensColorsProvider());
+                });
+    }
+
+    @Nullable
+    private static SemanticTokensLegend getLegend(LanguageServerItem languageServer) {
+        var serverCapabilities = languageServer.getServerCapabilities();
+        return serverCapabilities.getSemanticTokensProvider() != null ? serverCapabilities.getSemanticTokensProvider().getLegend() : null;
+    }
+
+}
