@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.client;
 
 import com.google.gson.JsonObject;
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
@@ -146,6 +147,27 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
             if (psiFile != null) {
                 Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
                 InlayHintsFactoryBridge.refreshInlayHints(psiFile, editors, true);
+            }
+        }
+    }
+
+    @Override
+    public CompletableFuture<Void> refreshSemanticTokens() {
+        return CompletableFuture.runAsync(() -> {
+            if (wrapper == null) {
+                return;
+            }
+            refreshSemanticTokensForAllOpenedFiles();
+        });
+    }
+
+    private void refreshSemanticTokensForAllOpenedFiles() {
+        for (var fileData : wrapper.getConnectedFiles()) {
+            VirtualFile file = fileData.getFile();
+            final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+            if (psiFile != null) {
+                // Should be enough?
+                DaemonCodeAnalyzer.getInstance(psiFile.getProject()).restart(psiFile);
             }
         }
     }

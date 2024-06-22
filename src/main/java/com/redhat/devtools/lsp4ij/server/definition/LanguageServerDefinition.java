@@ -23,6 +23,8 @@ import com.intellij.openapi.util.Pair;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
@@ -41,6 +43,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
+    private static SemanticTokensColorsProvider DEFAULT_SEMANTIC_TOKENS_COLORS_PROVIDER = new DefaultSemanticTokensColorsProvider();
+
     private final @NotNull
     String id;
     private final @NotNull
@@ -55,6 +59,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     Map<FileType, String> languageIdFileTypeMappings;
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
+    private SemanticTokensColorsProvider semanticTokensColorsProvider;
 
     public LanguageServerDefinition(@NotNull String id,
                                     @NotNull String name,
@@ -81,6 +86,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         this.languageIdFileTypeMappings = new ConcurrentHashMap<>();
         this.languageIdFileNameMatcherMappings = new CopyOnWriteArrayList<>();
         this.supportsLightEdit = supportsLightEdit;
+        setSemanticTokensColorsProvider(DEFAULT_SEMANTIC_TOKENS_COLORS_PROVIDER);
         if (updateEnabled) {
             // Enable by default language server
             setEnabled(true, null);
@@ -213,5 +219,15 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     public Icon getIcon() {
         return AllIcons.Webreferences.Server;
+    }
+
+
+    @NotNull
+    public SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
+        return semanticTokensColorsProvider;
+    }
+
+    public void setSemanticTokensColorsProvider(@NotNull SemanticTokensColorsProvider semanticTokensColorsProvider) {
+        this.semanticTokensColorsProvider = semanticTokensColorsProvider;
     }
 }

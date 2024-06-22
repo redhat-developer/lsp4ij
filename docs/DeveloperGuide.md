@@ -502,3 +502,41 @@ to open `references/implementations` in a popup when  clicking on a `Codelens` :
 
  * `LanguageClientImpl#createSettings()` which must return a Gson JsonObject of your configuration.
  * or `LanguageClientImpl#findSettings(String section)` if you don't want to work with GSon JsonObject.
+ 
+# Semantic tokens colors provider
+
+Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to enable support for semantic tokens.
+
+When the language server supports semantic tokens, the decoded token type and token modifiers must be translated to an IntelliJ `TextAttributeKeys`.
+using the [SemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/SemanticTokensColorsProvider.java) API:
+
+```java
+public interface SemanticTokensColorsProvider {
+
+    /**
+     * Returns the {@link TextAttributesKey} to use for colorization for the given token type and given token modifiers and null otherwise.
+     *
+     * @param tokenType      the token type.
+     * @param tokenModifiers the token modifiers.
+     * @param file           the Psi file.
+     * @return the {@link TextAttributesKey} to use for colorization for the given token type and given token modifiers and null otherwise.
+     */
+    @Nullable
+    TextAttributesKey getTextAttributesKey(@NotNull String tokenType,
+                                           @NotNull List<String> tokenModifiers,
+                                           @NotNull PsiFile file);
+}
+```
+
+By default, LSP4IJ uses the [DefaultSemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/DefaultSemanticTokensColorsProvider.java),
+but you can use your own provider with the `semanticTokensColorsProvider` extension point:
+
+```xml
+<extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+
+  <semanticTokensColorsProvider
+                   serverId="myLanguageServerId"
+                   class="my.language.server.MySemanticTokensColorsProvider" />
+
+</extensions>
+```

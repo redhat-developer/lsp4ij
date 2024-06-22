@@ -81,3 +81,38 @@ The following LSP features are integrated with the standard `Find Usages` menu (
 If the language server can support [workspace/willRenameFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles), when a file is
 renamed inside IntelliJ IDEA, LSP4IJ can consume it and applies the `WorkspaceEdit`
 to apply some refactoring.
+
+## Semantic Tokens support
+
+LSP4IJ provides **experimental**  support for [LSP Semantic Tokens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).
+
+### Enable semantic tokens
+
+By default, semantic tokens is not activated it.
+To activate it, you need to go to `Editor / Color Scheme / Language Server` and select the `Semantic highlighting` checkbox:
+
+![Enable LSP semantic tokens](./images/LSPSemanticTokensEnable.png)
+
+### Semantic Tokens Inspector
+
+The `Semantic Tokens Inspector` allows you to understand semantic coloring via LSP semantic tokens support. You can open the inspector
+with the menu `View / Tool Window / Semantic Tokens Inspector`:
+
+![LSP Semantic Tokens Inspector Menu](./images/LSPSemanticTokensInspectorMenu.png)
+
+Once the inspector is open, it tracks all calls to semantic tokens. 
+If a file must be colored via semantic tokens, it appears in a tab of the inspector 
+and must display information on the TextAttributeKeys to use and the token types / modifiers decoded
+that you can select in the left panel via the checkboxes:
+
+![LSP Semantic Tokens Inspector](./images/LSPSemanticTokensInspector.png)
+
+### Troubleshooting
+
+If the `Semantic Tokens` doesn't show the expected result, please check that:
+
+ * you have [enabled semantic tokens](#enable-semantic-tokens).
+ * show in the [LSP console](#lsp-console) that your language server reports 
+LSP request `textDocument/semanticTokens/full`
+ * uses the [Semantic Tokens Inspector](#semantic-tokens-inspector) to understand more how the 
+file content is tokenized. Problem could come if LSP4IJ doesn't support some token types / modifiers.

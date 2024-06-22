@@ -23,6 +23,7 @@ import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
@@ -70,8 +71,9 @@ public class LanguageServersRegistry {
     }
 
     private void initialize() {
-        // Load language servers / mappings from user extension point
+        // Load language servers / mappings / semanticTokensColorsProvider from user extension point
         loadServersAndMappingsFromExtensionPoint();
+
         // Load language servers / mappings from user settings
         loadServersAndMappingFromSettings();
         updateLanguages();
@@ -79,6 +81,7 @@ public class LanguageServersRegistry {
 
     private void loadServersAndMappingsFromExtensionPoint() {
         Map<String /* server id */, List<ServerMapping>> mappings = new HashMap<>();
+        Map<String /* server id */, SemanticTokensColorsProvider> semanticTokensColorsProviders = new HashMap<>();
 
         // Load language mappings from extensions point
         for (LanguageMappingExtensionPointBean extension : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
@@ -111,12 +114,28 @@ public class LanguageServersRegistry {
             mappingsForServer.add(new ServerFileNamePatternMapping(patterns, extension.serverId, languageId, extension.getDocumentMatcher()));
         }
 
+        // Load semantic tokens colors providers from extensions point
+        for (SemanticTokensColorsProviderExtensionPointBean extension : SemanticTokensColorsProviderExtensionPointBean.EP_NAME.getExtensions()) {
+            String serverId = extension.serverId;
+            try {
+                semanticTokensColorsProviders.put(serverId, extension.getSemanticTokensColorsProvider());
+            }
+            catch(Exception e) {
+                LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='" + serverId + "'.", e);
+            }
+        }
+
         // Load language servers from extensions point
         for (ServerExtensionPointBean server : ServerExtensionPointBean.EP_NAME.getExtensions()) {
             String serverId = server.id;
             if (serverId != null && !serverId.isEmpty()) {
                 List<ServerMapping> mappingsForServer = mappings.get(serverId);
                 mappings.remove(serverId);
+                var serverDefinition = new ExtensionLanguageServerDefinition(server);
+                SemanticTokensColorsProvider semanticTokensColorsProvider = semanticTokensColorsProviders.get(serverId);
+                if (semanticTokensColorsProvider != null) {
+                    serverDefinition.setSemanticTokensColorsProvider(semanticTokensColorsProvider);
+                }
                 addServerDefinitionWithoutNotification(new ExtensionLanguageServerDefinition(server), mappingsForServer);
             }
         }

@@ -29,6 +29,7 @@ import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSupport;
 import com.redhat.devtools.lsp4ij.features.references.LSPReferenceSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPPrepareRenameSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPRenameSupport;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensSupport;
 import com.redhat.devtools.lsp4ij.features.signatureHelp.LSPSignatureHelpSupport;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
 import org.jetbrains.annotations.ApiStatus;
@@ -78,6 +79,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private final LSPTypeDefinitionSupport typeDefinitionSupport;
 
+    private final LSPSemanticTokensSupport semanticTokensSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -97,6 +100,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.referenceSupport = new LSPReferenceSupport(file);
         this.declarationSupport = new LSPDeclarationSupport(file);
         this.typeDefinitionSupport = new LSPTypeDefinitionSupport(file);
+        this.semanticTokensSupport = new LSPSemanticTokensSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -121,8 +125,9 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getReferenceSupport().cancel();
         getDeclarationSupport().cancel();
         getTypeDefinitionSupport().cancel();
+        getSemanticTokensSupport().cancel();
         var map = getUserMap();
-        for(var key : map.getKeys()) {
+        for (var key : map.getKeys()) {
             var value = map.get(key);
             if (value instanceof Disposable disposable) {
                 disposable.dispose();
@@ -281,6 +286,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPTypeDefinitionSupport getTypeDefinitionSupport() {
         return typeDefinitionSupport;
+    }
+
+    /**
+     * Returns the LSP semantic tokens support.
+     *
+     * @return the LSP semantic tokens support.
+     */
+    public LSPSemanticTokensSupport getSemanticTokensSupport() {
+        return semanticTokensSupport;
     }
 
     /**
