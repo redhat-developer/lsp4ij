@@ -127,13 +127,13 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
                 """;
         String html = """
                 <p>Here's some java code:</p>
-                <pre><code>    @Test
+                <pre>    @Test
                     public void linksConversion() {
                         String markdown = &quot;Here is a link [example](https://example.com)&quot;;
                         String html = &quot;&lt;p&gt;Here is a link &lt;a href=\\&quot;https://example.com\\&quot;&gt;example&lt;/a&gt;&lt;/p&gt;\\n&quot;;
                         assertEquals(html, convert(markdown));
                     }
-                </code></pre>
+                </pre>
                 """;
         assertEquals(html, toHtml(markdown));
 
@@ -152,14 +152,14 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
                 """;
         html = """
                 <p>Here's some XML code:</p>
-                <pre><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+                <pre>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
                 &lt;note&gt;
                   &lt;to&gt;Angelo&lt;/to&gt;
                   &lt;from&gt;Fred&lt;/from&gt;
                   &lt;heading&gt;Tests&lt;/heading&gt;
                   &lt;body&gt;I wrote them!&lt;/body&gt;
                 &lt;/note&gt;
-                </code></pre>
+                </pre>
                 """;
         assertEquals(html, toHtml(markdown));
     }
