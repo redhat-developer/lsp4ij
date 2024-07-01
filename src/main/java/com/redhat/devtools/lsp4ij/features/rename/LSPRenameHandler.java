@@ -23,7 +23,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.refactoring.rename.RenameHandler;
 import com.intellij.refactoring.rename.RenameHandlerRegistry;
-import com.intellij.refactoring.rename.inplace.MemberInplaceRenameHandler;
+import com.intellij.refactoring.rename.inplace.VariableInplaceRenameHandler;
 import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
 import org.eclipse.lsp4j.Position;
@@ -31,7 +31,9 @@ import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDoneAsync;
 
@@ -187,7 +189,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
                 if (renameHandlers.isEmpty()) {
                     return true;
                 }
-                // When there are several rename handlers, IJ removes all MemberInplaceRenameHandlers (ex: inline Java field rename)
+                // When there are several rename handlers, IJ removes all VariableInplaceRenameHandler, MemberInplaceRenameHandlers (ex: inline Java field rename)
                 // See https://github.com/JetBrains/intellij-community/blob/cc10f72bc90a650b8d9d9f0427ae5a56111940dd/platform/lang-impl/src/com/intellij/refactoring/rename/RenameHandlerRegistry.java#L106
                 // To avoid showing the LSP Rename dialog when a Java field is renamed (which will do nothing)
                 // We want to show the IJ inline variable rename handler instead of LSP rename dialog.
@@ -195,7 +197,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
                 // in which case, the LSP rename dialog will not be available
                 return !renameHandlers
                         .stream()
-                        .allMatch(renameHandler -> renameHandler instanceof MemberInplaceRenameHandler);
+                        .allMatch(renameHandler -> renameHandler instanceof VariableInplaceRenameHandler);
             } finally {
                 searchingRenameHandlers = false;
             }
