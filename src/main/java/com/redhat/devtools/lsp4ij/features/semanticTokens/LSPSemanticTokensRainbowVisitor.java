@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens;
 import com.intellij.codeInsight.daemon.RainbowVisitor;
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
-import com.intellij.openapi.editor.colors.TextAttributesScheme;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -44,7 +43,8 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPSemanticTokensRainbowVisitor.class);
-    private TextAttributesScheme colorScheme;
+
+    private PsiFile file;
 
     @Override
     public boolean suitableForFile(@NotNull PsiFile file) {
@@ -53,17 +53,25 @@ public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
 
     @Override
     public boolean analyze(@NotNull PsiFile file, boolean updateWholeFile, @NotNull HighlightInfoHolder holder, @NotNull Runnable action) {
-        this.colorScheme = holder.getColorsScheme();
-        return super.analyze(file, updateWholeFile, holder, action);
+        if (LanguageServersRegistry.getInstance().isFileSupported(file)) {
+            enableSemanticTokensHighlighting(file);
+            return super.analyze(file, updateWholeFile, holder, action);
+        }
+        return false;
     }
 
     @Override
     public void visit(@NotNull PsiElement element) {
-        // Consume LSP 'textDocument/semanticTokens/full' request
-        PsiFile file = element.getContainingFile();
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
+        // This method is called for several PsiElements of the PsiFile
+        // In the context of LSP semantic tokens, highlighting is performed
+        // for the entire PsiFile and must be done just for the first call of this visit method
+        // to have good performance.
+        if (!isSemanticTokensHighlightingEnabled()) {
+            // The file is already highlighted, ignore it
             return;
         }
+
+        // Consume LSP 'textDocument/semanticTokens/full' request
         LSPSemanticTokensSupport semanticTokensSupport = LSPFileSupport.getSupport(file).getSemanticTokensSupport();
         var params = new SemanticTokensParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
         CompletableFuture<SemanticTokensData> semanticTokensFuture = semanticTokensSupport.getSemanticTokens(params);
@@ -84,7 +92,7 @@ public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
         }
 
         if (isDoneNormally(semanticTokensFuture)) {
-            // textDocument/semanticTokens/full has been collected correctly, create list of IJ HighlightInfo from LSP SemanticTokens list
+            // textDocument/semanticTokens/full has been collected correctly, create list of IJ HighlightInfo from LSP SemanticTokens data
             SemanticTokensData semanticTokens = semanticTokensFuture.getNow(null);
             if (semanticTokens != null) {
                 var document = LSPIJUtils.getDocument(file.getVirtualFile());
@@ -92,13 +100,27 @@ public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
                     return;
                 }
                 semanticTokens.highlight(file, document, info -> super.addInfo(info));
+                // LSP semantic token is highlighted, don't highlight it again for the next visited PsiElement
+                disableSemanticTokensHighlighting();
             }
-
         }
+    }
+
+    private void enableSemanticTokensHighlighting(@NotNull PsiFile file) {
+        this.file = file;
+    }
+
+    private void disableSemanticTokensHighlighting() {
+        this.file = null;
+    }
+
+    private boolean isSemanticTokensHighlightingEnabled() {
+        return file != null;
     }
 
     @Override
     public @NotNull HighlightVisitor clone() {
         return new LSPSemanticTokensRainbowVisitor();
     }
+
 }
