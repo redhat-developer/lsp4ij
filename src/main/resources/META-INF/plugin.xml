@@ -260,8 +260,8 @@
 
         <!-- LSP textDocument/semanticTokens request support -->
         <highlightVisitor
-                id="LSPRainbowVisitor"
-                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensRainbowVisitor"/>
+                id="LSPSemanticTokensHighlightVisitor"
+                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensHighlightVisitor"/>
         <colorSettingsPage
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
 
