@@ -458,7 +458,7 @@ You can change the notification behavior of `LSP/window/showMessageRequest` by u
 
 #### Semantic Tokens
 
-Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to enable support for semantic tokens.
+Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to configure support for semantic tokens.
 
 The semantic tokens support:
 

@@ -11,14 +11,13 @@
 package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
 import com.intellij.codeHighlighting.RainbowHighlighter;
-import com.intellij.lang.Language;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.fileTypes.SyntaxHighlighter;
 import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory;
 import com.intellij.openapi.options.colors.AttributesDescriptor;
 import com.intellij.openapi.options.colors.ColorDescriptor;
-import com.intellij.openapi.options.colors.RainbowColorSettingsPage;
+import com.intellij.openapi.options.colors.ColorSettingsPage;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.psi.codeStyle.DisplayPriority;
 import com.intellij.psi.codeStyle.DisplayPrioritySortable;
@@ -33,7 +32,7 @@ import java.util.Map;
 /**
  * LSP Semantic tokens color setting page.
  */
-public class SemanticTokensColorSettingsPage implements RainbowColorSettingsPage, DisplayPrioritySortable {
+public class SemanticTokensColorSettingsPage implements ColorSettingsPage, DisplayPrioritySortable {
 
     private static final AttributesDescriptor[] ourDescriptors = {
             // namespace
@@ -127,16 +126,6 @@ public class SemanticTokensColorSettingsPage implements RainbowColorSettingsPage
             var attributeKey = descriptor.getKey();
             ourTags.put(attributeKey.getExternalName(), attributeKey);
         }
-    }
-
-    @Override
-    public boolean isRainbowType(TextAttributesKey type) {
-        return false;
-    }
-
-    @Override
-    public @Nullable Language getLanguage() {
-        return null;
     }
 
     @Override
