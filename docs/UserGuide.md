@@ -71,7 +71,6 @@ The following LSP features are integrated with the standard `Find Usages` menu (
 
 ![Find Usages menu](./images/find-usages/FindUsagesMenu.png)
 
-
 ![Find Usages result](./images/find-usages/FindUsagesResult.png)
 
 ### Refactoring
@@ -86,12 +85,14 @@ to apply some refactoring.
 
 LSP4IJ provides **experimental**  support for [LSP Semantic Tokens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).
 
-### Enable semantic tokens
+### Language Server coloration
 
-By default, semantic tokens is not activated it.
-To activate it, you need to go to `Editor / Color Scheme / Language Server` and select the `Semantic highlighting` checkbox:
+LSP4IJ provides default colors for semantic tokens, configurable in `Editor / Color Scheme / Language Server`:
 
-![Enable LSP semantic tokens](./images/LSPSemanticTokensEnable.png)
+![Semantic tokens color settings](./images/LSPSemanticTokensColorPage.png)
+
+You can see the mapping between token types/modifiers and IntelliJ's TextAttributeKey on the color settings page (e.g., Class declaration)
+in [DefaultSemanticTokensColorsProvider](./LSPSupport.md#DefaultSemanticTokensColorsProvider) section.
 
 ### Semantic Tokens Inspector
 
@@ -111,7 +112,6 @@ that you can select in the left panel via the checkboxes:
 
 If the `Semantic Tokens` doesn't show the expected result, please check that:
 
- * you have [enabled semantic tokens](#enable-semantic-tokens).
  * show in the [LSP console](#lsp-console) that your language server reports 
 LSP request `textDocument/semanticTokens/full`
  * uses the [Semantic Tokens Inspector](#semantic-tokens-inspector) to understand more how the 

@@ -10,7 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
-import com.intellij.codeInsight.daemon.RainbowVisitor;
+import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -20,7 +20,9 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.SemanticTokensParams;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,18 +35,21 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 
 
 /**
- * LSP 'textDocument/semanticTokens support by implementing IntelliJ {@link RainbowVisitor}.
+ * LSP 'textDocument/semanticTokens support by implementing IntelliJ {@link HighlightVisitor}.
  *
  * <p>
- * Implementing {@link RainbowVisitor} gives the capability to have an existing highlighter (custom highlighter, TextMate highlighter)
+ * Implementing {@link HighlightVisitor} gives the capability to have an existing highlighter (custom highlighter, TextMate highlighter)
  * and add semantic coloration.
  * </p>
  */
-public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
+@ApiStatus.Internal
+public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(LSPSemanticTokensRainbowVisitor.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPSemanticTokensHighlightVisitor.class);
 
     private PsiFile file;
+
+    private HighlightInfoHolder myHolder;
 
     @Override
     public boolean suitableForFile(@NotNull PsiFile file) {
@@ -53,9 +58,17 @@ public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
 
     @Override
     public boolean analyze(@NotNull PsiFile file, boolean updateWholeFile, @NotNull HighlightInfoHolder holder, @NotNull Runnable action) {
+        myHolder = holder;
         if (LanguageServersRegistry.getInstance().isFileSupported(file)) {
             enableSemanticTokensHighlighting(file);
-            return super.analyze(file, updateWholeFile, holder, action);
+            myHolder = holder;
+            try {
+                action.run();
+            }
+            finally {
+                myHolder = null;
+            }
+            return true;
         }
         return false;
     }
@@ -99,7 +112,7 @@ public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
                 if (document == null) {
                     return;
                 }
-                semanticTokens.highlight(file, document, info -> super.addInfo(info));
+                semanticTokens.highlight(file, document, info -> addInfo(info));
                 // LSP semantic token is highlighted, don't highlight it again for the next visited PsiElement
                 disableSemanticTokensHighlighting();
             }
@@ -120,7 +133,10 @@ public class LSPSemanticTokensRainbowVisitor extends RainbowVisitor {
 
     @Override
     public @NotNull HighlightVisitor clone() {
-        return new LSPSemanticTokensRainbowVisitor();
+        return new LSPSemanticTokensHighlightVisitor();
     }
 
+    protected void addInfo(@Nullable HighlightInfo highlightInfo) {
+        myHolder.add(highlightInfo);
+    }
 }
