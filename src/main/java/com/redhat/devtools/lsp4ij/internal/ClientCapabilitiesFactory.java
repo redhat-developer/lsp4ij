@@ -252,6 +252,7 @@ public class ClientCapabilitiesFactory {
         ));
         semanticTokensCapabilities.setServerCancelSupport(Boolean.TRUE);
         var semanticTokensClientCapabilitiesRequests = new SemanticTokensClientCapabilitiesRequests(Boolean.TRUE, Boolean.FALSE);
+        semanticTokensCapabilities.setFormats(List.of(TokenFormat.Relative));
         semanticTokensCapabilities.setRequests(semanticTokensClientCapabilitiesRequests);
         textDocumentClientCapabilities.setSemanticTokens(semanticTokensCapabilities);
 
