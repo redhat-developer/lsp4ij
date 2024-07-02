@@ -505,7 +505,7 @@ to open `references/implementations` in a popup when  clicking on a `Codelens` :
  
 # Semantic tokens colors provider
 
-Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to enable support for semantic tokens.
+Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to configure support for semantic tokens.
 
 When the language server supports semantic tokens, the decoded token type and token modifiers must be translated to an IntelliJ `TextAttributeKeys`.
 using the [SemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/SemanticTokensColorsProvider.java) API:

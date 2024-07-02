@@ -458,14 +458,14 @@ You can change the notification behavior of `LSP/window/showMessageRequest` by u
 
 #### Semantic Tokens
 
-Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to enable support for semantic tokens.
+Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to configure support for semantic tokens.
 
 The semantic tokens support:
 
  * uses only [textDocument/semanticTokens/full](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest) LSP request.
  * uses the [IntelliJ Semantic Highlighting support](https://plugins.jetbrains.com/docs/intellij/syntax-highlighting-and-error-highlighting.html#semantic-highlighting) 
-by implementing [RainbowVisitor](https://github.com/JetBrains/intellij-community/blob/master/platform/analysis-impl/src/com/intellij/codeInsight/daemon/RainbowVisitor.java)
-with the [LSPSemanticTokensRainbowVisitor](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/LSPSemanticTokensRainbowVisitor.java) class.
+by implementing [HighlightVisitor](https://github.com/JetBrains/intellij-community/blob/master/platform/analysis-impl/src/com/intellij/codeInsight/daemon/impl/HighlightVisitor.java)
+with the [LSPSemanticTokensHighlightVisitor](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/LSPSemanticTokensHighlightVisitor.java) class.
  * Use [SemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/SemanticTokensColorsProvider.java) API to get TextAttributesKey from tokenType, tokenModifiers.
  * By default, LSP4IJ, uses the [DefaultSemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/DefaultSemanticTokensColorsProvider.java)
 but you can use your own provider with the [semanticTokensColorsProvider extension point](./DeveloperGuide.md#semantic-tokens-colors-provider). 
