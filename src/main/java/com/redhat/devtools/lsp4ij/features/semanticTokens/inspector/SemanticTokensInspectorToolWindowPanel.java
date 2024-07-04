@@ -88,12 +88,17 @@ public class SemanticTokensInspectorToolWindowPanel extends SimpleToolWindowPane
                 semanticTokensInspectorDetail.isShowTokenType(),
                 semanticTokensInspectorDetail.isShowTokenModifiers(),
                 project);
-        ApplicationManager.getApplication().invokeLater(() -> {
+        ApplicationManager.getApplication()
+                .invokeLater(() -> {
             // get the proper editor from the file tab
             var editorData = getEditorFor(data.file());
 
             // Update the editor with the LSP semantic tokens' information.
             var editor = editorData.editor();
+            if (editor.getText().equals(text)) {
+                // Don't refresh the editor
+                return;
+            }
             editor.setText(text);
 
             // Select the proper tab of the file

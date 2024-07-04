@@ -126,6 +126,11 @@ public class DefaultSemanticTokensColorsProvider implements SemanticTokensColors
             // function: for identifiers that declare a function.
             case SemanticTokenTypes.Function:
                 if (hasTokenModifiers(tokenModifiers,
+                        SemanticTokenModifiers.DefaultLibrary)) {
+                    // with defaultLibrary modifiers
+                    return SemanticTokensHighlightingColors.DEFAULT_LIBRARY_FUNCTION;
+                }
+                if (hasTokenModifiers(tokenModifiers,
                         SemanticTokenModifiers.Declaration,
                         SemanticTokenModifiers.Definition)) {
                     // with declaration, definition modifiers
