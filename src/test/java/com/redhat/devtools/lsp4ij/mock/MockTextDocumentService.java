@@ -152,7 +152,7 @@ public class MockTextDocumentService implements TextDocumentService {
         File file = new File(URI.create(params.getTextDocument().getUri()));
         if (file.exists() && file.length() > 100) {
             return CompletableFuture.completedFuture(Collections.singletonList(new CodeLens(
-                    new Range(new Position(1, 0), new Position(1, 1)), new Command("Hi, I'm a CodeLens", null), null)));
+                    new Range(new Position(1, 0), new Position(1, 1)), new Command("Hi, I'm a CodeLens", "mock.command"), null)));
         }
         return CompletableFuture.completedFuture(Collections.emptyList());
     }
@@ -410,4 +410,5 @@ public class MockTextDocumentService implements TextDocumentService {
     public CompletableFuture<List<FoldingRange>> foldingRange(FoldingRangeRequestParams params) {
         return CompletableFuture.completedFuture(this.foldingRanges);
     }
+
 }

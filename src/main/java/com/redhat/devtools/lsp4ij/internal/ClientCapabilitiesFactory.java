@@ -250,6 +250,7 @@ public class ClientCapabilitiesFactory {
                 "documentation",
                 "defaultLibrary"*/
         ));
+        semanticTokensCapabilities.setMultilineTokenSupport(Boolean.TRUE);
         semanticTokensCapabilities.setServerCancelSupport(Boolean.TRUE);
         var semanticTokensClientCapabilitiesRequests = new SemanticTokensClientCapabilitiesRequests(Boolean.TRUE, Boolean.FALSE);
         semanticTokensCapabilities.setFormats(List.of(TokenFormat.Relative));
