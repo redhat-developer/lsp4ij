@@ -138,7 +138,8 @@
         <extensionPoint
                 name="semanticTokensColorsProvider"
                 beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean">
-            <with attribute="class" implements="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider"/>
+            <with attribute="class"
+                  implements="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider"/>
         </extensionPoint>
 
     </extensionPoints>
@@ -504,8 +505,10 @@
 
     </extensions>
 
-    <!-- Semantic Tokens Inspector -->
+    <!-- Semantic Tokens -->
     <extensions defaultExtensionNs="com.intellij">
+
+        <!-- Semantic Tokens Inspector -->
 
         <projectService
                 id="com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorManager"
@@ -519,6 +522,19 @@
                 doNotActivateOnStart="true"
                 icon="AllIcons.General.InspectionsEye"/>
 
+        <!-- Color Schemes -->
+        <additionalTextAttributes
+                scheme="Dark"
+                file="colorSchemes/SemanticTokensDark.xml"/>
+        <additionalTextAttributes
+                scheme="High contrast"
+                file="colorSchemes/SemanticTokensHighContrast.xml"/>
+        <additionalTextAttributes
+                scheme="IntelliJ Light"
+                file="colorSchemes/SemanticTokensIntelliJLight.xml"/>
+        <additionalTextAttributes
+                scheme="Light"
+                file="colorSchemes/SemanticTokensLight.xml"/>
     </extensions>
 
     <!-- Launch configuration Language servers -->

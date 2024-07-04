@@ -70,7 +70,7 @@ public class SemanticTokensColorSettingsPage implements ColorSettingsPage, Displ
             // property
             new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.property.static"), SemanticTokensHighlightingColors.STATIC_PROPERTY),
             new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.property.static.readonly"), SemanticTokensHighlightingColors.STATIC_READONLY_PROPERTY),
-            new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.property"), SemanticTokensHighlightingColors.READONLY_PROPERTY),
+            new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.property"), SemanticTokensHighlightingColors.PROPERTY),
             new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.property.readonly"), SemanticTokensHighlightingColors.READONLY_PROPERTY),
 
             // enumMember
@@ -85,6 +85,7 @@ public class SemanticTokensColorSettingsPage implements ColorSettingsPage, Displ
             // function
             new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.function.call"), SemanticTokensHighlightingColors.FUNCTION),
             new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.function.declaration"), SemanticTokensHighlightingColors.FUNCTION_DECLARATION),
+            new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.function.defaultLibrary"), SemanticTokensHighlightingColors.DEFAULT_LIBRARY_FUNCTION),
 
             // method
             new AttributesDescriptor(LanguageServerBundle.message("options.lsp.attribute.descriptor.method.call"), SemanticTokensHighlightingColors.METHOD),
@@ -141,8 +142,59 @@ public class SemanticTokensColorSettingsPage implements ColorSettingsPage, Displ
     @Override
     public @NonNls @NotNull String getDemoText() {
         return """
-                public class <LSP_CLASS_DECLARATION>SomeClass</LSP_CLASS_DECLARATION><<typeParameter>T</typeParameter> extends <interface>Runnable</interface>> { // some comment
+                <LSP_COMMENT>// Here is a Java sample</LSP_COMMENT>
+                package <LSP_NAMESPACE>com</LSP_NAMESPACE>;
+                
+                <LSP_DECORATOR>@Deprecated</LSP_DECORATOR>(since = <LSP_STRING>"1.0.0"</LSP_STRING>)
+                <LSP_MODIFIER>public</LSP_MODIFIER> <LSP_MODIFIER>class</LSP_MODIFIER> <LSP_CLASS_DECLARATION>Bar</LSP_CLASS_DECLARATION><<LSP_TYPE_PARAMETER>T</LSP_TYPE_PARAMETER> extends <LSP_INTERFACE>Runnable</LSP_INTERFACE>> {
+
+                    <LSP_MODIFIER>private</LSP_MODIFIER> <LSP_MODIFIER>static</LSP_MODIFIER> <LSP_MODIFIER>final</LSP_MODIFIER> int <LSP_STATIC_READONLY_PROPERTY>CONSTANT</LSP_STATIC_READONLY_PROPERTY> = <LSP_NUMBER>1234</LSP_NUMBER>;
+                    <LSP_MODIFIER>private</LSP_MODIFIER> <LSP_MODIFIER>static</LSP_MODIFIER> int <LSP_STATIC_PROPERTY>GLOBAL</LSP_STATIC_PROPERTY>;
+                    <LSP_MODIFIER>private</LSP_MODIFIER> <LSP_MODIFIER>final</LSP_MODIFIER> int <LSP_READONLY_PROPERTY>readOnlyField</LSP_READONLY_PROPERTY> = <LSP_NUMBER>5678</LSP_NUMBER>;
+                    <LSP_MODIFIER>private</LSP_MODIFIER> int <LSP_PROPERTY>field</LSP_PROPERTY>;
+
+                    <LSP_MODIFIER>public</LSP_MODIFIER> int <LSP_METHOD_DECLARATION>someMethod</LSP_METHOD_DECLARATION>() {
+                        <LSP_CLASS>var</LSP_CLASS> <LSP_VARIABLE>bar</LSP_VARIABLE> = new <LSP_CLASS>Bar</LSP_CLASS><?>();
+                        <LSP_STATIC_METHOD>staticMethod</LSP_STATIC_METHOD>();
+                        <LSP_METHOD>someMethod</LSP_METHOD>();
+                        <LSP_KEYWORD>return</LSP_KEYWORD> <LSP_NUMBER>1</LSP_NUMBER> <LSP_OPERATOR>+</LSP_OPERATOR> <LSP_NUMBER>2</LSP_NUMBER> <LSP_OPERATOR>+</LSP_OPERATOR> <LSP_PROPERTY>field</LSP_PROPERTY>;
+                    }
+
+                    <LSP_MODIFIER>public</LSP_MODIFIER> <LSP_MODIFIER>static</LSP_MODIFIER> <LSP_CLASS>String</LSP_CLASS> <LSP_METHOD_DECLARATION>staticMethod</LSP_METHOD_DECLARATION>() {
+                        <LSP_KEYWORD>return</LSP_KEYWORD> <LSP_STRING>"foo"</LSP_STRING>;
+                    }
                 }
+                
+                <LSP_COMMENT>// Here is a TypeScript sample</LSP_COMMENT>
+                <LSP_KEYWORD>function</LSP_KEYWORD> <LSP_FUNCTION_DECLARATION>foo</LSP_FUNCTION_DECLARATION>() {
+                    <LSP_DEFAULT_LIBRARY_FUNCTION>print</LSP_DEFAULT_LIBRARY_FUNCTION>(<LSP_STRING>"bar"</LSP_STRING>)
+                }
+                
+                <LSP_COMMENT>// Here is a Go sample</LSP_COMMENT>
+                <LSP_KEYWORD>package</LSP_KEYWORD> <LSP_NAMESPACE>src</LSP_NAMESPACE>
+                
+                <LSP_KEYWORD>import</LSP_KEYWORD> (
+                	"<LSP_NAMESPACE>fmt</LSP_NAMESPACE>"
+                )
+                
+                <LSP_KEYWORD>func</LSP_KEYWORD> <LSP_FUNCTION_DECLARATION>foo</LSP_FUNCTION_DECLARATION>() {
+                    <LSP_KEYWORD>const</LSP_KEYWORD> <LSP_READONLY_VARIABLE>s</LSP_READONLY_VARIABLE> = <LSP_STRING>""</LSP_STRING>;
+                    <LSP_NAMESPACE>fmt</LSP_NAMESPACE>.<LSP_FUNCTION>Printf</LSP_FUNCTION>(<LSP_STRING>"s: %v\\n"</LSP_STRING>, <LSP_READONLY_VARIABLE>s</LSP_READONLY_VARIABLE>)
+                }
+                
+                <LSP_COMMENT>;; Here is a Clojure sample</LSP_COMMENT>
+
+                (<LSP_MACRO>defn</LSP_MACRO> <LSP_FUNCTION_DECLARATION>my-zipmap</LSP_FUNCTION_DECLARATION> [<LSP_VARIABLE>keys</LSP_VARIABLE> <LSP_VARIABLE>vals</LSP_VARIABLE>]
+                  (<LSP_MACRO>loop</LSP_MACRO> [<LSP_VARIABLE>my-map</LSP_VARIABLE> {}
+                         <LSP_VARIABLE>my-keys</LSP_VARIABLE> (<LSP_FUNCTION>seq</LSP_FUNCTION> <LSP_VARIABLE>keys</LSP_VARIABLE>)
+                         <LSP_VARIABLE>my-vals</LSP_VARIABLE> (<LSP_FUNCTION>seq</LSP_FUNCTION> <LSP_VARIABLE>vals</LSP_VARIABLE>)]
+                    (<LSP_FUNCTION>if</LSP_FUNCTION> (<LSP_MACRO>and</LSP_MACRO> <LSP_VARIABLE>my-keys</LSP_VARIABLE> <LSP_VARIABLE>my-vals</LSP_VARIABLE>)
+                      (<LSP_FUNCTION>recur</LSP_FUNCTION> (<LSP_FUNCTION>assoc</LSP_FUNCTION> <LSP_VARIABLE>my-map</LSP_VARIABLE> (<LSP_FUNCTION>first</LSP_FUNCTION> <LSP_VARIABLE>my-keys</LSP_VARIABLE>) (<LSP_FUNCTION>first</LSP_FUNCTION> <LSP_VARIABLE>my-vals</LSP_VARIABLE>))
+                             (<LSP_FUNCTION>next</LSP_FUNCTION> <LSP_VARIABLE>my-keys</LSP_VARIABLE>)
+                             (<LSP_FUNCTION>next</LSP_FUNCTION> <LSP_VARIABLE>my-vals</LSP_VARIABLE>))
+                      <LSP_VARIABLE>my-map</LSP_VARIABLE>)))
+                (<LSP_FUNCTION>my-zipmap</LSP_FUNCTION> [:<LSP_KEYWORD>a</LSP_KEYWORD> :<LSP_KEYWORD>b</LSP_KEYWORD> :<LSP_KEYWORD>c</LSP_KEYWORD>] [1 2 3])
+                <LSP_MACRO>-></LSP_MACRO> {:<LSP_KEYWORD>b</LSP_KEYWORD> 2, :<LSP_KEYWORD>c</LSP_KEYWORD> 3, :<LSP_KEYWORD>a</LSP_KEYWORD> 1}
                 """;
     }
 

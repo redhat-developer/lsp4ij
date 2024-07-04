@@ -68,6 +68,7 @@ public class SemanticTokensHighlightingColors {
     // function
     public static final TextAttributesKey FUNCTION = TextAttributesKey.createTextAttributesKey("LSP_FUNCTION", DefaultLanguageHighlighterColors.FUNCTION_CALL);
     public static final TextAttributesKey FUNCTION_DECLARATION = TextAttributesKey.createTextAttributesKey("LSP_FUNCTION_DECLARATION", DefaultLanguageHighlighterColors.FUNCTION_DECLARATION);
+    public static final TextAttributesKey DEFAULT_LIBRARY_FUNCTION = TextAttributesKey.createTextAttributesKey("LSP_DEFAULT_LIBRARY_FUNCTION", DefaultLanguageHighlighterColors.STATIC_METHOD);
 
     // method
     public static final TextAttributesKey METHOD = TextAttributesKey.createTextAttributesKey("LSP_METHOD", DefaultLanguageHighlighterColors.FUNCTION_CALL);

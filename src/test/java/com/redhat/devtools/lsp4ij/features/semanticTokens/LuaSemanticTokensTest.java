@@ -51,7 +51,7 @@ public class LuaSemanticTokensTest extends LSPSemanticTokensFixtureTestCase {
                     12,
                     512
                   ]
-                }                          
+                }
                 """,
                 """
                         --<LSP_COMMENT>[[
@@ -60,7 +60,7 @@ public class LuaSemanticTokensTest extends LSPSemanticTokensFixtureTestCase {
                           ** ===================================================================
                           --]]
                         
-                        <LSP_FUNCTION>print</LSP_FUNCTION>("memory-allocation errors")
+                        <LSP_DEFAULT_LIBRARY_FUNCTION>print</LSP_DEFAULT_LIBRARY_FUNCTION>("memory-allocation errors")
                         """
         );
     }

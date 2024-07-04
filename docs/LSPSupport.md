@@ -480,46 +480,47 @@ The following table lists the currently predefined mappings:
  * the `DefaultLanguageHighlighterColors` column defines the standard `TextAttributesKey` used by IntelliJ that `SemanticTokensHighlightingColors` inherits.
 
 | Semantic token types | Semantic modifier types | SemanticTokensHighlightingColors | (inherited from) DefaultLanguageHighlighterColors |
-|----------------------|------------------------|----------------------------------|---------------------------------------------------|
-| namespace            | definition             | NAMESPACE_DECLARATION            | CLASS_NAME                                        |
-| namespace            | declaration            | NAMESPACE_DECLARATION            | CLASS_NAME                                        |
-| namespace            |                        | NAMESPACE                        | CLASS_REFERENCE                                   |
-| class                | definition             | CLASS_DECLARATION                | CLASS_NAME                                        |
-| class                | declaration            | CLASS_DECLARATION                | CLASS_NAME                                        |
-| class                |                        | CLASS                            | CLASS_REFERENCE                                   |
-| enum                 |                        | ENUM                             | CLASS_NAME                                        |
-| interface            |                        | INTERFACE                        | INTERFACE_NAME                                    |
-| struct               |                        | STRUCT                           | CLASS_NAME                                        |
-| typeParameter        |                        | TYPE_PARAMETER                   | PARAMETER                                         |
-| type                 |                        | TYPE                             | CLASS_NAME                                        |
-| parameter            |                        | PARAMETER                        | PARAMETER                                         |
-| variable             | static + readonly      | STATIC_READONLY_VARIABLE         | CONSTANT                                          |
-| variable             | static                 | STATIC_VARIABLE                  | STATIC_FIELD                                      |
-| variable             | readonly               | READONLY_VARIABLE                | LOCAL_VARIABLE                                    |
-| variable             |                        | VARIABLE                         | REASSIGNED_LOCAL_VARIABLE                         |
-| property             | static + readonly      | STATIC_READONLY_PROPERTY         | CONSTANT                                          |
-| property             | static                 | STATIC_PROPERTY                  | STATIC_FIELD                                      |
-| property             | readonly               | READONLY_PROPERTY                | INSTANCE_FIELD                                    |
-| property             |                        | PROPERTY                         | INSTANCE_FIELD                                    |
-| enumMember           |                        | ENUM_MEMBER                      | STATIC_FIELD                                      |
-| decorator            |                        | DECORATOR                        | METADATA                                          |
-| event                |                        | EVENT                            | PREDEFINED_SYMBOL                                 |
-| function             | definition             | FUNCTION_DECLARATION             | FUNCTION_DECLARATION                              |
-| function             | declaration            | FUNCTION_DECLARATION             | FUNCTION_DECLARATION                              |
-| function             |                        | FUNCTION                         | FUNCTION_CALL                                     |
-| method               | definition             | METHOD_DECLARATION               | FUNCTION_DECLARATION                              |
-| method               | declaration            | METHOD_DECLARATION               | FUNCTION_DECLARATION                              |
-| method               | static                 | STATIC_METHOD                    | STATIC_METHOD                                     |
-| method               |                        | METHOD                           | FUNCTION_CALL                                     |
-| macro                |                        | MACRO                            | KEYWORD                                           |
-| label                |                        | LABEL                            | LABEL                                             |
-| comment              |                        | COMMENT                          | LINE_COMMENT                                      |
-| string               |                        | STRING                           | STRING                                            |
-| keyword              |                        | KEYWORD                          | KEYWORD                                           |
-| number               |                        | NUMBER                           | NUMBER                                            |
-| regexp               |                        | REGEXP                           | VALID_STRING_ESCAPE                               |
-| modifier             |                        | MODIFIER                         | KEYWORD                                           |
-| operator             |                        | OPERATOR                         | OPERATION_SIGN                                    |
+|----------------------|-------------------------|----------------------------------|---------------------------------------------------|
+| namespace            | definition              | NAMESPACE_DECLARATION            | CLASS_NAME                                        |
+| namespace            | declaration             | NAMESPACE_DECLARATION            | CLASS_NAME                                        |
+| namespace            |                         | NAMESPACE                        | CLASS_REFERENCE                                   |
+| class                | definition              | CLASS_DECLARATION                | CLASS_NAME                                        |
+| class                | declaration             | CLASS_DECLARATION                | CLASS_NAME                                        |
+| class                |                         | CLASS                            | CLASS_REFERENCE                                   |
+| enum                 |                         | ENUM                             | CLASS_NAME                                        |
+| interface            |                         | INTERFACE                        | INTERFACE_NAME                                    |
+| struct               |                         | STRUCT                           | CLASS_NAME                                        |
+| typeParameter        |                         | TYPE_PARAMETER                   | PARAMETER                                         |
+| type                 |                         | TYPE                             | CLASS_NAME                                        |
+| parameter            |                         | PARAMETER                        | PARAMETER                                         |
+| variable             | static + readonly       | STATIC_READONLY_VARIABLE         | CONSTANT                                          |
+| variable             | static                  | STATIC_VARIABLE                  | STATIC_FIELD                                      |
+| variable             | readonly                | READONLY_VARIABLE                | LOCAL_VARIABLE                                    |
+| variable             |                         | VARIABLE                         | REASSIGNED_LOCAL_VARIABLE                         |
+| property             | static + readonly       | STATIC_READONLY_PROPERTY         | CONSTANT                                          |
+| property             | static                  | STATIC_PROPERTY                  | STATIC_FIELD                                      |
+| property             | readonly                | READONLY_PROPERTY                | INSTANCE_FIELD                                    |
+| property             |                         | PROPERTY                         | INSTANCE_FIELD                                    |
+| enumMember           |                         | ENUM_MEMBER                      | STATIC_FIELD                                      |
+| decorator            |                         | DECORATOR                        | METADATA                                          |
+| event                |                         | EVENT                            | PREDEFINED_SYMBOL                                 |
+| function             | defaultLibrary          | DEFAULT_LIBRARY_FUNCTION         | STATIC_METHOD                                     |
+| function             | definition              | FUNCTION_DECLARATION             | FUNCTION_DECLARATION                              |
+| function             | declaration             | FUNCTION_DECLARATION             | FUNCTION_DECLARATION                              |
+| function             |                         | FUNCTION                         | FUNCTION_CALL                                     |
+| method               | definition              | METHOD_DECLARATION               | FUNCTION_DECLARATION                              |
+| method               | declaration             | METHOD_DECLARATION               | FUNCTION_DECLARATION                              |
+| method               | static                  | STATIC_METHOD                    | STATIC_METHOD                                     |
+| method               |                         | METHOD                           | FUNCTION_CALL                                     |
+| macro                |                         | MACRO                            | KEYWORD                                           |
+| label                |                         | LABEL                            | LABEL                                             |
+| comment              |                         | COMMENT                          | LINE_COMMENT                                      |
+| string               |                         | STRING                           | STRING                                            |
+| keyword              |                         | KEYWORD                          | KEYWORD                                           |
+| number               |                         | NUMBER                           | NUMBER                                            |
+| regexp               |                         | REGEXP                           | VALID_STRING_ESCAPE                               |
+| modifier             |                         | MODIFIER                         | KEYWORD                                           |
+| operator             |                         | OPERATOR                         | OPERATION_SIGN                                    |
 
 If you need other mapping:
 
