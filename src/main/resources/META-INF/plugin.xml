@@ -515,7 +515,7 @@
                 id="Semantic Tokens Inspector"
                 anchor="bottom"
                 factoryClass="com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorToolWindowFactory"
-                canCloseContents="true"
+                canCloseContents="false"
                 doNotActivateOnStart="true"
                 icon="AllIcons.General.InspectionsEye"/>
 
