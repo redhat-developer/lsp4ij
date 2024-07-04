@@ -136,7 +136,7 @@ public class LanguageServersRegistry {
                 if (semanticTokensColorsProvider != null) {
                     serverDefinition.setSemanticTokensColorsProvider(semanticTokensColorsProvider);
                 }
-                addServerDefinitionWithoutNotification(new ExtensionLanguageServerDefinition(server), mappingsForServer);
+                addServerDefinitionWithoutNotification(serverDefinition, mappingsForServer);
             }
         }
 
