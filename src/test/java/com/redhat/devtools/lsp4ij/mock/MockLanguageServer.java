@@ -162,6 +162,10 @@ public final class MockLanguageServer implements LanguageServer {
 		this.textDocumentService.setMockCompletionList(completionList);
 	}
 
+	public void setSemanticTokens(SemanticTokens semanticTokens) {
+		this.textDocumentService.setSemanticTokens(semanticTokens);
+	}
+
 	public void setHover(Hover hover) {
 		this.textDocumentService.setMockHover(hover);
 	}
@@ -320,4 +324,5 @@ public final class MockLanguageServer implements LanguageServer {
 		return "MockLanguageServer [started=" + started + ", delay=" + delay + ", remoteProxies=" + remoteProxies.size()
 				+ ", inFlight=" + inFlight.size() + "]";
 	}
+
 }
