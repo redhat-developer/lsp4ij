@@ -159,6 +159,7 @@ public class SemanticTokensInspectorToolWindowPanel extends SimpleToolWindowPane
         semanticTokenEditor.setLineWrap(true);
         semanticTokenEditor.setWrapStyleWord(true);
         semanticTokenEditor.setFont(JBFont.regular());
+        semanticTokenEditor.setEditable(false);
         return semanticTokenEditor;
     }
 
