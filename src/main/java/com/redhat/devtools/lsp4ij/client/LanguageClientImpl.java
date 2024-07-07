@@ -13,11 +13,13 @@ package com.redhat.devtools.lsp4ij.client;
 import com.google.gson.JsonObject;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
@@ -33,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -141,14 +144,18 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     private void refreshInlayHintsForAllOpenedFiles() {
-        for (var fileData : wrapper.getConnectedFiles()) {
-            VirtualFile file = fileData.getFile();
-            final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-            if (psiFile != null) {
-                Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
-                InlayHintsFactoryBridge.refreshInlayHints(psiFile, editors, true);
-            }
-        }
+        ReadAction.nonBlocking((Callable<Void>) () -> {
+                    for (var fileData : wrapper.getConnectedFiles()) {
+                        VirtualFile file = fileData.getFile();
+                        final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                        if (psiFile != null) {
+                            Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
+                            InlayHintsFactoryBridge.refreshInlayHints(psiFile, editors, true);
+                        }
+                    }
+                    return null;
+                }).coalesceBy(this)
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     @Override
@@ -162,14 +169,18 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     private void refreshSemanticTokensForAllOpenedFiles() {
-        for (var fileData : wrapper.getConnectedFiles()) {
-            VirtualFile file = fileData.getFile();
-            final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-            if (psiFile != null) {
-                // Should be enough?
-                DaemonCodeAnalyzer.getInstance(psiFile.getProject()).restart(psiFile);
-            }
-        }
+        ReadAction.nonBlocking((Callable<Void>) () -> {
+                    for (var fileData : wrapper.getConnectedFiles()) {
+                        VirtualFile file = fileData.getFile();
+                        final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                        if (psiFile != null) {
+                            // Should be enough?
+                            DaemonCodeAnalyzer.getInstance(psiFile.getProject()).restart(psiFile);
+                        }
+                    }
+                    return null;
+                }).coalesceBy(this)
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     @Override
