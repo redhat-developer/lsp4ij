@@ -26,7 +26,10 @@ import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.zip.ZipEntry;
@@ -64,12 +67,16 @@ public class LanguageServerTemplateManager {
                         LanguageServerTemplate template = importLsTemplate(templateDir);
                         if (template != null) {
                             templates.add(template);
+                        } else {
+                            LOGGER.warn("No template found in {}", templateDir);
                         }
                     } catch (IOException ex) {
                         LOGGER.warn(ex.getLocalizedMessage(), ex);
                     }
                 }
             }
+        } else {
+            LOGGER.warn("No templateRoot found, no templates ");
         }
     }
 
@@ -81,10 +88,22 @@ public class LanguageServerTemplateManager {
     public VirtualFile getTemplateRoot() {
         URL url = LanguageServerTemplateManager.class.getClassLoader().getResource(TEMPLATES_DIR);
         if (url == null) {
+            LOGGER.warn("No "+TEMPLATES_DIR+ " directory/url found");
             return null;
         }
-        String resourcePath = url.getPath().replace("jar:", "").replace("file:", "");
-        return JarFileSystem.getInstance().findFileByPath(resourcePath);
+        try {
+            // url looks like jar:file:/Users/username/Library/Application%20Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates
+            String filePart = url.toURI().getRawSchemeSpecificPart(); // get un-decoded, URI compatible part
+            // filePart looks like file:/Users/username/Library/Application%20Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates
+            LOGGER.debug("Templates filePart : {}", filePart);
+            String resourcePath =  new URI(filePart).getSchemeSpecificPart();// get decoded part (i.e. converts %20 to spaces ...)
+            // resourcePath looks like /Users/username/Library/Application Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates/
+            LOGGER.debug("Templates resources path from uri : {}", resourcePath);
+            return JarFileSystem.getInstance().findFileByPath(resourcePath);
+        } catch (URISyntaxException e) {
+            LOGGER.warn(e.getMessage());
+        }
+        return null;
     }
 
     public List<LanguageServerTemplate> getTemplates() {
