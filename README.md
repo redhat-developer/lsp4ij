@@ -59,6 +59,7 @@ Here are some projects that use LSP4IJ:
  * [Inga for IntelliJ](https://github.com/seachicken/intellij-inga)
  * [IntelliJ SumnekoLua](https://github.com/CppCXY/Intellij-SumnekoLua)
  * [Haskell LSP for IntelliJ](https://github.com/rockofox/intellij-haskell-lsp)
+ * [Zowe™ COBOL Language Support](https://github.com/zowe/zowe-cobol-language-support-intellij)
 
 ## Requirements
 
