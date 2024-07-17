@@ -60,6 +60,7 @@ Here are some projects that use LSP4IJ:
  * [IntelliJ SumnekoLua](https://github.com/CppCXY/Intellij-SumnekoLua)
  * [Haskell LSP for IntelliJ](https://github.com/rockofox/intellij-haskell-lsp)
  * [Zowe™ COBOL Language Support](https://github.com/zowe/zowe-cobol-language-support-intellij)
+ * [ZigBrains](https://github.com/FalsePattern/ZigBrains)
 
 ## Requirements
 
