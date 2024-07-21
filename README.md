@@ -61,6 +61,7 @@ Here are some projects that use LSP4IJ:
  * [Haskell LSP for IntelliJ](https://github.com/rockofox/intellij-haskell-lsp)
  * [Zowe™ COBOL Language Support](https://github.com/zowe/zowe-cobol-language-support-intellij)
  * [ZigBrains](https://github.com/FalsePattern/ZigBrains)
+ * [Pyright for PyCharm](https://github.com/InSyncWithFoo/pyright-for-pycharm)
 
 ## Requirements
 
