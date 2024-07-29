@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
@@ -96,7 +97,7 @@ public class LSPDocumentationHelper {
                     })
                     .filter(Objects::nonNull)
                     .toList();
-        } else if (hoverContents.isRight()){
+        } else if (hoverContents.isRight()) {
             MarkupContent content = hoverContents.getRight();
             if (isValidContent(content)) {
                 return List.of(content);
@@ -134,7 +135,7 @@ public class LSPDocumentationHelper {
             }
             MarkupContent content = contents.get(i);
             htmlBody.append(MarkupKind.MARKDOWN.equals(content.getKind()) ?
-                    MarkdownConverter.getInstance(project).toHtml(content.getValue(), file) :
+                    MarkdownConverter.getInstance(project).toHtml(StringUtilRt.convertLineSeparators(content.getValue()), file) :
                     content.getValue());
         }
         return htmlBody.toString();
