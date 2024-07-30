@@ -126,11 +126,9 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         }
         TreePath selectionPath = event.getPath();
         Object selectedItem = selectionPath != null ? selectionPath.getLastPathComponent() : null;
-        if (selectedItem instanceof LanguageServerTreeNode) {
-            LanguageServerTreeNode node = (LanguageServerTreeNode) selectedItem;
+        if (selectedItem instanceof LanguageServerTreeNode node) {
             onLanguageServerSelected(node);
-        } else if (selectedItem instanceof LanguageServerProcessTreeNode) {
-            LanguageServerProcessTreeNode node = (LanguageServerProcessTreeNode) selectedItem;
+        } else if (selectedItem instanceof LanguageServerProcessTreeNode node) {
             onLanguageServerProcessSelected(node);
         }
     };
@@ -186,17 +184,23 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                     return;
                 }
                 final TreePath[] paths = tree.getSelectionPaths();
-                if (paths == null) {
-                    return;
-                }
-
-                if (paths.length == 1) {
-                    handleSingleSelection(comp, x, y);
+                DefaultActionGroup group =  new DefaultActionGroup();
+                if (paths == null || paths.length ==0) {
+                    group.add(new OpenLanguageServerDialogAction(getProject()));
+                } else if (paths.length == 1) {
+                    handleSingleSelection(comp, x, y, group);
                 } else {
-                    handleMultipleSelections(comp, x, y, paths);
+                    handleMultipleSelections(comp, x, y, paths, group);
+                }
+                if (group.getChildrenCount() > 0) {
+                    ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.TOOLWINDOW_POPUP, group);
+                    menu.getComponent().show(comp, x, y);
                 }
             }
         });
+
+
+
         tree.putClientProperty(AnimatedIcon.ANIMATION_IN_RENDERER_ALLOWED, true);
 
         ((DefaultTreeModel) tree.getModel()).reload(top);
@@ -206,19 +210,19 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
     /**
      * Handle case when only one object is selected.
      */
-    private void handleSingleSelection(Component comp, int x, int y) {
+    private void handleSingleSelection(Component comp, int x, int y, DefaultActionGroup group) {
         final TreePath path = tree.getSelectionPath();
         if (path != null) {
-            DefaultActionGroup group = null;
             Object node = path.getLastPathComponent();
             if (node instanceof LanguageServerTreeNode serverTreeNode) {
                 // Compute popup menu actions for Language Server node
                 LanguageServerDefinition languageServerDefinition = serverTreeNode.getServerDefinition();
                 if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
-                    group = new DefaultActionGroup();
                     group.add(new DeleteServerAction(languageServerDefinition));
                     group.add(new EditServerAction(languageServerDefinition));
                     group.add(new ExportServerAction(Collections.singletonList(languageServerDefinition)));
+                    group.addSeparator();
+                    group.add(new OpenLanguageServerDialogAction(getProject()));
                 }
             } else if (node instanceof LanguageServerProcessTreeNode processTreeNode) {
                 // Compute popup menu actions for Language Server process node
@@ -226,7 +230,6 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                     case starting:
                     case started:
                         // Stop and disable the language server action
-                        group = new DefaultActionGroup();
                         AnAction stopServerAction = ActionManager.getInstance().getAction(StopServerAction.ACTION_ID);
                         group.add(stopServerAction);
                         if (IntelliJPlatformUtils.isDevMode()) {
@@ -238,21 +241,12 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                     case stopping:
                     case stopped:
                         // Restart language server action
-                        group = new DefaultActionGroup();
                         AnAction restartServerAction = ActionManager.getInstance().getAction(RestartServerAction.ACTION_ID);
                         group.add(restartServerAction);
                         break;
                 }
-                if (group == null) {
-                    group = new DefaultActionGroup();
-                }
                 AnAction testStartServerAction = ActionManager.getInstance().getAction(CopyStartServerCommandAction.ACTION_ID);
                 group.add(testStartServerAction);
-            }
-
-            if (group != null) {
-                ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.TOOLWINDOW_POPUP, group);
-                menu.getComponent().show(comp, x, y);
             }
         }
     }
@@ -260,7 +254,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
     /**
      * Handle selection when multiple objects are selected. Enables exporting multiple servers
      */
-    private void handleMultipleSelections(Component comp, int x, int y, TreePath[] paths) {
+    private void handleMultipleSelections(Component comp, int x, int y, TreePath[] paths, DefaultActionGroup group) {
         List<LanguageServerDefinition> languageServerDefinitions = new ArrayList<>();
         for (TreePath path : paths) {
             Object node = path.getLastPathComponent();
@@ -270,12 +264,10 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
         }
         if (languageServerDefinitions.isEmpty() || languageServerDefinitions.size() == 1) {
             // Fallback to single selection if no multiple language servers were selected
-            handleSingleSelection(comp, x, y);
+            handleSingleSelection(comp, x, y, group);
         }
-        DefaultActionGroup group = new DefaultActionGroup();
         group.add(new ExportServerAction(languageServerDefinitions));
-        ActionPopupMenu menu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.TOOLWINDOW_POPUP, group);
-        menu.getComponent().show(comp, x, y);
+
     }
 
     private static void loadLanguageServerDefinitions(DefaultMutableTreeNode top) {
