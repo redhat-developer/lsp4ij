@@ -122,7 +122,7 @@ public interface LSPPsiElementFactory<T extends LSPPsiElement> {
         if (document == null) {
             return null;
         }
-        TextRange textRange = LSPIJUtils.toTextRange(range, document);
+        TextRange textRange = LSPIJUtils.toTextRange(range, document, true);
         if (textRange == null) {
             return null;
         }
