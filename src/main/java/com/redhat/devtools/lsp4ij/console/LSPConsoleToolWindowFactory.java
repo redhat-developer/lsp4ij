@@ -23,10 +23,12 @@ import com.intellij.openapi.wm.ToolWindowFactory;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.console.explorer.actions.OpenLanguageServerDialogAction;
 import com.redhat.devtools.lsp4ij.launching.ui.NewLanguageServerDialog;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Language server console factory.
@@ -37,7 +39,7 @@ public class LSPConsoleToolWindowFactory implements ToolWindowFactory, DumbAware
 
     @Override
     public void createToolWindowContent(@NotNull Project project, @NotNull ToolWindow toolWindow) {
-        toolWindow.setTitleActions(Arrays.asList(new OpenLanguageServerDialogAction(project)));
+        toolWindow.setTitleActions(List.of(new OpenLanguageServerDialogAction(project)));
         LSPConsoleToolWindowPanel consoleWindow = new LSPConsoleToolWindowPanel(project);
         ContentManager contentManager = toolWindow.getContentManager();
         Content content = contentManager.getFactory().createContent(consoleWindow,
@@ -46,23 +48,5 @@ public class LSPConsoleToolWindowFactory implements ToolWindowFactory, DumbAware
         contentManager.addContent(content);
     }
 
-    private static class OpenLanguageServerDialogAction extends AnAction implements DumbAware {
 
-        private final Project project;
-
-        public OpenLanguageServerDialogAction(@NotNull Project project) {
-            super(
-                    LanguageServerBundle.message("action.lsp.console.new.language.server.text"),
-                    LanguageServerBundle.message("action.lsp.console.new.language.server.description"),
-                    AllIcons.Webreferences.Server);
-            this.project = project;
-        }
-
-        @Override
-        public void actionPerformed(@NotNull AnActionEvent e) {
-            NewLanguageServerDialog dialog = new NewLanguageServerDialog(project);
-            dialog.show();
-        }
-
-    }
 }
