@@ -10,66 +10,42 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features;
 
-import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Base class to consume LSP requests (ex : textDocument/codeLens) from all language servers applying to a given Psi file.
+ * Base class to consume LSP requests:
+ *
+ * <ul>
+ *     <li>textDocument/* : (ex : textDocument/codeLens) from all language servers applying to a given Psi file.</li>
+ *     <li>workspace/*: (ex : workspace/symbol) from all language servers applying to a given project.</li>
+ * </ul>
  *
  * @param <Params> the LSP requests parameters (ex : CodelensParams).
  * @param <Result> the LSP response results (ex : List<CodeLensData>).
  */
 public abstract class AbstractLSPFeatureSupport<Params, Result> {
 
-    // The Psi file
-    private final @NotNull PsiFile file;
-    // The current modification stamp of the Psi file
-    private long modificationStamp;
-
-    // true if the future must be canceled when the Psi file is modified and false otherwise.
-    private final boolean cancelWhenFileModified;
-
-    // The current LSP requests for all language servers applying to a given Psi file
+    // The current LSP requests for all language servers applying to a given Psi file, project
     private @Nullable CompletableFuture<Result> future;
 
     // The current cancellation support
     private @Nullable CancellationSupport cancellationSupport;
 
-    public AbstractLSPFeatureSupport(@NotNull PsiFile file) {
-        this(file, true);
-    }
-
-    public AbstractLSPFeatureSupport(@NotNull PsiFile file, boolean cancelWhenFileModified) {
-        this.file = file;
-        this.modificationStamp = -1;
-        this.cancelWhenFileModified = cancelWhenFileModified;
-    }
-
     /**
-     * Returns the Psi file.
-     *
-     * @return the Psi file.
-     */
-    public @NotNull PsiFile getFile() {
-        return file;
-    }
-
-    /**
-     * Returns the (cached or not) LSP requests for all language servers applying to a given Psi file
+     * Returns the (cached or not) LSP requests for all language servers applying to a given Psi file or project.
      *
      * @param params the LSP parameters expected to execute LSP requests.
-     * @return the (cached or not) LSP requests for all language servers applying to a given Psi file
+     * @return the (cached or not) LSP requests for all language servers applying to a given Psi file or project.
      */
     public CompletableFuture<Result> getFeatureData(Params params) {
         if (!isValidLSPFuture()) {
             // - the LSP requests have never been executed
             // - or the LSP requests has failed
             //  - or the Psi file has been updated
-            // --> consume LSP requests for all language servers applying to a given Psi file
+            // --> consume LSP requests for all language servers applying to a given Psi file, or project.
             future = load(params);
         }
         return future;
@@ -81,8 +57,10 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * @return true if the current LSP requests is valid and false otherwise.
      */
     protected boolean isValidLSPFuture() {
-        return future != null && !future.isCompletedExceptionally() && checkFileValid();
+        return future != null && !future.isCompletedExceptionally() && checkValid();
     }
+
+    protected abstract boolean checkValid();
 
     /**
      * Returns the current valid LSP request and null otherwise.
@@ -93,17 +71,13 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
         return isValidLSPFuture() ? future : null;
     }
 
-    private boolean checkFileValid() {
-        return !cancelWhenFileModified || this.file.getModificationStamp() == modificationStamp;
-    }
-
     /**
-     * Cancel previous LSP requests and load the LSP requests for all language servers applying to a given Psi file by using the given cancellation support.
+     * Cancel previous LSP requests and load the LSP requests for all language servers applying to a given Psi file or project by using the given cancellation support.
      *
      * @param params the LSP parameters expected to execute LSP requests.
      * @return the LSP response results.
      */
-    private synchronized CompletableFuture<Result> load(Params params) {
+    protected synchronized CompletableFuture<Result> load(Params params) {
         if (isValidLSPFuture()) {
             return future;
         }
@@ -111,10 +85,7 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
         cancel();
         // Load a new LSP requests future
         cancellationSupport = new CancellationSupport();
-        CompletableFuture<Result> future = doLoad(params, cancellationSupport);
-        // Update the modification stamp with the current modification stamp of the Psi file
-        this.modificationStamp = this.file.getModificationStamp();
-        return future;
+        return doLoad(params, cancellationSupport);
     }
 
     /**

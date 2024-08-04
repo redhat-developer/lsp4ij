@@ -17,7 +17,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.PrepareRenameDefaultBehavior;
@@ -40,7 +40,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/prepareRename' requests</li>
  * </ul>
  */
-public class LSPPrepareRenameSupport extends AbstractLSPFeatureSupport<LSPPrepareRenameParams, List<PrepareRenameResultData>> {
+public class LSPPrepareRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPPrepareRenameParams, List<PrepareRenameResultData>> {
     private int previousOffset = -1;
 
     public LSPPrepareRenameSupport(@NotNull PsiFile file) {

@@ -17,7 +17,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.InlayHint;
 import org.eclipse.lsp4j.InlayHintParams;
@@ -37,7 +37,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'inlayHint/resolve' requests</li>
  * </ul>
  */
-public class LSPInlayHintsSupport extends AbstractLSPFeatureSupport<InlayHintParams, List<InlayHintData>> {
+public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<InlayHintParams, List<InlayHintData>> {
 
     public LSPInlayHintsSupport(@NotNull PsiFile file) {
         super(file);

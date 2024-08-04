@@ -40,6 +40,10 @@ public class ClientCapabilitiesFactory {
         // Support for 'workspace/configuration'
         workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
 
+        // Support for 'workspace/symbol'
+        var symbolCapabilities = new SymbolCapabilities();
+        workspaceClientCapabilities.setSymbol(symbolCapabilities);
+
         // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#executeCommandClientCapabilities
         workspaceClientCapabilities.setExecuteCommand(new ExecuteCommandCapabilities(Boolean.TRUE));
         // TODO

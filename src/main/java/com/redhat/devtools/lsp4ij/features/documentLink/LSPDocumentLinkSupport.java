@@ -16,7 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.DocumentLinkParams;
@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/documentLink' requests</li>
  * </ul>
  */
-public class LSPDocumentLinkSupport extends AbstractLSPFeatureSupport<DocumentLinkParams, List<DocumentLinkData>> {
+public class LSPDocumentLinkSupport extends AbstractLSPDocumentFeatureSupport<DocumentLinkParams, List<DocumentLinkData>> {
 
     public LSPDocumentLinkSupport(@NotNull PsiFile file) {
         super(file);

@@ -22,7 +22,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
@@ -42,7 +42,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 /**
  * Abstract class for LSP formatting and range formatting.
  */
-public class LSPFormattingSupport extends AbstractLSPFeatureSupport<LSPFormattingParams, List<? extends TextEdit>> {
+public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPFormattingParams, List<? extends TextEdit>> {
 
     public LSPFormattingSupport(@NotNull PsiFile file) {
         super(file);

@@ -16,7 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.CodeLens;
@@ -39,7 +39,7 @@ import static com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider.g
  *     <li>LSP 'codeLens/resolve' requests</li>
  * </ul>
  */
-public class LSPCodeLensSupport extends AbstractLSPFeatureSupport<CodeLensParams, List<CodeLensData>> {
+public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLensParams, List<CodeLensData>> {
 
     public LSPCodeLensSupport(@NotNull PsiFile file) {
         super(file);

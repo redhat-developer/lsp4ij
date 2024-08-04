@@ -37,7 +37,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * LSP file support stored in the opened {@link PsiFile} with key "lsp.file.support"
- * which manages and caches LSP codeLens, inlayHint, color futures.
+ * which manages and caches LSP textDocument requests like codeLens, inlayHint, color futures, etc.
  */
 @ApiStatus.Internal
 public class LSPFileSupport extends UserDataHolderBase implements Disposable {

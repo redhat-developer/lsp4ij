@@ -47,6 +47,9 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_RENAME = "textDocument/rename";
     public static final String TEXT_DOCUMENT_DOCUMENT_COMPLETION = "textDocument/completion";
 
+    // workspace/* LSP requests
+    public static final String WORKSPACE_SYMBOL = "workspace/symbol";
+
     private LSPRequestConstants() {
 
     }
