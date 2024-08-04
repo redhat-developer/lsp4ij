@@ -16,7 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightParams;
@@ -35,7 +35,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/documentHighlight' requests</li>
  * </ul>
  */
-public class LSPHighlightSupport extends AbstractLSPFeatureSupport<DocumentHighlightParams, List<DocumentHighlight>> {
+public class LSPHighlightSupport extends AbstractLSPDocumentFeatureSupport<DocumentHighlightParams, List<DocumentHighlight>> {
 
     public LSPHighlightSupport(@NotNull PsiFile file) {
         super(file);

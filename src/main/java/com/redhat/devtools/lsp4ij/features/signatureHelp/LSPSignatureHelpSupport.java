@@ -16,7 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureHelpParams;
@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/signatureHelp' requests</li>
  * </ul>
  */
-public class LSPSignatureHelpSupport extends AbstractLSPFeatureSupport<SignatureHelpParams, SignatureHelp> {
+public class LSPSignatureHelpSupport extends AbstractLSPDocumentFeatureSupport<SignatureHelpParams, SignatureHelp> {
 
     public LSPSignatureHelpSupport(@NotNull PsiFile file) {
         super(file);

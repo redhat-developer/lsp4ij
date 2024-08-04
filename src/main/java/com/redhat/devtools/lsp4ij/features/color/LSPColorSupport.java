@@ -16,7 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.DocumentColorParams;
@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/documentColor' requests</li>
  * </ul>
  */
-public class LSPColorSupport extends AbstractLSPFeatureSupport<DocumentColorParams, List<ColorData>> {
+public class LSPColorSupport extends AbstractLSPDocumentFeatureSupport<DocumentColorParams, List<ColorData>> {
 
     public LSPColorSupport(@NotNull PsiFile file) {
         super(file);

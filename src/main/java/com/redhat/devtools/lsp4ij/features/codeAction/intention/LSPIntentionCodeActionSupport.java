@@ -16,7 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -40,7 +40,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
  *     <li>LSP 'textDocument/codeAction' requests</li>
  * </ul>
  */
-public class LSPIntentionCodeActionSupport extends AbstractLSPFeatureSupport<CodeActionParams, List<CodeActionData>> implements LSPLazyCodeActionProvider {
+public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSupport<CodeActionParams, List<CodeActionData>> implements LSPLazyCodeActionProvider {
 
     private CodeActionParams previousParams;
 

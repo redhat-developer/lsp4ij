@@ -16,7 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.eclipse.lsp4j.SemanticTokensParams;
@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/semanticTokens' requests</li>
  * </ul>
  */
-public class LSPSemanticTokensSupport extends AbstractLSPFeatureSupport<SemanticTokensParams, SemanticTokensData> {
+public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<SemanticTokensParams, SemanticTokensData> {
 
     public LSPSemanticTokensSupport(@NotNull PsiFile file) {
         super(file);

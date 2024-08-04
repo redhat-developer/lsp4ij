@@ -18,7 +18,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.HoverParams;
@@ -36,7 +36,7 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/hover' requests</li>
  * </ul>
  */
-public class LSPHoverSupport extends AbstractLSPFeatureSupport<HoverParams, List<Hover>> {
+public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverParams, List<Hover>> {
 
     private Integer previousOffset;
 

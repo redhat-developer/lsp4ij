@@ -17,7 +17,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.Location;
@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
  *      <li>textDocument/declaration</li>
  *  </ul>
  */
-public class LSPDeclarationSupport extends AbstractLSPFeatureSupport<LSPDeclarationParams, List<Location>> {
+public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSPDeclarationParams, List<Location>> {
 
     private Integer previousOffset;
 

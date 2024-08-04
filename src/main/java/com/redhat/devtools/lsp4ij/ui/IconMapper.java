@@ -22,6 +22,7 @@ import com.intellij.util.ui.ColorIcon;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -48,7 +49,7 @@ public class IconMapper {
 
     private static final int ICON_SIZE = 16;
 
-    private IconMapper(){
+    private IconMapper() {
     }
 
     /**
@@ -64,7 +65,7 @@ public class IconMapper {
         } else if (item.getKind() == CompletionItemKind.Color) {
             icon = getColorIcon(item);
         }
-        return icon == null? getIcon(item.getKind()) : icon;
+        return icon == null ? getIcon(item.getKind()) : icon;
     }
 
     private static Icon getFileIcon(CompletionItem item) {
@@ -72,10 +73,10 @@ public class IconMapper {
         if (fileType == null) {
             fileType = getFileType(item.getDetail());
         }
-        return fileType == null? null: fileType.getIcon();
+        return fileType == null ? null : fileType.getIcon();
     }
 
-    private static FileType getFileType(String fileOrPathName){
+    private static FileType getFileType(String fileOrPathName) {
         if (fileOrPathName == null || fileOrPathName.isBlank()) {
             return null;
         }
@@ -181,6 +182,60 @@ public class IconMapper {
             case Event:
             case Operator:
             case Color:
+            default:
+                return AllIcons.Nodes.EmptyNode;
+        }
+    }
+
+    public static @Nullable Icon getIcon(@Nullable SymbolKind kind) {
+        if (kind == null) {
+            return null;
+        }
+
+        switch (kind) {
+            case Namespace:
+            case Package:
+                return AllIcons.Nodes.Package;
+            case Constructor:
+                return AllIcons.Nodes.ClassInitializer;
+            case Method:
+                return AllIcons.Nodes.Method;
+            case Function:
+                return AllIcons.Nodes.Function;
+            case EnumMember://No matching icon, IDEA show enum members as fields
+            case Field:
+                return AllIcons.Nodes.Field;
+            case Variable:
+                return AllIcons.Nodes.Variable;
+            case Object:
+            case Struct:
+                return AllIcons.Json.Object;
+            case Array:
+                return AllIcons.Json.Array;
+            case Class:
+                return AllIcons.Nodes.Class;
+            case Interface:
+                return AllIcons.Nodes.Interface;
+            case Module:
+                return AllIcons.Nodes.Module;
+            case Property:
+                return AllIcons.Nodes.Property;
+            case Enum:
+                return AllIcons.Nodes.Enum;
+            case File:
+                return AllIcons.FileTypes.Any_type;
+            case Constant:
+                return AllIcons.Nodes.Constant;
+            case TypeParameter:
+                return AllIcons.Nodes.Parameter;
+            //No matching icons, no fallback
+            case Event:
+            case Operator:
+            case String:
+            case Number:
+            case Boolean:
+            case Key:
+            case Null:
             default:
                 return AllIcons.Nodes.EmptyNode;
         }

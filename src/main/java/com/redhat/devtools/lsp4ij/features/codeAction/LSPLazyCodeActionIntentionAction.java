@@ -191,6 +191,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     }
 
     private boolean isValidCodeAction() {
+        var action = this.action;
         return action != null && action.isLeft();
     }
 

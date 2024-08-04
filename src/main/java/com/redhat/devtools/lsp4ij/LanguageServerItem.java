@@ -512,4 +512,24 @@ public class LanguageServerItem {
     public SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
         return getServerWrapper().getServerDefinition().getSemanticTokensColorsProvider();
     }
+
+    /**
+     * Returns true if the language server can support workspace symbol and false otherwise.
+     *
+     * @return true if the language server can support workspace symbol and false otherwise.
+     */
+    public boolean isWorkspaceSymbolSupported() {
+        return isWorkspaceSymbolSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can support workspace symbol and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can support workspace symbol and false otherwise.
+     */
+    public static boolean isWorkspaceSymbolSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                hasCapability(serverCapabilities.getWorkspaceSymbolProvider());
+    }
 }

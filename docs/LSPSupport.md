@@ -35,7 +35,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/codeLens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens) (see [implementation details](#codeLens))
  * ✅ [codeLens/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve)
  * ❌ [workspace/codeLens/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_refresh)
- * ✅ [textDocument/inlayHint](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint) (see [implementation details](#inlayhint))
+ * ✅ [textDocument/inlayHint](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint) (see [implementation details](#inlay-hint))
  * ❌ [inlayHint/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint_resolve)
  * ✅ [workspace/inlayHint/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlayHint_refresh) 
  * ✅ [textDocument/completion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion) (see [implementation details](#completion-proposals))
@@ -44,7 +44,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) (see [implementation details](#publish-diagnostics))
  * ✅ [textDocument/codeAction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction) (see [implementation details](#codeAction))
  * ✅ [codeAction/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve)
- * ✅ [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) (see [implementation details](#documentColor))
+ * ✅ [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) (see [implementation details](#document-color))
  * ❌ [textDocument/colorPresentation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation).
  * ✅ [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) (see [implementation details](#declaration))
  * ✅ [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) (see [implementation details](#type-definition))
@@ -77,7 +77,7 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
  * ✅ [workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles).
  * ✅ [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand).
  * ✅ [workspace/applyEdit](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit).
- * ❌ [workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol).
+ * ✅ [workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) (see [implementation details](#workspace-symbol))
  * ❌ [workspace/symbolResolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve).
  * ✅ [workspace/configuration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration) (see [implementation details](./DeveloperGuide.md#workspace-configuration))
  * ❌ [workspace/workspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders).
@@ -101,7 +101,7 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
 
 ## Implementation details
 
-#### Progress support
+### Progress support
 
 [$/progress](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress) is implemented with `Background Tasks`.
 
@@ -109,14 +109,14 @@ Here a sample with [Eclipse JDT Language Server](https://github.com/eclipse-jdtl
 
 ![$/progress](./images/lsp-support/progress.png)
 
-#### Go to Definition
+### Go to Definition
 
 [textDocument/definition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition) is implemented via the  
 `gotoDeclarationHandler` extension point. As this extension point supports `any` language, it works out-of-the-box.
 
 It is also called via [Find Usages](./UserGuide.md#find-usages) to show definitions.
 
-#### References
+### References
 
 The [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is consumed with:
 
@@ -131,7 +131,7 @@ This menu action either opens the reference in a popup or navigates to the refer
 
 [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is used too via [Find Usages](./UserGuide.md#find-usages) to show references.
 
-#### Implementation
+### Implementation
 
 The [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is consumed with:
 
@@ -146,7 +146,7 @@ This menu action either opens the implementation in a popup or navigates to the 
 
 [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is too used via [Find Usages](./UserGuide.md#find-usages) to show implementations.
 
-#### Type definition
+### Type definition
 
 The [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is consumed with:
 
@@ -157,7 +157,7 @@ This menu action either opens the type definition in a popup or navigates to the
 
 [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is used too via [Find Usages](./UserGuide.md#find-usages) to show Type definitions.
 
-#### Declaration
+### Declaration
 
 The [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is consumed with:
 
@@ -168,7 +168,7 @@ This menu action either opens the declaration in a popup or navigates to the dec
 
 [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is used too via [Find Usages](./UserGuide.md#find-usages) to show declarations.
 
-#### Document Highlight
+### Document Highlight
 
 [textDocument/documentHighlight](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight) is implemented via the 
 `highlightUsagesHandlerFactory` extension point. As this extension point supports `any` language, it works out-of-the-box.
@@ -177,7 +177,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/documentHighlight](./images/lsp-support/textDocument_documentHighlight.png)
 
-#### Document Link
+### Document Link
 
 [textDocument/documentLink](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink) is implemented via:
 
@@ -190,7 +190,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/documentLink](./images/lsp-support/textDocument_documentLink.png)
 
-#### Hover
+### Hover
 
 [textDocument/hover](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover) is implemented with the `platform.backend.documentation.targetProvider` 
 extension point, to support any language, making `textDocument/hover` work out-of-the-box for all languages.
@@ -199,7 +199,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/hover](./images/lsp-support/textDocument_hover.png)
 
-##### Syntax Coloration
+#### Syntax Coloration
 
 LSP4IJ supports `Syntax Coloration` on hover and completion documentation. Here is an example with [Rust Analyzer](https://rust-analyzer.github.io/): 
 
@@ -231,7 +231,7 @@ will use the Syntax coloration which triggers the hover / completion.
 
 ![textDocument/hover Syntax Coloration Blockquote](./images/lsp-support/textDocument_hover_syntax_coloration_codeBlock.png)
 
-###### Syntax coloration discovery
+##### Syntax coloration discovery
 
 The rules to retrieve the proper syntax coloration are:
 
@@ -250,7 +250,7 @@ to find the file extension (e.g. `ts`) associated with the languageId (e.g. `typ
 If those strategies are insufficient for your needs, please [create an issue](https://github.com/redhat-developer/lsp4ij/issues) to request an extension point 
 for mapping the language and the file extension.
 
-#### CodeLens
+### CodeLens
 
 [textDocument/codeLens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens) is implemented with the `codeInsight.codeVisionProvider` extension point.
 As LSP4IJ registers [LSPCodeLensProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/codeLens/LSPCodeLensProvider.java) 
@@ -260,7 +260,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/codeLens](./images/lsp-support/textDocument_codeLens.png)
 
-#### InlayHint
+### Inlay Hint
 
 [textDocument/inlayHint](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint) is implemented with the `codeInsight.inlayProvider` extension point.
 LSP4IJ registers [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/inlayhint/LSPInlayHintsProvider.java) for all languages associated with a language server with
@@ -270,7 +270,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/inlayHint](./images/lsp-support/textDocument_inlayHint.png)
 
-#### DocumentColor
+### Document Color
 
 [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) is implemented with the `codeInsight.inlayProvider` extension point.
 LSP4IJ registers [LSPColorProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/color/LSPColorProvider.java) for all languages associated with a language server with
@@ -280,7 +280,7 @@ Here is an example with the [CSS language server](https://github.com/microsoft/v
 
 ![textDocument/documentColor](./images/lsp-support/textDocument_documentColor.png)
 
-#### Completion Proposals
+### Completion Proposals
 
 [textDocument/completion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion) is implemented with 
 [LSPCompletionContributor](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/completion/LSPCompletionContributor.java) class
@@ -291,7 +291,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/completion](./images/lsp-support/textDocument_completion.png)
 
-##### Completion item resolve
+#### Completion item resolve
 
 The [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) request is implemented to resolve:
 
@@ -309,7 +309,7 @@ Here a sample with [TypeScript Language Server](./user-defined-ls/typescript-lan
 
  * the `additionalTextEdits` property of a completionItem.
 
-#### Signature Help
+### Signature Help
 
 [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp) is implemented with
 the `codeInsight.parameterInfo` extension point. By default, LSP4IJ registers the `codeInsight.parameterInfo` with 
@@ -344,7 +344,7 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 
 ![textDocument/signatureHelp](./images/lsp-support/textDocument_signatureHelp.gif)
 
-#### Folding range
+### Folding range
 
 [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange) is implemented with
 the `lang.foldingBuilder` extension point. By default, LSP4IJ registers the `lang.foldingBuilder` with
@@ -369,7 +369,7 @@ Here is an example with the [Go Language Server](./user-defined-ls/gopls.md) sho
 
 ![textDocument/foldingRange](./images/lsp-support/textDocument_foldingRange.gif)
 
-#### Publish Diagnostics
+### Publish Diagnostics
 
 [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) is implemented with an `externalAnnotator` extension point. As this extension point supports `any` language, it works out-of-the-box.
 
@@ -377,7 +377,7 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/publishDiagnostics](./images/lsp-support/textDocument_publishDiagnostics.png)
 
-#### Code Action
+### Code Action
 
 Here is an example featuring the [Clojure LSP](./user-defined-ls/clojure-lsp.md), which offers code actions:
 
@@ -390,7 +390,7 @@ For the last type of code action, you can enable/disable them using the `Intenti
 
 ![Language Server Intentions](./images/lsp-support/textDocument_codeAction_intentions.png)
 
-#### Rename
+### Rename
 
 [textDocument/rename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename) is implemented with [LSPRenameHandler](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/rename/LSPRenameHandler.java) class 
 declared with the `renameHandler` extension point.
@@ -399,13 +399,13 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 
 ![textDocument/rename](./images/lsp-support/textDocument_rename.gif)
 
-#### Formatting
+### Formatting
 
 [textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) / [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) are implemented with 
 [LSPFormattingOnlyService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingOnlyService.java) /
 [LSPFormattingAndRangeBothService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingAndRangeBothService.java) with the `formattingService` extension point.
 
-#### Show Message
+### Show Message
 
 [window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage) supports Markdown messages and clickable links.
 
@@ -425,7 +425,7 @@ You can change the notification behavior of `LSP/window/showMessage` by using th
 
 ![window/showMessage Notification](./images/lsp-support/window_showMessage_Notification.png)
 
-## Show Message Request
+### Show Message Request
 
 [window/showMessageRequest](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest) is supported.
 
@@ -456,7 +456,7 @@ You can change the notification behavior of `LSP/window/showMessageRequest` by u
 
 ![window/showMessageRequest Notification](./images/lsp-support/window_showMessageRequest_Notification.png)
 
-#### Semantic Tokens
+### Semantic Tokens
 
 Before you start reading this section, please read the [User Guide](UserGuide.md#semantic-tokens-support) to configure support for semantic tokens.
 
@@ -470,7 +470,7 @@ with the [LSPSemanticTokensHighlightVisitor](https://github.com/redhat-developer
  * By default, LSP4IJ, uses the [DefaultSemanticTokensColorsProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/semanticTokens/DefaultSemanticTokensColorsProvider.java)
 but you can use your own provider with the [semanticTokensColorsProvider extension point](./DeveloperGuide.md#semantic-tokens-colors-provider). 
  
-##### DefaultSemanticTokensColorsProvider
+#### DefaultSemanticTokensColorsProvider
 
 The following table lists the currently predefined mappings:
 
@@ -526,3 +526,11 @@ If you need other mapping:
 
  * if you think it is a generic mapping, please create a contribution to define a new `SemanticTokensHighlightingColors` constants
  * if the mapping is specific to your language, use the [semanticTokensColorsProvider extension point](./DeveloperGuide.md#semantic-tokens-colors-provider) to define your own provider and mapping.
+
+### Workspace Symbol
+
+[workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) is implemented with the `gotoSymbolContributor` extension point. 
+
+Here is an example with the [MicroProfile language server](https://github.com/eclipse/lsp4mp/tree/master/microprofile.ls) collecting JAX-RS endpoints:
+
+![workspace/symbol](./images/lsp-support/workspace_symbol.gif)
