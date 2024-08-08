@@ -627,4 +627,11 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                 .builder(getItem().getLabel())
                 .presentation();
     }
+
+    @Override
+    public boolean isWorthShowingInAutoPopup() {
+        // leaves the completion popup open all the time when there is only one item
+        return true;
+    }
+
 }
