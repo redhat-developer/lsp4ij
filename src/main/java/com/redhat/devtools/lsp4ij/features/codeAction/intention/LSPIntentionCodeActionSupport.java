@@ -145,4 +145,9 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
         }
         return true;
     }
+
+    @Override
+    public void clear() {
+        super.cancel();
+    }
 }
