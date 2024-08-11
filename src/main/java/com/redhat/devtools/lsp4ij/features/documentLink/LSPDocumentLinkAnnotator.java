@@ -20,11 +20,13 @@ import com.intellij.openapi.editor.DefaultLanguageHighlighterColors;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPExternalAnnotator;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -42,9 +44,15 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 /**
  * Intellij {@link ExternalAnnotator} implementation which collect LSP document links and display them with underline style.
  */
-public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<DocumentLinkData>, List<DocumentLinkData>> {
+public class LSPDocumentLinkAnnotator extends AbstractLSPExternalAnnotator<List<DocumentLinkData>, List<DocumentLinkData>> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPDocumentLinkAnnotator.class);
+
+    private static final Key<Boolean> APPLIED_KEY = Key.create("lsp.documentLink.annotator.applied");
+
+    public LSPDocumentLinkAnnotator() {
+        super(APPLIED_KEY);
+    }
 
     @Nullable
     @Override
@@ -84,7 +92,7 @@ public class LSPDocumentLinkAnnotator extends ExternalAnnotator<List<DocumentLin
     }
 
     @Override
-    public void apply(@NotNull PsiFile file, @NotNull List<DocumentLinkData> documentLinks, @NotNull AnnotationHolder holder) {
+    public void doApply(@NotNull PsiFile file, @NotNull List<DocumentLinkData> documentLinks, @NotNull AnnotationHolder holder) {
         if (documentLinks.isEmpty()) {
             return;
         }
