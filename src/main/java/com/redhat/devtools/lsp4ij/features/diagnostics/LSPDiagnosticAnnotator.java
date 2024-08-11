@@ -15,13 +15,11 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.ProblemHighlightType;
-import com.intellij.lang.annotation.AnnotationBuilder;
-import com.intellij.lang.annotation.AnnotationHolder;
-import com.intellij.lang.annotation.ExternalAnnotator;
-import com.intellij.lang.annotation.HighlightSeverity;
+import com.intellij.lang.annotation.*;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
@@ -29,6 +27,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPExternalAnnotator;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.hint.LSPNavigationLinkHandler;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -44,7 +43,13 @@ import java.util.List;
  * Intellij {@link ExternalAnnotator} implementation which get the current LSP diagnostics for a given file and translate
  * them into Intellij {@link com.intellij.lang.annotation.Annotation}.
  */
-public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> {
+public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean, Boolean> {
+
+    private static final Key<Boolean> APPLIED_KEY = Key.create("lsp.diagnostic.annotator.applied");
+
+    public LSPDiagnosticAnnotator() {
+        super(APPLIED_KEY);
+    }
 
     @Nullable
     @Override
@@ -61,7 +66,7 @@ public class LSPDiagnosticAnnotator extends ExternalAnnotator<Boolean, Boolean> 
     }
 
     @Override
-    public void apply(@NotNull PsiFile file, Boolean applyAnnotator, @NotNull AnnotationHolder holder) {
+    public void doApply(@NotNull PsiFile file, Boolean applyAnnotator, @NotNull AnnotationHolder holder) {
         if (!applyAnnotator) {
             return;
         }
