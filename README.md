@@ -62,6 +62,7 @@ Here are some projects that use LSP4IJ:
  * [Zowe™ COBOL Language Support](https://github.com/zowe/zowe-cobol-language-support-intellij)
  * [ZigBrains](https://github.com/FalsePattern/ZigBrains)
  * [Pyright for PyCharm](https://github.com/InSyncWithFoo/pyright-for-pycharm)
+ * [Intellij EmmyLua2](https://github.com/EmmyLua/Intellij-EmmyLua2)
 
 ## Requirements
 
