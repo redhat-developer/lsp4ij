@@ -257,7 +257,12 @@ public class LanguageServerWrapper implements Disposable {
                                 // To avoid having some lock problem when message is written in the stream output
                                 // (when there are a lot of messages to write it)
                                 // we consume the message in async mode
-                                CompletableFuture.runAsync(() -> consumer.consume(message));
+                                CompletableFuture.runAsync(() -> consumer.consume(message))
+                                        .exceptionally(e -> {
+                                            // Log in the LSP console the error
+                                            getLanguageServerLifecycleManager().onError(this, e);
+                                            return null;
+                                        });
                             } catch (Throwable e) {
                                 // Log in the LSP console the error
                                 getLanguageServerLifecycleManager().onError(this, e);
@@ -809,12 +814,14 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * Returns the server capabilities if it is ready and null otherwise.
+     *
      * @return the server capabilities if it is ready and null otherwise.
      */
     @Nullable
     public ServerCapabilities getServerCapabilitiesSync() {
         return serverCapabilities;
     }
+
     /**
      * @return The language ID that this wrapper is dealing with if defined in the
      * language mapping for the language server
