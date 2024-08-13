@@ -5,6 +5,13 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+     <h3>0.4.0</h3>
+    <ul>
+      <li>Support for workspace/symbol</li>
+      <li>Fixing bugs</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/4?closed=1">changelog</a>.
+
     <h3>0.3.0</h3>
     <ul>
       <li>Support for textDocument/semanticTokens</li>
