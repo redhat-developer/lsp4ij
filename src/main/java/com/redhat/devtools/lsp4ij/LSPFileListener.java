@@ -153,6 +153,33 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
         return uri;
     }
 
+    /**
+     * Implements the <a href=https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didRename">
+     * LSP specification for document renaming</a>. Used for both file renames within the same directory and file shifts
+     * to a different directory.
+     *
+     * @param virtualParentFile directory of the file after renaming
+     * @param oldFileName file name before renaming
+     * @param virtualNewFile virtual file after renaming
+     * @return URI of the file before renaming
+     */
+    private @NotNull URI didRename(VirtualFile virtualParentFile, String oldFileName, VirtualFile virtualNewFile) {
+        File parentFile = VfsUtilCore.virtualToIoFile(virtualParentFile);
+        URI oldUri = LSPIJUtils.toUri(new File(parentFile, oldFileName));
+        boolean docIsConnected = languageServerWrapper.isConnectedTo(oldUri);
+        if (docIsConnected) {
+            // 1. Send a textDocument/didClose for the old file name
+            languageServerWrapper.disconnect(oldUri, false);
+            // 2. Send a textDocument/didOpen for the new file name
+            File newFile = VfsUtilCore.virtualToIoFile(virtualNewFile);
+            URI newUri = LSPIJUtils.toUri(newFile);
+            if (!languageServerWrapper.isConnectedTo(newUri)) {
+                languageServerWrapper.connect(virtualNewFile, null);
+            }
+        }
+        return oldUri;
+    }
+
     private void didChangeWatchedFiles(FileEvent... changes) {
         languageServerWrapper.sendNotification(ls -> {
             DidChangeWatchedFilesParams params = new DidChangeWatchedFilesParams(Arrays.asList(changes));
