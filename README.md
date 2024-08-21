@@ -3,10 +3,12 @@
 [plugin-repo]: https://plugins.jetbrains.com/plugin/23257-lsp4ij
 [plugin-version-svg]: https://img.shields.io/jetbrains/plugin/v/23257-lsp4ij.svg
 [plugin-downloads-svg]: https://img.shields.io/jetbrains/plugin/d/23257-lsp4ij.svg
+[plugin-rating-svg]: https://img.shields.io/jetbrains/plugin/r/rating/23257
 
 ![Java CI with Gradle](https://github.com/redhat-developer/lsp4ij/workflows/Java%20CI%20with%20Gradle/badge.svg)
 ![Validate against IJ versions](https://github.com/redhat-developer/lsp4ij/workflows/Validate%20against%20IJ%20versions/badge.svg)
 [![JetBrains plugins][plugin-version-svg]][plugin-repo]
+[![JetBrains Plugin Rating][plugin-rating-svg]][plugin-repo]
 [![JetBrains plugins][plugin-downloads-svg]][plugin-repo]
 
 ## Description
