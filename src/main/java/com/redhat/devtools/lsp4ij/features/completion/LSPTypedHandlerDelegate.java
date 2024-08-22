@@ -39,18 +39,32 @@ public class LSPTypedHandlerDelegate extends TypedHandlerDelegate {
             // The file is not associated to a language server.
             return Result.CONTINUE;
         }
-        if (hasLanguageServerSupportingTriggerCharacters(charTyped, project, file)) {
+
+        Result result = Result.CONTINUE;
+        if (hasLanguageServerSupportingCompletionTriggerCharacters(charTyped, project, file)) {
             // The current typed character is defined as "completion trigger characters"
             // in a associated language server, open the completion.
             AutoPopupController.getInstance(project).scheduleAutoPopup(editor);
-            return Result.STOP;
+            result = Result.STOP;
         }
-        return Result.CONTINUE;
+
+        if (hasLanguageServerSupportingSignatureTriggerCharacters(charTyped, project, file)) {
+            // The current typed character is defined as "signature trigger characters"
+            // in a associated language server, open the signature help.
+            AutoPopupController.getInstance(project).autoPopupParameterInfo(editor, null);
+            result = Result.STOP;
+        }
+
+        return result;
     }
 
-    private static boolean hasLanguageServerSupportingTriggerCharacters(char charTyped, Project project, PsiFile file) {
+    private static boolean hasLanguageServerSupportingCompletionTriggerCharacters(char charTyped, Project project, PsiFile file) {
         return LanguageServiceAccessor.getInstance(project)
                 .hasAny(file.getVirtualFile(), ls -> ls.isCompletionTriggerCharactersSupported(String.valueOf(charTyped)));
     }
 
+    private static boolean hasLanguageServerSupportingSignatureTriggerCharacters(char charTyped, Project project, PsiFile file) {
+        return LanguageServiceAccessor.getInstance(project)
+                .hasAny(file.getVirtualFile(), ls -> ls.isSignatureTriggerCharactersSupported(String.valueOf(charTyped)));
+    }
 }
