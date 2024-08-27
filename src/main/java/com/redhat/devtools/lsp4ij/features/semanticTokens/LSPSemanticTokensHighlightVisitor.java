@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
-import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -22,7 +21,6 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.SemanticTokensParams;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,10 +44,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPSemanticTokensHighlightVisitor.class);
-
-    private PsiFile file;
-
-    private HighlightInfoHolder myHolder;
+    ;
 
     @Override
     public boolean suitableForFile(@NotNull PsiFile file) {
@@ -58,32 +53,19 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
     @Override
     public boolean analyze(@NotNull PsiFile file, boolean updateWholeFile, @NotNull HighlightInfoHolder holder, @NotNull Runnable action) {
-        myHolder = holder;
         if (LanguageServersRegistry.getInstance().isFileSupported(file)) {
-            enableSemanticTokensHighlighting(file);
-            myHolder = holder;
-            try {
-                action.run();
-            }
-            finally {
-                myHolder = null;
-            }
-            return true;
+            action.run();
+            // run unconditionally, because the LSP semanticTokens API sucks and is file-level only
+            highlightSemanticTokens(file, holder);
         }
-        return false;
+        return true;
     }
 
     @Override
     public void visit(@NotNull PsiElement element) {
-        // This method is called for several PsiElements of the PsiFile
-        // In the context of LSP semantic tokens, highlighting is performed
-        // for the entire PsiFile and must be done just for the first call of this visit method
-        // to have good performance.
-        if (!isSemanticTokensHighlightingEnabled()) {
-            // The file is already highlighted, ignore it
-            return;
-        }
+    }
 
+    private void highlightSemanticTokens(@NotNull PsiFile file, @NotNull HighlightInfoHolder holder) {
         // Consume LSP 'textDocument/semanticTokens/full' request
         LSPSemanticTokensSupport semanticTokensSupport = LSPFileSupport.getSupport(file).getSemanticTokensSupport();
         var params = new SemanticTokensParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
@@ -112,23 +94,9 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
                 if (document == null) {
                     return;
                 }
-                semanticTokens.highlight(file, document, info -> addInfo(info));
-                // LSP semantic token is highlighted, don't highlight it again for the next visited PsiElement
-                disableSemanticTokensHighlighting();
+                semanticTokens.highlight(file, document, holder::add);
             }
         }
-    }
-
-    private void enableSemanticTokensHighlighting(@NotNull PsiFile file) {
-        this.file = file;
-    }
-
-    private void disableSemanticTokensHighlighting() {
-        this.file = null;
-    }
-
-    private boolean isSemanticTokensHighlightingEnabled() {
-        return file != null;
     }
 
     @Override
@@ -136,7 +104,4 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         return new LSPSemanticTokensHighlightVisitor();
     }
 
-    protected void addInfo(@Nullable HighlightInfo highlightInfo) {
-        myHolder.add(highlightInfo);
-    }
 }

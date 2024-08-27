@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensHighlightInfo;
@@ -80,6 +81,9 @@ public class SemanticTokensData {
             int length = 0;
             String tokenType = null;
             for (Integer data : dataStream) {
+                // Cancel LSP semantic tokens support as soon as possible.
+                ProgressManager.checkCanceled();
+
                 switch (idx % 5) {
                     case 0: // line
                         line += data;
@@ -110,7 +114,6 @@ public class SemanticTokensData {
                                     .range(start, end)
                                     .textAttributes(colorKey)
                                     .create();
-                            //HighlightInfo highlightInfo = highlighter.getInfo(colorIndex, start, end, colorKey);
                             addInfo.accept(highlightInfo);
                         }
 
