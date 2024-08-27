@@ -51,6 +51,10 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
     private HighlightInfoHolder myHolder;
 
+    private long lastHighlightTime = 0;
+
+    private static final long HIGHLIGHT_INTERVAL_MS = 1000; // 1 second
+
     @Override
     public boolean suitableForFile(@NotNull PsiFile file) {
         return LanguageServersRegistry.getInstance().isFileSupported(file);
@@ -128,6 +132,13 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
     }
 
     private boolean isSemanticTokensHighlightingEnabled() {
+        // Avoid highlighting the file too often
+        long currentTime = System.currentTimeMillis();
+        if (currentTime < lastHighlightTime + HIGHLIGHT_INTERVAL_MS) {
+            return false;
+        }
+
+        lastHighlightTime = currentTime;
         return file != null;
     }
 
