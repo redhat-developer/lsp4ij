@@ -41,12 +41,13 @@ public class LSPHighlightSupport extends AbstractLSPDocumentFeatureSupport<Docum
         super(file);
     }
 
-    public CompletableFuture<List<DocumentHighlight>> getHighlights(DocumentHighlightParams params) {
+    public CompletableFuture<List<DocumentHighlight>> getHighlights(@NotNull DocumentHighlightParams params) {
         return super.getFeatureData(params);
     }
 
     @Override
-    protected CompletableFuture<List<DocumentHighlight>> doLoad(DocumentHighlightParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<DocumentHighlight>> doLoad(@NotNull DocumentHighlightParams params,
+                                                                @NotNull CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return getHighlights(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
     }

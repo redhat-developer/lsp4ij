@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.features;
 
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
@@ -84,8 +85,9 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
         // Cancel previous LSP requests future
         cancel();
         // Load a new LSP requests future
-        cancellationSupport = new CancellationSupport();
-        return doLoad(params, cancellationSupport);
+        CancellationSupport cancellation = new CancellationSupport(); // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
+        cancellationSupport = cancellation;
+        return doLoad(params, cancellation);
     }
 
     /**
@@ -95,7 +97,7 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * @param cancellationSupport the cancellation support.
      * @return the LSP response results.
      */
-    protected abstract CompletableFuture<Result> doLoad(Params params, CancellationSupport cancellationSupport);
+    protected abstract CompletableFuture<Result> doLoad(Params params, @NotNull CancellationSupport cancellationSupport);
 
     /**
      * Cancel all LSP requests.
@@ -106,8 +108,7 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
             future.cancel(true);
         }
         this.future = null;
-        // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
-        CancellationSupport cancellation = cancellationSupport;
+        CancellationSupport cancellation = cancellationSupport; // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
         if (cancellation != null) {
             cancellation.cancel();
         }
