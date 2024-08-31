@@ -20,10 +20,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
-import com.redhat.devtools.lsp4ij.ServerMessageHandler;
-import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
@@ -169,12 +166,15 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     private void refreshSemanticTokensForAllOpenedFiles() {
+        // Received request 'workspace/semanticTokens/refresh
         ReadAction.nonBlocking((Callable<Void>) () -> {
                     for (var fileData : wrapper.getConnectedFiles()) {
                         VirtualFile file = fileData.getFile();
                         final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                         if (psiFile != null) {
-                            // Should be enough?
+                            // Evict the semantic tokens cache
+                            LSPFileSupport.getSupport(psiFile).getSemanticTokensSupport().cancel();
+                            // Refresh the UI
                             DaemonCodeAnalyzer.getInstance(psiFile.getProject()).restart(psiFile);
                         }
                     }
