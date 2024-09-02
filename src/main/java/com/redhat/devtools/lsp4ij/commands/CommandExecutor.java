@@ -26,9 +26,11 @@ import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.*;
@@ -98,7 +100,14 @@ public class CommandExecutor {
             if (document != null) {
                 WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), document);
                 if (edit != null) {
-                    LSPIJUtils.applyWorkspaceEdit(edit);
+                    if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+                        LSPIJUtils.applyWorkspaceEdit(edit);
+                    } else {
+                        return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<Boolean>) () -> {
+                            LSPIJUtils.applyWorkspaceEdit(edit);
+                            return true;
+                        });
+                    }
                     return true;
                 }
             }
@@ -132,7 +141,7 @@ public class CommandExecutor {
      * @return true if the LSP command on server side has been executed successfully and false otherwise.
      */
     private static boolean executeCommandServerSide(@NotNull Command command,
-                                                    @NotNull LanguageServerItem languageServer) {
+                                                    @Nullable LanguageServerItem languageServer) {
         CompletableFuture<LanguageServer> languageServerFuture = getLanguageServerForCommand(command, languageServer);
         if (languageServerFuture == null) {
             return false;
@@ -159,9 +168,9 @@ public class CommandExecutor {
 
     @Nullable
     private static CompletableFuture<LanguageServer> getLanguageServerForCommand(@NotNull Command command,
-                                                                                 @NotNull LanguageServerItem languageServer) {
+                                                                                 @Nullable LanguageServerItem languageServer) {
 
-        if (languageServer.supportsCommand(command)) {
+        if (languageServer != null && languageServer.supportsCommand(command)) {
             return languageServer
                     .getServerWrapper()
                     .getInitializedServer();
@@ -285,7 +294,7 @@ public class CommandExecutor {
             } else if (arg instanceof Map) {
                 Gson gson = new Gson(); // TODO? retrieve the GSon used by LS
                 TextEdit edit = gson.fromJson(gson.toJson(arg), TextEdit.class);
-                if (edit != null) {
+                if (isValid(edit)) {
                     currentEntry.value.add(edit);
                 }
             } else if (arg instanceof JsonPrimitive json) {
@@ -301,7 +310,7 @@ public class CommandExecutor {
                 Gson gson = new Gson(); // TODO? retrieve the GSon used by LS
                 array.forEach(elt -> {
                     TextEdit edit = gson.fromJson(gson.toJson(elt), TextEdit.class);
-                    if (edit != null) {
+                    if (isValid(edit)) {
                         currentEntry.value.add(edit);
                     }
                 });
@@ -313,7 +322,7 @@ public class CommandExecutor {
                     changes.putAll(entries);
                 } else {
                     TextEdit edit = gson.fromJson((JsonObject) arg, TextEdit.class);
-                    if (edit != null && edit.getRange() != null) {
+                    if (isValid(edit)) {
                         currentEntry.value.add(edit);
                     }
                 }
@@ -334,5 +343,9 @@ public class CommandExecutor {
         WorkspaceEdit workspaceEdit = new WorkspaceEdit();
         workspaceEdit.setChanges(changes);
         return workspaceEdit;
+    }
+
+    private static boolean isValid(TextEdit edit) {
+        return (edit != null && edit.getRange() != null && edit.getNewText() != null);
     }
 }
