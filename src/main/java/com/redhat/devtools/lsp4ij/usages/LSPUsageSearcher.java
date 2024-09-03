@@ -65,7 +65,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         // Get position where the "Find Usages" has been triggered
         Position position = getPosition(element);
         // Collect textDocument/definition, textDocument/references, etc
-        LSPUsageSupport usageSupport = new LSPUsageSupport(element.getContainingFile());
+        LSPUsageSupport usageSupport = new LSPUsageSupport(ReadAction.compute(() -> element.getContainingFile()));
         LSPUsageSupport.LSPUsageSupportParams params = new LSPUsageSupport.LSPUsageSupportParams(position);
         CompletableFuture<List<LSPUsagePsiElement>> usagesFuture = usageSupport.getFeatureData(params);
         try {
