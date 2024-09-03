@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.usages;
 import com.intellij.find.findUsages.PsiElement2UsageTargetAdapter;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -31,11 +30,11 @@ import static com.redhat.devtools.lsp4ij.LSPIJUtils.getWordRangeAt;
  */
 public class LSPUsageTargetProvider implements UsageTargetProvider {
 
-    private static final Key<Boolean> DISABLED_KEY = Key.create("lsp.find.usages.disabled");
-
     @Override
     public UsageTarget @Nullable [] getTargets(@NotNull Editor editor, @NotNull PsiFile file) {
-        if (isDisabled(file)) {
+        if (LanguageServersRegistry.getInstance().hasCustomLanguageFindUsages(file.getLanguage())) {
+            // the file language is associated to a custom FindUsagesProvider (ex: Java FindUsagesProvider)
+            // don't create LSP UsageTarget to avoid breaking the "Find Usages" from Java, etc files
             return null;
         }
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
@@ -48,7 +47,9 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
 
     @Override
     public UsageTarget @Nullable [] getTargets(@NotNull PsiElement psiElement) {
-        if (isDisabled(psiElement)) {
+        if (LanguageServersRegistry.getInstance().hasCustomLanguageFindUsages(psiElement.getLanguage())) {
+            // the Psi element language is associated to a custom FindUsagesProvider (ex: Java FindUsagesProvider)
+            // don't create LSP UsageTarget to avoid breaking the "Find Usages" from Java, etc files
             return null;
         }
         PsiFile file = psiElement.getContainingFile();
@@ -81,22 +82,6 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
         triggeredElement.getName();
         UsageTarget target = new PsiElement2UsageTargetAdapter(triggeredElement, true);
         return new UsageTarget[]{target};
-    }
-
-    private static boolean isDisabled(PsiFile file) {
-        return file.getUserData(DISABLED_KEY) != null;
-    }
-
-    public static void setDisabled(PsiFile file, Boolean disabled) {
-        file.putUserData(DISABLED_KEY, disabled);
-    }
-
-    private static boolean isDisabled(PsiElement element) {
-        return element.getUserData(DISABLED_KEY) != null;
-    }
-
-    public static void setDisabled(PsiElement element, Boolean disabled) {
-        element.putUserData(DISABLED_KEY, disabled);
     }
 
 }

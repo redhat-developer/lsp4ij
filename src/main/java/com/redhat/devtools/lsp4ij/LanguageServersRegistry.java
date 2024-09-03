@@ -23,13 +23,13 @@ import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
+import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
-import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
@@ -65,6 +65,8 @@ public class LanguageServersRegistry {
     private final Collection<LanguageServerDefinitionListener> listeners = new CopyOnWriteArrayList<>();
 
     private final List<ProviderInfo<? extends Object>> inlayHintsProviders = new ArrayList<>();
+
+    private final Set<Language> customLanguageFindUsages = new HashSet<>();
 
     private LanguageServersRegistry() {
         initialize();
@@ -119,8 +121,7 @@ public class LanguageServersRegistry {
             String serverId = extension.serverId;
             try {
                 semanticTokensColorsProviders.put(serverId, extension.getSemanticTokensColorsProvider());
-            }
-            catch(Exception e) {
+            } catch (Exception e) {
                 LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='" + serverId + "'.", e);
             }
         }
@@ -207,6 +208,7 @@ public class LanguageServersRegistry {
     }
 
     private void updateFindUsagesProvider(Set<Language> distinctLanguages) {
+        customLanguageFindUsages.clear();
         // Associate the LSP find usage provider
         // for all languages associated with a language server.
         // and which does not already define a provider for the language.
@@ -215,8 +217,20 @@ public class LanguageServersRegistry {
             var existingProviders = LanguageFindUsages.INSTANCE.allForLanguage(language);
             if (existingProviders.isEmpty() || (existingProviders.size() == 1 && existingProviders.get(0) instanceof EmptyFindUsagesProvider)) {
                 LanguageFindUsages.INSTANCE.addExplicitExtension(language, provider);
+            } else {
+                customLanguageFindUsages.add(language);
             }
         }
+    }
+
+    /**
+     * Returns true if the given language is associated to a custom FindUsagesProvider and false otherwise.
+     *
+     * @param language the language.
+     * @return true if the given language is associated to a custom FindUsagesProvider and false otherwise.
+     */
+    public boolean hasCustomLanguageFindUsages(@Nullable Language language) {
+        return language != null && customLanguageFindUsages.contains(language);
     }
 
     private static String getServerNotAvailableMessage(ServerMapping mapping) {

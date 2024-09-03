@@ -589,8 +589,6 @@
         <listener
                 topic="com.intellij.openapi.project.ProjectManagerListener"
                 class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
-        <listener topic="com.intellij.openapi.actionSystem.ex.AnActionListener"
-                  class="com.redhat.devtools.lsp4ij.usages.LSPFindActionTracker"/>
     </applicationListeners>
 
     <projectListeners>
