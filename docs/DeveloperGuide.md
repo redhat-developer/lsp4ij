@@ -39,7 +39,7 @@ excluding the LSP4J
 dependency from the [Qute Language Server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls):
 
 ```kotlin
-implementation("com.redhat.microprofile:com.redhat.qute.ls:0.17.0) {
+implementation("com.redhat.microprofile:com.redhat.qute.ls:0.17.0") {
   exclude("org.eclipse.lsp4j")
 }
 ```
