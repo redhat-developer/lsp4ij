@@ -14,7 +14,7 @@
 package com.redhat.devtools.lsp4ij.internal.telemetry;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.project.Project;
+import com.intellij.openapi.application.ApplicationManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
@@ -22,6 +22,7 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.telemetry.TelemetryEventName;
 import com.redhat.devtools.lsp4ij.telemetry.TelemetryService;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,12 +36,10 @@ import java.util.Map;
  */
 public class TelemetryManager implements Disposable {
 
-    private final Project project;
     private TelemetryService telemetryService;
     private LanguageServerDefinitionListener telemetryListener;
 
-    public TelemetryManager(Project project){
-        this.project = project;
+    public TelemetryManager() {
         try {
             Class.forName("com.redhat.devtools.intellij.telemetry.core.service.TelemetryService");
             telemetryService = new RedHatTelemetryService();
@@ -49,19 +48,22 @@ public class TelemetryManager implements Disposable {
         }
     }
 
-    public static TelemetryManager getInstance(@NotNull Project project) {
-        return project.getService(TelemetryManager.class);
+    public static TelemetryManager instance() {
+        return ApplicationManager.getApplication().getService(TelemetryManager.class);
     }
 
     /**
      * Initializes Telemetry by:
-     *  <ul>
-     *      <li>registering a LanguageServerDefinitionListener to the LanguageServersRegistry,
-     *          to report telemetry events for added/removed LanguageServerDefinition.
-     *      </li>
-     *  </ul>
+     * <ul>
+     *     <li>registering a LanguageServerDefinitionListener to the LanguageServersRegistry,
+     *         to report telemetry events for added/removed LanguageServerDefinition.
+     *     </li>
+     * </ul>
      */
-    public void initialize() {
+    public synchronized void initialize() {
+        if (telemetryListener != null) {
+            return;
+        }
         telemetryListener = createListener();
         LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(telemetryListener);
     }
@@ -75,28 +77,26 @@ public class TelemetryManager implements Disposable {
 
             @Override
             public void handleAdded(@NotNull LanguageServerAddedEvent event) {
-                if (project.equals(event.getProject())) {
-                    event.serverDefinitions.forEach(sd -> send("lsp.server.added", sd));
-                }
+                // Send "lsp.server.added" telemetry event
+                event.serverDefinitions.forEach(sd -> send(TelemetryEventName.LSP_SERVER_ADDED, sd));
             }
 
             @Override
             public void handleRemoved(@NotNull LanguageServerRemovedEvent event) {
-                if (project.equals(event.getProject())) {
-                    event.serverDefinitions.forEach(sd -> send("lsp.server.removed", sd));
-                }
+                // Send "lsp.server.removed" telemetry event
+                event.serverDefinitions.forEach(sd -> send(TelemetryEventName.LSP_SERVER_REMOVED, sd));
             }
 
             @Override
             public void handleChanged(@NotNull LanguageServerChangedEvent event) {
             }
 
-            private void send(String event, LanguageServerDefinition lsDef) {
+            private void send(TelemetryEventName event, LanguageServerDefinition lsDef) {
                 Map<String, String> eventProperties;
                 if (lsDef instanceof UserDefinedLanguageServerDefinition) {
                     eventProperties = new HashMap<>(2);
                     eventProperties.put("user_defined", "true");
-                    eventProperties.put("ls_label", getTemplateNames().contains(lsDef.getDisplayName())? lsDef.getDisplayName(): "User Custom LS");
+                    eventProperties.put("ls_label", getTemplateNames().contains(lsDef.getDisplayName()) ? lsDef.getDisplayName() : "User Custom LS");
                 } else if (lsDef instanceof ExtensionLanguageServerDefinition) {
                     //Currently can not happen
                     eventProperties = new HashMap<>(2);

@@ -13,6 +13,9 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.telemetry;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.Map;
 
 /**
@@ -22,16 +25,33 @@ public interface TelemetryService {
 
     /**
      * Sends a tracking event without additional properties.
+     *
      * @param eventName the name of the event
      */
-    default void send(String eventName){
+    default void send(@NotNull TelemetryEventName eventName) {
         send(eventName, null);
     }
 
     /**
      * Sends a tracking event with additional properties.
-     * @param eventName the name of the event
+     *
+     * @param eventName  the name of the event
      * @param properties the properties of the event
      */
-    default void send(String eventName, Map<String, String> properties){}
+    default void send(@NotNull TelemetryEventName eventName,
+                      @Nullable Map<String, String> properties) {
+        send(eventName, properties, null);
+    }
+
+    /**
+     * Sends a tracking event with additional properties.
+     *
+     * @param eventName  the name of the event
+     * @param properties the properties of the event
+     * @param error      the error of the event
+     */
+    default void send(@NotNull TelemetryEventName eventName,
+                      @Nullable Map<String, String> properties,
+                      @Nullable Exception error) {
+    }
 }
