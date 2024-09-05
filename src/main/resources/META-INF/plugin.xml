@@ -165,6 +165,8 @@
         <backgroundPostStartupActivity implementation="com.redhat.devtools.lsp4ij.internal.LSPPostStartupActivity"/>
         <!-- LSP application services -->
         <applicationService
+                serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
+        <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry"/>
         <applicationService
                 id="com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings"
@@ -182,8 +184,6 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.usages.LSPUsagesManager"/>
-        <projectService
-                serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter"/>
 

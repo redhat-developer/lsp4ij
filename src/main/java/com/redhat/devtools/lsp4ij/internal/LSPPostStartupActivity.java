@@ -33,7 +33,10 @@ public class LSPPostStartupActivity implements ProjectActivity, DumbAware {
     @Override
     public Object execute(@NotNull Project project, @NotNull Continuation<? super Unit> continuation) {
         if (!ApplicationManager.getApplication().isUnitTestMode() && !project.isDisposed()) {
-            TelemetryManager.getInstance(project).initialize();
+            // On the first project which is loaded
+            // we register a LanguageServerDefinitionListener to the LanguageServersRegistry,
+            // to report telemetry events for added/removed LanguageServerDefinition.
+            TelemetryManager.instance().initialize();
         }
         return null;
     }
