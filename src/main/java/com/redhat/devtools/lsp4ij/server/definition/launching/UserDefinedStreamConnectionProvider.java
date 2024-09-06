@@ -17,12 +17,10 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 /**
- * {@link ProcessStreamConnectionProvider} implementation to start a the language server with a
+ * {@link ProcessStreamConnectionProvider} implementation to start a language server with a
  * process command defined by the user.
  */
 public class UserDefinedStreamConnectionProvider extends ProcessStreamConnectionProvider {
@@ -33,40 +31,10 @@ public class UserDefinedStreamConnectionProvider extends ProcessStreamConnection
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
                                                @NotNull UserDefinedLanguageServerDefinition serverDefinition) {
-        super.setCommands(createCommands(commandLine));
+        super.setCommands(CommandUtils.createCommands(commandLine));
         super.setUserEnvironmentVariables(userEnvironmentVariables);
         super.setIncludeSystemEnvironmentVariables(includeSystemEnvironmentVariables);
         this.serverDefinition = serverDefinition;
-    }
-
-    private List<String> createCommands(String commandLine) {
-        List<String> commands = new ArrayList<>();
-        StringBuilder commandPart = new StringBuilder();
-        boolean inString = false;
-        for (int i = 0; i < commandLine.length(); i++) {
-            char c = commandLine.charAt(i);
-            switch(c) {
-                case '"':
-                    inString = !inString;
-                    break;
-                case ' ':
-                    if (inString) {
-                        commandPart.append(c);
-                    } else {
-                        commands.add(commandPart.toString());
-                        commandPart.setLength(0);
-                    }
-                    break;
-                default:
-                    commandPart.append(c);
-                    break;
-            }
-        }
-        if (commandPart.length() > 0) {
-            commands.add(commandPart.toString());
-            commandPart.setLength(0);
-        }
-        return commands;
     }
 
     @Override
