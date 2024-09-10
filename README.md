@@ -66,6 +66,7 @@ Here are some projects that use LSP4IJ:
  * [Pyright for PyCharm](https://github.com/InSyncWithFoo/pyright-for-pycharm)
  * [Intellij EmmyLua2](https://github.com/EmmyLua/Intellij-EmmyLua2)
  * [Lean4ij](https://github.com/onriv/lean4ij)
+ * [Intellij KCL](https://github.com/kcl-lang/intellij-kcl)
 
 ## Requirements
 
