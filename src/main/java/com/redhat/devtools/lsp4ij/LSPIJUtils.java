@@ -800,10 +800,15 @@ public class LSPIJUtils {
         return VfsUtil.findFileByIoFile(newFile, true);
     }
 
-    public static @Nullable VirtualFile findResourceFor(URI uri) {
+    public static @Nullable VirtualFile findResourceFor(@NotNull URI uri) {
         return LocalFileSystem.getInstance().findFileByIoFile(Paths.get(uri).toFile());
     }
 
+    /**
+     * Returns the virtual file from the given uri and null otherwise.
+     * @param uri the Uri.
+     * @return the virtual file from the given uri and null otherwise.
+     */
     public static @Nullable VirtualFile findResourceFor(@NotNull String uri) {
         if (uri.startsWith(JAR_SCHEME) || uri.startsWith(JRT_SCHEME)) {
             // ex : jar:file:///C:/Users/azerr/.m2/repository/io/quarkus/quarkus-core/3.0.1.Final/quarkus-core-3.0.1.Final.jar!/io/quarkus/runtime/ApplicationConfig.class
@@ -816,6 +821,9 @@ public class LSPIJUtils {
         if (uri.contains("%")) {
             // ex : file:///c%3A/Users/azerr/IdeaProjects/untitled7/test.js
             // the uri must be decoded (ex : file:///c:/Users) otherwise IntelliJ cannot retrieve the virtual file.
+            // Keep the original '+' after decoding the Uri
+            uri = uri.replace("+", "%2B");
+            // Decode the uri
             uri = URLDecoder.decode(uri, StandardCharsets.UTF_8);
         }
         return VirtualFileManager.getInstance().findFileByUrl(VfsUtilCore.fixURLforIDEA(uri));
