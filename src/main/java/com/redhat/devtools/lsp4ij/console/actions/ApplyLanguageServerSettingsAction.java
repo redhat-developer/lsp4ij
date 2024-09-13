@@ -14,7 +14,6 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.Balloon;
@@ -106,17 +105,15 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
                 .filter(c -> ACTION_TOOLBAR_COMPONENT_NAME.equals(c.getName()))
                 .findFirst();
 
-        if (actionToolbarComponent.isEmpty()) {
-            return;
+        if (actionToolbarComponent.isPresent() && actionToolbarComponent.get() instanceof JPanel actionToolBar) {
+            Component applyComponent = actionToolBar.getComponent(0);
+            // Move the position by 1/2 of the component width, because the icon is not centered
+            Point point = new Point(applyComponent.getWidth()/2 ,0);
+            RelativePoint displayPoint = new RelativePoint(applyComponent, point);
+
+            // Use invokeLater to prevent the balloon from resizing when it is shown
+            ApplicationManager.getApplication().invokeLater(() -> this.saveTipBalloon.show(displayPoint, Balloon.Position.above));
         }
-        Component applyComponent = ((ActionToolbarImpl) actionToolbarComponent.get()).getComponent(0);
-
-        // Move the position by 1/2 of the component width, because the icon is not centered
-        Point point = new Point(applyComponent.getWidth()/2 ,0);
-        RelativePoint displayPoint = new RelativePoint(applyComponent, point);
-
-        // Use invokeLater to prevent the balloon from resizing when it is shown
-        ApplicationManager.getApplication().invokeLater(() -> this.saveTipBalloon.show(displayPoint, Balloon.Position.above));
     }
 
     /**
