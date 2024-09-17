@@ -67,6 +67,7 @@ Here are some projects that use LSP4IJ:
  * [Intellij EmmyLua2](https://github.com/EmmyLua/Intellij-EmmyLua2)
  * [Lean4ij](https://github.com/onriv/lean4ij)
  * [Intellij KCL](https://github.com/kcl-lang/intellij-kcl)
+ * [Ruff for PyCharm](https://github.com/koxudaxi/ruff-pycharm-plugin)
 
 ## Requirements
 
