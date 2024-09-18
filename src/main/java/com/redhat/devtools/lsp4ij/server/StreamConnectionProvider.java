@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.server;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -33,18 +32,10 @@ public interface StreamConnectionProvider {
 
     OutputStream getOutputStream();
 
-    /**
-     * Returns the {@link InputStream} connected to the error output of the process
-     * running the language server. If the error output is redirected to standard
-     * output it returns <code>null</code>.
-     *
-     * @return the {@link InputStream} connected to the error output of the language
-     * server process or <code>null</code> if it's redirected or process not
-     * yet started.
-     */
-    @Nullable
-    InputStream getErrorStream();
 
+    default void addLogErrorHandler(LanguageServerLogErrorHandler handler) {
+
+    }
     /**
      * User provided initialization options.
      */

@@ -86,11 +86,6 @@ public class MockConnectionProvider implements StreamConnectionProvider {
 	}
 
 	@Override
-	public InputStream getErrorStream() {
-		return errorStream;
-	}
-
-	@Override
 	public void stop() {
 		streams.forEach(t -> {
 			try {

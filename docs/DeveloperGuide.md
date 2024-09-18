@@ -69,12 +69,12 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
         return new MyLanguageServer(project);
     }
 
-    @Override //If you need to provide client specific features
+    @Override // If you need to provide client specific features
     public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
         return new MyLanguageClient(project);
     }
 
-    @Override //If you need to expose a custom server API
+    @Override // If you need to expose a custom server API
     public @NotNull Class<? extends LanguageServer> getServerInterface() {
         return MyCustomServerAPI.class;
     }
@@ -99,7 +99,38 @@ API which :
 
 Frequently, a language server process is started through a runtime like Java, Node.js, etc. In this case you
 need to
-extend [ProcessStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/ProcessStreamConnectionProvider.java)
+extend [OSProcessStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/OSProcessStreamConnectionProvider.java) or [ProcessStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/ProcessStreamConnectionProvider.java)
+
+#### OSProcessStreamConnectionProvider
+
+Even though [OSProcessStreamConnectionProvider](#osprocessstreamconnectionprovider) is experimental, 
+it is recommended to extend it instead of [ProcessStreamConnectionProvider](#processstreamconnectionprovider) because the former internally uses the
+IntelliJ [OSProcessHandler](https://github.com/JetBrains/intellij-community/blob/master/platform/platform-util-io/src/com/intellij/execution/process/OSProcessHandler.java) class 
+which wraps a process and allows to track the process state via a 
+[ProcessListener](https://github.com/JetBrains/intellij-community/blob/master/platform/util/src/com/intellij/execution/process/ProcessListener.java) listener.
+
+In addition, OSProcessStreamConnectionProvider allows to log errors from the language server in the `Log tab` of the 
+[LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console).
+
+Here is a basic sample which starts the `path/to/my/language/server/main.js` language server written in JavaScript, with
+the Node.js runtime found in "path/to/nodejs/node.exe":
+
+```java
+package my.language.server;
+
+import com.intellij.execution.configurations.GeneralCommandLine;
+import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
+
+public class MyLanguageServer extends OSProcessStreamConnectionProvider {
+
+    public MyLanguageServer() {
+        GeneralCommandLine commandLine = new GeneralCommandLine("path/to/nodejs/node.exe", "path/to/my/language/server/main.js");
+        super.setCommandLine(commandLine);
+    }
+}
+```
+
+#### ProcessStreamConnectionProvider
 
 Here is a basic sample which starts the `path/to/my/language/server/main.js` language server written in JavaScript, with
 the Node.js runtime found in "path/to/nodejs/node.exe":
@@ -389,6 +420,20 @@ Your plugin.xml needs to specifically bind LSP4IJ's `LSPParameterInfoHandler` to
 ```
 
 See specific [Signature help implementation details](./LSPSupport.md#signature-help) for more details.
+
+### Document symbol
+
+[textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) is implemented via the `lang.psiStructureViewFactory` extension point, which requires binding to an IntelliJ language.
+Your plugin.xml needs to specifically bind LSP4IJ's `LSPDocumentSymbolStructureViewFactory` to that IntelliJ language:
+
+```xml
+<!-- LSP textDocument/documentSymbol -->
+<lang.psiStructureViewFactory
+        language="MyLanguage"
+        implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+```
+
+See specific [Document symbol implementation details](./LSPSupport.md#document-symbol) for more details.
 
 ## Language Server Manager
 

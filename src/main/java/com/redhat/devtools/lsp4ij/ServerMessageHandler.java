@@ -29,6 +29,7 @@ import com.intellij.openapi.ui.popup.LightweightWindowEvent;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -54,7 +55,17 @@ public class ServerMessageHandler {
      * @param params  the message request parameters
      */
     public static void logMessage(LanguageServerWrapper serverWrapper, MessageParams params) {
-        LSPConsoleToolWindowPanel.showLog(serverWrapper.getServerDefinition(), params, serverWrapper.getProject() );
+        logMessage(serverWrapper.getServerDefinition(), params, serverWrapper.getProject() );
+    }
+
+    /**
+     * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage">window/logMessage</a> specification.
+     *
+     * @param serverWrapper the language server wrapper
+     * @param params  the message request parameters
+     */
+    public static void logMessage(LanguageServerDefinition serverDefinition, MessageParams params, Project project) {
+        LSPConsoleToolWindowPanel.showLog(serverDefinition, params, project );
     }
 
     private static Icon messageTypeToIcon(MessageType type) {
