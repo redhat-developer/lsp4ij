@@ -43,7 +43,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     public LanguageServerProcessTreeNode(LanguageServerWrapper languageServer, DefaultTreeModel treeModel) {
         this.languageServer = languageServer;
         this.treeModel = treeModel;
-        this.serverStatus = ServerStatus.none;
+        setServerStatus(ServerStatus.none);
     }
 
     public void setServerStatus(ServerStatus serverStatus) {
