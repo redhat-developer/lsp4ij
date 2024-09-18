@@ -13,14 +13,12 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server;
 
-import java.io.IOException;
-
 /**
  * Language server exception when start process cannot be done.
  */
 public class CannotStartProcessException extends LanguageServerException {
 
-    public CannotStartProcessException(IOException e) {
+    public CannotStartProcessException(Exception e) {
         super(e);
     }
 

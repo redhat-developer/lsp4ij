@@ -220,27 +220,33 @@ public class LanguageServerWrapper implements Disposable {
             final VirtualFile rootURI = getRootURI();
             this.launcherFuture = new CompletableFuture<>();
             this.initializeFuture = CompletableFuture.supplyAsync(() -> {
-                        this.lspStreamProvider = serverDefinition.createConnectionProvider(initialProject);
-                        initParams.setInitializationOptions(this.lspStreamProvider.getInitializationOptions(rootURI));
+
+                        var provider = this.lspStreamProvider = serverDefinition.createConnectionProvider(initialProject);
+                        initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
+
+                        // Add error log
+                        provider.addLogErrorHandler(error -> {
+                            ServerMessageHandler.logMessage(this, new MessageParams(MessageType.Error, error));
+                        });
 
                         // Starting process...
                         updateStatus(ServerStatus.starting);
                         getLanguageServerLifecycleManager().onStatusChanged(this);
                         this.currentProcessId = null;
                         this.currentProcessCommandLines = null;
-                        lspStreamProvider.start();
+                        provider.start();
 
                         // As process can be stopped, we loose pid and command lines information
                         // when server is stopped, we store them here.
                         // to display them in the Language server explorer even if process is killed.
-                        if (lspStreamProvider instanceof ProcessStreamConnectionProvider provider) {
-                            this.currentProcessId = provider.getPid();
-                            this.currentProcessCommandLines = provider.getCommands();
+                        if (provider instanceof ProcessDataProvider data) {
+                            this.currentProcessId = data.getPid();
+                            this.currentProcessCommandLines = data.getCommands();
                         }
 
                         // Throws the CannotStartProcessException exception if process is not alive.
                         // This use case comes for instance when the start process command fails (not a valid start command)
-                        lspStreamProvider.ensureIsAlive();
+                        provider.ensureIsAlive();
                         return null;
                     }).thenRun(() -> {
                         languageClient = serverDefinition.createLanguageClient(initialProject);

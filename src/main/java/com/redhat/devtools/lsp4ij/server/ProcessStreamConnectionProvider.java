@@ -23,7 +23,7 @@ import java.util.Objects;
 /**
  * Process stream connection provider used to start a language server with a process.
  */
-public abstract class ProcessStreamConnectionProvider implements StreamConnectionProvider {
+public abstract class ProcessStreamConnectionProvider implements StreamConnectionProvider, ProcessDataProvider {
     @Nullable
     private Process process;
 
@@ -116,20 +116,13 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
 
     @Override
     public @Nullable
-    InputStream getErrorStream() {
-        Process p = process;
-        return p == null ? null : p.getErrorStream();
-    }
-
-    @Override
-    public @Nullable
     OutputStream getOutputStream() {
         Process p = process;
         return p == null ? null : p.getOutputStream();
     }
 
-    public @Nullable
-    Long getPid() {
+    @Override
+    public @Nullable Long getPid() {
         final Process p = process;
         return p == null ? null : p.pid();
     }
@@ -143,6 +136,7 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
         }
     }
 
+    @Override
     public List<String> getCommands() {
         return commands;
     }

@@ -69,7 +69,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         return new UserDefinedStreamConnectionProvider(resolvedCommandLine,
                 userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
-                this);
+                this,
+                project);
     }
 
     /**
