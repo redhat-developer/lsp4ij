@@ -19,6 +19,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.layout.LCFlags;
 import com.intellij.ui.layout.LayoutKt;
+import com.redhat.devtools.lsp4ij.LSPProjectContextManager;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
@@ -61,6 +62,9 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
             return EMPTY_INLAY_HINTS_COLLECTOR;
         }
 
+        if (LSPProjectContextManager.getInstance(psiFile.getProject()).addFileToRefreshIfNotReady(editor.getVirtualFile())) {
+            return EMPTY_INLAY_HINTS_COLLECTOR;
+        }
         final long modificationStamp = psiFile.getModificationStamp();
         return new FactoryInlayHintsCollector(editor) {
 

@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -225,7 +226,9 @@ public class LanguageServerManager {
             return;
         }
         // 2. The language server has never started, start it.
-        LanguageServiceAccessor.getInstance(project).findAndStartLanguageServerIfNeeded(serverDefinition, options.isForceStart(), project);
+        DumbService.getInstance(project).runWhenSmart(() -> {
+            LanguageServiceAccessor.getInstance(project).findAndStartLanguageServerIfNeeded(serverDefinition, options.isForceStart(), project);
+        });
     }
 
     // --------------------- Stop language server

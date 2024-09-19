@@ -25,6 +25,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPProjectContextManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPExternalAnnotator;
 import org.eclipse.lsp4j.DocumentLinkParams;
@@ -58,6 +59,9 @@ public class LSPDocumentLinkAnnotator extends AbstractLSPExternalAnnotator<List<
     @Override
     public List<DocumentLinkData> collectInformation(@NotNull PsiFile psiFile, @NotNull Editor editor, boolean hasErrors) {
         if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
+            return null;
+        }
+        if (LSPProjectContextManager.getInstance(psiFile.getProject()).addFileToRefreshIfNotReady(editor.getVirtualFile())) {
             return null;
         }
         // Consume LSP 'textDocument/documentLink' request
