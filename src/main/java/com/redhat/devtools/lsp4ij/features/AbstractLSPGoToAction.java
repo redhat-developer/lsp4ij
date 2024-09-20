@@ -25,12 +25,9 @@ import com.redhat.devtools.lsp4ij.usages.LSPUsagesManager;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
@@ -38,8 +35,6 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
  * Abstract class for Go To Implementation, Reference etc
  */
 public abstract class AbstractLSPGoToAction extends AnAction {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPGoToAction.class);
 
     @NotNull
     private final LSPUsageType usageType;
@@ -112,14 +107,8 @@ public abstract class AbstractLSPGoToAction extends AnAction {
             return false;
         }
         // Check if the file can support the feature
-        try {
-            return !LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file, this::canSupportFeature)
-                    .get(200, TimeUnit.MILLISECONDS)
-                    .isEmpty();
-        } catch (Exception ex) {
-            return false;
-        }
+        return LanguageServiceAccessor.getInstance(project)
+                .hasAny(file, ls -> canSupportFeature(ls.getServerCapabilitiesSync()));
     }
 
     protected abstract boolean canSupportFeature(ServerCapabilities serverCapabilities);
