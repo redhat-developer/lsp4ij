@@ -54,13 +54,25 @@ public class LSPUsagesManager {
 
     // Show references, implementation, etc in Popup
 
+
     public void findShowUsagesInPopup(@NotNull List<Location> locations,
                                       @NotNull LSPUsageType usageType,
                                       @NotNull DataContext dataContext,
                                       @Nullable MouseEvent event) {
+        @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
+        if(editor == null) {
+            return;
+        }
+        findShowUsagesInPopup(locations, usageType, editor,event);
+    }
+
+    public void findShowUsagesInPopup(@NotNull List<Location> locations,
+                                      @NotNull LSPUsageType usageType,
+                                      @NotNull Editor editor,
+                                      @Nullable MouseEvent event) {
         switch (locations.size()) {
             case 0: {
-                showNoUsage(usageType, dataContext);
+                showNoUsage(usageType, editor);
                 break;
             }
             case 1: {
@@ -71,7 +83,6 @@ public class LSPUsagesManager {
             }
             default: {
                 // Open locations in a Popup
-                @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
                 Location ref = locations.get(0);
                 LSPUsageTriggeredPsiElement element = toUsageTriggeredPsiElement(ref, project);
                 if(element != null) {
@@ -110,8 +121,7 @@ public class LSPUsagesManager {
         return LSPPsiElementFactory.toPsiElement(location, project, USAGE_TRIGGERED_ELEMENT_FACTORY);
     }
 
-    private void showNoUsage(@NotNull LSPUsageType usageType, DataContext dataContext) {
-        @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
+    private void showNoUsage(@NotNull LSPUsageType usageType, @NotNull Editor editor) {
         @NotNull String key = getNoUsageMessageKey(usageType);
         String message = LanguageServerBundle.message(key);
         if (editor == null) {

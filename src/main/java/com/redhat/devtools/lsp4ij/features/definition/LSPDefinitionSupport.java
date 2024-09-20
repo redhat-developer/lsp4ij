@@ -6,9 +6,9 @@
  * and is available at http://www.eclipse.org/legal/epl-v20.html
  *
  * Contributors:
- * Red Hat, Inc. - initial API and implementation
+ * Red Hat, Inc. - initial API and definition
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.implementation;
+package com.redhat.devtools.lsp4ij.features.definition;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -27,21 +27,21 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * LSP implementation support which collect:
+ * LSP definition support which collect:
  * 
  * <ul>
- *      <li>textDocument/implementation</li>
+ *      <li>textDocument/definition</li>
  *  </ul>
  */
-public class LSPImplementationSupport extends AbstractLSPDocumentFeatureSupport<LSPImplementationParams, List<Location>> {
+public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPDefinitionParams, List<Location>> {
 
     private Integer previousOffset;
 
-    public LSPImplementationSupport(@NotNull PsiFile file) {
+    public LSPDefinitionSupport(@NotNull PsiFile file) {
         super(file);
     }
 
-    public CompletableFuture<List<Location>> getImplementations(LSPImplementationParams params) {
+    public CompletableFuture<List<Location>> getDefinitions(LSPDefinitionParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
             super.cancel();
@@ -51,44 +51,44 @@ public class LSPImplementationSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     @Override
-    protected CompletableFuture<List<Location>> doLoad(LSPImplementationParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<Location>> doLoad(LSPDefinitionParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return collectImplementations(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return collectTypeDefinitions(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectImplementations(@NotNull VirtualFile file,
+    private static @NotNull CompletableFuture<List<Location>> collectTypeDefinitions(@NotNull VirtualFile file,
                                                                                      @NotNull Project project,
-                                                                                     @NotNull LSPImplementationParams params,
+                                                                                     @NotNull LSPDefinitionParams params,
                                                                                      @NotNull CancellationSupport cancellationSupport) {
         return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isImplementationSupported)
+                .getLanguageServers(file, LanguageServerItem::isTypeDefinitionSupported)
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
-                    // and which have implementation capability
+                    // and which have definition capability
                     if (languageServers.isEmpty()) {
                         return CompletableFuture.completedFuture(null);
                     }
 
-                    // Collect list of textDocument/implementation future for each language servers
-                    List<CompletableFuture<List<Location>>> implementationsPerServerFutures = languageServers
+                    // Collect list of textDocument/definition future for each language servers
+                    List<CompletableFuture<List<Location>>> definitionsPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getImplementationFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getTypeDefinitionFor(params, languageServer, cancellationSupport))
                             .toList();
 
-                    // Merge list of textDocument/implementation future in one future which return the list of implementation ranges
-                    return CompletableFutures.mergeInOneFuture(implementationsPerServerFutures, cancellationSupport);
+                    // Merge list of textDocument/definition future in one future which return the list of definition ranges
+                    return CompletableFutures.mergeInOneFuture(definitionsPerServerFutures, cancellationSupport);
                 });
     }
 
-    private static CompletableFuture<List<Location>> getImplementationFor(LSPImplementationParams params,
-                                                                             LanguageServerItem languageServer,
-                                                                             CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<Location>> getTypeDefinitionFor(LSPDefinitionParams params,
+                                                                          LanguageServerItem languageServer,
+                                                                          CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .implementation(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION)
+                        .definition(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DEFINITION)
                 .thenApplyAsync(locations -> {
                     if (locations == null) {
-                        // textDocument/implementation may return null
+                        // textDocument/definition may return null
                         return Collections.emptyList();
                     }
                     if (locations.isLeft()) {
