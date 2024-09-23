@@ -48,14 +48,15 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
     @Override
     protected CompletableFuture<List<DocumentSymbolData>> doLoad(DocumentSymbolParams documentSymbolParams, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getDocumentSymbols(file.getVirtualFile(), file.getProject(), documentSymbolParams, cancellationSupport);
+        return getDocumentSymbols(file, documentSymbolParams, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<DocumentSymbolData>> getDocumentSymbols(@NotNull VirtualFile file,
-                                                                                           @NotNull Project project,
+    private static @NotNull CompletableFuture<List<DocumentSymbolData>> getDocumentSymbols(@NotNull PsiFile psiFile,
                                                                                            @NotNull DocumentSymbolParams params,
                                                                                            @NotNull CancellationSupport cancellationSupport) {
 
+        Project project = psiFile.getProject();
+        VirtualFile file = psiFile.getVirtualFile();
         return LanguageServiceAccessor.getInstance(project)
                 .getLanguageServers(file, LanguageServerItem::isDocumentSymbolSupported)
                 .thenComposeAsync(languageServers -> {
@@ -68,7 +69,7 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
                     // Collect list of textDocument/documentSymbol future for each language servers
                     List<CompletableFuture<List<DocumentSymbolData>>> documentSymbolInformationPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getDocumentSymbolsFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getDocumentSymbolsFor(params, languageServer, psiFile, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/documentSymbol future in one future which return the list of document link
@@ -78,6 +79,7 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
 
     private static CompletableFuture<List<DocumentSymbolData>> getDocumentSymbolsFor(@NotNull DocumentSymbolParams params,
                                                                                      @NotNull LanguageServerItem languageServer,
+                                                                                     @NotNull PsiFile psiFile,
                                                                                      @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
@@ -92,17 +94,17 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
                             .map(symbol -> {
                                 if (symbol.isLeft()){
                                     var si = symbol.getLeft();
-                                    return new DocumentSymbolData(ConvertToDocumentSymbol(si));
+                                    return new DocumentSymbolData(convertToDocumentSymbol(si), psiFile);
                                 }
                                 else {
-                                    return new DocumentSymbolData(symbol.getRight());
+                                    return new DocumentSymbolData(symbol.getRight(), psiFile);
                                 }
                             })
                             .toList();
                 });
     }
 
-    private static DocumentSymbol ConvertToDocumentSymbol(SymbolInformation symbolInformation) {
+    private static DocumentSymbol convertToDocumentSymbol(SymbolInformation symbolInformation) {
         var name = symbolInformation.getName();
         var kind = symbolInformation.getKind();
         var range = symbolInformation.getLocation().getRange();

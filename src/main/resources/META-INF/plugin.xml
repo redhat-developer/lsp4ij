@@ -225,7 +225,11 @@
 
         <!-- LSP textDocument/documentSymbol request support -->
         <lang.psiStructureViewFactory
-                id="LSPDocumentSymbolStructureViewFactory"
+                id="LSPDocumentSymbolStructureViewFactoryForText"
+                language="TEXT"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+        <lang.psiStructureViewFactory
+                id="LSPDocumentSymbolStructureViewFactoryForTextMate"
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
 
