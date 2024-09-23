@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.declaration.LSPDeclarationSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
+import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
 import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeSupport;
 import com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingSupport;
@@ -81,6 +82,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private final LSPSemanticTokensSupport semanticTokensSupport;
 
+    private final LSPDocumentSymbolSupport documentSymbolSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -101,6 +104,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.declarationSupport = new LSPDeclarationSupport(file);
         this.typeDefinitionSupport = new LSPTypeDefinitionSupport(file);
         this.semanticTokensSupport = new LSPSemanticTokensSupport(file);
+        this.documentSymbolSupport = new LSPDocumentSymbolSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -126,6 +130,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getDeclarationSupport().cancel();
         getTypeDefinitionSupport().cancel();
         getSemanticTokensSupport().cancel();
+        getDocumentSymbolSupport().cancel();
         var map = getUserMap();
         for (var key : map.getKeys()) {
             var value = map.get(key);
@@ -295,6 +300,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPSemanticTokensSupport getSemanticTokensSupport() {
         return semanticTokensSupport;
+    }
+
+    /**
+     * Returns the LSP document symbol support.
+     *
+     * @return the LSP document symbol support.
+     */
+    public LSPDocumentSymbolSupport getDocumentSymbolSupport() {
+        return documentSymbolSupport;
     }
 
     /**

@@ -223,6 +223,12 @@
                 id="LSPDocumentLinkGotoDeclarationHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
 
+        <!-- LSP textDocument/documentSymbol request support -->
+        <lang.psiStructureViewFactory
+                id="LSPDocumentSymbolStructureViewFactory"
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+
         <!-- LSP textDocument/documentHighlight request support -->
         <highlightUsagesHandlerFactory
                 id="LSPHighlightUsagesHandlerFactory"
