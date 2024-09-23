@@ -13,19 +13,10 @@ package com.redhat.devtools.lsp4ij.features.documentSymbol;
 import com.intellij.ide.structureView.StructureViewModel;
 import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
-import com.intellij.ide.util.treeView.smartTree.TreeElement;
-import com.intellij.navigation.ItemPresentation;
-import com.intellij.openapi.Disposable;
+import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.util.NlsSafe;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
-import com.intellij.psi.PsiTreeChangeAdapter;
-import com.intellij.psi.PsiTreeChangeEvent;
-import com.intellij.util.ui.update.MergingUpdateQueue;
-import com.intellij.util.ui.update.Update;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.eclipse.lsp4j.DocumentSymbolParams;
@@ -33,9 +24,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-
+import java.util.Collection;
+import java.util.Collections;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Stream;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
@@ -44,124 +37,43 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  * LSP document symbol structure view model.
  */
 public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase implements StructureViewModel.ElementInfoProvider {
+
     private final PsiFile psiFile;
-    // Update queue to avoid multiple updates
-    private final MergingUpdateQueue updateQueue;
 
     public LSPDocumentSymbolStructureViewModel(@NotNull PsiFile psiFile, @Nullable Editor editor) {
         super(psiFile, editor, new LSPFileStructureViewElement(psiFile));
         this.psiFile = psiFile;
-        this.updateQueue = new MergingUpdateQueue("lsp.documentSymbol", 300, true, null);
-        // Register psi tree change listener
-        registerPsiTreeChangeListener();
     }
 
     @Override
     public boolean isAlwaysShowsPlus(StructureViewTreeElement element) {
-        return false;
+        return element.getChildren().length > 0;
     }
 
     @Override
     public boolean isAlwaysLeaf(StructureViewTreeElement element) {
-        return false;
+        return element.getChildren().length == 0;
     }
 
     @Override
     public void dispose() {
         super.dispose();
-        updateQueue.cancelAllUpdates();
-        updateQueue.deactivate();
         LSPDocumentSymbolSupport documentSymbolSupport = LSPFileSupport.getSupport(psiFile).getDocumentSymbolSupport();
         documentSymbolSupport.cancel();
     }
 
-    private void registerPsiTreeChangeListener() {
-        PsiManager.getInstance(psiFile.getProject()).addPsiTreeChangeListener(new PsiTreeChangeAdapter() {
-            @Override
-            public void childrenChanged(PsiTreeChangeEvent event) {
-                if (event.getFile() != null && event.getFile().equals(psiFile)) {
-                    scheduleUpdate();
-                }
-            }
+    static class LSPFileStructureViewElement extends PsiTreeElementBase<PsiFile> {
 
-        }, this);
-    }
-
-    private void scheduleUpdate() {
-        updateQueue.queue(new Update(this) {
-            @Override
-            public void run() {
-                var root = getRoot();
-                if (root instanceof LSPFileStructureViewElement) {
-                    ((LSPFileStructureViewElement) root).updateChildren(psiFile);
-                }
-            }
-        });
-    }
-
-    static class LSPDocumentSymbolViewElement implements StructureViewTreeElement {
-        private final PsiFile psiFile;
-        private final DocumentSymbolData documentSymbolData;
-        private final TreeElement[] children;
-
-        public LSPDocumentSymbolViewElement(PsiFile psiFile, DocumentSymbolData documentSymbolData) {
-            this.psiFile = psiFile;
-            this.documentSymbolData = documentSymbolData;
-            var children = this.documentSymbolData.documentSymbol().getChildren();
-            if (children != null) {
-                this.children = children.stream()
-                        .map(child -> new LSPDocumentSymbolViewElement(psiFile, new DocumentSymbolData(child)))
-                        .toArray(TreeElement[]::new);
-            } else {
-                this.children = TreeElement.EMPTY_ARRAY;
-            }
+        public LSPFileStructureViewElement(@NotNull PsiFile psiFile) {
+            super(psiFile);
         }
 
         @Override
-        public Object getValue() {
-            return documentSymbolData;
+        public @NotNull Collection<StructureViewTreeElement> getChildrenBase() {
+            return collectElements(getElement());
         }
 
-        @Override
-        public @NotNull ItemPresentation getPresentation() {
-            return documentSymbolData.getPresentation();
-        }
-
-        @Override
-        public TreeElement @NotNull [] getChildren() {
-            return children;
-        }
-
-        @Override
-        public void navigate(boolean requestFocus) {
-            var selectionRange = documentSymbolData.documentSymbol().getSelectionRange();
-            var start = selectionRange.getStart();
-
-            new OpenFileDescriptor(psiFile.getProject(), psiFile.getVirtualFile(), start.getLine(), start.getCharacter()).navigate(requestFocus);
-        }
-
-        @Override
-        public boolean canNavigate() {
-            return true;
-        }
-
-        @Override
-        public boolean canNavigateToSource() {
-            return true;
-        }
-    }
-
-    static class LSPFileStructureViewElement implements StructureViewTreeElement {
-        private final PsiFile psiFile;
-        private volatile TreeElement[] children;
-
-        public LSPFileStructureViewElement(PsiFile psiFile) {
-            this.psiFile = psiFile;
-            this.children = TreeElement.EMPTY_ARRAY;
-            updateChildren(psiFile);
-        }
-
-        public void updateChildren(PsiFile psiFile) {
+        private @NotNull Collection<StructureViewTreeElement> collectElements(@NotNull PsiFile psiFile) {
             LSPDocumentSymbolSupport documentSymbolSupport = LSPFileSupport.getSupport(psiFile).getDocumentSymbolSupport();
             var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
@@ -170,68 +82,67 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
             } catch (
                     ProcessCanceledException e) { //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                 documentSymbolSupport.cancel();
-                return;
+                throw e;
             } catch (CancellationException e) {
                 documentSymbolSupport.cancel();
-                return;
+                return Collections.emptyList();
             } catch (ExecutionException e) {
-                return;
+                return Collections.emptyList();
             }
 
             if (isDoneNormally(documentSymbolFuture)) {
                 var documentSymbols = documentSymbolFuture.getNow(null);
                 if (documentSymbols == null) {
-                    return;
+                    return Collections.emptyList();
                 }
-                this.children = documentSymbols.stream()
-                        .map(documentSymbol -> new LSPDocumentSymbolViewElement(psiFile, documentSymbol))
-                        .toArray(TreeElement[]::new);
+                return documentSymbols.stream()
+                        .map(documentSymbol -> (StructureViewTreeElement) new LSPDocumentSymbolViewElement(documentSymbol))
+                        .toList();
             }
+            return Collections.emptyList();
         }
 
         @Override
-        public Object getValue() {
-            return psiFile;
+        public @Nullable String getPresentableText() {
+            return getElement().getName();
         }
 
         @Override
-        public @NotNull ItemPresentation getPresentation() {
-            return new ItemPresentation() {
-                @Override
-                public @NlsSafe @Nullable String getPresentableText() {
-                    return psiFile.getName();
-                }
-
-                @Override
-                public @NlsSafe @Nullable String getLocationString() {
-                    return psiFile.getVirtualFile().getCanonicalPath();
-                }
-
-                @Override
-                public @Nullable Icon getIcon(boolean unused) {
-                    return psiFile.getIcon(0);
-                }
-            };
+        public @Nullable String getLocationString() {
+            return getElement().getVirtualFile().getCanonicalPath();
         }
 
         @Override
-        public TreeElement @NotNull [] getChildren() {
-            return children;
-        }
-
-        @Override
-        public void navigate(boolean requestFocus) {
-            new OpenFileDescriptor(psiFile.getProject(), psiFile.getVirtualFile()).navigate(requestFocus);
-        }
-
-        @Override
-        public boolean canNavigate() {
-            return true;
-        }
-
-        @Override
-        public boolean canNavigateToSource() {
-            return true;
+        public @Nullable Icon getIcon(boolean unused) {
+            return getElement().getFileType().getIcon();
         }
     }
+
+    static class LSPDocumentSymbolViewElement extends PsiTreeElementBase<DocumentSymbolData> {
+
+        public LSPDocumentSymbolViewElement(DocumentSymbolData documentSymbolData) {
+            super(documentSymbolData);
+        }
+
+        @Override
+        public @NotNull Collection<StructureViewTreeElement> getChildrenBase() {
+            return collectElements(getElement());
+        }
+
+        private @NotNull Collection<StructureViewTreeElement> collectElements(@Nullable DocumentSymbolData documentSymbolData) {
+            var children = documentSymbolData.getChildren();
+            if (children.length == 0) {
+                return Collections.emptyList();
+            }
+            return Stream.of(children)
+                    .map(child -> (StructureViewTreeElement) new LSPDocumentSymbolViewElement(child))
+                    .toList();
+        }
+
+        @Override
+        public @Nullable String getPresentableText() {
+            return getElement().getPresentableText();
+        }
+    }
+
 }

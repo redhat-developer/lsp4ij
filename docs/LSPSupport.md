@@ -57,7 +57,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ❌ [typeHierarchy/supertypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes).
  * ✅ [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange)  (see [implementation details](#folding-range))
  * ❌ [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange).
- * ❌ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol).
+ * ✅ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) (see [implementation details](#document-symbol))
  * ✅ [textDocument/semanticTokens (experimental)](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens) (see [implementation details](#semantic-tokens))
  * ❌ [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue).
  * ❌ [workspace/inlineValue/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh).
@@ -337,7 +337,7 @@ you can use `order="first"` to gain priority:
         id="YourID"
         language="YourLanguage"
         order="first"
-        implementationClass="YourClass"/>
+        implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 ```
 
 Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing signature help:
@@ -526,6 +526,44 @@ If you need other mapping:
 
  * if you think it is a generic mapping, please create a contribution to define a new `SemanticTokensHighlightingColors` constants
  * if the mapping is specific to your language, use the [semanticTokensColorsProvider extension point](./DeveloperGuide.md#semantic-tokens-colors-provider) to define your own provider and mapping.
+
+### Document Symbol
+
+[textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) is implemented with 
+the `lang.psiStructureViewFactory` extension point. By default, LSP4IJ registers the `lang.psiStructureViewFactory` with
+[LSPDocumentSymbolStructureViewFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/documentSymbol/LSPDocumentSymbolStructureViewFactory.java) class for `TEXT` and `textmate` languages:
+
+```xml
+<!-- LSP textDocument/documentSymbol -->
+<lang.psiStructureViewFactory
+        id="LSPDocumentSymbolStructureViewFactoryForText"
+        language="TEXT"
+        implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+<lang.psiStructureViewFactory
+        id="LSPDocumentSymbolStructureViewFactoryForTextMate"
+        language="textmate"
+        implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+```
+
+If you use another language, you will have to declare `lang.psiStructureViewFactory` with your language.
+If `lang.psiStructureViewFactory` for the language is already defined by another plugin or the IDE,
+you can use `order="first"` to gain priority:
+
+```xml
+<lang.psiStructureViewFactory
+        id="YourID"
+        language="YourLanguage"
+        order="first"
+        implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+```
+
+Here is an example with [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) 
+which opens the standard `File Structure` with `Ctrl+F12` / `Cmd+F12` 
+(also available with the `Navigate / File Structure` menu) to display TypeScript functions as symbols and navigate them easily:
+
+![textDocument/documentSymbol](./images/lsp-support/textDocument_documentSymbol.gif)
+
+You can too open the `Structure` view with `View / Tool Windows / Structure` menu:
 
 ### Workspace Symbol
 
