@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.internal;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -171,18 +172,17 @@ public class ClientCapabilitiesFactory {
         // DocumentLink support
         textDocumentClientCapabilities.setDocumentLink(new DocumentLinkCapabilities());
 
-        // TODO : support textDocument/documentSymbol
-        /**  final var documentSymbol = new DocumentSymbolCapabilities();
-         documentSymbol.setHierarchicalDocumentSymbolSupport(true);
-         documentSymbol.setSymbolKind(new SymbolKindCapabilities(Arrays.asList(SymbolKind.Array,
-         SymbolKind.Boolean, SymbolKind.Class, SymbolKind.Constant, SymbolKind.Constructor,
-         SymbolKind.Enum, SymbolKind.EnumMember, SymbolKind.Event, SymbolKind.Field, SymbolKind.File,
-         SymbolKind.Function, SymbolKind.Interface, SymbolKind.Key, SymbolKind.Method, SymbolKind.Module,
-         SymbolKind.Namespace, SymbolKind.Null, SymbolKind.Number, SymbolKind.Object,
-         SymbolKind.Operator, SymbolKind.Package, SymbolKind.Property, SymbolKind.String,
-         SymbolKind.Struct, SymbolKind.TypeParameter, SymbolKind.Variable)));
-         textDocumentClientCapabilities.setDocumentSymbol(documentSymbol);
-         **/
+        // textDocument/documentSymbol
+        final var documentSymbol = new DocumentSymbolCapabilities();
+        documentSymbol.setHierarchicalDocumentSymbolSupport(true);
+        documentSymbol.setSymbolKind(new SymbolKindCapabilities(Arrays.asList(SymbolKind.Array,
+                SymbolKind.Boolean, SymbolKind.Class, SymbolKind.Constant, SymbolKind.Constructor,
+                SymbolKind.Enum, SymbolKind.EnumMember, SymbolKind.Event, SymbolKind.Field, SymbolKind.File,
+                SymbolKind.Function, SymbolKind.Interface, SymbolKind.Key, SymbolKind.Method, SymbolKind.Module,
+                SymbolKind.Namespace, SymbolKind.Null, SymbolKind.Number, SymbolKind.Object,
+                SymbolKind.Operator, SymbolKind.Package, SymbolKind.Property, SymbolKind.String,
+                SymbolKind.Struct, SymbolKind.TypeParameter, SymbolKind.Variable)));
+        textDocumentClientCapabilities.setDocumentSymbol(documentSymbol);
 
         // FoldingRange support
         textDocumentClientCapabilities.setFoldingRange(new FoldingRangeCapabilities());

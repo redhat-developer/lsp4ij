@@ -514,6 +514,16 @@ public class LanguageServerItem {
     }
 
     /**
+     * Returns true if the language server can support document symbol and false otherwise.
+     *
+     * @return true if the language server can support document symbol and false otherwise.
+     */
+    public static boolean isDocumentSymbolSupported(@Nullable ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null &&
+                hasCapability(serverCapabilities.getDocumentSymbolProvider());
+    }
+
+    /**
      * Returns true if the language server can support workspace symbol and false otherwise.
      *
      * @return true if the language server can support workspace symbol and false otherwise.
