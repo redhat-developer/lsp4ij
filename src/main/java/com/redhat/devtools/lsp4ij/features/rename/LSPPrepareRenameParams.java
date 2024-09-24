@@ -11,9 +11,11 @@
 package com.redhat.devtools.lsp4ij.features.rename;
 
 import com.intellij.openapi.editor.Document;
+import com.intellij.psi.PsiFile;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.PrepareRenameParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Prepare rename parameters which hosts document and offset.
@@ -23,12 +25,17 @@ class LSPPrepareRenameParams extends PrepareRenameParams {
     // Use transient to avoid serializing the fields when GSON will be processed
     private transient final int offset;
     private transient final Document document;
+    private transient final @NotNull PsiFile file;
 
-    public LSPPrepareRenameParams(TextDocumentIdentifier textDocument, Position position, int offset, Document document) {
+    public LSPPrepareRenameParams(@NotNull TextDocumentIdentifier textDocument,
+                                  @NotNull Position position, int offset,
+                                  @NotNull Document document,
+                                  @NotNull PsiFile file) {
         super.setTextDocument(textDocument);
         super.setPosition(position);
         this.offset = offset;
         this.document = document;
+        this.file = file;
     }
 
     public int getOffset() {
@@ -37,5 +44,9 @@ class LSPPrepareRenameParams extends PrepareRenameParams {
 
     public Document getDocument() {
         return document;
+    }
+
+    public @NotNull PsiFile getFile() {
+        return file;
     }
 }

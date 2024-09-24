@@ -84,20 +84,24 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
                 // Loop for LSP diagnostics to transform it to Intellij annotation.
                 for (Diagnostic diagnostic : ds.getDiagnostics()) {
                     ProgressManager.checkCanceled();
-                    createAnnotation(diagnostic, document, ds, holder);
+                    createAnnotation(diagnostic, document, file, ds, holder);
                 }
             }
         }
     }
 
-    private static void createAnnotation(Diagnostic diagnostic, Document document, LSPDiagnosticsForServer diagnosticsForServer, AnnotationHolder holder) {
+    private static void createAnnotation(@NotNull Diagnostic diagnostic,
+                                         @NotNull Document document,
+                                         @Nullable PsiFile file,
+                                         @NotNull LSPDiagnosticsForServer diagnosticsForServer,
+                                         @NotNull AnnotationHolder holder) {
         // Get the text range from the given LSP diagnostic range.
         // Since IJ cannot highlight an error when the start/end range offset are the same
         // the method LSPIJUtils.toTextRange is called with adjust, in other words when start/end range offset are the same:
         // - when the offset is at the end of the line, the method returns a text range with the same  offset,
         // and annotation must be created with Annotation#setAfterEndOfLine(true).
         // - when the offset is inside the line, the end offset is incremented.
-        TextRange range = LSPIJUtils.toTextRange(diagnostic.getRange(), document, true);
+        TextRange range = LSPIJUtils.toTextRange(diagnostic.getRange(), document, null, true);
         if (range == null) {
             // Language server reports invalid diagnostic, ignore it.
             return;

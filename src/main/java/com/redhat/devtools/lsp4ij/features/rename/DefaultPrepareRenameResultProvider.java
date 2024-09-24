@@ -58,7 +58,7 @@ class DefaultPrepareRenameResultProvider implements Function<LanguageServerItem,
 
     public TextRange getTextRange() {
         if (textRange == null) {
-            textRange = LSPIJUtils.getWordRangeAt(getDocument(), prepareRenameParams.getOffset());
+            textRange = LSPIJUtils.getWordRangeAt(getDocument(), prepareRenameParams.getFile(), prepareRenameParams.getOffset());
         }
         return textRange;
     }

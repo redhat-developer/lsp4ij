@@ -122,11 +122,11 @@ public interface LSPPsiElementFactory<T extends LSPPsiElement> {
         if (document == null) {
             return null;
         }
-        TextRange textRange = LSPIJUtils.toTextRange(range, document, true);
+        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+        TextRange textRange = LSPIJUtils.toTextRange(range, document, psiFile,true);
         if (textRange == null) {
             return null;
         }
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
         return factory.createPsiElement(psiFile, textRange);
     }
 }

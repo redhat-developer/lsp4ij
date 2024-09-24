@@ -68,7 +68,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         // Get the text range and placeholder of the LSP rename with 'textDocument/prepareRename'.
         // If the language server doesn't support prepare rename capability,
         // the support returns a prepare rename result by using the token strategy.
-        LSPPrepareRenameParams prepareRenameParams = new LSPPrepareRenameParams(textDocument, position, offset, document);
+        LSPPrepareRenameParams prepareRenameParams = new LSPPrepareRenameParams(textDocument, position, offset, document, psiFile);
         var prepareRenameSupport = LSPFileSupport.getSupport(psiFile).getPrepareRenameSupport();
         // Cancel the previous prepare rename
         prepareRenameSupport.cancel();

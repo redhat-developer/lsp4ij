@@ -34,6 +34,7 @@ import com.intellij.openapi.vfs.*;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
@@ -134,18 +135,19 @@ public class LSPIJUtils {
      * Open the given fileUrl in an editor.
      *
      * <p>
-     *     the following syntax is supported for fileUrl:
+     * the following syntax is supported for fileUrl:
      *     <ul>
      *         <li>file:///C:/Users/username/foo.txt</li>
      *         <li>C:/Users/username/foo.txt</li>
      *         <li>file:///C:/Users/username/foo.txt#L1:5</li>
      *     </ul>
      * </p>
-     * @param fileUri the file Uri to open.
-     * @param position    the position.
-     * @param focusEditor true if editor will take the focus and false otherwise.
+     *
+     * @param fileUri            the file Uri to open.
+     * @param position           the position.
+     * @param focusEditor        true if editor will take the focus and false otherwise.
      * @param createFileIfNeeded true if file must be created if doesn't exist and false otherwise.
-     * @param project the project.
+     * @param project            the project.
      * @return true if file Url can be opened and false otherwise.
      */
     public static boolean openInEditor(@NotNull String fileUri,
@@ -212,7 +214,6 @@ public class LSPIJUtils {
      * Convert position String 'L1:2' to an LSP {@link Position} and null otherwise.
      *
      * @param positionString the position string (ex: 'L1:2')
-     *
      * @return position String 'L1:2' to an LSP {@link Position} and null otherwise.
      */
     private static Position toPosition(String positionString) {
@@ -576,8 +577,8 @@ public class LSPIJUtils {
         return new Range(LSPIJUtils.toPosition(range.getStartOffset(), document), LSPIJUtils.toPosition(range.getEndOffset(), document));
     }
 
-    public static @Nullable TextRange toTextRange(Range range, Document document) {
-        return toTextRange(range, document, false);
+    public static @Nullable TextRange toTextRange(@NotNull Range range, @NotNull Document document) {
+        return toTextRange(range, document, null, false);
     }
 
     /**
@@ -587,13 +588,31 @@ public class LSPIJUtils {
      * @param document the document.
      * @return the IJ {@link TextRange} from the given LSP range and null otherwise.
      */
-    public static @Nullable TextRange toTextRange(Range range, Document document, boolean adjust) {
+    @Deprecated
+    public static @Nullable TextRange toTextRange(@NotNull Range range,
+                                                  @NotNull Document document,
+                                                  boolean adjust) {
+        return toTextRange(range, document, null, adjust);
+    }
+
+    /**
+     * Returns the IJ {@link TextRange} from the given LSP range and null otherwise.
+     *
+     * @param range    the LSP range to convert.
+     * @param document the document.
+     * @param file     the PsiFile or null otherwise.
+     * @return the IJ {@link TextRange} from the given LSP range and null otherwise.
+     */
+    public static @Nullable TextRange toTextRange(@NotNull Range range,
+                                                  @NotNull Document document,
+                                                  @Nullable PsiFile file,
+                                                  boolean adjust) {
         try {
             int start = LSPIJUtils.toOffset(range.getStart(), document);
             int end = LSPIJUtils.toOffset(range.getEnd(), document);
             int docLength = document.getTextLength();
             if (start > end || end > docLength) {
-                // Language server reports invalid diagnostic, ignore it.
+                // Language server reports invalid range, ignore it.
                 return null;
             }
             if (start != end) {
@@ -604,7 +623,7 @@ public class LSPIJUtils {
                 return null;
             }
             // Select token at current offset, if possible
-            TextRange tokenRange = getWordRangeAt(document, start);
+            TextRange tokenRange = getWordRangeAt(document, file, start);
             if (tokenRange != null) {
                 return tokenRange;
             }
@@ -639,14 +658,78 @@ public class LSPIJUtils {
      * @param offset
      * @return the word range from the document at given offset and null otherwise.
      */
+    @Deprecated
     @Nullable
-    public static TextRange getWordRangeAt(Document document, int offset) {
+    public static TextRange getWordRangeAt(@NotNull Document document,
+                                           int offset) {
+        return getWordRangeAt(document, null, offset);
+    }
+
+    /**
+     * Returns the word range from the document at given offset and null otherwise.
+     *
+     * <code><pre>
+     *  - fo|o bar -> [foo]
+     *  - fo|o.bar() -> [foo]
+     *  - foo.b|ar() -> [bar]
+     *  - foo.bar(|) -> null
+     *  - foo  |  bar -> null
+     * </pre></code>
+     *
+     * @param document the document.
+     * @param file     the PsiFile or null otherwise.
+     * @param offset   the offset.
+     * @return the word range from the document at given offset and null otherwise.
+     */
+    @Nullable
+    public static TextRange getWordRangeAt(@NotNull Document document,
+                                           @Nullable PsiFile file,
+                                           int offset) {
         if (offset > document.getTextLength()) {
             offset = document.getTextLength() - 1;
         }
+        if (file != null && !SimpleLanguageUtils.isSupported(file.getLanguage())) {
+            // It is not TextMate, TEXT file (since those language doesn't tokenize the file)
+            // Try to use the PsiElement text range found at the given offset
+            TextRange textRange = findBestTextRangeAt(file, offset);
+            if (textRange != null) {
+                return textRange;
+            }
+        }
+
         int start = getLeftOffsetOfPart(document, offset);
         int end = getRightOffsetOfPart(document, offset);
         return (start < end) ? new TextRange(start, end) : null;
+    }
+
+    private static TextRange findBestTextRangeAt(@Nullable PsiFile file, int offset) {
+        TextRange fileTextRange = file.getTextRange();
+        PsiElement element = file.findElementAt(Math.max(offset - 1, 0));
+        if (element != null) {
+            TextRange textRange = element.getTextRange();
+            if (offset == textRange.getEndOffset()) {
+                // my.property|
+                // my.property=|
+                // my.property|=
+                // my.property=v|
+                // my.property=value|
+                if (textRange.getLength() == 1) {
+                    // my.property=| --> =
+                    // my.property=v| --> v
+                    // In this case (for properties file):
+                    // - '=' (equals) must be forbidden
+                    // - 'v' (property value) mus be allowed
+                    // To fix that with a generic mean, we check if the character is a letter or a digit
+                    // FIXME : provide an LSP API getWordRangeAt for a given language server
+                    char c = element.getText().charAt(0);
+                    if (!Character.isLetterOrDigit(c)) {
+                        return null;
+                    }
+                }
+            }
+            return textRange;
+        }
+        return null;
     }
 
     private static int getLeftOffsetOfPart(Document document, int offset) {
@@ -806,6 +889,7 @@ public class LSPIJUtils {
 
     /**
      * Returns the virtual file from the given uri and null otherwise.
+     *
      * @param uri the Uri.
      * @return the virtual file from the given uri and null otherwise.
      */
@@ -965,10 +1049,10 @@ public class LSPIJUtils {
      * @return the increment (positive or negative) used to update caret offset.
      */
     public static int applyEdit(int start,
-                                 int end,
-                                 @Nullable String newText,
-                                 @NotNull Document document,
-                                 int caretOffset) {
+                                int end,
+                                @Nullable String newText,
+                                @NotNull Document document,
+                                int caretOffset) {
         if (StringUtils.isEmpty(newText)) {
             // Delete operation
 

@@ -163,7 +163,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                             // Code lens is valid, create the proper code vision entry and text range.
                             String text = codeLens.getCommand().getTitle();
                             if (!StringUtils.isEmpty(text)) {
-                                TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), true);
+                                TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), null, true);
                                 CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, psiFile, codeLensData.languageServer());
                                 result.add(new Pair<>(textRange, entry));
                             }
