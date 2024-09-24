@@ -21,12 +21,12 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPRenameFixtureTestCase;
 public class QuteRenameTest extends LSPRenameFixtureTestCase {
 
     public QuteRenameTest() {
-        super("*.html");
+        super("*.qute");
     }
 
     public void testRenameWithoutPrepareRename() {
         // Qute LS don't support prepare rename
-        assertRename("test.html",
+        assertRename("test.qute",
                 """                
                         {#for i<caret>tem in items}
                             {item}
@@ -75,7 +75,7 @@ public class QuteRenameTest extends LSPRenameFixtureTestCase {
     public void testElementCannotBeRenamed() {
         // As Qute LS doesn't support prepare rename
         // LSP4IJ uses the client word range at strategy to get the prepare rename.
-        assertRenameWithError("test.html",
+        assertRenameWithError("test.qute",
                 """                
                         {<caret>#for item in items}
                             {item}

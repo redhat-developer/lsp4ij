@@ -53,7 +53,7 @@ public class LSP4IJAssert {
         int offset = contentWithOffset.indexOf('|');
         String content = contentWithOffset.substring(0, offset) + contentWithOffset.substring(offset + 1);
         Document document = new DocumentImpl(content);
-        TextRange textRange = LSPIJUtils.getWordRangeAt(document, offset);
+        TextRange textRange = LSPIJUtils.getWordRangeAt(document, null, offset);
         if (expected == null) {
             assertNull("TextRange should be null",textRange);
             return;

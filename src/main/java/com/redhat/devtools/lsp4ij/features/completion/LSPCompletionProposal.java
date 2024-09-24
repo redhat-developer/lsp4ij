@@ -528,7 +528,19 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     private Integer computePrefixStartFromInsertText(@NotNull Document document,
                                                      int completionOffset,
                                                      String insertText) {
-        // case 2.1: first strategy, we check if the left content of the completion offset
+
+        // case 2.1: first strategy, we collect word range at
+        // ex :
+        // insertText= '(let [${1:binding} ${2:value}])'
+        // document= le
+        // we have to return |le as prefix start offset
+
+        TextRange wordRange = LSPIJUtils.getWordRangeAt(document, file, completionOffset);
+        if (wordRange != null) {
+            return wordRange.getStartOffset();
+        }
+
+        // case 2.2: second strategy, we check if the left content of the completion offset
         // matches the full insertText left content
         // ex :
         // insertText= 'foo.bar'
@@ -540,16 +552,6 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             return prefixStartOffset;
         }
 
-        // case 2.2: second strategy, we collect word range at
-        // ex :
-        // insertText= '(let [${1:binding} ${2:value}])'
-        // document= le
-        // we have to return |le as prefix start offset
-
-        TextRange wordRange = LSPIJUtils.getWordRangeAt(document, completionOffset);
-        if (wordRange != null) {
-            return wordRange.getStartOffset();
-        }
         return null;
     }
 
