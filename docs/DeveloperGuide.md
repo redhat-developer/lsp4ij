@@ -82,6 +82,21 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 }
 ```
 
+In this sample `MyCustomServerAPI` interface could look like this:
+
+```java
+import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
+import org.eclipse.lsp4j.services.LanguageServer;
+
+import java.util.concurrent.CompletableFuture;
+
+public interface MyCustomServerAPI  extends LanguageServer {
+
+    @JsonRequest("my/applications")
+    CompletableFuture<List<Application>> getApplications();
+}
+```
+
 If you need to provide client specific features (e.g. commands), you can override the `createLanguageClient` method to
 return your custom LSP client implementation.
 
@@ -509,6 +524,92 @@ Project project = ...
 LanguageServerManager.getInstance(project).stop("myLanguageServerId", options);
 ```
 
+### Get language server
+
+If you need to execute an LSP Command, please read [here](#execute-a-command)
+
+If you need to get your language server and execute somethinh with it, you can write code like this:
+
+```java
+LanguageServerManager.getInstance(project)
+        .getLanguageServer("myLanguageServerId")
+        .thenAccept(languageServerItem -> {
+            if (languageServerItem != null) {
+                // Language server item exists here...
+              
+                // Get the LSP4J LanguageServer
+                org.eclipse.lsp4j.services.LanguageServer ls = languageServerItem.getServer();
+              
+                // Do something with the language server
+                
+            }});
+```
+
+Here `LanguageServerItem#getServer()` is used because we are sure that language server is initialized.
+
+Here a sample which consumes custom services with [MyCustomApi](#languageserverfactory) 
+
+```java
+import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
+import org.eclipse.lsp4j.services.LanguageServer;
+
+import java.util.concurrent.CompletableFuture;
+
+public interface MyCustomServerAPI  extends LanguageServer {
+
+    @JsonRequest("my/applications")
+    CompletableFuture<List<Application>> getApplications();
+}
+```
+
+to get list of Application:
+
+```java
+CompletableFuture<List<Application>> applications =
+  LanguageServerManager.getInstance(project)
+    .getLanguageServer("myLanguageServerId")
+    .thenApply(languageServerItem -> 
+                    languageServerItem != null ? languageServerItem.getServer() // here getServer is used because we are sure that server is initialized  
+                    : null)
+    .thenCompose(ls -> {
+      if (ls == null) {
+          return CompletableFuture.completedFuture(Collections.emptyList());
+      }
+      MyCustomServerAPI myServer = (MyCustomServerAPI) ls;
+      return myServer.getApplications();}
+    );
+```
+
+If you need to get your language server and store it in a field to keep a connection and reuse it several times, you can:
+
+ * store the result in a languageServerFuture field:
+
+```java
+Project project = ...
+CompletableFuture<@Nullable LanguageServerItem> languageServerFuture = 
+        LanguageServerManager.getInstance(project)
+            .getLanguageServer("myLanguageServerId");
+```
+ * consume it several times:
+
+```java
+CompletableFuture<List<Application>> applications = 
+     languageServerFuture
+     .thenCompose(languageServerItem -> {
+       if (languageServerItem != null) {
+         return CompletableFuture.completedFuture(null);
+       }
+       return languageServerItem.getInitializedServer(); // here getInitializedServer is used because language server could be stopped and must be restarted
+     })
+    .thenCompose(ls -> {
+      if (ls == null) {
+          return CompletableFuture.completedFuture(Collections.emptyList());
+      }
+      MyCustomServerAPI myServer = (MyCustomServerAPI) ls;
+      return myServer.getApplications();}
+    );
+```
+
 ## LSP commands
 
 ### LSPCommandAction
@@ -540,6 +641,21 @@ This command is used for instance with the [TypeScript Language Server](./user-d
 to open `references/implementations` in a popup when  clicking on a `Codelens` :
 
 ![editor.action.showReferences](./images/commands/ShowReferencesAction.png)
+
+### Execute a command
+
+If you need to `execute an LSP org.eclipse.lsp4j.Command` of your language server in a `View` for example, you can use `CommandExecutor` like this:
+
+```java
+Command command = new Command("My command", "command.from.your.ls");
+LSPCommandContext commandContext = new LSPCommandContext(command, project);
+commandContext.setPreferredLanguageServerId("myLanguageServerId");
+CommandExecutor.executeCommand(commandContext)
+        .response()
+        .thenAccept(r -> {
+        // Do something with the workspace/executeCommand Object response
+        });
+```
 
 # Workspace Configuration
 

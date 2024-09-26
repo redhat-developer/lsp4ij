@@ -15,11 +15,11 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Prepare rename result.
+ * Prepare rename response.
  *
  * @param range          the range.
  * @param placeholder    the placeholder.
- * @param languageServer the language server which has been used to compute this prepare rename result.
+ * @param languageServer the language server which has been used to compute this prepare rename response.
  */
 record PrepareRenameResultData(@NotNull TextRange range,
                                @NotNull String placeholder,

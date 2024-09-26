@@ -10,13 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.implementation;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -29,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * LSP implementation support which collect:
- * 
+ *
  * <ul>
  *      <li>textDocument/implementation</li>
  *  </ul>
@@ -54,16 +50,15 @@ public class LSPImplementationSupport extends AbstractLSPDocumentFeatureSupport<
     @Override
     protected CompletableFuture<List<Location>> doLoad(LSPImplementationParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return collectImplementations(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return collectImplementations(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectImplementations(@NotNull VirtualFile file,
-                                                                                     @NotNull Project project,
+    private static @NotNull CompletableFuture<List<Location>> collectImplementations(@NotNull PsiFile file,
                                                                                      @NotNull LSPImplementationParams params,
                                                                                      @NotNull CancellationSupport cancellationSupport) {
-        var textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file);
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isImplementationSupported)
+        return getLanguageServers(file,
+                f -> f.getImplementationFeature().isEnabled(file),
+                f -> f.getImplementationFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have implementation capability
@@ -83,8 +78,8 @@ public class LSPImplementationSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     private static CompletableFuture<List<Location>> getImplementationFor(LSPImplementationParams params,
-                                                                             LanguageServerItem languageServer,
-                                                                             CancellationSupport cancellationSupport) {
+                                                                          LanguageServerItem languageServer,
+                                                                          CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .implementation(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION)

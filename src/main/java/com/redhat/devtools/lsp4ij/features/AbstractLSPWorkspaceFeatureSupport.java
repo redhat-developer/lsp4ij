@@ -11,7 +11,15 @@
 package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 /**
  * Base class to consume LSP requests (ex : workspace/symbol) from all language servers applying to a given project.
@@ -40,5 +48,12 @@ public abstract class AbstractLSPWorkspaceFeatureSupport<Params, Result> extends
     @Override
     protected boolean checkValid() {
         return !project.isDisposed();
+    }
+
+    protected static CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull Project project,
+                                                                                    @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+                                                                                    @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
+        return LanguageServiceAccessor.getInstance(project)
+                .getLanguageServers(beforeStartingServerFilter, afterStartingServerFilter);
     }
 }

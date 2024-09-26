@@ -24,7 +24,7 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
     }
 
     public void testRenameWithPrepareRenameResult() {
-        // Go LS uses prepare rename result (range + placeholder)
+        // Go LS uses prepare rename response (range + placeholder)
         assertRename("test.go",
                 """                
                         package src

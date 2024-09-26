@@ -81,7 +81,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             // Wait for completion of textDocument/definition, textDocument/references, etc
             waitUntilDone(usagesFuture);
             if (usagesFuture.isDone()) {
-                // Show result of textDocument/definition, textDocument/references, etc as usage info.
+                // Show response of textDocument/definition, textDocument/references, etc as usage info.
                 List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
                 if (usages != null) {
                     for (LSPUsagePsiElement usage : usages) {

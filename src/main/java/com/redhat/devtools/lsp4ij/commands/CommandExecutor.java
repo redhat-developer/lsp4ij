@@ -60,6 +60,19 @@ public class CommandExecutor {
     public static final DataKey<LanguageServerItem> LSP_COMMAND_LANGUAGE_SERVER = DataKey.create("com.redhat.devtools.lsp4ij.command.server");
 
     /**
+     * The command response.
+     *
+     * @param exists   true if the command is executed on server / client side and false otherwise.
+     * @param response the response of workspace/executeCommand executed on server side and null otherwise.
+     */
+    public record LSPCommandResponse(boolean exists, @Nullable CompletableFuture<java.lang.Object> response) {
+
+        private static final LSPCommandResponse NOT_FOUND = new LSPCommandResponse(false, CompletableFuture.completedFuture(null));
+
+        private static final LSPCommandResponse FOUND = new LSPCommandResponse(true, CompletableFuture.completedFuture(null));
+    }
+
+    /**
      * Will execute the given {@code command} either on a language server,
      * supporting the command, or on the client, if an {@link AnAction} is
      * registered for the ID of the command. If
@@ -68,14 +81,15 @@ public class CommandExecutor {
      * heuristic method will try to interpret the command locally.
      *
      * @param context the LSP command context.
-     * @return true if the command exists on language server / client side and false otherwise.
+     * @return the {@link LSPCommandResponse} if the command exists on language server / client side and {@link LSPCommandResponse#exists() to false} otherwise.
      */
-    public static boolean executeCommand(LSPCommandContext context) {
+    public static LSPCommandResponse executeCommand(LSPCommandContext context) {
         Command command = context.getCommand();
 
         // 1. try to execute command on server side
-        if (executeCommandServerSide(command, context.getPreferredLanguageServer())) {
-            return true;
+        LSPCommandResponse result = executeCommandServerSide(command, context.getPreferredLanguageServer(), context.getPreferredLanguageServerId(), context.getProject());
+        if (result.exists()) {
+            return result;
         }
 
         VirtualFile file = context.getFile();
@@ -91,7 +105,7 @@ public class CommandExecutor {
                 context.getSource(),
                 context.getInputEvent(),
                 context.getPreferredLanguageServer())) {
-            return true;
+            return LSPCommandResponse.FOUND;
         }
 
         // 3. tentative fallback
@@ -103,12 +117,12 @@ public class CommandExecutor {
                     if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
                         LSPIJUtils.applyWorkspaceEdit(edit);
                     } else {
-                        return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<Boolean>) () -> {
+                        return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<LSPCommandResponse>) () -> {
                             LSPIJUtils.applyWorkspaceEdit(edit);
-                            return true;
+                            return LSPCommandResponse.FOUND;
                         });
                     }
-                    return true;
+                    return LSPCommandResponse.FOUND;
                 }
             }
         }
@@ -117,7 +131,7 @@ public class CommandExecutor {
             String commandId = context.getCommand().getCommand();
             var preferredLanguageServer = context.getPreferredLanguageServer();
             String content = preferredLanguageServer != null ?
-                    MarkdownConverter.getInstance(project).toHtml(LanguageServerBundle.message("lsp.command.error.with.ls.content", commandId, preferredLanguageServer.getServerWrapper().getServerDefinition().getDisplayName())):
+                    MarkdownConverter.getInstance(project).toHtml(LanguageServerBundle.message("lsp.command.error.with.ls.content", commandId, preferredLanguageServer.getServerDefinition().getDisplayName())) :
                     MarkdownConverter.getInstance(project).toHtml(LanguageServerBundle.message("lsp.command.error.without.ls.content", commandId));
 
             Notification notification = new Notification(LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID,
@@ -128,52 +142,66 @@ public class CommandExecutor {
             notification.setListener(NotificationListener.URL_OPENING_LISTENER);
             Notifications.Bus.notify(notification, context.getProject());
         }
-        return false;
+        return LSPCommandResponse.NOT_FOUND;
     }
 
     /**
      * Execute LSP command on server side.
      *
-     * @param command        the LSP Command to be executed. If {@code null} this method will
-     *                       do nothing.
-     * @param languageServer the language server for which the {@code command} is
-     *                       applicable.
+     * @param command                   the LSP Command to be executed. If {@code null} this method will
+     *                                  do nothing.
+     * @param languageServer            the language server for which the {@code command} is
+     *                                  applicable.
+     * @param preferredLanguageServerId
+     * @param project
      * @return true if the LSP command on server side has been executed successfully and false otherwise.
      */
-    private static boolean executeCommandServerSide(@NotNull Command command,
-                                                    @Nullable LanguageServerItem languageServer) {
-        CompletableFuture<LanguageServer> languageServerFuture = getLanguageServerForCommand(command, languageServer);
+    private static LSPCommandResponse executeCommandServerSide(@NotNull Command command,
+                                                               @Nullable LanguageServerItem languageServer,
+                                                               @Nullable String preferredLanguageServerId,
+                                                               @NotNull Project project) {
+        CompletableFuture<LanguageServer> languageServerFuture = getLanguageServerForCommand(command, languageServer, preferredLanguageServerId, project);
         if (languageServerFuture == null) {
-            return false;
+            return LSPCommandResponse.NOT_FOUND;
         }
         // Server can handle command
-        languageServerFuture.thenAcceptAsync(server -> {
-            ExecuteCommandParams params = new ExecuteCommandParams();
-            params.setCommand(command.getCommand());
-            params.setArguments(command.getArguments());
-            server.getWorkspaceService()
-                    .executeCommand(params)
-                    .exceptionally(error -> {
-                        // Language server throws an error when executing a command
-                        // Display it with an IntelliJ notification.
-                        var languageServerWrapper = languageServer.getServerWrapper();
-                        MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
-                        var languageServerDefinition = languageServerWrapper.getServerDefinition();
-                        ServerMessageHandler.showMessage(languageServerDefinition.getDisplayName(), messageParams, languageServerWrapper.getProject());
-                        return error;
-                    });
-        });
-        return true;
+        CompletableFuture<Object> result = languageServerFuture
+                .thenComposeAsync(server -> {
+                    if (server == null) {
+                        MessageParams messageParams = new MessageParams(MessageType.Error, LanguageServerBundle.message("lsp.command.error.ls.undefined.title"));
+                        ServerMessageHandler.showMessage(LanguageServerBundle.message("lsp.command.error.ls.undefined.content", command.getCommand(), preferredLanguageServerId), messageParams, project);
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    ExecuteCommandParams params = new ExecuteCommandParams();
+                    params.setCommand(command.getCommand());
+                    params.setArguments(command.getArguments());
+                    return server.getWorkspaceService()
+                            .executeCommand(params)
+                            .exceptionally(error -> {
+                                // Language server throws an error when executing a command
+                                // Display it with an IntelliJ notification.
+                                MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
+                                ServerMessageHandler.showMessage(languageServer.getServerDefinition().getDisplayName(), messageParams, project);
+                                return error;
+                            });
+                });
+        return new LSPCommandResponse(true, result);
     }
 
     @Nullable
     private static CompletableFuture<LanguageServer> getLanguageServerForCommand(@NotNull Command command,
-                                                                                 @Nullable LanguageServerItem languageServer) {
+                                                                                 @Nullable LanguageServerItem languageServer,
+                                                                                 @Nullable String preferredLanguageServerId,
+                                                                                 @NotNull Project project) {
 
         if (languageServer != null && languageServer.supportsCommand(command)) {
             return languageServer
-                    .getServerWrapper()
                     .getInitializedServer();
+        }
+        if (preferredLanguageServerId != null) {
+            return LanguageServerManager.getInstance(project)
+                    .getLanguageServer(preferredLanguageServerId)
+                    .thenApply(ls -> ls != null ? ls.getServer() : null);
         }
         return null;
     }
@@ -336,7 +364,7 @@ public class CommandExecutor {
         }
         boolean hasTextEdits = changes.values()
                 .stream()
-                .anyMatch(edits -> edits != null &&  !edits.isEmpty());
+                .anyMatch(edits -> edits != null && !edits.isEmpty());
         if (!hasTextEdits) {
             return null;
         }

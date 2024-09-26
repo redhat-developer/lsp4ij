@@ -127,7 +127,7 @@ public class CommandExecutorTest extends BasePlatformTestCase {
         Path filePath = Files.createTempFile(null, ".ts");
         VirtualFile file = VirtualFileManager.getInstance().refreshAndFindFileByNioPath(filePath);
         context.setFile(file);
-        boolean actual = CommandExecutor.executeCommand(context);
-        Assertions.assertEquals(expected, actual);
+        CommandExecutor.LSPCommandResponse result = CommandExecutor.executeCommand(context);
+        Assertions.assertEquals(expected, result.exists());
     }
 }

@@ -63,7 +63,7 @@ public class CancellationSupport implements CancelChecker {
      * Add the given future to the list of the futures to cancel (when CancellationSupport.cancel() is called)
      *
      * @param future the future to cancel when CancellationSupport.cancel() is called
-     * @param <T>    the result type of the future.
+     * @param <T>    the response type of the future.
      * @return the future to execute.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future) {
@@ -76,17 +76,11 @@ public class CancellationSupport implements CancelChecker {
      * @param future         the future to cancel when CancellationSupport.cancel() is called.
      * @param languageServer the language server which have created the LSP future and null otherwise.
      * @param featureName    the LSP feature name (ex: textDocument/completion) and null otherwise.
-     * @param <T>            the result type of the future.
+     * @param <T>            the response type of the future.
      * @return the future to execute.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
                                             @Nullable LanguageServerItem languageServer,
-                                            @Nullable String featureName) {
-        return execute(future, languageServer != null ? languageServer.getServerWrapper() : null, featureName);
-    }
-
-    public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
-                                            @Nullable LanguageServerWrapper languageServer,
                                             @Nullable String featureName) {
         return execute(future, languageServer, featureName, true);
     }
@@ -98,11 +92,11 @@ public class CancellationSupport implements CancelChecker {
      * @param languageServer            the language server which have created the LSP future and null otherwise.
      * @param featureName               the LSP feature name (ex: textDocument/completion) and null otherwise.
      * @param handleLanguageServerError true if the error coming from language server are caught and displayed as notification, log, ignore and false otherwise.
-     * @param <T>                       the result type of the future.
+     * @param <T>                       the response type of the future.
      * @return the future to execute.
      */
     public <T> CompletableFuture<T> execute(@NotNull CompletableFuture<T> future,
-                                            @Nullable LanguageServerWrapper languageServer,
+                                            @Nullable LanguageServerItem languageServer,
                                             @Nullable String featureName,
                                             boolean handleLanguageServerError) {
         if (cancelled) {
@@ -115,9 +109,9 @@ public class CancellationSupport implements CancelChecker {
             this.futuresToCancel.add(future);
             if (languageServer != null) {
                 // It is an LSP request (ex : textDocument/completion)
-                // Handle the LSP request result to show LSP error (ResponseErrorException) in an IJ notification
-                // In this error case, the future will return null as result instead of throwing the ResponseErrorException error
-                // to avoid breaking the LSP request result of another language server (when file is associated to several language servers)
+                // Handle the LSP request response to show LSP error (ResponseErrorException) in an IJ notification
+                // In this error case, the future will return null as response instead of throwing the ResponseErrorException error
+                // to avoid breaking the LSP request response of another language server (when file is associated to several language servers)
                 future = future.handle(handleLSPFeatureResult(languageServer, featureName, handleLanguageServerError));
             }
         }
@@ -125,7 +119,7 @@ public class CancellationSupport implements CancelChecker {
     }
 
     @NotNull
-    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@NotNull LanguageServerWrapper languageServer,
+    private static <T> BiFunction<T, Throwable, T> handleLSPFeatureResult(@NotNull LanguageServerItem languageServer,
                                                                           @Nullable String featureName,
                                                                           boolean handleLanguageServerError) {
         return (result, error) -> {
@@ -137,8 +131,8 @@ public class CancellationSupport implements CancelChecker {
             }
             if (handleLanguageServerError && error instanceof ResponseErrorException responseError) {
                 handleLanguageServerError(languageServer, featureName, responseError);
-                // return null as result instead of throwing the ResponseErrorException error
-                // to avoid breaking the LSP request result of another language server (when file is associated to several language servers)
+                // return null as response instead of throwing the ResponseErrorException error
+                // to avoid breaking the LSP request response of another language server (when file is associated to several language servers)
                 return null;
             }
             if (error != null) {
@@ -148,12 +142,12 @@ public class CancellationSupport implements CancelChecker {
                 // Rethrow the error
                 throw new CompletionException(error);
             }
-            // Return the result
+            // Return the response
             return result;
         };
     }
 
-    private static void handleLanguageServerError(@NotNull LanguageServerWrapper languageServer,
+    private static void handleLanguageServerError(@NotNull LanguageServerItem languageServer,
                                                   @Nullable String featureName,
                                                   @NotNull ResponseErrorException error) {
         ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
@@ -171,7 +165,7 @@ public class CancellationSupport implements CancelChecker {
         }
     }
 
-    private static void showNotificationError(@NotNull LanguageServerWrapper serverWrapper, @Nullable String featureName, ResponseErrorException error) {
+    private static void showNotificationError(@NotNull LanguageServerItem serverWrapper, @Nullable String featureName, ResponseErrorException error) {
         String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
         String content = error.getMessage();
         Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
@@ -193,7 +187,7 @@ public class CancellationSupport implements CancelChecker {
      * @return the error reporting kind for the given language server.
      */
     @NotNull
-    private static ErrorReportingKind getReportErrorKind(@NotNull LanguageServerWrapper languageServer) {
+    private static ErrorReportingKind getReportErrorKind(@NotNull LanguageServerItem languageServer) {
         String languageServerId = languageServer.getServerDefinition().getId();
         ErrorReportingKind errorReportingKind = null;
         Project project = languageServer.getProject();

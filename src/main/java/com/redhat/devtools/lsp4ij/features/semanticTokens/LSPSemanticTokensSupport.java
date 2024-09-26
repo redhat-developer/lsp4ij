@@ -10,12 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.SemanticTokensLegend;
@@ -47,16 +44,16 @@ public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<
     @Override
     protected CompletableFuture<SemanticTokensData> doLoad(SemanticTokensParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getSemanticTokens(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getSemanticTokens(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<SemanticTokensData> getSemanticTokens(@NotNull VirtualFile file,
-                                                                                    @NotNull Project project,
+    private static @NotNull CompletableFuture<SemanticTokensData> getSemanticTokens(@NotNull PsiFile file,
                                                                                     @NotNull SemanticTokensParams params,
                                                                                     @NotNull CancellationSupport cancellationSupport) {
 
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isSemanticTokensSupported)
+        return getLanguageServers(file,
+                f -> f.getSemanticTokensFeature().isEnabled(file),
+                f -> f.getSemanticTokensFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have folding range capability

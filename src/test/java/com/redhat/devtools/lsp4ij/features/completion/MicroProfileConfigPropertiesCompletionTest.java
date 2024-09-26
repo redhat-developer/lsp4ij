@@ -26,7 +26,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
     // ------------ Completion on property key
 
     public void testCompletionOnPropertyKeyWithEmptyContent() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("microprofile-config.properties",
                 "<caret>", """                
                         {
@@ -66,7 +66,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
     }
 
     public void testCompletionOnPropertyKeyWithNotEmptyContent() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("microprofile-config.properties",
                 "qu<caret>k", """                
                         {
@@ -107,7 +107,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
     // ------------ Completion on property value
 
     public void testCompletionOnPropertyValueWithEmptyContent() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("microprofile-config.properties",
                 "quarkus.banner.enabled=<caret>", """                
                         {
@@ -177,7 +177,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
     }
 
     public void testCompletionOnPropertyValueWithNotEmptyContentAt_1_caret() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("microprofile-config.properties",
                 "quarkus.banner.enabled=t<caret>re", """                
                         {
@@ -246,7 +246,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
     }
 
     public void testCompletionOnPropertyValueWithNotEmptyContentAt_3_caret() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("microprofile-config.properties",
                 "quarkus.banner.enabled=tre<caret>", """                
                         {
@@ -315,7 +315,7 @@ public class MicroProfileConfigPropertiesCompletionTest extends LSPCompletionFix
     }
 
     public void testCompletionOnPropertyValueWithNotEmptyContent_false_value() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("microprofile-config.properties",
                 "quarkus.banner.enabled=<caret>false", """                
                         {

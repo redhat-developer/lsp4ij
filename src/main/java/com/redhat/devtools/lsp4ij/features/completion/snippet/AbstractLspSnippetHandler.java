@@ -43,17 +43,17 @@ public abstract class AbstractLspSnippetHandler implements LspSnippetHandler {
      *
      * @param text the text to format according to the LSP client settings.
      *
-     * @return the result of '\n' and '\t' replacement declared in the snippets according to the LSP client settings.
+     * @return the response of '\n' and '\t' replacement declared in the snippets according to the LSP client settings.
      */
     protected String formatText(String text) {
         return indentOptions != null ? indentOptions.formatText(text) : text;
     }
 
     /**
-     * Return the result of the resolved LSP variable and null otherwise.
+     * Return the response of the resolved LSP variable and null otherwise.
      *
      * @param variableName the variable name to resolve.
-     * @return the result of the resolved LSP variable and null otherwise.
+     * @return the response of the resolved LSP variable and null otherwise.
      */
     protected String resolveVariable(String variableName) {
         if (variableResolver == null || variableName == null || variableName.isEmpty()) {

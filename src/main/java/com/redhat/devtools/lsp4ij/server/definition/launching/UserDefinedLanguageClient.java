@@ -58,6 +58,7 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
         super.triggerChangeConfiguration();
     }
 
+    @Override
     public UserDefinedLanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }

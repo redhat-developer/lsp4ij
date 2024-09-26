@@ -23,7 +23,7 @@ public class RustRenameTest extends LSPRenameFixtureTestCase {
     }
 
     public void testRenameWithPrepareNameRange() {
-        // Rust LS uses range as prepare rename result
+        // Rust LS uses range as prepare rename response
         assertRename("test.rs",
                 """                
                         fn m<caret>ain() {

@@ -72,7 +72,7 @@ public class LSPRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPRenam
                                                                            @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                                 .getTextDocumentService()
-                                .rename(params), languageServer.getServerWrapper(), LSPRequestConstants.TEXT_DOCUMENT_RENAME,
+                                .rename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RENAME,
                         false /* if rename throws an error, the error must not be displayed as notification but as hint in the editor  */)
                 .thenApplyAsync(workspaceEdit -> {
                     if (isValidWorkspaceEdit(workspaceEdit)) {

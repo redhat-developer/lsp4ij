@@ -65,7 +65,7 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
         }
         var params = new LSPHoverParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document), offset);
         LSPHoverSupport hoverSupport = LSPFileSupport.getSupport(psiFile).getHoverSupport();
-        CompletableFuture<List<Hover>> hoverFuture = hoverSupport.getHover(params);
+        CompletableFuture<List<HoverData>> hoverFuture = hoverSupport.getHover(params);
 
         try {
             waitUntilDone(hoverFuture, psiFile);
@@ -81,7 +81,7 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
 
         if (isDoneNormally(hoverFuture)) {
             // textDocument/hover has been collected correctly
-            List<Hover> hovers = hoverFuture.getNow(null);
+            List<HoverData> hovers = hoverFuture.getNow(null);
             if (hovers != null) {
                 return hovers
                         .stream()
@@ -95,9 +95,10 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
     }
 
     @Nullable
-    private static DocumentationTarget toDocumentTarget(@Nullable Hover hover,
+    private static DocumentationTarget toDocumentTarget(@Nullable HoverData hoverData,
                                                         @NotNull Document document,
                                                         @NotNull PsiFile file) {
+        Hover hover = hoverData != null ? hoverData.hover() : null;
         if (hover == null) {
             return null;
         }
@@ -106,7 +107,7 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
             return null;
         }
         String presentationText = getPresentationText(hover, document);
-        return new LSPDocumentationTarget(contents, presentationText, file);
+        return new LSPDocumentationTarget(contents, presentationText, file, hoverData.languageServer());
     }
 
     private static String getPresentationText(@NotNull Hover hover, @NotNull Document document) {

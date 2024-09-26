@@ -202,7 +202,7 @@ public class LanguageServerPanel {
     }
 
     /**
-     * Update preview command label with expanded macro result if needed.
+     * Update preview command label with expanded macro response if needed.
      *
      * @param commandLine         the command line which could contains macro syntax.
      * @param previewCommandLabel the preview command label.

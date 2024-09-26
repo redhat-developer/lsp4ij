@@ -12,18 +12,14 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 
 import com.intellij.formatting.service.AsyncDocumentFormattingService;
 import com.intellij.formatting.service.AsyncFormattingRequest;
-import com.intellij.lang.LanguageFormatting;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPFileSupport;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import org.eclipse.lsp4j.ServerCapabilities;
+import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -108,20 +104,24 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
 
     @Override
     public final boolean canFormat(@NotNull PsiFile file) {
-        if (!LanguageFormatting.INSTANCE.allForLanguage(file.getLanguage()).isEmpty()) {
-            // When IJ provides formatting for the language (ex : JAVA, HTML)
-            // the LSP formatting support is ignored to avoid having some conflicts when formatting is done
-            return false;
-        }
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
             // The file is not associated to a language server
             return false;
         }
-        // Check if the file can support formatting / range formatting
         Project project = file.getProject();
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> canSupportFormatting(ls.getServerCapabilitiesSync()));
+                .hasAny(file.getVirtualFile(), ls -> canSupportFormatting(ls, file));
     }
+
+    private boolean canSupportFormatting(LanguageServerWrapper ls, PsiFile file) {
+        var formattingFeature= ls.getClientFeatures().getFormattingFeature();
+        if (!formattingFeature.isEnabled(file)) {
+            return false;
+        }
+        return canSupportFormatting(formattingFeature, file);
+    }
+
+    protected abstract boolean canSupportFormatting(LSPFormattingFeature formattingFeature, PsiFile file);
 
     private static TextRange getFormattingRange(AsyncFormattingRequest formattingRequest) {
         List<TextRange> ranges = formattingRequest.getFormattingRanges();
@@ -136,5 +136,4 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
         return textRange;
     }
 
-    protected abstract boolean canSupportFormatting(@Nullable ServerCapabilities serverCapabilities);
 }

@@ -24,7 +24,7 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithoutTextEditAndEmptyContent() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.clj",
                 "<caret>", """                
                         [
@@ -49,7 +49,7 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithoutTextEdit() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.clj",
                 "let<caret>", """                
                         [
@@ -74,7 +74,7 @@ public class ClojureCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithoutTextEditAndCaretInsideToken() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.clj",
                 "le<caret>t", """                
                         [

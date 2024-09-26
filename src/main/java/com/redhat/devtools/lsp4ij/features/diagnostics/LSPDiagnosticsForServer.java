@@ -13,10 +13,11 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.diagnostics;
 
+import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
-import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.codeAction.quickfix.LSPLazyCodeActions;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Position;
@@ -53,6 +54,9 @@ public class LSPDiagnosticsForServer {
         this.diagnostics = Collections.emptyMap();
     }
 
+    public LSPClientFeatures getClientFeatures() {
+        return languageServer.getClientFeatures();
+    }
     /**
      * Update the new LSP published diagnosics.
      *
@@ -63,7 +67,9 @@ public class LSPDiagnosticsForServer {
         this.diagnostics = toMap(diagnostics, this.diagnostics);
     }
 
-    private Map<Diagnostic, LSPLazyCodeActions> toMap(List<Diagnostic> diagnostics, Map<Diagnostic, LSPLazyCodeActions> existingDiagnostics) {
+    private Map<Diagnostic, LSPLazyCodeActions> toMap(List<Diagnostic> diagnostics,
+                                                      Map<Diagnostic, LSPLazyCodeActions> existingDiagnostics) {
+        // Collect quick fixes from LSP code action
         Map<Diagnostic, LSPLazyCodeActions> map = new HashMap<>(diagnostics.size());
         // Sort diagnostics by range
         List<Diagnostic> sortedDiagnostics = diagnostics
@@ -134,7 +140,7 @@ public class LSPDiagnosticsForServer {
      * @param diagnostic the diagnostic.
      * @return Intellij quickfixes for the given diagnostic if there available.
      */
-    public List<LSPLazyCodeActionIntentionAction> getQuickFixesFor(Diagnostic diagnostic) {
+    public List<IntentionAction> getQuickFixesFor(Diagnostic diagnostic) {
         boolean codeActionSupported = isCodeActionSupported(languageServer.getServerWrapper());
         if (!codeActionSupported || diagnostics.isEmpty()) {
             return Collections.emptyList();

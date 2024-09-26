@@ -51,20 +51,13 @@ public class ServerMessageHandler {
     /**
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage">window/logMessage</a> specification.
      *
-     * @param serverWrapper the language server wrapper
-     * @param params  the message request parameters
+     * @param serverDefinition the language server definition.
+     * @param params  the message request parameters.
+     * @param project the project.
      */
-    public static void logMessage(LanguageServerWrapper serverWrapper, MessageParams params) {
-        logMessage(serverWrapper.getServerDefinition(), params, serverWrapper.getProject() );
-    }
-
-    /**
-     * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage">window/logMessage</a> specification.
-     *
-     * @param serverWrapper the language server wrapper
-     * @param params  the message request parameters
-     */
-    public static void logMessage(LanguageServerDefinition serverDefinition, MessageParams params, Project project) {
+    public static void logMessage(@NotNull LanguageServerDefinition serverDefinition,
+                                  @NotNull MessageParams params,
+                                  @NotNull Project project) {
         LSPConsoleToolWindowPanel.showLog(serverDefinition, params, project );
     }
 
@@ -107,17 +100,16 @@ public class ServerMessageHandler {
     /**
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest">window/showMessageRequest</a> specification.
      *
-     * @param serverWrapper the language server wrapper
-     * @param params  the message request parameters
+     * @param languageServerName the language server name.
+     * @param params  the message request parameters.
+     * @param project the project.
      */
-    public static CompletableFuture<MessageActionItem> showMessageRequest(@NotNull LanguageServerWrapper serverWrapper,
+    public static CompletableFuture<MessageActionItem> showMessageRequest(@NotNull String languageServerName,
                                                                           @NotNull ShowMessageRequestParams params,
                                                                           @NotNull Project project) {
         CompletableFuture<MessageActionItem> future = new CompletableFuture<>();
         ApplicationManager.getApplication()
                 .invokeLater(() -> {
-                    String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
-                    String title = params.getMessage();
                     String content = MarkdownConverter.getInstance(project).toHtml(params.getMessage());
                     final Notification notification = new Notification(
                             LSP_WINDOW_SHOW_MESSAGE_REQUEST_GROUP_ID,
@@ -147,7 +139,7 @@ public class ServerMessageHandler {
                         }
                     });
 
-                    Notifications.Bus.notify(notification, serverWrapper.getProject());
+                    Notifications.Bus.notify(notification, project);
                     var balloon= notification.getBalloon();
                     if (balloon != null) {
                         balloon.addListener(new JBPopupListener() {

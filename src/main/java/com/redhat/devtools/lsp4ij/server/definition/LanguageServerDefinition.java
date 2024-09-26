@@ -22,7 +22,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
-import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -43,12 +42,10 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
-    private static SemanticTokensColorsProvider DEFAULT_SEMANTIC_TOKENS_COLORS_PROVIDER = new DefaultSemanticTokensColorsProvider();
+    private static final SemanticTokensColorsProvider DEFAULT_SEMANTIC_TOKENS_COLORS_PROVIDER = new DefaultSemanticTokensColorsProvider();
 
-    private final @NotNull
-    String id;
-    private final @NotNull
-    String name;
+    private final @NotNull String id;
+    private final @NotNull String name;
     private final boolean isSingleton;
     private final String description;
     private final int lastDocumentDisconnectedTimeout;
@@ -110,7 +107,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      */
     @NotNull
     public String getDisplayName() {
-        return name != null ? name : id;
+        return name;
     }
 
     /**
@@ -199,22 +196,12 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         return null;
     }
 
-    @Override
-    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
-        return new LanguageClientImpl(project);
-    }
-
-    @Override
-    public @NotNull Class<? extends LanguageServer> getServerInterface() {
-        return LanguageServer.class;
-    }
-
     public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
         return new Launcher.Builder<>();
     }
 
     public boolean supportsCurrentEditMode(@NotNull Project project) {
-        return project != null && (supportsLightEdit || !LightEdit.owns(project));
+        return (supportsLightEdit || !LightEdit.owns(project));
     }
 
     public Icon getIcon() {

@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -62,7 +63,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return project;
     }
 
-    public final void connect(LanguageServer server, LanguageServerWrapper wrapper) {
+    public final void connect(@NotNull LanguageServer server, @NotNull LanguageServerWrapper wrapper) {
         this.server = server;
         this.wrapper = wrapper;
         this.diagnosticHandler = new LSPDiagnosticHandler(wrapper);
@@ -73,19 +74,23 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return server;
     }
 
+    public LanguageServerDefinition getServerDefinition() {
+        return wrapper.getServerDefinition();
+    }
+
     @Override
     public void telemetryEvent(Object object) {
         // TODO
     }
 
     @Override
-    public final CompletableFuture<MessageActionItem> showMessageRequest(ShowMessageRequestParams requestParams) {
-        return ServerMessageHandler.showMessageRequest(wrapper, requestParams, getProject());
+    public CompletableFuture<MessageActionItem> showMessageRequest(ShowMessageRequestParams requestParams) {
+        return ServerMessageHandler.showMessageRequest(getServerDefinition().getDisplayName(), requestParams, getProject());
     }
 
     @Override
-    public final void showMessage(MessageParams messageParams) {
-        ServerMessageHandler.showMessage(wrapper.getServerDefinition().getDisplayName(), messageParams, getProject());
+    public void showMessage(MessageParams messageParams) {
+        ServerMessageHandler.showMessage(getServerDefinition().getDisplayName(), messageParams, getProject());
     }
 
     @Override
@@ -94,17 +99,17 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     @Override
-    public final void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
+    public void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
         this.diagnosticHandler.accept(diagnostics);
     }
 
     @Override
-    public final void logMessage(MessageParams message) {
-        CompletableFuture.runAsync(() -> ServerMessageHandler.logMessage(wrapper, message));
+    public void logMessage(MessageParams message) {
+        CompletableFuture.runAsync(() -> ServerMessageHandler.logMessage(getServerDefinition(), message, getProject()));
     }
 
     @Override
-    public final CompletableFuture<ApplyWorkspaceEditResponse> applyEdit(ApplyWorkspaceEditParams params) {
+    public CompletableFuture<ApplyWorkspaceEditResponse> applyEdit(ApplyWorkspaceEditParams params) {
         CompletableFuture<ApplyWorkspaceEditResponse> future = new CompletableFuture<>();
         WriteCommandAction.runWriteCommandAction(getProject(), () -> {
             LSPIJUtils.applyWorkspaceEdit(params.getEdit());
@@ -125,9 +130,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<List<WorkspaceFolder>> workspaceFolders() {
-        return CompletableFuture.supplyAsync(() -> {
-            return LSPIJUtils.toWorkspaceFolders(project);
-        });
+        return CompletableFuture.supplyAsync(() -> LSPIJUtils.toWorkspaceFolders(project));
     }
 
     @Override
@@ -144,7 +147,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         ReadAction.nonBlocking((Callable<Void>) () -> {
                     for (var fileData : wrapper.getConnectedFiles()) {
                         VirtualFile file = fileData.getFile();
-                        final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                         if (psiFile != null) {
                             Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
                             InlayHintsFactoryBridge.refreshInlayHints(psiFile, editors, true);
@@ -170,7 +173,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         ReadAction.nonBlocking((Callable<Void>) () -> {
                     for (var fileData : wrapper.getConnectedFiles()) {
                         VirtualFile file = fileData.getFile();
-                        final PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                         if (psiFile != null) {
                             // Evict the semantic tokens cache
                             LSPFileSupport.getSupport(psiFile).getSemanticTokensSupport().cancel();
@@ -201,7 +204,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
             for (ConfigurationItem item : params.getItems()) {
                 String section = item.getSection();
                 Object result = findSettings(section);
-                // The result is the configuration setting or null, according to the spec:
+                // The response is the configuration setting or null, according to the spec:
                 //  - If a scope URI is provided the client should return the setting scoped to the provided resource.
                 //  - If the client can’t provide a configuration setting for a given scope then null needs to be present in the returned array.
                 settings.add(result);

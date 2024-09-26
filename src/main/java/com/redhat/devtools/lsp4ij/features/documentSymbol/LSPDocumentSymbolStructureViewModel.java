@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
@@ -96,7 +97,8 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
                     return Collections.emptyList();
                 }
                 return documentSymbols.stream()
-                        .map(documentSymbol -> (StructureViewTreeElement) new LSPDocumentSymbolViewElement(documentSymbol))
+                        .map(documentSymbol -> getStructureViewTreeElement(documentSymbol))
+                        .filter(Objects::nonNull)
                         .toList();
             }
             return Collections.emptyList();
@@ -118,7 +120,7 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
         }
     }
 
-    static class LSPDocumentSymbolViewElement extends PsiTreeElementBase<DocumentSymbolData> {
+    public static class LSPDocumentSymbolViewElement extends PsiTreeElementBase<DocumentSymbolData> {
 
         public LSPDocumentSymbolViewElement(DocumentSymbolData documentSymbolData) {
             super(documentSymbolData);
@@ -135,7 +137,8 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
                 return Collections.emptyList();
             }
             return Stream.of(children)
-                    .map(child -> (StructureViewTreeElement) new LSPDocumentSymbolViewElement(child))
+                    .map(child -> getStructureViewTreeElement(child))
+                    .filter(Objects::nonNull)
                     .toList();
         }
 
@@ -143,6 +146,10 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
         public @Nullable String getPresentableText() {
             return getElement().getPresentableText();
         }
+    }
+
+    private static @Nullable StructureViewTreeElement getStructureViewTreeElement(DocumentSymbolData documentSymbol) {
+        return documentSymbol.getClientFeatures().getDocumentSymbolFeature().getStructureViewTreeElement(documentSymbol);
     }
 
 }

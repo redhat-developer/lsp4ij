@@ -80,7 +80,7 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // Server capabilities filter is set to null to avoid waiting
         // for the start of the server when server capabilities are checked
         LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, null);
+                .getLanguageServers(file, null, null);
     }
 
 }

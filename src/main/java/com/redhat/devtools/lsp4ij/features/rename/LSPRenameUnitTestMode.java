@@ -18,7 +18,7 @@ import org.eclipse.lsp4j.RenameParams;
  * <ul>
  *     <li>showErrorHint : when there is an error while renaming</li>
  *     <li>showRenameRefactoringDialog : when rename dialog is opened with rename parameters
- *     initialized with the prepare rename result</li>
+ *     initialized with the prepare rename response</li>
  * </ul>
  */
 public class LSPRenameUnitTestMode {
@@ -33,7 +33,7 @@ public class LSPRenameUnitTestMode {
         void showErrorHint(String errorHintText);
 
         /**
-         * Show the rename dialog with the rename parameters initialized with the prepare rename result.
+         * Show the rename dialog with the rename parameters initialized with the prepare rename response.
          *
          * @param renameParams the rename parameters.
          */

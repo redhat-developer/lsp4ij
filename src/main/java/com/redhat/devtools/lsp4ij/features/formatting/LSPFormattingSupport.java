@@ -14,14 +14,12 @@ import com.intellij.formatting.service.AsyncFormattingRequest;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.*;
@@ -84,20 +82,20 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
     @Override
     protected CompletableFuture<List<? extends TextEdit>> doLoad(LSPFormattingParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getFormatting(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getFormatting(file, params, cancellationSupport);
     }
 
-    protected @NotNull CompletableFuture<List<? extends TextEdit>> getFormatting(@NotNull VirtualFile file,
-                                                                                 @NotNull Project project,
+    protected @NotNull CompletableFuture<List<? extends TextEdit>> getFormatting(@NotNull PsiFile file,
                                                                                  @NotNull LSPFormattingParams params,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
         boolean isRangeFormatting = params.textRange() != null;
-        Predicate<ServerCapabilities> filter = !isRangeFormatting ?
-                LanguageServerItem::isDocumentFormattingSupported :
-                capability -> (LanguageServerItem.isDocumentRangeFormattingSupported(capability) ||
-                        LanguageServerItem.isDocumentFormattingSupported(capability));
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, filter)
+        Predicate<LSPClientFeatures> filter = !isRangeFormatting ?
+                f -> f.getFormattingFeature().isDocumentFormattingSupported(file) :
+                f -> f.getFormattingFeature().isDocumentFormattingSupported(file) ||
+                        f.getFormattingFeature().isDocumentRangeFormattingSupported(file);
+        return getLanguageServers(file,
+                f -> f.getFormattingFeature().isEnabled(file),
+                filter)
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have formatting capability

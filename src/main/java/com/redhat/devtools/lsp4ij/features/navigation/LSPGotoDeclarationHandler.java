@@ -59,10 +59,11 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
             return PsiElement.EMPTY_ARRAY;
         }
         Document document = editor.getDocument();
+
+        // Consume LSP 'textDocument/definition' request
         LSPDefinitionSupport definitionSupport = LSPFileSupport.getSupport(psiFile).getDefinitionSupport();
         var params = new LSPDefinitionParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<Location>> definitionsFuture = definitionSupport.getDefinitions(params);
-
         try {
             waitUntilDone(definitionsFuture, psiFile);
         } catch (ProcessCanceledException ex) {

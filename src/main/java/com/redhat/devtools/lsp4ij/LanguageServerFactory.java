@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 
@@ -50,4 +51,7 @@ public interface LanguageServerFactory {
         return LanguageServer.class;
     }
 
+    @NotNull default LSPClientFeatures createClientFeatures() {
+        return new LSPClientFeatures();
+    }
 }

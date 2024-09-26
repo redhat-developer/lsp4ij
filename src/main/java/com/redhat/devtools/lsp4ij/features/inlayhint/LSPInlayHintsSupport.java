@@ -10,15 +10,12 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.inlayhint;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import org.eclipse.lsp4j.InlayHint;
 import org.eclipse.lsp4j.InlayHintParams;
 import org.jetbrains.annotations.NotNull;
@@ -50,16 +47,16 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
     @Override
     protected CompletableFuture<List<InlayHintData>> doLoad(InlayHintParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getInlayHints(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getInlayHints(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<InlayHintData>> getInlayHints(@NotNull VirtualFile file,
-                                                                                 @NotNull Project project,
+    private static @NotNull CompletableFuture<List<InlayHintData>> getInlayHints(@NotNull PsiFile file,
                                                                                  @NotNull InlayHintParams params,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
 
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isInlayHintSupported)
+        return getLanguageServers(file,
+                f -> f.getInlayHintFeature().isEnabled(file),
+                f -> f.getInlayHintFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have inlay hint capability

@@ -67,7 +67,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
 
         // Get the text range and placeholder of the LSP rename with 'textDocument/prepareRename'.
         // If the language server doesn't support prepare rename capability,
-        // the support returns a prepare rename result by using the token strategy.
+        // the support returns a prepare rename response by using the token strategy.
         LSPPrepareRenameParams prepareRenameParams = new LSPPrepareRenameParams(textDocument, position, offset, document, psiFile);
         var prepareRenameSupport = LSPFileSupport.getSupport(psiFile).getPrepareRenameSupport();
         // Cancel the previous prepare rename
@@ -77,7 +77,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
 
         // As invoke method is invoked in the EDT Thread,
         // com.redhat.devtools.lsp4ij.internal.CompletableFutures#waitUntilDone
-        // cannot be used to avoid freezing IJ, in this case the result Future
+        // cannot be used to avoid freezing IJ, in this case the response Future
         // is collected when the future is ready.
 
         // Wait until the future is finished and stop waiting if there are some ProcessCanceledExceptions.

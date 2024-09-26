@@ -11,8 +11,6 @@
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
 import com.intellij.codeInsight.codeVision.*;
-import com.intellij.codeInsight.codeVision.ui.model.ClickableTextCodeVisionEntry;
-import com.intellij.codeInsight.codeVision.ui.model.TextCodeVisionEntry;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
@@ -24,18 +22,15 @@ import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ui.EDT;
-import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
-import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
+import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
-import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,8 +38,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -121,6 +117,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                     return CodeVisionState.Companion.getREADY_EMPTY();
                 }
                 if (!data.isEmpty()) {
+                    Map<LanguageServerItem, LSPCodeLensFeature.LSPCodeLensContext> codeLensContexts = new HashMap<>();
                     // At this step codelens are sorted by line number
                     // Create IJ CodeVision from LSP CodeLens
                     // As CodeVision cannot support showing several CodeVision entries for the same line, we create
@@ -160,12 +157,26 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                             }
                         }
                         if (codeLens.getCommand() != null) {
+                            var codeLensFeature = codeLensData.languageServer().getClientFeatures().getCodeLensFeature();
                             // Code lens is valid, create the proper code vision entry and text range.
                             String text = codeLens.getCommand().getTitle();
                             if (!StringUtils.isEmpty(text)) {
-                                TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), null, true);
-                                CodeVisionEntry entry = createCodeVisionEntry(codeLens, nbCodeLensForCurrentLine, psiFile, codeLensData.languageServer());
-                                result.add(new Pair<>(textRange, entry));
+                                // If LSP CodeLens is the  first lens for the current line, we use the same providerId as this LSPCodeLensProvider ('LSPCodeLensProvider)
+                                // other we generate a providerId like 'LSPCodeLensProvider0' and as DummyCodeVisionProvider are registered with 'LSPCodeLensProvider0', etc
+                                // the code vision entry will be updated correctly
+                                // See https://github.com/JetBrains/intellij-community/blob/f18aa7b9d65ab4b03d75a26aaec1e726821dc4d7/platform/lang-impl/src/com/intellij/codeInsight/codeVision/CodeVisionHost.kt#L348
+                                var ls = codeLensData.languageServer();
+                                var context = codeLensContexts.get(ls);
+                                if (context == null) {
+                                    context = new LSPCodeLensFeature.LSPCodeLensContext(psiFile, ls);
+                                    codeLensContexts.put(ls, context);
+                                }
+                                String providerId = nbCodeLensForCurrentLine == -1 ? getId() : getId() + nbCodeLensForCurrentLine;
+                                CodeVisionEntry entry = codeLensFeature.createCodeVisionEntry(codeLens, providerId, context);
+                                if (entry != null) {
+                                    TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), null, true);
+                                    result.add(new Pair<>(textRange, entry));
+                                }
                             }
                         }
                         previous = codeLensData;
@@ -218,44 +229,6 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         return codeLensData.codeLens().getRange().getStart().getLine();
     }
 
-    @NotNull
-    private TextCodeVisionEntry createCodeVisionEntry(@NotNull CodeLens codeLens,
-                                                      int nbCodeLensForCurrentLine,
-                                                      @NotNull PsiFile psiFile,
-                                                      @NotNull LanguageServerItem languageServer) {
-        Command command = codeLens.getCommand();
-        String text = getCodeLensContent(codeLens);
-        String commandId = command.getCommand();
-        // If LSP CodeLens is the  first lens for the current line, we use the same providerId as this LSPCodeLensProvider ('LSPCodeLensProvider)
-        // other we generate a providerId like 'LSPCodeLensProvider0' and as DummyCodeVisionProvider are registered with 'LSPCodeLensProvider0', etc
-        // the code vision entry will be updated correctly
-        // See https://github.com/JetBrains/intellij-community/blob/f18aa7b9d65ab4b03d75a26aaec1e726821dc4d7/platform/lang-impl/src/com/intellij/codeInsight/codeVision/CodeVisionHost.kt#L348
-        String providerId = nbCodeLensForCurrentLine == -1 ? getId() : getId() + nbCodeLensForCurrentLine;
-        if (StringUtils.isEmpty(commandId)) {
-            // Create a simple text code vision.
-            return new TextCodeVisionEntry(text, providerId, null, text, text, Collections.emptyList());
-        }
-        // Code lens defines a command, create a clickable code vsion to execute the command.
-        return new ClickableTextCodeVisionEntry(text, providerId, (e, editor) -> {
-            LSPCommandContext context = new LSPCommandContext(command, psiFile, LSPCommandContext.ExecutedBy.CODE_LENS, editor, languageServer)
-                    .setInputEvent(e);
-            if (languageServer.isResolveCodeLensSupported()) {
-                languageServer.getTextDocumentService()
-                        .resolveCodeLens(codeLens)
-                        .thenAcceptAsync(resolvedCodeLens -> {
-                                    if (resolvedCodeLens != null) {
-                                        UIUtil.invokeLaterIfNeeded(() ->
-                                                CommandExecutor.executeCommand(context));
-                                    }
-                                }
-                        );
-            } else {
-                CommandExecutor.executeCommand(context);
-            }
-            return null;
-        }, null, text, text, Collections.emptyList());
-    }
-
     private static CompletableFuture<List<CodeLensData>> getCodeLenses(@NotNull PsiFile psiFile) {
         LSPCodeLensSupport codeLensSupport = LSPFileSupport.getSupport(psiFile).getCodeLensSupport();
         var params = new CodeLensParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
@@ -281,11 +254,4 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         return List.of(new CodeVisionRelativeOrdering.CodeVisionRelativeOrderingBefore("lsp"));
     }
 
-    static String getCodeLensContent(CodeLens codeLens) {
-        Command command = codeLens.getCommand();
-        if (command == null || command.getTitle().isEmpty()) {
-            return null;
-        }
-        return command.getTitle();
-    }
 }

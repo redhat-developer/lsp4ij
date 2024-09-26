@@ -56,7 +56,7 @@ public class LspSnippetIndentOptions {
      *
      * @param text the text to format according to the LSP client settings.
      *
-     * @return the result of '\n' and '\t' replacement declared in the snippets according to the LSP client settings.
+     * @return the response of '\n' and '\t' replacement declared in the snippets according to the LSP client settings.
      */
     protected String formatText(String text) {
         if (!shouldBeFormatted(text)) {

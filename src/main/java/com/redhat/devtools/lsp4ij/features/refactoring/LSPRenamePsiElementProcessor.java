@@ -72,7 +72,9 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
         CancellationSupport cancellationSupport = new CancellationSupport();
         var willRenameFilesFuture =
                 LanguageServiceAccessor.getInstance(project)
-                        .getLanguageServers(file.getVirtualFile(), LanguageServerItem::isWillRenameFilesSupported)
+                        .getLanguageServers(file.getVirtualFile(),
+                                null,
+                                f -> f.getRenameFeature().isWillRenameFilesSupported(file))
                         .thenComposeAsync(languageServerItems -> {
 
                             if (languageServerItems.isEmpty()) {

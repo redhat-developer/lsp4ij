@@ -10,10 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.formatting;
 
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import org.eclipse.lsp4j.ServerCapabilities;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 
@@ -30,7 +29,8 @@ public class LSPFormattingAndRangeBothService extends AbstractLSPFormattingServi
     }
 
     @Override
-    protected boolean canSupportFormatting(@Nullable ServerCapabilities serverCapabilities) {
-        return LanguageServerItem.isDocumentRangeFormattingSupported(serverCapabilities);
+    protected boolean canSupportFormatting(LSPFormattingFeature formattingFeature, PsiFile file) {
+        return formattingFeature.isDocumentRangeFormattingSupported(file);
     }
+
 }

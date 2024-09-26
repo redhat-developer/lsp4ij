@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.internal.ClientCapabilitiesFactory;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -107,6 +108,8 @@ public class LanguageServerWrapper implements Disposable {
     private final LSPFileListener fileListener = new LSPFileListener(this);
 
     private FileOperationsManager fileOperationsManager;
+
+    private LSPClientFeatures clientFeatures;
 
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
@@ -226,7 +229,7 @@ public class LanguageServerWrapper implements Disposable {
 
                         // Add error log
                         provider.addLogErrorHandler(error -> {
-                            ServerMessageHandler.logMessage(this, new MessageParams(MessageType.Error, error));
+                            ServerMessageHandler.logMessage(this.getServerDefinition(), new MessageParams(MessageType.Error, error), getProject());
                         });
 
                         // Starting process...
@@ -408,6 +411,9 @@ public class LanguageServerWrapper implements Disposable {
         this.disposed = true;
         stop();
         stopDispatcher();
+        if (clientFeatures != null) {
+            clientFeatures.dispose();
+        }
     }
 
     public boolean isDisposed() {
@@ -708,7 +714,7 @@ public class LanguageServerWrapper implements Disposable {
             synchronizer.getDocument().removeDocumentListener(synchronizer);
             synchronizer.documentClosed();
         }
-        if (stopIfNoOpenedFiles && this.connectedDocuments.isEmpty()) {
+        if (!getClientFeatures().keepServerAlive() && stopIfNoOpenedFiles && this.connectedDocuments.isEmpty()) {
             if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
                 removeStopTimer(true);
                 startStopTimer();
@@ -761,6 +767,10 @@ public class LanguageServerWrapper implements Disposable {
         } else {
             return languageServerFuture.join();
         }
+    }
+
+    public LanguageServer getLanguageServer() {
+        return languageServer;
     }
 
     /**
@@ -1133,7 +1143,7 @@ public class LanguageServerWrapper implements Disposable {
      * @param file the file.
      * @return true if the given file support the 'workspace/didRenameFiles' and false otherwise.
      */
-    public boolean isDidRenameFilesSupported(PsiFile file) {
+    public boolean isDidRenameFilesSupported(@NotNull PsiFile file) {
         if (fileOperationsManager == null) {
             return false;
         }
@@ -1173,5 +1183,21 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         return triggerCharacters.contains(charTyped);
+    }
+
+    public LSPClientFeatures getClientFeatures() {
+        if (clientFeatures == null) {
+            clientFeatures = getOrCreateClientFeatures();
+        }
+        return clientFeatures;
+    }
+
+    private synchronized LSPClientFeatures getOrCreateClientFeatures() {
+        if  (clientFeatures != null) {
+            return clientFeatures;
+        }
+        LSPClientFeatures clientFeatures = getServerDefinition().createClientFeatures();
+        clientFeatures.setServerWrapper(this);
+        return clientFeatures;
     }
 }

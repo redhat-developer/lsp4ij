@@ -28,7 +28,7 @@ import java.awt.event.InputEvent;
  */
 public class LSPCommandContext {
 
-    public static enum ExecutedBy {
+    public enum ExecutedBy {
         CODE_LENS,
         INLAY_HINT,
         CODE_ACTION,
@@ -53,6 +53,8 @@ public class LSPCommandContext {
     private InputEvent inputEvent;
     @Nullable
     private LanguageServerItem preferredLanguageServer;
+    @Nullable
+    private String preferredLanguageServerId;
 
     public LSPCommandContext(@NotNull Command command,
                              @NotNull PsiFile psiFile,
@@ -95,6 +97,15 @@ public class LSPCommandContext {
 
     public LSPCommandContext setPreferredLanguageServer(LanguageServerItem preferredLanguageServer) {
         this.preferredLanguageServer = preferredLanguageServer;
+        return this;
+    }
+
+    public @Nullable String getPreferredLanguageServerId() {
+        return preferredLanguageServerId;
+    }
+
+    public LSPCommandContext setPreferredLanguageServerId(@Nullable String preferredLanguageServerId) {
+        this.preferredLanguageServerId = preferredLanguageServerId;
         return this;
     }
 

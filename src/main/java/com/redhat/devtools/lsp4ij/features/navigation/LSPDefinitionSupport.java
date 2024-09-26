@@ -10,12 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.navigation;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -53,15 +50,15 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
     @Override
     protected CompletableFuture<List<Location>> doLoad(LSPDefinitionParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return collectDefinitions(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return collectDefinitions(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectDefinitions(@NotNull VirtualFile file,
-                                                                                 @NotNull Project project,
+    private static @NotNull CompletableFuture<List<Location>> collectDefinitions(@NotNull PsiFile psiFile,
                                                                                  @NotNull LSPDefinitionParams params,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isDefinitionSupported)
+        return getLanguageServers(psiFile,
+                f -> f.getDefinitionFeature().isEnabled(psiFile),
+                f -> f.getDefinitionFeature().isSupported(psiFile))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have definition capability

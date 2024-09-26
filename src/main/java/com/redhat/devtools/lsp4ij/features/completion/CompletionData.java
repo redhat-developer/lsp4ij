@@ -21,8 +21,8 @@ import java.util.List;
 /**
  * LSP completion data.
  *
- * @param completion               the LSP completion result
- * @param languageServer         the language server which has created the completion result.
+ * @param completion               the LSP completion response
+ * @param languageServer         the language server which has created the completion response.
  */
 record CompletionData(@NotNull Either<List<CompletionItem>, CompletionList> completion,
                       @NotNull LanguageServerItem languageServer) {

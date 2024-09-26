@@ -169,7 +169,7 @@ public class TracingMessageConsumer {
             result.append("Result: ");
             result.append(resultJson);
         } else {
-            result.append("No result returned.");
+            result.append("No response returned.");
         }
         if (errorJson != null && !"null".equals(errorJson)) {
             result.append("\nError: ");

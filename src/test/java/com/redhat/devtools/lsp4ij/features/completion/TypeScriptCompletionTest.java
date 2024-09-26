@@ -23,7 +23,7 @@ public class TypeScriptCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithTextEdit() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.ts",
                 "''.<caret>", """                
                         {
