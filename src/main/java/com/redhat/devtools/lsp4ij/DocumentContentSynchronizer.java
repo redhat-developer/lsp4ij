@@ -29,12 +29,15 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Synchronize IntelliJ document (open, content changed, close, save)
  * with LSP notifications (didOpen, didChanged, didClose, didSave).
  */
 public class DocumentContentSynchronizer implements DocumentListener {
+
+    private static final long WAIT_AFTER_SENDING_DID_OPEN = 500L;
 
     private final @NotNull LanguageServerWrapper languageServerWrapper;
     private final @NotNull Document document;
@@ -43,9 +46,7 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
     private int version = 0;
     private final List<TextDocumentContentChangeEvent> changeEvents;
-    @NotNull
-    final CompletableFuture<Void> didOpenFuture;
-    private final Object lock = new Object();
+    @NotNull final CompletableFuture<Void> didOpenFuture;
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull URI fileUri,
@@ -68,21 +69,21 @@ public class DocumentContentSynchronizer implements DocumentListener {
                 .getInitializedServer()
                 .thenAcceptAsync(ls -> ls.getTextDocumentService()
                         .didOpen(new DidOpenTextDocumentParams(textDocument)))
-                .thenRun(() -> {
-                    if (ApplicationManager.getApplication().isUnitTestMode()) {
-                        return;
-                    }
-                    // Wait for 500 ms after to send the didOpen notification
-                    // to be sure that the notification has been sent before
-                    // consuming other LSP request like 'textDocument/codeLens'.
-                    synchronized (lock) {
-                        try {
-                            lock.wait(500);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                });
+                .thenCompose(result ->
+                        CompletableFuture.runAsync(() -> {
+                            if (ApplicationManager.getApplication().isUnitTestMode()) {
+                                return;
+                            }
+                            try {
+                                // Wait 500ms after sending didOpen notification
+                                // to be sure that the notification has been sent before
+                                // consuming other LSP request like 'textDocument/codeLens'.
+                                TimeUnit.MILLISECONDS.sleep(WAIT_AFTER_SENDING_DID_OPEN);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                        })
+                );
 
         // Initialize LSP change events
         changeEvents = new ArrayList<>();

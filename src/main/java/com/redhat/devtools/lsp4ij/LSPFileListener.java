@@ -44,7 +44,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
 
     @Override
     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
-        if (languageServerWrapper.initialProject != null && !Objects.equals(source.getProject(), languageServerWrapper.initialProject)) {
+        if (!Objects.equals(source.getProject(), languageServerWrapper.getProject())) {
             // The file has been closed from another project,don't send textDocument/didClose
             return;
         }
