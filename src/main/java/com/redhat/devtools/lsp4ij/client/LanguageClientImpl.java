@@ -218,12 +218,16 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      * must return an instance of {@link JsonObject} but this method can be overridden to return another structure.
      * </p>
      *
-     * @param section the section.
-     * @return the settings retrieved by the given section and null otherwise.
+     * @param section the section. In the base implementation, a null section indicates a request for the entire
+     *                settings object.
+     * @return the settings retrieved by a valid section and null otherwise.
      */
     protected Object findSettings(String section) {
         var config = createSettings();
         if (config instanceof JsonObject json) {
+            if (section == null) {
+                return config;
+            }
             String[] sections = section.split("[.]");
             return findSettings(sections, json);
         }
