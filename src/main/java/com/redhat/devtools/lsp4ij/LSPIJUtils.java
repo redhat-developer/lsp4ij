@@ -1138,11 +1138,11 @@ public class LSPIJUtils {
     }
 
     /**
-     * Apply text edits by using the given document without updating and returns the result of the apply text edits.
+     * Apply text edits by using the given document without updating and returns the response of the apply text edits.
      *
      * @param document the document used to apply text edits without updating it.
      * @param edits    the text edit list to apply to the given document.
-     * @return the result of the apply text edits.
+     * @return the response of the apply text edits.
      */
     public static String applyEdits(@NotNull Document document,
                                     @NotNull List<? extends TextEdit> edits) {

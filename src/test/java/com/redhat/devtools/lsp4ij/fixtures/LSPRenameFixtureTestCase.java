@@ -160,7 +160,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
                     throw new ResponseErrorException(error);
                 });
             } else {
-                // Prepare rename result
+                // Prepare rename response
                 Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior> prepareRenameResponse = getPrepareRenameResponse(jsonPrepareRenameResponse);
                 MockLanguageServer.INSTANCE.setPrepareRenameProcessor(params -> prepareRenameResponse);
             }
@@ -192,7 +192,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
             // we wait for some ms.
             try {
                 LanguageServiceAccessor.getInstance(file.getProject())
-                        .getLanguageServers(file.getVirtualFile(), null)
+                        .getLanguageServers(file.getVirtualFile(), null, null)
                         .get(5000, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
                 e.printStackTrace();

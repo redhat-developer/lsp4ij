@@ -10,12 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentLink;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -48,16 +45,15 @@ public class LSPDocumentLinkSupport extends AbstractLSPDocumentFeatureSupport<Do
     protected CompletableFuture<List<DocumentLinkData>> doLoad(@NotNull DocumentLinkParams params,
                                                                @NotNull CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getDocumentLinks(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getDocumentLinks(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<DocumentLinkData>> getDocumentLinks(@NotNull VirtualFile file,
-                                                                                       @NotNull Project project,
+    private static @NotNull CompletableFuture<List<DocumentLinkData>> getDocumentLinks(@NotNull PsiFile file,
                                                                                        @NotNull DocumentLinkParams params,
                                                                                        @NotNull CancellationSupport cancellationSupport) {
-
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isDocumentLinkSupported)
+        return getLanguageServers(file,
+                f -> f.getDocumentLinkFeature().isEnabled(file),
+                f -> f.getDocumentLinkFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have document link capability
@@ -77,8 +73,8 @@ public class LSPDocumentLinkSupport extends AbstractLSPDocumentFeatureSupport<Do
     }
 
     private static CompletableFuture<List<DocumentLinkData>> getDocumentLinksFor(@NotNull DocumentLinkParams params,
-                                                                          @NotNull LanguageServerItem languageServer,
-                                                                          @NotNull CancellationSupport cancellationSupport) {
+                                                                                 @NotNull LanguageServerItem languageServer,
+                                                                                 @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .documentLink(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_LINK)

@@ -10,12 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -28,8 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-
-import static com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider.getCodeLensContent;
 
 /**
  * LSP codeLens support which loads and caches code lenses by consuming:
@@ -52,16 +47,16 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
     @Override
     protected CompletableFuture<List<CodeLensData>> doLoad(CodeLensParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getCodeLenses(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getCodeLenses(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<CodeLensData>> getCodeLenses(@NotNull VirtualFile file,
-                                                                                @NotNull Project project,
+    private static @NotNull CompletableFuture<List<CodeLensData>> getCodeLenses(@NotNull PsiFile file,
                                                                                 @NotNull CodeLensParams params,
                                                                                 @NotNull CancellationSupport cancellationSupport) {
 
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isCodeLensSupported)
+        return getLanguageServers(file,
+                        f -> f.getCodeLensFeature().isEnabled(file),
+                        f -> f.getCodeLensFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have code lens capability
@@ -107,7 +102,8 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                                             .getTextDocumentService()
                                             .resolveCodeLens(codeLens), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RESOLVE_CODE_LENS);
                                 }
-                                if (getCodeLensContent(codeLens) != null || resolvedCodeLensFuture != null) {
+                                var codeLensFeature = languageServer.getClientFeatures().getCodeLensFeature();
+                                if (codeLensFeature.getText(codeLens) != null || resolvedCodeLensFuture != null) {
                                     // The codelens content is filled or the codelens must be resolved
                                     data.add(new CodeLensData(codeLens, languageServer, resolvedCodeLensFuture));
                                 }

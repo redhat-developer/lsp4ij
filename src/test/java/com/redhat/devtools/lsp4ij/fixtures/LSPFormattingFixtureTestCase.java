@@ -47,7 +47,7 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
      *
      * @param fileName       the file name used to match registered language servers.
      * @param text           the editor content text.
-     * @param formattingTextEdits the formatting TextEdit result of language server.
+     * @param formattingTextEdits the formatting TextEdit response of language server.
      * @param formattedText  the expected formatted text.
      */
     protected void assertFormatting(@NotNull String fileName,
@@ -62,7 +62,7 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
         // to avoid having some block when ReadAction#compute is required (ex: call of LSP4IJUtils#getDocument).
         try {
             LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file.getVirtualFile(), null)
+                    .getLanguageServers(file.getVirtualFile(), null, null)
                     .get(5000, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             e.printStackTrace();

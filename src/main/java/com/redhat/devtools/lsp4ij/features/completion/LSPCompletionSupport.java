@@ -10,12 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.completion;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -37,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
 public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPCompletionParams, List<CompletionData>> {
 
     private Integer previousOffset;
+
     public LSPCompletionSupport(@NotNull PsiFile file) {
         super(file);
     }
@@ -54,16 +52,16 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
     protected CompletableFuture<List<CompletionData>> doLoad(@NotNull LSPCompletionParams params,
                                                              @NotNull CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getCompletions(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getCompletions(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<CompletionData>> getCompletions(@NotNull VirtualFile file,
-                                                                              @NotNull Project project,
-                                                                              @NotNull LSPCompletionParams params,
-                                                                              @NotNull CancellationSupport cancellationSupport) {
+    private static @NotNull CompletableFuture<List<CompletionData>> getCompletions(@NotNull PsiFile file,
+                                                                                   @NotNull LSPCompletionParams params,
+                                                                                   @NotNull CancellationSupport cancellationSupport) {
 
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isCompletionSupported)
+        return getLanguageServers(file,
+                f -> f.getCompletionFeature().isEnabled(file),
+                f -> f.getCompletionFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have completion capability
@@ -74,7 +72,7 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
                     // Collect list of textDocument/completion future for each language servers
                     List<CompletableFuture<List<CompletionData>>> completionPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getCompletionsFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getCompletionsFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/completion future in one future which return the list of completion items
@@ -83,10 +81,11 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
     }
 
     private static CompletableFuture<List<CompletionData>> getCompletionsFor(@NotNull LSPCompletionParams params,
-                                                                        @NotNull LanguageServerItem languageServer,
-                                                                        @NotNull CancellationSupport cancellationSupport) {
+                                                                             @NotNull PsiFile file,
+                                                                             @NotNull LanguageServerItem languageServer,
+                                                                             @NotNull CancellationSupport cancellationSupport) {
 
-        params.setContext(createCompletionContext(params, languageServer));
+        params.setContext(createCompletionContext(params, file, languageServer));
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .completion(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COMPLETION)
@@ -99,10 +98,10 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
                 });
     }
 
-    private static CompletionContext createCompletionContext(LSPCompletionParams params, LanguageServerItem languageServer) {
+    private static CompletionContext createCompletionContext(LSPCompletionParams params, @NotNull PsiFile file, LanguageServerItem languageServer) {
         String completionChar = params.getCompletionChar();
         if (params.isAutoPopup() &&
-                languageServer.getServerWrapper().isCompletionTriggerCharactersSupported(completionChar)) {
+                languageServer.getClientFeatures().getCompletionFeature().isCompletionTriggerCharactersSupported(file, completionChar)) {
             return new CompletionContext(CompletionTriggerKind.TriggerCharacter, completionChar);
         }
         return new CompletionContext(CompletionTriggerKind.Invoked);

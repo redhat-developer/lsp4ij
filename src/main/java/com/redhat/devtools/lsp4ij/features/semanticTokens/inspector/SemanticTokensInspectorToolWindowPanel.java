@@ -32,7 +32,7 @@ import java.awt.*;
  *
  * <ul>
  *     <li>on the left some configuration to show TextAttributeKey, toke,type, token modifier in the editor view which shows
- *     the tokenization of the result of the semantic tokens.</li>
+ *     the tokenization of the response of the semantic tokens.</li>
  *     <li>tabs which contains a tab per file which hosts the editor content.</li>
  * </ul>
  */
@@ -74,7 +74,7 @@ public class SemanticTokensInspectorToolWindowPanel extends SimpleToolWindowPane
             ApplicationManager.getApplication()
                     .executeOnPooledThread(() -> {
                         // The file has been updated with new LSP semantic tokens
-                        // show the tokenization result in the editor
+                        // show the tokenization response in the editor
                         show(data);
                     });
         };

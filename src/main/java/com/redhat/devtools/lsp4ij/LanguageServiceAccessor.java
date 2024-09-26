@@ -21,21 +21,19 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
-import org.eclipse.lsp4j.ServerCapabilities;
-import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Language server accessor.
@@ -44,6 +42,7 @@ import java.util.stream.Collectors;
  * <p>
  * If adopters need to collect some language servers, LSP4IJ must provide an API for that.
  */
+@ApiStatus.Internal
 public class LanguageServiceAccessor implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
 
@@ -63,11 +62,11 @@ public class LanguageServiceAccessor implements Disposable {
             List<LanguageServerWrapper> serversToDispose = startedServers
                     .stream()
                     .filter(server -> event.serverDefinitions.contains(server.getServerDefinition()))
-                    .collect(Collectors.toList());
+                    .toList();
             serversToDispose.forEach(LanguageServerWrapper::dispose);
             // Remove all servers which are removed from the cache
             synchronized (startedServers) {
-                startedServers.removeAll(serversToDispose);
+                serversToDispose.forEach(startedServers::remove);
             }
         }
 
@@ -81,7 +80,7 @@ public class LanguageServiceAccessor implements Disposable {
                 List<LanguageServerWrapper> serversToRestart = startedServers
                         .stream()
                         .filter(server -> event.serverDefinition.equals(server.getServerDefinition()))
-                        .collect(Collectors.toList());
+                        .toList();
                 serversToRestart.forEach(LanguageServerWrapper::restart);
             }
         }
@@ -123,7 +122,7 @@ public class LanguageServiceAccessor implements Disposable {
         if (forceStart) {
             // The language server must be started even if there is no open file corresponding to it.
             LinkedHashSet<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
-            collectLanguageServersFromDefinition(null, project, Set.of(definition), matchedServers);
+            collectLanguageServersFromDefinition(null, Set.of(definition), matchedServers, null);
             for (var ls : matchedServers) {
                 ls.restart();
             }
@@ -144,7 +143,7 @@ public class LanguageServiceAccessor implements Disposable {
      */
     private void findAndStartLsForFile(@NotNull VirtualFile file,
                                        @NotNull LanguageServerDefinition definition) {
-        getLanguageServers(file, null, definition);
+        getLanguageServers(file, null, null, definition);
     }
 
     /**
@@ -154,7 +153,6 @@ public class LanguageServiceAccessor implements Disposable {
      * @param filter the filter.
      * @return true if the given file matches one of started language server with the given filter and false otherwise.
      */
-    @NotNull
     public boolean hasAny(@NotNull VirtualFile file,
                           @NotNull Predicate<LanguageServerWrapper> filter) {
         var startedServers = getStartedServers();
@@ -176,22 +174,56 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     @NotNull
-    public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
-                                                                          @Nullable Predicate<ServerCapabilities> filter) {
-        return getLanguageServers(file, filter, null);
+    public CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+                                                                                   @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
+        Set<LanguageServerDefinition> serverDefinitions = new HashSet<>(LanguageServersRegistry.getInstance().getServerDefinitions());
+        return getLanguageServers(serverDefinitions, beforeStartingServerFilter, afterStartingServerFilter);
     }
 
     @NotNull
-    public CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
-                                                                          @Nullable Predicate<ServerCapabilities> filter,
-                                                                          @Nullable LanguageServerDefinition matchServerDefinition) {
-        URI uri = LSPIJUtils.toUri(file);
-        if (uri == null) {
+    CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull Set<LanguageServerDefinition> serverDefinitions,
+                                                                            @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+                                                                            @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
+        Set<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
+        collectLanguageServersFromDefinition(null, serverDefinitions, matchedServers, beforeStartingServerFilter);
+        final List<LanguageServerItem> servers = Collections.synchronizedList(new ArrayList<>());
+        try {
+            return CompletableFuture.allOf(matchedServers
+                            .stream()
+                            .filter(LanguageServerWrapper::isEnabled)
+                            .map(wrapper ->
+                                    wrapper.getInitializedServer()
+                                            .thenComposeAsync(server -> {
+                                                if (server != null &&
+                                                        (afterStartingServerFilter == null || afterStartingServerFilter.test(wrapper.getClientFeatures()))) {
+                                                    servers.add(new LanguageServerItem(server, wrapper));
+                                                }
+                                                return CompletableFuture.completedFuture(null);
+                                            }))
+                            .toArray(CompletableFuture[]::new))
+                    .thenApply(theVoid -> servers);
+        } catch (ProcessCanceledException cancellation) {
+            throw cancellation;
+        } catch (Exception e) {
+            LOGGER.warn(e.getLocalizedMessage(), e);
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
+    }
 
+    @NotNull
+    public CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
+                                                                                   @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+                                                                                   @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
+        return getLanguageServers(file, beforeStartingServerFilter, afterStartingServerFilter, null);
+    }
+
+    @NotNull
+    private CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
+                                                                                    @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+                                                                                    @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
+                                                                                    @Nullable LanguageServerDefinition matchServerDefinition) {
         // Collect started (or not) language servers which matches the given file.
-        CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(file, matchServerDefinition);
+        CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(file, matchServerDefinition, beforeStartingServerFilter);
         if (matchedServers.isDone() && matchedServers.getNow(Collections.emptyList()).isEmpty()) {
             // None language servers matches the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -209,12 +241,12 @@ public class LanguageServiceAccessor implements Disposable {
             return matchedServers
                     .thenComposeAsync(result -> CompletableFuture.allOf(result
                             .stream()
+                            .filter(LanguageServerWrapper::isEnabled)
                             .map(wrapper ->
                                     wrapper.getInitializedServer()
                                             .thenComposeAsync(server -> {
                                                 if (server != null &&
-                                                        wrapper.isEnabled() &&
-                                                        (filter == null || filter.test(wrapper.getServerCapabilities()))) {
+                                                        (afterStartingServerFilter == null || afterStartingServerFilter.test(wrapper.getClientFeatures()))) {
                                                     return wrapper.connect(file, document);
                                                 }
                                                 return CompletableFuture.completedFuture(null);
@@ -249,14 +281,15 @@ public class LanguageServiceAccessor implements Disposable {
     @NotNull
     private CompletableFuture<Collection<LanguageServerWrapper>> getMatchedLanguageServersWrappers(
             @NotNull VirtualFile file,
-            @Nullable LanguageServerDefinition matchServerDefinition) {
+            @Nullable LanguageServerDefinition matchServerDefinition,
+            @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project, false);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             // There are no mapping for the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
 
-        LinkedHashSet<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
+        Set<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
 
         // Collect sync server definitions
         var serverDefinitions = mappings.getMatched();
@@ -264,9 +297,9 @@ public class LanguageServiceAccessor implements Disposable {
             if (!serverDefinitions.contains(matchServerDefinition)) {
                 return CompletableFuture.completedFuture(Collections.emptyList());
             }
-            collectLanguageServersFromDefinition(file, project, Set.of(matchServerDefinition), matchedServers);
+            collectLanguageServersFromDefinition(file, Set.of(matchServerDefinition), matchedServers, beforeStartingServerFilter);
         } else {
-            collectLanguageServersFromDefinition(file, project, serverDefinitions, matchedServers);
+            collectLanguageServersFromDefinition(file, serverDefinitions, matchedServers, beforeStartingServerFilter);
         }
 
         CompletableFuture<Set<LanguageServerDefinition>> async = mappings.getAsyncMatched();
@@ -274,7 +307,7 @@ public class LanguageServiceAccessor implements Disposable {
             // Collect async server definitions
             return async
                     .thenApply(asyncServerDefinitions -> {
-                        collectLanguageServersFromDefinition(file, project, asyncServerDefinitions, matchedServers);
+                        collectLanguageServersFromDefinition(file, asyncServerDefinitions, matchedServers, beforeStartingServerFilter);
                         return matchedServers;
                     });
         }
@@ -284,19 +317,23 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Get or create a language server wrapper for the given server definitions and add then to the given  matched servers.
      *
-     * @param file              the file.
-     * @param fileProject       the file project.
-     * @param serverDefinitions the server definitions.
-     * @param matchedServers    the list to update with get/created language server.
+     * @param file                       the file.
+     * @param serverDefinitions          the server definitions.
+     * @param matchedServers             the list to update with get/created language server.
+     * @param beforeStartingServerFilter
      */
-    private void collectLanguageServersFromDefinition(@Nullable VirtualFile file, @NotNull Project fileProject, @NotNull Set<LanguageServerDefinition> serverDefinitions, @NotNull Set<LanguageServerWrapper> matchedServers) {
+    private void collectLanguageServersFromDefinition(@Nullable VirtualFile file,
+                                                      @NotNull Set<LanguageServerDefinition> serverDefinitions,
+                                                      @NotNull Set<LanguageServerWrapper> matchedServers,
+                                                      @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         synchronized (startedServers) {
             for (var serverDefinition : serverDefinitions) {
                 boolean useExistingServer = false;
                 // Loop for started language servers
                 for (var startedServer : startedServers) {
                     if (startedServer.getServerDefinition().equals(serverDefinition)
-                            && (file == null || startedServer.canOperate(file))) {
+                            && (file == null || startedServer.canOperate(file))
+                            && (beforeStartingServerFilter == null || beforeStartingServerFilter.test(startedServer.getClientFeatures()))) {
                         // A started language server match the file, use it
                         matchedServers.add(startedServer);
                         useExistingServer = true;
@@ -305,9 +342,11 @@ public class LanguageServiceAccessor implements Disposable {
                 }
                 if (!useExistingServer) {
                     // There are none started servers which matches the file, create and add it.
-                    LanguageServerWrapper wrapper = new LanguageServerWrapper(fileProject, serverDefinition);
-                    startedServers.add(wrapper);
-                    matchedServers.add(wrapper);
+                    LanguageServerWrapper wrapper = new LanguageServerWrapper(project, serverDefinition);
+                    if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(wrapper.getClientFeatures())) {
+                        startedServers.add(wrapper);
+                        matchedServers.add(wrapper);
+                    }
                 }
             }
         }
@@ -356,9 +395,9 @@ public class LanguageServiceAccessor implements Disposable {
      * @param ignoreMatch true if {@link DocumentMatcher} must be ignored when mapping matches the given file and false otherwise.
      * @return the matched language server definitions for the given file.
      */
-    public MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull VirtualFile file,
-                                                                                @NotNull Project fileProject,
-                                                                                boolean ignoreMatch) {
+    private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull VirtualFile file,
+                                                                                 @NotNull Project fileProject,
+                                                                                 boolean ignoreMatch) {
 
         Set<LanguageServerDefinition> syncMatchedDefinitions = null;
         Set<LanguageServerFileAssociation> asyncMatchedDefinitions = null;
@@ -371,9 +410,7 @@ public class LanguageServiceAccessor implements Disposable {
             languages.add(language);
         }
         FileType fileType = file.getFileType();
-        if (fileType != null) {
-            languages.add(fileType);
-        }
+        languages.add(fileType);
 
         while (!languages.isEmpty()) {
             Object contentType = languages.poll();
@@ -429,16 +466,14 @@ public class LanguageServiceAccessor implements Disposable {
                 final Set<LanguageServerDefinition> serverDefinitions = Collections.synchronizedSet(new HashSet<>());
                 async = CompletableFuture.allOf(asyncMatchedDefinitions
                                 .stream()
-                                .map(mapping -> {
-                                            return mapping
-                                                    .matchAsync(file, fileProject)
-                                                    .thenApply(result -> {
-                                                        if (result) {
-                                                            serverDefinitions.add(mapping.getServerDefinition());
-                                                        }
-                                                        return null;
-                                                    });
-                                        }
+                                .map(mapping -> mapping
+                                        .matchAsync(file, fileProject)
+                                        .thenApply(result -> {
+                                            if (result) {
+                                                serverDefinitions.add(mapping.getServerDefinition());
+                                            }
+                                            return null;
+                                        })
                                 )
                                 .toArray(CompletableFuture[]::new))
                         .thenApply(theVoid -> serverDefinitions);
@@ -454,48 +489,6 @@ public class LanguageServiceAccessor implements Disposable {
             return ReadAction.compute(() -> mapping.match(file, fileProject));
         }
         return mapping.match(file, fileProject);
-    }
-
-
-    /**
-     * Gets list of running LS satisfying a capability predicate. This does not
-     * start any matching language servers, it returns the already running ones.
-     *
-     * @param request
-     * @return list of Language Servers
-     */
-    @NotNull
-    public List<LanguageServer> getActiveLanguageServers(Predicate<ServerCapabilities> request) {
-        return getLanguageServers(null, request, true);
-    }
-
-    /**
-     * Gets list of LS initialized for given project
-     *
-     * @param onlyActiveLS true if this method should return only the already running
-     *                     language servers, otherwise previously started language servers
-     *                     will be re-activated
-     * @return list of Language Servers
-     */
-    @NotNull
-    public List<LanguageServer> getLanguageServers(@Nullable Project project,
-                                                   Predicate<ServerCapabilities> request, boolean onlyActiveLS) {
-        List<LanguageServer> serverInfos = new ArrayList<>();
-        for (LanguageServerWrapper wrapper : startedServers) {
-            if ((!onlyActiveLS || wrapper.isActive()) && (project == null || wrapper.canOperate(project))) {
-                @Nullable
-                LanguageServer server = wrapper.getServer();
-                if (server == null) {
-                    continue;
-                }
-                if (request == null
-                        || wrapper.getServerCapabilities() == null /* null check is workaround for https://github.com/TypeFox/ls-api/issues/47 */
-                        || request.test(wrapper.getServerCapabilities())) {
-                    serverInfos.add(server);
-                }
-            }
-        }
-        return serverInfos;
     }
 
     @Override

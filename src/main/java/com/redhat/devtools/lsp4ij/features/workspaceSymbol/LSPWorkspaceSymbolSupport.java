@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPWorkspaceFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -26,12 +25,10 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
- * LSP workspace symbol support which loads and caches symbol result by consuming:
+ * LSP workspace symbol support which loads and caches symbol response by consuming:
  *
  * <ul>
  *     <li>LSP 'workspace/symbol' requests</li>
@@ -54,32 +51,27 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
     }
 
     private static @NotNull CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbol(@NotNull Project project,
-                                                                                          @NotNull WorkspaceSymbolParams params,
-                                                                                          @NotNull CancellationSupport cancellationSupport) {
+                                                                                            @NotNull WorkspaceSymbolParams params,
+                                                                                            @NotNull CancellationSupport cancellationSupport) {
+        return getLanguageServers(project,
+                        f -> f.getWorkspaceSymbolFeature().isEnabled(),
+                        f -> f.getWorkspaceSymbolFeature().isSupported())
+                .thenComposeAsync(languageServers -> {
+                    // Here languageServers is the list of language servers which have workspaceSymbol capability
+                    if (languageServers.isEmpty()) {
+                        return CompletableFuture.completedFuture(null);
+                    }
 
+                    // Collect list of workspace/symbol future for each language servers
+                    List<CompletableFuture<List<WorkspaceSymbolData>>> workspaceSymbolPerServerFutures = languageServers
+                            .stream()
+                            .map(languageServer -> getWorkspaceSymbolFor(params, languageServer, cancellationSupport, project))
+                            .filter(Objects::nonNull)
+                            .toList();
 
-        // TODO : support workspace symbol when language server is not started
-        Set<LanguageServerItem> languageServers =
-                LanguageServiceAccessor.getInstance(project).getStartedServers()
-                        .stream()
-                        .map(ls -> new LanguageServerItem(ls.getServer(), ls))
-                        .filter(LanguageServerItem::isWorkspaceSymbolSupported)
-                        .collect(Collectors.toSet());
-
-        // Here languageServers is the list of language servers which have workspace symbol capability
-        if (languageServers.isEmpty()) {
-            return CompletableFuture.completedFuture(null);
-        }
-
-        // Collect list of workspace/symbol future for each language servers
-        List<CompletableFuture<List<WorkspaceSymbolData>>> workspaceSymbolPerServerFutures = languageServers
-                .stream()
-                .map(languageServer -> getWorkspaceSymbolFor(params, languageServer, cancellationSupport, project))
-                .filter(Objects::nonNull)
-                .toList();
-
-        // Merge list of workspace/symbol future in one future which return the list of workspace symbol data
-        return CompletableFutures.mergeInOneFuture(workspaceSymbolPerServerFutures, cancellationSupport);
+                    // Merge list of workspace/symbol future in one future which return the list of workspace symbol data
+                    return CompletableFutures.mergeInOneFuture(workspaceSymbolPerServerFutures, cancellationSupport);
+                });
     }
 
     private static CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbolFor(@NotNull WorkspaceSymbolParams params,

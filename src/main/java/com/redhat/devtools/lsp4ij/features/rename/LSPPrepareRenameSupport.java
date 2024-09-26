@@ -10,13 +10,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.rename;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -60,16 +57,15 @@ public class LSPPrepareRenameSupport extends AbstractLSPDocumentFeatureSupport<L
     protected CompletableFuture<List<PrepareRenameResultData>> doLoad(@NotNull LSPPrepareRenameParams params,
                                                                       @NotNull CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getPrepareRenameResult(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getPrepareRenameResult(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<PrepareRenameResultData>> getPrepareRenameResult(@NotNull VirtualFile file,
-                                                                                                    @NotNull Project project,
+    private static @NotNull CompletableFuture<List<PrepareRenameResultData>> getPrepareRenameResult(@NotNull PsiFile file,
                                                                                                     @NotNull LSPPrepareRenameParams params,
                                                                                                     @NotNull CancellationSupport cancellationSupport) {
-
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isRenameSupported)
+        return getLanguageServers(file,
+                f -> f.getRenameFeature().isEnabled(file),
+                f -> f.getRenameFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have 'rename' support
@@ -106,7 +102,7 @@ public class LSPPrepareRenameSupport extends AbstractLSPDocumentFeatureSupport<L
                                                                                          @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                                 .getTextDocumentService()
-                                .prepareRename(params), languageServer.getServerWrapper(), LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME,
+                                .prepareRename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME,
                         false /* if prepare name throws an error, the error must not be displayed as notification but as hint in the editor  */)
                 .thenApplyAsync(prepareRename -> {
                     PrepareRenameResultData result = getPrepareRenameResultData(defaultPrepareRenameResultProvider, languageServer, prepareRename);

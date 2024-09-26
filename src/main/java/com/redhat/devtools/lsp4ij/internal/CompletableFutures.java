@@ -164,7 +164,7 @@ public class CompletableFutures {
                 } catch (Exception e) {
                     // Do nothing, error should be handled by the block code
                     // which consumes the future:
-                    // future.handler((result, error) -> ....
+                    // future.handler((response, error) -> ....
                 }
             }
         });

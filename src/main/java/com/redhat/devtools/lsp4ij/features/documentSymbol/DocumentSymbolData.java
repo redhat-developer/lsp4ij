@@ -14,8 +14,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.FakePsiElement;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.ui.IconMapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,57 +26,59 @@ import javax.swing.*;
 /**
  * LSP document symbol data.
  */
-class DocumentSymbolData extends FakePsiElement {
+public class DocumentSymbolData extends FakePsiElement {
 
     private static final DocumentSymbolData[] EMPTY_ARRAY = new DocumentSymbolData[0];
 
     private final @NotNull DocumentSymbol documentSymbol;
     private final @NotNull PsiFile psiFile;
     private final DocumentSymbolData parent;
+    private final @NotNull LanguageServerItem languageServer;
     private DocumentSymbolData[] cachedChildren;
 
     public DocumentSymbolData(@NotNull DocumentSymbol documentSymbol,
-                              @NotNull PsiFile psiFile) {
-        this(documentSymbol, psiFile,null);
+                              @NotNull PsiFile psiFile,
+                              @NotNull LanguageServerItem languageServer) {
+        this(documentSymbol, psiFile, languageServer, null);
     }
 
     public DocumentSymbolData(@NotNull DocumentSymbol documentSymbol,
                               @NotNull PsiFile psiFile,
+                              @NotNull LanguageServerItem languageServer,
                               @Nullable DocumentSymbolData parent) {
         this.documentSymbol = documentSymbol;
         this.psiFile = psiFile;
+        this.languageServer = languageServer;
         this.parent = parent;
     }
 
-    private @NotNull DocumentSymbol getDocumentSymbol() {
+    public @NotNull DocumentSymbol getDocumentSymbol() {
         return documentSymbol;
     }
 
     @Override
     public @Nullable String getPresentableText() {
-        return documentSymbol.getName();
+        return getClientFeatures().getDocumentSymbolFeature().getPresentableText(documentSymbol, psiFile);
     }
 
     @Override
     public @Nullable Icon getIcon(boolean unused) {
-        return IconMapper.getIcon(documentSymbol.getKind());
+        return getClientFeatures().getDocumentSymbolFeature().getIcon(documentSymbol, psiFile, unused);
     }
 
     @Override
     public @Nullable String getLocationString() {
-        return documentSymbol.getDetail();
+        return getClientFeatures().getDocumentSymbolFeature().getLocationString(documentSymbol, psiFile);
     }
 
     @Override
     public void navigate(boolean requestFocus) {
-        var selectionRange = getDocumentSymbol().getSelectionRange();
-        LSPIJUtils.openInEditor(psiFile.getVirtualFile(), selectionRange.getStart(), psiFile.getProject());
+        getClientFeatures().getDocumentSymbolFeature().navigate(documentSymbol, psiFile, requestFocus);
     }
 
     @Override
     public boolean canNavigate() {
-        var selectionRange = getDocumentSymbol().getSelectionRange();
-        return selectionRange != null && selectionRange.getStart() != null;
+        return getClientFeatures().getDocumentSymbolFeature().canNavigate(documentSymbol, psiFile);
     }
 
     @Override
@@ -92,10 +94,14 @@ class DocumentSymbolData extends FakePsiElement {
         }
         if (cachedChildren == null) {
             cachedChildren = children.stream()
-                    .map(child -> new DocumentSymbolData(child, psiFile, this))
+                    .map(child -> new DocumentSymbolData(child, psiFile,  languageServer,this))
                     .toArray(DocumentSymbolData[]::new);
         }
         return cachedChildren;
+    }
+
+    public @NotNull LSPClientFeatures getClientFeatures() {
+        return languageServer.getClientFeatures();
     }
 
     @Override

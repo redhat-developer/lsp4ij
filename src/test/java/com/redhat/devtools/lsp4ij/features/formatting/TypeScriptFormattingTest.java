@@ -23,7 +23,7 @@ public class TypeScriptFormattingTest extends LSPFormattingFixtureTestCase {
     }
 
     public void testFormatting() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertFormatting("test.ts",
                 """                
                            function foo() {

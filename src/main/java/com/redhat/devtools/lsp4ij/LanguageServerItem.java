@@ -10,14 +10,21 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.eclipse.lsp4j.services.WorkspaceService;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Item which stores the initialized LSP4j language server and the language server wrapper.
@@ -35,12 +42,36 @@ public class LanguageServerItem {
     }
 
     /**
-     * Returns the LSP4j language server.
+     * Returns the project.
      *
-     * @return the LSP4j language server.
+     * @return the project.
+     */
+    @NotNull
+    public Project getProject() {
+        return getServerWrapper().getProject();
+    }
+
+    /**
+     * Returns the LSP4J language server initialized when the LanguageServerItem was created.
+     * <p>
+     * Storing this instance is not recommended, as there's no guarantee the language server instance will still be alive in the long term.
+     * Thus, it is recommended to use {@link #getInitializedServer()} instead, which guarantees the server instance will be initialized at the time of that call.
+     * </p>
+     *
+     * @return the LSP4J language server initialized when the LanguageServerItem was created.
      */
     public LanguageServer getServer() {
         return server;
+    }
+
+    /**
+     * Returns the LSP4J language server, guaranteed to be initialized at that point.
+     *
+     * @return the LSP4J language server, guaranteed to be initialized at that point.
+     */
+    @NotNull
+    public CompletableFuture<LanguageServer> getInitializedServer() {
+        return getServerWrapper().getInitializedServer();
     }
 
     /**
@@ -48,8 +79,28 @@ public class LanguageServerItem {
      *
      * @return the language server wrapper.
      */
+    @ApiStatus.Internal
     public LanguageServerWrapper getServerWrapper() {
         return serverWrapper;
+    }
+
+    /**
+     * Returns the server definition.
+     *
+     * @return the server definition.
+     */
+    @NotNull
+    public LanguageServerDefinition getServerDefinition() {
+        return getServerWrapper().getServerDefinition();
+    }
+
+    /**
+     * Returns the LSP client features.
+     *
+     * @return the LSP client features.
+     */
+    public LSPClientFeatures getClientFeatures() {
+        return getServerWrapper().getClientFeatures();
     }
 
     /**
@@ -340,12 +391,12 @@ public class LanguageServerItem {
     }
 
     /**
-     * Returns true if the language server can support folding and false otherwise.
+     * Returns true if the language server can support folding range and false otherwise.
      *
      * @param serverCapabilities the server capabilities.
-     * @return true if the language server can support folding and false otherwise.
+     * @return true if the language server can support folding range and false otherwise.
      */
-    public static boolean isFoldingSupported(@Nullable ServerCapabilities serverCapabilities) {
+    public static boolean isFoldingRangeSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
                 hasCapability(serverCapabilities.getFoldingRangeProvider());
     }
@@ -479,7 +530,7 @@ public class LanguageServerItem {
         ExecuteCommandOptions provider = serverCapabilities.getExecuteCommandProvider();
         return provider != null && provider.getCommands().contains(command.getCommand());
     }
-    
+
     /**
      * Returns the LSP {@link TextDocumentService} of the language server.
      *
@@ -510,7 +561,7 @@ public class LanguageServerItem {
     }
 
     public SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
-        return getServerWrapper().getServerDefinition().getSemanticTokensColorsProvider();
+        return getClientFeatures().getSemanticTokensFeature();
     }
 
     /**
@@ -542,4 +593,13 @@ public class LanguageServerItem {
         return serverCapabilities != null &&
                 hasCapability(serverCapabilities.getWorkspaceSymbolProvider());
     }
+
+    public static boolean isUsageSupported(ServerCapabilities serverCapabilities) {
+        return LanguageServerItem.isDeclarationSupported(serverCapabilities) ||
+                LanguageServerItem.isTypeDefinitionSupported(serverCapabilities) ||
+                LanguageServerItem.isDefinitionSupported(serverCapabilities) ||
+                LanguageServerItem.isReferencesSupported(serverCapabilities) ||
+                LanguageServerItem.isImplementationSupported(serverCapabilities);
+    }
+
 }

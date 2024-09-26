@@ -23,7 +23,7 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithAdditionalTextEdits() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.go",
                 """
                         package src
@@ -164,7 +164,7 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithAdditionalTextEdits2() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.go",
                 """
                         package src
@@ -346,7 +346,7 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletionWithAdditionalTextEdits3() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.go",
                 """
                         package src

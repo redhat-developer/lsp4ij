@@ -32,21 +32,15 @@ import java.util.Map;
  */
 public class CompletionPrefix {
 
-    private final int completionOffset;
     private final Position completionPos;
     private final Document document;
 
     private final Map<Range, String /* prefix */> prefixCache;
 
     public CompletionPrefix(int completionOffset, Document document) {
-        this.completionOffset = completionOffset;
         this.document = document;
         this.completionPos = LSPIJUtils.toPosition(completionOffset, document);
         this.prefixCache = new HashMap<>();
-    }
-
-    public int getCompletionOffset() {
-        return completionOffset;
     }
 
     public Document getDocument() {

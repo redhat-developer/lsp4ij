@@ -23,7 +23,7 @@ public class QuteCompletionTest extends LSPCompletionFixtureTestCase {
     }
 
     public void testCompletion() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("test.html",
                 """
                         <ul>

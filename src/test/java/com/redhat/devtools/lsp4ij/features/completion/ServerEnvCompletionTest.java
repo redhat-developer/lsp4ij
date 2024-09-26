@@ -26,7 +26,7 @@ public class ServerEnvCompletionTest extends LSPCompletionFixtureTestCase {
     // ------------ Completion on property key
 
     public void testCaseInsensitive() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("server.env",
                 "w<caret>", """                
                         [

@@ -10,12 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentSymbol;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -30,7 +27,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * LSP document symbol support which loads and caches symbol result by consuming:
+ * LSP document symbol support which loads and caches symbol response by consuming:
  *
  * <ul>
  *     <li>LSP 'textDocument/documentSymbol' requests</li>
@@ -51,14 +48,12 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
         return getDocumentSymbols(file, documentSymbolParams, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<DocumentSymbolData>> getDocumentSymbols(@NotNull PsiFile psiFile,
+    private static @NotNull CompletableFuture<List<DocumentSymbolData>> getDocumentSymbols(@NotNull PsiFile file,
                                                                                            @NotNull DocumentSymbolParams params,
                                                                                            @NotNull CancellationSupport cancellationSupport) {
-
-        Project project = psiFile.getProject();
-        VirtualFile file = psiFile.getVirtualFile();
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isDocumentSymbolSupported)
+        return getLanguageServers(file,
+                f -> f.getDocumentSymbolFeature().isEnabled(file),
+                f -> f.getDocumentSymbolFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have document link capability
@@ -69,7 +64,7 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
                     // Collect list of textDocument/documentSymbol future for each language servers
                     List<CompletableFuture<List<DocumentSymbolData>>> documentSymbolInformationPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getDocumentSymbolsFor(params, languageServer, psiFile, cancellationSupport))
+                            .map(languageServer -> getDocumentSymbolsFor(params, languageServer, file, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/documentSymbol future in one future which return the list of document link
@@ -92,12 +87,11 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
                     return documentSymbol.stream()
                             .filter(Objects::nonNull)
                             .map(symbol -> {
-                                if (symbol.isLeft()){
+                                if (symbol.isLeft()) {
                                     var si = symbol.getLeft();
-                                    return new DocumentSymbolData(convertToDocumentSymbol(si), psiFile);
-                                }
-                                else {
-                                    return new DocumentSymbolData(symbol.getRight(), psiFile);
+                                    return new DocumentSymbolData(convertToDocumentSymbol(si), psiFile, languageServer);
+                                } else {
+                                    return new DocumentSymbolData(symbol.getRight(), psiFile, languageServer);
                                 }
                             })
                             .toList();

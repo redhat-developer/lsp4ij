@@ -11,9 +11,15 @@
 package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 /**
  * Base class to consume LSP requests (ex : textDocument/codeLens) from all language servers applying to a given Psi file.
@@ -66,5 +72,14 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
         // Update the modification stamp with the current modification stamp of the Psi file
         this.modificationStamp = this.file.getModificationStamp();
         return future;
+    }
+
+    protected static CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull PsiFile file,
+                                                                  @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+                                                                  @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
+        return LanguageServiceAccessor.getInstance(file.getProject())
+                .getLanguageServers(file.getVirtualFile(),
+                        beforeStartingServerFilter,
+                        afterStartingServerFilter);
     }
 }

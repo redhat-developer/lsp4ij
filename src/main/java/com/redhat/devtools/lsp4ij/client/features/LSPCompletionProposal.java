@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.completion;
+package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.codeInsight.AutoPopupController;
 import com.intellij.codeInsight.completion.CodeCompletionHandlerBase;
@@ -34,10 +34,13 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
+import com.redhat.devtools.lsp4ij.features.completion.CompletionProposalTools;
+import com.redhat.devtools.lsp4ij.features.completion.SnippetTemplateFactory;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetIndentOptions;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -53,47 +56,42 @@ import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentation
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
-import static com.redhat.devtools.lsp4ij.ui.IconMapper.getIcon;
 
 /**
  * LSP completion lookup element.
  */
+@ApiStatus.Internal
 public class LSPCompletionProposal extends LookupElement implements Pointer<LSPCompletionProposal>, Symbol, DocumentationTarget {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
 
     private final CompletionItem item;
     private final PsiFile file;
-    private final Boolean supportResolveCompletion;
-    private final boolean supportSignatureHelp;
-    private final LSPCompletionContributor completionContributor;
 
     // offset where completion has been triggered
     // ex : string.charA|
     private final int completionOffset;
+    private final LSPCompletionFeature.@NotNull LSPCompletionContext completionContext;
+    private final @NotNull LSPCompletionFeature completionFeature;
 
     // offset where prefix completion starts
     // ex : string.|charA
     private int prefixStartOffset;
 
     private final Editor editor;
-    private final LanguageServerItem languageServer;
+
     private CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
-    public LSPCompletionProposal(@NotNull PsiFile file,
-                                 @NotNull Editor editor,
-                                 int completionOffset,
-                                 @NotNull CompletionItem item,
-                                 @NotNull LanguageServerItem languageServer,
-                                 @NotNull LSPCompletionContributor completionContributor) {
-        this.file = file;
+    public LSPCompletionProposal(@NotNull CompletionItem item,
+                                 @NotNull LSPCompletionFeature.LSPCompletionContext completionContext,
+                                 @NotNull LSPCompletionFeature completionFeature) {
+        this.file = completionContext.getParameters().getOriginalFile();
         this.item = item;
-        this.editor = editor;
-        this.languageServer = languageServer;
-        this.completionContributor = completionContributor;
-        this.completionOffset = completionOffset;
+        this.editor = completionContext.getParameters().getEditor();
+        this.completionContext = completionContext;
+        this.completionOffset = completionContext.getParameters().getOffset();
         this.prefixStartOffset = getPrefixStartOffset(editor.getDocument(), completionOffset);
-        this.supportResolveCompletion = languageServer.isResolveCompletionSupported();
-        this.supportSignatureHelp = languageServer.isSignatureHelpSupported();
+        this.completionFeature = completionFeature;
         putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
     }
 
@@ -115,7 +113,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         }
 
         // Apply all text edits
-        apply(context.getDocument(), context.getCompletionChar(), 0, context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
+        apply(context.getDocument(), context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
 
         if (shouldStartTemplate(template)) {
             // LSP completion with snippet syntax, activate the inline template
@@ -127,10 +125,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         // Execute custom command of the completion item if needed
         Command command = item.getCommand();
         if (command != null) {
-            executeCustomCommand(command, context.getFile(), context.getEditor(), languageServer);
+            executeCustomCommand(command, context.getFile(), context.getEditor(), completionContext.getLanguageServer());
         }
 
-        if (supportSignatureHelp) {
+        if (completionContext.isSignatureHelpSupported()) {
             // The language server supports signature help, open the parameter info popup
             AutoPopupController popupController = AutoPopupController.getInstance(context.getProject());
             if (popupController != null) {
@@ -213,21 +211,9 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         return item.getLabel();
     }
 
-    private boolean isDeprecated() {
-        return (item.getTags() != null && item.getTags().contains(CompletionItemTag.Deprecated))
-                || (item.getDeprecated() != null && item.getDeprecated().booleanValue());
-    }
-
     @Override
     public void renderElement(LookupElementPresentation presentation) {
-        presentation.setItemText(item.getLabel());
-        presentation.setTypeText(item.getDetail());
-        presentation.setIcon(getIcon(item));
-        if (isDeprecated()) {
-            presentation.setStrikeout(true);
-        }
-        var labelDetails = item.getLabelDetails();
-        presentation.setTailText(labelDetails != null ? labelDetails.getDetail() : null);
+        completionFeature.renderLookupElement(presentation, item);
     }
 
     @Override
@@ -265,10 +251,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
      * @return true if the LSP completion item 'detail' must be resolved and false otherwise.
      */
     public boolean needToResolveCompletionDetail() {
-        return item.getDetail() == null && supportResolveCompletion;
+        return item.getDetail() == null && completionContext.isResolveCompletionSupported();
     }
 
-    protected void apply(Document document, char trigger, int stateMask, int offset) {
+    protected void apply(Document document, int offset) {
         String insertText = null;
         Either<TextEdit, InsertReplaceEdit> eitherTextEdit = item.getTextEdit();
         TextEdit textEdit = null;
@@ -334,7 +320,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             }
 
             List<TextEdit> additionalEdits = item.getAdditionalTextEdits();
-            if ((additionalEdits == null || additionalEdits.isEmpty()) && supportResolveCompletion) {
+            if ((additionalEdits == null || additionalEdits.isEmpty()) && completionContext.isResolveCompletionSupported()) {
                 // The LSP completion item 'additionalEdits' is not filled, try to resolve it.
                 CompletionItem resolved = getResolvedCompletionItem();
                 if (resolved != null) {
@@ -391,10 +377,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     }
 
     /**
-     * Return the result of the resolved LSP variable and null otherwise.
+     * Return the response of the resolved LSP variable and null otherwise.
      *
      * @param variableName the variable name to resolve.
-     * @return the result of the resolved LSP variable and null otherwise.
+     * @return the response of the resolved LSP variable and null otherwise.
      */
     private @Nullable String getVariableValue(String variableName) {
         Document document = editor.getDocument();
@@ -450,14 +436,15 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
      */
     private CompletionItem getResolvedCompletionItem() {
         if (resolvedCompletionItemFuture == null) {
-            resolvedCompletionItemFuture = languageServer.getServer()
+            resolvedCompletionItemFuture = completionContext.getLanguageServer().getServer()
                     .getTextDocumentService()
                     .resolveCompletionItem(item);
         }
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(resolvedCompletionItemFuture, file);
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+        } catch (
+                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
             return null;
         } catch (CancellationException e) {
@@ -591,8 +578,8 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             if (contents.isEmpty()) {
                 return null;
             }
-            return DocumentationResult.documentation(convertToHtml(contents, file));
-        } else if (supportResolveCompletion) {
+            return DocumentationResult.documentation(convertToHtml(contents, null, file));
+        } else if (completionContext.isResolveCompletionSupported()) {
             if (resolvedCompletionItemFuture != null && resolvedCompletionItemFuture.isDone()) {
                 CompletionItem resolved = getResolvedCompletionItem();
                 if (resolved != null) {
@@ -602,7 +589,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                 if (contents.isEmpty()) {
                     return null;
                 }
-                return DocumentationResult.documentation(convertToHtml(contents, file));
+                return DocumentationResult.documentation(convertToHtml(contents, null, file));
             } else {
                 DocumentationResult.asyncDocumentation(() -> {
                     // The LSP completion item 'documentation' is not filled, try to resolve it
@@ -615,7 +602,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                     if (contents.isEmpty()) {
                         return null;
                     }
-                    return DocumentationResult.documentation(convertToHtml(contents, file));
+                    return DocumentationResult.documentation(convertToHtml(contents, null, file));
                 });
             }
         }

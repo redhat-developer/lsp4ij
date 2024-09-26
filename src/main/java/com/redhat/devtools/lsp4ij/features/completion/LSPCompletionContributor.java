@@ -13,11 +13,7 @@ package com.redhat.devtools.lsp4ij.features.completion;
 import com.intellij.codeInsight.completion.CompletionContributor;
 import com.intellij.codeInsight.completion.CompletionParameters;
 import com.intellij.codeInsight.completion.CompletionResultSet;
-import com.intellij.codeInsight.completion.PrioritizedLookupElement;
-import com.intellij.codeInsight.lookup.Lookup;
-import com.intellij.codeInsight.lookup.LookupEvent;
-import com.intellij.codeInsight.lookup.LookupListener;
-import com.intellij.codeInsight.lookup.LookupManagerListener;
+import com.intellij.codeInsight.lookup.*;
 import com.intellij.codeInsight.lookup.impl.LookupImpl;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
@@ -29,7 +25,8 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
+import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -100,7 +97,7 @@ public class LSPCompletionContributor extends CompletionContributor {
                 CompletionPrefix completionPrefix = new CompletionPrefix(offset, document);
                 for (var item : data) {
                     ProgressManager.checkCanceled();
-                    addCompletionItems(psiFile, editor, completionPrefix, item.completion(), item.languageServer(), result);
+                    addCompletionItems(parameters, completionPrefix, item.completion(), item.languageServer(), result);
                 }
             }
         }
@@ -108,8 +105,7 @@ public class LSPCompletionContributor extends CompletionContributor {
 
     private static final CompletionItemComparator completionProposalComparator = new CompletionItemComparator();
 
-    private void addCompletionItems(@NotNull PsiFile file,
-                                    @NotNull Editor editor,
+    private void addCompletionItems(@NotNull CompletionParameters parameters,
                                     @NotNull CompletionPrefix completionPrefix,
                                     @NotNull Either<List<CompletionItem>, CompletionList> completion,
                                     @NotNull LanguageServerItem languageServer,
@@ -128,48 +124,24 @@ public class LSPCompletionContributor extends CompletionContributor {
         items.sort(completionProposalComparator);
         int size = items.size();
 
-        //Items now sorted by priority, low index == high priority
+        var completionFeature = languageServer.getClientFeatures().getCompletionFeature();
+        LSPCompletionFeature.LSPCompletionContext context = new LSPCompletionFeature.LSPCompletionContext(parameters, languageServer);
+        // Items now sorted by priority, low index == high priority
         for (int i = 0; i < size; i++) {
             var item = items.get(i);
-            if (StringUtils.isBlank(item.getLabel())) {
-                // Invalid completion Item, ignore it
-                continue;
-            }
             ProgressManager.checkCanceled();
+            // Update text edit range, commitCharacters, ... with item defaults if needed
+            updateWithItemDefaults(item, itemDefaults);
             // Create lookup item
-            var lookupItem = createLookupItem(file, editor, completionPrefix.getCompletionOffset(), item, itemDefaults, languageServer);
-
-            var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, size - i);
-            // Compute the prefix
-            var textEditRange = lookupItem.getTextEditRange();
-            String prefix = textEditRange != null ? completionPrefix.getPrefixFor(textEditRange, item) : null;
-            if (prefix != null) {
-                // Add the IJ completion item (lookup item) by using the computed prefix
-                result.withPrefixMatcher(prefix)
-                        .caseInsensitive()
-                        .addElement(prioritizedLookupItem);
-            } else {
-                // Should happen rarely, only when text edit is for multi-lines or if completion is triggered outside the text edit range.
-                // Add the IJ completion item (lookup item) which will use the IJ prefix
-                result.caseInsensitive()
-                        .addElement(prioritizedLookupItem);
+            LookupElement lookupItem = completionFeature.createLookupElement(item, context);
+            if (lookupItem != null) {
+               completionFeature.addLookupItem(completionPrefix, result, lookupItem, size- i, item);
             }
         }
     }
 
-    private LSPCompletionProposal createLookupItem(@NotNull PsiFile file,
-                                                   @NotNull Editor editor,
-                                                   int completionOffset,
-                                                   @NotNull CompletionItem item,
-                                                   @Nullable CompletionItemDefaults itemDefaults,
-                                                   @NotNull LanguageServerItem languageServer) {
-        // Update text edit range, commitCharacters, ... with item defaults if needed
-        updateWithItemDefaults(item, itemDefaults);
-        return new LSPCompletionProposal(file, editor, completionOffset, item, languageServer, this);
-    }
-
-    private static void updateWithItemDefaults(@NotNull CompletionItem item,
-                                               @Nullable CompletionItemDefaults itemDefaults) {
+    protected void updateWithItemDefaults(@NotNull CompletionItem item,
+                                          @Nullable CompletionItemDefaults itemDefaults) {
         if (itemDefaults == null) {
             return;
         }
@@ -205,7 +177,6 @@ public class LSPCompletionContributor extends CompletionContributor {
             item.setCommitCharacters(itemDefaults.getCommitCharacters());
         }
     }
-
 
     /**
      * LSP lookup listener to track the selected completion item

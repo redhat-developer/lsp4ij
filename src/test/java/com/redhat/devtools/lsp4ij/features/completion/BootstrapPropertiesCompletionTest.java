@@ -26,7 +26,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     // ------------ Completion on property key
 
     public void testCompletionOnPropertyKeyAtEnd() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "com.ibm.ws.log<caret>", """                
                         [
@@ -64,7 +64,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     }
 
     public void testCompletionOnPropertyKeyNotAtEnd() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "ibm.ws.<caret>=100", """                
                         [
@@ -102,7 +102,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     }
 
     public void testCompletionOnPropertyKeyEndsWithDot() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "logging.<caret>=100", """                
                         [
@@ -140,7 +140,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     }
 
     public void testCompletionOnPropertyKeyEndsWithDotUpperCase() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "LOGGING.<caret>=100", """                
                         [
@@ -178,7 +178,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     }
 
     public void testCompletionOnPropertyKeyUpperCase() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "COM.IBM.<caret>=100", """                
                         [
@@ -218,7 +218,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     // ------------ Completion on property value
 
     public void testCompletionOnPropertyValueWithEmptyValueAtEnd() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "com.ibm.hpel.trace.bufferingEnabled=<caret>", """                
                         [
@@ -248,7 +248,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     }
 
     public void testCompletionOnPropertyValueWithValueAtEnd() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "com.ibm.hpel.trace.bufferingEnabled=f<caret>", """                
                         [
@@ -276,7 +276,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     }
 
     public void testCompletionOnPropertyValueWithValueAfterEquals() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "com.ibm.hpel.trace.bufferingEnabled=<caret>F", """                
                         [
@@ -304,7 +304,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
     }
 
     public void testCompletionOnPropertyValueWithValueInsideValue() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertCompletion("bootstrap.properties",
                 "com.ibm.hpel.trace.bufferingEnabled=fa<caret>ls", """                
                         [

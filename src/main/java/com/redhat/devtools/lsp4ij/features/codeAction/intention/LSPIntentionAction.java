@@ -50,21 +50,17 @@ public abstract class LSPIntentionAction extends LSPLazyCodeActionIntentionActio
     /**
      * Create the LSP code action parameters for the given diagnostic and file.
      *
+     * @param  editor the editor.
      * @param file the file.
      * @return the LSP code action parameters for the given diagnostic and file.
      */
-    private static CodeActionParams createCodeActionParams(Editor editor, PsiFile file) {
-        CodeActionParams params = new CodeActionParams();
-        params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
-
+    private static CodeActionParams createCodeActionParams(@NotNull Editor editor,
+                                                           @NotNull PsiFile file) {
         Document document = LSPIJUtils.getDocument(file.getVirtualFile());
         Caret caret = editor.getCaretModel().getPrimaryCaret();
         Range range = LSPIJUtils.toRange(caret.getSelectionRange(), document);
-        params.setRange(range);
-
         CodeActionContext context = new CodeActionContext(Collections.emptyList());
         context.setTriggerKind(CodeActionTriggerKind.Automatic);
-        params.setContext(context);
-        return params;
+        return new CodeActionParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()), range, context);
     }
 }

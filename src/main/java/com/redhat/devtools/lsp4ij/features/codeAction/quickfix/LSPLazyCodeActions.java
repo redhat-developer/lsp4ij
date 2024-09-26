@@ -56,7 +56,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     private final LanguageServerItem languageServer;
 
     // List of lazy code actions
-    private final List<LSPLazyCodeActionIntentionAction> codeActions;
+    private final List<IntentionAction> codeActions;
 
     // LSP code actions request used to load code action for the diagnostic.
     private CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
@@ -119,9 +119,8 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @return list of Intellij {@link IntentionAction} which are used to create Intellij QuickFix.
      */
     private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(List<Diagnostic> diagnostics) {
-        var languageServerWrapper= languageServer.getServerWrapper();
         return CompletableFutures
-                .computeAsyncCompose(cancelChecker -> languageServerWrapper
+                .computeAsyncCompose(cancelChecker -> languageServer
                         .getInitializedServer()
                         .thenCompose(ls -> {
                             // Language server is initialized here
@@ -181,7 +180,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      *
      * @return the list of lazy code actions.
      */
-    public List<LSPLazyCodeActionIntentionAction> getCodeActions() {
+    public List<IntentionAction> getCodeActions() {
         return codeActions;
     }
 

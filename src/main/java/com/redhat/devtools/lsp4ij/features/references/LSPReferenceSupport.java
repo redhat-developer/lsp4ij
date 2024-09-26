@@ -10,13 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.references;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -54,16 +50,15 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
     @Override
     protected CompletableFuture<List<Location>> doLoad(LSPReferenceParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return collectReferences(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return collectReferences(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectReferences(@NotNull VirtualFile file,
-                                                                                @NotNull Project project,
+    private static @NotNull CompletableFuture<List<Location>> collectReferences(@NotNull PsiFile file,
                                                                                 @NotNull LSPReferenceParams params,
                                                                                 @NotNull CancellationSupport cancellationSupport) {
-        var textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file);
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isReferencesSupported)
+        return getLanguageServers(file,
+                f -> f.getReferencesFeature().isEnabled(file),
+                f -> f.getReferencesFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have reference capability

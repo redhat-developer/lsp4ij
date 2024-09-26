@@ -64,7 +64,7 @@ public class LSPUsagesManager {
                 break;
             }
             case 1: {
-                // On result, open editor with the given location
+                // On response, open editor with the given location
                 Location ref = locations.get(0);
                 openLocation(ref, project);
                 break;

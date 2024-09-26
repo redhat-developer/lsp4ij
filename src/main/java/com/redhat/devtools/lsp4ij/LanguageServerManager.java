@@ -16,6 +16,9 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+
 public class LanguageServerManager {
 
     private final Project project;
@@ -274,6 +277,27 @@ public class LanguageServerManager {
             // 2. Disable language server
             serverDefinition.setEnabled(false, project);
         }
+    }
+
+    /**
+     * Returns the initialized language server item from the given language server id and null otherwise.
+     *
+     * @param languageServerId the language server id.
+     * @return the initialized language server item from the given language server id and null otherwise.
+     */
+    public CompletableFuture<@Nullable LanguageServerItem> getLanguageServer(@NotNull String languageServerId) {
+        LanguageServerDefinition serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
+        if (serverDefinition == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return LanguageServiceAccessor.getInstance(project)
+                .getLanguageServers(Set.of(serverDefinition), null, null)
+                .thenApply(servers -> {
+                    if (servers.isEmpty()) {
+                        return null;
+                    }
+                    return servers.get(0);
+                });
     }
 
 }

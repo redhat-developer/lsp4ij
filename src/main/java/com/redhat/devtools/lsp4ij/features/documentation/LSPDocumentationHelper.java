@@ -11,8 +11,9 @@
 package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.LSPHoverFeature;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
@@ -126,6 +127,7 @@ public class LSPDocumentationHelper {
      * @return the converted HTML of the LSP markup content and an empty string otherwise.
      */
     public static String convertToHtml(@NotNull List<MarkupContent> contents,
+                                       @Nullable LanguageServerItem languageServer,
                                        @NotNull PsiFile file) {
         Project project = file.getProject();
         StringBuilder htmlBody = new StringBuilder();
@@ -133,10 +135,13 @@ public class LSPDocumentationHelper {
             if (i > 0) {
                 htmlBody.append("<hr />");
             }
-            MarkupContent content = contents.get(i);
-            htmlBody.append(MarkupKind.MARKDOWN.equals(content.getKind()) ?
-                    MarkdownConverter.getInstance(project).toHtml(StringUtilRt.convertLineSeparators(content.getValue()), file) :
-                    content.getValue());
+            MarkupContent markupContent = contents.get(i);
+            var hoverFeatures = languageServer != null ? languageServer.getClientFeatures().getHoverFeature()
+                    : new LSPHoverFeature();
+            String content = hoverFeatures.getContent(markupContent, file);
+            if(content != null) {
+                htmlBody.append(content);
+            }
         }
         return htmlBody.toString();
     }

@@ -10,14 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.signatureHelp;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureHelpParams;
 import org.jetbrains.annotations.NotNull;
@@ -43,16 +40,16 @@ public class LSPSignatureHelpSupport extends AbstractLSPDocumentFeatureSupport<S
     @Override
     protected CompletableFuture<SignatureHelp> doLoad(SignatureHelpParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getSignatureHelp(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return getSignatureHelp(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<SignatureHelp> getSignatureHelp(@NotNull VirtualFile file,
-                                                                              @NotNull Project project,
+    private static @NotNull CompletableFuture<SignatureHelp> getSignatureHelp(@NotNull PsiFile file,
                                                                               @NotNull SignatureHelpParams params,
                                                                               @NotNull CancellationSupport cancellationSupport) {
 
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isSignatureHelpSupported)
+        return getLanguageServers(file,
+                f -> f.getSignatureHelpFeature().isEnabled(file),
+                f -> f.getSignatureHelpFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have signature help capability

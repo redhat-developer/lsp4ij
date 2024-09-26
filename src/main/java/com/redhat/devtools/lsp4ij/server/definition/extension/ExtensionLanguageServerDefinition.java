@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
@@ -70,6 +71,20 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
             languageClient = super.createLanguageClient(project);
         }
         return languageClient;
+    }
+
+    @Override
+    public @NotNull LSPClientFeatures createClientFeatures() {
+        LSPClientFeatures clientFeatures = null;
+        try {
+            clientFeatures = getFactory().createClientFeatures();
+        } catch (Exception e) {
+            LOGGER.warn("Exception occurred while creating an instance of the LSP client features", e); //$NON-NLS-1$
+        }
+        if (clientFeatures == null) {
+            clientFeatures = super.createClientFeatures();
+        }
+        return clientFeatures;
     }
 
     @SuppressWarnings("unchecked")
@@ -146,7 +161,7 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
     }
 
     @Override
-    public SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
+    public @NotNull SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
         return super.getSemanticTokensColorsProvider();
     }
 }

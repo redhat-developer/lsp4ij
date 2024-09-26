@@ -10,13 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.typeDefinition;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -29,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * LSP typeDefinition support which collect:
- * 
+ *
  * <ul>
  *      <li>textDocument/typeDefinition</li>
  *  </ul>
@@ -54,16 +50,15 @@ public class LSPTypeDefinitionSupport extends AbstractLSPDocumentFeatureSupport<
     @Override
     protected CompletableFuture<List<Location>> doLoad(LSPTypeDefinitionParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return collectTypeDefinitions(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return collectTypeDefinitions(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectTypeDefinitions(@NotNull VirtualFile file,
-                                                                                     @NotNull Project project,
+    private static @NotNull CompletableFuture<List<Location>> collectTypeDefinitions(@NotNull PsiFile file,
                                                                                      @NotNull LSPTypeDefinitionParams params,
                                                                                      @NotNull CancellationSupport cancellationSupport) {
-        var textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file);
-        return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isTypeDefinitionSupported)
+        return getLanguageServers(file,
+                f -> f.getTypeDefinitionFeature().isEnabled(file),
+                f -> f.getTypeDefinitionFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have typeDefinition capability

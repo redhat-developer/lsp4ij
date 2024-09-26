@@ -97,7 +97,7 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                                 // At this step we cannot open a dialog directly, we need to open the dialog
                                 // with invoke later.
                                 LSPIJUtils.openInEditor(target, null, true, true, project);
-                                // Return an empty result here.
+                                // Return an empty response here.
                                 // If user accepts to create the file, the open is done after the creation of the file.
                                 return PsiElement.EMPTY_ARRAY;
                             }

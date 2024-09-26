@@ -26,7 +26,7 @@ public class LuaSemanticTokensTest extends LSPSemanticTokensFixtureTestCase {
 
 
     public void testSemanticTokens() {
-        // 1. Test completion items result
+        // 1. Test completion items response
         assertSemanticTokens("test.luax",
                 """
                 --[[
