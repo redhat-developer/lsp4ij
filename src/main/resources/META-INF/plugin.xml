@@ -5,6 +5,14 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.6.0</h3>
+    <ul>
+      <h1>Support for textDocument/documentSymbol</1h>
+      <h1>Provide a new way to connect to a language server with OSProcessStreamConnectionProvider</h1>
+      <li>Fixing bugs</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/6?closed=1">changelog</a>.
+
     <h3>0.5.0</h3>
     <ul>
       <li>Fixing bugs</li>
