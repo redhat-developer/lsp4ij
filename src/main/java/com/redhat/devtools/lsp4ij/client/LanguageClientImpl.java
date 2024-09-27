@@ -222,7 +222,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      *                settings object.
      * @return the settings retrieved by a valid section and null otherwise.
      */
-    protected Object findSettings(String section) {
+    protected Object findSettings(@Nullable String section) {
         var config = createSettings();
         if (config instanceof JsonObject json) {
             if (section == null) {
