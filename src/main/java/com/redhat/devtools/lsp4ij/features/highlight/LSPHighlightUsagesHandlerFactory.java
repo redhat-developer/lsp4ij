@@ -25,8 +25,6 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
-import org.eclipse.lsp4j.DocumentHighlightParams;
-import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -70,13 +68,10 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         // Create DocumentHighlightParams
         Document document = editor.getDocument();
         int offset = TargetElementUtil.adjustOffset(psiFile, document, editor.getCaretModel().getOffset());
-        Position position = LSPIJUtils.toPosition(offset, document);
-        DocumentHighlightParams params = new DocumentHighlightParams(LSPIJUtils.toTextDocumentIdentifier(file), position);
 
         // Consume LSP 'textDocument/documentHighlight' request
         LSPHighlightSupport highlightSupport = LSPFileSupport.getSupport(psiFile).getHighlightSupport();
-        highlightSupport.cancel();
-        CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
+        CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(offset, document, file);
         try {
             waitUntilDone(highlightFuture, psiFile);
         } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
