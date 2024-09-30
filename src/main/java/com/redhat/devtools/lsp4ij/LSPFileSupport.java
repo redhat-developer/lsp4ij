@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingSupport;
 import com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightSupport;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSupport;
+import com.redhat.devtools.lsp4ij.features.navigation.LSPDefinitionSupport;
 import com.redhat.devtools.lsp4ij.features.references.LSPReferenceSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPPrepareRenameSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPRenameSupport;
@@ -76,6 +77,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private final LSPReferenceSupport referenceSupport;
 
+    private final LSPDefinitionSupport definitionSupport;
+    
     private final LSPDeclarationSupport declarationSupport;
 
     private final LSPTypeDefinitionSupport typeDefinitionSupport;
@@ -101,6 +104,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.completionSupport = new LSPCompletionSupport(file);
         this.implementationSupport = new LSPImplementationSupport(file);
         this.referenceSupport = new LSPReferenceSupport(file);
+        this.definitionSupport = new LSPDefinitionSupport(file);
         this.declarationSupport = new LSPDeclarationSupport(file);
         this.typeDefinitionSupport = new LSPTypeDefinitionSupport(file);
         this.semanticTokensSupport = new LSPSemanticTokensSupport(file);
@@ -275,6 +279,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         return referenceSupport;
     }
 
+    /**
+     * Returns the LSP definition support.
+     *
+     * @return the LSP definition support.
+     */
+    public LSPDefinitionSupport getDefinitionSupport() {
+        return definitionSupport;
+    }
+    
     /**
      * Returns the LSP declaration support.
      *

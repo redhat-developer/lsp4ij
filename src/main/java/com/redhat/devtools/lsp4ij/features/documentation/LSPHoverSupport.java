@@ -10,11 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentation;
 
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -44,13 +42,12 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
         super(file);
     }
 
-    public CompletableFuture<List<Hover>> getHover(int offset, Document document) {
-        if (previousOffset != null && previousOffset != offset) {
-            // Cancel previous hover (without setting previousOffset to null)
-            cancel();
+    public CompletableFuture<List<Hover>> getHover(LSPHoverParams params) {
+        int offset = params.getOffset();
+        if (previousOffset != null && !previousOffset.equals(offset)) {
+            super.cancel();
         }
         previousOffset = offset;
-        HoverParams params = LSPIJUtils.toHoverParams(offset, document);
         return super.getFeatureData(params);
     }
 

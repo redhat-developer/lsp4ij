@@ -63,8 +63,9 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
         if (document == null) {
             return Collections.emptyList();
         }
+        var params = new LSPHoverParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document), offset);
         LSPHoverSupport hoverSupport = LSPFileSupport.getSupport(psiFile).getHoverSupport();
-        CompletableFuture<List<Hover>> hoverFuture = hoverSupport.getHover(offset, document);
+        CompletableFuture<List<Hover>> hoverFuture = hoverSupport.getHover(params);
 
         try {
             waitUntilDone(hoverFuture, psiFile);

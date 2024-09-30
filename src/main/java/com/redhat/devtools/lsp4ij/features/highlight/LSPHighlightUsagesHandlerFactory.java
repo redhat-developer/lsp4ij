@@ -70,8 +70,9 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         int offset = TargetElementUtil.adjustOffset(psiFile, document, editor.getCaretModel().getOffset());
 
         // Consume LSP 'textDocument/documentHighlight' request
+        var params = new LSPDocumentHighlightParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document), offset);
         LSPHighlightSupport highlightSupport = LSPFileSupport.getSupport(psiFile).getHighlightSupport();
-        CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(offset, document, file);
+        CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
         try {
             waitUntilDone(highlightFuture, psiFile);
         } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
