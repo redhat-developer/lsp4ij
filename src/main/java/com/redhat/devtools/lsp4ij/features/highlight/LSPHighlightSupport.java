@@ -10,16 +10,19 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.highlight;
 
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightParams;
+import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -37,11 +40,22 @@ import java.util.concurrent.CompletableFuture;
  */
 public class LSPHighlightSupport extends AbstractLSPDocumentFeatureSupport<DocumentHighlightParams, List<DocumentHighlight>> {
 
+    private Integer previousOffset;
+
     public LSPHighlightSupport(@NotNull PsiFile file) {
         super(file);
     }
 
-    public CompletableFuture<List<DocumentHighlight>> getHighlights(DocumentHighlightParams params) {
+    public CompletableFuture<List<DocumentHighlight>> getHighlights(int offset, 
+                                                                    @NotNull Document document,
+                                                                    @NotNull VirtualFile file) {
+        if (previousOffset != null && previousOffset != offset) {
+            // Cancel previous documentHighlight (without setting previousOffset to null)
+            cancel();
+        }
+        previousOffset = offset;
+        Position position = LSPIJUtils.toPosition(offset, document);
+        DocumentHighlightParams params = new DocumentHighlightParams(LSPIJUtils.toTextDocumentIdentifier(file), position);
         return super.getFeatureData(params);
     }
 

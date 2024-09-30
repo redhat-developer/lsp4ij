@@ -43,9 +43,9 @@ public class LSPHighlightUsagesHandler extends HighlightUsagesHandlerBase<LSPHig
         targets.forEach(target ->
         {
             if (target.getKind() == DocumentHighlightKind.Read || target.getKind() == DocumentHighlightKind.Text) {
-                myReadUsages.add(target.getTextRange());
+                getReadUsages().add(target.getTextRange());
             } else {
-                myWriteUsages.add(target.getTextRange());
+                getWriteUsages().add(target.getTextRange());
             }
         });
     }
