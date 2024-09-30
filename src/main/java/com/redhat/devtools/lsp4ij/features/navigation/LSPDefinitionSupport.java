@@ -6,9 +6,9 @@
  * and is available at http://www.eclipse.org/legal/epl-v20.html
  *
  * Contributors:
- * Red Hat, Inc. - initial API and declaration
+ * Red Hat, Inc. - initial API and definition
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.declaration;
+package com.redhat.devtools.lsp4ij.features.navigation;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -27,21 +27,21 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * LSP declaration support which collect:
- * 
+ * LSP definition support which collect:
+ *
  * <ul>
- *      <li>textDocument/declaration</li>
+ *      <li>textDocument/definition</li>
  *  </ul>
  */
-public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSPDeclarationParams, List<Location>> {
+public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPDefinitionParams, List<Location>> {
 
     private Integer previousOffset;
 
-    public LSPDeclarationSupport(@NotNull PsiFile file) {
+    public LSPDefinitionSupport(@NotNull PsiFile file) {
         super(file);
     }
 
-    public CompletableFuture<List<Location>> getDeclarations(LSPDeclarationParams params) {
+    public CompletableFuture<List<Location>> getDefinitions(LSPDefinitionParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
             super.cancel();
@@ -51,44 +51,44 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
     }
 
     @Override
-    protected CompletableFuture<List<Location>> doLoad(LSPDeclarationParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<Location>> doLoad(LSPDefinitionParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return collectDeclarations(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
+        return collectDefinitions(file.getVirtualFile(), file.getProject(), params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectDeclarations(@NotNull VirtualFile file,
-                                                                                     @NotNull Project project,
-                                                                                     @NotNull LSPDeclarationParams params,
-                                                                                     @NotNull CancellationSupport cancellationSupport) {
+    private static @NotNull CompletableFuture<List<Location>> collectDefinitions(@NotNull VirtualFile file,
+                                                                                 @NotNull Project project,
+                                                                                 @NotNull LSPDefinitionParams params,
+                                                                                 @NotNull CancellationSupport cancellationSupport) {
         return LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, LanguageServerItem::isDeclarationSupported)
+                .getLanguageServers(file, LanguageServerItem::isDefinitionSupported)
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
-                    // and which have declaration capability
+                    // and which have definition capability
                     if (languageServers.isEmpty()) {
                         return CompletableFuture.completedFuture(null);
                     }
 
-                    // Collect list of textDocument/declaration future for each language servers
-                    List<CompletableFuture<List<Location>>> declarationsPerServerFutures = languageServers
+                    // Collect list of textDocument/definition future for each language servers
+                    List<CompletableFuture<List<Location>>> definitionsPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getDeclarationFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getDefinitionFor(params, languageServer, cancellationSupport))
                             .toList();
 
-                    // Merge list of textDocument/declaration future in one future which return the list of declaration ranges
-                    return CompletableFutures.mergeInOneFuture(declarationsPerServerFutures, cancellationSupport);
+                    // Merge list of textDocument/definition future in one future which return the list of definition ranges
+                    return CompletableFutures.mergeInOneFuture(definitionsPerServerFutures, cancellationSupport);
                 });
     }
 
-    private static CompletableFuture<List<Location>> getDeclarationFor(LSPDeclarationParams params,
-                                                                          LanguageServerItem languageServer,
-                                                                          CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<Location>> getDefinitionFor(LSPDefinitionParams params,
+                                                                      LanguageServerItem languageServer,
+                                                                      CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .declaration(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
+                        .definition(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
                 .thenApplyAsync(locations -> {
                     if (locations == null) {
-                        // textDocument/declaration may return null
+                        // textDocument/definition may return null
                         return Collections.emptyList();
                     }
                     if (locations.isLeft()) {
