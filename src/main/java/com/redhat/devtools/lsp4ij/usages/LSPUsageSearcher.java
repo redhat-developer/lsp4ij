@@ -15,7 +15,9 @@ import com.intellij.find.findUsages.FindUsagesOptions;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.usages.Usage;
 import com.intellij.usages.UsageInfo2UsageAdapter;
@@ -23,12 +25,12 @@ import com.intellij.util.Processor;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
@@ -62,10 +64,17 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             }
         }
 
+        PsiFile file = element.getContainingFile();
+        if (file == null) {
+            return;
+        }
         // Get position where the "Find Usages" has been triggered
-        Position position = getPosition(element);
-        // Collect textDocument/definition, textDocument/references, etc
-        LSPUsageSupport usageSupport = new LSPUsageSupport(ReadAction.compute(() -> element.getContainingFile()));
+        Position position = getPosition(element, file);
+        if (position == null) {
+            return;
+        }
+         // Collect textDocument/definition, textDocument/references, etc
+        LSPUsageSupport usageSupport = new LSPUsageSupport(ReadAction.compute(() -> file));
         LSPUsageSupport.LSPUsageSupportParams params = new LSPUsageSupport.LSPUsageSupportParams(position);
         CompletableFuture<List<LSPUsagePsiElement>> usagesFuture = usageSupport.getFeatureData(params);
         try {
@@ -80,20 +89,29 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                     }
                 }
             }
-        } catch (ExecutionException e) {
+        } catch (Exception e) {
             LOGGER.error("Error while collection LSP Usages", e);
         }
     }
 
-    private static Position getPosition(PsiElement element) {
+    @Nullable
+    private static Position getPosition(@NotNull PsiElement element, @NotNull PsiFile psiFile) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return doGetPosition(element);
+            return doGetPosition(element, psiFile);
         }
-        return ReadAction.compute(() -> doGetPosition(element));
+        return ReadAction.compute(() -> doGetPosition(element, psiFile));
     }
 
-    private static Position doGetPosition(PsiElement element) {
-        Document document = LSPIJUtils.getDocument(element.getContainingFile().getVirtualFile());
+    @Nullable
+    private static Position doGetPosition(@NotNull PsiElement element, @NotNull PsiFile psiFile) {
+        VirtualFile file = psiFile.getVirtualFile();
+        if (file == null) {
+            return null;
+        }
+        Document document = LSPIJUtils.getDocument(file);
+        if (document == null) {
+            return null;
+        }
         return LSPIJUtils.toPosition(Math.min(element.getTextRange().getStartOffset() + 1, element.getTextRange().getEndOffset()), document);
     }
 }
