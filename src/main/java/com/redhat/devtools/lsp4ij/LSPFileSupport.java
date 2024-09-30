@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.declaration.LSPDeclarationSupport;
+import com.redhat.devtools.lsp4ij.features.definition.LSPDefinitionSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
@@ -44,6 +45,7 @@ import org.jetbrains.annotations.NotNull;
 public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private static final Key<LSPFileSupport> LSP_FILE_SUPPORT_KEY = Key.create("lsp.file.support");
+
     private final PsiFile file;
 
     private final LSPCodeLensSupport codeLensSupport;
@@ -76,6 +78,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private final LSPReferenceSupport referenceSupport;
 
+    private final LSPDefinitionSupport definitionSupport;
+
     private final LSPDeclarationSupport declarationSupport;
 
     private final LSPTypeDefinitionSupport typeDefinitionSupport;
@@ -102,6 +106,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.implementationSupport = new LSPImplementationSupport(file);
         this.referenceSupport = new LSPReferenceSupport(file);
         this.declarationSupport = new LSPDeclarationSupport(file);
+        this.definitionSupport = new LSPDefinitionSupport(file);
         this.typeDefinitionSupport = new LSPTypeDefinitionSupport(file);
         this.semanticTokensSupport = new LSPSemanticTokensSupport(file);
         this.documentSymbolSupport = new LSPDocumentSymbolSupport(file);
@@ -127,6 +132,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getCompletionSupport().cancel();
         getImplementationSupport().cancel();
         getReferenceSupport().cancel();
+        getDefinitionSupport().cancel();
         getDeclarationSupport().cancel();
         getTypeDefinitionSupport().cancel();
         getSemanticTokensSupport().cancel();
@@ -273,6 +279,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPReferenceSupport getReferenceSupport() {
         return referenceSupport;
+    }
+
+    /**
+     * Returns the LSP definition support.
+     *
+     * @return the LSP definition support.
+     */
+    public LSPDefinitionSupport getDefinitionSupport() {
+        return definitionSupport;
     }
 
     /**

@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.typeDefinition;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -61,7 +60,6 @@ public class LSPTypeDefinitionSupport extends AbstractLSPDocumentFeatureSupport<
                                                                                      @NotNull Project project,
                                                                                      @NotNull LSPTypeDefinitionParams params,
                                                                                      @NotNull CancellationSupport cancellationSupport) {
-        var textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file);
         return LanguageServiceAccessor.getInstance(project)
                 .getLanguageServers(file, LanguageServerItem::isTypeDefinitionSupported)
                 .thenComposeAsync(languageServers -> {
