@@ -18,6 +18,21 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * LSP formatting feature.
+ * <p>
+ * The following code snippet demonstrates how to use this class to allow a language server to override an existing
+ * formatter service:
+ * <pre>{@code
+ * public class MyLSPFormattingFeature extends LSPFormattingFeature {
+ *     @Override
+ *     protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
+ *         // returns true even if there is a custom formatter
+ *         return true;
+ *     }
+ * }
+ * }</pre>
+ * See the documentation of {@link #isExistingFormatterOverrideable(PsiFile)} for more details.
+ * <p>
+ * Additional information is available on <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md#lsp-formatting-feature">GitHub</a>
  */
 @ApiStatus.Experimental
 public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
@@ -36,9 +51,16 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Returns true if existing formatter are overrideable and false (default value) otherwise.
+     * This specifies whether the language server should override a formatting service registered for languages in a file.
+     * <p>
+     * If <code>true</code>, then the language server will be used for the <code>Reformat Code</code> action.
+     * <p>
+     * If <code>false</code>, then formatters registered for the language will be preferred, but the language server may still be
+     * used if there is no registered formatter available.
      *
-     * @return true if existing formatter are overrideable and false (default value) otherwise.
+     * @return true to use the language server for code formatting and false to use plugin-provided/built-in formatters.
+     *
+     * @apiNote This method will only be called with files that contain a language supported by this language server.
      */
     protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
         return false;
