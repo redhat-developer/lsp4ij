@@ -15,7 +15,7 @@ package com.redhat.devtools.lsp4ij.console.explorer;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -35,7 +35,7 @@ import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIf
  */
 public class LanguageServerExplorerLifecycleListener implements LanguageServerLifecycleListener {
 
-    private final Map<LanguageServerWrapper, TracingMessageConsumer> tracingPerServer = new HashMap<>(10);
+    private final Map<LanguageServerItem, TracingMessageConsumer> tracingPerServer = new HashMap<>(10);
 
     private boolean disposed;
 
@@ -46,14 +46,14 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     }
 
     @Override
-    public void handleStatusChanged(LanguageServerWrapper languageServer) {
+    public void handleStatusChanged(LanguageServerItem languageServer) {
         ServerStatus serverStatus = languageServer.getServerStatus();
         boolean selectProcess = serverStatus == ServerStatus.starting;
         updateServerStatus(languageServer, serverStatus, selectProcess);
     }
 
     @Override
-    public void handleLSPMessage(Message message, MessageConsumer messageConsumer, LanguageServerWrapper languageServer) {
+    public void handleLSPMessage(Message message, MessageConsumer messageConsumer, LanguageServerItem languageServer) {
         if (explorer.isDisposed()) {
             return;
         }
@@ -72,7 +72,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     }
 
     @Override
-    public void handleError(LanguageServerWrapper languageServer, Throwable exception) {
+    public void handleError(LanguageServerItem languageServer, Throwable exception) {
         LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
         if (exception == null) {
             return;
@@ -81,7 +81,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         invokeLaterIfNeeded(() -> showError(processTreeNode, exception));
     }
 
-    private TracingMessageConsumer getLSPRequestCacheFor(LanguageServerWrapper languageServer) {
+    private TracingMessageConsumer getLSPRequestCacheFor(LanguageServerItem languageServer) {
         TracingMessageConsumer cache = tracingPerServer.get(languageServer);
         if (cache != null) {
             return cache;
@@ -107,7 +107,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         return serverTrace != null ? serverTrace : ServerTrace.getDefaultValue();
     }
 
-    private LanguageServerProcessTreeNode updateServerStatus(LanguageServerWrapper languageServer, ServerStatus serverStatus, boolean selectProcess) {
+    private LanguageServerProcessTreeNode updateServerStatus(LanguageServerItem languageServer, ServerStatus serverStatus, boolean selectProcess) {
         LanguageServerTreeNode serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
         if (serverNode == null) {
             // Should never occur.

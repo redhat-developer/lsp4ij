@@ -60,7 +60,7 @@ public abstract class TreeAction extends AnAction {
         TreePath path = tree.getSelectionPath();
         Object node = path != null ? path.getLastPathComponent() : null;
         if (node instanceof LanguageServerProcessTreeNode) {
-            return ((LanguageServerProcessTreeNode) node).getLanguageServer();
+            return (LanguageServerWrapper) ((LanguageServerProcessTreeNode) node).getLanguageServer();
         }
         return null;
     }

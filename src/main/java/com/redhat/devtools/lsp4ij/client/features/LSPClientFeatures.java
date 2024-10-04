@@ -12,7 +12,7 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 @ApiStatus.Experimental
 public class LSPClientFeatures implements Disposable {
 
-    private LanguageServerWrapper serverWrapper;
+    private LanguageServerItem serverWrapper;
 
     private LSPCodeActionFeature codeActionFeature;
 
@@ -119,7 +119,7 @@ public class LSPClientFeatures implements Disposable {
      */
     @Nullable
     public final LanguageServer getLanguageServer() {
-        return getServerWrapper().getLanguageServer();
+        return getServerWrapper().getServer();
     }
 
     /**
@@ -687,7 +687,7 @@ public class LSPClientFeatures implements Disposable {
      * @param serverWrapper the language server wrapper.
      */
     @ApiStatus.Internal
-    public final void setServerWrapper(LanguageServerWrapper serverWrapper) {
+    public final void setServerWrapper(LanguageServerItem serverWrapper) {
         this.serverWrapper = serverWrapper;
     }
 
@@ -697,7 +697,7 @@ public class LSPClientFeatures implements Disposable {
      * @return the language server wrapper.
      */
     @ApiStatus.Internal
-    final LanguageServerWrapper getServerWrapper() {
+    final LanguageServerItem getServerWrapper() {
         return serverWrapper;
     }
 

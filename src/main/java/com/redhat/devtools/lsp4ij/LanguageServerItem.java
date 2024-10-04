@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -20,7 +21,6 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.eclipse.lsp4j.services.WorkspaceService;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,17 +29,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Item which stores the initialized LSP4j language server and the language server wrapper.
  */
-public class LanguageServerItem {
-
-    private final LanguageServerWrapper serverWrapper;
-    private final LanguageServer server;
-    private final ServerCapabilities serverCapabilities;
-
-    public LanguageServerItem(LanguageServer server, LanguageServerWrapper serverWrapper) {
-        this.server = server;
-        this.serverWrapper = serverWrapper;
-        this.serverCapabilities = serverWrapper.getServerCapabilities();
-    }
+public interface LanguageServerItem extends Disposable {
 
     /**
      * Returns the project.
@@ -47,9 +37,7 @@ public class LanguageServerItem {
      * @return the project.
      */
     @NotNull
-    public Project getProject() {
-        return getServerWrapper().getProject();
-    }
+    Project getProject();
 
     /**
      * Returns the LSP4J language server initialized when the LanguageServerItem was created.
@@ -60,9 +48,7 @@ public class LanguageServerItem {
      *
      * @return the LSP4J language server initialized when the LanguageServerItem was created.
      */
-    public LanguageServer getServer() {
-        return server;
-    }
+    LanguageServer getServer();
 
     /**
      * Returns the LSP4J language server, guaranteed to be initialized at that point.
@@ -70,19 +56,7 @@ public class LanguageServerItem {
      * @return the LSP4J language server, guaranteed to be initialized at that point.
      */
     @NotNull
-    public CompletableFuture<LanguageServer> getInitializedServer() {
-        return getServerWrapper().getInitializedServer();
-    }
-
-    /**
-     * Returns the language server wrapper.
-     *
-     * @return the language server wrapper.
-     */
-    @ApiStatus.Internal
-    public LanguageServerWrapper getServerWrapper() {
-        return serverWrapper;
-    }
+    CompletableFuture<LanguageServer> getInitializedServer();
 
     /**
      * Returns the server definition.
@@ -90,34 +64,31 @@ public class LanguageServerItem {
      * @return the server definition.
      */
     @NotNull
-    public LanguageServerDefinition getServerDefinition() {
-        return getServerWrapper().getServerDefinition();
-    }
+    LanguageServerDefinition getServerDefinition();
+
+    @NotNull
+    ServerStatus getServerStatus();
 
     /**
      * Returns the LSP client features.
      *
      * @return the LSP client features.
      */
-    public LSPClientFeatures getClientFeatures() {
-        return getServerWrapper().getClientFeatures();
-    }
+    LSPClientFeatures getClientFeatures();
 
     /**
      * Returns the server capabilities of the language server.
      *
      * @return the server capabilities of the language server.
      */
-    public ServerCapabilities getServerCapabilities() {
-        return serverCapabilities;
-    }
+    ServerCapabilities getServerCapabilities();
 
     /**
      * Returns true if the language server can support resolve completion and false otherwise.
      *
      * @return true if the language server can support resolve completion and false otherwise.
      */
-    public boolean isResolveCompletionSupported() {
+    default boolean isResolveCompletionSupported() {
         return isResolveCompletionSupported(getServerCapabilities());
     }
 
@@ -126,7 +97,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support signature help and false otherwise.
      */
-    public boolean isSignatureHelpSupported() {
+    default boolean isSignatureHelpSupported() {
         return isSignatureHelpSupported(getServerCapabilities());
     }
 
@@ -135,7 +106,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support resolve code lens and false otherwise.
      */
-    public boolean isResolveCodeLensSupported() {
+    default boolean isResolveCodeLensSupported() {
         return isResolveCodeLensSupported(getServerCapabilities());
     }
 
@@ -144,7 +115,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support resolve inlay hint and false otherwise.
      */
-    public boolean isResolveInlayHintSupported() {
+    default boolean isResolveInlayHintSupported() {
         return isResolveInlayHintSupported(getServerCapabilities());
     }
 
@@ -153,7 +124,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support references and false otherwise.
      */
-    public boolean isReferencesSupported() {
+    default boolean isReferencesSupported() {
         return isReferencesSupported(getServerCapabilities());
     }
 
@@ -162,7 +133,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support implementation and false otherwise.
      */
-    public boolean isImplementationSupported() {
+    default boolean isImplementationSupported() {
         return isImplementationSupported(getServerCapabilities());
     }
 
@@ -171,7 +142,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support declaration and false otherwise.
      */
-    public boolean isDeclarationSupported() {
+    default boolean isDeclarationSupported() {
         return isDeclarationSupported(getServerCapabilities());
     }
 
@@ -180,7 +151,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support definition and false otherwise.
      */
-    public boolean isDefinitionSupported() {
+    default boolean isDefinitionSupported() {
         return isDefinitionSupported(getServerCapabilities());
     }
 
@@ -189,7 +160,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support type definition and false otherwise.
      */
-    public boolean isTypeDefinitionSupported() {
+    default boolean isTypeDefinitionSupported() {
         return isTypeDefinitionSupported(getServerCapabilities());
     }
 
@@ -198,7 +169,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support formatting and false otherwise.
      */
-    public boolean isDocumentFormattingSupported() {
+    default boolean isDocumentFormattingSupported() {
         return isDocumentFormattingSupported(getServerCapabilities());
     }
 
@@ -207,7 +178,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support range formatting and false otherwise.
      */
-    public boolean isDocumentRangeFormattingSupported() {
+    default boolean isDocumentRangeFormattingSupported() {
         return isDocumentRangeFormattingSupported(getServerCapabilities());
     }
 
@@ -428,7 +399,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support code action and false otherwise.
      */
-    public boolean isCodeActionSupported() {
+    default boolean isCodeActionSupported() {
         return isCodeActionSupported(getServerCapabilities());
     }
 
@@ -484,7 +455,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support prepare rename and false otherwise.
      */
-    public boolean isPrepareRenameSupported() {
+    default boolean isPrepareRenameSupported() {
         return isPrepareRenameSupported(getServerCapabilities());
     }
 
@@ -502,9 +473,7 @@ public class LanguageServerItem {
         return false;
     }
 
-    public boolean isWillRenameFilesSupported(PsiFile file) {
-        return serverWrapper.isWillRenameFilesSupported(file);
-    }
+    boolean isWillRenameFilesSupported(PsiFile file);
 
     public static boolean isWillRenameFilesSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
@@ -519,7 +488,7 @@ public class LanguageServerItem {
      * @param command the LSP command.
      * @return true if the given LSP command is supported by the language server and false otherwise.
      */
-    public boolean supportsCommand(@Nullable Command command) {
+    default boolean supportsCommand(@Nullable Command command) {
         if (command == null) {
             return false;
         }
@@ -536,7 +505,7 @@ public class LanguageServerItem {
      *
      * @return the LSP {@link TextDocumentService} of the language server.
      */
-    public TextDocumentService getTextDocumentService() {
+    default TextDocumentService getTextDocumentService() {
         return getServer().getTextDocumentService();
     }
 
@@ -545,7 +514,7 @@ public class LanguageServerItem {
      *
      * @return the LSP {@link WorkspaceService} of the language server.
      */
-    public WorkspaceService getWorkspaceService() {
+    default WorkspaceService getWorkspaceService() {
         return getServer().getWorkspaceService();
     }
 
@@ -560,7 +529,7 @@ public class LanguageServerItem {
         return capability != null && capability;
     }
 
-    public SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
+    default SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
         return getClientFeatures().getSemanticTokensFeature();
     }
 
@@ -579,7 +548,7 @@ public class LanguageServerItem {
      *
      * @return true if the language server can support workspace symbol and false otherwise.
      */
-    public boolean isWorkspaceSymbolSupported() {
+    default boolean isWorkspaceSymbolSupported() {
         return isWorkspaceSymbolSupported(getServerCapabilities());
     }
 
@@ -602,4 +571,13 @@ public class LanguageServerItem {
                 LanguageServerItem.isImplementationSupported(serverCapabilities);
     }
 
+    boolean isEnabled();
+
+    Exception getServerError();
+
+    @Nullable ServerCapabilities getServerCapabilitiesSync();
+
+    boolean isCompletionTriggerCharactersSupported(String completionChar);
+
+    boolean isDidRenameFilesSupported(@NotNull PsiFile file);
 }
