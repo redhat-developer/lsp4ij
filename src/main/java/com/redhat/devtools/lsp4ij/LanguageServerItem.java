@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -25,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Item which stores the initialized LSP4j language server and the language server wrapper.
@@ -39,6 +41,37 @@ public class LanguageServerItem {
         this.server = server;
         this.serverWrapper = serverWrapper;
         this.serverCapabilities = serverWrapper.getServerCapabilities();
+    }
+
+    /**
+     * Creates a 'lease' on this language server which expresses the intent of
+     * the caller for the server to be 'kept alive' for at as long as this
+     * lease has not been disposed.
+     * <p>
+     * The server may still be terminated under some exceptional circumstances, for example
+     * when:
+     * - the server crashed
+     * - the user explicitly terminated the server from the lsp4ij user interface
+     * <p>
+     * Under 'normal circumstances' however the server will not be shutdown due to 'inactivity'
+     * or because there are no more open editors.
+     * <p>
+     * In other words calling this methods creates a 'similar demand' on the language
+     * server's lifecycle as would opening a document in an editor.
+     */
+    public Disposable keepAlive() {
+        serverWrapper.incrementKeepAlive();
+        return new Disposable() {
+
+            AtomicBoolean isDisposed = new AtomicBoolean();
+
+            @Override
+            public void dispose() {
+                 if (!isDisposed.getAndSet(true)) {
+                     serverWrapper.decrementKeepAlive();
+                 }
+            }
+        };
     }
 
     /**

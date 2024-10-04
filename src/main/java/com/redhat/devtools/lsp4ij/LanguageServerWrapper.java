@@ -47,6 +47,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -109,6 +110,7 @@ public class LanguageServerWrapper implements Disposable {
     private FileOperationsManager fileOperationsManager;
 
     private LSPClientFeatures clientFeatures;
+    private final AtomicInteger keepAliveCounter = new AtomicInteger();
 
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
@@ -713,7 +715,13 @@ public class LanguageServerWrapper implements Disposable {
             synchronizer.getDocument().removeDocumentListener(synchronizer);
             synchronizer.documentClosed();
         }
-        if (!getClientFeatures().keepServerAlive() && stopIfNoOpenedFiles && this.connectedDocuments.isEmpty()) {
+        if (stopIfNoOpenedFiles) {
+            maybeShutdown();
+        }
+    }
+
+    private void maybeShutdown() {
+        if (!keepAlive()) {
             if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
                 removeStopTimer(true);
                 startStopTimer();
@@ -721,6 +729,19 @@ public class LanguageServerWrapper implements Disposable {
                 stop();
             }
         }
+    }
+
+    private boolean keepAlive() {
+        return getClientFeatures().keepServerAlive() && this.connectedDocuments.isEmpty() && this.keepAliveCounter.get() <= 0;
+    }
+
+    void incrementKeepAlive() {
+        keepAliveCounter.incrementAndGet();
+    }
+
+    void decrementKeepAlive() {
+        keepAliveCounter.decrementAndGet();
+        maybeShutdown();
     }
 
     /**
