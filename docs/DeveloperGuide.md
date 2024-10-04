@@ -701,3 +701,7 @@ but you can use your own provider with the `semanticTokensColorsProvider` extens
 
 </extensions>
 ```
+
+# Customize LSP features
+
+If you need to customize LSP (completion, diagnostics, etc) features please read [LSP API](./LSPApi.md). 

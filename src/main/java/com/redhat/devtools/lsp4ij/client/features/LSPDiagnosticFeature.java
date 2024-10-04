@@ -33,6 +33,26 @@ import java.util.List;
 
 /**
  * LSP diagnostic feature.
+ * <p>
+ * The following code snippet demonstrates how to use this class to allow a language server to ignore some LSP diagnostic:
+ * <pre>{@code
+ * public class MyLSPDiagnosticFeature extends LSPDiagnosticFeature {
+ *      @Override
+ *     public @Nullable HighlightSeverity getHighlightSeverity(@NotNull Diagnostic diagnostic) {
+ *         if (diagnostic.getCode() != null &&
+ *                 diagnostic.getCode().isLeft() &&
+ *                 "ignore".equals(diagnostic.getCode().getLeft())) {
+ *             // return a null HighlightSeverity when LSP diagnostic code is equals
+ *             // to 'ignore' to avoid creating an IntelliJ annotation
+ *             return null;
+ *         }
+ *         return super.getHighlightSeverity(diagnostic);
+ *     }
+ * }
+ * }</pre>
+ * See the documentation of {@link #getHighlightSeverity(Diagnostic)} for more details.
+ * <p>
+ * Additional information is available on <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md#lsp-diagnostic-feature">GitHub</a>
  */
 @ApiStatus.Experimental
 public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
@@ -51,7 +71,7 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
      */
     public void createAnnotation(@NotNull Diagnostic diagnostic,
                                  @NotNull Document document,
-                                 List<IntentionAction> fixes,
+                                 @NotNull List<IntentionAction> fixes,
                                  @NotNull AnnotationHolder holder) {
 
         // Get the text range from the given LSP diagnostic range.
@@ -78,7 +98,7 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
         // Create IntelliJ Annotation from the given LSP diagnostic
         AnnotationBuilder builder = holder
                 .newAnnotation(severity, message)
-                .tooltip(getToolTip(diagnostic))
+                .tooltip(getTooltip(diagnostic))
                 .range(range);
         if (range.getStartOffset() == range.getEndOffset()) {
             // Show the annotation at the end of line.
@@ -131,7 +151,7 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
      * @return the annotation tooltip from the given LSP diagnostic.
      */
     @NotNull
-    public String getToolTip(@NotNull Diagnostic diagnostic) {
+    public String getTooltip(@NotNull Diagnostic diagnostic) {
         // message
         StringBuilder tooltip = new StringBuilder("<html>");
         tooltip.append(StringUtil.escapeXmlEntities(diagnostic.getMessage()));
@@ -176,7 +196,7 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
     }
 
     @NotNull
-    private static String getFileName(Location location) {
+    private static String getFileName(@NotNull Location location) {
         String fileUri = location.getUri();
         int index = fileUri.lastIndexOf('/');
         String fileName = fileUri.substring(index + 1);
