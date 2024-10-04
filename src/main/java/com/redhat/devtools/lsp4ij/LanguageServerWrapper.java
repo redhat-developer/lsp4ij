@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.JsonObject;
 import com.intellij.lang.Language;
-import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -26,12 +25,12 @@ import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.internal.ClientCapabilitiesFactory;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -39,6 +38,7 @@ import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -56,7 +56,8 @@ import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClien
 /**
  * Language server wrapper.
  */
-public class LanguageServerWrapper implements Disposable {
+@ApiStatus.Internal
+public class LanguageServerWrapper implements LanguageServerItem {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerWrapper.class);
 
@@ -658,7 +659,7 @@ public class LanguageServerWrapper implements Disposable {
 
                 DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(fileUri, document);
                 document.addDocumentListener(synchronizer);
-                LSPVirtualFileData data = new LSPVirtualFileData(new LanguageServerItem(languageServer, this), fileToConnect, synchronizer);
+                LSPVirtualFileData data = new LSPVirtualFileData(this, fileToConnect, synchronizer);
                 LanguageServerWrapper.this.connectedDocuments.put(fileUri, data);
 
                 return getLanguageServerWhenDidOpen(synchronizer.didOpenFuture);

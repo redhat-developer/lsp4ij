@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.lifecycle;
 
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
@@ -55,7 +56,7 @@ public class LanguageServerLifecycleManager {
         this.listeners.remove(listener);
     }
 
-    public void onStatusChanged(LanguageServerWrapper languageServer) {
+    public void onStatusChanged(LanguageServerItem languageServer) {
         if (isDisposed()) {
             return;
         }

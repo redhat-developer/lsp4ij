@@ -141,7 +141,7 @@ public class LSPDiagnosticsForServer {
      * @return Intellij quickfixes for the given diagnostic if there available.
      */
     public List<IntentionAction> getQuickFixesFor(Diagnostic diagnostic) {
-        boolean codeActionSupported = isCodeActionSupported(languageServer.getServerWrapper());
+        boolean codeActionSupported = isCodeActionSupported((LanguageServerWrapper) languageServer);
         if (!codeActionSupported || diagnostics.isEmpty()) {
             return Collections.emptyList();
         }

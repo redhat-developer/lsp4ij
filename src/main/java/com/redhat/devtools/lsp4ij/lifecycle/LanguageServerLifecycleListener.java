@@ -13,7 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.lifecycle;
 
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 
@@ -24,11 +24,11 @@ import org.eclipse.lsp4j.jsonrpc.messages.Message;
  */
 public interface LanguageServerLifecycleListener {
     
-    void handleStatusChanged(LanguageServerWrapper languageServer);
+    void handleStatusChanged(LanguageServerItem languageServer);
 
-    void handleLSPMessage(Message message, MessageConsumer consumer, LanguageServerWrapper languageServer);
+    void handleLSPMessage(Message message, MessageConsumer consumer, LanguageServerItem languageServer);
 
-    void handleError(LanguageServerWrapper languageServer, Throwable exception);
+    void handleError(LanguageServerItem languageServer, Throwable exception);
 
     void dispose();
 

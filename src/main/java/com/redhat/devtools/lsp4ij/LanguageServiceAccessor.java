@@ -63,7 +63,7 @@ public class LanguageServiceAccessor implements Disposable {
                     .stream()
                     .filter(server -> event.serverDefinitions.contains(server.getServerDefinition()))
                     .toList();
-            serversToDispose.forEach(LanguageServerWrapper::dispose);
+            serversToDispose.forEach(LanguageServerItem::dispose);
             // Remove all servers which are removed from the cache
             synchronized (startedServers) {
                 serversToDispose.forEach(startedServers::remove);
@@ -190,13 +190,13 @@ public class LanguageServiceAccessor implements Disposable {
         try {
             return CompletableFuture.allOf(matchedServers
                             .stream()
-                            .filter(LanguageServerWrapper::isEnabled)
+                            .filter(LanguageServerItem::isEnabled)
                             .map(wrapper ->
                                     wrapper.getInitializedServer()
                                             .thenComposeAsync(server -> {
                                                 if (server != null &&
                                                         (afterStartingServerFilter == null || afterStartingServerFilter.test(wrapper.getClientFeatures()))) {
-                                                    servers.add(new LanguageServerItem(server, wrapper));
+                                                    servers.add(wrapper);
                                                 }
                                                 return CompletableFuture.completedFuture(null);
                                             }))
@@ -241,7 +241,7 @@ public class LanguageServiceAccessor implements Disposable {
             return matchedServers
                     .thenComposeAsync(result -> CompletableFuture.allOf(result
                             .stream()
-                            .filter(LanguageServerWrapper::isEnabled)
+                            .filter(LanguageServerItem::isEnabled)
                             .map(wrapper ->
                                     wrapper.getInitializedServer()
                                             .thenComposeAsync(server -> {
@@ -252,7 +252,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                 return CompletableFuture.completedFuture(null);
                                             }).thenAccept(server -> {
                                                 if (server != null) {
-                                                    servers.add(new LanguageServerItem(server, wrapper));
+                                                    servers.add(wrapper);
                                                 }
                                             })).toArray(CompletableFuture[]::new)))
                     .thenApply(theVoid -> servers);

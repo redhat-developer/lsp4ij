@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.features.refactoring;
 
 import com.intellij.refactoring.listeners.RefactoringEventData;
 import com.intellij.refactoring.listeners.RefactoringEventListener;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.eclipse.lsp4j.RenameFilesParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,7 +38,7 @@ public class LSPRefactoringListener implements RefactoringEventListener {
             // Send for those language servers an LSP 'workspace/didRenameFiles' notifications.
             context.servers()
                             .forEach(languageServerItem ->  {
-                                var serverWrapper = languageServerItem.getServerWrapper();
+                                LanguageServerWrapper serverWrapper = (LanguageServerWrapper) languageServerItem;
                                 if (languageServerItem.getClientFeatures().getRenameFeature().isDidRenameFilesSupported(file)) {
                                     serverWrapper.sendNotification(ls -> {
                                         RenameFilesParams params = context.params();

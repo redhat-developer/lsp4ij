@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.console.explorer;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.util.text.Formats;
 import com.intellij.ui.AnimatedIcon;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 
@@ -30,7 +31,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
 
     private static final Icon RUNNING_ICON = new AnimatedIcon.Default();
 
-    private final LanguageServerWrapper languageServer;
+    private final LanguageServerItem languageServer;
 
     private final DefaultTreeModel treeModel;
 
@@ -40,7 +41,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
 
     private String displayName;
 
-    public LanguageServerProcessTreeNode(LanguageServerWrapper languageServer, DefaultTreeModel treeModel) {
+    public LanguageServerProcessTreeNode(LanguageServerItem languageServer, DefaultTreeModel treeModel) {
         this.languageServer = languageServer;
         this.treeModel = treeModel;
         setServerStatus(ServerStatus.none);
@@ -73,15 +74,15 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
             name.append(serverStatus.name());
         } else {
             name.append(serverStatus == ServerStatus.stopped ? "crashed" : serverStatus.name());
-            int nbTryRestart = languageServer.getNumberOfRestartAttempts();
-            int nbTryRestartMax = languageServer.getMaxNumberOfRestartAttempts();
+            int nbTryRestart = ((LanguageServerWrapper)languageServer).getNumberOfRestartAttempts();
+            int nbTryRestartMax = ((LanguageServerWrapper)languageServer).getMaxNumberOfRestartAttempts();
             name.append(" [");
             name.append(nbTryRestart);
             name.append("/");
             name.append(nbTryRestartMax);
             name.append("]");
         }
-        Long pid = languageServer.getCurrentProcessId();
+        Long pid = ((LanguageServerWrapper)languageServer).getCurrentProcessId();
         if (pid != null) {
             name.append(" pid:");
             name.append(pid);
@@ -89,7 +90,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
         return name.toString();
     }
 
-    public LanguageServerWrapper getLanguageServer() {
+    public LanguageServerItem getLanguageServer() {
         return languageServer;
     }
 
