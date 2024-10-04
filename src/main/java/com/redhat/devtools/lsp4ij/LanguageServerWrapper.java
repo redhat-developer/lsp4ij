@@ -732,7 +732,7 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private boolean keepAlive() {
-        return getClientFeatures().keepServerAlive() && this.connectedDocuments.isEmpty() && this.keepAliveCounter.get() <= 0;
+        return getClientFeatures().keepServerAlive() || !this.connectedDocuments.isEmpty() || this.keepAliveCounter.get() > 0;
     }
 
     void incrementKeepAlive() {
