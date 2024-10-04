@@ -45,13 +45,14 @@ public class LanguageServerItem {
 
     /**
      * Creates a 'lease' on this language server which expresses the intent of
-     * the caller for the server to be 'kept alive' for at as long as this
+     * the caller for the server to be 'kept alive' for as long as this
      * lease has not been disposed.
      * <p>
      * The server may still be terminated under some exceptional circumstances, for example
      * when:
      * - the server crashed
      * - the user explicitly terminated the server from the lsp4ij user interface
+     * - the IDE is shutting down
      * <p>
      * Under 'normal circumstances' however the server will not be shutdown due to 'inactivity'
      * or because there are no more open editors.
