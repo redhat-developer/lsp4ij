@@ -12,10 +12,11 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.util.text.StringUtilRt;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
+import com.redhat.devtools.lsp4ij.server.capabilities.HoverCapabilityRegistry;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,9 +27,37 @@ import org.jetbrains.annotations.Nullable;
 @ApiStatus.Experimental
 public class LSPHoverFeature extends AbstractLSPDocumentFeature {
 
+    private HoverCapabilityRegistry hoverCapabilityRegistry;
+
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
         return isHoverSupported(file);
+    }
+
+    /**
+     * Returns true if the file associated with a language server can support hover and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the file associated with a language server can support hover and false otherwise.
+     */
+    public boolean isHoverSupported(@NotNull PsiFile file) {
+        return getHoverCapabilityRegistry().isHoverSupported(file);
+    }
+
+    public HoverCapabilityRegistry getHoverCapabilityRegistry() {
+        if (hoverCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            hoverCapabilityRegistry = new HoverCapabilityRegistry(clientFeatures);
+            hoverCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return hoverCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (hoverCapabilityRegistry != null) {
+            hoverCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 
     /**
@@ -53,17 +82,6 @@ public class LSPHoverFeature extends AbstractLSPDocumentFeature {
         var project = file.getProject();
         return MarkdownConverter.getInstance(project)
                 .toHtml(StringUtilRt.convertLineSeparators(content.getValue()), file);
-    }
-
-    /**
-     * Returns true if the file associated with a language server can support hover and false otherwise.
-     *
-     * @param file the file.
-     * @return true if the file associated with a language server can support hover and false otherwise.
-     */
-    public boolean isHoverSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isHoverSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
     }
 
 }

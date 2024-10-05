@@ -43,7 +43,6 @@ public abstract class AbstractLSPDocumentFeature extends AbstractLSPFeature {
      * </p>
      *
      * @param file the file.
-     *
      * @return true if the LSP feature is supported for the given file and false otherwise.
      */
     public abstract boolean isSupported(@NotNull PsiFile file);

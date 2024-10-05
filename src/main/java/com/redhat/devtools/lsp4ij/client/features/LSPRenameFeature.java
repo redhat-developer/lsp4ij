@@ -12,8 +12,11 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.RenameCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP rename feature.
@@ -21,20 +24,47 @@ import org.jetbrains.annotations.NotNull;
 @ApiStatus.Experimental
 public class LSPRenameFeature extends AbstractLSPDocumentFeature {
 
+    private RenameCapabilityRegistry renameCapabilityRegistry;
+
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
         return isRenameSupported(file);
     }
 
     /**
-     * Returns true if the file associated with a language server can support codelens and false otherwise.
+     * Returns true if the file associated with a language server can support rename and false otherwise.
      *
      * @param file the file.
-     * @return true if the file associated with a language server can support codelens and false otherwise.
+     * @return true if the file associated with a language server can support rename and false otherwise.
      */
     public boolean isRenameSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isRenameSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getRenameCapabilityRegistry().isRenameSupported(file);
+    }
+
+    /**
+     * Returns true if the file associated with a language server can support prepareRename and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the file associated with a language server can support prepareRename and false otherwise.
+     */
+    public boolean isPrepareRenameSupported(@NotNull PsiFile file) {
+        return getRenameCapabilityRegistry().isPrepareRenameSupported(file);
+    }
+
+    public RenameCapabilityRegistry getRenameCapabilityRegistry() {
+        if (renameCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            renameCapabilityRegistry = new RenameCapabilityRegistry(clientFeatures);
+            renameCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return renameCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (renameCapabilityRegistry != null) {
+            renameCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 
     public boolean isWillRenameFilesSupported(@NotNull PsiFile file) {

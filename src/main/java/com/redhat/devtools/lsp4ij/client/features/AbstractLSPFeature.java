@@ -14,6 +14,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -100,4 +101,6 @@ public abstract class AbstractLSPFeature implements Disposable {
     public void dispose() {
         clientFeatures = null;
     }
+
+    public abstract void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities);
 }

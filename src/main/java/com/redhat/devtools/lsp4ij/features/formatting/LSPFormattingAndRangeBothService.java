@@ -30,7 +30,7 @@ public class LSPFormattingAndRangeBothService extends AbstractLSPFormattingServi
 
     @Override
     protected boolean canSupportFormatting(LSPFormattingFeature formattingFeature, PsiFile file) {
-        return formattingFeature.isDocumentRangeFormattingSupported(file);
+        return formattingFeature.isRangeFormattingSupported(file);
     }
 
 }

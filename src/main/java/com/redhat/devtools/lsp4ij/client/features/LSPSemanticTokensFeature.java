@@ -12,8 +12,8 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -57,7 +57,13 @@ public class LSPSemanticTokensFeature extends AbstractLSPDocumentFeature impleme
      * @return true if the file associated with a language server can support semanticTokens and false otherwise.
      */
     public boolean isSemanticTokensSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isSemanticTokensSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        var serverCapabilities = getClientFeatures().getServerWrapper().getServerCapabilitiesSync();
+        return serverCapabilities != null &&
+                serverCapabilities.getSemanticTokensProvider() != null;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        // Do nothing
     }
 }

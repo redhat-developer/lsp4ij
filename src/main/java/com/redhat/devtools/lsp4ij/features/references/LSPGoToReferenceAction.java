@@ -16,11 +16,11 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.ServerCapabilities;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,14 +56,14 @@ public class LSPGoToReferenceAction extends AbstractLSPGoToAction {
             // cancel the LSP requests textDocument/references
             referenceSupport.cancel();
         } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/reference' request", e);
+            LOGGER.error("Error while consuming LSP 'textDocument/references' request", e);
         }
         return referencesFuture;
     }
 
     @Override
-    protected boolean canSupportFeature(ServerCapabilities serverCapabilities) {
-        return LanguageServerItem.isReferencesSupported(serverCapabilities);
+    protected boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file) {
+        return clientFeatures.getReferencesFeature().isReferencesSupported(file);
     }
 
 }

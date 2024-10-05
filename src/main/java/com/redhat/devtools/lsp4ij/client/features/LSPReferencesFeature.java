@@ -11,15 +11,19 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.ReferencesCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP references feature.
  */
 @ApiStatus.Experimental
 public class LSPReferencesFeature extends AbstractLSPDocumentFeature {
+
+    private ReferencesCapabilityRegistry referencesCapabilityRegistry;
 
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
@@ -33,7 +37,23 @@ public class LSPReferencesFeature extends AbstractLSPDocumentFeature {
      * @return true if the file associated with a language server can support references and false otherwise.
      */
     public boolean isReferencesSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isReferencesSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getReferencesCapabilityRegistry().isReferencesSupported(file);
     }
+
+    public ReferencesCapabilityRegistry getReferencesCapabilityRegistry() {
+        if (referencesCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            referencesCapabilityRegistry = new ReferencesCapabilityRegistry(clientFeatures);
+            referencesCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return referencesCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (referencesCapabilityRegistry != null) {
+            referencesCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
+    }
+    
 }

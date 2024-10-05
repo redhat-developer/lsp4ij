@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -23,6 +24,7 @@ import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.util.Ranges;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -138,10 +140,12 @@ public class LSPDiagnosticsForServer {
      * Returns Intellij quickfixes for the given diagnostic if there available.
      *
      * @param diagnostic the diagnostic.
+     * @param file
      * @return Intellij quickfixes for the given diagnostic if there available.
      */
-    public List<IntentionAction> getQuickFixesFor(Diagnostic diagnostic) {
-        boolean codeActionSupported = isCodeActionSupported(languageServer.getServerWrapper());
+    public List<IntentionAction> getQuickFixesFor(@NotNull Diagnostic diagnostic,
+                                                  @NotNull PsiFile file) {
+        boolean codeActionSupported = isCodeActionSupported(languageServer.getServerWrapper(), file);
         if (!codeActionSupported || diagnostics.isEmpty()) {
             return Collections.emptyList();
         }
@@ -149,13 +153,14 @@ public class LSPDiagnosticsForServer {
         return codeActions != null ? codeActions.getCodeActions() : Collections.emptyList();
     }
 
-    private static boolean isCodeActionSupported(LanguageServerWrapper languageServerWrapper) {
+    private static boolean isCodeActionSupported(@NotNull LanguageServerWrapper languageServerWrapper,
+                                                 @NotNull PsiFile file) {
         if (!languageServerWrapper.isActive() || languageServerWrapper.isStopping()) {
             // This use-case comes from when a diagnostics is published and the language server is stopped
             // We cannot use here languageServerWrapper.getServerCapabilities() otherwise it will restart the language server.
             return false;
         }
-        return LanguageServerItem.isCodeActionSupported(languageServerWrapper.getServerCapabilities());
+        return languageServerWrapper.getClientFeatures().getCodeActionFeature().isCodeActionSupported(file);
     }
 
 }

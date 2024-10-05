@@ -16,11 +16,11 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.ServerCapabilities;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +62,8 @@ public class LSPGoToImplementationAction extends AbstractLSPGoToAction {
     }
 
     @Override
-    protected boolean canSupportFeature(ServerCapabilities serverCapabilities) {
-        return LanguageServerItem.isImplementationSupported(serverCapabilities);
+    protected boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file) {
+        return clientFeatures.getImplementationFeature().isImplementationSupported(file);
     }
 
 }

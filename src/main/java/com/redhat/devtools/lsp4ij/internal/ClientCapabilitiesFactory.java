@@ -118,13 +118,13 @@ public class ClientCapabilitiesFactory {
         textDocumentClientCapabilities.setCodeAction(codeAction);
 
         // Code Lens support
-        textDocumentClientCapabilities.setCodeLens(new CodeLensCapabilities());
+        textDocumentClientCapabilities.setCodeLens(new CodeLensCapabilities(Boolean.TRUE));
 
         // Inlay Hint support
-        textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities());
+        textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities(Boolean.TRUE));
 
         // textDocument/colorPresentation support
-        textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities());
+        textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities(Boolean.TRUE));
 
         // Completion support
         final var completionItemCapabilities = new CompletionItemCapabilities(Boolean.TRUE);
@@ -140,10 +140,11 @@ public class ClientCapabilitiesFactory {
         completionItemCapabilities.setLabelDetailsSupport(Boolean.TRUE);
         CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
         completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
+        completionCapabilities.setDynamicRegistration(Boolean.TRUE);
         textDocumentClientCapabilities.setCompletion(completionCapabilities);
 
         // Signature help support
-        SignatureHelpCapabilities signatureHelpCapabilities = new SignatureHelpCapabilities();
+        SignatureHelpCapabilities signatureHelpCapabilities = new SignatureHelpCapabilities(Boolean.TRUE);
         SignatureInformationCapabilities signatureInformationCapabilities = new SignatureInformationCapabilities();
         ParameterInformationCapabilities parameterInformationCapabilities = new ParameterInformationCapabilities();
         parameterInformationCapabilities.setLabelOffsetSupport(Boolean.TRUE);
@@ -152,28 +153,28 @@ public class ClientCapabilitiesFactory {
         textDocumentClientCapabilities.setSignatureHelp(signatureHelpCapabilities);
 
         // Declaration support
-        final var declarationCapabilities = new DeclarationCapabilities();
+        final var declarationCapabilities = new DeclarationCapabilities(Boolean.TRUE);
         declarationCapabilities.setLinkSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setDeclaration(declarationCapabilities);
 
         // Definition support
-        final var definitionCapabilities = new DefinitionCapabilities();
+        final var definitionCapabilities = new DefinitionCapabilities(Boolean.TRUE);
         definitionCapabilities.setLinkSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setDefinition(definitionCapabilities);
 
         // Type Definition support
-        final var typeDefinitionCapabilities = new TypeDefinitionCapabilities();
+        final var typeDefinitionCapabilities = new TypeDefinitionCapabilities(Boolean.TRUE);
         typeDefinitionCapabilities.setLinkSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setTypeDefinition(typeDefinitionCapabilities);
 
         // DocumentHighlight support
-        textDocumentClientCapabilities.setDocumentHighlight(new DocumentHighlightCapabilities());
+        textDocumentClientCapabilities.setDocumentHighlight(new DocumentHighlightCapabilities(Boolean.TRUE));
 
         // DocumentLink support
-        textDocumentClientCapabilities.setDocumentLink(new DocumentLinkCapabilities());
+        textDocumentClientCapabilities.setDocumentLink(new DocumentLinkCapabilities(Boolean.TRUE));
 
         // textDocument/documentSymbol
-        final var documentSymbol = new DocumentSymbolCapabilities();
+        final var documentSymbol = new DocumentSymbolCapabilities(Boolean.TRUE);
         documentSymbol.setHierarchicalDocumentSymbolSupport(true);
         documentSymbol.setSymbolKind(new SymbolKindCapabilities(Arrays.asList(SymbolKind.Array,
                 SymbolKind.Boolean, SymbolKind.Class, SymbolKind.Constant, SymbolKind.Constructor,
@@ -185,37 +186,36 @@ public class ClientCapabilitiesFactory {
         textDocumentClientCapabilities.setDocumentSymbol(documentSymbol);
 
         // FoldingRange support
-        textDocumentClientCapabilities.setFoldingRange(new FoldingRangeCapabilities());
-
-        // Formatting support
-        textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
-        textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities(Boolean.TRUE));
+        var foldingRangeCapabilities = new FoldingRangeCapabilities();
+        foldingRangeCapabilities.setDynamicRegistration(Boolean.TRUE);
+        textDocumentClientCapabilities.setFoldingRange(foldingRangeCapabilities);
 
         // Hover support
-        final var hoverCapabilities = new HoverCapabilities();
+        final var hoverCapabilities = new HoverCapabilities(Boolean.TRUE);
         hoverCapabilities.setContentFormat(List.of(MarkupKind.MARKDOWN, MarkupKind.PLAINTEXT));
         textDocumentClientCapabilities.setHover(hoverCapabilities);
 
         // References support
-        textDocumentClientCapabilities.setReferences(new ReferencesCapabilities());
+        textDocumentClientCapabilities.setReferences(new ReferencesCapabilities(Boolean.TRUE));
 
         // Implementation support
-        var implementationCapabilities = new ImplementationCapabilities();
+        var implementationCapabilities = new ImplementationCapabilities(Boolean.TRUE);
         implementationCapabilities.setLinkSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setImplementation(implementationCapabilities);
 
-        // TODO: support onTypeFormatting
-        // textDocumentClientCapabilities.setOnTypeFormatting(null); // TODO
-        // TODO : support textDocument/rangeFormatting
-        // textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities());
+        // textDocument/formatting
+        textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
+
+        // textDocument/rangeFormatting
+        textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities(Boolean.TRUE));
 
         // textDocument/rename support
-        final var renameCapabilities = new RenameCapabilities();
+        final var renameCapabilities = new RenameCapabilities(Boolean.TRUE);
         renameCapabilities.setPrepareSupport(true);
         textDocumentClientCapabilities.setRename(renameCapabilities);
 
         // textDocument/semanticTokens
-        var semanticTokensCapabilities = new SemanticTokensCapabilities();
+        var semanticTokensCapabilities = new SemanticTokensCapabilities(Boolean.TRUE);
         semanticTokensCapabilities.setTokenTypes(List.of(
                 SemanticTokenTypes.Namespace,
                 SemanticTokenTypes.Type,

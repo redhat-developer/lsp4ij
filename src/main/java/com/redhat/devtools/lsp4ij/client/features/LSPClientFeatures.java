@@ -12,9 +12,13 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.TextDocumentRegistrationOptions;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -32,7 +36,7 @@ public class LSPClientFeatures implements Disposable {
 
     private LSPCodeLensFeature codeLensFeature;
 
-    private LSPColorFeature colorFeature;
+    private LSPDocumentColorFeature documentColorFeature;
 
     private LSPCompletionFeature completionFeature;
 
@@ -71,7 +75,7 @@ public class LSPClientFeatures implements Disposable {
     private LSPUsageFeature usageFeature;
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
-
+    
     /**
      * Returns the project.
      *
@@ -187,22 +191,22 @@ public class LSPClientFeatures implements Disposable {
      * @return the LSP color feature.
      */
     @NotNull
-    public final LSPColorFeature getColorFeature() {
-        if (colorFeature == null) {
-            setColorFeature(new LSPColorFeature());
+    public final LSPDocumentColorFeature getDocumentColorFeature() {
+        if (documentColorFeature == null) {
+            setDocumentColorFeature(new LSPDocumentColorFeature());
         }
-        return colorFeature;
+        return documentColorFeature;
     }
 
     /**
      * Initialize the LSP color feature.
      *
-     * @param colorFeature the LSP color feature.
+     * @param documentColorFeature the LSP color feature.
      * @return the LSP client features.
      */
-    public final LSPClientFeatures setColorFeature(@NotNull LSPColorFeature colorFeature) {
-        colorFeature.setClientFeatures(this);
-        this.colorFeature = colorFeature;
+    public final LSPClientFeatures setDocumentColorFeature(@NotNull LSPDocumentColorFeature documentColorFeature) {
+        documentColorFeature.setClientFeatures(this);
+        this.documentColorFeature = documentColorFeature;
         return this;
     }
 
@@ -713,8 +717,8 @@ public class LSPClientFeatures implements Disposable {
         if (codeLensFeature != null) {
             codeLensFeature.dispose();
         }
-        if (colorFeature != null) {
-            colorFeature.dispose();
+        if (documentColorFeature != null) {
+            documentColorFeature.dispose();
         }
         if (completionFeature != null) {
             completionFeature.dispose();
@@ -780,4 +784,161 @@ public class LSPClientFeatures implements Disposable {
             workspaceSymbolFeature.dispose();
         }
     }
+
+    public void setServerCapabilities(@NotNull ServerCapabilities serverCapabilities) {
+        if (codeActionFeature != null) {
+            codeActionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (codeLensFeature != null) {
+            codeLensFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (completionFeature != null) {
+            completionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (codeActionFeature != null) {
+            codeActionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (codeActionFeature != null) {
+            codeActionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (declarationFeature != null) {
+            declarationFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (definitionFeature != null) {
+            definitionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (documentColorFeature != null) {
+            documentColorFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (documentLinkFeature != null) {
+            documentLinkFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (documentHighlightFeature != null) {
+            documentHighlightFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (documentSymbolFeature != null) {
+            documentSymbolFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (diagnosticFeature != null) {
+            diagnosticFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (foldingRangeFeature != null) {
+            foldingRangeFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (formattingFeature != null) {
+            formattingFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (implementationFeature != null) {
+            implementationFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (inlayHintFeature != null) {
+            inlayHintFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (hoverFeature != null) {
+            hoverFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (referencesFeature != null) {
+            referencesFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (renameFeature != null) {
+            renameFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (semanticTokensFeature != null) {
+            semanticTokensFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (signatureHelpFeature != null) {
+            signatureHelpFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (typeDefinitionFeature != null) {
+            typeDefinitionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (usageFeature != null) {
+            usageFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (workspaceSymbolFeature != null) {
+            workspaceSymbolFeature.setServerCapabilities(serverCapabilities);
+        }
+    }
+
+    @Nullable
+    public TextDocumentServerCapabilityRegistry<? extends TextDocumentRegistrationOptions> getCapabilityRegistry(String method) {
+        if (LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION.equals(method)) {
+            // register 'textDocument/codeAction' capability
+            return getCodeActionFeature().getCodeActionCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS.equals(method)) {
+            // register 'textDocument/codeLens' capability
+            return getCodeLensFeature().getCodeLensCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR.equals(method)) {
+            // register 'textDocument/documentColor' capability
+            return getDocumentColorFeature().getDocumentColorCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_COMPLETION.equals(method)) {
+            // register 'textDocument/completion' capability
+            return getCompletionFeature().getCompletionCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_DECLARATION.equals(method)) {
+            // register 'textDocument/declaration' capability
+            return getDeclarationFeature().getDeclarationCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_DEFINITION.equals(method)) {
+            // register 'textDocument/definition' capability
+            return getDefinitionFeature().getDefinitionCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT.equals(method)) {
+            // register 'textDocument/documentHighlight' capability
+            return getDocumentHighlightFeature().getDocumentHighlightCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_LINK.equals(method)) {
+            // register 'textDocument/documentHighLink' capability
+            return getDocumentLinkFeature().getDocumentLinkCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_SYMBOL.equals(method)) {
+            // register 'textDocument/documentSymbol' capability
+            return getDocumentSymbolFeature().getDocumentSymbolCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_FOLDING_RANGE.equals(method)) {
+            // register 'textDocument/foldingRange' capability
+            return getFoldingRangeFeature().getFoldingRangeCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_FORMATTING.equals(method)) {
+            // register 'textDocument/formatting' capability
+            return getFormattingFeature().getFormattingCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING.equals(method)) {
+            // register 'textDocument/rangeFormatting' capability
+            return getFormattingFeature().getRangeFormattingCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_HOVER.equals(method)) {
+            // register 'textDocument/hover' capability
+            return getHoverFeature().getHoverCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION.equals(method)) {
+            // register 'textDocument/implementation' capability
+            return getImplementationFeature().getImplementationCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT.equals(method)) {
+            // register 'textDocument/inlayHint' capability
+            return getInlayHintFeature().getInlayHintCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_REFERENCES.equals(method)) {
+            // register 'textDocument/references' capability
+            return getReferencesFeature().getReferencesCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_RENAME.equals(method)) {
+            // register 'textDocument/rename' capability
+            return getRenameFeature().getRenameCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_SIGNATURE_HELP.equals(method)) {
+            // register 'textDocument/signatureHelp' capability
+            return getSignatureHelpFeature().getSignatureHelpCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION.equals(method)) {
+            // register 'textDocument/typeDefinition' capability
+            return getTypeDefinitionFeature().getTypeDefinitionCapabilityRegistry();
+        }
+        return null;
+    }
+
 }

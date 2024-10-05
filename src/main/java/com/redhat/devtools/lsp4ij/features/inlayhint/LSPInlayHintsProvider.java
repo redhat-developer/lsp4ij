@@ -178,7 +178,7 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
                                 @NotNull InlayHint inlayHint,
                                 int index,
                                 @Nullable MouseEvent event) {
-        if (languageServer.isResolveInlayHintSupported()) {
+        if (languageServer.getClientFeatures().getInlayHintFeature().isResolveInlayHintSupported(psiFile)) {
             languageServer.getTextDocumentService()
                     .resolveInlayHint(inlayHint)
                     .thenAcceptAsync(resolvedInlayHint -> {

@@ -12,11 +12,12 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.capabilities.CodeActionCapabilityRegistry;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,6 +28,8 @@ import org.jetbrains.annotations.Nullable;
 @ApiStatus.Experimental
 public class LSPCodeActionFeature extends AbstractLSPDocumentFeature {
 
+    private CodeActionCapabilityRegistry codeActionCapabilityRegistry;
+
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
         return isCodeActionSupported(file);
@@ -35,13 +38,23 @@ public class LSPCodeActionFeature extends AbstractLSPDocumentFeature {
     /**
      * Returns true if the file associated with a language server can support codeAction and false otherwise.
      *
-     * @param file the file.
+     * @param file    the file.
      * @return true if the file associated with a language server can support codeAction and false otherwise.
      */
     public boolean isCodeActionSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isCodeActionSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getCodeActionCapabilityRegistry().isCodeActionSupported(file);
     }
+
+    /**
+     * Returns true if the file associated with a language server can support resolve codeAction and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the file associated with a language server can support resolve codeAction and false otherwise.
+     */
+    public boolean isResolveCodeActionSupported(@NotNull PsiFile file) {
+        return getCodeActionCapabilityRegistry().isResolveCodeActionSupported(file);
+    }
+
 
     /**
      * Returns true if quick fixes are enabled and false otherwise.
@@ -124,5 +137,21 @@ public class LSPCodeActionFeature extends AbstractLSPDocumentFeature {
     @NotNull
     public String getFamilyName(@NotNull Command command) {
         return "LSP Command";
+    }
+
+    public CodeActionCapabilityRegistry getCodeActionCapabilityRegistry() {
+        if (codeActionCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            codeActionCapabilityRegistry = new CodeActionCapabilityRegistry(clientFeatures);
+            codeActionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return codeActionCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if(codeActionCapabilityRegistry != null) {
+            codeActionCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 }

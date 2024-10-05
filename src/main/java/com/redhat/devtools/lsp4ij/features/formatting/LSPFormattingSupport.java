@@ -90,9 +90,9 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
                                                                                  @NotNull CancellationSupport cancellationSupport) {
         boolean isRangeFormatting = params.textRange() != null;
         Predicate<LSPClientFeatures> filter = !isRangeFormatting ?
-                f -> f.getFormattingFeature().isDocumentFormattingSupported(file) :
-                f -> f.getFormattingFeature().isDocumentFormattingSupported(file) ||
-                        f.getFormattingFeature().isDocumentRangeFormattingSupported(file);
+                f -> f.getFormattingFeature().isFormattingSupported(file) :
+                f -> f.getFormattingFeature().isFormattingSupported(file) ||
+                        f.getFormattingFeature().isRangeFormattingSupported(file);
         return getLanguageServers(file,
                 f -> f.getFormattingFeature().isEnabled(file),
                 filter)

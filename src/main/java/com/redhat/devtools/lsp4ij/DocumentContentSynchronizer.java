@@ -10,20 +10,17 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.fileTypes.FileType;
-import com.intellij.openapi.fileTypes.FileTypes;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -50,8 +47,9 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull URI fileUri,
+                                       @NotNull VirtualFile file,
                                        @NotNull Document document,
-                                       TextDocumentSyncKind syncKind) {
+                                       @Nullable TextDocumentSyncKind syncKind) {
         this.languageServerWrapper = languageServerWrapper;
         this.fileUri = fileUri.toASCIIString();
         this.syncKind = syncKind != null ? syncKind : TextDocumentSyncKind.Full;
@@ -62,7 +60,7 @@ public class DocumentContentSynchronizer implements DocumentListener {
         textDocument.setUri(this.fileUri);
         textDocument.setText(document.getText());
 
-        @NotNull String languageId = getLanguageId(document, languageServerWrapper);
+        @NotNull String languageId = languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
         textDocument.setLanguageId(languageId);
         textDocument.setVersion(++version);
         didOpenFuture = languageServerWrapper
@@ -87,54 +85,6 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
         // Initialize LSP change events
         changeEvents = new ArrayList<>();
-    }
-
-    /**
-     * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
-     *
-     * @param document       the document.
-     * @param languageServer the language server.
-     * @return the LSP language id.
-     */
-    private static @NotNull String getLanguageId(@NotNull Document document, @NotNull LanguageServerWrapper languageServer) {
-        VirtualFile file = FileDocumentManager.getInstance().getFile(document);
-        if (file == null) {
-            return FileTypes.UNKNOWN.getName().toLowerCase();
-        }
-
-        Project project = languageServer.getProject();
-
-        // 1. Try to get the LSP languageId by using language mapping
-        Language language = LSPIJUtils.getFileLanguage(file, project);
-        String languageId = languageServer.getLanguageId(language);
-        if (languageId != null) {
-            return languageId;
-        }
-
-        // 2. Try to get the LSP languageId by using the fileType mapping
-        FileType fileType = file.getFileType();
-        languageId = languageServer.getLanguageId(fileType);
-        if (languageId != null) {
-            return languageId;
-        }
-
-        // 3. Try to get the LSP languageId by using the file name pattern mapping
-        languageId = languageServer.getLanguageId(file.getName());
-        if (languageId != null) {
-            return languageId;
-        }
-
-        // At this step there is no mapping
-
-        // We return the language Id if it exists or file type name
-        // with 'lower case' to try to map the recommended languageId specified at
-        // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem
-        if (language != null) {
-            // The language exists, use its ID with lower case
-            return language.getID().toLowerCase();
-        }
-        // Returns the existing file type or 'unknown' with lower case
-        return file.getName().toLowerCase();
     }
 
     @Override

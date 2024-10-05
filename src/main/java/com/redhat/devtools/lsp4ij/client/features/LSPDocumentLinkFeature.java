@@ -11,15 +11,19 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.DocumentLinkCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP documentLink feature.
  */
 @ApiStatus.Experimental
 public class LSPDocumentLinkFeature extends AbstractLSPDocumentFeature {
+
+    private DocumentLinkCapabilityRegistry documentLinkCapabilityRegistry;
 
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
@@ -33,7 +37,22 @@ public class LSPDocumentLinkFeature extends AbstractLSPDocumentFeature {
      * @return true if the file associated with a language server can support codelens and false otherwise.
      */
     public boolean isDocumentLinkSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isDocumentLinkSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getDocumentLinkCapabilityRegistry().isDocumentLinkSupported(file);
+    }
+
+    public DocumentLinkCapabilityRegistry getDocumentLinkCapabilityRegistry() {
+        if (documentLinkCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            documentLinkCapabilityRegistry = new DocumentLinkCapabilityRegistry(clientFeatures);
+            documentLinkCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return documentLinkCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (documentLinkCapabilityRegistry != null) {
+            documentLinkCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 }

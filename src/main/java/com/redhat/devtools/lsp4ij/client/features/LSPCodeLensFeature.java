@@ -19,8 +19,10 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.capabilities.CodeLensCapabilityRegistry;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -32,6 +34,33 @@ import java.util.Collections;
  */
 @ApiStatus.Experimental
 public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
+
+    private CodeLensCapabilityRegistry codeLensCapabilityRegistry;
+
+    @Override
+    public boolean isSupported(@NotNull PsiFile file) {
+        return isCodeLensSupported(file);
+    }
+
+    /**
+     * Returns true if the file associated with a language server can support codelens and false otherwise.
+     *
+     * @param file    the Psi file.
+     * @return true if the file associated with a language server can support codelens and false otherwise.
+     */
+    public boolean isCodeLensSupported(@NotNull PsiFile file) {
+        return getCodeLensCapabilityRegistry().isCodeLensSupported(file);
+    }
+
+    /**
+     * Returns true if the file associated with a language server can support resolve codelens and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the file associated with a language server can support resolve codelens and false otherwise.
+     */
+    public boolean isResolveCodeLensSupported(@NotNull PsiFile file) {
+        return getCodeLensCapabilityRegistry().isResolveCodeLensSupported(file);
+    }
 
     public static class LSPCodeLensContext {
         private final @NotNull PsiFile psiFile;
@@ -120,30 +149,19 @@ public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
         return command.getTitle();
     }
 
+    public CodeLensCapabilityRegistry getCodeLensCapabilityRegistry() {
+        if (codeLensCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            codeLensCapabilityRegistry = new CodeLensCapabilityRegistry(clientFeatures);
+            codeLensCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return codeLensCapabilityRegistry;
+    }
 
     @Override
-    public boolean isSupported(@NotNull PsiFile file) {
-        return isCodeLensSupported(file);
-    }
-
-    /**
-     * Returns true if the file associated with a language server can support codelens and false otherwise.
-     *
-     * @param file the file.
-     * @return true if the file associated with a language server can support codelens and false otherwise.
-     */
-    public boolean isCodeLensSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isCodeLensSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
-    }
-
-    /**
-     * Returns true if the file associated with a language server can support resolve codelens and false otherwise.
-     *
-     * @param file the file.
-     * @return true if the file associated with a language server can support resolve codelens and false otherwise.
-     */
-    public boolean isResolveCodeLensSupported(@NotNull PsiFile file) {
-        return LanguageServerItem.isResolveCodeLensSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if(codeLensCapabilityRegistry != null) {
+            codeLensCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 }

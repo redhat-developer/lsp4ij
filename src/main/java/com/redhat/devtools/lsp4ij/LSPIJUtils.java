@@ -321,23 +321,6 @@ public class LSPIJUtils {
         return LanguageUtil.getLanguageForPsi(project, file);
     }
 
-    private static <T extends TextDocumentPositionParams> T toTextDocumentPositionParamsCommon(T param, int offset, Document document) {
-        Position start = toPosition(offset, document);
-        param.setPosition(start);
-        TextDocumentIdentifier id = new TextDocumentIdentifier();
-        URI uri = toUri(document);
-        if (uri != null) {
-            id.setUri(uri.toASCIIString());
-        }
-        param.setTextDocument(id);
-        return param;
-    }
-
-    public static HoverParams toHoverParams(int offset, Document document) {
-        return toTextDocumentPositionParamsCommon(new HoverParams(), offset, document);
-    }
-
-
     /**
      * Returns the Uri of the virtual file corresponding to the specified document.
      *

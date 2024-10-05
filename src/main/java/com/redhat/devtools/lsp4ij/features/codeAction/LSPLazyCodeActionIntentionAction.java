@@ -33,8 +33,6 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import static com.redhat.devtools.lsp4ij.LanguageServerItem.isCodeActionResolveSupported;
-
 /**
  * The lazy IJ Quick fix / Intention.
  */
@@ -84,7 +82,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         var languageServer = getLanguageServer();
         if (codeAction != null) {
             if (codeAction.getEdit() == null && codeAction.getCommand() == null
-                    && isCodeActionResolveSupported(languageServer.getServerCapabilities())) {
+                    && languageServer.getClientFeatures().getCodeActionFeature().isResolveCodeActionSupported(file)) {
                 // Unresolved code action "edit" property. Resolve it.
                 languageServer
                         .getInitializedServer()

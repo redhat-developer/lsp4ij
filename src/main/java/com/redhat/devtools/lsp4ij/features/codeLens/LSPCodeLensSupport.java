@@ -67,7 +67,7 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                     // Collect list of textDocument/codeLens future for each language servers
                     List<CompletableFuture<List<CodeLensData>>> codeLensPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getCodeLensesFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getCodeLensesFor(params, languageServer, file, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/codelens future in one future which return the list of code lenses
@@ -80,7 +80,10 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                 });
     }
 
-    private static CompletableFuture<List<CodeLensData>> getCodeLensesFor(CodeLensParams params, LanguageServerItem languageServer, CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<CodeLensData>> getCodeLensesFor(@NotNull CodeLensParams params,
+                                                                          @NotNull LanguageServerItem languageServer,
+                                                                          @NotNull PsiFile file,
+                                                                          @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .codeLens(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS)
@@ -95,14 +98,14 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                             .filter(LSPCodeLensSupport::isValidCodeLens)
                             .forEach(codeLens -> {
                                 CompletableFuture<CodeLens> resolvedCodeLensFuture = null;
-                                if (codeLens.getCommand() == null && languageServer.isResolveCodeLensSupported()) {
+                                var codeLensFeature = languageServer.getClientFeatures().getCodeLensFeature();
+                                if (codeLens.getCommand() == null && codeLensFeature.isResolveCodeLensSupported(file)) {
                                     // - the codelens has no command, and the language server supports codeLens/resolve
                                     // prepare the future which resolves the codelens.
                                     resolvedCodeLensFuture = cancellationSupport.execute(languageServer
                                             .getTextDocumentService()
                                             .resolveCodeLens(codeLens), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RESOLVE_CODE_LENS);
                                 }
-                                var codeLensFeature = languageServer.getClientFeatures().getCodeLensFeature();
                                 if (codeLensFeature.getText(codeLens) != null || resolvedCodeLensFuture != null) {
                                     // The codelens content is filled or the codelens must be resolved
                                     data.add(new CodeLensData(codeLens, languageServer, resolvedCodeLensFuture));

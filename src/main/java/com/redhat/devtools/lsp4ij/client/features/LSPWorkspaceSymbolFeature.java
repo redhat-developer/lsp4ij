@@ -10,9 +10,12 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client.features;
 
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Nullable;
+
+import static com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry.hasCapability;
 
 /**
  * LSP workspace symbol feature.
@@ -28,6 +31,13 @@ public class LSPWorkspaceSymbolFeature extends AbstractLSPWorkspaceFeature {
 
     @Override
     public boolean isSupported() {
-        return LanguageServerItem.isWorkspaceSymbolSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        var serverCapabilities = getClientFeatures().getServerWrapper().getServerCapabilitiesSync();
+        return serverCapabilities != null &&
+                hasCapability(serverCapabilities.getWorkspaceSymbolProvider());
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        // Do nothing
     }
 }

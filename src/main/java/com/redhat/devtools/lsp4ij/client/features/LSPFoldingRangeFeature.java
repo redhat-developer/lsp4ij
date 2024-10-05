@@ -11,9 +11,11 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.FoldingRangeCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP foldingRange feature.
@@ -21,19 +23,36 @@ import org.jetbrains.annotations.NotNull;
 @ApiStatus.Experimental
 public class LSPFoldingRangeFeature extends AbstractLSPDocumentFeature {
 
+    private FoldingRangeCapabilityRegistry foldingRangeCapabilityRegistry;
+
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
         return isFoldingRangeSupported(file);
     }
 
     /**
-     * Returns true if the file associated with a language server can support folding range and false otherwise.
+     * Returns true if the file associated with a language server can support foldingRange and false otherwise.
      *
      * @param file the file.
-     * @return true if the file associated with a language server can support folding range and false otherwise.
+     * @return true if the file associated with a language server can support foldingRange and false otherwise.
      */
     public boolean isFoldingRangeSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isFoldingRangeSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getFoldingRangeCapabilityRegistry().isFoldingRangeSupported(file);
+    }
+
+    public FoldingRangeCapabilityRegistry getFoldingRangeCapabilityRegistry() {
+        if (foldingRangeCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            foldingRangeCapabilityRegistry = new FoldingRangeCapabilityRegistry(clientFeatures);
+            foldingRangeCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return foldingRangeCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (foldingRangeCapabilityRegistry != null) {
+            foldingRangeCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 }

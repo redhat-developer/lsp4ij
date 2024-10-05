@@ -12,9 +12,12 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.lang.LanguageFormatting;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.DocumentFormattingCapabilityRegistry;
+import com.redhat.devtools.lsp4ij.server.capabilities.DocumentRangeFormattingCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP formatting feature.
@@ -37,6 +40,10 @@ import org.jetbrains.annotations.NotNull;
 @ApiStatus.Experimental
 public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
 
+    private DocumentFormattingCapabilityRegistry formattingCapabilityRegistry;
+
+    private DocumentRangeFormattingCapabilityRegistry rangeFormattingCapabilityRegistry;
+
     @Override
     public boolean isEnabled(@NotNull PsiFile file) {
         if (!isExistingFormatterOverrideable(file) && LanguageFormatting.INSTANCE.forContext(file) != null) {
@@ -47,7 +54,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
 
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
-        return isDocumentFormattingSupported(file);
+        return isFormattingSupported(file);
     }
 
     /**
@@ -72,9 +79,8 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
      * @param file the file.
      * @return true if the file associated with a language server can support formatting and false otherwise.
      */
-    public boolean isDocumentFormattingSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isDocumentFormattingSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+    public boolean isFormattingSupported(@NotNull PsiFile file) {
+        return getFormattingCapabilityRegistry().isFormattingSupported(file);
     }
 
     /**
@@ -83,9 +89,35 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
      * @param file the file.
      * @return true if the file associated with a language server can support range formatting and false otherwise.
      */
-    public boolean isDocumentRangeFormattingSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isDocumentRangeFormattingSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+    public boolean isRangeFormattingSupported(@NotNull PsiFile file) {
+        return getRangeFormattingCapabilityRegistry().isRangeFormattingSupported(file);
     }
 
+    public DocumentFormattingCapabilityRegistry getFormattingCapabilityRegistry() {
+        if (formattingCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            formattingCapabilityRegistry = new DocumentFormattingCapabilityRegistry(clientFeatures);
+            formattingCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return formattingCapabilityRegistry;
+    }
+
+    public DocumentRangeFormattingCapabilityRegistry getRangeFormattingCapabilityRegistry() {
+        if (rangeFormattingCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            rangeFormattingCapabilityRegistry = new DocumentRangeFormattingCapabilityRegistry(clientFeatures);
+            rangeFormattingCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return rangeFormattingCapabilityRegistry;
+    }
+    
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (formattingCapabilityRegistry != null) {
+            formattingCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
+        if (rangeFormattingCapabilityRegistry != null) {
+            rangeFormattingCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
+    }
 }

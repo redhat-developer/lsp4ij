@@ -11,15 +11,19 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.ImplementationCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP implementation feature.
  */
 @ApiStatus.Experimental
 public class LSPImplementationFeature extends AbstractLSPDocumentFeature {
+
+    private ImplementationCapabilityRegistry implementationCapabilityRegistry;
 
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
@@ -33,7 +37,23 @@ public class LSPImplementationFeature extends AbstractLSPDocumentFeature {
      * @return true if the file associated with a language server can support implementation and false otherwise.
      */
     public boolean isImplementationSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isImplementationSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getImplementationCapabilityRegistry().isImplementationSupported(file);
     }
+
+    public ImplementationCapabilityRegistry getImplementationCapabilityRegistry() {
+        if (implementationCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            implementationCapabilityRegistry = new ImplementationCapabilityRegistry(clientFeatures);
+            implementationCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return implementationCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (implementationCapabilityRegistry != null) {
+            implementationCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
+    }
+
 }

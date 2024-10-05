@@ -20,10 +20,10 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LSPUsagesManager;
 import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -98,20 +98,20 @@ public abstract class AbstractLSPGoToAction extends AnAction {
             return false;
         }
 
-        VirtualFile file = e.getData(CommonDataKeys.VIRTUAL_FILE);
+        PsiFile file = e.getData(CommonDataKeys.PSI_FILE);
         if (file == null) {
             return false;
         }
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file, project)) {
+        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
             // The file is not associated to a language server
             return false;
         }
         // Check if the file can support the feature
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file, ls -> canSupportFeature(ls.getServerCapabilitiesSync()));
+                .hasAny(file.getVirtualFile(), ls -> canSupportFeature(ls.getClientFeatures(), file));
     }
 
-    protected abstract boolean canSupportFeature(ServerCapabilities serverCapabilities);
+    protected abstract boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file);
 
     @Override
     public final @NotNull ActionUpdateThread getActionUpdateThread() {

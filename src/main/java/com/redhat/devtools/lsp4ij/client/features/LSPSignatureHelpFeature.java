@@ -6,20 +6,24 @@
  * and is available at https://www.eclipse.org/legal/epl-v20.html
  *
  * Contributors:
- * Red Hat, Inc. - initial API and implementation
+ * Red Hat, Inc. - initial API and signatureHelp
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.SignatureHelpCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP signatureHelp feature.
  */
 @ApiStatus.Experimental
 public class LSPSignatureHelpFeature extends AbstractLSPDocumentFeature {
+
+    private SignatureHelpCapabilityRegistry signatureHelpCapabilityRegistry;
 
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
@@ -33,7 +37,23 @@ public class LSPSignatureHelpFeature extends AbstractLSPDocumentFeature {
      * @return true if the file associated with a language server can support signatureHelp and false otherwise.
      */
     public boolean isSignatureHelpSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isSignatureHelpSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getSignatureHelpCapabilityRegistry().isSignatureHelpSupported(file);
     }
+
+    public SignatureHelpCapabilityRegistry getSignatureHelpCapabilityRegistry() {
+        if (signatureHelpCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            signatureHelpCapabilityRegistry = new SignatureHelpCapabilityRegistry(clientFeatures);
+            signatureHelpCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return signatureHelpCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (signatureHelpCapabilityRegistry != null) {
+            signatureHelpCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
+    }
+
 }
