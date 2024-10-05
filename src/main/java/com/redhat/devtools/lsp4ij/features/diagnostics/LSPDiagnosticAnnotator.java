@@ -98,7 +98,7 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
         List<IntentionAction> fixes = Collections.emptyList();
         var codeActionFeature = clientFeatures.getCodeActionFeature();
         if (codeActionFeature.isQuickFixesEnabled(file)) {
-            fixes = diagnosticsForServer.getQuickFixesFor(diagnostic);
+            fixes = diagnosticsForServer.getQuickFixesFor(diagnostic, file);
         }
         diagnosticSupport.createAnnotation(diagnostic, document, fixes, holder);
     }

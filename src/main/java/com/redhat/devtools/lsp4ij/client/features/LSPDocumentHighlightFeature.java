@@ -11,9 +11,11 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.DocumentHighlightCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP documentHighlight feature.
@@ -21,19 +23,35 @@ import org.jetbrains.annotations.NotNull;
 @ApiStatus.Experimental
 public class LSPDocumentHighlightFeature extends AbstractLSPDocumentFeature {
 
+    private DocumentHighlightCapabilityRegistry documentHighlightCapabilityRegistry;
+
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
         return isDocumentHighlightSupported(file);
     }
 
     /**
-     * Returns true if the file associated with a language server can support codelens and false otherwise.
+     * Returns true if the file associated with a language server can support documentHighlight and false otherwise.
      *
      * @param file the file.
-     * @return true if the file associated with a language server can support codelens and false otherwise.
+     * @return true if the file associated with a language server can support documentHighlight and false otherwise.
      */
     public boolean isDocumentHighlightSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isDocumentHighlightSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getDocumentHighlightCapabilityRegistry().isDocumentHighlightSupported(file);
+    }
+
+    public DocumentHighlightCapabilityRegistry getDocumentHighlightCapabilityRegistry() {
+        if (documentHighlightCapabilityRegistry == null) {
+            documentHighlightCapabilityRegistry = new DocumentHighlightCapabilityRegistry(getClientFeatures());
+            documentHighlightCapabilityRegistry.setServerCapabilities(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        }
+        return documentHighlightCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if(documentHighlightCapabilityRegistry != null) {
+            documentHighlightCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 }

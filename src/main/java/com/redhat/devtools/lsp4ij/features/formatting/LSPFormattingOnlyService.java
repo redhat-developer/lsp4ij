@@ -31,8 +31,8 @@ public class LSPFormattingOnlyService extends AbstractLSPFormattingService {
 
     @Override
     protected boolean canSupportFormatting(LSPFormattingFeature formattingFeature, PsiFile file) {
-        return formattingFeature.isDocumentFormattingSupported(file) &&
-                !formattingFeature.isDocumentRangeFormattingSupported(file);
+        return formattingFeature.isFormattingSupported(file) &&
+                !formattingFeature.isRangeFormattingSupported(file);
     }
 
 }

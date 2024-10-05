@@ -249,4 +249,8 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
         return null;
     }
 
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        // Do nothing
+    }
 }

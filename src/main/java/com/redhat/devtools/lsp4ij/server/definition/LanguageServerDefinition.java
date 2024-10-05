@@ -18,8 +18,12 @@ import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.lang.Language;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.FileTypes;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
@@ -165,9 +169,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         this.languageIdFileNameMatcherMappings.add(Pair.create(matchers, languageId));
     }
 
-    public @Nullable String getLanguageId(Language language) {
-        return languageIdLanguageMappings.get(language);
-    }
+
 
     public Map<Language, String> getLanguageMappings() {
         return languageIdLanguageMappings;
@@ -179,21 +181,6 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     public List<Pair<List<FileNameMatcher>, String>> getFilenameMatcherMappings() {
         return languageIdFileNameMatcherMappings;
-    }
-
-    public @Nullable String getLanguageId(FileType fileType) {
-        return languageIdFileTypeMappings.get(fileType);
-    }
-
-    public @Nullable String getLanguageId(String filename) {
-        for (var mapping : languageIdFileNameMatcherMappings) {
-            for (var matcher : mapping.getFirst()) {
-                if (matcher.acceptsCharSequence(filename)) {
-                    return mapping.getSecond();
-                }
-            }
-        }
-        return null;
     }
 
     public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
@@ -216,5 +203,148 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     public void setSemanticTokensColorsProvider(@NotNull SemanticTokensColorsProvider semanticTokensColorsProvider) {
         this.semanticTokensColorsProvider = semanticTokensColorsProvider;
+    }
+
+    /**
+     * Returns the LSP language id defined in mapping otherwise null.
+     *
+     * @param file the PsiFile file.
+     * @return the LSP language id or null.
+     */
+    @Nullable
+    public String getLanguageIdOrNull(@NotNull PsiFile file) {
+        return getLanguageId(file.getLanguage(), file.getFileType(), file.getName(), true);
+    }
+
+    /**
+     * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
+     *
+     * @param file the PsiFile file.
+     * @return the LSP language id.
+     */
+    @NotNull
+    public String getLanguageId(@NotNull PsiFile file) {
+        return getLanguageId(file.getLanguage(), file.getFileType(), file.getName());
+    }
+
+    /**
+     * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
+     *
+     * @param file the virtual file.
+     * @param project the project.
+     * @return the LSP language id.
+     */
+    @NotNull
+    public String getLanguageId(@Nullable VirtualFile file,
+                                @NotNull Project project) {
+        if (file == null) {
+            return FileTypes.UNKNOWN.getName().toLowerCase();
+        }
+        Language language = LSPIJUtils.getFileLanguage(file, project);
+        return getLanguageId(language, file.getFileType(), file.getName());
+    }
+
+    /**
+     * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
+     *
+     * @param language the language.
+     * @param fileType the file type.
+     * @param fileName the file name.
+     * @return the LSP language id.
+     */
+    @NotNull
+    public String getLanguageId(@Nullable Language language,
+                                @Nullable FileType fileType,
+                                @NotNull String fileName) {
+        return getLanguageId(language, fileType, fileName, false);
+    }
+    /**
+     * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
+     *
+     * @param language the language.
+     * @param fileType the file type.
+     * @param fileName the file name.
+     * @param nullIfNotFound returns null if not found.
+     * @return the LSP language id.
+     */
+    @Nullable
+    private String getLanguageId(@Nullable Language language,
+                                 @Nullable FileType fileType,
+                                 @NotNull String fileName,
+                                 boolean nullIfNotFound) {
+        // 1. Try to get the LSP languageId by using language mapping
+        String languageId = getLanguageId(language);
+        if (languageId != null) {
+            return languageId;
+        }
+
+        // 2. Try to get the LSP languageId by using the fileType mapping
+        languageId = getLanguageId(fileType);
+        if (languageId != null) {
+            return languageId;
+        }
+
+        // 3. Try to get the LSP languageId by using the file name pattern mapping
+        languageId = getLanguageId(fileName);
+        if (languageId != null) {
+            return languageId;
+        }
+
+        // At this step there is no mapping
+        if (nullIfNotFound) {
+            return null;
+        }
+
+        // We return the language Id if it exists or file type name
+        // with 'lower case' to try to map the recommended languageId specified at
+        // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem
+        if (language != null) {
+            // The language exists, use its ID with lower case
+            return language.getID().toLowerCase();
+        }
+        // Returns the existing file type or 'unknown' with lower case
+        return fileName.toLowerCase();
+    }
+
+    /**
+     * @return The language ID that this wrapper is dealing with if defined in the
+     * language mapping for the language server
+     */
+    @Nullable
+    public String getLanguageId(@Nullable Language language) {
+        while (language != null) {
+            String languageId =  languageIdLanguageMappings.get(language);
+            if (languageId != null) {
+                return languageId;
+            }
+            language = language.getBaseLanguage();
+        }
+        return null;
+    }
+
+    /**
+     * @return The language ID that this wrapper is dealing with if defined in the
+     * file type mapping for the language server
+     */
+    @Nullable
+    public String getLanguageId(@Nullable FileType fileType) {
+        if (fileType == null) {
+            return null;
+        }
+        return languageIdLanguageMappings.get(fileType);
+    }
+    /**
+     * @return The language ID that this wrapper is dealing with if defined in the
+     * file type mapping for the language server
+     */
+    public @Nullable String getLanguageId(String filename) {
+        for (var mapping : languageIdFileNameMatcherMappings) {
+            for (var matcher : mapping.getFirst()) {
+                if (matcher.acceptsCharSequence(filename)) {
+                    return mapping.getSecond();
+                }
+            }
+        }
+        return null;
     }
 }

@@ -11,9 +11,11 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.server.capabilities.DeclarationCapabilityRegistry;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP declaration feature.
@@ -21,19 +23,36 @@ import org.jetbrains.annotations.NotNull;
 @ApiStatus.Experimental
 public class LSPDeclarationFeature extends AbstractLSPDocumentFeature {
 
+    private DeclarationCapabilityRegistry declarationCapabilityRegistry;
+
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
         return isDeclarationSupported(file);
     }
 
     /**
-     * Returns true if the file associated with a language server can support codelens and false otherwise.
+     * Returns true if the file associated with a language server can support declaration and false otherwise.
      *
      * @param file the file.
-     * @return true if the file associated with a language server can support codelens and false otherwise.
+     * @return true if the file associated with a language server can support declaration and false otherwise.
      */
     public boolean isDeclarationSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isDeclarationSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getDeclarationCapabilityRegistry().isDeclarationSupported(file);
+    }
+
+    public DeclarationCapabilityRegistry getDeclarationCapabilityRegistry() {
+        if (declarationCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            declarationCapabilityRegistry = new DeclarationCapabilityRegistry(clientFeatures);
+            declarationCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return declarationCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (declarationCapabilityRegistry != null) {
+            declarationCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 }

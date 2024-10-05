@@ -13,11 +13,12 @@ package com.redhat.devtools.lsp4ij.client.features;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.DocumentSymbolData;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewModel;
+import com.redhat.devtools.lsp4ij.server.capabilities.DocumentSymbolCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.DocumentSymbol;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -29,6 +30,8 @@ import javax.swing.*;
  */
 @ApiStatus.Experimental
 public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
+
+    private DocumentSymbolCapabilityRegistry documentSymbolCapabilityRegistry;
 
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
@@ -42,8 +45,23 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
      * @return true if the file associated with a language server can support codelens and false otherwise.
      */
     public boolean isDocumentSymbolSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isDocumentSymbolSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getDocumentSymbolCapabilityRegistry().isDocumentSymbolSupported(file);
+    }
+
+    public DocumentSymbolCapabilityRegistry getDocumentSymbolCapabilityRegistry() {
+        if (documentSymbolCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            documentSymbolCapabilityRegistry = new DocumentSymbolCapabilityRegistry(clientFeatures);
+            documentSymbolCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return documentSymbolCapabilityRegistry;
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (documentSymbolCapabilityRegistry != null) {
+            documentSymbolCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 
     @Nullable

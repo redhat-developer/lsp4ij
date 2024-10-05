@@ -77,8 +77,9 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                     List<CompletableFuture<List<LSPUsagePsiElement>>> allFutures = new ArrayList<>();
                     for (var ls : languageServers) {
 
+                        var clientFeature = ls.getClientFeatures();
                         // Collect declarations
-                        if (ls.isDeclarationSupported()) {
+                        if (clientFeature.getDeclarationFeature().isDeclarationSupported(file)) {
                             allFutures.add(
                                     cancellationSupport.execute(ls
                                                     .getTextDocumentService()
@@ -88,7 +89,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect definitions
-                        if (ls.isDefinitionSupported()) {
+                        if (clientFeature.getDefinitionFeature().isDefinitionSupported(file)) {
                             allFutures.add(
                                     cancellationSupport.execute(ls
                                                     .getTextDocumentService()
@@ -98,7 +99,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect type definitions
-                        if (ls.isTypeDefinitionSupported()) {
+                        if (clientFeature.getTypeDefinitionFeature().isTypeDefinitionSupported(file)) {
                             allFutures.add(
                                     cancellationSupport.execute(ls
                                                     .getTextDocumentService()
@@ -108,7 +109,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect references
-                        if (ls.isReferencesSupported()) {
+                        if (clientFeature.getReferencesFeature().isReferencesSupported(file)) {
                             allFutures.add(
                                     cancellationSupport.execute(ls
                                                     .getTextDocumentService()
@@ -118,7 +119,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect implementation
-                        if (ls.isImplementationSupported()) {
+                        if (clientFeature.getImplementationFeature().isImplementationSupported(file)) {
                             allFutures.add(
                                     cancellationSupport.execute(ls
                                                     .getTextDocumentService()

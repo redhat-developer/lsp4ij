@@ -53,8 +53,8 @@ public class LSPColorSupport extends AbstractLSPDocumentFeatureSupport<DocumentC
                                                                          @NotNull CancellationSupport cancellationSupport) {
 
         return getLanguageServers(file,
-                        f -> f.getColorFeature().isEnabled(file),
-                        f -> f.getColorFeature().isSupported(file))
+                        f -> f.getDocumentColorFeature().isEnabled(file),
+                        f -> f.getDocumentColorFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have color capability

@@ -67,7 +67,7 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
                     // Collect list of textDocument/inlayHint future for each language servers
                     List<CompletableFuture<List<InlayHintData>>> inlayHintPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getInlayHintsFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getInlayHintsFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/inlayHint future in one future which return the list of inlay hints
@@ -75,7 +75,10 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
                 });
     }
 
-    private static CompletableFuture<List<InlayHintData>> getInlayHintsFor(InlayHintParams params, LanguageServerItem languageServer, CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<InlayHintData>> getInlayHintsFor(@NotNull InlayHintParams params,
+                                                                           @NotNull PsiFile file,
+                                                                           @NotNull LanguageServerItem languageServer,
+                                                                           @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .inlayHint(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT)
@@ -89,7 +92,7 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
                             .filter(Objects::nonNull)
                             .forEach(inlayHint -> {
                                 CompletableFuture<InlayHint> resolvedInlayHintFuture = null;
-                                if (inlayHint.getLabel() == null && languageServer.isResolveInlayHintSupported()) {
+                                if (inlayHint.getLabel() == null && languageServer.getClientFeatures().getInlayHintFeature().isResolveInlayHintSupported(file)) {
                                     // - the inlayHint has no label, and the language server supports inlayHint/resolve
                                     // prepare the future which resolves the inlayHint.
                                     resolvedInlayHintFuture = cancellationSupport.execute(languageServer

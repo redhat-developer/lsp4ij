@@ -11,9 +11,10 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP usage feature.
@@ -33,7 +34,16 @@ public class LSPUsageFeature extends AbstractLSPDocumentFeature {
      * @return true if the file associated with a language server can support usage and false otherwise.
      */
     public boolean isUsageSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isUsageSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        var clientFeature = getClientFeatures();
+        return clientFeature.getDeclarationFeature().isDeclarationSupported(file) ||
+                clientFeature.getTypeDefinitionFeature().isTypeDefinitionSupported(file) ||
+                clientFeature.getDefinitionFeature().isDefinitionSupported(file) ||
+                clientFeature.getReferencesFeature().isReferencesSupported(file) ||
+                clientFeature.getImplementationFeature().isImplementationSupported(file);
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        // Do nothing
     }
 }

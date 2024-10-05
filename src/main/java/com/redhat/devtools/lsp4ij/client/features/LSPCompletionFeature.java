@@ -19,10 +19,12 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.completion.CompletionPrefix;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.capabilities.CompletionCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.CompletionItemTag;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +36,8 @@ import javax.swing.*;
  */
 @ApiStatus.Experimental
 public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
+
+    private CompletionCapabilityRegistry completionCapabilityRegistry;
 
     public static class LSPCompletionContext {
 
@@ -84,12 +88,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @return true if the file associated with a language server can support completion and false otherwise.
      */
     public boolean isCompletionSupported(@NotNull PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isCompletionSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
-    }
-
-    public boolean isCompletionTriggerCharactersSupported(@NotNull PsiFile file, String completionChar) {
-        return getClientFeatures().getServerWrapper().isCompletionTriggerCharactersSupported(completionChar);
+        return getCompletionCapabilityRegistry().isCompletionSupported(file);
     }
 
     /**
@@ -99,8 +98,12 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @return true the file associated with a language server can support resolve completion and false otherwise.
      */
     public boolean isResolveCompletionSupported(@Nullable PsiFile file) {
-        // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isResolveCompletionSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getCompletionCapabilityRegistry().isResolveCompletionSupported(file);
+    }
+
+    public boolean isCompletionTriggerCharactersSupported(@NotNull PsiFile file, String completionChar) {
+        // TODO: manage documentSelector for trigger character
+        return getClientFeatures().getServerWrapper().isCompletionTriggerCharactersSupported(completionChar);
     }
 
     /**
@@ -225,5 +228,19 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         }
     }
 
+    public CompletionCapabilityRegistry getCompletionCapabilityRegistry() {
+        if (completionCapabilityRegistry == null) {
+            var clientFeatures = getClientFeatures();
+            completionCapabilityRegistry = new CompletionCapabilityRegistry(clientFeatures);
+            completionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+        }
+        return completionCapabilityRegistry;
+    }
 
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if(completionCapabilityRegistry != null) {
+            completionCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
+    }
 }
