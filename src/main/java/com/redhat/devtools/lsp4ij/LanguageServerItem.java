@@ -10,11 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.server.LanguageServerException;
+import com.redhat.devtools.lsp4ij.server.Lease;
+import com.redhat.devtools.lsp4ij.server.ServerWasStoppedException;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -60,12 +62,25 @@ public class LanguageServerItem {
      * In other words calling this methods creates a 'similar demand' on the language
      * server's lifecycle as would opening a document in an editor.
      */
-    public Disposable keepAlive() {
+    public Lease<LanguageServer> keepAlive() {
         serverWrapper.incrementKeepAlive();
-        return new Disposable() {
+        return new Lease<>() {
+            final AtomicBoolean isDisposed = new AtomicBoolean();
 
-            AtomicBoolean isDisposed = new AtomicBoolean();
-
+            @Override
+            public LanguageServer get() throws LanguageServerException {
+                if (isDisposed.get()) {
+                    throw new IllegalStateException("Bug: trying to use an already disposed Lease");
+                }
+                var item = LanguageServerItem.this;
+                if (item.serverWrapper.getServerStatus() == ServerStatus.started) {
+                    return LanguageServerItem.this.getServer();
+                }
+                //TODO (maybe): Can `item.serverWrapper.getServerError()` provide a more informative error message?
+                var serverDefinition = item.getServerDefinition();
+                throw new ServerWasStoppedException("The server was stopped unexpectedly '"
+                        + serverDefinition.getId() + "' (pid=" + item.serverWrapper.getCurrentProcessId());
+            }
             @Override
             public void dispose() {
                  if (!isDisposed.getAndSet(true)) {
