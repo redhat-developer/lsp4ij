@@ -58,7 +58,7 @@ public interface Lease<T> extends Disposable {
         var self = this;
         return new Lease<>() {
             @Override
-            public R get() throws LanguageServerException, IllegalStateException {
+            public R get() throws ServerWasStoppedException, IllegalStateException {
                 return f.apply(self.get());
             }
 

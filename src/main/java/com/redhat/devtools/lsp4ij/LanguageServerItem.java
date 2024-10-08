@@ -68,7 +68,7 @@ public class LanguageServerItem {
             final AtomicBoolean isDisposed = new AtomicBoolean();
 
             @Override
-            public LanguageServerItem get() throws LanguageServerException {
+            public LanguageServerItem get() throws ServerWasStoppedException, IllegalStateException {
                 if (isDisposed.get()) {
                     throw new IllegalStateException("Bug: trying to use an already disposed Lease");
                 }
