@@ -49,7 +49,7 @@ public interface Lease<T> extends Disposable {
      * <pre>{@code
      *     Lease<MyLanguageServer> serverLease = serverItem
      *          .keepAlive()
-     *          .transform(si -> (MyCustomLanguageServer)si.getServer());
+     *          .transform(si -> (MyLanguageServer)si.getServer());
      * }</pre>
      *
      * @return A Lease that shares the same liveness claim as the original lease.
