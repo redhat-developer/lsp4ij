@@ -528,7 +528,7 @@ LanguageServerManager.getInstance(project).stop("myLanguageServerId", options);
 
 If you need to execute an LSP Command, please read [here](#execute-a-command)
 
-If you need to get your language server and execute somethinh with it, you can write code like this:
+If you need to get your language server and execute something with it, you can write code like this:
 
 ```java
 LanguageServerManager.getInstance(project)
@@ -609,6 +609,53 @@ CompletableFuture<List<Application>> applications =
       return myServer.getApplications();}
     );
 ```
+
+## Keep a Language Server alive with a Lease
+
+If you need a reference to your language server and need to execute operations with it, 
+for an extended period of time, you can use `LanguageServerItem.keepAlive()` method create
+a `Lease` on the item. The lease represents a request for lsp4ij not terminate the language 
+server until the `Lease` is disposed.
+
+```java
+Project project = ...
+CompletableFuture<Lease<LanguageServerItem>> serverLease = 
+        LanguageServerManager.getInstance(project).getLanguageServer("myLanguageServerId")
+        .thenApply(item -> item.keepAlive());
+```
+
+As long as the lease has not been disposed this will request lsp4ij not arbitrarily terminate the language
+server under 'normal circumstances'. This means that the server will not be terminated for example when
+there are no more open editors.
+
+To get access to your language server from the lease call the `get()` method on the lease.
+This will return a LanuageServerItem that is guaranteed to have an 'active' server at that time.
+
+```java
+serverLease.thenAccept(lease -> {
+    // Fetch list of 'applications' using some custom protocol on 'MyLanguageServer'
+    List<Application> applications = ((MyLanguageServer)lease.get().getServer()).getApplications();   
+    ... do something with the result... 
+});
+```
+
+Note that it is still possible under some circumstance that the server might get terminated despite having 
+active leases: 
+
+  - the server process could crash unexpectedly. 
+  - a user could stop the language server from lsp4ij UI.
+  - when the IDE shuts down all language servers will be terminated regardles of active leases.
+
+You should be prepared to handle these kinds of situations in a graceful manner. You can detect whether
+this has happened by handling `ServerWasStoppedException` thrown from `Lease.get()`.
+
+Once you are done using the server and no longer need it to remain alive, you 
+should `dispose` the lease. This tells lsp4ij that you are not using it anymore
+and it is okay to stop the server (presuming there is nothing else still using it, be 
+it another active `Lease` or any open editors).
+
+For more information on the correct way to `dispose` a disposable, see the 
+JavaDoc on `com.intellij.openapi.Disposable` and [here](https://plugins.jetbrains.com/docs/intellij/disposers.html#the-disposer-singleton).
 
 ## LSP commands
 
