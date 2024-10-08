@@ -58,6 +58,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 | ServerStatus getServerStatus()                               | Returns the server status.                                                                                                         |                   |
 | LanguageServer getLanguageServer()                           | Returns the LSP4J language server.                                                                                                 |                   |
 | boolean keepServerAlive()                                    | Returns `true` if the server is kept alive even if all files associated with the language server are closed and `false` otherwise. | `false`           |
+| boolean canStopServerByUser()                                | Returns `true` if the user can stop the language server in LSP console from the context menu and `false` otherwise.                | `true`            |
 
 ```java
 package my.language.server;

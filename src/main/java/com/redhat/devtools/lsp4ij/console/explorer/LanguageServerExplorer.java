@@ -230,8 +230,10 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                     case starting:
                     case started:
                         // Stop and disable the language server action
-                        AnAction stopServerAction = ActionManager.getInstance().getAction(StopServerAction.ACTION_ID);
-                        group.add(stopServerAction);
+                        if (processTreeNode.getLanguageServer().getClientFeatures().canStopServerByUser()) {
+                            AnAction stopServerAction = ActionManager.getInstance().getAction(StopServerAction.ACTION_ID);
+                            group.add(stopServerAction);
+                        }
                         if (IntelliJPlatformUtils.isDevMode()) {
                             // In dev mode, enable the "Pause" action
                             AnAction pauseServerAction = ActionManager.getInstance().getAction(PauseServerAction.ACTION_ID);
