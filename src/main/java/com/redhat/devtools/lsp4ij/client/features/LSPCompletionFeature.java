@@ -101,9 +101,15 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         return getCompletionCapabilityRegistry().isResolveCompletionSupported(file);
     }
 
-    public boolean isCompletionTriggerCharactersSupported(@NotNull PsiFile file, String completionChar) {
-        // TODO: manage documentSelector for trigger character
-        return getClientFeatures().getServerWrapper().isCompletionTriggerCharactersSupported(completionChar);
+    /**
+     * Returns true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
+     *
+     * @param file the file.
+     * @param charTyped the current typed character.
+     * @return true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
+     */
+    public boolean isCompletionTriggerCharactersSupported(@NotNull PsiFile file, String charTyped) {
+        return getCompletionCapabilityRegistry().isCompletionTriggerCharactersSupported(file, charTyped);
     }
 
     /**
