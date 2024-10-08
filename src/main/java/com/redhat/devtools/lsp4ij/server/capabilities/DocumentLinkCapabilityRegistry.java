@@ -47,9 +47,9 @@ public class DocumentLinkCapabilityRegistry extends TextDocumentServerCapability
     }
 
     @Override
-    protected @Nullable DocumentLinkRegistrationOptions create(JsonObject json) {
+    protected @Nullable DocumentLinkRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedLinkFormattingRegistrationOptions.class);
     }
 

@@ -47,9 +47,9 @@ public class HoverCapabilityRegistry extends TextDocumentServerCapabilityRegistr
     }
 
     @Override
-    protected @Nullable HoverRegistrationOptions create(JsonObject json) {
+    protected @Nullable HoverRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedHoverRegistrationOptions.class);
     }
 

@@ -53,9 +53,9 @@ public class CompletionCapabilityRegistry extends TextDocumentServerCapabilityRe
     }
 
     @Override
-    protected @Nullable CompletionRegistrationOptions create(JsonObject json) {
+    protected @Nullable CompletionRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedCompletionFormattingRegistrationOptions.class);
     }
 

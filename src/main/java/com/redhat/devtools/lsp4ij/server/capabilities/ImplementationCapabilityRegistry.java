@@ -47,9 +47,9 @@ public class ImplementationCapabilityRegistry extends TextDocumentServerCapabili
     }
 
     @Override
-    protected @Nullable ImplementationRegistrationOptions create(JsonObject json) {
+    protected @Nullable ImplementationRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedImplementationRegistrationOptions.class);
     }
 

@@ -61,9 +61,9 @@ public class CodeActionCapabilityRegistry extends TextDocumentServerCapabilityRe
     }
 
     @Override
-    protected @Nullable CodeActionRegistrationOptions create(JsonObject json) {
+    protected @Nullable CodeActionRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedCodeActionFormattingRegistrationOptions.class);
     }
 

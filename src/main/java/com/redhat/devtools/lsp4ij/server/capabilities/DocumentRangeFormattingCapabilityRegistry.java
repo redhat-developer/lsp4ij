@@ -48,9 +48,9 @@ public class DocumentRangeFormattingCapabilityRegistry extends TextDocumentServe
 
 
     @Override
-    protected @Nullable DocumentRangeFormattingRegistrationOptions create(JsonObject json) {
+    protected @Nullable DocumentRangeFormattingRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedDocumentRangeFormattingRegistrationOptions.class);
     }
 

@@ -58,9 +58,9 @@ public class InlayHintCapabilityRegistry extends TextDocumentServerCapabilityReg
     }
 
     @Override
-    protected @Nullable InlayHintRegistrationOptions create(JsonObject json) {
+    protected @Nullable InlayHintRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedInlayHintRegistrationOptions.class);
     }
 

@@ -47,9 +47,9 @@ public class DocumentFormattingCapabilityRegistry extends TextDocumentServerCapa
     }
 
     @Override
-    protected @Nullable DocumentFormattingRegistrationOptions create(JsonObject json) {
+    protected @Nullable DocumentFormattingRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedDocumentFormattingRegistrationOptions.class);
     }
 

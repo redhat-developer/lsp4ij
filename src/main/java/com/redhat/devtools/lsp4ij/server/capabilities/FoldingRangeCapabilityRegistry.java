@@ -47,9 +47,9 @@ public class FoldingRangeCapabilityRegistry extends TextDocumentServerCapability
     }
 
     @Override
-    protected @Nullable FoldingRangeProviderOptions create(JsonObject json) {
+    protected @Nullable FoldingRangeProviderOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedFoldingRangeProviderOptions.class);
     }
 
