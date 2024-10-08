@@ -32,7 +32,7 @@ public interface Lease<T> extends Disposable {
      * @throws LanguageServerException if the server is no longer alive.
      * @throws IllegalStateException if trying to use an already disposed lease.
      */
-    T get() throws LanguageServerException, IllegalStateException;
+    T get() throws ServerWasStoppedException, IllegalStateException;
 
     /**
      * Transforms the value in this lease by applying a function to it.
