@@ -75,7 +75,7 @@ public class LSPClientFeatures implements Disposable {
     private LSPUsageFeature usageFeature;
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
-    
+
     /**
      * Returns the project.
      *
@@ -133,6 +133,18 @@ public class LSPClientFeatures implements Disposable {
      */
     public boolean keepServerAlive() {
         return false;
+    }
+
+    /**
+     * Returns true if the user can stop the language server in LSP console from the context menu and false otherwise.
+     * <p>
+     * By default, user can stop the server.
+     * </p>
+     *
+     * @return true if the user can stop the language server in LSP console from the context menu and false otherwise.
+     */
+    public boolean canStopServerByUser() {
+        return true;
     }
 
     /**
