@@ -29,7 +29,7 @@ public interface Lease<T> extends Disposable {
      * not meant to be stored, instead call this method every time you need
      * to use the language server or need to check whether it is still alive.
      *
-     * @throws LanguageServerException if the server is no longer alive.
+     * @throws ServerWasStoppedException if the server is no longer alive.
      * @throws IllegalStateException if trying to use an already disposed lease.
      */
     T get() throws ServerWasStoppedException, IllegalStateException;
