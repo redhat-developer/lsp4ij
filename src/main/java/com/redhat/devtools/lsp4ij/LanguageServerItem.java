@@ -62,19 +62,19 @@ public class LanguageServerItem {
      * In other words calling this methods creates a 'similar demand' on the language
      * server's lifecycle as would opening a document in an editor.
      */
-    public Lease<LanguageServer> keepAlive() {
+    public Lease<LanguageServerItem> keepAlive() {
         serverWrapper.incrementKeepAlive();
         return new Lease<>() {
             final AtomicBoolean isDisposed = new AtomicBoolean();
 
             @Override
-            public LanguageServer get() throws LanguageServerException {
+            public LanguageServerItem get() throws LanguageServerException {
                 if (isDisposed.get()) {
                     throw new IllegalStateException("Bug: trying to use an already disposed Lease");
                 }
                 var item = LanguageServerItem.this;
                 if (item.serverWrapper.getServerStatus() == ServerStatus.started) {
-                    return LanguageServerItem.this.getServer();
+                    return LanguageServerItem.this;
                 }
                 //TODO (maybe): Can `item.serverWrapper.getServerError()` provide a more informative error message?
                 var serverDefinition = item.getServerDefinition();
