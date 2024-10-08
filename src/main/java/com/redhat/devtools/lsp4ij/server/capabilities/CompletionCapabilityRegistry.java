@@ -40,7 +40,7 @@ public class CompletionCapabilityRegistry extends TextDocumentServerCapabilityRe
         super(clientFeatures);
     }
 
-    class ExtendedCompletionFormattingRegistrationOptions extends CompletionRegistrationOptions  implements ExtendedDocumentSelector.DocumentFilersProvider {
+    class ExtendedCompletionFormattingRegistrationOptions extends CompletionRegistrationOptions implements ExtendedDocumentSelector.DocumentFilersProvider {
         private transient ExtendedDocumentSelector documentSelector;
 
         @Override
@@ -79,4 +79,31 @@ public class CompletionCapabilityRegistry extends TextDocumentServerCapabilityRe
         return super.isSupported(file, RESOLVE_SERVER_CAPABILITIES_PREDICATE, RESOLVE_REGISTRATION_OPTIONS_PREDICATE);
     }
 
+    /**
+     * Returns true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
+     *
+     * @param file      the file.
+     * @param charTyped the current typed character.
+     * @return true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
+     */
+    public boolean isCompletionTriggerCharactersSupported(@NotNull PsiFile file,
+                                                          String charTyped) {
+        return super.isSupported(file,
+                sc -> isCompletionTriggerCharactersSupported(sc, charTyped),
+                o -> isMatchTriggerCharacters(o.getTriggerCharacters(), charTyped));
+    }
+
+    private static boolean isCompletionTriggerCharactersSupported(@Nullable ServerCapabilities serverCapabilities,
+                                                                  String charTyped) {
+        var triggerCharacters = serverCapabilities.getCompletionProvider() != null ? serverCapabilities.getCompletionProvider().getTriggerCharacters() : null;
+        return isMatchTriggerCharacters(triggerCharacters, charTyped);
+    }
+
+    private static boolean isMatchTriggerCharacters(@Nullable List<String> characters,
+                                                    @NotNull String charTyped) {
+        if (characters == null || characters.isEmpty()) {
+            return false;
+        }
+        return characters.contains(charTyped);
+    }
 }

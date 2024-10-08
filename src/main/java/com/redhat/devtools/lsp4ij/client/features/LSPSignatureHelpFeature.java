@@ -56,4 +56,15 @@ public class LSPSignatureHelpFeature extends AbstractLSPDocumentFeature {
         }
     }
 
+    /**
+     * Returns true if the given character is defined as "signature trigger" in the server capability of the language server and false otherwise.
+     *
+     * @param file the file.
+     * @param charTyped the current typed character.
+     * @return true if the given character is defined as "signature trigger" in the server capability of the language server and false otherwise.
+     */
+    public boolean isSignatureTriggerCharactersSupported(@NotNull PsiFile file, String charTyped) {
+        return getSignatureHelpCapabilityRegistry().isSignatureTriggerCharactersSupported(file, charTyped);
+    }
+
 }

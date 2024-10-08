@@ -1095,41 +1095,6 @@ public class LanguageServerWrapper implements Disposable {
         return fileOperationsManager.canDidRenameFiles(LSPIJUtils.toUri(file), file.isDirectory());
     }
 
-    /**
-     * Returns true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
-     *
-     * @param charTyped the current typed character.
-     * @return true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
-     */
-    public boolean isCompletionTriggerCharactersSupported(String charTyped) {
-        if (serverCapabilities == null) {
-            return false;
-        }
-        var triggerCharacters = serverCapabilities.getCompletionProvider() != null ? serverCapabilities.getCompletionProvider().getTriggerCharacters() : null;
-        if (triggerCharacters == null || triggerCharacters.isEmpty()) {
-            return false;
-        }
-        return triggerCharacters.contains(charTyped);
-    }
-
-    /**
-     * Returns true if the given character is defined as "signature trigger" in the server capability of the language server and false otherwise.
-     *
-     * @param charTyped the current typed character.
-     * @return true if the given character is defined as "signature trigger" in the server capability of the language server and false otherwise.
-     */
-    public boolean isSignatureTriggerCharactersSupported(String charTyped) {
-        if (serverCapabilities == null) {
-            return false;
-        }
-
-        var triggerCharacters = serverCapabilities.getSignatureHelpProvider() != null ? serverCapabilities.getSignatureHelpProvider().getTriggerCharacters() : null;
-        if (triggerCharacters == null || triggerCharacters.isEmpty()) {
-            return false;
-        }
-        return triggerCharacters.contains(charTyped);
-    }
-
     public LSPClientFeatures getClientFeatures() {
         if (clientFeatures == null) {
             clientFeatures = getOrCreateClientFeatures();

@@ -63,4 +63,32 @@ public class SignatureHelpCapabilityRegistry extends TextDocumentServerCapabilit
         return super.isSupported(file, SERVER_CAPABILITIES_PREDICATE);
     }
 
+    /**
+     * Returns true if the given character is defined as "signature trigger" in the server capability of the language server and false otherwise.
+     *
+     * @param file      the file.
+     * @param charTyped the current typed character.
+     * @return true if the given character is defined as "signature trigger" in the server capability of the language server and false otherwise.
+     */
+    public boolean isSignatureTriggerCharactersSupported(@NotNull PsiFile file,
+                                                          String charTyped) {
+        return super.isSupported(file,
+                sc -> isSignatureTriggerCharactersSupported(sc, charTyped),
+                o -> isMatchTriggerCharacters(o.getTriggerCharacters(), charTyped));
+    }
+
+    private static boolean isSignatureTriggerCharactersSupported(@Nullable ServerCapabilities serverCapabilities,
+                                                                  String charTyped) {
+        var triggerCharacters = serverCapabilities.getSignatureHelpProvider() != null ? serverCapabilities.getSignatureHelpProvider().getTriggerCharacters() : null;
+        return isMatchTriggerCharacters(triggerCharacters, charTyped);
+    }
+
+    private static boolean isMatchTriggerCharacters(@Nullable List<String> characters,
+                                                    @NotNull String charTyped) {
+        if (characters == null || characters.isEmpty()) {
+            return false;
+        }
+        return characters.contains(charTyped);
+    }
+
 }

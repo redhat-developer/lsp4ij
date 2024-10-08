@@ -60,11 +60,15 @@ public class LSPTypedHandlerDelegate extends TypedHandlerDelegate {
 
     private static boolean hasLanguageServerSupportingCompletionTriggerCharacters(char charTyped, Project project, PsiFile file) {
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.isCompletionTriggerCharactersSupported(String.valueOf(charTyped)));
+                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures()
+                        .getCompletionFeature()
+                        .isCompletionTriggerCharactersSupported(file, String.valueOf(charTyped)));
     }
 
     private static boolean hasLanguageServerSupportingSignatureTriggerCharacters(char charTyped, Project project, PsiFile file) {
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.isSignatureTriggerCharactersSupported(String.valueOf(charTyped)));
+                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures()
+                                .getSignatureHelpFeature()
+                                .isSignatureTriggerCharactersSupported(file, String.valueOf(charTyped)));
     }
 }
