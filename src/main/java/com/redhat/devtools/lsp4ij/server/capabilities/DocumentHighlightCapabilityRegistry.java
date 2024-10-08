@@ -48,9 +48,9 @@ public class DocumentHighlightCapabilityRegistry extends TextDocumentServerCapab
     }
 
     @Override
-    protected @Nullable DocumentHighlightRegistrationOptions create(JsonObject json) {
+    protected @Nullable DocumentHighlightRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedDocumentHighlightingFormattingRegistrationOptions.class);
     }
 

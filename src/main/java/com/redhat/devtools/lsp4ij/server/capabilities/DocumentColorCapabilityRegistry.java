@@ -47,9 +47,9 @@ public class DocumentColorCapabilityRegistry extends TextDocumentServerCapabilit
     }
 
     @Override
-    protected @Nullable ColorProviderOptions create(JsonObject json) {
+    protected @Nullable ColorProviderOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedColorFormattingRegistrationOptions.class);
     }
 

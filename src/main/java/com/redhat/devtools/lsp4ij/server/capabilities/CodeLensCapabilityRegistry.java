@@ -53,9 +53,9 @@ public class CodeLensCapabilityRegistry extends TextDocumentServerCapabilityRegi
     }
 
     @Override
-    protected @Nullable CodeLensRegistrationOptions create(JsonObject json) {
+    protected @Nullable CodeLensRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedCodeLensFormattingRegistrationOptions.class);
     }
 

@@ -47,9 +47,9 @@ public class DefinitionCapabilityRegistry extends TextDocumentServerCapabilityRe
     }
 
     @Override
-    protected @Nullable DefinitionRegistrationOptions create(JsonObject json) {
+    protected @Nullable DefinitionRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedDefinitionRegistrationOptions.class);
     }
 

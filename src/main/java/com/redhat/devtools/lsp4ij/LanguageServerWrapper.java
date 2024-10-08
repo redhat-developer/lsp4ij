@@ -885,7 +885,20 @@ public class LanguageServerWrapper implements Disposable {
                         final TextDocumentServerCapabilityRegistry<? extends TextDocumentRegistrationOptions> registry = getClientFeatures().getCapabilityRegistry(method);
                         if (registry != null) {
                             // register 'textDocument/*' capability
-                            final TextDocumentRegistrationOptions options = registry.registerCapability((JsonObject) reg.getRegisterOptions());
+                            JsonObject registerOptions = (JsonObject) reg.getRegisterOptions();
+                            if (registerOptions == null) {
+                                // ex:
+                                // {
+                                //  "registrations": [
+                                //    {
+                                //      "id": "5d54639d-a478-422f-bfb8-112c4b8a93ee",
+                                //      "method": "textDocument/hover"
+                                //    }
+                                //  ]
+                                //}
+                                registerOptions = new JsonObject();
+                            }
+                            final TextDocumentRegistrationOptions options = registry.registerCapability(registerOptions);
                             addRegistration(reg, () -> registry.unregisterCapability(options));
                         }
                     } catch (Exception e) {

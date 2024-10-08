@@ -47,9 +47,9 @@ public class TypeDefinitionCapabilityRegistry extends TextDocumentServerCapabili
     }
 
     @Override
-    protected @Nullable TypeDefinitionRegistrationOptions create(JsonObject json) {
+    protected @Nullable TypeDefinitionRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedTypeDefinitionRegistrationOptions.class);
     }
 

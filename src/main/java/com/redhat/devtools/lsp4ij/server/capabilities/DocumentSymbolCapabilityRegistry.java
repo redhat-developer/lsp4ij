@@ -47,9 +47,9 @@ public class DocumentSymbolCapabilityRegistry extends TextDocumentServerCapabili
     }
 
     @Override
-    protected @Nullable DocumentSymbolRegistrationOptions create(JsonObject json) {
+    protected @Nullable DocumentSymbolRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedSymbolFormattingRegistrationOptions.class);
     }
 

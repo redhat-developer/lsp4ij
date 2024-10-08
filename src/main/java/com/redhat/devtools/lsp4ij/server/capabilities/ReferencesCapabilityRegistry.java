@@ -47,9 +47,9 @@ public class ReferencesCapabilityRegistry extends TextDocumentServerCapabilityRe
     }
 
     @Override
-    protected @Nullable ReferenceRegistrationOptions create(JsonObject json) {
+    protected @Nullable ReferenceRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedReferenceRegistrationOptions.class);
     }
 

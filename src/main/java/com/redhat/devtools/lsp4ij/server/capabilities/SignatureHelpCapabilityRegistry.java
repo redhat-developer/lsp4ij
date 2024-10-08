@@ -47,9 +47,9 @@ public class SignatureHelpCapabilityRegistry extends TextDocumentServerCapabilit
     }
 
     @Override
-    protected @Nullable SignatureHelpRegistrationOptions create(JsonObject json) {
+    protected @Nullable SignatureHelpRegistrationOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedSignatureHelpRegistrationOptions.class);
     }
 

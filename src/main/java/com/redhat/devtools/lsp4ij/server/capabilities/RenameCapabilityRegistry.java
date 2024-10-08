@@ -59,9 +59,9 @@ public class RenameCapabilityRegistry extends TextDocumentServerCapabilityRegist
     }
 
     @Override
-    protected @Nullable RenameOptions create(JsonObject json) {
+    protected @Nullable RenameOptions create(@NotNull JsonObject registerOptions) {
         return JSONUtils.getLsp4jGson()
-                .fromJson(json,
+                .fromJson(registerOptions,
                         ExtendedRenameOptions.class);
     }
 
