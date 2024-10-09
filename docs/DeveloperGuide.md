@@ -637,9 +637,14 @@ import com.intellij.openapi.util.Disposer;
 
 serverLease.thenAccept(lease -> {
     try {
-       // Fetch list of 'applications' using some custom protocol on 'MyLanguageServer'
-       List<Application> applications = ((MyLanguageServer)lease.get().getServer()).getApplications();   
-       ... do something with the result...
+       while (...we need to do suff...) {
+          // Fetch list of 'applications' using some custom protocol on 'MyLanguageServer'
+          List<Application> applications = ((MyLanguageServer)lease.get().getServer()).getApplications();   
+          ... do something with the result...
+       }
+    } catch (ServerWasStoppedException e) {   
+        // handle the case where the server was unexpectedly terminated
+        ...
     } finally {
        // Release the lease when the server is no longer needed
        Disposer.dispose(lease);
