@@ -632,10 +632,18 @@ To get access to your language server from the lease call the `get()` method on 
 This will return a LanuageServerItem that is guaranteed to have an 'active' server at that time.
 
 ```java
+import com.intellij.openapi.util.Disposer;
+...
+
 serverLease.thenAccept(lease -> {
-    // Fetch list of 'applications' using some custom protocol on 'MyLanguageServer'
-    List<Application> applications = ((MyLanguageServer)lease.get().getServer()).getApplications();   
-    ... do something with the result... 
+    try {
+       // Fetch list of 'applications' using some custom protocol on 'MyLanguageServer'
+       List<Application> applications = ((MyLanguageServer)lease.get().getServer()).getApplications();   
+       ... do something with the result...
+    } finally {
+       // Release the lease when the server is no longer needed
+       Disposer.dispose(lease);
+    }
 });
 ```
 
