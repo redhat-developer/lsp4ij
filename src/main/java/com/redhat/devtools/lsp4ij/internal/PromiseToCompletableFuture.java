@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.ide.lightEdit.LightEdit;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.NonBlockingReadAction;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -80,7 +81,9 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
         // if indexation is processing and not in Light Edit mode, we need to execute the promise in smart mode
         var executeInSmartMode = !LightEdit.owns(project) && DumbService.getInstance(project).isDumb();
         var promise = nonBlockingReadActionPromise(executeInSmartMode);
-        bind(promise);
+        DumbService.getInstance(project).runWhenSmart(() -> {
+            bind(promise.submit(AppExecutorUtil.getAppExecutorService()));
+        });
     }
 
     /**
@@ -120,7 +123,9 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                     // 1.2 Index are not ready or the read action cannot be done, retry in smart mode...
                     LOGGER.warn("Restart non blocking read action for '" + progressTitle + "' with attempt " + nbAttempt.get() + "/" + MAX_ATTEMPT + ".", ex);
                     var newPromise = nonBlockingReadActionPromise(true);
-                    bind(newPromise);
+                    DumbService.getInstance(project).runWhenSmart(() -> {
+                        bind(newPromise.submit(AppExecutorUtil.getAppExecutorService()));
+                    });
                 }
             } else {
                 this.complete(value.result);
@@ -135,7 +140,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
      * @return a non blocking read action promise
      */
     @NotNull
-    private CancellablePromise<ResultOrError<R>> nonBlockingReadActionPromise(boolean executeInSmartMode) {
+    private NonBlockingReadAction<ResultOrError<R>> nonBlockingReadActionPromise(boolean executeInSmartMode) {
         var indicator = createProgressIndicator();
         indicator.setText(progressTitle);
         var action = ReadAction.nonBlocking(() ->
@@ -163,8 +168,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
         if (coalesceBy != null && !(coalesceBy.length == 1 && Objects.isNull(coalesceBy[0]))) {
             action = action.coalesceBy(coalesceBy);
         }
-        return action
-                .submit(AppExecutorUtil.getAppExecutorService());
+        return action;
     }
 
     protected ProgressIndicator createProgressIndicator() {
