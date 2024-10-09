@@ -79,7 +79,7 @@ public class LanguageServerItem {
                 //TODO (maybe): Can `item.serverWrapper.getServerError()` provide a more informative error message?
                 var serverDefinition = item.getServerDefinition();
                 throw new ServerWasStoppedException("The server was stopped unexpectedly '"
-                        + serverDefinition.getId() + "' (pid=" + item.serverWrapper.getCurrentProcessId());
+                        + serverDefinition.getId() + "' (pid=" + item.serverWrapper.getCurrentProcessId()+")");
             }
             @Override
             public void dispose() {
