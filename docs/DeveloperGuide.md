@@ -613,8 +613,8 @@ CompletableFuture<List<Application>> applications =
 ## Keep a Language Server alive with a Lease
 
 If you need a reference to your language server and need to execute operations with it, 
-for an extended period of time, you can use `LanguageServerItem.keepAlive()` method create
-a `Lease` on the item. The lease represents a request for lsp4ij not terminate the language 
+for an extended period of time, you can use `LanguageServerItem.keepAlive()` method to create
+a `Lease` on the item. The lease represents a request for lsp4ij not to terminate the language 
 server until the `Lease` is disposed.
 
 ```java
