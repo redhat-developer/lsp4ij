@@ -656,7 +656,8 @@ Note that it is still possible under some circumstance that the server might get
 active leases: 
 
   - the server process could crash unexpectedly. 
-  - a user could stop the language server from lsp4ij UI.
+  - a user could stop the language server from lsp4ij UI (but see [LSP Client Features API](./LSPApi.md#lsp-client-features)
+    for a way to disable this user ability by overriding `canStopServerByUser()`)
   - when the IDE shuts down all language servers will be terminated regardles of active leases.
 
 You should be prepared to handle these kinds of situations in a graceful manner. You can detect whether
