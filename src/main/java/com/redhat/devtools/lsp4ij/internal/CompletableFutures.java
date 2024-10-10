@@ -18,6 +18,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
@@ -104,6 +105,7 @@ public class CompletableFutures {
      */
     public static void waitUntilDone(@NotNull CompletableFuture<?> future,
                                      @Nullable PsiFile file) throws ExecutionException, ProcessCanceledException {
+        long start = System.currentTimeMillis();
         final long modificationStamp = file != null ? file.getModificationStamp() : -1;
         while (!future.isDone()) {
             try {
@@ -118,6 +120,14 @@ public class CompletableFutures {
                 // wait for 25 ms
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
+                if (!future.isDone() && System.currentTimeMillis() - start > 5000 && ProjectIndexingManager.getInstance(file.getProject()).isIndexingAll()){
+                    // When some projects are being indexed,
+                    // the language server startup can take a long time
+                    // and the LSP feature (ex: codeLens)
+                    // waits for the language server startup.
+                    // This wait can block IJ, here we stop the wait (and we could lose some LSP feature)
+                    throw new CancellationException("Some projects are indexing");
+                }
                 // Ignore timeout
             } catch (ExecutionException | CompletionException e) {
                 Throwable cause = e.getCause();

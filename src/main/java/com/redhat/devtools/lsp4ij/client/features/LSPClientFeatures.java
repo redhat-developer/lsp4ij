@@ -877,7 +877,7 @@ public class LSPClientFeatures implements Disposable {
      * @return the language server wrapper.
      */
     @ApiStatus.Internal
-    final LanguageServerWrapper getServerWrapper() {
+    public final LanguageServerWrapper getServerWrapper() {
         return serverWrapper;
     }
 

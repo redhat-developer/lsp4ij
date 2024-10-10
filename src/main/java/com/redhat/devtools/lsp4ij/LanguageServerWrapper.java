@@ -547,19 +547,21 @@ public class LanguageServerWrapper implements Disposable {
             // - exit
 
             // shutdown the language server
-            try {
-                shutdownLanguageServerInstance(languageServerInstance);
-            } catch (Exception ex) {
-                getLanguageServerLifecycleManager().onError(this, ex);
-            }
+            if (provider.isAlive()) {
+                try {
+                    shutdownLanguageServerInstance(languageServerInstance);
+                } catch (Exception ex) {
+                    getLanguageServerLifecycleManager().onError(this, ex);
+                }
 
-            // exit the language server
-            // Consume language server exit() before cancelling launcher future (serverFuture.cancel())
-            // to avoid having error like "The pipe is being closed".
-            try {
-                exitLanguageServerInstance(languageServerInstance);
-            } catch (Exception ex) {
-                getLanguageServerLifecycleManager().onError(this, ex);
+                // exit the language server
+                // Consume language server exit() before cancelling launcher future (serverFuture.cancel())
+                // to avoid having error like "The pipe is being closed".
+                try {
+                    exitLanguageServerInstance(languageServerInstance);
+                } catch (Exception ex) {
+                    getLanguageServerLifecycleManager().onError(this, ex);
+                }
             }
         }
 

@@ -198,6 +198,9 @@
 
         <!-- LSP project services -->
         <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.client.ProjectIndexingManager"/>
+        <projectIndexingActivityHistoryListener implementation="com.redhat.devtools.lsp4ij.client.ProjectIndexingListener" />
+        <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServerManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager"/>

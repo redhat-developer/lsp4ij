@@ -274,19 +274,22 @@ public class LanguageServiceAccessor implements Disposable {
                             .stream()
                             .filter(LanguageServerWrapper::isEnabled)
                             .filter(wrapper -> wrapper.getClientFeatures().isEnabled(file))
-                            .map(wrapper ->
-                                    wrapper.getInitializedServer()
-                                            .thenComposeAsync(server -> {
-                                                if (server != null &&
-                                                        (afterStartingServerFilter == null || afterStartingServerFilter.test(wrapper.getClientFeatures()))) {
-                                                    return wrapper.connect(file, document);
-                                                }
-                                                return CompletableFuture.completedFuture(null);
-                                            }).thenAccept(server -> {
-                                                if (server != null) {
-                                                    servers.add(new LanguageServerItem(server, wrapper));
-                                                }
-                                            })).toArray(CompletableFuture[]::new)))
+                            .map(wrapper -> {
+                                        var clientFeatures = wrapper.getClientFeatures();
+                                        return wrapper.getInitializedServer()
+                                                .thenComposeAsync(server -> {
+                                                    if (server != null &&
+                                                            (afterStartingServerFilter == null || afterStartingServerFilter.test(clientFeatures))) {
+                                                        return wrapper.connect(file, document);
+                                                    }
+                                                    return CompletableFuture.completedFuture(null);
+                                                }).thenAccept(server -> {
+                                                    if (server != null) {
+                                                        servers.add(new LanguageServerItem(server, wrapper));
+                                                    }
+                                                });
+                                    }
+                            ).toArray(CompletableFuture[]::new)))
                     .thenApply(theVoid -> servers);
         } catch (final ProcessCanceledException cancellation) {
             throw cancellation;

@@ -25,7 +25,8 @@ import com.intellij.util.ui.EDT;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import kotlin.Pair;
@@ -33,7 +34,6 @@ import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,13 +90,16 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         if (project == null || project.isDisposed()) {
             return CodeVisionState.Companion.getREADY_EMPTY();
         }
-        if (DumbService.isDumb(project)) {
-            return CodeVisionState.NotReady.INSTANCE;
-        }
+
         final VirtualFile file = editor.getVirtualFile();
-        if (!acceptsFile(file, project)) {
+        ExecuteLSPFeatureStatus acceptsFile = ProjectIndexingManager.canExecuteLSPFeature(file, project);
+        if (acceptsFile == ExecuteLSPFeatureStatus.NOT) {
             return CodeVisionState.Companion.getREADY_EMPTY();
         }
+        if (acceptsFile == ExecuteLSPFeatureStatus.AFTER_INDEXING) {
+            return CodeVisionState.NotReady.INSTANCE;
+        }
+
         return computeCodeVisionUnderReadAction(() -> {
 
             PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
@@ -188,10 +191,6 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             }
             return CodeVisionState.NotReady.INSTANCE;
         }, project);
-    }
-
-    private static boolean acceptsFile(@Nullable VirtualFile file, @NotNull Project project) {
-        return LanguageServersRegistry.getInstance().isFileSupported(file, project);
     }
 
     private static CodeVisionState computeCodeVisionUnderReadAction(@NotNull ThrowableComputable<CodeVisionState, Throwable> computable,

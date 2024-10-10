@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal.editor;
 
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
@@ -42,6 +43,8 @@ import java.util.concurrent.Callable;
 @ApiStatus.Internal
 public class EditorFeatureManager implements Disposable {
 
+    record RefreshEditorFeatureContext(@NotNull PsiFile file, @NotNull List<Runnable> runnables) {}
+
     private final @NotNull Project project;
 
     private final Map<EditorFeatureType, EditorFeature> editorFeatures;
@@ -72,7 +75,7 @@ public class EditorFeatureManager implements Disposable {
     public void refreshEditorFeature(@NotNull VirtualFile file,
                                      @NotNull EditorFeatureType featureType,
                                      boolean clearLSPCache) {
-        ReadAction.nonBlocking((Callable<List<Runnable>>) () -> {
+        ReadAction.nonBlocking((Callable<RefreshEditorFeatureContext>) () -> {
                     // Get the Psi file.
                     PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                     if (psiFile == null) {
@@ -98,13 +101,12 @@ public class EditorFeatureManager implements Disposable {
                         // Collect runnable which must be executed on UI step.
                         collectUiRunnables(psiFile, editor, featureType, runnables);
                     }
-                    return runnables;
+                    return new RefreshEditorFeatureContext(psiFile, runnables);
                 })
-                .finishOnUiThread(ModalityState.any(), runnables -> {
-                    if (runnables == null) {
-                        return;
-                    }
-                    for (var runnable : runnables) {
+                .coalesceBy(file, featureType, clearLSPCache)
+                .finishOnUiThread(ModalityState.any(), context -> {
+                    DaemonCodeAnalyzer.getInstance(project).restart(context.file());
+                    for (var runnable : context.runnables()) {
                         runnable.run();
                     }
                 }).submit(AppExecutorUtil.getAppExecutorService());
