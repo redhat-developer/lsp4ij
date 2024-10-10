@@ -21,6 +21,7 @@ import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.ExecutionAttemptLimitReachedException;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.concurrency.CancellablePromise;
@@ -141,6 +142,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
         var action = ReadAction.nonBlocking(() ->
                 {
                     try {
+                        ProjectIndexingManager.getInstance(project).waitForIndexing().get();
                         R result = code.apply(indicator);
                         return new ResultOrError<R>(result, null);
                     } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
