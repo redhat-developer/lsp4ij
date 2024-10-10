@@ -84,6 +84,7 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                                                                           @NotNull LanguageServerItem languageServer,
                                                                           @NotNull PsiFile file,
                                                                           @NotNull CancellationSupport cancellationSupport) {
+
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .codeLens(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS)

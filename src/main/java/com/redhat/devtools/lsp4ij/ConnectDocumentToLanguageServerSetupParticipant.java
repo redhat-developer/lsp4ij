@@ -16,30 +16,14 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.client.CoalesceByKey;
-import com.redhat.devtools.lsp4ij.internal.PromiseToCompletableFuture;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import org.jetbrains.annotations.NotNull;
-
-import java.text.MessageFormat;
 
 /**
  * Track file opened / closed to start language servers / disconnect file from language servers.
  */
 public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectManagerListener, FileEditorManagerListener {
-
-    private static class ConnectToLanguageServerCompletableFuture extends PromiseToCompletableFuture<Void> {
-
-        private static final String MESSAGE_KEY = "Connect ''{0}'' file to language servers.";
-
-        public ConnectToLanguageServerCompletableFuture(@NotNull VirtualFile file, @NotNull Project project) {
-            super(monitor -> {
-                connectToLanguageServer(file, project);
-                return null;
-            }, MessageFormat.format(MESSAGE_KEY, file.getUrl()), project, null, new CoalesceByKey(ConnectDocumentToLanguageServerSetupParticipant.class.getName(), file.getUrl()));
-            init();
-        }
-    }
 
     @Override
     public void projectOpened(@NotNull Project project) {
@@ -59,7 +43,12 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // to avoid starting language server in the EDT Thread which could freeze IJ.
         // Wait for indexing is finished and read action is enabled
         // --> force the start of all languages servers mapped with the given file when indexing is finished and read action is allowed
-        new ConnectToLanguageServerCompletableFuture(file, project);
+        ProjectIndexingManager
+                .waitForIndexingAll()
+                .thenApplyAsync(unused -> {
+                    connectToLanguageServer(file, project);
+                    return null;
+                });
     }
 
     @Override

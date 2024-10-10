@@ -1,11 +1,14 @@
 package com.redhat.devtools.lsp4ij.server.capabilities;
 
 import com.google.gson.JsonObject;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.files.PathPatternMatcher;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.TextDocumentRegistrationOptions;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -20,13 +23,20 @@ import java.util.function.Predicate;
 public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumentRegistrationOptions> {
 
     private final @NotNull LSPClientFeatures clientFeatures;
+    private final @Nullable EditorFeatureType editorFeatureType;
     private @Nullable ServerCapabilities serverCapabilities;
 
     private final List<T> dynamicCapabilities;
 
     public TextDocumentServerCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures) {
+     this(clientFeatures,null);
+    }
+
+    public TextDocumentServerCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures,
+                                                @Nullable EditorFeatureType editorFeatureType) {
         this.clientFeatures = clientFeatures;
         this.dynamicCapabilities = new ArrayList<>();
+        this.editorFeatureType = editorFeatureType;
     }
 
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
@@ -44,6 +54,14 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
         if (t != null) {
             synchronized (dynamicCapabilities) {
                 dynamicCapabilities.add(t);
+            }
+        }
+        if (editorFeatureType != null) {
+            // Refresh codelens, inlay hints, folding, etc according to the register/unregister capability.
+            for (var fileData : clientFeatures.getServerWrapper().getConnectedFiles()) {
+                VirtualFile file = fileData.getFile();
+                EditorFeatureManager.getInstance(clientFeatures.getProject())
+                        .refreshEditorFeature(file, editorFeatureType, true);
             }
         }
         return t;

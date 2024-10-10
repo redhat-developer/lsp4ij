@@ -28,12 +28,12 @@ import java.util.List;
 
 /**
  * Code vision feature to refresh IntelliJ code vision (even if Psi file doesn't change).
- *
+ * <p>
  * Bridge class which consumes CodeVisionPassFactory with Java Reflection to support any IntelliJ version:
  *
  * <ul>
- *     <li>with old version (< 2024.3): CodeVisionPassFactory.Companion.clearModificationStamp(editor)</li>
- *     <li>with new version (>= 2024.3):  CodeVisionPassFactory.ModificationStampUtil.clearModificationStamp(editor)</li>
+ *     <li>with old version (< 2024.3): CodeVisionPassFactory.Companion.clearModificationStamp(Editor)</li>
+ *     <li>with new version (>= 2024.3):  ModificationStampUtil.clearModificationStamp(Editor)</li>
  * </ul>
  */
 @ApiStatus.Internal
@@ -41,7 +41,11 @@ public class CodeVisionEditorFeature implements EditorFeature {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CodeVisionEditorFeature.class);
 
-    private static final String CODE_VISION_PASS_FACTORY_CLASS = "com.intellij.codeInsight.hints.codeVision.CodeVisionPassFactory";
+    public static final String MODIFICATION_STAMP_UTIL_CLASS_NAME = "com.intellij.codeInsight.hints.codeVision.ModificationStampUtil";
+
+    private static final String[] CODE_VISION_PASS_FACTORY_CLASSES = {
+            MODIFICATION_STAMP_UTIL_CLASS_NAME,
+            "com.intellij.codeInsight.hints.codeVision.CodeVisionPassFactory"};
 
     // CodeVisionPassFactory.Companion
     private static Object companionInstance;
@@ -61,10 +65,10 @@ public class CodeVisionEditorFeature implements EditorFeature {
             // (with the key PSI_MODIFICATION_STAMP)
             // to refresh the code vision even if Psi file has not changed
             // see https://github.com/JetBrains/intellij-community/blob/7c8933354e46a99e1f41022aaa6552d2c0455eec/platform/lang-impl/src/com/intellij/codeInsight/hints/codeVision/CodeVisionPassFactory.kt#L32
-            loadCodeVisionPassFactoryIfNeeded();
+            loadModificationStampUtilIfNeeded();
             clearModificationStampMethod.invoke(companionInstance, editor);
         } catch (Exception e) {
-            LOGGER.error("Error while calling CodeVisionPassFactory.ModificationStampUtil.clearModificationStamp(editor)", e);
+            LOGGER.error("Error while calling ModificationStampUtil.clearModificationStamp(editor)", e);
         }
     }
 
@@ -87,29 +91,40 @@ public class CodeVisionEditorFeature implements EditorFeature {
         runnableList.add(runnable);
     }
 
-    private static void loadCodeVisionPassFactoryIfNeeded() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
-        if (companionInstance != null) {
+    private static void loadModificationStampUtilIfNeeded() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
+        if (clearModificationStampMethod != null) {
             return;
         }
-        loadCodeVisionPassFactory();
+        loadModificationStampUtil();
     }
 
-    private static synchronized void loadCodeVisionPassFactory() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
-        if (companionInstance != null) {
+    private static synchronized void loadModificationStampUtil() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
+        if (clearModificationStampMethod != null) {
             return;
         }
-        Class<?> codeVisionPassFactoryClass = loadCodeVisionPassFactoryClass();
-        // Create instance of CodeVisionPassFactory
-        Object codeVisionPassFactoryInstance = codeVisionPassFactoryClass.getConstructors()[0].newInstance();
+        Class<?> modificationStampUtilClass = loadCodeVisionPassFactoryClass();
+        if (modificationStampUtilClass.getName().equals(MODIFICATION_STAMP_UTIL_CLASS_NAME)) {
+            // Ij >= 2024.3 -> consume ModificationStampUtil.clearModificationStamp(Editor)
+            clearModificationStampMethod = modificationStampUtilClass.getMethod("clearModificationStamp", Editor.class);
+            clearModificationStampMethod.setAccessible(true);
 
-        // Get CodeVisionPassFactory.ModificationStampUtil which defines relevant methods
-        Class<?> companionClass = codeVisionPassFactoryClass.getClasses()[0];
-        Field companionField = getCompanionInstance(codeVisionPassFactoryClass);
+            var constructor = modificationStampUtilClass.getDeclaredConstructors()[0];
+            constructor.setAccessible(true);
+            Object companionInstance = constructor.newInstance();
+            CodeVisionEditorFeature.companionInstance = companionInstance;
+
+            return;
+        }
+        // IJ < 2024.3 -> consume CodeVisionPassFactory.Companion.clearModificationStamp(Editor)
+        // Create instance of CodeVisionPassFactory
+        Object codeVisionPassFactoryInstance = modificationStampUtilClass.getConstructors()[0].newInstance();
+
+        Class<?> companionClass = modificationStampUtilClass.getClasses()[0];
+        Field companionField = getCompanionInstance(modificationStampUtilClass);
         companionField.setAccessible(true);
         Object companionInstance = companionField.get(codeVisionPassFactoryInstance);
 
         // Get
-        // - CodeVisionPassFactory.ModificationStampUtil.clearModificationStamp(editor) method -> New version of IJ (>= 2024.3)
         // - CodeVisionPassFactory.Companion.clearModificationStamp(editor) method -> Old version of IJ (< 2024.3)
         clearModificationStampMethod = companionClass.getMethod("clearModificationStamp", Editor.class);
         clearModificationStampMethod.setAccessible(true);
@@ -117,13 +132,16 @@ public class CodeVisionEditorFeature implements EditorFeature {
     }
 
     private static Class<?> loadCodeVisionPassFactoryClass() throws ClassNotFoundException {
-        try {
-            return Class.forName(CODE_VISION_PASS_FACTORY_CLASS);
-        } catch (Exception e) {
-            // Do nothing
+        for (var className : CODE_VISION_PASS_FACTORY_CLASSES) {
+            try {
+                return Class.forName(className);
+            } catch (Exception e) {
+                // Do nothing
+            }
         }
-        LOGGER.error("Error while trying to initialize CodeVisionEditorFeature from classes " + CODE_VISION_PASS_FACTORY_CLASS);
-        throw new ClassNotFoundException(CODE_VISION_PASS_FACTORY_CLASS);
+        String classNames = "[" + String.join(",", CODE_VISION_PASS_FACTORY_CLASSES) + "]";
+        LOGGER.error("Error while trying to initialize CodeVisionEditorFeature from classes " + classNames);
+        throw new ClassNotFoundException(classNames);
     }
 
     private static Field getCompanionInstance(Class<?> codeVisionPassFactoryClass) throws NoSuchFieldException {

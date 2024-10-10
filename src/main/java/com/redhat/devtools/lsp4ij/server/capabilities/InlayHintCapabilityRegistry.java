@@ -14,6 +14,8 @@ import com.google.gson.JsonObject;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeature;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.InlayHintRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
@@ -42,7 +44,7 @@ public class InlayHintCapabilityRegistry extends TextDocumentServerCapabilityReg
             hasCapability(o.getResolveProvider());
 
     public InlayHintCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures) {
-        super(clientFeatures);
+        super(clientFeatures, EditorFeatureType.INLAY_HINT );
     }
 
     class ExtendedInlayHintRegistrationOptions extends InlayHintRegistrationOptions implements ExtendedDocumentSelector.DocumentFilersProvider {
