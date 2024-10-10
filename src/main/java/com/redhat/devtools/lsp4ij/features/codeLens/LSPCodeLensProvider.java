@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
@@ -90,12 +91,12 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         if (project == null || project.isDisposed()) {
             return CodeVisionState.Companion.getREADY_EMPTY();
         }
-        if (DumbService.isDumb(project)) {
-            return CodeVisionState.NotReady.INSTANCE;
-        }
         final VirtualFile file = editor.getVirtualFile();
         if (!acceptsFile(file, project)) {
             return CodeVisionState.Companion.getREADY_EMPTY();
+        }
+        if (LSPProjectContextManager.getInstance(project).addFileToRefreshIfNotReady(file)) {
+            return CodeVisionState.NotReady.INSTANCE;
         }
         return computeCodeVisionUnderReadAction(() -> {
 

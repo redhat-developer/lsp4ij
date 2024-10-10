@@ -191,6 +191,8 @@
 
         <!-- LSP project services -->
         <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.LSPProjectContextManager"/>
+        <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServerManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServiceAccessor"/>

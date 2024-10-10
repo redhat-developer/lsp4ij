@@ -20,6 +20,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPProjectContextManager;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
@@ -55,6 +56,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
             return;
         }
 
+        if (LSPProjectContextManager.getInstance(file.getProject()).addFileToRefreshIfNotReady(file.getVirtualFile())) {
+            return;
+        }
         // Consume LSP 'textDocument/foldingRanges' request
         LSPFoldingRangeSupport foldingRangeSupport = LSPFileSupport.getSupport(file).getFoldingRangeSupport();
         var params = new FoldingRangeRequestParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));

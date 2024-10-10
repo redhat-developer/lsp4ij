@@ -22,6 +22,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPProjectContextManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
@@ -51,6 +52,9 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
     @Override
     public @Nullable HighlightUsagesHandlerBase createHighlightUsagesHandler(@NotNull Editor editor, @NotNull PsiFile file) {
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
+            return null;
+        }
+        if (LSPProjectContextManager.getInstance(editor.getProject()).addFileToRefreshIfNotReady(editor.getVirtualFile())) {
             return null;
         }
         List<LSPHighlightPsiElement> targets = getTargets(editor, file);
