@@ -234,4 +234,17 @@ public class CancellationSupport implements CancelChecker {
             throw new CancellationException();
         }
     }
+
+    public static void forwardCancellation(CompletableFuture<?> from, CompletableFuture<?>... to) {
+        from.exceptionally(t -> {
+            if (t instanceof CancellationException) {
+                if (to != null) {
+                    for (var f : to) {
+                        f.cancel(true);
+                    }
+                }
+            }
+            return null;
+        });
+    }
 }

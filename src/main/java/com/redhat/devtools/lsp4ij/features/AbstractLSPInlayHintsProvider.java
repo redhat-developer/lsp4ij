@@ -21,6 +21,7 @@ import com.intellij.ui.layout.LCFlags;
 import com.intellij.ui.layout.LayoutKt;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import org.eclipse.lsp4j.Command;
@@ -83,10 +84,13 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                 }
                 try {
                     final List<CompletableFuture> pendingFutures = new ArrayList<>();
-                    doCollect(psiFile, editor, getFactory(), inlayHintsSink, pendingFutures);
+                    if (ProjectIndexingManager.getInstance(project).isIndexing()) {
+                        pendingFutures.add(ProjectIndexingManager.getInstance(project).waitForIndexing());
+                    } else {
+                        doCollect(psiFile, editor, getFactory(), inlayHintsSink, pendingFutures);
+                    }
                     if (!pendingFutures.isEmpty()) {
                         // Some LSP requests:
-                        // - textDocument/codeLens, codeLens/resolve
                         // - textDocument/inlayHint, inlayHint/resolve
                         // - textDocument/colorInformation
                         // are pending, wait for their completion and refresh the inlay hints UI to render them

@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.codeLens;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -84,6 +85,11 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                                                                           @NotNull LanguageServerItem languageServer,
                                                                           @NotNull PsiFile file,
                                                                           @NotNull CancellationSupport cancellationSupport) {
+
+        if (languageServer.getServer() == null) {
+            ProjectIndexingManager.refreshFeatureWhenIndexingFinished(file, LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS);
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .codeLens(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS)

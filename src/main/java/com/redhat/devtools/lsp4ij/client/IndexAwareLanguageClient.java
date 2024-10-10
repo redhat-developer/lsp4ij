@@ -17,6 +17,7 @@ import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,7 +52,13 @@ public class IndexAwareLanguageClient extends LanguageClientImpl {
      * @return the output of the function code
      */
     protected <R> CompletableFuture<R> runAsBackground(String progressTitle, Function<ProgressIndicator, R> code, Object coalesceBy) {
-        return new LSPCompletableFuture<>(code, progressTitle, IndexAwareLanguageClient.this, coalesceBy);
+       var waitForIndexing = ProjectIndexingManager.getInstance(getProject())
+                .waitForIndexing();
+       var future =  new LSPCompletableFuture<>(code, progressTitle, IndexAwareLanguageClient.this, coalesceBy);
+       var root = waitForIndexing
+               .thenComposeAsync(unused -> future);
+        CancellationSupport.forwardCancellation(root,waitForIndexing, future);
+        return root;
     }
 
     /**
