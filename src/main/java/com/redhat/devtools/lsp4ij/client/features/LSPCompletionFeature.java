@@ -212,6 +212,15 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         return item.getKind() != null && item.getKind() == CompletionItemKind.Keyword;
     }
 
+    /**
+     * Don't override this method, we need to revisit the API and the prefix computation (to customize it).
+     * @param completionPrefix
+     * @param result
+     * @param lookupItem
+     * @param priority
+     * @param item
+     */
+    @ApiStatus.Internal
     public void addLookupItem(@NotNull CompletionPrefix completionPrefix,
                               @NotNull CompletionResultSet result,
                               @NotNull LookupElement lookupItem,

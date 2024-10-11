@@ -5,10 +5,17 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.7.0</h3>
+    <ul>
+      <h1>Support for documentSelector in <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_registerCapability">registerCapability</a></1h>
+      <h1>Provide the <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md">LSP client features API</a></h1>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/7?closed=1">changelog</a>.
+
     <h3>0.6.0</h3>
     <ul>
       <h1>Support for textDocument/documentSymbol</1h>
-      <h1>Provide a new way to connect to a language server with OSProcessStreamConnectionProvider</h1>
+      <h1>Provide a new way to connect to a language server with <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#osprocessstreamconnectionprovider">OSProcessStreamConnectionProvider</a></h1>
       <li>Fixing bugs</li>
     </ul>
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/6?closed=1">changelog</a>.
