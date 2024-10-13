@@ -48,6 +48,12 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
             // The file has been closed from another project,don't send textDocument/didClose
             return;
         }
+        if (source.getAllEditors(file).length > 0) {
+            // The file has been opened by multiple editors (e.g. via 'Split Right' menu),
+            // we ignore the fileClosed event to ensure that a 'textDocument/didClose'
+            // is sent when the last editor of the file has closed.
+            return;
+        }
         // Manage textDocument/didClose
         URI uri = LSPIJUtils.toUri(file);
         if (uri != null) {
