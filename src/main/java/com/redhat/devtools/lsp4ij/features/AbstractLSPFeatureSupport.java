@@ -101,16 +101,15 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * Cancel all LSP requests.
      */
     public void cancel() {
+        // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
+        CancellationSupport cancellation = cancellationSupport;
         var future = this.future;
         if (future != null && !future.isCancelled() && !future.isDone()) {
             future.cancel(true);
         }
         this.future = null;
-        // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
-        CancellationSupport cancellation = cancellationSupport;
         if (cancellation != null) {
             cancellation.cancel();
         }
-        cancellationSupport = null;
     }
 }
