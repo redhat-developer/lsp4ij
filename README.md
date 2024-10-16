@@ -69,6 +69,7 @@ Here are some projects that use LSP4IJ:
  * [Intellij KCL](https://github.com/kcl-lang/intellij-kcl)
  * [Ruff for PyCharm](https://github.com/koxudaxi/ruff-pycharm-plugin)
  * [Intellij Gleam](https://github.com/themartdev/intellij-gleam)
+ * [Liberty Tools for IntelliJ](https://github.com/OpenLiberty/liberty-tools-intellij)
 
 ## Requirements
 
