@@ -10,8 +10,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -59,7 +61,15 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // to avoid starting language server in the EDT Thread which could freeze IJ.
         // Wait for indexing is finished and read action is enabled
         // --> force the start of all languages servers mapped with the given file when indexing is finished and read action is allowed
-        new ConnectToLanguageServerCompletableFuture(file, project);
+        DumbService.getInstance(project)
+                .runWhenSmart(() -> {
+                    ReadAction.nonBlocking(() -> {
+                        connectToLanguageServer(file, project);
+                        LSPProjectContextManager.getInstance(project).refreshProjectEditors();
+                    });
+//                    LSPProjectContextManager.getInstance(project).setReady(true);
+
+                });
     }
 
     @Override
