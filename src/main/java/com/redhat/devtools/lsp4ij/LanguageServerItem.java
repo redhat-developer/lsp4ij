@@ -14,11 +14,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
-import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import com.redhat.devtools.lsp4ij.server.Lease;
 import com.redhat.devtools.lsp4ij.server.ServerWasStoppedException;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.ExecuteCommandOptions;
+import org.eclipse.lsp4j.RenameOptions;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
@@ -39,7 +41,7 @@ public class LanguageServerItem {
     private final LanguageServer server;
     private final ServerCapabilities serverCapabilities;
 
-    public LanguageServerItem(LanguageServer server, LanguageServerWrapper serverWrapper) {
+    public LanguageServerItem(@Nullable LanguageServer server, @NotNull LanguageServerWrapper serverWrapper) {
         this.server = server;
         this.serverWrapper = serverWrapper;
         this.serverCapabilities = serverWrapper.getServerCapabilities();

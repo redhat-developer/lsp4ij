@@ -97,6 +97,10 @@ public abstract class AbstractLSPFeature implements Disposable {
         this.clientFeatures = clientFeatures;
     }
 
+    public boolean canExecuteFeatureWhileIndexing() {
+        return true;
+    }
+
     @Override
     public void dispose() {
         clientFeatures = null;

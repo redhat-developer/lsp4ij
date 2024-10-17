@@ -26,6 +26,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import kotlin.Pair;
@@ -90,8 +91,8 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         if (project == null || project.isDisposed()) {
             return CodeVisionState.Companion.getREADY_EMPTY();
         }
-        if (DumbService.isDumb(project)) {
-            return CodeVisionState.NotReady.INSTANCE;
+        if (ProjectIndexingManager.isIndexing(project)) {
+            //return CodeVisionState.NotReady.INSTANCE;
         }
         final VirtualFile file = editor.getVirtualFile();
         if (!acceptsFile(file, project)) {

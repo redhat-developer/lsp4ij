@@ -21,6 +21,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
@@ -242,19 +243,38 @@ public class LanguageServiceAccessor implements Disposable {
                     .thenComposeAsync(result -> CompletableFuture.allOf(result
                             .stream()
                             .filter(LanguageServerWrapper::isEnabled)
-                            .map(wrapper ->
-                                    wrapper.getInitializedServer()
-                                            .thenComposeAsync(server -> {
-                                                if (server != null &&
-                                                        (afterStartingServerFilter == null || afterStartingServerFilter.test(wrapper.getClientFeatures()))) {
-                                                    return wrapper.connect(file, document);
-                                                }
-                                                return CompletableFuture.completedFuture(null);
-                                            }).thenAccept(server -> {
-                                                if (server != null) {
-                                                    servers.add(new LanguageServerItem(server, wrapper));
-                                                }
-                                            })).toArray(CompletableFuture[]::new)))
+                            .map(wrapper -> {
+                                        var clientFeatures = wrapper.getClientFeatures();
+                                        if (!clientFeatures.canStartServerWhileIndexing() && ProjectIndexingManager.isIndexing(project)) {
+                                            /*var waitForIndexing = ProjectIndexingManager.waitForIndexing(project);
+                                            var serverStarted = waitForIndexing
+                                                    .thenCompose(unused -> {
+                                                        return wrapper.getInitializedServer()
+                                                                .thenComposeAsync(server -> {
+                                                                    if (server != null &&
+                                                                            (afterStartingServerFilter == null || afterStartingServerFilter.test(clientFeatures))) {
+                                                                        return wrapper.connect(file, document);
+                                                                    }
+                                                                    return CompletableFuture.completedFuture(null);
+                                                                });
+                                                    });*/
+                                            servers.add(new LanguageServerItem(null, wrapper));
+                                            return CompletableFuture.completedFuture(null);
+                                        }
+                                        return wrapper.getInitializedServer()
+                                                .thenComposeAsync(server -> {
+                                                    if (server != null &&
+                                                            (afterStartingServerFilter == null || afterStartingServerFilter.test(clientFeatures))) {
+                                                        return wrapper.connect(file, document);
+                                                    }
+                                                    return CompletableFuture.completedFuture(null);
+                                                }).thenAccept(server -> {
+                                                    if (server != null) {
+                                                        servers.add(new LanguageServerItem(server, wrapper));
+                                                    }
+                                                });
+                                    }
+                            ).toArray(CompletableFuture[]::new)))
                     .thenApply(theVoid -> servers);
         } catch (final ProcessCanceledException cancellation) {
             throw cancellation;
