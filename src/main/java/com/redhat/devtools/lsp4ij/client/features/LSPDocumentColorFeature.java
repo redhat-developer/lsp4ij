@@ -42,11 +42,18 @@ public class LSPDocumentColorFeature extends AbstractLSPDocumentFeature {
 
     public DocumentColorCapabilityRegistry getDocumentColorCapabilityRegistry() {
         if (documentColorCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            documentColorCapabilityRegistry = new DocumentColorCapabilityRegistry(clientFeatures);
-            documentColorCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initDocumentColorCapabilityRegistry();
         }
         return documentColorCapabilityRegistry;
+    }
+
+    private synchronized void initDocumentColorCapabilityRegistry() {
+        if (documentColorCapabilityRegistry != null){
+            return;
+        }
+         var clientFeatures = getClientFeatures();
+        documentColorCapabilityRegistry = new DocumentColorCapabilityRegistry(clientFeatures);
+        documentColorCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

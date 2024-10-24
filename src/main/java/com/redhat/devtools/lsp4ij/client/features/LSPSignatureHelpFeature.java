@@ -42,11 +42,18 @@ public class LSPSignatureHelpFeature extends AbstractLSPDocumentFeature {
 
     public SignatureHelpCapabilityRegistry getSignatureHelpCapabilityRegistry() {
         if (signatureHelpCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            signatureHelpCapabilityRegistry = new SignatureHelpCapabilityRegistry(clientFeatures);
-            signatureHelpCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initSignatureHelpCapabilityRegistry();
         }
         return signatureHelpCapabilityRegistry;
+    }
+
+    private synchronized void initSignatureHelpCapabilityRegistry() {
+        if (signatureHelpCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        signatureHelpCapabilityRegistry = new SignatureHelpCapabilityRegistry(clientFeatures);
+        signatureHelpCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

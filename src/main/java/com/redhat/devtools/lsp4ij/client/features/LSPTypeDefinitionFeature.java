@@ -42,11 +42,18 @@ public class LSPTypeDefinitionFeature extends AbstractLSPDocumentFeature {
 
     public TypeDefinitionCapabilityRegistry getTypeDefinitionCapabilityRegistry() {
         if (typeDefinitionCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            typeDefinitionCapabilityRegistry = new TypeDefinitionCapabilityRegistry(clientFeatures);
-            typeDefinitionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initTypeDefinitionCapabilityRegistry();
         }
         return typeDefinitionCapabilityRegistry;
+    }
+
+    private synchronized void initTypeDefinitionCapabilityRegistry() {
+        if (typeDefinitionCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        typeDefinitionCapabilityRegistry = new TypeDefinitionCapabilityRegistry(clientFeatures);
+        typeDefinitionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

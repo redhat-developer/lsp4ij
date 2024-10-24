@@ -52,11 +52,18 @@ public class LSPInlayHintFeature extends AbstractLSPDocumentFeature {
 
     public InlayHintCapabilityRegistry getInlayHintCapabilityRegistry() {
         if (inlayHintCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            inlayHintCapabilityRegistry = new InlayHintCapabilityRegistry(clientFeatures);
-            inlayHintCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initInlayHintCapabilityRegistry();
         }
         return inlayHintCapabilityRegistry;
+    }
+
+    private synchronized void initInlayHintCapabilityRegistry() {
+        if (inlayHintCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        inlayHintCapabilityRegistry = new InlayHintCapabilityRegistry(clientFeatures);
+        inlayHintCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

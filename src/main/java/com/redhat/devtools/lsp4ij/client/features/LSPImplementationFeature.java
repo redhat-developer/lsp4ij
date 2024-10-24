@@ -42,11 +42,18 @@ public class LSPImplementationFeature extends AbstractLSPDocumentFeature {
 
     public ImplementationCapabilityRegistry getImplementationCapabilityRegistry() {
         if (implementationCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            implementationCapabilityRegistry = new ImplementationCapabilityRegistry(clientFeatures);
-            implementationCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initImplementationCapabilityRegistry();
         }
         return implementationCapabilityRegistry;
+    }
+
+    private synchronized void initImplementationCapabilityRegistry() {
+        if (implementationCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        implementationCapabilityRegistry = new ImplementationCapabilityRegistry(clientFeatures);
+        implementationCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override
