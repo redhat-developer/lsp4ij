@@ -46,11 +46,18 @@ public class LSPHoverFeature extends AbstractLSPDocumentFeature {
 
     public HoverCapabilityRegistry getHoverCapabilityRegistry() {
         if (hoverCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            hoverCapabilityRegistry = new HoverCapabilityRegistry(clientFeatures);
-            hoverCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initHoverCapabilityRegistry();
         }
         return hoverCapabilityRegistry;
+    }
+
+    private synchronized void initHoverCapabilityRegistry() {
+        if(hoverCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        hoverCapabilityRegistry = new HoverCapabilityRegistry(clientFeatures);
+        hoverCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

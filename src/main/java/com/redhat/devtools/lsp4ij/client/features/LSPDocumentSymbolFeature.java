@@ -50,11 +50,18 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
 
     public DocumentSymbolCapabilityRegistry getDocumentSymbolCapabilityRegistry() {
         if (documentSymbolCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            documentSymbolCapabilityRegistry = new DocumentSymbolCapabilityRegistry(clientFeatures);
-            documentSymbolCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initDocumentSymbolCapabilityRegistry();
         }
         return documentSymbolCapabilityRegistry;
+    }
+
+    private synchronized void initDocumentSymbolCapabilityRegistry() {
+        if (documentSymbolCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        documentSymbolCapabilityRegistry = new DocumentSymbolCapabilityRegistry(clientFeatures);
+        documentSymbolCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

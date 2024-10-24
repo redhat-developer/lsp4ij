@@ -42,11 +42,18 @@ public class LSPDocumentLinkFeature extends AbstractLSPDocumentFeature {
 
     public DocumentLinkCapabilityRegistry getDocumentLinkCapabilityRegistry() {
         if (documentLinkCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            documentLinkCapabilityRegistry = new DocumentLinkCapabilityRegistry(clientFeatures);
-            documentLinkCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initDocumentLinkCapabilityRegistry();
         }
         return documentLinkCapabilityRegistry;
+    }
+
+    private synchronized void initDocumentLinkCapabilityRegistry() {
+        if (documentLinkCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        documentLinkCapabilityRegistry = new DocumentLinkCapabilityRegistry(clientFeatures);
+        documentLinkCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

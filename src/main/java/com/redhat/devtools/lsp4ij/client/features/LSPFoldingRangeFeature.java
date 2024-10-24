@@ -42,11 +42,18 @@ public class LSPFoldingRangeFeature extends AbstractLSPDocumentFeature {
 
     public FoldingRangeCapabilityRegistry getFoldingRangeCapabilityRegistry() {
         if (foldingRangeCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            foldingRangeCapabilityRegistry = new FoldingRangeCapabilityRegistry(clientFeatures);
-            foldingRangeCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initFoldingRangeCapabilityRegistry();
         }
         return foldingRangeCapabilityRegistry;
+    }
+
+    private synchronized void initFoldingRangeCapabilityRegistry() {
+        if (foldingRangeCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        foldingRangeCapabilityRegistry = new FoldingRangeCapabilityRegistry(clientFeatures);
+        foldingRangeCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

@@ -151,11 +151,18 @@ public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
 
     public CodeLensCapabilityRegistry getCodeLensCapabilityRegistry() {
         if (codeLensCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            codeLensCapabilityRegistry = new CodeLensCapabilityRegistry(clientFeatures);
-            codeLensCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initCodeLensCapabilityRegistry();
         }
         return codeLensCapabilityRegistry;
+    }
+
+    private synchronized void initCodeLensCapabilityRegistry() {
+        if (codeLensCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        codeLensCapabilityRegistry = new CodeLensCapabilityRegistry(clientFeatures);
+        codeLensCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

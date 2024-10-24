@@ -42,11 +42,18 @@ public class LSPDeclarationFeature extends AbstractLSPDocumentFeature {
 
     public DeclarationCapabilityRegistry getDeclarationCapabilityRegistry() {
         if (declarationCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            declarationCapabilityRegistry = new DeclarationCapabilityRegistry(clientFeatures);
-            declarationCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initDeclarationCapabilityRegistry();
         }
         return declarationCapabilityRegistry;
+    }
+
+    private synchronized void initDeclarationCapabilityRegistry() {
+        if (declarationCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        declarationCapabilityRegistry = new DeclarationCapabilityRegistry(clientFeatures);
+        declarationCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

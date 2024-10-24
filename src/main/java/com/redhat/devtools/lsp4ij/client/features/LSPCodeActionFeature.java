@@ -141,11 +141,18 @@ public class LSPCodeActionFeature extends AbstractLSPDocumentFeature {
 
     public CodeActionCapabilityRegistry getCodeActionCapabilityRegistry() {
         if (codeActionCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            codeActionCapabilityRegistry = new CodeActionCapabilityRegistry(clientFeatures);
-            codeActionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initCodeActionCapabilityRegistry();
         }
         return codeActionCapabilityRegistry;
+    }
+
+    private synchronized void initCodeActionCapabilityRegistry() {
+        if(codeActionCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        codeActionCapabilityRegistry = new CodeActionCapabilityRegistry(clientFeatures);
+        codeActionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

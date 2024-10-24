@@ -42,11 +42,18 @@ public class LSPReferencesFeature extends AbstractLSPDocumentFeature {
 
     public ReferencesCapabilityRegistry getReferencesCapabilityRegistry() {
         if (referencesCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            referencesCapabilityRegistry = new ReferencesCapabilityRegistry(clientFeatures);
-            referencesCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initReferencesCapabilityRegistry();
         }
         return referencesCapabilityRegistry;
+    }
+
+    private synchronized void initReferencesCapabilityRegistry() {
+        if (referencesCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        referencesCapabilityRegistry = new ReferencesCapabilityRegistry(clientFeatures);
+        referencesCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

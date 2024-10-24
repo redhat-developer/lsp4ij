@@ -42,10 +42,18 @@ public class LSPDocumentHighlightFeature extends AbstractLSPDocumentFeature {
 
     public DocumentHighlightCapabilityRegistry getDocumentHighlightCapabilityRegistry() {
         if (documentHighlightCapabilityRegistry == null) {
-            documentHighlightCapabilityRegistry = new DocumentHighlightCapabilityRegistry(getClientFeatures());
-            documentHighlightCapabilityRegistry.setServerCapabilities(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+            initDocumentHighlightCapabilityRegistry();
         }
         return documentHighlightCapabilityRegistry;
+    }
+
+    private synchronized void initDocumentHighlightCapabilityRegistry() {
+        if (documentHighlightCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        documentHighlightCapabilityRegistry = new DocumentHighlightCapabilityRegistry(clientFeatures);
+        documentHighlightCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

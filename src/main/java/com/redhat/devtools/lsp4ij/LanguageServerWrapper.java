@@ -297,6 +297,7 @@ public class LanguageServerWrapper implements Disposable {
                     .thenAccept(res -> {
                         serverError = null;
                         serverCapabilities = res.getCapabilities();
+                        getClientFeatures().setServerCapabilities(serverCapabilities);
                         this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                     }).thenRun(() -> this.languageServer.initialized(new InitializedParams())).thenRun(() -> {
                         initializeFuture.thenRunAsync(() -> {
@@ -311,7 +312,6 @@ public class LanguageServerWrapper implements Disposable {
 
                         fileOperationsManager = new FileOperationsManager(this);
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
-                        getClientFeatures().setServerCapabilities(serverCapabilities);
 
                         updateStatus(ServerStatus.started);
                         getLanguageServerLifecycleManager().onStatusChanged(this);

@@ -155,9 +155,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPCodeActionFeature getCodeActionFeature() {
         if (codeActionFeature == null) {
-            setCodeActionFeature(new LSPCodeActionFeature());
+            initCodeActionFeature();
         }
         return codeActionFeature;
+    }
+
+    private synchronized void initCodeActionFeature() {
+        if(codeActionFeature != null) {
+            return;
+        }
+        setCodeActionFeature(new LSPCodeActionFeature());
     }
 
     /**
@@ -180,9 +187,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPCodeLensFeature getCodeLensFeature() {
         if (codeLensFeature == null) {
-            setCodeLensFeature(new LSPCodeLensFeature());
+            initCodeLensFeature();
         }
         return codeLensFeature;
+    }
+
+    private synchronized void initCodeLensFeature() {
+        if(codeLensFeature != null) {
+            return;
+        }
+        setCodeLensFeature(new LSPCodeLensFeature());
     }
 
     /**
@@ -205,9 +219,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPDocumentColorFeature getDocumentColorFeature() {
         if (documentColorFeature == null) {
-            setDocumentColorFeature(new LSPDocumentColorFeature());
+            initDocumentColorFeature();
         }
         return documentColorFeature;
+    }
+
+    private synchronized void initDocumentColorFeature() {
+        if(documentColorFeature != null) {
+            return;
+        }
+        setDocumentColorFeature(new LSPDocumentColorFeature());
     }
 
     /**
@@ -230,9 +251,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPCompletionFeature getCompletionFeature() {
         if (completionFeature == null) {
-            setCompletionFeature(new LSPCompletionFeature());
+            initCompletionFeature();
         }
         return completionFeature;
+    }
+
+    private synchronized void initCompletionFeature() {
+        if(completionFeature != null) {
+            return;
+        }
+        setCompletionFeature(new LSPCompletionFeature());
     }
 
     /**
@@ -255,9 +283,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPDeclarationFeature getDeclarationFeature() {
         if (declarationFeature == null) {
-            setDeclarationFeature(new LSPDeclarationFeature());
+            initDeclarationFeature();
         }
         return declarationFeature;
+    }
+
+    private synchronized void initDeclarationFeature() {
+        if(declarationFeature != null) {
+            return;
+        }
+        setDeclarationFeature(new LSPDeclarationFeature());
     }
 
     /**
@@ -280,9 +315,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPDefinitionFeature getDefinitionFeature() {
         if (definitionFeature == null) {
-            setDefinitionFeature(new LSPDefinitionFeature());
+            initDefinitionFeature();
         }
         return definitionFeature;
+    }
+
+    private synchronized void initDefinitionFeature() {
+        if(definitionFeature != null) {
+            return;
+        }
+        setDefinitionFeature(new LSPDefinitionFeature());
     }
 
     /**
@@ -305,9 +347,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPDocumentHighlightFeature getDocumentHighlightFeature() {
         if (documentHighlightFeature == null) {
-            setDocumentHighlightFeature(new LSPDocumentHighlightFeature());
+            initDocumentHighlightFeature();
         }
         return documentHighlightFeature;
+    }
+
+    private synchronized void initDocumentHighlightFeature() {
+        if(documentHighlightFeature != null) {
+            return;
+        }
+        setDocumentHighlightFeature(new LSPDocumentHighlightFeature());
     }
 
     /**
@@ -330,9 +379,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPDocumentLinkFeature getDocumentLinkFeature() {
         if (documentLinkFeature == null) {
-            setDocumentLinkFeature(new LSPDocumentLinkFeature());
+            initDocumentLinkFeature();
         }
         return documentLinkFeature;
+    }
+
+    private synchronized void initDocumentLinkFeature() {
+        if(documentLinkFeature != null) {
+            return;
+        }
+        setDocumentLinkFeature(new LSPDocumentLinkFeature());
     }
 
     /**
@@ -355,9 +411,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPDocumentSymbolFeature getDocumentSymbolFeature() {
         if (documentSymbolFeature == null) {
-            setDocumentSymbolFeature(new LSPDocumentSymbolFeature());
+            initDocumentSymbolFeature();
         }
         return documentSymbolFeature;
+    }
+
+    private synchronized void initDocumentSymbolFeature() {
+        if(documentSymbolFeature != null) {
+            return;
+        }
+        setDocumentSymbolFeature(new LSPDocumentSymbolFeature());
     }
 
     /**
@@ -380,9 +443,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPDiagnosticFeature getDiagnosticFeature() {
         if (diagnosticFeature == null) {
-            setDiagnosticFeature(new LSPDiagnosticFeature());
+            initDiagnosticFeature();
         }
         return diagnosticFeature;
+    }
+
+    private synchronized void initDiagnosticFeature() {
+        if(diagnosticFeature != null) {
+            return;
+        }
+        setDiagnosticFeature(new LSPDiagnosticFeature());
     }
 
     /**
@@ -405,9 +475,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPFoldingRangeFeature getFoldingRangeFeature() {
         if (foldingRangeFeature == null) {
-            setFoldingRangeFeature(new LSPFoldingRangeFeature());
+            initFoldingRangeFeature();
         }
         return foldingRangeFeature;
+    }
+
+    private synchronized void initFoldingRangeFeature() {
+        if(foldingRangeFeature != null) {
+            return;
+        }
+        setFoldingRangeFeature(new LSPFoldingRangeFeature());
     }
 
     /**
@@ -430,11 +507,17 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPFormattingFeature getFormattingFeature() {
         if (formattingFeature == null) {
-            setFormattingFeature(new LSPFormattingFeature());
+            initFormattingFeature();
         }
         return formattingFeature;
     }
 
+    private synchronized void initFormattingFeature() {
+        if(formattingFeature != null) {
+            return;
+        }
+        setFormattingFeature(new LSPFormattingFeature());
+    }
     /**
      * Initialize the LSP formatting feature.
      *
@@ -455,9 +538,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPImplementationFeature getImplementationFeature() {
         if (implementationFeature == null) {
-            setImplementationFeature(new LSPImplementationFeature());
+            initImplementationFeature();
         }
         return implementationFeature;
+    }
+
+    private synchronized void initImplementationFeature() {
+        if(implementationFeature != null) {
+            return;
+        }
+        setImplementationFeature(new LSPImplementationFeature());
     }
 
     /**
@@ -480,9 +570,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPInlayHintFeature getInlayHintFeature() {
         if (inlayHintFeature == null) {
-            setInlayHintFeature(new LSPInlayHintFeature());
+            initInlayHintFeature();
         }
         return inlayHintFeature;
+    }
+
+    private synchronized void initInlayHintFeature() {
+        if(inlayHintFeature != null) {
+            return;
+        }
+        setInlayHintFeature(new LSPInlayHintFeature());
     }
 
     /**
@@ -505,9 +602,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPHoverFeature getHoverFeature() {
         if (hoverFeature == null) {
-            setHoverFeature(new LSPHoverFeature());
+            initHoverFeature();
         }
         return hoverFeature;
+    }
+
+    private synchronized void initHoverFeature() {
+        if(hoverFeature != null) {
+            return;
+        }
+        setHoverFeature(new LSPHoverFeature());
     }
 
     /**
@@ -530,9 +634,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPReferencesFeature getReferencesFeature() {
         if (referencesFeature == null) {
-            setReferencesFeature(new LSPReferencesFeature());
+            initReferencesFeature();
         }
         return referencesFeature;
+    }
+
+    private synchronized void initReferencesFeature() {
+        if(referencesFeature != null) {
+            return;
+        }
+        setReferencesFeature(new LSPReferencesFeature());
     }
 
     /**
@@ -555,9 +666,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPRenameFeature getRenameFeature() {
         if (renameFeature == null) {
-            setRenameFeature(new LSPRenameFeature());
+            initRenameFeature();
         }
         return renameFeature;
+    }
+
+    private synchronized void initRenameFeature() {
+        if(renameFeature != null) {
+            return;
+        }
+        setRenameFeature(new LSPRenameFeature());
     }
 
     /**
@@ -580,9 +698,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPSemanticTokensFeature getSemanticTokensFeature() {
         if (semanticTokensFeature == null) {
-            setSemanticTokensFeature(new LSPSemanticTokensFeature());
+            initSemanticTokensFeature();
         }
         return semanticTokensFeature;
+    }
+
+    private synchronized void initSemanticTokensFeature() {
+        if(semanticTokensFeature != null) {
+            return;
+        }
+        setSemanticTokensFeature(new LSPSemanticTokensFeature());
     }
 
     /**
@@ -605,9 +730,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPSignatureHelpFeature getSignatureHelpFeature() {
         if (signatureHelpFeature == null) {
-            setSignatureHelpFeature(new LSPSignatureHelpFeature());
+            initSignatureHelpFeature();
         }
         return signatureHelpFeature;
+    }
+
+    private synchronized void initSignatureHelpFeature() {
+        if(signatureHelpFeature != null) {
+            return;
+        }
+        setSignatureHelpFeature(new LSPSignatureHelpFeature());
     }
 
     /**
@@ -630,9 +762,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPTypeDefinitionFeature getTypeDefinitionFeature() {
         if (typeDefinitionFeature == null) {
-            setTypeDefinitionFeature(new LSPTypeDefinitionFeature());
+            initTypeDefinitionFeature();
         }
         return typeDefinitionFeature;
+    }
+
+    private synchronized void initTypeDefinitionFeature() {
+        if(typeDefinitionFeature != null) {
+            return;
+        }
+        setTypeDefinitionFeature(new LSPTypeDefinitionFeature());
     }
 
     /**
@@ -655,9 +794,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPUsageFeature getUsageFeature() {
         if (usageFeature == null) {
-            setUsageFeature(new LSPUsageFeature());
+            initUsageFeature();
         }
         return usageFeature;
+    }
+
+    private synchronized void initUsageFeature() {
+        if(usageFeature != null) {
+            return;
+        }
+        setUsageFeature(new LSPUsageFeature());
     }
 
     /**
@@ -680,9 +826,16 @@ public class LSPClientFeatures implements Disposable {
     @NotNull
     public final LSPWorkspaceSymbolFeature getWorkspaceSymbolFeature() {
         if (workspaceSymbolFeature == null) {
-            setWorkspaceSymbolFeature(new LSPWorkspaceSymbolFeature());
+            initWorkspaceSymbolFeature();
         }
         return workspaceSymbolFeature;
+    }
+
+    private synchronized void initWorkspaceSymbolFeature() {
+        if(workspaceSymbolFeature != null) {
+            return;
+        }
+        setWorkspaceSymbolFeature(new LSPWorkspaceSymbolFeature());
     }
 
     /**
@@ -729,17 +882,8 @@ public class LSPClientFeatures implements Disposable {
         if (codeLensFeature != null) {
             codeLensFeature.dispose();
         }
-        if (documentColorFeature != null) {
-            documentColorFeature.dispose();
-        }
         if (completionFeature != null) {
             completionFeature.dispose();
-        }
-        if (codeActionFeature != null) {
-            codeActionFeature.dispose();
-        }
-        if (codeActionFeature != null) {
-            codeActionFeature.dispose();
         }
         if (declarationFeature != null) {
             declarationFeature.dispose();
@@ -747,17 +891,20 @@ public class LSPClientFeatures implements Disposable {
         if (definitionFeature != null) {
             definitionFeature.dispose();
         }
-        if (documentLinkFeature != null) {
-            documentLinkFeature.dispose();
+        if (diagnosticFeature != null) {
+            diagnosticFeature.dispose();
+        }
+        if (documentColorFeature != null) {
+            documentColorFeature.dispose();
         }
         if (documentHighlightFeature != null) {
             documentHighlightFeature.dispose();
         }
+        if (documentLinkFeature != null) {
+            documentLinkFeature.dispose();
+        }
         if (documentSymbolFeature != null) {
             documentSymbolFeature.dispose();
-        }
-        if (diagnosticFeature != null) {
-            diagnosticFeature.dispose();
         }
         if (foldingRangeFeature != null) {
             foldingRangeFeature.dispose();
@@ -765,14 +912,14 @@ public class LSPClientFeatures implements Disposable {
         if (formattingFeature != null) {
             formattingFeature.dispose();
         }
+        if (hoverFeature != null) {
+            hoverFeature.dispose();
+        }
         if (implementationFeature != null) {
             implementationFeature.dispose();
         }
         if (inlayHintFeature != null) {
             inlayHintFeature.dispose();
-        }
-        if (hoverFeature != null) {
-            hoverFeature.dispose();
         }
         if (referencesFeature != null) {
             referencesFeature.dispose();
@@ -807,32 +954,26 @@ public class LSPClientFeatures implements Disposable {
         if (completionFeature != null) {
             completionFeature.setServerCapabilities(serverCapabilities);
         }
-        if (codeActionFeature != null) {
-            codeActionFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (codeActionFeature != null) {
-            codeActionFeature.setServerCapabilities(serverCapabilities);
-        }
         if (declarationFeature != null) {
             declarationFeature.setServerCapabilities(serverCapabilities);
         }
         if (definitionFeature != null) {
             definitionFeature.setServerCapabilities(serverCapabilities);
         }
+        if (diagnosticFeature != null) {
+            diagnosticFeature.setServerCapabilities(serverCapabilities);
+        }
         if (documentColorFeature != null) {
             documentColorFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (documentLinkFeature != null) {
-            documentLinkFeature.setServerCapabilities(serverCapabilities);
         }
         if (documentHighlightFeature != null) {
             documentHighlightFeature.setServerCapabilities(serverCapabilities);
         }
+        if (documentLinkFeature != null) {
+            documentLinkFeature.setServerCapabilities(serverCapabilities);
+        }
         if (documentSymbolFeature != null) {
             documentSymbolFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (diagnosticFeature != null) {
-            diagnosticFeature.setServerCapabilities(serverCapabilities);
         }
         if (foldingRangeFeature != null) {
             foldingRangeFeature.setServerCapabilities(serverCapabilities);
@@ -840,14 +981,14 @@ public class LSPClientFeatures implements Disposable {
         if (formattingFeature != null) {
             formattingFeature.setServerCapabilities(serverCapabilities);
         }
+        if (hoverFeature != null) {
+            hoverFeature.setServerCapabilities(serverCapabilities);
+        }
         if (implementationFeature != null) {
             implementationFeature.setServerCapabilities(serverCapabilities);
         }
         if (inlayHintFeature != null) {
             inlayHintFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (hoverFeature != null) {
-            hoverFeature.setServerCapabilities(serverCapabilities);
         }
         if (referencesFeature != null) {
             referencesFeature.setServerCapabilities(serverCapabilities);

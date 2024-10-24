@@ -53,11 +53,18 @@ public class LSPRenameFeature extends AbstractLSPDocumentFeature {
 
     public RenameCapabilityRegistry getRenameCapabilityRegistry() {
         if (renameCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            renameCapabilityRegistry = new RenameCapabilityRegistry(clientFeatures);
-            renameCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initRenameCapabilityRegistry();
         }
         return renameCapabilityRegistry;
+    }
+
+    private synchronized void initRenameCapabilityRegistry() {
+        if (renameCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        renameCapabilityRegistry = new RenameCapabilityRegistry(clientFeatures);
+        renameCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override

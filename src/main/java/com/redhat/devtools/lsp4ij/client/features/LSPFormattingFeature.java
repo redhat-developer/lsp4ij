@@ -95,22 +95,36 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
 
     public DocumentFormattingCapabilityRegistry getFormattingCapabilityRegistry() {
         if (formattingCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            formattingCapabilityRegistry = new DocumentFormattingCapabilityRegistry(clientFeatures);
-            formattingCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initDocumentFormattingCapabilityRegistry();
         }
         return formattingCapabilityRegistry;
     }
 
+    private synchronized void initDocumentFormattingCapabilityRegistry() {
+        if (formattingCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        formattingCapabilityRegistry = new DocumentFormattingCapabilityRegistry(clientFeatures);
+        formattingCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+    }
+
     public DocumentRangeFormattingCapabilityRegistry getRangeFormattingCapabilityRegistry() {
         if (rangeFormattingCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            rangeFormattingCapabilityRegistry = new DocumentRangeFormattingCapabilityRegistry(clientFeatures);
-            rangeFormattingCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initDocumentRangeFormattingCapabilityRegistry();
         }
         return rangeFormattingCapabilityRegistry;
     }
-    
+
+    private synchronized void initDocumentRangeFormattingCapabilityRegistry() {
+        if (rangeFormattingCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        rangeFormattingCapabilityRegistry = new DocumentRangeFormattingCapabilityRegistry(clientFeatures);
+        rangeFormattingCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+    }
+
     @Override
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
         if (formattingCapabilityRegistry != null) {

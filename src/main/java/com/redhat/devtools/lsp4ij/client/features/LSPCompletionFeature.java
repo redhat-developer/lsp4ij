@@ -245,11 +245,18 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
 
     public CompletionCapabilityRegistry getCompletionCapabilityRegistry() {
         if (completionCapabilityRegistry == null) {
-            var clientFeatures = getClientFeatures();
-            completionCapabilityRegistry = new CompletionCapabilityRegistry(clientFeatures);
-            completionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+            initCompletionCapabilityRegistry();
         }
         return completionCapabilityRegistry;
+    }
+
+    private synchronized void initCompletionCapabilityRegistry() {
+        if (completionCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        completionCapabilityRegistry = new CompletionCapabilityRegistry(clientFeatures);
+        completionCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
     }
 
     @Override
