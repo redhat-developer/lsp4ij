@@ -19,6 +19,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -75,6 +76,9 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
         }
 
         private @NotNull Collection<StructureViewTreeElement> collectElements(@NotNull PsiFile psiFile) {
+            if(ProjectIndexingManager.getInstance(psiFile.getProject()).isIndexing()) {
+                return Collections.emptyList();
+            }
             LSPDocumentSymbolSupport documentSymbolSupport = LSPFileSupport.getSupport(psiFile).getDocumentSymbolSupport();
             var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);

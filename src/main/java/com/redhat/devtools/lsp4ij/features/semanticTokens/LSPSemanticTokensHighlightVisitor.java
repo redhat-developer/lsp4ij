@@ -18,6 +18,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import org.eclipse.lsp4j.SemanticTokensParams;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -53,6 +54,9 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
     @Override
     public boolean analyze(@NotNull PsiFile file, boolean updateWholeFile, @NotNull HighlightInfoHolder holder, @NotNull Runnable action) {
+        if (ProjectIndexingManager.getInstance(file.getProject()).isIndexing()) {
+            return true;
+        }
         if (LanguageServersRegistry.getInstance().isFileSupported(file)) {
             action.run();
             // run unconditionally, because the LSP semanticTokens API sucks and is file-level only
