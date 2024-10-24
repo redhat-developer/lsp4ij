@@ -39,7 +39,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
     }
 
     @Nullable
-    public T registerCapability(@NotNull JsonObject registerOptions) {
+    public synchronized T registerCapability(@NotNull JsonObject registerOptions) {
         T t = create(registerOptions);
         if (t != null) {
             dynamicCapabilities.add(t);

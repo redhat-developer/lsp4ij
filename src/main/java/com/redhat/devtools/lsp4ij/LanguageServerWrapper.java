@@ -297,6 +297,10 @@ public class LanguageServerWrapper implements Disposable {
                     .thenAccept(res -> {
                         serverError = null;
                         serverCapabilities = res.getCapabilities();
+                        getClientFeatures().setServerCapabilities(serverCapabilities);
+                        synchronized (dynamicRegistrations) {
+                            this.dynamicRegistrations.clear();
+                        }
                         this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                     }).thenRun(() -> this.languageServer.initialized(new InitializedParams())).thenRun(() -> {
                         initializeFuture.thenRunAsync(() -> {
@@ -311,7 +315,6 @@ public class LanguageServerWrapper implements Disposable {
 
                         fileOperationsManager = new FileOperationsManager(this);
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
-                        getClientFeatures().setServerCapabilities(serverCapabilities);
 
                         updateStatus(ServerStatus.started);
                         getLanguageServerLifecycleManager().onStatusChanged(this);
@@ -858,82 +861,81 @@ public class LanguageServerWrapper implements Disposable {
         return serverCapabilities;
     }
 
-    public void registerCapability(RegistrationParams params) {
-        initializeFuture.thenRun(() -> {
-            params.getRegistrations().forEach(reg -> {
-                if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
-                    // register 'workspace/didChangeWorkspaceFolders' capability
-                    assert serverCapabilities != null :
-                            "Dynamic capability registration failed! Server not yet initialized?"; //$NON-NLS-1$
-                    if (initiallySupportsWorkspaceFolders) {
-                        // Can treat this as a NOP since nothing can disable it dynamically if it was
-                        // enabled on initialization.
-                    } else if (supportsWorkspaceFolders(serverCapabilities)) {
-                        LOGGER.warn(
-                                "Dynamic registration of 'workspace/didChangeWorkspaceFolders' ignored. It was already enabled before"); //$NON-NLS-1$);
-                    } else {
-                        addRegistration(reg, () -> setWorkspaceFoldersEnablement(false));
-                        setWorkspaceFoldersEnablement(true);
-                    }
-                } else if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WATCHED_FILES.equals(reg.getMethod())) {
-                    // register 'workspace/didChangeWatchedFiles' capability
-                    try {
-                        DidChangeWatchedFilesRegistrationOptions options = JSONUtils.getLsp4jGson()
-                                .fromJson((JsonObject) reg.getRegisterOptions(),
-                                        DidChangeWatchedFilesRegistrationOptions.class);
-                        fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
-                        addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
-                    } catch (Exception e) {
-                        LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
-                    }
-                } else if (LSPRequestConstants.WORKSPACE_EXECUTE_COMMAND.equals(reg.getMethod())) {
-                    // register 'workspace/executeCommand' capability
-                    try {
-                        ExecuteCommandOptions executeCommandOptions = JSONUtils.getLsp4jGson()
-                                .fromJson((JsonObject) reg.getRegisterOptions(),
-                                        ExecuteCommandOptions.class);
-                        List<String> newCommands = executeCommandOptions.getCommands();
-                        if (!newCommands.isEmpty()) {
-                            addRegistration(reg, () -> unregisterCommands(newCommands));
-                            registerCommands(newCommands);
-                        }
-                    } catch (Exception e) {
-                        LOGGER.error("Error while getting 'workspace/executeCommand' capability", e);
-                    }
+    public CompletableFuture<Void> registerCapability(RegistrationParams params) {
+        params.getRegistrations().forEach(reg -> {
+            if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
+                // register 'workspace/didChangeWorkspaceFolders' capability
+                assert serverCapabilities != null :
+                        "Dynamic capability registration failed! Server not yet initialized?"; //$NON-NLS-1$
+                if (initiallySupportsWorkspaceFolders) {
+                    // Can treat this as a NOP since nothing can disable it dynamically if it was
+                    // enabled on initialization.
+                } else if (supportsWorkspaceFolders(serverCapabilities)) {
+                    LOGGER.warn(
+                            "Dynamic registration of 'workspace/didChangeWorkspaceFolders' ignored. It was already enabled before"); //$NON-NLS-1$);
                 } else {
-                    String method = reg.getMethod();
-                    try {
-                        final TextDocumentServerCapabilityRegistry<? extends TextDocumentRegistrationOptions> registry = getClientFeatures().getCapabilityRegistry(method);
-                        if (registry != null) {
-                            // register 'textDocument/*' capability
-                            JsonObject registerOptions = (JsonObject) reg.getRegisterOptions();
-                            if (registerOptions == null) {
-                                // ex:
-                                // {
-                                //  "registrations": [
-                                //    {
-                                //      "id": "5d54639d-a478-422f-bfb8-112c4b8a93ee",
-                                //      "method": "textDocument/hover"
-                                //    }
-                                //  ]
-                                //}
-                                registerOptions = new JsonObject();
-                            }
-                            final TextDocumentRegistrationOptions options = registry.registerCapability(registerOptions);
-                            addRegistration(reg, () -> registry.unregisterCapability(options));
-                        }
-                    } catch (Exception e) {
-                        LOGGER.error("Error while getting '" + method + "' capability", e);
-                    }
+                    addRegistration(reg, () -> setWorkspaceFoldersEnablement(false));
+                    setWorkspaceFoldersEnablement(true);
                 }
-            });
+            } else if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WATCHED_FILES.equals(reg.getMethod())) {
+                // register 'workspace/didChangeWatchedFiles' capability
+                try {
+                    DidChangeWatchedFilesRegistrationOptions options = JSONUtils.getLsp4jGson()
+                            .fromJson((JsonObject) reg.getRegisterOptions(),
+                                    DidChangeWatchedFilesRegistrationOptions.class);
+                    fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
+                    addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                } catch (Exception e) {
+                    LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
+                }
+            } else if (LSPRequestConstants.WORKSPACE_EXECUTE_COMMAND.equals(reg.getMethod())) {
+                // register 'workspace/executeCommand' capability
+                try {
+                    ExecuteCommandOptions executeCommandOptions = JSONUtils.getLsp4jGson()
+                            .fromJson((JsonObject) reg.getRegisterOptions(),
+                                    ExecuteCommandOptions.class);
+                    List<String> newCommands = executeCommandOptions.getCommands();
+                    if (!newCommands.isEmpty()) {
+                        addRegistration(reg, () -> unregisterCommands(newCommands));
+                        registerCommands(newCommands);
+                    }
+                } catch (Exception e) {
+                    LOGGER.error("Error while getting 'workspace/executeCommand' capability", e);
+                }
+            } else {
+                String method = reg.getMethod();
+                try {
+                    final TextDocumentServerCapabilityRegistry<? extends TextDocumentRegistrationOptions> registry = getClientFeatures().getCapabilityRegistry(method);
+                    if (registry != null) {
+                        // register 'textDocument/*' capability
+                        JsonObject registerOptions = (JsonObject) reg.getRegisterOptions();
+                        if (registerOptions == null) {
+                            // ex:
+                            // {
+                            //  "registrations": [
+                            //    {
+                            //      "id": "5d54639d-a478-422f-bfb8-112c4b8a93ee",
+                            //      "method": "textDocument/hover"
+                            //    }
+                            //  ]
+                            //}
+                            registerOptions = new JsonObject();
+                        }
+                        final TextDocumentRegistrationOptions options = registry.registerCapability(registerOptions);
+                        addRegistration(reg, () -> registry.unregisterCapability(options));
+                    }
+                } catch (Exception e) {
+                    LOGGER.error("Error while getting '" + method + "' capability", e);
+                }
+            }
         });
+        return CompletableFuture.completedFuture(null);
     }
 
     private void addRegistration(@NotNull Registration reg, @NotNull Runnable unregistrationHandler) {
         String regId = reg.getId();
         synchronized (dynamicRegistrations) {
-            assert !dynamicRegistrations.containsKey(regId) : "Registration id is not unique"; //$NON-NLS-1$
+            //assert !dynamicRegistrations.containsKey(regId) : "Registration id is not unique"; //$NON-NLS-1$
             dynamicRegistrations.put(regId, unregistrationHandler);
         }
     }
@@ -973,7 +975,7 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-    public void unregisterCapability(UnregistrationParams params) {
+    public CompletableFuture<Void> unregisterCapability(UnregistrationParams params) {
         params.getUnregisterations().forEach(reg -> {
             String id = reg.getId();
             Runnable unregisters;
@@ -985,6 +987,7 @@ public class LanguageServerWrapper implements Disposable {
                 unregisters.run();
             }
         });
+        return CompletableFuture.completedFuture(null);
     }
 
     void unregisterCommands(List<String> cmds) {

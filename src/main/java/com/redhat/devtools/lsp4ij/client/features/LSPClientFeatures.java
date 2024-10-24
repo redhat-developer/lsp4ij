@@ -729,17 +729,8 @@ public class LSPClientFeatures implements Disposable {
         if (codeLensFeature != null) {
             codeLensFeature.dispose();
         }
-        if (documentColorFeature != null) {
-            documentColorFeature.dispose();
-        }
         if (completionFeature != null) {
             completionFeature.dispose();
-        }
-        if (codeActionFeature != null) {
-            codeActionFeature.dispose();
-        }
-        if (codeActionFeature != null) {
-            codeActionFeature.dispose();
         }
         if (declarationFeature != null) {
             declarationFeature.dispose();
@@ -747,17 +738,20 @@ public class LSPClientFeatures implements Disposable {
         if (definitionFeature != null) {
             definitionFeature.dispose();
         }
-        if (documentLinkFeature != null) {
-            documentLinkFeature.dispose();
+        if (diagnosticFeature != null) {
+            diagnosticFeature.dispose();
+        }
+        if (documentColorFeature != null) {
+            documentColorFeature.dispose();
         }
         if (documentHighlightFeature != null) {
             documentHighlightFeature.dispose();
         }
+        if (documentLinkFeature != null) {
+            documentLinkFeature.dispose();
+        }
         if (documentSymbolFeature != null) {
             documentSymbolFeature.dispose();
-        }
-        if (diagnosticFeature != null) {
-            diagnosticFeature.dispose();
         }
         if (foldingRangeFeature != null) {
             foldingRangeFeature.dispose();
@@ -765,14 +759,14 @@ public class LSPClientFeatures implements Disposable {
         if (formattingFeature != null) {
             formattingFeature.dispose();
         }
+        if (hoverFeature != null) {
+            hoverFeature.dispose();
+        }
         if (implementationFeature != null) {
             implementationFeature.dispose();
         }
         if (inlayHintFeature != null) {
             inlayHintFeature.dispose();
-        }
-        if (hoverFeature != null) {
-            hoverFeature.dispose();
         }
         if (referencesFeature != null) {
             referencesFeature.dispose();
@@ -807,32 +801,26 @@ public class LSPClientFeatures implements Disposable {
         if (completionFeature != null) {
             completionFeature.setServerCapabilities(serverCapabilities);
         }
-        if (codeActionFeature != null) {
-            codeActionFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (codeActionFeature != null) {
-            codeActionFeature.setServerCapabilities(serverCapabilities);
-        }
         if (declarationFeature != null) {
             declarationFeature.setServerCapabilities(serverCapabilities);
         }
         if (definitionFeature != null) {
             definitionFeature.setServerCapabilities(serverCapabilities);
         }
+        if (diagnosticFeature != null) {
+            diagnosticFeature.setServerCapabilities(serverCapabilities);
+        }
         if (documentColorFeature != null) {
             documentColorFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (documentLinkFeature != null) {
-            documentLinkFeature.setServerCapabilities(serverCapabilities);
         }
         if (documentHighlightFeature != null) {
             documentHighlightFeature.setServerCapabilities(serverCapabilities);
         }
+        if (documentLinkFeature != null) {
+            documentLinkFeature.setServerCapabilities(serverCapabilities);
+        }
         if (documentSymbolFeature != null) {
             documentSymbolFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (diagnosticFeature != null) {
-            diagnosticFeature.setServerCapabilities(serverCapabilities);
         }
         if (foldingRangeFeature != null) {
             foldingRangeFeature.setServerCapabilities(serverCapabilities);
@@ -840,14 +828,14 @@ public class LSPClientFeatures implements Disposable {
         if (formattingFeature != null) {
             formattingFeature.setServerCapabilities(serverCapabilities);
         }
+        if (hoverFeature != null) {
+            hoverFeature.setServerCapabilities(serverCapabilities);
+        }
         if (implementationFeature != null) {
             implementationFeature.setServerCapabilities(serverCapabilities);
         }
         if (inlayHintFeature != null) {
             inlayHintFeature.setServerCapabilities(serverCapabilities);
-        }
-        if (hoverFeature != null) {
-            hoverFeature.setServerCapabilities(serverCapabilities);
         }
         if (referencesFeature != null) {
             referencesFeature.setServerCapabilities(serverCapabilities);
