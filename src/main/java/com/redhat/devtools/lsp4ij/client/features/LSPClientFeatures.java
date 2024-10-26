@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -848,6 +849,16 @@ public class LSPClientFeatures implements Disposable {
         workspaceSymbolFeature.setClientFeatures(this);
         this.workspaceSymbolFeature = workspaceSymbolFeature;
         return this;
+    }
+
+    /**
+     * Returns true if the language server is enabled for the given file and false otherwise. Default to true
+     *
+     * @param file the file for test
+     * @return true if the language server is enabled for the input and false otherwise. Default to true
+     */
+    public boolean isEnabled(@NotNull VirtualFile file) {
+        return true;
     }
 
     /**
