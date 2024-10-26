@@ -242,6 +242,7 @@ public class LanguageServiceAccessor implements Disposable {
                     .thenComposeAsync(result -> CompletableFuture.allOf(result
                             .stream()
                             .filter(LanguageServerWrapper::isEnabled)
+                            .filter(wrapper->wrapper.getClientFeatures().isEnabled(file))
                             .map(wrapper ->
                                     wrapper.getInitializedServer()
                                             .thenComposeAsync(server -> {
