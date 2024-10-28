@@ -68,24 +68,27 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
 
     @Override
     public void propertyChanged(@NotNull VirtualFilePropertyEvent event) {
-        if (event.getPropertyName().equals(VirtualFile.PROP_NAME) && event.getOldValue() instanceof String) {
-            String oldValue = (String) event.getOldValue();
-            String newValue = null;
-            // A file (Test1.java) has been renamed (to Test2.java) by using Refactor / Rename from IJ
-            // or a "properties" file is changed or saved.
-            if (event.getNewValue() instanceof String) {
-                newValue = (String) event.getNewValue();
-            }
-            if (!oldValue.equals(newValue)) {
-                // 1. Send a textDocument/didClose for the old file name (Test1.java) followed
-                //    by a textDocument/didOpen for the new file name (Test2.java)
-                VirtualFile newFile = event.getFile();
-                URI oldFileUri = didRename(newFile.getParent(), oldValue, newFile);
-
-                // 2. Send a workspace/didChangeWatchedFiles
-                moveFile(oldFileUri, newFile);
-            }
+        // Either a file (Test1.java) has been renamed (to Test2.java) by using Refactor / Rename from IJ
+        // or a "properties" file is changed or saved.
+        if (!isRenameFile(event)) {
+            return;
         }
+        // 1. Send a textDocument/didClose for the old file name (Test1.java) followed
+        //    by a textDocument/didOpen for the new file name (Test2.java)
+        VirtualFile newFile = event.getFile();
+        URI oldFileUri = didRename(newFile.getParent(), (String) event.getOldValue(), newFile);
+
+        // 2. Send a workspace/didChangeWatchedFiles
+        moveFile(oldFileUri, newFile);
+    }
+
+    private static boolean isRenameFile(@NotNull VirtualFilePropertyEvent event) {
+        if (event.getPropertyName().equals(VirtualFile.PROP_NAME) &&
+                event.getOldValue() instanceof String oldValue &&
+                event.getNewValue() instanceof String newValue) {
+            return Objects.equals(oldValue, newValue);
+        }
+        return false;
     }
 
     private void moveFile(URI oldFileUri, VirtualFile newFile) {
