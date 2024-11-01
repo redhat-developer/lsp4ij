@@ -71,15 +71,14 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
         // Either a file (Test1.java) has been renamed (to Test2.java) by using Refactor / Rename from IJ
         // or a "properties" file is changed or saved.
         if (isRenameFile(event)) {
-            return;
-        }
-        // 1. Send a textDocument/didClose for the old file name (Test1.java) followed
-        //    by a textDocument/didOpen for the new file name (Test2.java)
-        VirtualFile newFile = event.getFile();
-        URI oldFileUri = didRename(newFile.getParent(), (String) event.getOldValue(), newFile);
+            // 1. Send a textDocument/didClose for the old file name (Test1.java) followed
+            //    by a textDocument/didOpen for the new file name (Test2.java)
+            VirtualFile newFile = event.getFile();
+            URI oldFileUri = didRename(newFile.getParent(), (String) event.getOldValue(), newFile);
 
-        // 2. Send a workspace/didChangeWatchedFiles
-        moveFile(oldFileUri, newFile);
+            // 2. Send a workspace/didChangeWatchedFiles
+            moveFile(oldFileUri, newFile);
+        }
     }
 
     private static boolean isRenameFile(@NotNull VirtualFilePropertyEvent event) {
