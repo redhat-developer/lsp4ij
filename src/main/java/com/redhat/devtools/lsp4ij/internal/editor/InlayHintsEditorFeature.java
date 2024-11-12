@@ -8,26 +8,25 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.internal;
+package com.redhat.devtools.lsp4ij.internal.editor;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.List;
 
 /**
+ * Inlay hints feature to refresh IntelliJ inlay hints (even if Psi file doesn't change).
+ *
  * Bridge class which consumes InlayHintsFactory with Java Reflection to support any IntelliJ version:
  *
  * <ul>
@@ -35,9 +34,10 @@ import java.util.stream.Stream;
  *     <li>with new version (>= 2024.1): com.intellij.codeInsight.hints.InlayHintsFactory</li>
  * </ul>
  */
-public class InlayHintsFactoryBridge {
+@ApiStatus.Internal
+public class InlayHintsEditorFeature implements EditorFeature {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(InlayHintsFactoryBridge.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(InlayHintsEditorFeature.class);
 
     private static final String[] INLAY_HINTS_PASS_FACTORY_CLASSES = {
             "com.intellij.codeInsight.hints.InlayHintsFactory",
@@ -49,47 +49,13 @@ public class InlayHintsFactoryBridge {
     // InlayHintsPassFactory.Companion.clearModificationStamp(editor)
     private static Method clearModificationStampMethod;
 
-    /**
-     * Refresh inlay hints for the given Psi file and editor.
-     *
-     * @param psiFile           the Psi file.
-     * @param editors           the editors to refresh.
-     * @param refreshLSPSupport true if codeLens, inlayHint, color support must be canceled and false otherwise.
-     */
-    public static void refreshInlayHints(@NotNull PsiFile psiFile, @NotNull Editor[] editors, boolean refreshLSPSupport) {
-        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
-            doRefreshHighlighting(psiFile, editors, refreshLSPSupport);
-        } else {
-            ReadAction.run(() -> doRefreshHighlighting(psiFile, editors, refreshLSPSupport));
-        }
+    @Override
+    public EditorFeatureType getFeatureType() {
+        return EditorFeatureType.INLAY_HINT;
     }
 
-    private static void doRefreshHighlighting(@NotNull PsiFile psiFile, @Nullable Editor[] editors, boolean refreshLSPSupport) {
-        if (editors != null) {
-            for (Editor editor : editors) {
-                // Clear the modification stamp stored in the editor user-data
-                // (with the key PSI_MODIFICATION_STAMP)
-                // to refresh the inlay hints even if Psi file has not changed
-                // see https://github.com/JetBrains/intellij-community/blob/9c675b406d27f908ea4abc2499e5d06310fc2fc6/platform/lang-impl/src/com/intellij/codeInsight/daemon/impl/InlayHintsPassFactoryInternal.kt#L42
-                clearModificationStamp(editor);
-            }
-        }
-        if (refreshLSPSupport) {
-            // Evict the cache of LSP requests from inlayHint and color support
-            var fileSupport = LSPFileSupport.getSupport(psiFile);
-            fileSupport.getInlayHintsSupport().cancel();
-            fileSupport.getColorSupport().cancel();
-        }
-        // Refresh the annotations, inlay hints both
-        DaemonCodeAnalyzer.getInstance(psiFile.getProject()).restart(psiFile);
-    }
-
-    /**
-     * Clear notification stamp from the given editor.
-     *
-     * @param editor the editor.
-     */
-    public static void clearModificationStamp(Editor editor) {
+    @Override
+    public void clearEditorCache(@NotNull Editor editor) {
         // old class: com.intellij.codeInsight.hints.InlayHintsPassFactory
         // --> InlayHintsPassFactory.Companion.clearModificationStamp(editor);
         //
@@ -101,6 +67,25 @@ public class InlayHintsFactoryBridge {
         } catch (Exception e) {
             LOGGER.error("Error while calling InlayHintsPassFactory.Companion.clearModificationStamp(editor)", e);
         }
+    }
+
+    @Override
+    public void clearLSPCache(PsiFile file) {
+        // Evict the cache of LSP requests from inlayHint and color support
+        var fileSupport = LSPFileSupport.getSupport(file);
+        fileSupport.getInlayHintsSupport().cancel();
+        fileSupport.getColorSupport().cancel();
+    }
+
+    @Override
+    public void collectUiRunnable(@NotNull Editor editor,
+                                  @NotNull PsiFile file,
+                                  @NotNull List<Runnable> runnableList) {
+        Runnable runnable = () -> {
+            // Refresh the annotations, inlay hints both
+            DaemonCodeAnalyzer.getInstance(file.getProject()).restart(file);
+        };
+        runnableList.add(runnable);
     }
 
     private static void loadInlayHintsPassFactoryIfNeeded() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
@@ -127,7 +112,7 @@ public class InlayHintsFactoryBridge {
         // Get InlayHintsPassFactory.Companion.clearModificationStamp(editor) method
         clearModificationStampMethod = companionClass.getMethod("clearModificationStamp", Editor.class);
         clearModificationStampMethod.setAccessible(true);
-        InlayHintsFactoryBridge.companionInstance = companionInstance;
+        InlayHintsEditorFeature.companionInstance = companionInstance;
     }
 
     private static Class<?> loadInlayHintsPassFactoryClass() throws ClassNotFoundException {
@@ -138,8 +123,7 @@ public class InlayHintsFactoryBridge {
                 // Do nothing
             }
         }
-        String classNames = "[" + Stream.of(INLAY_HINTS_PASS_FACTORY_CLASSES)
-                .collect(Collectors.joining(",")) + "]";
+        String classNames = "[" + String.join(",", INLAY_HINTS_PASS_FACTORY_CLASSES) + "]";
         LOGGER.error("Error while trying to load InlayHintsPassFactory from classes " + classNames);
         throw new ClassNotFoundException(classNames);
     }
