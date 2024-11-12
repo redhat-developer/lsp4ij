@@ -23,6 +23,8 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,8 +36,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-
-import static com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge.refreshInlayHints;
 
 /*
  * Abstract class used to display IntelliJ inlay hints.
@@ -95,7 +95,8 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                                     // Check if PsiFile was not modified
                                     if (modificationStamp == psiFile.getModificationStamp()) {
                                         // All pending futures are finished, refresh the inlay hints
-                                        refreshInlayHints(psiFile, new Editor[]{editor}, false);
+                                        EditorFeatureManager.getInstance(project)
+                                                        .refreshEditorFeature(psiFile.getVirtualFile(), EditorFeatureType.INLAY_HINT, false);
                                     }
                                     return null;
                                 });

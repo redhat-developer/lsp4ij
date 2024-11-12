@@ -21,7 +21,10 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
@@ -59,11 +62,12 @@ public class LanguageServiceAccessor implements Disposable {
         @Override
         public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
             // Dispose all servers which are removed
+            // and remove code vision, inlay hints, folding from editors
             List<LanguageServerWrapper> serversToDispose = startedServers
                     .stream()
                     .filter(server -> event.serverDefinitions.contains(server.getServerDefinition()))
                     .toList();
-            serversToDispose.forEach(LanguageServerWrapper::dispose);
+            serversToDispose.forEach(wrapper -> wrapper.dispose(!ApplicationManager.getApplication().isUnitTestMode())); // dispose by removing code vision, inlay hints, folding from editors
             // Remove all servers which are removed from the cache
             synchronized (startedServers) {
                 serversToDispose.forEach(startedServers::remove);
@@ -118,32 +122,59 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
-    public void findAndStartLanguageServerIfNeeded(LanguageServerDefinition definition, boolean forceStart, Project project) {
+    public void findAndStartLanguageServerIfNeeded(@NotNull LanguageServerDefinition serverDefinition,
+                                                   boolean forceStart,
+                                                   @NotNull Project project) {
         if (forceStart) {
             // The language server must be started even if there is no open file corresponding to it.
             LinkedHashSet<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
-            collectLanguageServersFromDefinition(null, Set.of(definition), matchedServers, null);
+            collectLanguageServersFromDefinition(null, Set.of(serverDefinition), matchedServers, null);
             for (var ls : matchedServers) {
                 ls.restart();
             }
         } else {
             // The language server should only be started if there is an open file corresponding to it.
-            VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
-            for (VirtualFile file : files) {
-                findAndStartLsForFile(file, definition);
-            }
+            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project);
         }
     }
 
     /**
-     * Try to find a ls wrapper for the file and definition. Connect the file, if a matching one is found
+     * For all opened files of the project:
+     * <ul>
+     * <li>1. send a textDocument/didOpen notification to the language server of the given server definition.</li>
+     * <li>2. refresh code vision, inlay hints, folding for all opened editors
+     * which edit the files associated to the language server.</li>
+     * </ul>
+     *      @param serverDefinition the language server definition.
      *
-     * @param file       to handle
-     * @param definition definition used to match to the wrapper
+     * @param project the project.
      */
-    private void findAndStartLsForFile(@NotNull VirtualFile file,
-                                       @NotNull LanguageServerDefinition definition) {
-        getLanguageServers(file, null, null, definition);
+    void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
+                                                          @NotNull Project project) {
+        VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
+        for (VirtualFile file : files) {
+            sendDidOpenAndRefreshEditorFeatureFor(file, serverDefinition);
+        }
+    }
+
+    private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull VirtualFile file, @NotNull LanguageServerDefinition serverDefinition) {
+        ReadAction.nonBlocking(() -> {
+                    // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
+                    LanguageServiceAccessor.getInstance(project)
+                            .getLanguageServers(file, null, null, serverDefinition)
+                            .thenAccept(servers -> {
+                                // textDocument/didOpen notification has been sent
+                                if (servers.isEmpty()) {
+                                    return;
+                                }
+                                // refresh IJ code visions, inlay hints, folding features
+                                EditorFeatureManager.getInstance(project)
+                                        .refreshEditorFeature(file, EditorFeatureType.ALL, true);
+                            });
+
+                })
+                .coalesceBy(this, file)
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     /**
@@ -218,10 +249,10 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     @NotNull
-    private CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
-                                                                                    @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
-                                                                                    @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
-                                                                                    @Nullable LanguageServerDefinition matchServerDefinition) {
+    CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
+                                                                            @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+                                                                            @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
+                                                                            @Nullable LanguageServerDefinition matchServerDefinition) {
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(file, matchServerDefinition, beforeStartingServerFilter);
         if (matchedServers.isDone() && matchedServers.getNow(Collections.emptyList()).isEmpty()) {
@@ -242,7 +273,7 @@ public class LanguageServiceAccessor implements Disposable {
                     .thenComposeAsync(result -> CompletableFuture.allOf(result
                             .stream()
                             .filter(LanguageServerWrapper::isEnabled)
-                            .filter(wrapper->wrapper.getClientFeatures().isEnabled(file))
+                            .filter(wrapper -> wrapper.getClientFeatures().isEnabled(file))
                             .map(wrapper ->
                                     wrapper.getInitializedServer()
                                             .thenComposeAsync(server -> {

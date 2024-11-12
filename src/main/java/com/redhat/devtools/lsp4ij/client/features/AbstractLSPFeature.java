@@ -99,7 +99,6 @@ public abstract class AbstractLSPFeature implements Disposable {
 
     @Override
     public void dispose() {
-        clientFeatures = null;
     }
 
     public abstract void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities);

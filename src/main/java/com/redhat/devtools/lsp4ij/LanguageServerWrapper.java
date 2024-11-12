@@ -27,6 +27,8 @@ import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.internal.ClientCapabilitiesFactory;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
@@ -170,15 +172,57 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public synchronized void stopAndDisable() {
-        setEnabled(false);
-        stop();
+        stopAndDisable(true);
     }
 
+    /**
+     * Stop the language server, disable it and
+     * remove IJ code vision, inlay hints, folding
+     * for all opened editors which edit the files associated to the language server.
+     */
+    public synchronized void stopAndDisable(boolean refreshEditorFeature) {
+        // Collect opened files before stopping the language server
+        List<VirtualFile> openedFiles = refreshEditorFeature ? connectedDocuments.entrySet()
+                .stream()
+                .map(c -> c.getValue().getFile())
+                .toList() : Collections.emptyList();
+
+        // Disable the language server
+        setEnabled(false);
+
+        // Stop the language server
+        stop();
+
+        if (!openedFiles.isEmpty()) {
+            // remove IJ code vision, inlay hints, folding
+            // for all opened editors which edit the files associated to the language server.
+            for (var file : openedFiles) {
+                // refresh IJ code visions, inlay hints, folding
+                EditorFeatureManager.getInstance(getProject())
+                        .refreshEditorFeature(file, EditorFeatureType.ALL, true);
+            }
+        }
+    }
+
+    /**
+     * Enable the language server, restart it and refresh ode vision, inlay hints, folding for all opened editors
+     * which edit the files associated to the language server.
+     */
     public synchronized void restart() {
         numberOfRestartAttempts = 0;
         setEnabled(true);
         stop();
-        start();
+        // start the language server
+        getInitializedServer()
+                .thenAccept(unused -> {
+                    // The language server is started.
+                    // For all opened files of the project:
+                    // 1. send a textDocument/didOpen notification
+                    // 2. refresh code vision, inlay hints, folding for all opened editors
+                    // which edit the files associated to the language server.
+                    LanguageServiceAccessor.getInstance(getProject()).
+                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, getProject());
+                });
     }
 
     private void setEnabled(boolean enabled) {
@@ -408,11 +452,16 @@ public class LanguageServerWrapper implements Disposable {
 
     @Override
     public void dispose() {
+        dispose(false);
+    }
+
+    public void dispose(boolean refreshEditorFeature) {
         this.disposed = true;
-        stop();
+        stopAndDisable(refreshEditorFeature);
         stopDispatcher();
         if (clientFeatures != null) {
             clientFeatures.dispose();
+            clientFeatures = null;
         }
     }
 
@@ -1042,7 +1091,7 @@ public class LanguageServerWrapper implements Disposable {
         return (int) ProcessHandle.current().pid();
     }
 
-    // ------------------ Current Process information.
+// ------------------ Current Process information.
 
     /**
      * Returns the current process id and null otherwise.
@@ -1057,7 +1106,7 @@ public class LanguageServerWrapper implements Disposable {
         return currentProcessCommandLines;
     }
 
-    // ------------------ Server status information .
+// ------------------ Server status information .
 
     /**
      * Returns the server status.

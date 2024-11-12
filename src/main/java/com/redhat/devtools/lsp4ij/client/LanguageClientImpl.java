@@ -15,7 +15,6 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -23,7 +22,8 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
-import com.redhat.devtools.lsp4ij.internal.InlayHintsFactoryBridge;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -133,6 +133,25 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return CompletableFuture.supplyAsync(() -> LSPIJUtils.toWorkspaceFolders(project));
     }
 
+
+    @Override
+    public CompletableFuture<Void> refreshCodeLenses() {
+        return CompletableFuture.runAsync(() -> {
+            if (wrapper == null) {
+                return;
+            }
+            refreshCodeLensForAllOpenedFiles();
+        });
+    }
+
+    private void refreshCodeLensForAllOpenedFiles() {
+        for (var fileData : wrapper.getConnectedFiles()) {
+            VirtualFile file = fileData.getFile();
+            EditorFeatureManager.getInstance(getProject())
+                    .refreshEditorFeature(file, EditorFeatureType.CODE_VISION, true);
+        }
+    }
+
     @Override
     public CompletableFuture<Void> refreshInlayHints() {
         return CompletableFuture.runAsync(() -> {
@@ -144,18 +163,11 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     private void refreshInlayHintsForAllOpenedFiles() {
-        ReadAction.nonBlocking((Callable<Void>) () -> {
-                    for (var fileData : wrapper.getConnectedFiles()) {
-                        VirtualFile file = fileData.getFile();
-                        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-                        if (psiFile != null) {
-                            Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
-                            InlayHintsFactoryBridge.refreshInlayHints(psiFile, editors, true);
-                        }
-                    }
-                    return null;
-                }).coalesceBy(this)
-                .submit(AppExecutorUtil.getAppExecutorService());
+        for (var fileData : wrapper.getConnectedFiles()) {
+            VirtualFile file = fileData.getFile();
+            EditorFeatureManager.getInstance(getProject())
+                    .refreshEditorFeature(file, EditorFeatureType.INLAY_HINT, true);
+        }
     }
 
     @Override

@@ -39,7 +39,7 @@ public class DummyCodeVisionProvider implements CodeVisionProvider {
     private final List<CodeVisionRelativeOrdering> relativeOrderings;
 
     public DummyCodeVisionProvider(int index) {
-        id = LSPCodeLensProvider.LSP_CODE_LENS_PROVIDER_ID + index;
+        id =DummyCodeVisionProviderFactory.generateProviderId(index);
         // Keep the proper order of LSP CodeLens
         relativeOrderings = List.of(new CodeVisionRelativeOrdering.CodeVisionRelativeOrderingAfter(getPreviousProviderId(index)));
     }

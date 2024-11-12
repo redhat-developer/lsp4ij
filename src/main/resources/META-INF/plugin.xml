@@ -200,6 +200,8 @@
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServerManager"/>
         <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager"/>
+        <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServiceAccessor"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager"/>

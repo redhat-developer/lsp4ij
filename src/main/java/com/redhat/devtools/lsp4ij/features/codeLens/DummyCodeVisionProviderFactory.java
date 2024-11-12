@@ -18,16 +18,29 @@ import kotlin.sequences.SequencesKt;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
  * Factory to create 10 dummy code vision provider with ids 'LSPCodelensProvider0', 'LSPCodelensProvider1', etc
  */
 public class DummyCodeVisionProviderFactory implements CodeVisionProviderFactory {
+
+    private static final int NB_PROVIDERS  = 10;
+
+    public static final Collection<String> LSP_CODE_VISION_PROVIDER_IDS;
+
+    static {
+        LSP_CODE_VISION_PROVIDER_IDS =new ArrayList<>();
+        LSP_CODE_VISION_PROVIDER_IDS.add( LSPCodeLensProvider.LSP_CODE_LENS_PROVIDER_ID);
+        for (int i = 0; i < NB_PROVIDERS; i++) {
+            LSP_CODE_VISION_PROVIDER_IDS.add( generateProviderId(i));
+        }
+    }
     @NotNull
     @Override
     public Sequence<CodeVisionProvider<?>> createProviders(@NotNull Project project) {
-        CodeVisionProvider<?>[] s = createDummyProviders(10);
+        CodeVisionProvider<?>[] s = createDummyProviders(NB_PROVIDERS);
         return SequencesKt.sequenceOf(s);
     }
 
@@ -37,5 +50,9 @@ public class DummyCodeVisionProviderFactory implements CodeVisionProviderFactory
             list.add(new DummyCodeVisionProvider(i));
         }
         return list.toArray(new CodeVisionProvider<?>[size]);
+    }
+
+    static String generateProviderId(int index) {
+        return LSPCodeLensProvider.LSP_CODE_LENS_PROVIDER_ID + index;
     }
 }
