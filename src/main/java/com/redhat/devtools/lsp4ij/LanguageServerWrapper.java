@@ -172,7 +172,7 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public synchronized void stopAndDisable() {
-        stopAndDisable(true);
+        stopAndRefreshEditorFeature(true, true);
     }
 
     /**
@@ -180,7 +180,7 @@ public class LanguageServerWrapper implements Disposable {
      * remove IJ code vision, inlay hints, folding
      * for all opened editors which edit the files associated to the language server.
      */
-    public synchronized void stopAndDisable(boolean refreshEditorFeature) {
+    private synchronized void stopAndRefreshEditorFeature(boolean refreshEditorFeature, boolean disable) {
         // Collect opened files before stopping the language server
         List<VirtualFile> openedFiles = refreshEditorFeature ? connectedDocuments.entrySet()
                 .stream()
@@ -188,7 +188,9 @@ public class LanguageServerWrapper implements Disposable {
                 .toList() : Collections.emptyList();
 
         // Disable the language server
-        setEnabled(false);
+        if (disable) {
+            setEnabled(false);
+        }
 
         // Stop the language server
         stop();
@@ -457,7 +459,7 @@ public class LanguageServerWrapper implements Disposable {
 
     public void dispose(boolean refreshEditorFeature) {
         this.disposed = true;
-        stopAndDisable(refreshEditorFeature);
+        stopAndRefreshEditorFeature(refreshEditorFeature, false);
         stopDispatcher();
         if (clientFeatures != null) {
             clientFeatures.dispose();
