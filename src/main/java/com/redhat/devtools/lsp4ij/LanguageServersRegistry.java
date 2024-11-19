@@ -552,7 +552,7 @@ public class LanguageServersRegistry {
      * @return true if the language of the file is supported by a language server and false otherwise.
      */
     public boolean isFileSupported(@Nullable VirtualFile file, @NotNull Project project) {
-        if (file == null) {
+        if (file == null || !file.isInLocalFileSystem()) {
             return false;
         }
         Language language = LSPIJUtils.getFileLanguage(file, project);
