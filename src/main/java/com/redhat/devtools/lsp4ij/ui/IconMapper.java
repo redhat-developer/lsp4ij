@@ -29,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -117,7 +118,7 @@ public class IconMapper {
         if (!isValidHexColor(hexValue)) {
             return null;
         }
-        return colorToIconCache.computeIfAbsent(hexValue.toUpperCase(), key -> {
+        return colorToIconCache.computeIfAbsent(hexValue.toUpperCase(Locale.ROOT), key -> {
             try {
                 Color decodedColor = java.awt.Color.decode(key);
                 return new ColorIcon(ICON_SIZE, decodedColor, true);

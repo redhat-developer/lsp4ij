@@ -21,6 +21,8 @@ import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Locale;
+
 /**
  * Utility class to map language servers' {@link DiagnosticSeverity} to Intellij's {@link HighlightSeverity}, and vice-versa.
  */
@@ -84,7 +86,7 @@ public class SeverityMapping {
      * @return {@link DiagnosticSeverity} as lower case, or <code>none</code> if severity is <code>null</code>.
      */
     public static @NotNull String toString(@Nullable DiagnosticSeverity severity) {
-        return (severity == null)? NONE_SEVERITY : severity.name().toLowerCase();
+        return (severity == null)? NONE_SEVERITY : severity.name().toLowerCase(Locale.ROOT);
     }
 
     public static DiagnosticSeverity getSeverity(String inspectionId, InspectionProfile profile) {
