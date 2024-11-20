@@ -35,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -238,7 +239,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     public String getLanguageId(@Nullable VirtualFile file,
                                 @NotNull Project project) {
         if (file == null) {
-            return FileTypes.UNKNOWN.getName().toLowerCase();
+            return FileTypes.UNKNOWN.getName().toLowerCase(Locale.ROOT);
         }
         Language language = LSPIJUtils.getFileLanguage(file, project);
         return getLanguageId(language, file.getFileType(), file.getName());
@@ -300,10 +301,10 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem
         if (language != null) {
             // The language exists, use its ID with lower case
-            return language.getID().toLowerCase();
+            return language.getID().toLowerCase(Locale.ROOT);
         }
         // Returns the existing file type or 'unknown' with lower case
-        return fileName.toLowerCase();
+        return fileName.toLowerCase(Locale.ROOT);
     }
 
     /**
