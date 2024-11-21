@@ -20,6 +20,7 @@ public class LSPRequestConstants {
     public static final String WORKSPACE_WILL_CREATE_FILES = "workspace/willCreateFiles";
     public static final String WORKSPACE_WILL_DELETE_FILES = "workspace/willDeleteFiles";
     public static final String WORKSPACE_WILL_RENAME_FILES = "workspace/willRenameFiles";
+    public static final String WORKSPACE_SYMBOL = "workspace/symbol";
 
     // textDocument/* LSP requests
 
@@ -31,10 +32,10 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_TYPE_DEFINITION = "textDocument/typeDefinition";
     public static final String TEXT_DOCUMENT_CODE_ACTION = "textDocument/codeAction";
     public static final String TEXT_DOCUMENT_CODE_LENS = "textDocument/codeLens";
-    public static final String TEXT_DOCUMENT_RESOLVE_CODE_LENS = "textDocument/resolveCodelens";
+    public static final String CODE_LENS_RESOLVE = "codelens/resolve";
     public static final String TEXT_DOCUMENT_HOVER = "textDocument/hover";
     public static final String TEXT_DOCUMENT_INLAY_HINT = "textDocument/inlayHint";
-    public static final String TEXT_DOCUMENT_RESOLVE_INLAY_HINT = "textDocument/resolveInlayHint";
+    public static final String INLAY_HINT_RESOLVE = "inlayHint/resolve";
     public static final String TEXT_DOCUMENT_DOCUMENT_COLOR = "textDocument/documentColor";
     public static final String TEXT_DOCUMENT_COMPLETION = "textDocument/completion";
     public static final String TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT = "textDocument/documentHighlight";
@@ -45,11 +46,15 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_SIGNATURE_HELP = "textDocument/signatureHelp";
     public static final String TEXT_DOCUMENT_PREPARE_RENAME = "textDocument/prepareRename";
     public static final String TEXT_DOCUMENT_RENAME = "textDocument/rename";
-    public static final String TEXT_DOCUMENT_DOCUMENT_COMPLETION = "textDocument/completion";
     public static final String TEXT_DOCUMENT_DOCUMENT_SYMBOL = "textDocument/documentSymbol";
-
-    // workspace/* LSP requests
-    public static final String WORKSPACE_SYMBOL = "workspace/symbol";
+    public static final String TEXT_DOCUMENT_CALL_HIERARCHY = "textDocument/callHierarchy";
+    public static final String TEXT_DOCUMENT_PREPARE_CALL_HIERARCHY = "textDocument/prepareCallHierarchy";
+    public static final String CALL_HIERARCHY_INCOMING_CALLS = "callHierarchy/incomingCalls";
+    public static final String CALL_HIERARCHY_OUTGOING_CALLS = "callHierarchy/outgoingCalls";
+    public static final String TEXT_DOCUMENT_PREPARE_TYPE_HIERARCHY = "textDocument/prepareTypeHierarchy";
+    public static final String TYPE_HIERARCHY_SUB_TYPES = "typeHierarchy/subtypes";
+    public static final String TYPE_HIERARCHY_SUPER_TYPES = "typeHierarchy/supertypes";
+    public static final String TEXT_DOCUMENT_TYPE_HIERARCHY = "textDocument/typeHierarchy";
 
     private LSPRequestConstants() {
 

@@ -88,7 +88,7 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
         params.setContext(createCompletionContext(params, file, languageServer));
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .completion(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COMPLETION)
+                        .completion(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_COMPLETION)
                 .thenApplyAsync(result -> {
                     if (result == null) {
                         // textDocument/completion may return null

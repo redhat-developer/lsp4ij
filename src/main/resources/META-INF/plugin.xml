@@ -318,6 +318,22 @@
         <colorSettingsPage
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
 
+        <!-- LSP textDocument/prepareTypeHierarchy request support -->
+        <typeHierarchyProvider
+                language="TEXT"
+                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider" />
+        <typeHierarchyProvider
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider" />
+
+        <!-- LSP textDocument/callHierarchy request support -->
+        <callHierarchyProvider
+                language="TEXT"
+                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" />
+        <callHierarchyProvider
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" />
+
         <!-- LSP Find Usages (LSP) support shows:
              - textDocument/declaration
              - textDocument/definition

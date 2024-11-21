@@ -123,7 +123,7 @@ public class ClientCapabilitiesFactory {
         // Inlay Hint support
         textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities(Boolean.TRUE));
 
-        // textDocument/colorPresentation support
+        // Color support
         textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities(Boolean.TRUE));
 
         // Completion support
@@ -264,6 +264,12 @@ public class ClientCapabilitiesFactory {
         // Synchronization support
         textDocumentClientCapabilities
                 .setSynchronization(new SynchronizationCapabilities(Boolean.TRUE, Boolean.TRUE, Boolean.TRUE));
+
+        // Call Hierarchy support
+        textDocumentClientCapabilities.setCallHierarchy(new CallHierarchyCapabilities(Boolean.TRUE));
+
+        // Type Hierarchy support
+        textDocumentClientCapabilities.setTypeHierarchy(new TypeHierarchyCapabilities(Boolean.TRUE));
 
         // TODO
         // SelectionRangeCapabilities selectionRange = new SelectionRangeCapabilities();
