@@ -14,6 +14,9 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyIncomingCallsSupport;
+import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyOutgoingCallsSupport;
+import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPPrepareCallHierarchySupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCodeActionSupport;
 import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
@@ -34,6 +37,9 @@ import com.redhat.devtools.lsp4ij.features.rename.LSPRenameSupport;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensSupport;
 import com.redhat.devtools.lsp4ij.features.signatureHelp.LSPSignatureHelpSupport;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
+import com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPPrepareTypeHierarchySupport;
+import com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchySubtypesSupport;
+import com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchySupertypesSupport;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
@@ -87,6 +93,14 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private final LSPDocumentSymbolSupport documentSymbolSupport;
 
+    private final LSPPrepareCallHierarchySupport prepareCallHierarchySupport;
+    private final LSPCallHierarchyIncomingCallsSupport callHierarchyIncomingCallsSupport;
+    private final LSPCallHierarchyOutgoingCallsSupport callHierarchyOutgoingCallsSupport;
+
+    private final LSPPrepareTypeHierarchySupport prepareTypeHierarchySupport;
+    private final LSPTypeHierarchySubtypesSupport typeHierarchySubtypesSupport;
+    private final LSPTypeHierarchySupertypesSupport typeHierarchySupertypesSupport;
+
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
         this.codeLensSupport = new LSPCodeLensSupport(file);
@@ -109,6 +123,12 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.typeDefinitionSupport = new LSPTypeDefinitionSupport(file);
         this.semanticTokensSupport = new LSPSemanticTokensSupport(file);
         this.documentSymbolSupport = new LSPDocumentSymbolSupport(file);
+        this.prepareCallHierarchySupport = new LSPPrepareCallHierarchySupport(file);
+        this.callHierarchyIncomingCallsSupport = new LSPCallHierarchyIncomingCallsSupport(file);
+        this.callHierarchyOutgoingCallsSupport = new LSPCallHierarchyOutgoingCallsSupport(file);
+        this.prepareTypeHierarchySupport = new LSPPrepareTypeHierarchySupport(file);
+        this.typeHierarchySubtypesSupport = new LSPTypeHierarchySubtypesSupport(file);
+        this.typeHierarchySupertypesSupport = new LSPTypeHierarchySupertypesSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
     }
 
@@ -135,6 +155,12 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getTypeDefinitionSupport().cancel();
         getSemanticTokensSupport().cancel();
         getDocumentSymbolSupport().cancel();
+        getPrepareCallHierarchySupport().cancel();
+        getCallHierarchyIncomingCallsSupport().cancel();
+        getCallHierarchyOutgoingCallsSupport().cancel();
+        getPrepareTypeHierarchySupport().cancel();
+        getTypeHierarchySubtypesSupport().cancel();
+        getTypeHierarchySupertypesSupport().cancel();
         var map = getUserMap();
         for (var key : map.getKeys()) {
             var value = map.get(key);
@@ -322,6 +348,60 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPDocumentSymbolSupport getDocumentSymbolSupport() {
         return documentSymbolSupport;
+    }
+
+    /**
+     * Returns the LSP prepare call hierarchy support.
+     *
+     * @return the LSP prepare call hierarchy support.
+     */
+    public LSPPrepareCallHierarchySupport getPrepareCallHierarchySupport() {
+        return prepareCallHierarchySupport;
+    }
+
+    /**
+     * Returns the LSP call hierarchy incoming calls support.
+     *
+     * @return the LSP call hierarchy incoming calls support.
+     */
+    public LSPCallHierarchyIncomingCallsSupport getCallHierarchyIncomingCallsSupport() {
+        return callHierarchyIncomingCallsSupport;
+    }
+
+    /**
+     * Returns the LSP prepare call hierarchy outgoing calls support.
+     *
+     * @return the LSP prepare call hierarchy outgoing calls support.
+     */
+    public LSPCallHierarchyOutgoingCallsSupport getCallHierarchyOutgoingCallsSupport() {
+        return callHierarchyOutgoingCallsSupport;
+    }
+
+    /**
+     * Returns the LSP prepare type hierarchy support.
+     *
+     * @return the LSP prepare type hierarchy support.
+     */
+    public LSPPrepareTypeHierarchySupport getPrepareTypeHierarchySupport() {
+        return prepareTypeHierarchySupport;
+    }
+
+    /**
+     * Returns the LSP type hierarchy subtypes support.
+     *
+     * @return the LSP type hierarchy subtypes support.
+     */
+    public LSPTypeHierarchySubtypesSupport getTypeHierarchySubtypesSupport() {
+        return typeHierarchySubtypesSupport;
+    }
+
+    /**
+     * Returns the LSP type hierarchy supertypes support.
+     *
+     * @return the LSP type hierarchy supertypes support.
+     */
+    public LSPTypeHierarchySupertypesSupport getTypeHierarchySupertypesSupport() {
+        return typeHierarchySupertypesSupport;
     }
 
     /**

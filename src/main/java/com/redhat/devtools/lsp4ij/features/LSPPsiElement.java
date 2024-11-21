@@ -35,7 +35,8 @@ public class LSPPsiElement extends FakePsiElement {
     private @NotNull TextRange textRange;
     private String name;
 
-    public LSPPsiElement(@NotNull PsiFile file, @NotNull TextRange textRange) {
+    public LSPPsiElement(@NotNull PsiFile file,
+                         @NotNull TextRange textRange) {
         this.file = file;
         setTextRange(textRange);
     }

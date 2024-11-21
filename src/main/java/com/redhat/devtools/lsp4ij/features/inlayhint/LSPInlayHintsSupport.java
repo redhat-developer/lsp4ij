@@ -97,7 +97,7 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
                                     // prepare the future which resolves the inlayHint.
                                     resolvedInlayHintFuture = cancellationSupport.execute(languageServer
                                             .getTextDocumentService()
-                                            .resolveInlayHint(inlayHint), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RESOLVE_INLAY_HINT);
+                                            .resolveInlayHint(inlayHint), languageServer, LSPRequestConstants.INLAY_HINT_RESOLVE);
                                 }
                                 if (inlayHint.getLabel() != null || resolvedInlayHintFuture != null) {
                                     // The inlayHint content is filled or the inlayHint must be resolved

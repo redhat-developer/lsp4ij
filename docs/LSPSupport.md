@@ -50,11 +50,12 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) (see [implementation details](#type-definition))
  * ✅ [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) (see [implementation details](#implementation))
  * ✅ [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) (see [implementation details](#references))
- * ❌ [textDocument/prepareCallHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy).
- * ❌ [textDocument/incomingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls).
- * ❌ [textDocument/outgoingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls).
- * ❌ [textDocument/prepareTypeHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy).
- * ❌ [typeHierarchy/supertypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes).
+ * ✅ [textDocument/prepareCallHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy) (see [implementation details](#call-hierarchy))
+ * ✅ [textDocument/incomingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls).
+ * ✅ [textDocument/outgoingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls).
+ * ✅ [textDocument/prepareTypeHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy) (see [implementation details](#type-hierarchy))
+* ✅ [typeHierarchy/subtypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_subtypes). 
+ * ✅ [typeHierarchy/supertypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes).
  * ✅ [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange)  (see [implementation details](#folding-range))
  * ❌ [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange).
  * ✅ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) (see [implementation details](#document-symbol))
@@ -129,7 +130,7 @@ This menu action either opens the reference in a popup or navigates to the refer
 
 ![textDocument/implementation popup](./images/lsp-support/textDocument_references_popup.png)
 
-[textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is used too via [Find Usages](./UserGuide.md#find-usages) to show references.
+[textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is used also via [Find Usages](./UserGuide.md#find-usages) to show references.
 
 ### Implementation
 
@@ -144,7 +145,7 @@ This menu action either opens the implementation in a popup or navigates to the 
 
 ![textDocument/implementation popup](./images/lsp-support/textDocument_implementation_popup.png)
 
-[textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is too used via [Find Usages](./UserGuide.md#find-usages) to show implementations.
+[textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is also used via [Find Usages](./UserGuide.md#find-usages) to show implementations.
 
 ### Type definition
 
@@ -155,7 +156,7 @@ The [textDocument/typeDefinition](https://microsoft.github.io/language-server-pr
 
 This menu action either opens the type definition in a popup or navigates to the type definition if there are several type definitions:
 
-[textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is used too via [Find Usages](./UserGuide.md#find-usages) to show Type definitions.
+[textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is also used via [Find Usages](./UserGuide.md#find-usages) to show Type definitions.
 
 ### Declaration
 
@@ -166,7 +167,7 @@ The [textDocument/declaration](https://microsoft.github.io/language-server-proto
 
 This menu action either opens the declaration in a popup or navigates to the declaration if there are several declarations:
 
-[textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is used too via [Find Usages](./UserGuide.md#find-usages) to show declarations.
+[textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is also used via [Find Usages](./UserGuide.md#find-usages) to show declarations.
 
 ### Document Highlight
 
@@ -561,9 +562,64 @@ Here is an example with [TypeScript Language Server](./user-defined-ls/typescrip
 which opens the standard `File Structure` with `Ctrl+F12` / `Cmd+F12` 
 (also available with the `Navigate / File Structure` menu) to display TypeScript functions as symbols and navigate them easily:
 
+You can also open the `Structure` view using the `View / Tool Windows / Structure` menu:
+
 ![textDocument/documentSymbol](./images/lsp-support/textDocument_documentSymbol.gif)
 
-You can too open the `Structure` view with `View / Tool Windows / Structure` menu:
+### Call Hierarchy
+
+[textDocument/prepareCallHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy) is implemented with
+the `callHierarchyProvider` extension point. By default, LSP4IJ registers the `callHierarchyProvider` with
+[LSPCallHierarchyProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/callHierarchy/LSPCallHierarchyProvider.java) class for `TEXT` and `textmate` languages:
+
+```xml
+<!-- LSP textDocument/callHierarchy request support -->
+<callHierarchyProvider
+        language="TEXT"
+        implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" />
+<callHierarchyProvider
+        language="textmate"
+        implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" />
+```
+
+If you use another language, you will have to declare `callHierarchyProvider` with your language:
+
+```xml
+<callHierarchyProvider
+        language="YourLanguage"
+        implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" />
+```
+
+After setting the cursor position in a file, you can view the Call Hierarchy using the `Navigate / Call Hierarchy` menu (or `Ctrl+Alt+H`).  
+Below is an example of a call hierarchy using the [Go Language Server](./user-defined-ls/gopls.md):
+
+![textDocument/callHierarchy](./images/lsp-support/textDocument_callHierarchy.png)
+
+### Type Hierarchy
+
+[textDocument/prepareTypeHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy) is implemented with
+the `typeHierarchyProvider` extension point. By default, LSP4IJ registers the `typeHierarchyProvider` with
+[LSPTypeHierarchyProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/typeHierarchy/LSPTypeHierarchyProvider.java) class for `TEXT` and `textmate` languages:
+
+```xml
+<!-- LSP textDocument/typeHierarchy request support -->
+<typeHierarchyProvider
+        language="TEXT"
+        implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider" />
+<typeHierarchyProvider
+        language="textmate"
+        implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider" />
+```
+
+If you use another language, you will have to declare `typeHierarchyProvider` with your language:
+
+```xml
+<typeHierarchyProvider
+        language="YourLanguage"
+        implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider" />
+```
+
+After setting the cursor position in a file, you can view the Type Hierarchy using the `Navigate / Type Hierarchy` menu (or `Ctrl+H`).
 
 ### Workspace Symbol
 

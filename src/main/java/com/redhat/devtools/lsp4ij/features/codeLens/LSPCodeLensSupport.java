@@ -105,7 +105,7 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                                     // prepare the future which resolves the codelens.
                                     resolvedCodeLensFuture = cancellationSupport.execute(languageServer
                                             .getTextDocumentService()
-                                            .resolveCodeLens(codeLens), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RESOLVE_CODE_LENS);
+                                            .resolveCodeLens(codeLens), languageServer, LSPRequestConstants.CODE_LENS_RESOLVE);
                                 }
                                 if (codeLensFeature.getText(codeLens) != null || resolvedCodeLensFuture != null) {
                                     // The codelens content is filled or the codelens must be resolved

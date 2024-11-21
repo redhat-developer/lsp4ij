@@ -33,6 +33,8 @@ public class LSPClientFeatures implements Disposable {
 
     private LanguageServerWrapper serverWrapper;
 
+    private LSPCallHierarchyFeature callHierarchyFeature;
+    
     private LSPCodeActionFeature codeActionFeature;
 
     private LSPCodeLensFeature codeLensFeature;
@@ -57,11 +59,11 @@ public class LSPClientFeatures implements Disposable {
 
     private LSPFormattingFeature formattingFeature;
 
+    private LSPHoverFeature hoverFeature;
+
     private LSPImplementationFeature implementationFeature;
 
     private LSPInlayHintFeature inlayHintFeature;
-
-    private LSPHoverFeature hoverFeature;
 
     private LSPReferencesFeature referencesFeature;
 
@@ -73,10 +75,12 @@ public class LSPClientFeatures implements Disposable {
 
     private LSPTypeDefinitionFeature typeDefinitionFeature;
 
+    private LSPTypeHierarchyFeature typeHierarchyFeature;
+    
     private LSPUsageFeature usageFeature;
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
-
+    
     /**
      * Returns the project.
      *
@@ -146,6 +150,38 @@ public class LSPClientFeatures implements Disposable {
      */
     public boolean canStopServerByUser() {
         return true;
+    }
+
+    /**
+     * Returns the LSP callHierarchy feature.
+     *
+     * @return the LSP callHierarchy feature.
+     */
+    @NotNull
+    public final LSPCallHierarchyFeature getCallHierarchyFeature() {
+        if (callHierarchyFeature == null) {
+            initCallHierarchyFeature();
+        }
+        return callHierarchyFeature;
+    }
+
+    private synchronized void initCallHierarchyFeature() {
+        if(callHierarchyFeature != null) {
+            return;
+        }
+        setCallHierarchyFeature(new LSPCallHierarchyFeature());
+    }
+
+    /**
+     * Initialize the LSP callHierarchy feature.
+     *
+     * @param callHierarchyFeature the LSP callHierarchy feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setCallHierarchyFeature(@NotNull LSPCallHierarchyFeature callHierarchyFeature) {
+        callHierarchyFeature.setClientFeatures(this);
+        this.callHierarchyFeature = callHierarchyFeature;
+        return this;
     }
 
     /**
@@ -532,6 +568,38 @@ public class LSPClientFeatures implements Disposable {
     }
 
     /**
+     * Returns the LSP hover feature.
+     *
+     * @return the LSP hover feature.
+     */
+    @NotNull
+    public final LSPHoverFeature getHoverFeature() {
+        if (hoverFeature == null) {
+            initHoverFeature();
+        }
+        return hoverFeature;
+    }
+
+    private synchronized void initHoverFeature() {
+        if(hoverFeature != null) {
+            return;
+        }
+        setHoverFeature(new LSPHoverFeature());
+    }
+
+    /**
+     * Initialize the LSP hover feature.
+     *
+     * @param hoverFeature the LSP hover feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setHoverFeature(@NotNull LSPHoverFeature hoverFeature) {
+        hoverFeature.setClientFeatures(this);
+        this.hoverFeature = hoverFeature;
+        return this;
+    }
+
+    /**
      * Returns the LSP implementation feature.
      *
      * @return the LSP implementation feature.
@@ -594,39 +662,7 @@ public class LSPClientFeatures implements Disposable {
         this.inlayHintFeature = inlayHintFeature;
         return this;
     }
-
-    /**
-     * Returns the LSP hover feature.
-     *
-     * @return the LSP hover feature.
-     */
-    @NotNull
-    public final LSPHoverFeature getHoverFeature() {
-        if (hoverFeature == null) {
-            initHoverFeature();
-        }
-        return hoverFeature;
-    }
-
-    private synchronized void initHoverFeature() {
-        if(hoverFeature != null) {
-            return;
-        }
-        setHoverFeature(new LSPHoverFeature());
-    }
-
-    /**
-     * Initialize the LSP hover feature.
-     *
-     * @param hoverFeature the LSP hover feature.
-     * @return the LSP client features.
-     */
-    public final LSPClientFeatures setHoverFeature(@NotNull LSPHoverFeature hoverFeature) {
-        hoverFeature.setClientFeatures(this);
-        this.hoverFeature = hoverFeature;
-        return this;
-    }
-
+    
     /**
      * Returns the LSP references feature.
      *
@@ -788,6 +824,38 @@ public class LSPClientFeatures implements Disposable {
     }
 
     /**
+     * Returns the LSP typeHierarchy feature.
+     *
+     * @return the LSP typeHierarchy feature.
+     */
+    @NotNull
+    public final LSPTypeHierarchyFeature getTypeHierarchyFeature() {
+        if (typeHierarchyFeature == null) {
+            initTypeHierarchyFeature();
+        }
+        return typeHierarchyFeature;
+    }
+
+    private synchronized void initTypeHierarchyFeature() {
+        if(typeHierarchyFeature != null) {
+            return;
+        }
+        setTypeHierarchyFeature(new LSPTypeHierarchyFeature());
+    }
+
+    /**
+     * Initialize the LSP typeHierarchy feature.
+     *
+     * @param typeHierarchyFeature the LSP typeHierarchy feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setTypeHierarchyFeature(@NotNull LSPTypeHierarchyFeature typeHierarchyFeature) {
+        typeHierarchyFeature.setClientFeatures(this);
+        this.typeHierarchyFeature = typeHierarchyFeature;
+        return this;
+    }
+    
+    /**
      * Returns the LSP usage feature.
      *
      * @return the LSP usage feature.
@@ -887,6 +955,9 @@ public class LSPClientFeatures implements Disposable {
     @Override
     public void dispose() {
         serverWrapper = null;
+        if (callHierarchyFeature != null) {
+            callHierarchyFeature.dispose();
+        }
         if (codeActionFeature != null) {
             codeActionFeature.dispose();
         }
@@ -947,6 +1018,9 @@ public class LSPClientFeatures implements Disposable {
         if (typeDefinitionFeature != null) {
             typeDefinitionFeature.dispose();
         }
+        if (typeHierarchyFeature != null) {
+            typeHierarchyFeature.dispose();
+        }
         if (usageFeature != null) {
             usageFeature.dispose();
         }
@@ -956,6 +1030,9 @@ public class LSPClientFeatures implements Disposable {
     }
 
     public void setServerCapabilities(@NotNull ServerCapabilities serverCapabilities) {
+        if (callHierarchyFeature != null) {
+            callHierarchyFeature.setServerCapabilities(serverCapabilities);
+        }
         if (codeActionFeature != null) {
             codeActionFeature.setServerCapabilities(serverCapabilities);
         }
@@ -1015,6 +1092,9 @@ public class LSPClientFeatures implements Disposable {
         }
         if (typeDefinitionFeature != null) {
             typeDefinitionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (typeHierarchyFeature != null) {
+            typeHierarchyFeature.setServerCapabilities(serverCapabilities);
         }
         if (usageFeature != null) {
             usageFeature.setServerCapabilities(serverCapabilities);
@@ -1086,6 +1166,10 @@ public class LSPClientFeatures implements Disposable {
             // register 'textDocument/inlayHint' capability
             return getInlayHintFeature().getInlayHintCapabilityRegistry();
         }
+        if (LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY.equals(method)) {
+            // register 'textDocument/callHierarchy' capability
+            return getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();
+        }
         if (LSPRequestConstants.TEXT_DOCUMENT_REFERENCES.equals(method)) {
             // register 'textDocument/references' capability
             return getReferencesFeature().getReferencesCapabilityRegistry();
@@ -1101,6 +1185,10 @@ public class LSPClientFeatures implements Disposable {
         if (LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION.equals(method)) {
             // register 'textDocument/typeDefinition' capability
             return getTypeDefinitionFeature().getTypeDefinitionCapabilityRegistry();
+        }
+        if (LSPRequestConstants.TEXT_DOCUMENT_TYPE_HIERARCHY.equals(method)) {
+            // register 'textDocument/typeHierarchy' capability
+            return getTypeHierarchyFeature().getTypeHierarchyCapabilityRegistry();
         }
         return null;
     }
