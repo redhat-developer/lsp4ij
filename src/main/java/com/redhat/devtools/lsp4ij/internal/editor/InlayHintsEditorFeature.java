@@ -43,11 +43,15 @@ public class InlayHintsEditorFeature implements EditorFeature {
             "com.intellij.codeInsight.hints.InlayHintsFactory",
             "com.intellij.codeInsight.hints.InlayHintsPassFactory"};
 
+    private static final Object INVALID_COMPANION_INSTANCE = new Object();
+
     // InlayHintsPassFactory.Companion
-    private static Object companionInstance;
+    private Object companionInstance;
 
     // InlayHintsPassFactory.Companion.clearModificationStamp(editor)
-    private static Method clearModificationStampMethod;
+    private Method clearModificationStampMethod;
+
+    private boolean errorLogged;
 
     @Override
     public EditorFeatureType getFeatureType() {
@@ -63,9 +67,12 @@ public class InlayHintsEditorFeature implements EditorFeature {
         // --> InlayHintsFactory.Companion.clearModificationStamp(editor);
         try {
             loadInlayHintsPassFactoryIfNeeded();
-            clearModificationStampMethod.invoke(companionInstance, editor);
+            if (companionInstance != INVALID_COMPANION_INSTANCE) {
+                clearModificationStampMethod.invoke(companionInstance, editor);
+            }
         } catch (Exception e) {
             LOGGER.error("Error while calling InlayHintsPassFactory.Companion.clearModificationStamp(editor)", e);
+            this.companionInstance = INVALID_COMPANION_INSTANCE;
         }
     }
 
@@ -88,14 +95,14 @@ public class InlayHintsEditorFeature implements EditorFeature {
         runnableList.add(runnable);
     }
 
-    private static void loadInlayHintsPassFactoryIfNeeded() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
+    private void loadInlayHintsPassFactoryIfNeeded() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
         if (companionInstance != null) {
             return;
         }
         loadInlayHintsPassFactory();
     }
 
-    private static synchronized void loadInlayHintsPassFactory() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
+    private synchronized void loadInlayHintsPassFactory() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {
         if (companionInstance != null) {
             return;
         }
@@ -105,14 +112,14 @@ public class InlayHintsEditorFeature implements EditorFeature {
 
         // Get InlayHintsPassFactory.Companion which defines relevant methods
         Class<?> companionClass = inlayHintsPassFactoryClass.getClasses()[0];
-        Field companionField = inlayHintsPassFactoryClass.getDeclaredField("Companion");
-        companionField.setAccessible(true);
-        Object companionInstance = companionField.get(inlayHintsPassFactoryInstance);
 
         // Get InlayHintsPassFactory.Companion.clearModificationStamp(editor) method
-        clearModificationStampMethod = companionClass.getMethod("clearModificationStamp", Editor.class);
-        clearModificationStampMethod.setAccessible(true);
-        InlayHintsEditorFeature.companionInstance = companionInstance;
+        this.clearModificationStampMethod = companionClass.getMethod("clearModificationStamp", Editor.class);
+        this.clearModificationStampMethod.setAccessible(true);
+
+        Field companionField = inlayHintsPassFactoryClass.getDeclaredField("Companion");
+        companionField.setAccessible(true);
+        this.companionInstance = companionField.get(inlayHintsPassFactoryInstance);
     }
 
     private static Class<?> loadInlayHintsPassFactoryClass() throws ClassNotFoundException {

@@ -34,8 +34,8 @@ public class FoldingEditorFeature implements EditorFeature {
     private static final String FOLDING_UPDATE_CLASS = "com.intellij.codeInsight.folding.impl.FoldingUpdate";
 
     // CodeVisionPassFactory.clearModificationStamp(editor)
-    private static Method clearFoldingCacheMethod;
-    private static Boolean loaded;
+    private Method clearFoldingCacheMethod;
+    private Boolean loaded;
 
     @Override
     public EditorFeatureType getFeatureType() {
@@ -70,14 +70,14 @@ public class FoldingEditorFeature implements EditorFeature {
         // Do nothing
     }
 
-    private static void loadFoldingUpdateIfNeeded() {
+    private void loadFoldingUpdateIfNeeded() {
         if (loaded != null) {
             return;
         }
         loadFoldingUpdate();
     }
 
-    private static synchronized void loadFoldingUpdate() {
+    private synchronized void loadFoldingUpdate() {
         if (loaded != null) {
             return;
         }
@@ -86,10 +86,10 @@ public class FoldingEditorFeature implements EditorFeature {
             // Get FoldingUpdate.clearFoldingCache(editor) method
             clearFoldingCacheMethod = foldingUpdateClass.getDeclaredMethod("clearFoldingCache", Editor.class);
             clearFoldingCacheMethod.setAccessible(true);
-            FoldingEditorFeature.loaded = Boolean.TRUE;
+            this.loaded = Boolean.TRUE;
         }
         catch(Exception e) {
-            FoldingEditorFeature.loaded = Boolean.FALSE;
+            this.loaded = Boolean.FALSE;
             LOGGER.error("Error while loading FoldingUpdate.clearFoldingCache(editor)", e);
         }
     }
