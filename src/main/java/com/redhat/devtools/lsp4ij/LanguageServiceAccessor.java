@@ -157,7 +157,8 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
-    private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull VirtualFile file, @NotNull LanguageServerDefinition serverDefinition) {
+    private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull VirtualFile file,
+                                                       @NotNull LanguageServerDefinition serverDefinition) {
         ReadAction.nonBlocking(() -> {
                     // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
                     LanguageServiceAccessor.getInstance(project)
