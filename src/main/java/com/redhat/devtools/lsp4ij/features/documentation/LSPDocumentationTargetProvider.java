@@ -21,6 +21,8 @@ import com.intellij.platform.backend.documentation.DocumentationTargetProvider;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Range;
@@ -53,6 +55,9 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
     public @NotNull List<? extends @NotNull DocumentationTarget> documentationTargets(@NotNull PsiFile psiFile, int offset) {
         Project project = psiFile.getProject();
         if (project.isDisposed() || DumbService.isDumb(project)) {
+            return Collections.emptyList();
+        }
+        if (ProjectIndexingManager.canExecuteLSPFeature(psiFile) != ExecuteLSPFeatureStatus.NOW) {
             return Collections.emptyList();
         }
         VirtualFile file = LSPIJUtils.getFile(psiFile);

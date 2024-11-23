@@ -18,7 +18,12 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -104,7 +109,7 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
 
     @Override
     public final boolean canFormat(@NotNull PsiFile file) {
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             // The file is not associated to a language server
             return false;
         }

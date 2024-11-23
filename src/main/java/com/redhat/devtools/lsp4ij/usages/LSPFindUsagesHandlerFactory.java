@@ -15,7 +15,8 @@ import com.intellij.find.findUsages.FindUsagesHandlerFactory;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.psi.PsiElement;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,7 +28,7 @@ public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
     public boolean canFindUsages(@NotNull PsiElement element) {
         // Execute the dummy LSP find usage handler to collect references, implementations
         // with LSPUsageSearcher if file is associated to a language server.
-        if (LanguageServersRegistry.getInstance().isFileSupported(element.getContainingFile())) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(element.getContainingFile()) != ExecuteLSPFeatureStatus.NOW) {
             // To avoid overriding existing FindUsagesHandlerFactory for the given PsiElement
             // (ex: JavaFindUsagesHandlerFactory which is also defined as "last".)
             // we check if it exists a FindUsagesHandlerFactory for the element.

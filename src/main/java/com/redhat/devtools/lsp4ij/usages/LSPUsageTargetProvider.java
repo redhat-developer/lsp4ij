@@ -20,6 +20,8 @@ import com.intellij.usages.UsageTarget;
 import com.intellij.usages.UsageTargetProvider;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,7 +39,7 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
             // don't create LSP UsageTarget to avoid breaking the "Find Usages" from Java, etc files
             return null;
         }
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             // The file is not associated to a language server
             return null;
         }
