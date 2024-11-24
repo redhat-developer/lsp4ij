@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.server.capabilities.DocumentSymbolCapabilityRe
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.SymbolKind;
 import org.jetbrains.annotations.ApiStatus;
@@ -114,9 +115,10 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
             (symbolKind == SymbolKind.Struct) ||
             (symbolKind == SymbolKind.Method) ||
             (symbolKind == SymbolKind.Function)) {
-            Position startPosition = documentSymbol.getSelectionRange().getStart();
+            Range selectionRange = documentSymbol.getSelectionRange();
+            Position startPosition = selectionRange != null ? selectionRange.getStart() : null;
             Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
-            if (document != null) {
+            if ((startPosition != null) && (document != null)) {
                 return LSPIJUtils.toOffset(startPosition, document);
             }
         }
