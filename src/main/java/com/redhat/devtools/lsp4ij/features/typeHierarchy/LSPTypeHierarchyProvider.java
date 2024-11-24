@@ -10,9 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.typeHierarchy;
 
-import com.intellij.ide.hierarchy.CallHierarchyBrowserBase;
 import com.intellij.ide.hierarchy.HierarchyBrowser;
 import com.intellij.ide.hierarchy.HierarchyBrowserBaseEx;
+import com.intellij.ide.hierarchy.TypeHierarchyBrowserBase;
 import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyProviderBase;
 import org.jetbrains.annotations.NotNull;
@@ -29,6 +29,6 @@ public class LSPTypeHierarchyProvider extends LSPHierarchyProviderBase {
 
     @Override
     public void browserActivated(@NotNull HierarchyBrowser hierarchyBrowser) {
-        ((HierarchyBrowserBaseEx)hierarchyBrowser).changeView(CallHierarchyBrowserBase.getCallerType());
+        ((HierarchyBrowserBaseEx) hierarchyBrowser).changeView(TypeHierarchyBrowserBase.getSubtypesHierarchyType());
     }
 }
