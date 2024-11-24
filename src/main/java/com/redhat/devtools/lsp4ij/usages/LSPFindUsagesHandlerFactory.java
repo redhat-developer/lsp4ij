@@ -28,7 +28,7 @@ public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
     public boolean canFindUsages(@NotNull PsiElement element) {
         // Execute the dummy LSP find usage handler to collect references, implementations
         // with LSPUsageSearcher if file is associated to a language server.
-        if (ProjectIndexingManager.canExecuteLSPFeature(element.getContainingFile()) != ExecuteLSPFeatureStatus.NOW) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(element.getContainingFile()) == ExecuteLSPFeatureStatus.NOW) {
             // To avoid overriding existing FindUsagesHandlerFactory for the given PsiElement
             // (ex: JavaFindUsagesHandlerFactory which is also defined as "last".)
             // we check if it exists a FindUsagesHandlerFactory for the element.
