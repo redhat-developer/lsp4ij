@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.ide.structureView.StructureViewTreeElement;
+import com.intellij.openapi.editor.Document;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.DocumentSymbolData;
@@ -18,7 +19,9 @@ import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStruc
 import com.redhat.devtools.lsp4ij.server.capabilities.DocumentSymbolCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.DocumentSymbol;
+import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.SymbolKind;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -90,6 +93,20 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
     public @Nullable String getLocationString(@NotNull DocumentSymbol documentSymbol,
                                               @NotNull PsiFile psiFile) {
         return documentSymbol.getDetail();
+    }
+
+    public int getTextOffset(@NotNull DocumentSymbol documentSymbol,
+                             @NotNull PsiFile psiFile) {
+        SymbolKind symbolKind = documentSymbol.getKind();
+        // TODO: This works quite well without having to implement MethodNavigationOffsetProvider
+        if ((symbolKind == SymbolKind.Method) || (symbolKind == SymbolKind.Function)) {
+            Position startPosition = documentSymbol.getSelectionRange().getStart();
+            Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
+            if (document != null) {
+                return LSPIJUtils.toOffset(startPosition, document);
+            }
+        }
+        return 0;
     }
 
     public void navigate(@NotNull DocumentSymbol documentSymbol,
