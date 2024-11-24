@@ -99,7 +99,12 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
                              @NotNull PsiFile psiFile) {
         SymbolKind symbolKind = documentSymbol.getKind();
         // TODO: This works quite well without having to implement MethodNavigationOffsetProvider
-        if ((symbolKind == SymbolKind.Method) || (symbolKind == SymbolKind.Function)) {
+        if ((symbolKind == SymbolKind.Class) ||
+            (symbolKind == SymbolKind.Interface) ||
+            (symbolKind == SymbolKind.Enum) ||
+            (symbolKind == SymbolKind.Struct) ||
+            (symbolKind == SymbolKind.Method) ||
+            (symbolKind == SymbolKind.Function)) {
             Position startPosition = documentSymbol.getSelectionRange().getStart();
             Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
             if (document != null) {
