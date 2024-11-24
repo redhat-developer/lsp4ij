@@ -101,8 +101,7 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
      * reported as having a text offset.
      *
      * @param documentSymbol the document symbol
-     * @param psiFile the file
-     *
+     * @param psiFile        the file
      * @return the start of the symbol's selection range if valid; otherwise 0
      */
     public int getTextOffset(@NotNull DocumentSymbol documentSymbol,
@@ -110,11 +109,11 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
         SymbolKind symbolKind = documentSymbol.getKind();
         // TODO: This works quite well without having to implement MethodNavigationOffsetProvider
         if ((symbolKind == SymbolKind.Class) ||
-            (symbolKind == SymbolKind.Interface) ||
-            (symbolKind == SymbolKind.Enum) ||
-            (symbolKind == SymbolKind.Struct) ||
-            (symbolKind == SymbolKind.Method) ||
-            (symbolKind == SymbolKind.Function)) {
+                (symbolKind == SymbolKind.Interface) ||
+                (symbolKind == SymbolKind.Enum) ||
+                (symbolKind == SymbolKind.Struct) ||
+                (symbolKind == SymbolKind.Method) ||
+                (symbolKind == SymbolKind.Function)) {
             Range selectionRange = documentSymbol.getSelectionRange();
             Position startPosition = selectionRange != null ? selectionRange.getStart() : null;
             Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
