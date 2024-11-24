@@ -95,6 +95,15 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
         return documentSymbol.getDetail();
     }
 
+    /**
+     * Finds the text offset of the symbol as the start of its selection range. Only types and methods/functions are
+     * reported as having a text offset.
+     *
+     * @param documentSymbol the document symbol
+     * @param psiFile the file
+     *
+     * @return the start of the symbol's selection range if valid; otherwise 0
+     */
     public int getTextOffset(@NotNull DocumentSymbol documentSymbol,
                              @NotNull PsiFile psiFile) {
         SymbolKind symbolKind = documentSymbol.getKind();
