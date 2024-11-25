@@ -5,17 +5,26 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.8.0</h3>
+    <ul>
+      <li>Support for <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md#call-hierarchy">Call Hierarchy</a></li>
+      <li>Support for <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md#type-hierarchy">Type Hierarchy</a></li>
+      <li>Starting the language servers after all projects are indexed to ensure very good performance of the IntelliJ startup</li>
+      <li>Fixing bugs</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/8?closed=1">changelog</a>.
+
     <h3>0.7.0</h3>
     <ul>
-      <h1>Support for documentSelector in <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_registerCapability">registerCapability</a></1h>
-      <h1>Provide the <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md">LSP client features API</a></h1>
+      <li>Support for documentSelector in <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#client_registerCapability">registerCapability</a></li>
+      <li>Provide the <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md">LSP client features API</a></li>
     </ul>
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/7?closed=1">changelog</a>.
 
     <h3>0.6.0</h3>
     <ul>
-      <h1>Support for textDocument/documentSymbol</1h>
-      <h1>Provide a new way to connect to a language server with <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#osprocessstreamconnectionprovider">OSProcessStreamConnectionProvider</a></h1>
+      <li>Support for textDocument/documentSymbol</li>
+      <li>Provide a new way to connect to a language server with <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#osprocessstreamconnectionprovider">OSProcessStreamConnectionProvider</a></li>
       <li>Fixing bugs</li>
     </ul>
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/6?closed=1">changelog</a>.
