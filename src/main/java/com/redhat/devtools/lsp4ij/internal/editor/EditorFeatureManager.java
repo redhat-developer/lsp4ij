@@ -105,6 +105,10 @@ public class EditorFeatureManager implements Disposable {
                 })
                 .coalesceBy(file, featureType, clearLSPCache)
                 .finishOnUiThread(ModalityState.any(), context -> {
+                    if (context == null) {
+                        // No opened editors associated from any language servers.
+                        return;
+                    }
                     DaemonCodeAnalyzer.getInstance(project).restart(context.file());
                     for (var runnable : context.runnables()) {
                         runnable.run();

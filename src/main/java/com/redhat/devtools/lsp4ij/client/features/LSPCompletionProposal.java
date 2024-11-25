@@ -97,6 +97,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     @Override
     public void handleInsert(@NotNull InsertionContext context) {
+        updateCompletionItemFromResolved();
         Template template = null;
         if (item.getInsertTextFormat() == InsertTextFormat.Snippet) {
             // Insert text has snippet syntax, ex : ${1:name}
@@ -134,6 +135,26 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             if (popupController != null) {
                 popupController.autoPopupParameterInfo(editor, null);
             }
+        }
+    }
+
+    private void updateCompletionItemFromResolved() {
+        CompletionItem resolved = resolvedCompletionItemFuture != null ? resolvedCompletionItemFuture.getNow(null) : null;
+        if(resolved == null) {
+            return;
+        }
+        if (resolved.getInsertTextFormat() != null) {
+            item.setInsertTextFormat(resolved.getInsertTextFormat());
+        }
+        if (resolved.getInsertText() != null) {
+            // A sample use case is with typescript-language-server which updates insertText on resolve completion
+            // to insert function/method signature with snippet.
+            // Before resolve -> bar
+            // After resolve -> bar()$0
+            item.setInsertText(resolved.getInsertText());
+        }
+        if (resolved.getInsertTextMode() != null) {
+            item.setInsertTextMode(resolved.getInsertTextMode());
         }
     }
 
