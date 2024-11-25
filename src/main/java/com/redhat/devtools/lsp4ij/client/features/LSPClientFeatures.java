@@ -954,7 +954,6 @@ public class LSPClientFeatures implements Disposable {
      */
     @Override
     public void dispose() {
-        serverWrapper = null;
         if (callHierarchyFeature != null) {
             callHierarchyFeature.dispose();
         }

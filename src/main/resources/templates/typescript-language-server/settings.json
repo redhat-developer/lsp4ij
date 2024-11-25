@@ -1,4 +1,7 @@
 {
+  "completions": {
+    "completeFunctionCalls": true
+  },
   "typescript": {
     "inlayHints": {
       "includeInlayEnumMemberValueHints": true,
