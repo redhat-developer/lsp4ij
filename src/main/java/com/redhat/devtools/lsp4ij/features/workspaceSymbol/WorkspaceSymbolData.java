@@ -41,8 +41,7 @@ public class WorkspaceSymbolData implements NavigationItem {
     private final VirtualFile file;
     private final LSPItemPresentation presentation;
 
-    private record LSPItemPresentation(String name, SymbolKind symbolKind,
-                                       String locationString) implements ItemPresentation {
+    private record LSPItemPresentation(String name, SymbolKind symbolKind, String locationString) implements ItemPresentation {
 
         public String name() {
             return name;
@@ -114,7 +113,6 @@ public class WorkspaceSymbolData implements NavigationItem {
 
     /**
      * This code is a copy/paste from https://github.com/JetBrains/intellij-community/blob/22243811e3e8342918b5c064cbb94c7886d8e3ed/plugins/htmltools/src/com/intellij/htmltools/html/HtmlGotoSymbolProvider.java#L46
-     *
      * @param project
      * @param file
      * @return

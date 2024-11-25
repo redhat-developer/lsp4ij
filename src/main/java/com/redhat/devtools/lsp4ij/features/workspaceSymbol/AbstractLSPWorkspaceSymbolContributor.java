@@ -113,7 +113,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
     private @Nullable List<WorkspaceSymbolData> filter(@Nullable List<WorkspaceSymbolData> items) {
         if (items != null) {
             List<WorkspaceSymbolData> mutableItems = new ArrayList<>(items);
-            mutableItems.removeIf(item -> !accept(item));
+            mutableItems.removeIf(item -> (item != null) && !accept(item));
             return mutableItems;
         } else {
             return null;
