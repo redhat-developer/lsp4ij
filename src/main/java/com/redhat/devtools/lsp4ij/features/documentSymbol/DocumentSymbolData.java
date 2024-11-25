@@ -72,6 +72,11 @@ public class DocumentSymbolData extends FakePsiElement {
     }
 
     @Override
+    public int getTextOffset() {
+        return getClientFeatures().getDocumentSymbolFeature().getTextOffset(documentSymbol, psiFile);
+    }
+
+    @Override
     public void navigate(boolean requestFocus) {
         getClientFeatures().getDocumentSymbolFeature().navigate(documentSymbol, psiFile, requestFocus);
     }

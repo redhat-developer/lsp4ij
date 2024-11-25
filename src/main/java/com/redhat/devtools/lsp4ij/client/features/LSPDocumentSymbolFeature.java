@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.ide.structureView.StructureViewTreeElement;
+import com.intellij.openapi.editor.Document;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.DocumentSymbolData;
@@ -18,7 +19,10 @@ import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStruc
 import com.redhat.devtools.lsp4ij.server.capabilities.DocumentSymbolCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.DocumentSymbol;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.SymbolKind;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -90,6 +94,34 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
     public @Nullable String getLocationString(@NotNull DocumentSymbol documentSymbol,
                                               @NotNull PsiFile psiFile) {
         return documentSymbol.getDetail();
+    }
+
+    /**
+     * Finds the text offset of the symbol as the start of its selection range. Only types and methods/functions are
+     * reported as having a text offset.
+     *
+     * @param documentSymbol the document symbol
+     * @param psiFile        the file
+     * @return the start of the symbol's selection range if valid; otherwise 0
+     */
+    public int getTextOffset(@NotNull DocumentSymbol documentSymbol,
+                             @NotNull PsiFile psiFile) {
+        SymbolKind symbolKind = documentSymbol.getKind();
+        // TODO: This works quite well without having to implement MethodNavigationOffsetProvider
+        if ((symbolKind == SymbolKind.Class) ||
+                (symbolKind == SymbolKind.Interface) ||
+                (symbolKind == SymbolKind.Enum) ||
+                (symbolKind == SymbolKind.Struct) ||
+                (symbolKind == SymbolKind.Method) ||
+                (symbolKind == SymbolKind.Function)) {
+            Range selectionRange = documentSymbol.getSelectionRange();
+            Position startPosition = selectionRange != null ? selectionRange.getStart() : null;
+            Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
+            if ((startPosition != null) && (document != null)) {
+                return LSPIJUtils.toOffset(startPosition, document);
+            }
+        }
+        return 0;
     }
 
     public void navigate(@NotNull DocumentSymbol documentSymbol,
