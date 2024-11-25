@@ -366,8 +366,10 @@
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageTypeProvider"/>
 
         <!-- LSP workspace/symbol request support -->
-        <gotoSymbolContributor id="LSPWorkspaceSymbolContributor"
-                               implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceSymbolContributor"/>
+        <gotoClassContributor id="LSPWorkspaceGotoClassContributor"
+                              implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceGotoClassContributor"/>
+        <gotoSymbolContributor id="LSPWorkspaceGotoSymbolContributor"
+                               implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceGotoSymbolContributor"/>
 
         <!-- LSP textDocument/rename request support -->
         <renameHandler

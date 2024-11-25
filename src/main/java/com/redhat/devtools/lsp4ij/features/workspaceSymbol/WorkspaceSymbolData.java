@@ -32,15 +32,17 @@ import java.util.Optional;
 /**
  * LSP navigation item implementation.
  */
-public class WorkspaceSymbolData implements NavigationItem  {
+public class WorkspaceSymbolData implements NavigationItem {
 
+    private final SymbolKind symbolKind;
     private final String fileUri;
     private final Position position;
     private final Project project;
     private final VirtualFile file;
     private final LSPItemPresentation presentation;
 
-    private record LSPItemPresentation(String name, SymbolKind symbolKind, String locationString) implements ItemPresentation {
+    private record LSPItemPresentation(String name, SymbolKind symbolKind,
+                                       String locationString) implements ItemPresentation {
 
         public String name() {
             return name;
@@ -68,6 +70,7 @@ public class WorkspaceSymbolData implements NavigationItem  {
     }
 
     public WorkspaceSymbolData(String name, SymbolKind symbolKind, String fileUri, Position position, Project project) {
+        this.symbolKind = symbolKind;
         this.fileUri = fileUri;
         this.position = position;
         this.project = project;
@@ -78,6 +81,10 @@ public class WorkspaceSymbolData implements NavigationItem  {
 
     public VirtualFile getFile() {
         return file;
+    }
+
+    public @Nullable SymbolKind getSymbolKind() {
+        return symbolKind;
     }
 
     @Override
@@ -107,6 +114,7 @@ public class WorkspaceSymbolData implements NavigationItem  {
 
     /**
      * This code is a copy/paste from https://github.com/JetBrains/intellij-community/blob/22243811e3e8342918b5c064cbb94c7886d8e3ed/plugins/htmltools/src/com/intellij/htmltools/html/HtmlGotoSymbolProvider.java#L46
+     *
      * @param project
      * @param file
      * @return
