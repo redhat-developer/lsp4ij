@@ -139,8 +139,12 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     }
 
     private void updateCompletionItemFromResolved() {
-        CompletionItem resolved = resolvedCompletionItemFuture != null ? resolvedCompletionItemFuture.getNow(null) : null;
-        if(resolved == null) {
+        if (!completionContext.isResolveCompletionSupported() ||
+                !completionFeature.shouldResolveOnApply(item, file)) {
+            return;
+        }
+        CompletionItem resolved = getResolvedCompletionItem();
+        if (resolved == null) {
             return;
         }
         if (resolved.getInsertTextFormat() != null) {
@@ -169,7 +173,6 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                 && (template.getSegmentsCount() > 0 // There are some tabstops, e.g. $0, $1
                 || !template.getVariables().isEmpty()); // There are some placeholders, e.g ${1:name}
     }
-
 
     /**
      * Update the insert text with the given new value <code>newText</code>.
