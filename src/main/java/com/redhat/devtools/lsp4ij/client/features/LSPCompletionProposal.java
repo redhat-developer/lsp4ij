@@ -65,7 +65,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
 
-    private final CompletionItem item;
+    private CompletionItem item; // can be replaced with resolved
     private final PsiFile file;
 
     // offset where completion has been triggered
@@ -147,19 +147,12 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         if (resolved == null) {
             return;
         }
-        if (resolved.getInsertTextFormat() != null) {
-            item.setInsertTextFormat(resolved.getInsertTextFormat());
-        }
-        if (resolved.getInsertText() != null) {
-            // A sample use case is with typescript-language-server which updates insertText on resolve completion
-            // to insert function/method signature with snippet.
-            // Before resolve -> bar
-            // After resolve -> bar()$0
-            item.setInsertText(resolved.getInsertText());
-        }
-        if (resolved.getInsertTextMode() != null) {
-            item.setInsertTextMode(resolved.getInsertTextMode());
-        }
+        // Update completion item with resolved completion item.
+        // A sample use case is with typescript-language-server which updates insertText on resolve completion
+        // to insert function/method signature with snippet.
+        // Before resolve -> bar
+        // After resolve -> bar()$0
+        this.item = resolved;
     }
 
     /**
