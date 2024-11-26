@@ -104,7 +104,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     /**
      * Returns true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
      *
-     * @param file the file.
+     * @param file      the file.
      * @param charTyped the current typed character.
      * @return true if the given character is defined as "completion trigger" in the server capability of the language server and false otherwise.
      */
@@ -214,6 +214,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
 
     /**
      * Don't override this method, we need to revisit the API and the prefix computation (to customize it).
+     *
      * @param completionPrefix
      * @param result
      * @param lookupItem
@@ -243,6 +244,18 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         }
     }
 
+    /**
+     * Returns true if completion item must be resolved and false otherwise when completion item is applied.
+     *
+     * @param item the completion item which is applied.
+     * @param file the file.
+     * @return true if completion item must be resolved and false otherwise when completion item is applied.
+     */
+    public boolean shouldResolveOnApply(@NotNull CompletionItem item,
+                                        @NotNull PsiFile file) {
+        return true;
+    }
+
     public CompletionCapabilityRegistry getCompletionCapabilityRegistry() {
         if (completionCapabilityRegistry == null) {
             initCompletionCapabilityRegistry();
@@ -261,7 +274,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
 
     @Override
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
-        if(completionCapabilityRegistry != null) {
+        if (completionCapabilityRegistry != null) {
             completionCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
     }
