@@ -11,19 +11,11 @@
 package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * LSP workspace goto symbol contributor.
  */
 public class LSPWorkspaceGotoSymbolContributor extends AbstractLSPWorkspaceSymbolContributor {
-
-    private final static Logger LOGGER = LoggerFactory.getLogger(LSPWorkspaceGotoSymbolContributor.class);
-
-    public LSPWorkspaceGotoSymbolContributor() {
-        super(LOGGER);
-    }
 
     @Override
     protected boolean accept(@NotNull WorkspaceSymbolData item) {

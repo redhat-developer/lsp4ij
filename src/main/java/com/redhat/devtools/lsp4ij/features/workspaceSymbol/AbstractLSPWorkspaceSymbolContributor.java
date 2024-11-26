@@ -24,6 +24,7 @@ import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,11 +40,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  */
 abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameContributorEx {
 
-    private final Logger LOGGER;
-
-    protected AbstractLSPWorkspaceSymbolContributor(@NotNull Logger logger) {
-        this.LOGGER = logger;
-    }
+    private final static Logger LOGGER = LoggerFactory.getLogger(AbstractLSPWorkspaceSymbolContributor.class);
 
     @Override
     public void processNames(@NotNull Processor<? super String> processor,
