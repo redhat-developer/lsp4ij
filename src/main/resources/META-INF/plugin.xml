@@ -277,6 +277,11 @@
                 id="LSPHighlightUsagesHandlerFactory"
                 implementation="com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightUsagesHandlerFactory"/>
 
+        <!-- A target element evaluator that returns a fake PSI element for the highlighted identifier at the caret -->
+        <targetElementEvaluator
+                language=""
+                implementationClass="com.redhat.devtools.lsp4ij.features.highlight.LSPTargetElementEvaluator"/>
+
         <!-- LSP textDocument/codeLens request support -->
         <codeInsight.codeVisionProviderFactory
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.DummyCodeVisionProviderFactory"/>
@@ -380,6 +385,10 @@
                               implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceGotoClassContributor"/>
         <gotoSymbolContributor id="LSPWorkspaceGotoSymbolContributor"
                                implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceGotoSymbolContributor"/>
+
+        <!-- LSP textDocument/implementation support -->
+        <definitionsScopedSearch
+                implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceImplementationsSearch"/>
 
         <!-- LSP textDocument/rename request support -->
         <renameHandler

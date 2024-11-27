@@ -50,11 +50,11 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPHighlightUsagesHandlerFactory.class);
 
     @Override
-    public @Nullable HighlightUsagesHandlerBase createHighlightUsagesHandler(@NotNull Editor editor, @NotNull PsiFile file) {
+    public @Nullable HighlightUsagesHandlerBase<LSPHighlightPsiElement> createHighlightUsagesHandler(@NotNull Editor editor, @NotNull PsiFile file) {
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
             return null;
         }
-        if (ProjectIndexingManager.getInstance(file.getProject()).isIndexingAll()) {
+        if (ProjectIndexingManager.isIndexingAll()) {
             return null;
         }
         List<LSPHighlightPsiElement> targets = getTargets(editor, file);
