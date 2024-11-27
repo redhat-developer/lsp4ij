@@ -139,6 +139,12 @@ public class LSPCompletionContributor extends CompletionContributor {
                 completionFeature.addLookupItem(context, completionPrefix, result, lookupItem, size - i, item);
             }
         }
+
+        // If completions were added from LSP and this is auto-completion or the explicit completion trigger was typed
+        // only once, don't show completions from other contributors, specifically the word completion contributor
+        if ((size > 0) && (parameters.getInvocationCount() < 2)) {
+            result.stopHere();
+        }
     }
 
     protected void updateWithItemDefaults(@NotNull CompletionItem item,
