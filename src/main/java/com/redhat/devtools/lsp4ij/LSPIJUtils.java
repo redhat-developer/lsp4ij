@@ -1197,4 +1197,28 @@ public class LSPIJUtils {
         }
         return project.getName();
     }
+
+    /**
+     * Extracts the most specific location information from the provided list of locations or location links.
+     *
+     * @param locations the locations/links
+     * @return the most specific location information that was found based on the provided locations/links
+     */
+    public static @NotNull List<Location> getLocations(@Nullable Either<List<? extends Location>, List<? extends LocationLink>> locations) {
+        if (locations == null) {
+            // textDocument/definition may return null
+            return Collections.emptyList();
+        }
+        if (locations.isLeft()) {
+            return locations.getLeft()
+                    .stream()
+                    .map(l -> new Location(l.getUri(), l.getRange()))
+                    .toList();
+
+        }
+        return locations.getRight()
+                .stream()
+                .map(l -> new Location(l.getTargetUri(), l.getTargetSelectionRange() != null ? l.getTargetSelectionRange() : l.getTargetRange()))
+                .toList();
+    }
 }
