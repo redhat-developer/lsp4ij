@@ -236,7 +236,7 @@
                 id="LSPCompletionContributor"
                 language="any"
                 implementationClass="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor"
-                order="first"/>
+                order="first, before wordCompletion"/>
 
         <!-- LSP textDocument/definition request support -->
         <gotoDeclarationHandler
