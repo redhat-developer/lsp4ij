@@ -16,6 +16,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
@@ -43,7 +44,10 @@ public class LSPGoToDeclarationAction extends AbstractLSPGoToAction {
     }
 
     @Override
-    protected CompletableFuture<List<Location>> getLocations(PsiFile psiFile, Document document, Editor editor, int offset) {
+    protected CompletableFuture<List<Location>> getLocations(@NotNull PsiFile psiFile,
+                                                             @NotNull Document document,
+                                                             @NotNull Editor editor,
+                                                             int offset) {
         LSPDeclarationSupport declarationSupport = LSPFileSupport.getSupport(psiFile).getDeclarationSupport();
         var params = new LSPDeclarationParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<Location>> declarationsFuture = declarationSupport.getDeclarations(params);
@@ -66,4 +70,9 @@ public class LSPGoToDeclarationAction extends AbstractLSPGoToAction {
         return clientFeatures.getDeclarationFeature().isDeclarationSupported(file);
     }
 
+    @Override
+    protected @NotNull String getProgressTitle(@NotNull PsiFile psiFile,
+                                               int offset) {
+        return LanguageServerBundle.message("lsp.goto.declaration.progress.title", psiFile.getName(), offset);
+    }
 }
