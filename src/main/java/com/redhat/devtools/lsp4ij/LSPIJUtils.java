@@ -1251,7 +1251,7 @@ public class LSPIJUtils {
      *
      * @param file   the file
      * @param editor the editor
-     * @return the token at the specified current offset in the file and editor, or null if no token is found
+     * @return the token at the specified current caret in the file and editor, or null if no token is found
      */
     public static @Nullable TextRange getTokenTextRange(@NotNull PsiFile file, @NotNull Editor editor) {
         return getTokenTextRange(file, editor, editor.getCaretModel().getOffset());
