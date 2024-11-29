@@ -53,7 +53,7 @@ public class IndexAwareLanguageClient extends LanguageClientImpl {
      * @return the output of the function code
      */
     protected <R> CompletableFuture<R> runAsBackground(String progressTitle, Function<ProgressIndicator, R> code, Object coalesceBy) {
-       var waitForIndexing = ProjectIndexingManager.waitForIndexingAll();
+       var waitForIndexing = ProjectIndexingManager.getInstance(getProject()).waitForIndexing();
        var future =  new LSPCompletableFuture<>(code, progressTitle, IndexAwareLanguageClient.this, coalesceBy);
        var root = waitForIndexing
                .thenComposeAsync(unused -> future);

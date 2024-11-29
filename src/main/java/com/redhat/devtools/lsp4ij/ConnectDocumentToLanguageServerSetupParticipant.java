@@ -44,7 +44,8 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // Wait for indexing is finished and read action is enabled
         // --> force the start of all languages servers mapped with the given file when indexing is finished and read action is allowed
         ProjectIndexingManager
-                .waitForIndexingAll()
+                .getInstance(project)
+                .waitForIndexing()
                 .thenApplyAsync(unused -> {
                     connectToLanguageServer(file, project);
                     return null;

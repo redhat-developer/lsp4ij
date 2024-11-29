@@ -76,7 +76,7 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
         }
 
         private @NotNull Collection<StructureViewTreeElement> collectElements(@NotNull PsiFile psiFile) {
-            if(ProjectIndexingManager.getInstance(psiFile.getProject()).isIndexingAll()) {
+            if(ProjectIndexingManager.getInstance(psiFile.getProject()).isIndexing()) {
                 return Collections.emptyList();
             }
             LSPDocumentSymbolSupport documentSymbolSupport = LSPFileSupport.getSupport(psiFile).getDocumentSymbolSupport();

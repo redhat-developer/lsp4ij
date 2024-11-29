@@ -54,7 +54,7 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
             return null;
         }
-        if (ProjectIndexingManager.getInstance(file.getProject()).isIndexingAll()) {
+        if (ProjectIndexingManager.getInstance(file.getProject()).isIndexing()) {
             return null;
         }
         List<LSPHighlightPsiElement> targets = getTargets(editor, file);

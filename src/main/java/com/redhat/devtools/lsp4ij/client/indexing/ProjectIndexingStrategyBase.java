@@ -54,7 +54,7 @@ public abstract class ProjectIndexingStrategyBase {
         }
         ProjectIndexingManager manager = ProjectIndexingManager.getInstance(project);
         manager.scanning = false;
-        refreshEditorsFeaturesIfNeeded(manager);
+       // refreshEditorsFeaturesIfNeeded(manager);
     }
 
     /**
@@ -86,7 +86,7 @@ public abstract class ProjectIndexingStrategyBase {
         }
         ProjectIndexingManager manager = ProjectIndexingManager.getInstance(project);
         manager.dumbIndexing = false;
-        refreshEditorsFeaturesIfNeeded(manager);
+        //refreshEditorsFeaturesIfNeeded(manager);
     }
 
     private void refreshEditorsFeaturesIfNeeded(ProjectIndexingManager manager) {

@@ -11,11 +11,12 @@
 package com.redhat.devtools.lsp4ij.client.indexing;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
@@ -23,6 +24,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArraySet;
 
@@ -42,6 +44,8 @@ public class ProjectIndexingManager implements Disposable {
     boolean scanning;
     final Set<VirtualFile> filesToRefresh;
 
+    private CompletableFuture<Void> waitForIndexingFuture;
+
     private static CompletableFuture<Void> waitForIndexingAllFuture;
 
     ProjectIndexingManager(@NotNull Project project) {
@@ -58,7 +62,7 @@ public class ProjectIndexingManager implements Disposable {
     }
 
     public boolean isIndexing() {
-        return scanning || dumbIndexing || DumbService.isDumb(project);
+        return waitForIndexingFuture == null || !waitForIndexingFuture.isDone(); //scanning || dumbIndexing || DumbService.isDumb(project);
     }
 
     /**
@@ -68,11 +72,11 @@ public class ProjectIndexingManager implements Disposable {
      */
     public static boolean isIndexingAll() {
         for (var project : ProjectManager.getInstance().getOpenProjects()) {
-            if (isIndexing(project)) {
-                return true;
+            if (!isIndexing(project)) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     @Override
@@ -82,7 +86,35 @@ public class ProjectIndexingManager implements Disposable {
         }
     }
 
-    public static CompletableFuture<Void> waitForIndexingAll() {
+    public CompletableFuture<Void> waitForIndexing() {
+        if (shouldInitialize2()) {
+            return initialize2(project);
+        }
+        return waitForIndexingFuture;
+    }
+
+    private boolean shouldInitialize2() {
+        return waitForIndexingFuture == null || waitForIndexingFuture.isDone();
+    }
+
+    private synchronized CompletableFuture<Void> initialize2(Project project) {
+        if (!shouldInitialize2()) {
+            return waitForIndexingFuture;
+        }
+        CompletableFuture<Void>  waitForIndexingFuture = new CompletableFuture<>();
+        ReadAction.nonBlocking((Callable<Void>) () -> {
+            waitForIndexingFuture.complete(null);
+                    return null;
+                }).inSmartMode(project)
+                .submit(AppExecutorUtil.getAppExecutorService());
+        this.waitForIndexingFuture = waitForIndexingFuture;
+        return waitForIndexingFuture;
+    }
+
+
+
+
+        public static CompletableFuture<Void> waitForIndexingAll() {
         if (shouldInitialize()) {
             return initialize();
         }
@@ -97,6 +129,7 @@ public class ProjectIndexingManager implements Disposable {
         if (!shouldInitialize()) {
             return waitForIndexingAllFuture;
         }
+
         waitForIndexingAllFuture = CompletableFutures.computeAsync(cancelChecker -> {
             while (isIndexingAll()) {
                 try {
@@ -138,7 +171,7 @@ public class ProjectIndexingManager implements Disposable {
             return ExecuteLSPFeatureStatus.NOT;
         }
         ProjectIndexingManager manager = getInstance(project);
-        if (manager.isIndexingAll()) {
+        if (manager.isIndexing()) {
             // The file is associated to a language server, but the project is indexing
             // Execute the LSP feature when the project indexing process is finished.
             manager.filesToRefresh.add(file);
