@@ -125,6 +125,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
+* [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md) 
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 
 If the template directory contains a `README.md` file, you can open the instructions by pressing the help icon.

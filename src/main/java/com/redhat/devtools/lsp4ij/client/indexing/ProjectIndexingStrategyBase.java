@@ -8,46 +8,84 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.client;
+package com.redhat.devtools.lsp4ij.client.indexing;
 
-import com.intellij.util.indexing.diagnostic.ProjectDumbIndexingHistory;
-import com.intellij.util.indexing.diagnostic.ProjectIndexingActivityHistoryListener;
-import com.intellij.util.indexing.diagnostic.ProjectScanningHistory;
+import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
 
 /**
- * {@link ProjectIndexingActivityHistoryListener} implementation to track project indexing process (dum, scannings files, etc).
+ * Base class strategy to track project indexing state (start/end of dumb, files indexing).
  */
 @ApiStatus.Internal
-public class ProjectIndexingListener implements ProjectIndexingActivityHistoryListener {
+public abstract class ProjectIndexingStrategyBase {
 
-    @Override
-    public void onStartedDumbIndexing(@NotNull ProjectDumbIndexingHistory history) {
-        ProjectIndexingManager.getInstance(history.getProject()).dumbIndexing = true;
+
+    /**
+     * On started scanning files.
+     *
+     * @param project the project.
+     */
+    protected final void onStartedScanning(@Nullable Project project) {
+        if (project == null) {
+            return;
+        }
+        ProjectIndexingManager.getInstance(project).scanning = true;
     }
 
-    @Override
-    public void onFinishedDumbIndexing(@NotNull ProjectDumbIndexingHistory history) {
-        ProjectIndexingManager manager = ProjectIndexingManager.getInstance(history.getProject());
-        manager.dumbIndexing = false;
+    /**
+     * On finished scanning files.
+     * <p>
+     * If all projects have finished their dumb and scanning files,
+     * the language servers associated with the opened files of the project are started
+     * and the opened editors are refreshed to display some LSP features like CodeLens, InlayHint, Folding.
+     * </p>
+     *
+     * @param project the project.
+     */
+    protected final void onFinishedScanning(@Nullable Project project) {
+        if (project == null) {
+            return;
+        }
+        ProjectIndexingManager manager = ProjectIndexingManager.getInstance(project);
+        manager.scanning = false;
         refreshEditorsFeaturesIfNeeded(manager);
     }
 
-    @Override
-    public void onStartedScanning(@NotNull ProjectScanningHistory history) {
-        ProjectIndexingManager.getInstance(history.getProject()).scanning = true;
+    /**
+     * On started dumb indexing.
+     *
+     * @param project the project.
+     */
+    protected final void onStartedDumbIndexing(@Nullable Project project) {
+        if (project == null) {
+            return;
+        }
+        ProjectIndexingManager.getInstance(project).dumbIndexing = true;
     }
 
-    @Override
-    public void onFinishedScanning(@NotNull ProjectScanningHistory history) {
-        ProjectIndexingManager manager = ProjectIndexingManager.getInstance(history.getProject());
-        manager.scanning = false;
+    /**
+     * On finished dumb indexing.
+     *
+     * <p>
+     * If all projects have finished their dumb and scanning files,
+     * the language servers associated with the opened files of the project are started
+     * and the opened editors are refreshed to display some LSP features like CodeLens, InlayHint, Folding.
+     * </p>
+     *
+     * @param project the project.
+     */
+    protected final void onFinishedDumbIndexing(@Nullable Project project) {
+        if (project == null) {
+            return;
+        }
+        ProjectIndexingManager manager = ProjectIndexingManager.getInstance(project);
+        manager.dumbIndexing = false;
         refreshEditorsFeaturesIfNeeded(manager);
     }
 
