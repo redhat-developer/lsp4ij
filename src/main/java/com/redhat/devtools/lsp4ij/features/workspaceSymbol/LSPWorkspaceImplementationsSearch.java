@@ -32,7 +32,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
-import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationParams;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
