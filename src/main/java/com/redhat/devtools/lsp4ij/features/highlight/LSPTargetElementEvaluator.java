@@ -36,8 +36,8 @@ public class LSPTargetElementEvaluator extends TargetElementEvaluatorEx2 {
             return null;
         }
 
-        // Try to find the token at the caret and return fake PSI element for it
-        TextRange tokenTextRange = LSPIJUtils.getTokenTextRange(file, editor, offset);
-        return tokenTextRange != null ? new LSPPsiElement(file, tokenTextRange) : null;
+        // Try to find the word at the caret and return a fake PSI element for it
+        TextRange targetTextRange = LSPIJUtils.getWordRangeAt(editor.getDocument(), file, offset);
+        return targetTextRange != null ? new LSPPsiElement(file, targetTextRange) : null;
     }
 }

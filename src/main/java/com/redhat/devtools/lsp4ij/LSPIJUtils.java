@@ -1221,39 +1221,4 @@ public class LSPIJUtils {
                 .map(l -> new Location(l.getTargetUri(), l.getTargetSelectionRange() != null ? l.getTargetSelectionRange() : l.getTargetRange()))
                 .toList();
     }
-
-    /**
-     * Finds the text range of the token at the specified offset in the provided file and editor.
-     *
-     * @param file   the file
-     * @param editor the editor
-     * @param offset the offset within the file
-     * @return the token at the specified offset in the file and editor, or null if no token is found
-     */
-    public static @Nullable TextRange getTokenTextRange(@NotNull PsiFile file, @NotNull Editor editor, int offset) {
-        Document document = editor.getDocument();
-        if ((offset < 0) ||
-                (offset > document.getTextLength()) ||
-                (offset > file.getTextLength()) /* PsiFile and document could have different contents */) {
-            return null;
-        }
-        // Try to get the token range (ex : foo.ba|r() --> foo.[bar]())
-        TextRange tokenTextRange = getWordRangeAt(document, file, offset);
-        if (tokenTextRange == null) {
-            // Get range only for the offset
-            tokenTextRange = new TextRange(offset > 0 ? offset - 1 : offset, offset);
-        }
-        return tokenTextRange;
-    }
-
-    /**
-     * Finds the text range of the token at the current caret in the provided file and editor.
-     *
-     * @param file   the file
-     * @param editor the editor
-     * @return the token at the specified current caret in the file and editor, or null if no token is found
-     */
-    public static @Nullable TextRange getTokenTextRange(@NotNull PsiFile file, @NotNull Editor editor) {
-        return getTokenTextRange(file, editor, editor.getCaretModel().getOffset());
-    }
 }
