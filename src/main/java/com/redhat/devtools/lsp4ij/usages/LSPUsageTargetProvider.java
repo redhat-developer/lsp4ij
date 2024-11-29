@@ -63,11 +63,11 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
 
     @NotNull
     private static UsageTarget[] getLSPTargets(@NotNull Editor editor, @NotNull PsiFile file) {
-        TextRange tokenTextRange = LSPIJUtils.getTokenTextRange(file, editor);
-        if (tokenTextRange == null) {
+        TextRange targetTextRange = LSPIJUtils.getWordRangeAt(editor.getDocument(), file, editor.getCaretModel().getOffset());
+        if (targetTextRange == null) {
             return UsageTarget.EMPTY_ARRAY;
         }
-        LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, tokenTextRange);
+        LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, targetTextRange);
         // force to compute of the name by using token range
         triggeredElement.getName();
         UsageTarget target = new PsiElement2UsageTargetAdapter(triggeredElement, true);
