@@ -379,6 +379,10 @@
         <definitionsScopedSearch
                 implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceImplementationsSearch"/>
 
+        <!-- LSP textDocument/typeDefinition support -->
+        <typeDeclarationProvider
+                implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceTypeDeclarationProvider"/>
+
         <!-- LSP textDocument/rename request support -->
         <renameHandler
                 id="LSPRenameHandler"
