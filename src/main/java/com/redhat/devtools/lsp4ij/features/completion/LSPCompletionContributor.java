@@ -10,15 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.completion;
 
-import com.intellij.codeInsight.completion.CompletionContributor;
-import com.intellij.codeInsight.completion.CompletionParameters;
-import com.intellij.codeInsight.completion.CompletionResultSet;
+import com.intellij.codeInsight.completion.*;
 import com.intellij.codeInsight.lookup.*;
 import com.intellij.codeInsight.lookup.impl.LookupImpl;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
@@ -142,20 +141,45 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
 
         // If completions were added from LSP and this is auto-completion or the explicit completion trigger was typed
-        // only once, add completions from other contributors carefully to avoid duplicates, specifically from the word
-        // completion contributor
+        // only once, add completions from other all other contributors except for the word completion contributor.
+        // Note that the word completion contributor only really kicks in when LSP completions are added in the context
+        // of a TextMate file (see TextMateCompletionContributor), but that's going to be very common for LSP usage
+        // since it's often adding (pseudo-)language support when not already present in the host JetBrains IDE.
         if ((size > 0) && (parameters.getInvocationCount() < 2)) {
+            // Stop standard processing
             result.stopHere();
-            result.runRemainingContributors(parameters, completionResult -> {
-                LookupElement lookupElement = completionResult.getLookupElement();
-                if (lookupElement != null) {
-                    String lookupString = lookupElement.getLookupString();
-                    if (!addedLookupStrings.contains(lookupString)) {
-                        result.consume(lookupElement);
-                        addedLookupStrings.add(lookupString);
-                    }
+
+            // Try to disable word completion by temporarily setting FORBID_WORD_COMPLETION=true on the completion process
+            CompletionProcess completionProcess = parameters.getProcess();
+            UserDataHolder userDataHolder = completionProcess instanceof UserDataHolder ? (UserDataHolder) completionProcess : null;
+            boolean originalForbidWordCompletion = false;
+            if (userDataHolder != null) {
+                originalForbidWordCompletion = userDataHolder.getUserData(BaseCompletionService.FORBID_WORD_COMPLETION) == Boolean.TRUE;
+                userDataHolder.putUserData(BaseCompletionService.FORBID_WORD_COMPLETION, true);
+            }
+            try {
+                if (userDataHolder != null) {
+                    // If we disabled word completion, just run all remaining contributors
+                    result.runRemainingContributors(parameters, true);
+                } else {
+                    // If not, run all remaining contributors and only add results with distinct lookup strings
+                    result.runRemainingContributors(parameters, completionResult -> {
+                        LookupElement lookupElement = completionResult.getLookupElement();
+                        if (lookupElement != null) {
+                            String lookupString = lookupElement.getLookupString();
+                            if (!addedLookupStrings.contains(lookupString)) {
+                                result.consume(lookupElement);
+                                addedLookupStrings.add(lookupString);
+                            }
+                        }
+                    });
                 }
-            });
+            } finally {
+                // If appropriate, re-enable word completion
+                if (userDataHolder != null) {
+                    userDataHolder.putUserData(BaseCompletionService.FORBID_WORD_COMPLETION, originalForbidWordCompletion);
+                }
+            }
         }
     }
 
