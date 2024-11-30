@@ -21,13 +21,14 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
-import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -35,9 +36,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -125,6 +124,7 @@ public class LSPCompletionContributor extends CompletionContributor {
         items.sort(completionProposalComparator);
         int size = items.size();
 
+        Set<String> addedLookupStrings = new HashSet<>();
         var completionFeature = languageServer.getClientFeatures().getCompletionFeature();
         LSPCompletionFeature.LSPCompletionContext context = new LSPCompletionFeature.LSPCompletionContext(parameters, languageServer);
         // Items now sorted by priority, low index == high priority
@@ -137,13 +137,25 @@ public class LSPCompletionContributor extends CompletionContributor {
             LookupElement lookupItem = completionFeature.createLookupElement(item, context);
             if (lookupItem != null) {
                completionFeature.addLookupItem(completionPrefix, result, lookupItem, size- i, item);
+                ContainerUtil.addIfNotNull(addedLookupStrings, lookupItem.getLookupString());
             }
         }
 
         // If completions were added from LSP and this is auto-completion or the explicit completion trigger was typed
-        // only once, don't show completions from other contributors, specifically the word completion contributor
+        // only once, add completions from other contributors carefully to avoid duplicates, specifically from the word
+        // completion contributor
         if ((size > 0) && (parameters.getInvocationCount() < 2)) {
             result.stopHere();
+            result.runRemainingContributors(parameters, completionResult -> {
+                LookupElement lookupElement = completionResult.getLookupElement();
+                if (lookupElement != null) {
+                    String lookupString = lookupElement.getLookupString();
+                    if (!addedLookupStrings.contains(lookupString)) {
+                        result.consume(lookupElement);
+                        addedLookupStrings.add(lookupString);
+                    }
+                }
+            });
         }
     }
 
