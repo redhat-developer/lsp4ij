@@ -87,8 +87,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
     public void testNoHoverWithEmptyContents() {
         assertHover("test.ts",
                 """
-                        const s = "";
-                        s.c<caret>harAt(0);
+                        const s = "";<caret>
+                        s.charAt(0);
                         """,
                 """
                                 {
@@ -100,8 +100,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
 
         assertHover("test.ts",
                 """
-                        const s = "";
-                        s.c<caret>harAt(0);
+                        const s = "";<caret>
+                        s.charAt(0);
                         """,
                 """
                                 {
@@ -115,8 +115,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
     public void testNoHoverWithInvalidMarkupContent() {
         assertHover("test.ts",
                 """
-                        const s = "";
-                        s.c<caret>harAt(0);
+                        const s = "";<caret>
+                        s.charAt(0);
                         """,
                 """
                                 {
@@ -143,8 +143,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
     public void testNoHoverWithInvalidMarkedString() {
         assertHover("test.ts",
                 """
-                        const s = "";
-                        s.c<caret>harAt(0);
+                        const s = "";<caret>
+                        s.charAt(0);
                         """,
                 """
                         {
@@ -160,5 +160,4 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                 null
         );
     }
-
 }
