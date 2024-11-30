@@ -25,6 +25,7 @@ import java.util.List;
  */
 public class LSPSettingsJsonSchemaProviderFactory implements JsonSchemaProviderFactory {
     private static final LSP4IJJsonSchemaFileProvider[] JSON_SCHEMA_FILE_PROVIDERS = new LSP4IJJsonSchemaFileProvider[]{
+            new CssLanguageServerConfigurationJsonSchemaFileProvider(),
             new TypeScriptLanguageServerConfigurationJsonSchemaFileProvider()
     };
 
