@@ -25,7 +25,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
-import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
 import org.eclipse.lsp4j.*;

@@ -16,6 +16,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
@@ -66,4 +67,9 @@ public class LSPGoToTypeDefinitionAction extends AbstractLSPGoToAction {
         return clientFeatures.getTypeDefinitionFeature().isTypeDefinitionSupported(file);
     }
 
+    @Override
+    protected @NotNull String getProgressTitle(@NotNull PsiFile psiFile,
+                                               int offset) {
+        return LanguageServerBundle.message("lsp.goto.typeDefinition.progress.title", psiFile.getName(), offset);
+    }
 }

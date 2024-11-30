@@ -21,7 +21,7 @@ import com.intellij.ui.layout.LCFlags;
 import com.intellij.ui.layout.LayoutKt;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
-import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;

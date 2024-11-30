@@ -18,7 +18,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
