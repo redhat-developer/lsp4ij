@@ -664,4 +664,11 @@
                   topic="com.intellij.openapi.project.DumbService$DumbModeListener"/>
     </projectListeners>
 
+    <!-- Bundled language server JSON schema definitions -->
+    <depends optional="true">com.intellij.modules.json</depends>
+    <extensions defaultExtensionNs="JavaScript.JsonSchema">
+        <ProviderFactory
+                implementation="com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPSettingsJsonSchemaProviderFactory"/>
+    </extensions>
+
 </idea-plugin>
