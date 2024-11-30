@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.features.implementation;
 
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
@@ -19,7 +20,6 @@ import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -83,23 +83,6 @@ public class LSPImplementationSupport extends AbstractLSPDocumentFeatureSupport<
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .implementation(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION)
-                .thenApplyAsync(locations -> {
-                    if (locations == null) {
-                        // textDocument/implementation may return null
-                        return Collections.emptyList();
-                    }
-                    if (locations.isLeft()) {
-                        return locations.getLeft()
-                                .stream()
-                                .map(l -> new Location(l.getUri(), l.getRange()))
-                                .toList();
-
-                    }
-                    return locations.getRight()
-                            .stream()
-                            .map(l -> new Location(l.getTargetUri(), l.getTargetRange()))
-                            .toList();
-                });
+                .thenApplyAsync(LSPIJUtils::getLocations);
     }
-
 }

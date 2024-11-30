@@ -12,21 +12,27 @@ package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.codeInsight.TargetElementUtil;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
-import com.redhat.devtools.lsp4ij.client.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LSPUsagesManager;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -72,20 +78,30 @@ public abstract class AbstractLSPGoToAction extends AnAction {
         }
         // Consume LSP 'textDocument/implementation' request
         int offset = TargetElementUtil.adjustOffset(psiFile, document, editor.getCaretModel().getOffset());
-        CompletableFuture<List<Location>> locationsFuture = getLocations(psiFile, document, editor, offset);
 
-        if (isDoneNormally(locationsFuture)) {
-            // textDocument/implementations has been collected correctly
-            List<Location> locations = locationsFuture.getNow(null);
-            if (locations != null) {
-                DataContext dataContext = e.getDataContext();
-                // Call "Find Usages" in popup mode.
-                LSPUsagesManager.getInstance(project).findShowUsagesInPopup(locations, usageType, dataContext, null);
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, getProgressTitle(psiFile, offset), true) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                List<Location> locations = null;
+                try {
+                    CompletableFuture<List<Location>> locationsFuture = getLocations(psiFile, document, editor, offset);
+
+                    if (isDoneNormally(locationsFuture)) {
+                        // textDocument/(declaration|implementation|references|typeDefinition) has been collected correctly
+                        locations = locationsFuture.getNow(null);
+                    }
+                } finally {
+                    final List<Location> resultLocations = locations != null ? locations : Collections.emptyList();
+                    DataContext dataContext = e.getDataContext();
+                    // Call "Find Usages" in popup mode.
+                    ApplicationManager.getApplication()
+                            .invokeLater(() ->
+                                    LSPUsagesManager.getInstance(project).findShowUsagesInPopup(resultLocations, usageType, dataContext, null)
+                            );
+                }
             }
-        }
+        });
     }
-
-    protected abstract CompletableFuture<List<Location>> getLocations(PsiFile psiFile, Document document, Editor editor, int offset);
 
     @Override
     public final void update(@NotNull AnActionEvent e) {
@@ -112,7 +128,40 @@ public abstract class AbstractLSPGoToAction extends AnAction {
                 .hasAny(file.getVirtualFile(), ls -> canSupportFeature(ls.getClientFeatures(), file));
     }
 
-    protected abstract boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file);
+
+    /**
+     * Returns the progress title used by the task monitor which execute the LSP GoTo feature.
+     *
+     * @param psiFile the Psi file.
+     * @param offset  the offset.
+     * @return the progress title used by the task monitor which execute the LSP GoTo feature.
+     */
+    protected abstract @NlsContexts.ProgressTitle @NotNull String getProgressTitle(@NotNull PsiFile psiFile,
+                                                                                   int offset);
+
+    /**
+     * Returns the LSP {@link Location} list result of the execution of the LSP GoTo feature.
+     *
+     * @param psiFile  the Psi file.
+     * @param document the document.
+     * @param editor   the editor.
+     * @param offset   the offset.
+     * @return the LSP {@link Location} list result of the execution of the LSP GoTo feature.
+     */
+    protected abstract CompletableFuture<List<Location>> getLocations(@NotNull PsiFile psiFile,
+                                                                      @NotNull Document document,
+                                                                      @NotNull Editor editor,
+                                                                      int offset);
+
+    /**
+     * Returns true if the action is supported by the client features of the language server and false otherwise.
+     *
+     * @param clientFeatures the client features.
+     * @param file           the Psi file.
+     * @return true if the action is supported by the client features of the language server and false otherwise.
+     */
+    protected abstract boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures,
+                                                 @NotNull PsiFile file);
 
     @Override
     public final @NotNull ActionUpdateThread getActionUpdateThread() {

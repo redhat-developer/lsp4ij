@@ -195,6 +195,8 @@
         <backgroundPostStartupActivity implementation="com.redhat.devtools.lsp4ij.internal.LSPPostStartupActivity"/>
         <!-- LSP application services -->
         <applicationService
+                serviceImplementation="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingDumbAndScanningStrategy"/>
+        <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry"/>
@@ -207,8 +209,7 @@
 
         <!-- LSP project services -->
         <projectService
-                serviceImplementation="com.redhat.devtools.lsp4ij.client.ProjectIndexingManager"/>
-        <projectIndexingActivityHistoryListener implementation="com.redhat.devtools.lsp4ij.client.ProjectIndexingListener" />
+                serviceImplementation="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServerManager"/>
         <projectService
@@ -652,6 +653,8 @@
         <listener
                 topic="com.intellij.openapi.project.ProjectManagerListener"
                 class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+        <listener topic="com.intellij.ide.AppLifecycleListener"
+                  class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingAppLifecycleListener" />
     </applicationListeners>
 
     <projectListeners>
@@ -659,6 +662,8 @@
                   class="com.redhat.devtools.lsp4ij.features.refactoring.LSPRefactoringListener"/>
         <listener topic="com.intellij.codeInsight.lookup.LookupManagerListener"
                   class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener"/>
+        <listener class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingOnlyDumbStrategy"
+                  topic="com.intellij.openapi.project.DumbService$DumbModeListener"/>
     </projectListeners>
 
 </idea-plugin>
