@@ -79,7 +79,7 @@ public class LanguageServerPanel {
 
     private void createUI(FormBuilder builder, JComponent description, EditionMode mode) {
         JBTabbedPane tabbedPane = new JBTabbedPane();
-        builder.addComponent(tabbedPane);
+        builder.addComponentFillVertically(tabbedPane, 0);
 
         // Server tab
         addServerTab(tabbedPane, description, mode);
@@ -180,7 +180,7 @@ public class LanguageServerPanel {
         if (addToTop) {
             tabPanel.addToTop(builder.getPanel());
         } else {
-            tabPanel.add(builder.getPanel());
+            tabPanel.addToCenter(builder.getPanel());
         }
         tabbedPane.add(tabTitle, tabPanel);
         return builder;
@@ -250,16 +250,14 @@ public class LanguageServerPanel {
     }
 
     private void createConfigurationField(FormBuilder builder) {
-        configurationWidget = new LanguageServerConfigurationWidget();
+        configurationWidget = new LanguageServerConfigurationWidget(project);
         JBScrollPane scrollPane = new JBScrollPane(configurationWidget);
-        scrollPane.setMinimumSize(new Dimension(JBUIScale.scale(600), JBUIScale.scale(100)));
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), scrollPane, true);
     }
 
     private void createInitializationOptionsTabField(FormBuilder builder) {
-        initializationOptionsWidget = new LanguageServerInitializationOptionsWidget();
+        initializationOptionsWidget = new LanguageServerInitializationOptionsWidget(project);
         JBScrollPane scrollPane = new JBScrollPane(initializationOptionsWidget);
-        scrollPane.setMinimumSize(new Dimension(JBUIScale.scale(600), JBUIScale.scale(100)));
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.initializationOptions"), scrollPane, true);
     }
 

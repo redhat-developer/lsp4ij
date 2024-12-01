@@ -13,7 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
-import com.intellij.ui.AnActionButton;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.ui.AnActionButtonRunnable;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.table.TableView;
@@ -44,6 +44,7 @@ public abstract class AbstractServerMappingTablePanel extends BorderLayoutPanel 
                 new ArrayList<>(),
                 0);
         table = new TableView<>(model);
+        table.setColumnSelectionAllowed(true);
 
         ToolbarDecorator toolbar = ToolbarDecorator.createDecorator(table)
                 .setAddAction(addData())
@@ -61,25 +62,26 @@ public abstract class AbstractServerMappingTablePanel extends BorderLayoutPanel 
     }
 
     private AnActionButtonRunnable addData() {
-        return new AnActionButtonRunnable() {
-            @Override
-            public void run(AnActionButton anActionButton) {
-                ServerMappingSettings newMapping = createServerMappingSettings();
-                table.getListTableModel().addRow(newMapping);
-                fireStateChanged();
-            }
+        return anActionButton -> {
+            ServerMappingSettings newMapping = createServerMappingSettings();
+            table.getListTableModel().addRow(newMapping);
+            fireStateChanged();
+            // Immediately select the first cell in the new row
+            ApplicationManager.getApplication().invokeLater(() -> {
+                int newRowIndex = table.getRowCount() - 1;
+                table.getSelectionModel().setSelectionInterval(newRowIndex, newRowIndex);
+                table.getColumnModel().getSelectionModel().setSelectionInterval(0, 0);
+                table.requestFocusInWindow();
+            });
         };
     }
 
     protected abstract ServerMappingSettings createServerMappingSettings();
 
     private AnActionButtonRunnable removeData() {
-        return new AnActionButtonRunnable() {
-            @Override
-            public void run(AnActionButton anActionButton) {
-                table.getListTableModel().removeRow(table.getSelectedRow());
-                fireStateChanged();
-            }
+        return anActionButton -> {
+            table.getListTableModel().removeRow(table.getSelectedRow());
+            fireStateChanged();
         };
     }
 
