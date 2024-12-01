@@ -65,22 +65,17 @@ public class JsonTextField extends JPanel {
         add(editorTextField, BorderLayout.CENTER);
     }
 
-    /**
-     * Sets the editor's filename so that the correct JSON schema will be used for code completion and validation.
-     *
-     * @param jsonFilename the JSON file name
-     */
-    public void setJsonFilename(@NotNull String jsonFilename) {
+    public void setJsonSchema(@NotNull String jsonSchemaName) {
         try {
             Document document = editorTextField.getDocument();
             VirtualFile file = FileDocumentManager.getInstance().getFile(document);
             if (file != null) {
-                file.rename(this, jsonFilename);
+                file.rename(this, jsonSchemaName);
             } else {
-                LOGGER.warn("Failed to rename the JSON text field file to '{}'.", jsonFilename);
+                LOGGER.warn("Failed to rename the JSON text field file to '{}'.", jsonSchemaName);
             }
         } catch (IOException e) {
-            LOGGER.warn("Failed to configure JSON text field for JSON schema '{}'.", jsonFilename, e);
+            LOGGER.warn("Failed to configure JSON text field for JSON schema '{}'.", jsonSchemaName, e);
         }
     }
 

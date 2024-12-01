@@ -31,7 +31,6 @@ import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPSettingsJsonSchemaProviderFactory;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -50,6 +49,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.redhat.devtools.lsp4ij.LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID;
+import static com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPSettingsJsonSchemaProviderFactory.TypeScriptLanguageServerConfigurationJsonSchemaFileProvider.TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME;
 
 /**
  * New language server dialog.
@@ -115,7 +115,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
             }
         });
 
-        showInstructionButton = super.createHelpButton(new JBInsets(0, 0, 0, 0));
+        showInstructionButton = super.createHelpButton(new JBInsets(0,0,0,0));
         showInstructionButton.setText("");
         templateCombo.addItemListener(getTemplateComboListener());
 
@@ -126,7 +126,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     /**
      * Create the template combo listener that handles item selection
-     *
      * @return created ItemListener
      */
     private ItemListener getTemplateComboListener() {
@@ -173,7 +172,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     /**
      * Check that the template is not a placeholder and that it has a valid description
-     *
      * @param template to check
      * @return true if template is not null, not a placeholder and has a description, else false
      */
@@ -212,12 +210,10 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update configuration
         var configuration = this.languageServerPanel.getConfiguration();
+        // TODO: Derive this from the language server type
+        configuration.setJsonSchema(TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME);
         configuration.setText(template.getConfiguration() != null ? template.getConfiguration() : "");
         configuration.setCaretPosition(0);
-        String jsonFilename = LSPSettingsJsonSchemaProviderFactory.getJsonFilename(command);
-        if (jsonFilename != null) {
-            configuration.setJsonFilename(jsonFilename);
-        }
 
         // Update initialize options
         var initializationOptions = this.languageServerPanel.getInitializationOptionsWidget();
@@ -298,7 +294,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 serverName,
                 "",
                 commandLine,
-                userEnvironmentVariables,
+                userEnvironmentVariables ,
                 includeSystemEnvironmentVariables,
                 configuration,
                 initializationOptions);

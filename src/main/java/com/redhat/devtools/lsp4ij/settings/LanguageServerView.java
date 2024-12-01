@@ -29,7 +29,6 @@ import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPSettingsJsonSchemaProviderFactory;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +39,8 @@ import javax.swing.border.TitledBorder;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import static com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPSettingsJsonSchemaProviderFactory.TypeScriptLanguageServerConfigurationJsonSchemaFileProvider.TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME;
 
 /**
  * UI settings view to configure a given language server:
@@ -104,7 +105,7 @@ public class LanguageServerView implements Disposable {
                     && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
                     && Objects.equals(this.getMappings(), settings.getMappings())
                     && isEquals(this.getConfigurationContent(), settings.getConfigurationContent())
-                    && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent()))) {
+                    && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent()))){
                 return true;
             }
         }
@@ -395,12 +396,10 @@ public class LanguageServerView implements Disposable {
 
     public void setConfigurationContent(String configurationContent) {
         var configuration = languageServerPanel.getConfiguration();
+        // TODO: Derive this from the language server type
+        configuration.setJsonSchema(TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME);
         configuration.setText(configurationContent);
         configuration.setCaretPosition(0);
-        String jsonFilename = LSPSettingsJsonSchemaProviderFactory.getJsonFilename(getCommandLine());
-        if (jsonFilename != null) {
-            configuration.setJsonFilename(jsonFilename);
-        }
     }
 
     public String getInitializationOptionsContent() {

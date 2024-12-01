@@ -1,56 +1,90 @@
-/*******************************************************************************
- * Copyright (c) 2024 Red Hat, Inc.
- * Distributed under license by Red Hat, Inc. All rights reserved.
- * This program is made available under the terms of the
- * Eclipse Public License v2.0 which accompanies this distribution,
- * and is available at https://www.eclipse.org/legal/epl-v20.html
- *
- * Contributors:
- * Red Hat, Inc. - initial API and implementation
- ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.jsonSchema;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.util.containers.ContainerUtil;
+import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.jetbrains.jsonSchema.extension.JsonSchemaFileProvider;
 import com.jetbrains.jsonSchema.extension.JsonSchemaProviderFactory;
+import com.jetbrains.jsonSchema.extension.SchemaType;
+import com.jetbrains.jsonSchema.impl.JsonSchemaVersion;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.net.URL;
 import java.util.LinkedList;
 import java.util.List;
 
-/**
- * Implementation of JsonSchema.ProviderFactory for all bundled language server configuration JSON schema definitions.
- */
 public class LSPSettingsJsonSchemaProviderFactory implements JsonSchemaProviderFactory {
-    private static final LSP4IJJsonSchemaFileProvider[] JSON_SCHEMA_FILE_PROVIDERS = new LSP4IJJsonSchemaFileProvider[]{
-            new TypeScriptLanguageServerConfigurationJsonSchemaFileProvider()
-    };
-
     @NotNull
     @Override
     public List<JsonSchemaFileProvider> getProviders(@NotNull Project project) {
         List<JsonSchemaFileProvider> providers = new LinkedList<>();
-        ContainerUtil.addAllNotNull(providers, JSON_SCHEMA_FILE_PROVIDERS);
+        providers.add(new TypeScriptLanguageServerConfigurationJsonSchemaFileProvider());
         return providers;
     }
 
-    /**
-     * Returns the JSON filename for the specified language server command-line. If one is found, it can be used to
-     * set the filename of the {@link com.redhat.devtools.lsp4ij.settings.ui.JsonTextField} so that it uses the
-     * corresponding JSON schema.
-     *
-     * @param commandLine the language server command-line
-     * @return the JSON filename for the language server, or null if no matching JSON schema file provider is found
-     */
-    @Nullable
-    public static String getJsonFilename(@NotNull String commandLine) {
-        for (LSP4IJJsonSchemaFileProvider jsonSchemaFileProvider : JSON_SCHEMA_FILE_PROVIDERS) {
-            if (jsonSchemaFileProvider.supports(commandLine)) {
-                return jsonSchemaFileProvider.getJsonFilename();
-            }
+    private static abstract class AbstractIlluminatedCloudJsonSchemaFileProvider implements JsonSchemaFileProvider {
+        private final String jsonSchemaPath;
+        private final String jsonFilename;
+        private VirtualFile jsonSchemaFile = null;
+
+        protected AbstractIlluminatedCloudJsonSchemaFileProvider(@NotNull String jsonSchemaPath, @NotNull String jsonFilename) {
+            this.jsonSchemaPath = jsonSchemaPath;
+            this.jsonFilename = jsonFilename;
         }
-        return null;
+
+        @Nullable
+        @Override
+        public final VirtualFile getSchemaFile() {
+            if (jsonSchemaFile == null) {
+                URL jsonSchemaUrl = getClass().getResource(jsonSchemaPath);
+                String jsonSchemaFileUrl = jsonSchemaUrl != null ? VfsUtil.convertFromUrl(jsonSchemaUrl) : null;
+                jsonSchemaFile = jsonSchemaFileUrl != null ? VirtualFileManager.getInstance().findFileByUrl(jsonSchemaFileUrl) : null;
+                // Make sure that the IDE is using the absolute latest version of the JSON schema
+                if (jsonSchemaFile != null) {
+                    jsonSchemaFile.refresh(true, false);
+                }
+            }
+            return jsonSchemaFile;
+        }
+
+        @Override
+        public boolean isAvailable(@NotNull VirtualFile file) {
+            return StringUtil.equalsIgnoreCase(jsonFilename, file.getName());
+        }
+
+        @NotNull
+        @Override
+        public final String getName() {
+            return jsonFilename;
+        }
+
+        @NotNull
+        @Override
+        public final SchemaType getSchemaType() {
+            return SchemaType.schema;
+        }
+
+        @Override
+        public final JsonSchemaVersion getSchemaVersion() {
+            return JsonSchemaVersion.SCHEMA_7;
+        }
+
+        @NotNull
+        @Override
+        public final String getPresentableName() {
+            return getName();
+        }
+    }
+
+    public static class TypeScriptLanguageServerConfigurationJsonSchemaFileProvider extends AbstractIlluminatedCloudJsonSchemaFileProvider {
+        private static final String TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_SCHEMA_JSON_PATH = "/templates/typescript-language-server/settings.schema.json";
+        public static final String TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME = "typescript-language-server-settings.json";
+
+        private TypeScriptLanguageServerConfigurationJsonSchemaFileProvider() {
+            super(TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_SCHEMA_JSON_PATH, TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME);
+        }
     }
 }
