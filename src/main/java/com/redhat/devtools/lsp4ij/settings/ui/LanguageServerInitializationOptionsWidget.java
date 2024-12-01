@@ -10,20 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
-import com.intellij.ui.components.JBTextArea;
-import com.intellij.util.ui.JBFont;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.intellij.openapi.project.Project;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Language server LSP 'Initialize Options' widget used to fill the LSP 'Initialization Options' expected by the language server.
  */
-public class LanguageServerInitializationOptionsWidget extends JBTextArea {
-
-    public LanguageServerInitializationOptionsWidget() {
-        super(5, 0);
-        super.setLineWrap(true);
-        super.setWrapStyleWord(true);
-        super.setFont(JBFont.regular());
-        super.getEmptyText().setText(LanguageServerBundle.message("language.server.initializationOptions.emptyText"));
+public class LanguageServerInitializationOptionsWidget extends JsonTextField {
+    public LanguageServerInitializationOptionsWidget(@NotNull Project project) {
+        super(project);
     }
 }
