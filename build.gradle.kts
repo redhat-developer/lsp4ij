@@ -173,6 +173,8 @@ tasks {
     }
 
     runIde {
+        // Improved hotswap for the IDE's JVM
+        jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
         //Use "debug" to send telemetry to dev source at segment.com
         systemProperties["com.redhat.devtools.intellij.telemetry.mode"] = "debug" // "disabled"
     }
