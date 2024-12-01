@@ -13,7 +13,7 @@
         "completeFunctionCalls": {
           "type": "boolean",
           "default": false,
-          "title": "Complete functions with their parameter signature."
+          "description": "Complete functions with their parameter signature."
         }
       }
     },
