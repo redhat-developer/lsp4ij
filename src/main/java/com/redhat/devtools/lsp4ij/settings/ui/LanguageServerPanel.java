@@ -251,14 +251,12 @@ public class LanguageServerPanel {
 
     private void createConfigurationField(FormBuilder builder) {
         configurationWidget = new LanguageServerConfigurationWidget(project);
-        JBScrollPane scrollPane = new JBScrollPane(configurationWidget);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), scrollPane, true);
+        builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.configuration"), configurationWidget);
     }
 
     private void createInitializationOptionsTabField(FormBuilder builder) {
         initializationOptionsWidget = new LanguageServerInitializationOptionsWidget(project);
-        JBScrollPane scrollPane = new JBScrollPane(initializationOptionsWidget);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.initializationOptions"), scrollPane, true);
+        builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.initializationOptions"), initializationOptionsWidget);
     }
 
     public JBTextField getServerName() {
