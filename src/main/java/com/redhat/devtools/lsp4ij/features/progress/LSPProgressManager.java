@@ -139,7 +139,7 @@ public class LSPProgressManager implements Disposable {
                                          @Nullable Integer percentage,
                                          @NotNull ProgressIndicator progressIndicator) {
         if (message != null && !message.isBlank()) {
-            progressIndicator.setText(message);
+            progressIndicator.setText2(message);
         }
         if (percentage != null) {
             progressIndicator.setFraction(percentage.doubleValue() / 100);
