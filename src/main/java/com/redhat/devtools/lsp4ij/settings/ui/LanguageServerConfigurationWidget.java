@@ -10,20 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
-import com.intellij.ui.components.JBTextArea;
-import com.intellij.util.ui.JBFont;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.intellij.openapi.project.Project;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Language server configuration widget used to fill the configuration expected by the language server.
  */
-public class LanguageServerConfigurationWidget extends JBTextArea {
-
-    public LanguageServerConfigurationWidget() {
-        super(5, 0);
-        super.setLineWrap(true);
-        super.setWrapStyleWord(true);
-        super.setFont(JBFont.regular());
-        super.getEmptyText().setText(LanguageServerBundle.message("language.server.configuration.emptyText"));
+public class LanguageServerConfigurationWidget extends JsonTextField {
+    public LanguageServerConfigurationWidget(@NotNull Project project) {
+        super(project);
     }
 }
