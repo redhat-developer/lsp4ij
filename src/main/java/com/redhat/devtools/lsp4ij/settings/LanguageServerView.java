@@ -40,8 +40,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPSettingsJsonSchemaProviderFactory.TypeScriptLanguageServerConfigurationJsonSchemaFileProvider.TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME;
-
 /**
  * UI settings view to configure a given language server:
  *
@@ -396,8 +394,6 @@ public class LanguageServerView implements Disposable {
 
     public void setConfigurationContent(String configurationContent) {
         var configuration = languageServerPanel.getConfiguration();
-        // TODO: Derive this from the language server type
-        configuration.setJsonSchema(TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME);
         configuration.setText(configurationContent);
         configuration.setCaretPosition(0);
     }

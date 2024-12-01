@@ -16,9 +16,7 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComboBox;
-import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.openapi.ui.*;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
@@ -49,7 +47,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.redhat.devtools.lsp4ij.LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID;
-import static com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPSettingsJsonSchemaProviderFactory.TypeScriptLanguageServerConfigurationJsonSchemaFileProvider.TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME;
 
 /**
  * New language server dialog.
@@ -210,8 +207,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update configuration
         var configuration = this.languageServerPanel.getConfiguration();
-        // TODO: Derive this from the language server type
-        configuration.setJsonSchema(TYPESCRIPT_LANGUAGE_SERVER_SETTINGS_JSON_FILENAME);
         configuration.setText(template.getConfiguration() != null ? template.getConfiguration() : "");
         configuration.setCaretPosition(0);
 
