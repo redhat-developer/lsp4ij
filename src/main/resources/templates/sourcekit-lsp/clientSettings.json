@@ -1,0 +1,17 @@
+{
+  "cpp": {
+    "caseSensitive": true
+  },
+  "swift": {
+    "caseSensitive": true
+  },
+  "objective-c": {
+    "caseSensitive": true
+  },
+  "objective-cpp": {
+    "caseSensitive": true
+  },
+  "c": {
+    "caseSensitive": true
+  }
+}
