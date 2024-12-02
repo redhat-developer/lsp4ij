@@ -40,6 +40,7 @@ public class LanguageServerTemplate {
     public static final String TEMPLATE_FILE_NAME = "template.json";
     public static final String INITIALIZATION_OPTIONS_FILE_NAME = "initializationOptions.json";
     public static final String SETTINGS_FILE_NAME = "settings.json";
+    public static final String CLIENT_SETTINGS_FILE_NAME = "clientSettings.json";
     public static final String README_FILE_NAME = "README.md";
 
     public static final String LANGUAGE_ID_JSON_PROPERTY = "languageId";
@@ -70,6 +71,7 @@ public class LanguageServerTemplate {
 
     private String configuration;
     private String initializationOptions;
+    private String clientConfiguration;
 
     public String getName() {
         return name;
@@ -150,4 +152,11 @@ public class LanguageServerTemplate {
         this.initializationOptions = initializationOptions;
     }
 
+    public String getClientConfiguration() {
+        return clientConfiguration;
+    }
+
+    public void setClientConfiguration(String clientConfiguration) {
+        this.clientConfiguration = clientConfiguration;
+    }
 }

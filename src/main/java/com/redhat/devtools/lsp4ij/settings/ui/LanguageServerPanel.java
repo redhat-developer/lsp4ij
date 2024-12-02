@@ -68,9 +68,10 @@ public class LanguageServerPanel {
     private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
-    private LanguageServerConfigurationWidget configurationWidget;
 
-    private LanguageServerInitializationOptionsWidget initializationOptionsWidget;
+    private JsonTextField configurationWidget;
+    private JsonTextField initializationOptionsWidget;
+    private JsonTextField clientConfigurationWidget;
 
     public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode, Project project) {
         this.project = project;
@@ -165,8 +166,16 @@ public class LanguageServerPanel {
 
     private void addConfigurationTab(JBTabbedPane tabbedPane) {
         FormBuilder configurationTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.configuration"), false);
-        createConfigurationField(configurationTab);
-        createInitializationOptionsTabField(configurationTab);
+
+        JBTabbedPane configurationTabbedPane = new JBTabbedPane();
+        configurationTab.addComponentFillVertically(configurationTabbedPane, 0);
+
+        FormBuilder serverConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.server"), false);
+        createConfigurationField(serverConfigurationTab);
+        createInitializationOptionsTabField(serverConfigurationTab);
+
+        FormBuilder clientConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.client"), false);
+        createClientConfigurationField(clientConfigurationTab);
     }
 
     private static FormBuilder addTab(JBTabbedPane tabbedPane, String tabTitle) {
@@ -250,13 +259,18 @@ public class LanguageServerPanel {
     }
 
     private void createConfigurationField(FormBuilder builder) {
-        configurationWidget = new LanguageServerConfigurationWidget(project);
+        configurationWidget = new JsonTextField(project);
         builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.configuration"), configurationWidget);
     }
 
     private void createInitializationOptionsTabField(FormBuilder builder) {
-        initializationOptionsWidget = new LanguageServerInitializationOptionsWidget(project);
+        initializationOptionsWidget = new JsonTextField(project);
         builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.initializationOptions"), initializationOptionsWidget);
+    }
+
+    private void createClientConfigurationField(FormBuilder builder) {
+        clientConfigurationWidget = new JsonTextField(project);
+        builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.configuration"), clientConfigurationWidget);
     }
 
     public JBTextField getServerName() {
@@ -275,12 +289,17 @@ public class LanguageServerPanel {
         return mappingsPanel;
     }
 
-    public LanguageServerConfigurationWidget getConfiguration() {
+    // TODO: Rename this to getConfigurationWidget()? getServerConfigurationWidget()?
+    public JsonTextField getConfiguration() {
         return configurationWidget;
     }
 
-    public LanguageServerInitializationOptionsWidget getInitializationOptionsWidget() {
+    public JsonTextField getInitializationOptionsWidget() {
         return initializationOptionsWidget;
+    }
+
+    public JsonTextField getClientConfigurationWidget() {
+        return clientConfigurationWidget;
     }
 
     public JBCheckBox getDebugSuspendCheckBox() {
@@ -298,5 +317,4 @@ public class LanguageServerPanel {
     public ComboBox<ErrorReportingKind> getErrorReportingKindCombo() {
         return errorReportingKindCombo;
     }
-
 }

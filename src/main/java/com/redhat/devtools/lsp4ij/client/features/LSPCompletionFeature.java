@@ -220,27 +220,38 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @param lookupItem
      * @param priority
      * @param item
+     * @param caseSensitive
      */
     @ApiStatus.Internal
     public void addLookupItem(@NotNull CompletionPrefix completionPrefix,
                               @NotNull CompletionResultSet result,
                               @NotNull LookupElement lookupItem,
                               int priority,
-                              @NotNull CompletionItem item) {
+                              @NotNull CompletionItem item,
+                              boolean caseSensitive) {
         var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, priority);
         // Compute the prefix
         var textEditRange = ((LSPCompletionProposal) lookupItem).getTextEditRange();
         String prefix = textEditRange != null ? completionPrefix.getPrefixFor(textEditRange, item) : null;
         if (prefix != null) {
-            // Add the IJ completion item (lookup item) by using the computed prefix
-            result.withPrefixMatcher(prefix)
-                    .caseInsensitive()
-                    .addElement(prioritizedLookupItem);
+            // Add the IJ completion item (lookup item) by using the computed prefix respecting the language's case-sensitivity
+            if (caseSensitive) {
+                result.withPrefixMatcher(prefix)
+                        .addElement(prioritizedLookupItem);
+            } else {
+                result.withPrefixMatcher(prefix)
+                        .caseInsensitive()
+                        .addElement(prioritizedLookupItem);
+            }
         } else {
             // Should happen rarely, only when text edit is for multi-lines or if completion is triggered outside the text edit range.
-            // Add the IJ completion item (lookup item) which will use the IJ prefix
-            result.caseInsensitive()
-                    .addElement(prioritizedLookupItem);
+            // Add the IJ completion item (lookup item) which will use the IJ prefix respecting the language's case-sensitivity
+            if (caseSensitive) {
+                result.addElement(prioritizedLookupItem);
+            } else {
+                result.caseInsensitive()
+                        .addElement(prioritizedLookupItem);
+            }
         }
     }
 

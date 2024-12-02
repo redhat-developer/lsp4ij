@@ -162,7 +162,8 @@ public class LanguageServersRegistry {
                                 launch.getUserEnvironmentVariables(),
                                 launch.isIncludeSystemEnvironmentVariables(),
                                 launch.getConfigurationContent(),
-                                launch.getInitializationOptionsContent()),
+                                launch.getInitializationOptionsContent(),
+                                launch.getClientConfigurationContent()),
                         mappings);
             }
         } catch (Exception e) {
@@ -365,6 +366,7 @@ public class LanguageServersRegistry {
             }
             settings.setConfigurationContent(definitionFromSettings.getConfigurationContent());
             settings.setInitializationOptionsContent(definitionFromSettings.getInitializationOptionsContent());
+            settings.setClientConfigurationContent(definitionFromSettings.getClientConfigurationContent());
             UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
         }
     }
@@ -469,6 +471,7 @@ public class LanguageServersRegistry {
         request.serverDefinition().setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         request.serverDefinition().setConfigurationContent(request.configurationContent());
         request.serverDefinition().setInitializationOptionsContent(request.initializationOptionsContent());
+        request.serverDefinition().setClientConfigurationContent(request.clientConfigurationContent());
 
         // remove associations
         removeAssociationsFor(request.serverDefinition());
@@ -483,6 +486,7 @@ public class LanguageServersRegistry {
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), request.mappings());
         boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
         boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
+        // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
 
         settings.setServerName(request.name());
         settings.setCommandLine(request.commandLine());
@@ -490,6 +494,7 @@ public class LanguageServersRegistry {
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         settings.setConfigurationContent(request.configurationContent());
         settings.setInitializationOptionsContent(request.initializationOptionsContent());
+        settings.setClientConfigurationContent(request.clientConfigurationContent);
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
@@ -578,7 +583,8 @@ public class LanguageServersRegistry {
                                                 boolean includeSystemEnvironmentVariables,
                                                 @NotNull List<ServerMappingSettings> mappings,
                                                 @Nullable String configurationContent,
-                                                @Nullable String initializationOptionsContent) {
+                                                @Nullable String initializationOptionsContent,
+                                                @Nullable String clientConfigurationContent) {
     }
 
     /**
