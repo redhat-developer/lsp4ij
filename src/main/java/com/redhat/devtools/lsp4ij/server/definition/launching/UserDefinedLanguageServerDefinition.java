@@ -17,6 +17,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.annotations.SerializedName;
 import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -45,6 +46,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private Object configuration;
     private String initializationOptionsContent;
     private Object initializationOptions;
+    private String clientConfigurationContent;
+    private Map<String, ClientConfigurationLanguageSettings> clientConfiguration;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
                                                @NotNull String name,
@@ -53,7 +56,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
                                                @Nullable String configurationContent,
-                                               @Nullable String initializationOptionsContent) {
+                                               @Nullable String initializationOptionsContent,
+                                               @Nullable String clientConfigurationContent) {
         super(id, name, description, true, null, false);
         this.name = name;
         this.commandLine = commandLine;
@@ -61,6 +65,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
         this.configurationContent = configurationContent;
         this.initializationOptionsContent = initializationOptionsContent;
+        this.clientConfigurationContent = clientConfigurationContent;
     }
 
     @Override
@@ -135,6 +140,15 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.initializationOptions = null;
     }
 
+    public String getClientConfigurationContent() {
+        return clientConfigurationContent;
+    }
+
+    public void setClientConfigurationContent(String clientConfigurationContent) {
+        this.clientConfigurationContent = clientConfigurationContent;
+        this.clientConfiguration = null;
+    }
+
     public Object getLanguageServerConfiguration() {
         if (configuration == null && configurationContent != null && !configurationContent.isBlank()) {
             try {
@@ -157,9 +171,19 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         return initializationOptions;
     }
 
+    public Map<String, ClientConfigurationLanguageSettings> getLanguageServerClientConfiguration() {
+        if ((clientConfiguration == null) && (clientConfigurationContent != null) && !clientConfigurationContent.isBlank()) {
+            try {
+                clientConfiguration = JSONUtils.getLsp4jGson().fromJson(clientConfigurationContent, ClientConfigurationLanguageSettings.TYPE_TOKEN);
+            } catch (Exception e) {
+                LOGGER.error("Error while parsing JSON client configuration for the language server '" + getId() + "'", e);
+            }
+        }
+        return clientConfiguration;
+    }
+
     @Override
     public @NotNull String getDisplayName() {
         return name;
     }
-
 }

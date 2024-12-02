@@ -70,6 +70,8 @@ public class LanguageServerTemplateManagerTest {
         assertNotEquals("", template.getInitializationOptions());
         assertNotNull(template.getConfiguration());
         assertNotEquals("", template.getConfiguration());
+        assertNotNull(template.getClientConfiguration());
+        assertNotEquals("", template.getClientConfiguration());
     }
 
     @Test
@@ -107,7 +109,7 @@ public class LanguageServerTemplateManagerTest {
                 new HashMap<>(),
                 false,
                 null,
-                null
-        );
+                null,
+                null);
     }
 }
