@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPClientConfigurationJsonSchemaFileProvider;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -270,6 +271,7 @@ public class LanguageServerPanel {
 
     private void createClientConfigurationField(FormBuilder builder) {
         clientConfigurationWidget = new JsonTextField(project);
+        clientConfigurationWidget.setJsonFilename(LSPClientConfigurationJsonSchemaFileProvider.CLIENT_SETTINGS_JSON_FILE_NAME);
         builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.configuration"), clientConfigurationWidget);
     }
 
