@@ -1,0 +1,17 @@
+{
+  "go": {
+    "caseSensitive": true
+  },
+  "go.mod": {
+    "caseSensitive": true
+  },
+  "go.work": {
+    "caseSensitive": true
+  },
+  "go.sum": {
+    "caseSensitive": true
+  },
+  "gotmpl": {
+    "caseSensitive": true
+  }
+}
