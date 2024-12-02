@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/jsonSchema/clientSettings.schema.json",
+  "title": "LSP4IJ user-defined language server client-side settings JSON schema",
+  "type": "object",
+  "patternProperties": {
+    "\\w+": {
+      "type": "object",
+      "title": "Language-specific client configuration",
+      "properties": {
+        "caseSensitive": {
+          "type": "boolean",
+          "title": "Language grammar case-sensitivity",
+          "description": "Whether or not the language's grammar is case-sensitive.",
+          "default": false
+        }
+      }
+    }
+  }
+}
