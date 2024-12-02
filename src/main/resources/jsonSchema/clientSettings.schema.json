@@ -3,10 +3,12 @@
   "$id": "https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/jsonSchema/clientSettings.schema.json",
   "title": "LSP4IJ user-defined language server client-side settings JSON schema",
   "type": "object",
+  "additionalProperties": false,
   "patternProperties": {
-    "\\w+": {
+    "^[a-zA-Z0-9-_]+$": {
       "type": "object",
       "title": "Language-specific client configuration",
+      "additionalProperties": false,
       "properties": {
         "caseSensitive": {
           "type": "boolean",
