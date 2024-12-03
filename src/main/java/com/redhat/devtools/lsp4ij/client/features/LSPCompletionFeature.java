@@ -20,9 +20,6 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.completion.CompletionPrefix;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.capabilities.CompletionCapabilityRegistry;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
@@ -218,6 +215,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     /**
      * Don't override this method, we need to revisit the API and the prefix computation (to customize it).
      *
+     * @param context
      * @param completionPrefix
      * @param result
      * @param lookupItem
@@ -225,11 +223,15 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @param item
      */
     @ApiStatus.Internal
-    public void addLookupItem(@NotNull CompletionPrefix completionPrefix,
+    public void addLookupItem(@NotNull LSPCompletionContext context,
+                              @NotNull CompletionPrefix completionPrefix,
                               @NotNull CompletionResultSet result,
                               @NotNull LookupElement lookupItem,
                               int priority,
                               @NotNull CompletionItem item) {
+        // Determine whether or not completions should be case-sensitive
+        boolean caseSensitive = isCaseSensitive(context.getParameters().getOriginalFile());
+
         var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, priority);
 
         // Compute the prefix
@@ -237,7 +239,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         String prefix = textEditRange != null ? completionPrefix.getPrefixFor(textEditRange, item) : null;
         if (prefix != null) {
             // Add the IJ completion item (lookup item) by using the computed prefix respecting the language's case-sensitivity
-            if (isCaseSensitive()) {
+            if (caseSensitive) {
                 result.withPrefixMatcher(prefix)
                         .addElement(prioritizedLookupItem);
             } else {
@@ -248,7 +250,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         } else {
             // Should happen rarely, only when text edit is for multi-lines or if completion is triggered outside the text edit range.
             // Add the IJ completion item (lookup item) which will use the IJ prefix respecting the language's case-sensitivity
-            if (isCaseSensitive()) {
+            if (caseSensitive) {
                 result.addElement(prioritizedLookupItem);
             } else {
                 result.caseInsensitive()
@@ -292,16 +294,14 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         }
     }
 
-    // Client configuration-based completion features
-
-    // TODO: This shouldn't be here; need more guidance from Angelo on how it should be refactored to fit appropriately
-    public boolean isCaseSensitive() {
-        LanguageServerDefinition serverDefinition = getServerDefinition();
-        if (serverDefinition instanceof UserDefinedLanguageServerDefinition languageServerDefinition) {
-            ClientConfigurationSettings clientConfiguration = languageServerDefinition.getLanguageServerClientConfiguration();
-            return (clientConfiguration != null) && clientConfiguration.completions.caseSensitive;
-        }
-        // Default to case-insensitive if unspecified for backward-compatibility
+    /**
+     * Determines whether or not completions for the file should be offered in a case-sensitive manner.
+     *
+     * @param file the file
+     * @return true if completions should be offered in a case-sensitive manner; otherwise false
+     */
+    public boolean isCaseSensitive(@NotNull PsiFile file) {
+        // Default to case-insensitive
         return false;
     }
 }
