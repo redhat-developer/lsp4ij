@@ -136,7 +136,7 @@ public class LSPCompletionContributor extends CompletionContributor {
             // Create lookup item
             LookupElement lookupItem = completionFeature.createLookupElement(item, context);
             if (lookupItem != null) {
-                completionFeature.addLookupItem(completionPrefix, result, lookupItem, size - i, item);
+                completionFeature.addLookupItem(context, completionPrefix, result, lookupItem, size - i, item);
             }
         }
     }
