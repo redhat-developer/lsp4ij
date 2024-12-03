@@ -294,6 +294,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
 
     // Client configuration-based completion features
 
+    // TODO: This shouldn't be here; need more guidance from Angelo on how it should be refactored to fit appropriately
     public boolean isCaseSensitive() {
         LanguageServerDefinition serverDefinition = getServerDefinition();
         if (serverDefinition instanceof UserDefinedLanguageServerDefinition languageServerDefinition) {
