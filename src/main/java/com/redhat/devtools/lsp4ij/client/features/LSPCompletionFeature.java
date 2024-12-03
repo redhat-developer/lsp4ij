@@ -20,6 +20,9 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.completion.CompletionPrefix;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.capabilities.CompletionCapabilityRegistry;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
@@ -220,22 +223,21 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @param lookupItem
      * @param priority
      * @param item
-     * @param caseSensitive
      */
     @ApiStatus.Internal
     public void addLookupItem(@NotNull CompletionPrefix completionPrefix,
                               @NotNull CompletionResultSet result,
                               @NotNull LookupElement lookupItem,
                               int priority,
-                              @NotNull CompletionItem item,
-                              boolean caseSensitive) {
+                              @NotNull CompletionItem item) {
         var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, priority);
+
         // Compute the prefix
         var textEditRange = ((LSPCompletionProposal) lookupItem).getTextEditRange();
         String prefix = textEditRange != null ? completionPrefix.getPrefixFor(textEditRange, item) : null;
         if (prefix != null) {
             // Add the IJ completion item (lookup item) by using the computed prefix respecting the language's case-sensitivity
-            if (caseSensitive) {
+            if (isCaseSensitive()) {
                 result.withPrefixMatcher(prefix)
                         .addElement(prioritizedLookupItem);
             } else {
@@ -246,7 +248,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         } else {
             // Should happen rarely, only when text edit is for multi-lines or if completion is triggered outside the text edit range.
             // Add the IJ completion item (lookup item) which will use the IJ prefix respecting the language's case-sensitivity
-            if (caseSensitive) {
+            if (isCaseSensitive()) {
                 result.addElement(prioritizedLookupItem);
             } else {
                 result.caseInsensitive()
@@ -288,5 +290,17 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         if (completionCapabilityRegistry != null) {
             completionCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
+    }
+
+    // Client configuration-based completion features
+
+    public boolean isCaseSensitive() {
+        LanguageServerDefinition serverDefinition = getServerDefinition();
+        if (serverDefinition instanceof UserDefinedLanguageServerDefinition languageServerDefinition) {
+            ClientConfigurationSettings clientConfiguration = languageServerDefinition.getLanguageServerClientConfiguration();
+            return (clientConfiguration != null) && clientConfiguration.completions.caseSensitive;
+        }
+        // Default to case-insensitive if unspecified for backward-compatibility
+        return false;
     }
 }

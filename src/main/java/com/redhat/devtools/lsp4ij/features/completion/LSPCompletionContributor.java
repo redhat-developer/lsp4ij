@@ -28,9 +28,6 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationLanguageSettings;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -41,7 +38,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -129,9 +125,6 @@ public class LSPCompletionContributor extends CompletionContributor {
         items.sort(completionProposalComparator);
         int size = items.size();
 
-        // Determine whether or not the language is case-sensitive so that we can add completions accordingly
-        boolean caseSensitive = isCaseSensitive(languageServer, parameters.getOriginalFile());
-
         var completionFeature = languageServer.getClientFeatures().getCompletionFeature();
         LSPCompletionFeature.LSPCompletionContext context = new LSPCompletionFeature.LSPCompletionContext(parameters, languageServer);
         // Items now sorted by priority, low index == high priority
@@ -143,21 +136,9 @@ public class LSPCompletionContributor extends CompletionContributor {
             // Create lookup item
             LookupElement lookupItem = completionFeature.createLookupElement(item, context);
             if (lookupItem != null) {
-                completionFeature.addLookupItem(completionPrefix, result, lookupItem, size - i, item, caseSensitive);
+                completionFeature.addLookupItem(completionPrefix, result, lookupItem, size - i, item);
             }
         }
-    }
-
-    private static boolean isCaseSensitive(@NotNull LanguageServerItem languageServer, @NotNull PsiFile file) {
-        LanguageServerDefinition serverDefinition = languageServer.getServerDefinition();
-        if (serverDefinition instanceof UserDefinedLanguageServerDefinition languageServerDefinition) {
-            Map<String, ClientConfigurationLanguageSettings> clientConfiguration = languageServerDefinition.getLanguageServerClientConfiguration();
-            String languageId = serverDefinition.getLanguageIdOrNull(file);
-            ClientConfigurationLanguageSettings languageSettings = (clientConfiguration != null) && (languageId != null) ? clientConfiguration.get(languageId) : null;
-            return (languageSettings != null) && languageSettings.caseSensitive;
-        }
-        // Default to case-insensitive if unspecified for backward-compatibility
-        return false;
     }
 
     protected void updateWithItemDefaults(@NotNull CompletionItem item,
@@ -236,5 +217,4 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
         return null;
     }
-
 }

@@ -13,18 +13,24 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
-import com.google.gson.reflect.TypeToken;
-
-import java.lang.reflect.Type;
-import java.util.Map;
+import org.jetbrains.annotations.NotNull;
 
 /**
- * Language-specific client-side settings for a user-defined language server configuration.
+ * Client-side settings for a user-defined language server configuration.
  */
-public class ClientConfigurationLanguageSettings {
-    // Type token to facilitate Gson (de)serialization
-    static final Type TYPE_TOKEN = new TypeToken<Map<String, ClientConfigurationLanguageSettings>>() {
-    }.getType();
+public class ClientConfigurationSettings {
+    /**
+     * Client-side code completion settings.
+     */
+    public static class ClientConfigurationCompletionSettings {
+        /**
+         * Whether or not completions should be offered as case-sensitive. Defaults to false.
+         **/
+        public boolean caseSensitive = false;
+    }
 
-    public boolean caseSensitive = false;
+    /**
+     * Client-side code completion settings
+     */
+    public @NotNull ClientConfigurationCompletionSettings completions = new ClientConfigurationCompletionSettings();
 }
