@@ -47,7 +47,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private String initializationOptionsContent;
     private Object initializationOptions;
     private String clientConfigurationContent;
-    private Map<String, ClientConfigurationLanguageSettings> clientConfiguration;
+    private ClientConfigurationSettings clientConfiguration;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
                                                @NotNull String name,
@@ -171,10 +171,10 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         return initializationOptions;
     }
 
-    public Map<String, ClientConfigurationLanguageSettings> getLanguageServerClientConfiguration() {
+    public ClientConfigurationSettings getLanguageServerClientConfiguration() {
         if ((clientConfiguration == null) && (clientConfigurationContent != null) && !clientConfigurationContent.isBlank()) {
             try {
-                clientConfiguration = JSONUtils.getLsp4jGson().fromJson(clientConfigurationContent, ClientConfigurationLanguageSettings.TYPE_TOKEN);
+                clientConfiguration = JSONUtils.getLsp4jGson().fromJson(clientConfigurationContent, ClientConfigurationSettings.class);
             } catch (Exception e) {
                 LOGGER.error("Error while parsing JSON client configuration for the language server '" + getId() + "'", e);
             }

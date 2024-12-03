@@ -4,16 +4,16 @@
   "title": "LSP4IJ user-defined language server client-side settings JSON schema",
   "type": "object",
   "additionalProperties": false,
-  "patternProperties": {
-    "^[a-zA-Z0-9-_]+$": {
+  "properties": {
+    "completions": {
       "type": "object",
-      "title": "Language-specific client configuration",
+      "title": "Client-side completion configuration",
       "additionalProperties": false,
       "properties": {
         "caseSensitive": {
           "type": "boolean",
-          "title": "Language grammar case-sensitivity",
-          "description": "Whether or not the language's grammar is case-sensitive.",
+          "title": "Completion case-sensitivity",
+          "description": "Whether or not completions should be offered as case-sensitive.",
           "default": false
         }
       }

@@ -1,8 +1,5 @@
 {
-  "javascript": {
-    "caseSensitive": true
-  },
-  "typescript": {
+  "completions": {
     "caseSensitive": true
   }
 }

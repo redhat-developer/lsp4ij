@@ -1,11 +1,5 @@
 {
-  "xml": {
-    "caseSensitive": true
-  },
-  "dtd": {
-    "caseSensitive": true
-  },
-  "relax-ng": {
+  "completions": {
     "caseSensitive": true
   }
 }
