@@ -15,7 +15,6 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -25,11 +24,8 @@ public class UserDefinedCompletionFeature extends LSPCompletionFeature {
 
     @Override
     public boolean isCaseSensitive(@NotNull PsiFile file) {
-        LanguageServerDefinition serverDefinition = getClientFeatures().getServerDefinition();
-        if (serverDefinition instanceof UserDefinedLanguageServerDefinition languageServerDefinition) {
-            ClientConfigurationSettings clientConfiguration = languageServerDefinition.getLanguageServerClientConfiguration();
-            return (clientConfiguration != null) && clientConfiguration.completions.caseSensitive;
-        }
-        return super.isCaseSensitive(file);
+        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getClientFeatures().getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.completions.caseSensitive : super.isCaseSensitive(file);
     }
 }
