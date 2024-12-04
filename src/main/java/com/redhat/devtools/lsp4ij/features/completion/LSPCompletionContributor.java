@@ -25,9 +25,9 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
-import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -136,7 +136,7 @@ public class LSPCompletionContributor extends CompletionContributor {
             // Create lookup item
             LookupElement lookupItem = completionFeature.createLookupElement(item, context);
             if (lookupItem != null) {
-               completionFeature.addLookupItem(completionPrefix, result, lookupItem, size- i, item);
+                completionFeature.addLookupItem(context, completionPrefix, result, lookupItem, size - i, item);
             }
         }
     }
@@ -217,5 +217,4 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
         return null;
     }
-
 }

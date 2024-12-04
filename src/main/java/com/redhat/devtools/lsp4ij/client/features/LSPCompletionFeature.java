@@ -215,6 +215,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     /**
      * Don't override this method, we need to revisit the API and the prefix computation (to customize it).
      *
+     * @param context
      * @param completionPrefix
      * @param result
      * @param lookupItem
@@ -222,25 +223,39 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @param item
      */
     @ApiStatus.Internal
-    public void addLookupItem(@NotNull CompletionPrefix completionPrefix,
+    public void addLookupItem(@NotNull LSPCompletionContext context,
+                              @NotNull CompletionPrefix completionPrefix,
                               @NotNull CompletionResultSet result,
                               @NotNull LookupElement lookupItem,
                               int priority,
                               @NotNull CompletionItem item) {
+        // Determine whether or not completions should be case-sensitive
+        boolean caseSensitive = isCaseSensitive(context.getParameters().getOriginalFile());
+
         var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, priority);
+
         // Compute the prefix
         var textEditRange = ((LSPCompletionProposal) lookupItem).getTextEditRange();
         String prefix = textEditRange != null ? completionPrefix.getPrefixFor(textEditRange, item) : null;
         if (prefix != null) {
-            // Add the IJ completion item (lookup item) by using the computed prefix
-            result.withPrefixMatcher(prefix)
-                    .caseInsensitive()
-                    .addElement(prioritizedLookupItem);
+            // Add the IJ completion item (lookup item) by using the computed prefix respecting the language's case-sensitivity
+            if (caseSensitive) {
+                result.withPrefixMatcher(prefix)
+                        .addElement(prioritizedLookupItem);
+            } else {
+                result.withPrefixMatcher(prefix)
+                        .caseInsensitive()
+                        .addElement(prioritizedLookupItem);
+            }
         } else {
             // Should happen rarely, only when text edit is for multi-lines or if completion is triggered outside the text edit range.
-            // Add the IJ completion item (lookup item) which will use the IJ prefix
-            result.caseInsensitive()
-                    .addElement(prioritizedLookupItem);
+            // Add the IJ completion item (lookup item) which will use the IJ prefix respecting the language's case-sensitivity
+            if (caseSensitive) {
+                result.addElement(prioritizedLookupItem);
+            } else {
+                result.caseInsensitive()
+                        .addElement(prioritizedLookupItem);
+            }
         }
     }
 
@@ -277,5 +292,16 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         if (completionCapabilityRegistry != null) {
             completionCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
+    }
+
+    /**
+     * Determines whether or not completions for the file should be offered in a case-sensitive manner.
+     *
+     * @param file the file
+     * @return true if completions should be offered in a case-sensitive manner; otherwise false
+     */
+    public boolean isCaseSensitive(@NotNull PsiFile file) {
+        // Default to case-insensitive
+        return false;
     }
 }

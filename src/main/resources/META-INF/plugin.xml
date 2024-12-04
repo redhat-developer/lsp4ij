@@ -158,6 +158,7 @@
     <depends>com.intellij.modules.platform</depends>
     <depends optional="true">org.jetbrains.plugins.textmate</depends>
     <depends optional="true">com.redhat.devtools.intellij.telemetry</depends>
+    <depends optional="true" config-file="plugin-json.xml">com.intellij.modules.json</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
     <idea-version since-build="232.*"/>
 
