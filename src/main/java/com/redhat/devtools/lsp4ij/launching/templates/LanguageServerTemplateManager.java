@@ -17,25 +17,26 @@ import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
@@ -82,13 +83,14 @@ public class LanguageServerTemplateManager {
 
     /**
      * Load the resources/templates file as a VirtualFile from the jar
+     *
      * @return template root as virtual file or null, if one couldn't be found
      */
     @Nullable
     public VirtualFile getTemplateRoot() {
         URL url = LanguageServerTemplateManager.class.getClassLoader().getResource(TEMPLATES_DIR);
         if (url == null) {
-            LOGGER.warn("No "+TEMPLATES_DIR+ " directory/url found");
+            LOGGER.warn("No " + TEMPLATES_DIR + " directory/url found");
             return null;
         }
         try {
@@ -96,7 +98,7 @@ public class LanguageServerTemplateManager {
             String filePart = url.toURI().getRawSchemeSpecificPart(); // get un-decoded, URI compatible part
             // filePart looks like file:/Users/username/Library/Application%20Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates
             LOGGER.debug("Templates filePart : {}", filePart);
-            String resourcePath =  new URI(filePart).getSchemeSpecificPart();// get decoded part (i.e. converts %20 to spaces ...)
+            String resourcePath = new URI(filePart).getSchemeSpecificPart();// get decoded part (i.e. converts %20 to spaces ...)
             // resourcePath looks like /Users/username/Library/Application Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates/
             LOGGER.debug("Templates resources path from uri : {}", resourcePath);
             return JarFileSystem.getInstance().findFileByPath(resourcePath);
@@ -112,6 +114,7 @@ public class LanguageServerTemplateManager {
 
     /**
      * Import language server template from a directory
+     *
      * @param templateFolder directory that contains the template files
      * @return LanguageServerTemplate or null if one couldn't be created
      */
@@ -122,6 +125,7 @@ public class LanguageServerTemplateManager {
 
     /**
      * Parses the template files to create a LanguageServerTemplate
+     *
      * @param templateFolder directory that contains the template files
      * @return LanguageServerTemplate or null if one couldn't be created
      * @throws IOException if an IO error occurs when loading the text from any template file
@@ -131,6 +135,7 @@ public class LanguageServerTemplateManager {
         String templateJson = null;
         String settingsJson = null;
         String initializationOptionsJson = null;
+        String clientSettingsJson = null;
         String description = null;
 
         for (VirtualFile file : templateFolder.getChildren()) {
@@ -146,6 +151,9 @@ public class LanguageServerTemplateManager {
                     break;
                 case INITIALIZATION_OPTIONS_FILE_NAME:
                     initializationOptionsJson = VfsUtilCore.loadText(file);
+                    break;
+                case CLIENT_SETTINGS_FILE_NAME:
+                    clientSettingsJson = VfsUtilCore.loadText(file);
                     break;
                 case README_FILE_NAME:
                     description = VfsUtilCore.loadText(file);
@@ -165,6 +173,9 @@ public class LanguageServerTemplateManager {
         if (initializationOptionsJson == null) {
             initializationOptionsJson = "{}";
         }
+        if (clientSettingsJson == null) {
+            clientSettingsJson = "{}";
+        }
 
         GsonBuilder builder = new GsonBuilder();
         builder.registerTypeAdapter(LanguageServerTemplate.class, new LanguageServerTemplateDeserializer());
@@ -173,6 +184,7 @@ public class LanguageServerTemplateManager {
         LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
         template.setConfiguration(settingsJson);
         template.setInitializationOptions(initializationOptionsJson);
+        template.setClientConfiguration(clientSettingsJson);
         if (StringUtils.isNotBlank(description)) {
             template.setDescription(description);
         }
@@ -182,7 +194,8 @@ public class LanguageServerTemplateManager {
 
     /**
      * Exports one or more language server templates to a zip file
-     * @param exportZip target zip
+     *
+     * @param exportZip     target zip
      * @param lsDefinitions to export
      */
     public int exportLsTemplates(@NotNull VirtualFile exportZip, @NotNull List<LanguageServerDefinition> lsDefinitions) {
@@ -200,6 +213,7 @@ public class LanguageServerTemplateManager {
 
     /**
      * Creates a zip file by handling each user defined language server definitions
+     *
      * @return zip file as a byte array
      * @throws IOException if an IO error occurs when writing to the zip file
      */
@@ -216,11 +230,13 @@ public class LanguageServerTemplateManager {
             String template = gson.toJson(lsDefinition);
             String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
+            String clientSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getClientConfigurationContent();
             lsName = lsDefinition.getDisplayName();
 
             writeToZip(TEMPLATE_FILE_NAME, template, zos);
             writeToZip(INITIALIZATION_OPTIONS_FILE_NAME, initializationOptions, zos);
             writeToZip(SETTINGS_FILE_NAME, settings, zos);
+            writeToZip(CLIENT_SETTINGS_FILE_NAME, clientSettings, zos);
             zos.closeEntry();
             count++;
         }
@@ -231,9 +247,10 @@ public class LanguageServerTemplateManager {
 
     /**
      * Writes a file (name + content) to a zip output stream
+     *
      * @param filename name of the file to write
-     * @param content file content
-     * @param zos to write the file to
+     * @param content  file content
+     * @param zos      to write the file to
      */
     private void writeToZip(String filename, String content, ZipOutputStream zos) throws IOException {
         if (StringUtils.isBlank(content)) {
