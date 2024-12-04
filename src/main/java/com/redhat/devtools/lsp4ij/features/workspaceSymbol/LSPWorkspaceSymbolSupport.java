@@ -54,16 +54,26 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
                                                                                             @NotNull WorkspaceSymbolParams params,
                                                                                             @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(project,
-                        f -> f.getWorkspaceSymbolFeature().isEnabled(),
-                        f -> f.getWorkspaceSymbolFeature().isSupported())
+                f -> f.getWorkspaceSymbolFeature().isEnabled(),
+                f -> f.getWorkspaceSymbolFeature().isSupported())
                 .thenComposeAsync(languageServers -> {
+                    // Remove language servers that aren't supported efficiently by the provided params
+                    List<LanguageServerItem> mutableLanguageServers = new ArrayList<>(languageServers);
+                    mutableLanguageServers.removeIf(languageServer -> {
+                        // If queried for types only, make sure that the language server supports that type of query efficiently
+                        return (params instanceof LSPWorkspaceSymbolParams lspWorkspaceSymbolParams) &&
+                                (lspWorkspaceSymbolParams.getRequestedSymbolTypes() == LSPWorkspaceRequestedSymbolTypes.TYPE_SYMBOLS) &&
+                                // This is confirmed null-safe
+                                !languageServer.getClientFeatures().getWorkspaceSymbolFeature().supportsGotoClass();
+                    });
+
                     // Here languageServers is the list of language servers which have workspaceSymbol capability
-                    if (languageServers.isEmpty()) {
+                    if (mutableLanguageServers.isEmpty()) {
                         return CompletableFuture.completedFuture(null);
                     }
 
                     // Collect list of workspace/symbol future for each language servers
-                    List<CompletableFuture<List<WorkspaceSymbolData>>> workspaceSymbolPerServerFutures = languageServers
+                    List<CompletableFuture<List<WorkspaceSymbolData>>> workspaceSymbolPerServerFutures = mutableLanguageServers
                             .stream()
                             .map(languageServer -> getWorkspaceSymbolFor(params, languageServer, cancellationSupport, project))
                             .filter(Objects::nonNull)

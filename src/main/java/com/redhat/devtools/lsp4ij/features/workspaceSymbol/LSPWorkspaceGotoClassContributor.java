@@ -27,6 +27,10 @@ public class LSPWorkspaceGotoClassContributor extends AbstractLSPWorkspaceSymbol
             SymbolKind.Struct
     );
 
+    public LSPWorkspaceGotoClassContributor() {
+        super(LSPWorkspaceRequestedSymbolTypes.TYPE_SYMBOLS);
+    }
+
     @Override
     protected boolean accept(@NotNull WorkspaceSymbolData item) {
         // Include only type symbols

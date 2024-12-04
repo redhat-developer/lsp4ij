@@ -25,12 +25,27 @@ public class ClientConfigurationSettings {
     public static class ClientConfigurationCompletionSettings {
         /**
          * Whether or not completions should be offered as case-sensitive. Defaults to false.
-         **/
+         */
         public boolean caseSensitive = false;
+    }
+
+    /**
+     * Client-side code workspace symbol settings.
+     */
+    public static class ClientConfigurationWorkspaceSymbolSettings {
+        /**
+         * Whether or not completions should be offered as case-sensitive. Defaults to false.
+         */
+        public boolean supportsGotoClass = false;
     }
 
     /**
      * Client-side code completion settings
      */
     public @NotNull ClientConfigurationCompletionSettings completions = new ClientConfigurationCompletionSettings();
+
+    /**
+     * Client-side code workspace symbol settings
+     */
+    public @NotNull ClientConfigurationWorkspaceSymbolSettings workspaceSymbols = new ClientConfigurationWorkspaceSymbolSettings();
 }

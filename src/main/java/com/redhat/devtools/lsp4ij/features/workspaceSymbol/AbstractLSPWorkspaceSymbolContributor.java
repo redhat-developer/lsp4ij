@@ -42,6 +42,12 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
 
     private final static Logger LOGGER = LoggerFactory.getLogger(AbstractLSPWorkspaceSymbolContributor.class);
 
+    private final LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes;
+
+    protected AbstractLSPWorkspaceSymbolContributor(@NotNull LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes) {
+        this.requestedSymbolTypes = requestedSymbolTypes;
+    }
+
     @Override
     public void processNames(@NotNull Processor<? super String> processor,
                              @NotNull GlobalSearchScope scope,
@@ -82,7 +88,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
         if (cancel) {
             workspaceSymbolSupport.cancel();
         }
-        WorkspaceSymbolParams params = new WorkspaceSymbolParams(name);
+        WorkspaceSymbolParams params = new LSPWorkspaceSymbolParams(name, requestedSymbolTypes);
         CompletableFuture<List<WorkspaceSymbolData>> workspaceSymbolFuture = workspaceSymbolSupport.getWorkspaceSymbol(params);
         try {
             waitUntilDone(workspaceSymbolFuture);

@@ -10,20 +10,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 
-import org.jetbrains.annotations.NotNull;
-
 /**
- * LSP workspace goto symbol contributor.
+ * The types of workspace symbols being requested in {@link LSPWorkspaceSymbolParams}.
  */
-public class LSPWorkspaceGotoSymbolContributor extends AbstractLSPWorkspaceSymbolContributor {
-
-    public LSPWorkspaceGotoSymbolContributor() {
-        super(LSPWorkspaceRequestedSymbolTypes.ALL_SYMBOLS);
-    }
-
-    @Override
-    protected boolean accept(@NotNull WorkspaceSymbolData item) {
-        // Include all symbols
-        return true;
-    }
+enum LSPWorkspaceRequestedSymbolTypes {
+    ALL_SYMBOLS,
+    TYPE_SYMBOLS
 }
