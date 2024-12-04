@@ -22,13 +22,14 @@ import org.jetbrains.annotations.NotNull;
  * Adds client-side completion configuration features.
  */
 public class UserDefinedCompletionFeature extends LSPCompletionFeature {
+
+    @Override
     public boolean isCaseSensitive(@NotNull PsiFile file) {
         LanguageServerDefinition serverDefinition = getClientFeatures().getServerDefinition();
         if (serverDefinition instanceof UserDefinedLanguageServerDefinition languageServerDefinition) {
             ClientConfigurationSettings clientConfiguration = languageServerDefinition.getLanguageServerClientConfiguration();
             return (clientConfiguration != null) && clientConfiguration.completions.caseSensitive;
         }
-        // Default to case-insensitive if unspecified for backward-compatibility
-        return false;
+        return super.isCaseSensitive(file);
     }
 }
