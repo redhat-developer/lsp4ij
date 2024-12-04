@@ -119,6 +119,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String initializationOptionsContent;
 
+        private String clientConfigurationContent = "{}";
+
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
 
@@ -206,6 +208,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         public void setInitializationOptionsContent(String initializationOptionsContent) {
             this.initializationOptionsContent = initializationOptionsContent;
         }
+
+        public String getClientConfigurationContent() {
+            return clientConfigurationContent;
+        }
+
+        public void setClientConfigurationContent(String clientConfigurationContent) {
+            this.clientConfigurationContent = clientConfigurationContent;
+        }
     }
 
     public static class MyState {
@@ -215,7 +225,5 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         MyState() {
         }
-
     }
-
 }

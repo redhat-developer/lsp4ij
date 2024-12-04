@@ -12,15 +12,21 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.SpellCheckingEditorCustomizationProvider;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.*;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +35,8 @@ import java.util.List;
  * Wrapper for EditorTextField configured for JSON.
  */
 public class JsonTextField extends JPanel {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(JsonTextField.class);
 
     private static final String JSON_LANGUAGE_NAME = "JSON";
     private static final String DEFAULT_VALUE = "{}";
@@ -55,6 +63,25 @@ public class JsonTextField extends JPanel {
         // Add it to this panel
         setLayout(new BorderLayout());
         add(editorTextField, BorderLayout.CENTER);
+    }
+
+    /**
+     * Sets the editor's filename so that the correct JSON schema will be used for code completion and validation.
+     *
+     * @param jsonFilename the JSON file name
+     */
+    public void setJsonFilename(@NotNull String jsonFilename) {
+        try {
+            Document document = editorTextField.getDocument();
+            VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+            if (file != null) {
+                file.rename(this, jsonFilename);
+            } else {
+                LOGGER.warn("Failed to rename the JSON text field file to '{}'.", jsonFilename);
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Failed to configure JSON text field for JSON schema '{}'.", jsonFilename, e);
+        }
     }
 
     // Proxy some simple accessors to the editor text field

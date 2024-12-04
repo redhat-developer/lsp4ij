@@ -16,7 +16,9 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.*;
+import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
@@ -112,7 +114,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
             }
         });
 
-        showInstructionButton = super.createHelpButton(new JBInsets(0,0,0,0));
+        showInstructionButton = super.createHelpButton(new JBInsets(0, 0, 0, 0));
         showInstructionButton.setText("");
         templateCombo.addItemListener(getTemplateComboListener());
 
@@ -123,6 +125,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     /**
      * Create the template combo listener that handles item selection
+     *
      * @return created ItemListener
      */
     private ItemListener getTemplateComboListener() {
@@ -169,6 +172,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     /**
      * Check that the template is not a placeholder and that it has a valid description
+     *
      * @param template to check
      * @return true if template is not null, not a placeholder and has a description, else false
      */
@@ -205,15 +209,20 @@ public class NewLanguageServerDialog extends DialogWrapper {
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();
         mappingsPanel.refreshMappings(template);
 
-        // Update configuration
+        // Update server configuration
         var configuration = this.languageServerPanel.getConfiguration();
         configuration.setText(template.getConfiguration() != null ? template.getConfiguration() : "");
         configuration.setCaretPosition(0);
 
-        // Update initialize options
+        // Update initialization options
         var initializationOptions = this.languageServerPanel.getInitializationOptionsWidget();
         initializationOptions.setText(template.getInitializationOptions() != null ? template.getInitializationOptions() : "");
         initializationOptions.setCaretPosition(0);
+
+        // Update client configuration
+        var clientConfiguration = this.languageServerPanel.getClientConfigurationWidget();
+        clientConfiguration.setText(template.getClientConfiguration() != null ? template.getClientConfiguration() : "");
+        clientConfiguration.setCaretPosition(0);
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
@@ -285,16 +294,17 @@ public class NewLanguageServerDialog extends DialogWrapper {
         boolean includeSystemEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().isPassParentEnvs();
         String configuration = this.languageServerPanel.getConfiguration().getText();
         String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
+        String clientConfiguration = this.languageServerPanel.getClientConfigurationWidget().getText();
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
                 serverName,
                 "",
                 commandLine,
-                userEnvironmentVariables ,
+                userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
                 configuration,
-                initializationOptions);
+                initializationOptions,
+                clientConfiguration);
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
-
     }
 
     private void addValidator(JTextComponent textComponent) {
@@ -305,5 +315,4 @@ public class NewLanguageServerDialog extends DialogWrapper {
             }
         });
     }
-
 }

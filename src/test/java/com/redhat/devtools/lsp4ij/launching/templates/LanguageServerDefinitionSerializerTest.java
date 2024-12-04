@@ -38,8 +38,8 @@ public class LanguageServerDefinitionSerializerTest {
                 Map.of(),
                 false,
                 "",
-                ""
-        );
+                "",
+                "");
 
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(UserDefinedLanguageServerDefinition.class, new LanguageServerDefinitionSerializer())
@@ -61,8 +61,8 @@ public class LanguageServerDefinitionSerializerTest {
                 Map.of(),
                 false,
                 "",
-                ""
-        );
+                "",
+                "");
         lsDef.getLanguageMappings().put(Language.ANY, "testing");
 
         Gson gson = new GsonBuilder()
@@ -88,8 +88,8 @@ public class LanguageServerDefinitionSerializerTest {
                 Map.of(),
                 false,
                 "",
-                ""
-        );
+                "",
+                "");
         FileNameMatcher fileNameMatcher1 = new ExtensionFileNameMatcher("rs");
         FileNameMatcher fileNameMatcher2 = new WildcardFileNameMatcher("*kt");
         List<FileNameMatcher> fileNameMatcherList = List.of(fileNameMatcher1, fileNameMatcher2);
@@ -122,8 +122,8 @@ public class LanguageServerDefinitionSerializerTest {
                 Map.of(),
                 false,
                 "",
-                ""
-        );
+                "",
+                "");
         FileTypeManager fileTypeManager = FileTypeManager.getInstance();
         FileType fileType = fileTypeManager.getFileTypeByExtension("any");
         lsDef.getFileTypeMappings().put(fileType, "Mock");
