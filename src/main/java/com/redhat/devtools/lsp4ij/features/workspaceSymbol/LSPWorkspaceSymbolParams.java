@@ -17,7 +17,9 @@ import org.jetbrains.annotations.NotNull;
  * Extension of {@link WorkspaceSymbolParams} that includes additional parameters specific to LSP4IJ.
  */
 class LSPWorkspaceSymbolParams extends WorkspaceSymbolParams {
-    private final LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes;
+
+    // Use transient to avoid serializing the fields when GSON will be processed
+    private transient final LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes;
 
     LSPWorkspaceSymbolParams(@NotNull String query, @NotNull LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes) {
         super(query);
