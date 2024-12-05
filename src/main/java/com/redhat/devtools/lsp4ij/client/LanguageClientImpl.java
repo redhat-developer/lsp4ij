@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
@@ -250,15 +251,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     protected static Object findSettings(String[] sections, JsonObject jsonObject) {
-        JsonObject current = jsonObject;
-        for (String section : sections) {
-            Object result = current.get(section);
-            if (!(result instanceof JsonObject json)) {
-                return null;
-            }
-            current = json;
-        }
-        return current;
+        return SettingsHelper.findSettings(sections, jsonObject);
     }
 
     /**
