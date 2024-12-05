@@ -146,7 +146,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         String documentText = document.getText();
         int documentLength = documentText.length();
 
-        int start = LSPFoldingRangeBuilder.getStartOffset(foldingRange, document);
+        int start = getStartOffset(foldingRange, document);
         Character startChar = start > 0 ? documentText.charAt(start - 1) : null;
         if ((startChar != null) && ((openBraceChar == null) || (startChar == openBraceChar))) {
             // If necessary, infer the braces for this block
@@ -155,7 +155,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
                 closeBraceChar = getCloseBraceChar(openBraceChar);
             }
 
-            int end = LSPFoldingRangeBuilder.getEndOffset(foldingRange, document);
+            int end = getEndOffset(foldingRange, document);
             // The end offsets can fall a bit short, so look for the closing brace character
             if (closeBraceChar != null) {
                 while ((end < documentLength) && (documentText.charAt(end) != closeBraceChar)) {
