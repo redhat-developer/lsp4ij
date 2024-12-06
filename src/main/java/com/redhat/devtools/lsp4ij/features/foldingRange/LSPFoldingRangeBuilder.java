@@ -70,7 +70,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         if (!ContainerUtil.isEmpty(foldingRanges)) {
             for (FoldingRange foldingRange : foldingRanges) {
                 TextRange textRange = getTextRange(foldingRange, document);
-                if (textRange != null) {
+                if ((textRange != null) && (textRange.getLength() > 0)) {
                     String collapsedText = foldingRange.getCollapsedText();
                     if (collapsedText != null) {
                         descriptors.add(new FoldingDescriptor(root.getNode(), textRange, null, collapsedText));
