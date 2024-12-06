@@ -623,7 +623,7 @@ After setting the cursor position in a file, you can view the Type Hierarchy usi
 
 ### Workspace Symbol
 
-[workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) is implemented with the `gotoSymbolContributor` extension point. 
+[workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) is implemented with the `gotoSymbolContributor` and `gotoClassContributor` extension points as appropriate for the symbol type(s). 
 
 Here is an example with the [MicroProfile language server](https://github.com/eclipse/lsp4mp/tree/master/microprofile.ls) collecting JAX-RS endpoints:
 

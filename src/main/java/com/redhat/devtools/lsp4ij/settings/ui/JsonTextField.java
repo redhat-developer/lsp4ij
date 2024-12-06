@@ -21,6 +21,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.*;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,8 +87,8 @@ public class JsonTextField extends JPanel {
 
     // Proxy some simple accessors to the editor text field
 
-    public void setText(@NotNull String text) {
-        editorTextField.setText(text);
+    public void setText(@Nullable String text) {
+        editorTextField.setText(text != null ? text : DEFAULT_VALUE);
     }
 
     public @NotNull String getText() {
