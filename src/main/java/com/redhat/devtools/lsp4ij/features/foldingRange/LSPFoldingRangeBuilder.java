@@ -48,7 +48,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPFoldingRangeBuilder.class);
 
-    // TODO: Can this be derived from the language server? If not, these are the standard for modern languages
+    // NOTE: JetBrains has maintained a long assumption that these are the primary structural block delimiters via
+    // AbstractFileType's explicit support for them. If/when other structural block delimiters are discovered for
+    // languages supported by LSP, we can revisit this hard-coded assumption.
     private static final Map<Character, Character> BRACE_PAIR_CHARS_FWD = Map.of(
             '{', '}',
             '[', ']',
