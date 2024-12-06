@@ -330,6 +330,14 @@
                 id="LSPFormattingAndRangeBothService"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingAndRangeBothService"/>
 
+        <!-- LSP textDocument/selectionRange request support -->
+        <extendWordSelectionHandler
+                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPExtendWordSelectionHandler"
+                order="first"/>
+        <basicWordSelectionFilter
+                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPBasicWordSelectionFilter"
+                order="first"/>
+
         <!-- LSP textDocument/semanticTokens request support -->
         <highlightVisitor
                 id="LSPSemanticTokensHighlightVisitor"
