@@ -15,6 +15,9 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 
+/**
+ * Prevents {@link com.intellij.codeInsight.editorActions.wordSelection.WordSelectioner} from adding selections to LSP files.
+ */
 public class LSPBasicWordSelectionFilter implements Condition<PsiElement> {
     @Override
     public boolean value(PsiElement element) {

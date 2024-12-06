@@ -43,6 +43,12 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     @Override
+    protected boolean isValidLSPFuture() {
+        // Disable caching until/unless it can take into account the params, in this case, the caret offset
+        return false;
+    }
+
+    @Override
     protected CompletableFuture<List<SelectionRange>> doLoad(SelectionRangeParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return getSelectionRanges(file, params, cancellationSupport);

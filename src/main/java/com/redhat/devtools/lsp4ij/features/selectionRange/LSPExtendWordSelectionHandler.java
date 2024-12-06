@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.selectionRange;
 import com.intellij.codeInsight.editorActions.ExtendWordSelectionHandler;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
@@ -44,8 +43,16 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
 
     @Override
     public boolean canSelect(@NotNull PsiElement element) {
-        // TODO: Check the capability?
-        return true;
+        if (!element.isValid()) {
+            return false;
+        }
+
+        PsiFile file = element.getContainingFile();
+        if ((file == null) || !file.isValid()) {
+            return false;
+        }
+
+        return LSPFileSupport.getSupport(file).getSelectionRangeSupport() != null;
     }
 
     @Override
@@ -58,48 +65,30 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             return null;
         }
 
-        List<SelectionRange> selectionRanges = getSelectionRanges(file, editor, offset);
+        Document document = editor.getDocument();
+        List<SelectionRange> selectionRanges = getSelectionRanges(file, document, offset);
         if (ContainerUtil.isEmpty(selectionRanges)) {
             return null;
         }
 
-        Document document = editor.getDocument();
-        SelectionModel selectionModel = editor.getSelectionModel();
-        TextRange currentSelectionTextRange = TextRange.create(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd());
-
         Set<TextRange> textRanges = new LinkedHashSet<>(selectionRanges.size());
         for (SelectionRange selectionRange : selectionRanges) {
             TextRange selectionTextRange = getTextRange(selectionRange, document);
-            if (selectionTextRange.contains(currentSelectionTextRange) && !selectionTextRange.equals(currentSelectionTextRange)) {
-                textRanges.addAll(expandToWholeLinesWithBlanks(editorText, selectionTextRange));
-            }
+            textRanges.addAll(expandToWholeLinesWithBlanks(editorText, selectionTextRange));
+
             for (SelectionRange parentSelectionRange = selectionRange.getParent();
                  parentSelectionRange != null;
                  parentSelectionRange = parentSelectionRange.getParent()) {
                 TextRange parentSelectionTextRange = getTextRange(parentSelectionRange, document);
-                if (!parentSelectionTextRange.equals(selectionTextRange) && parentSelectionTextRange.contains(currentSelectionTextRange) && !parentSelectionTextRange.equals(currentSelectionTextRange)) {
-                    textRanges.addAll(expandToWholeLinesWithBlanks(editorText, parentSelectionTextRange));
-                    // Stop on the first one that provides a wider selection
-                    break;
-                }
+                textRanges.addAll(expandToWholeLinesWithBlanks(editorText, parentSelectionTextRange));
             }
         }
         return new ArrayList<>(textRanges);
     }
 
-    private static @NotNull TextRange getTextRange(@NotNull SelectionRange selectionRange, @NotNull Document document) {
-        Range range = selectionRange.getRange();
-        Position start = range.getStart();
-        Position end = range.getEnd();
-        int startOffset = LSPIJUtils.toOffset(start, document);
-        int endOffset = LSPIJUtils.toOffset(end, document);
-        return TextRange.create(startOffset, endOffset);
-    }
-
-    @NotNull
-    static List<SelectionRange> getSelectionRanges(@NotNull PsiFile file,
-                                                   @NotNull Editor editor,
-                                                   int offset) {
+    private static @NotNull List<SelectionRange> getSelectionRanges(@NotNull PsiFile file,
+                                                                    @NotNull Document document,
+                                                                    int offset) {
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             return Collections.emptyList();
         }
@@ -112,26 +101,8 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
 
         TextDocumentIdentifier textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile());
 
-        Document document = editor.getDocument();
-        List<Position> positions = new LinkedList<>();
-        // If there's a selection, include positions for its range
-        SelectionModel selectionModel = editor.getSelectionModel();
-        if (selectionModel.hasSelection()) {
-//            int selectionStart = selectionModel.getSelectionStart();
-//            int adjustedSelectionStart = selectionStart > 0 ? selectionStart - 1 : selectionStart;
-//            positions.add(LSPIJUtils.toPosition(adjustedSelectionStart, document));
-//            int selectionEnd = selectionModel.getSelectionEnd();
-//            int adjustedSelectionEnd = selectionEnd < (document.getTextLength() - 1) ? selectionEnd + 1 : selectionEnd;
-//            positions.add(LSPIJUtils.toPosition(adjustedSelectionEnd, document));
-            positions.add(LSPIJUtils.toPosition(selectionModel.getSelectionStart(), document));
-            positions.add(LSPIJUtils.toPosition(selectionModel.getSelectionEnd(), document));
-        }
-        // If not, just include the current offset
-        else {
-            positions.add(LSPIJUtils.toPosition(offset, document));
-        }
-
-        var params = new SelectionRangeParams(textDocumentIdentifier, positions);
+        Position position = LSPIJUtils.toPosition(offset, document);
+        var params = new SelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position));
         CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);
         try {
             waitUntilDone(selectionRangesFuture, file);
@@ -155,5 +126,15 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
 
         // textDocument/selectionRanges has been collected correctly, create list of IJ SelectionDescriptor from LSP SelectionRange list
         return selectionRangesFuture.getNow(null);
+    }
+
+    private static @NotNull TextRange getTextRange(@NotNull SelectionRange selectionRange,
+                                                   @NotNull Document document) {
+        Range range = selectionRange.getRange();
+        Position start = range.getStart();
+        Position end = range.getEnd();
+        int startOffset = LSPIJUtils.toOffset(start, document);
+        int endOffset = LSPIJUtils.toOffset(end, document);
+        return TextRange.create(startOffset, endOffset);
     }
 }
