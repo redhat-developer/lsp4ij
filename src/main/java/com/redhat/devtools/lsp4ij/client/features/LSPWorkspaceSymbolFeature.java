@@ -40,4 +40,19 @@ public class LSPWorkspaceSymbolFeature extends AbstractLSPWorkspaceFeature {
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
         // Do nothing
     }
+
+    /**
+     * Determines whether or not the language server's workspace/symbol feature implementation is efficient enough to
+     * support the JetBrains' IDE's gotoClassContributor EP. In general, the action associated with that EP is invoked
+     * much more frequently than the action associated with the IDE's gotoSymbolContributor, so this method should only
+     * return true if the language server's implementation of workspace/symbol can realistically accommodate those
+     * requests.
+     *
+     * @return true if the language server's workspace/symbol feature can support the IDE's gotoClassContributor EP
+     * efficiently; otherwise false
+     */
+    public boolean supportsGotoClass() {
+        // Default to unsupported
+        return false;
+    }
 }

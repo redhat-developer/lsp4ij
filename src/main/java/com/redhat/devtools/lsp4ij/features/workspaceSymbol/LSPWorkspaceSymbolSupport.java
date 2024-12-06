@@ -19,7 +19,6 @@ import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.SymbolInformation;
 import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.WorkspaceSymbol;
-import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -34,28 +33,28 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'workspace/symbol' requests</li>
  * </ul>
  */
-public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSupport<WorkspaceSymbolParams, List<WorkspaceSymbolData>> {
+public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSupport<LSPWorkspaceSymbolParams, List<WorkspaceSymbolData>> {
 
     public LSPWorkspaceSymbolSupport(@NotNull Project project) {
         super(project);
     }
 
-    public CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbol(WorkspaceSymbolParams params) {
+    public CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbol(LSPWorkspaceSymbolParams params) {
         return super.getFeatureData(params);
     }
 
     @Override
-    protected CompletableFuture<List<WorkspaceSymbolData>> doLoad(WorkspaceSymbolParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<WorkspaceSymbolData>> doLoad(LSPWorkspaceSymbolParams params, CancellationSupport cancellationSupport) {
         Project project = super.getProject();
         return getWorkspaceSymbol(project, params, cancellationSupport);
     }
 
     private static @NotNull CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbol(@NotNull Project project,
-                                                                                            @NotNull WorkspaceSymbolParams params,
+                                                                                            @NotNull LSPWorkspaceSymbolParams params,
                                                                                             @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(project,
-                        f -> f.getWorkspaceSymbolFeature().isEnabled(),
-                        f -> f.getWorkspaceSymbolFeature().isSupported())
+                f -> f.getWorkspaceSymbolFeature().isEnabled() && params.canSupport(f.getWorkspaceSymbolFeature()),
+                f -> f.getWorkspaceSymbolFeature().isSupported())
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which have workspaceSymbol capability
                     if (languageServers.isEmpty()) {
@@ -74,7 +73,7 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
                 });
     }
 
-    private static CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbolFor(@NotNull WorkspaceSymbolParams params,
+    private static CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbolFor(@NotNull LSPWorkspaceSymbolParams params,
                                                                                       @NotNull LanguageServerItem languageServer,
                                                                                       @NotNull CancellationSupport cancellationSupport,
                                                                                       @NotNull Project project) {
@@ -90,14 +89,18 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
                     if (symbols.isLeft()) {
                         List<? extends SymbolInformation> s = symbols.getLeft();
                         for (var si : s) {
-                            items.add(new WorkspaceSymbolData(
-                                    si.getName(), si.getKind(), si.getLocation(), project));
+                            if (params.accept(si)) {
+                                items.add(new WorkspaceSymbolData(
+                                        si.getName(), si.getKind(), si.getLocation(), project));
+                            }
                         }
                     } else if (symbols.isRight()) {
                         List<? extends WorkspaceSymbol> ws = symbols.getRight();
                         for (var si : ws) {
-                            WorkspaceSymbolData item = createItem(si, project);
-                            items.add(item);
+                            if (params.accept(si)) {
+                                WorkspaceSymbolData item = createItem(si, project);
+                                items.add(item);
+                            }
                         }
                     }
                     return items;
@@ -114,5 +117,4 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
         return new WorkspaceSymbolData(
                 name, symbolKind, si.getLocation().getRight().getUri(), null, project);
     }
-
 }

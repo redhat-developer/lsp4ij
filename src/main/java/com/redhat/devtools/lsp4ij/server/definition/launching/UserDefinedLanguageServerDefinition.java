@@ -69,6 +69,26 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.clientConfigurationContent = clientConfigurationContent;
     }
 
+    // Backward-compatible signature for clients calling without client configuration content
+    public UserDefinedLanguageServerDefinition(@NotNull String id,
+                                               @NotNull String name,
+                                               @Nullable String description,
+                                               @NotNull String commandLine,
+                                               @NotNull Map<String, String> userEnvironmentVariables,
+                                               boolean includeSystemEnvironmentVariables,
+                                               @Nullable String configurationContent,
+                                               @Nullable String initializationOptionsContent) {
+        this(id,
+                name,
+                description,
+                commandLine,
+                userEnvironmentVariables,
+                includeSystemEnvironmentVariables,
+                configurationContent,
+                initializationOptionsContent,
+                null);
+    }
+
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
         String resolvedCommandLine = resolveCommandLine(commandLine, project);
