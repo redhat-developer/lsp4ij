@@ -493,7 +493,8 @@ public class MyLSPSemanticTokensFeature extends LSPSemanticTokensFeature {
 
 ## LSP Workspace Symbol Feature
 
-| API                   | Description                                                                                                                                                                              | Default Behaviour                      |
-|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
-| boolean isEnabled()   | Returns `true` if the LSP feature is enabled and `false` otherwise.                                                                                                                      | `true` when server is starting/started |
-| boolean isSupported() | Returns `true` if the LSP feature is supported and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the LSP server capabilities. | Check the server capability            |
+| API                         | Description                                                                                                                                                                              | Default Behaviour                      |
+|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| boolean isEnabled()         | Returns `true` if the LSP feature is enabled and `false` otherwise.                                                                                                                      | `true` when server is starting/started |
+| boolean isSupported()       | Returns `true` if the LSP feature is supported and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the LSP server capabilities. | Check the server capability            |
+| boolean supportsGotoClass() | Returns `true` if the LSP feature is efficient enough to support the IDE's Go To Class action which may be invoked frequently and `false` otherwise.                                     | `false`                                |

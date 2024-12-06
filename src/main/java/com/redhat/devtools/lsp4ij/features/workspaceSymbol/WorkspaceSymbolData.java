@@ -32,8 +32,9 @@ import java.util.Optional;
 /**
  * LSP navigation item implementation.
  */
-public class WorkspaceSymbolData implements NavigationItem  {
+public class WorkspaceSymbolData implements NavigationItem {
 
+    private final SymbolKind symbolKind;
     private final String fileUri;
     private final Position position;
     private final Project project;
@@ -68,6 +69,7 @@ public class WorkspaceSymbolData implements NavigationItem  {
     }
 
     public WorkspaceSymbolData(String name, SymbolKind symbolKind, String fileUri, Position position, Project project) {
+        this.symbolKind = symbolKind;
         this.fileUri = fileUri;
         this.position = position;
         this.project = project;
@@ -78,6 +80,10 @@ public class WorkspaceSymbolData implements NavigationItem  {
 
     public VirtualFile getFile() {
         return file;
+    }
+
+    public @Nullable SymbolKind getSymbolKind() {
+        return symbolKind;
     }
 
     @Override

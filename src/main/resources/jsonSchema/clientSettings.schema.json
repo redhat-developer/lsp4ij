@@ -17,6 +17,19 @@
           "default": false
         }
       }
+    },
+    "workspaceSymbol": {
+      "type": "object",
+      "title": "Client-side workspace symbol configuration",
+      "additionalProperties": false,
+      "properties": {
+        "supportsGotoClass": {
+          "type": "boolean",
+          "title": "Go to class support",
+          "description": "Whether or not the language server can efficiently support the IDE's Go To Class feature.",
+          "default": false
+        }
+      }
     }
   }
 }
