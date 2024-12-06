@@ -143,7 +143,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     ) {
         TextRange textRange = null;
 
-        String documentText = document.getText();
+        CharSequence documentText = document.getCharsSequence();
         int documentLength = documentText.length();
 
         int start = getStartOffset(foldingRange, document);
@@ -174,11 +174,11 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     }
 
     static boolean isOpenBraceChar(@Nullable Character character) {
-        return (character != null) && BRACE_PAIR_CHARS_FWD.keySet().contains(character);
+        return (character != null) && BRACE_PAIR_CHARS_FWD.containsKey(character);
     }
 
     static boolean isCloseBraceChar(@Nullable Character character) {
-        return (character != null) && BRACE_PAIR_CHARS_BWD.keySet().contains(character);
+        return (character != null) && BRACE_PAIR_CHARS_BWD.containsKey(character);
     }
 
     @Nullable
