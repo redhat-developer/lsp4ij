@@ -143,11 +143,11 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     ) {
         TextRange textRange = null;
 
-        CharSequence documentText = document.getCharsSequence();
-        int documentLength = documentText.length();
+        CharSequence documentChars = document.getCharsSequence();
+        int documentLength = documentChars.length();
 
         int start = getStartOffset(foldingRange, document);
-        Character startChar = start > 0 ? documentText.charAt(start - 1) : null;
+        Character startChar = start > 0 ? documentChars.charAt(start - 1) : null;
         if ((startChar != null) && ((openBraceChar == null) || (startChar == openBraceChar))) {
             // If necessary, infer the braces for this block
             if ((openBraceChar == null) && isOpenBraceChar(startChar)) {
@@ -158,12 +158,12 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
             int end = getEndOffset(foldingRange, document);
             // The end offsets can fall a bit short, so look for the closing brace character
             if (closeBraceChar != null) {
-                while ((end < documentLength) && (documentText.charAt(end) != closeBraceChar)) {
+                while ((end < documentLength) && (documentChars.charAt(end) != closeBraceChar)) {
                     end++;
                 }
             }
             if (end >= start) {
-                Character endChar = end < documentLength ? documentText.charAt(end) : null;
+                Character endChar = end < documentLength ? documentChars.charAt(end) : null;
                 if ((endChar != null) && ((closeBraceChar == null) || (endChar == closeBraceChar))) {
                     textRange = TextRange.create(start, end);
                 }

@@ -35,13 +35,13 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
         List<FoldingRange> foldingRanges = LSPFoldingRangeBuilder.getFoldingRanges(file);
         if (!ContainerUtil.isEmpty(foldingRanges)) {
             Document document = editor.getDocument();
-            String documentText = document.getText();
-            int documentLength = documentText.length();
+            CharSequence documentChars = document.getCharsSequence();
+            int documentLength = documentChars.length();
 
             // Adjust the offset slightly based on before/after brace
             int offset = editor.getCaretModel().getOffset();
-            Character beforeCharacter = offset > 0 ? documentText.charAt(offset - 1) : null;
-            Character afterCharacter = offset < documentLength ? documentText.charAt(offset) : null;
+            Character beforeCharacter = offset > 0 ? documentChars.charAt(offset - 1) : null;
+            Character afterCharacter = offset < documentLength ? documentChars.charAt(offset) : null;
             if (isOpenBraceChar(afterCharacter)) {
                 offset++;
             } else if (isCloseBraceChar(beforeCharacter)) {
@@ -51,11 +51,11 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
             // See if we're anchored by a known brace character
             Character openBraceChar = null;
             Character closeBraceChar = null;
-            if ((offset > 0) && isOpenBraceChar(documentText.charAt(offset - 1))) {
-                openBraceChar = documentText.charAt(offset - 1);
+            if ((offset > 0) && isOpenBraceChar(documentChars.charAt(offset - 1))) {
+                openBraceChar = documentChars.charAt(offset - 1);
                 closeBraceChar = getCloseBraceChar(openBraceChar);
-            } else if ((offset < (documentLength - 1)) && isCloseBraceChar(documentText.charAt(offset + 1))) {
-                closeBraceChar = documentText.charAt(offset + 1);
+            } else if ((offset < (documentLength - 1)) && isCloseBraceChar(documentChars.charAt(offset + 1))) {
+                closeBraceChar = documentChars.charAt(offset + 1);
                 openBraceChar = getOpenBraceChar(closeBraceChar);
             }
 
