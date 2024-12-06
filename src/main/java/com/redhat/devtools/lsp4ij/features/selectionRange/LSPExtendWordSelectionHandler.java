@@ -37,6 +37,9 @@ import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerB
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
+/**
+ * Implementation of the IDE's extendWordSelectionHandler EP for LSP4IJ files against textDocument/selectionRange.
+ */
 public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPExtendWordSelectionHandler.class);
@@ -52,6 +55,7 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             return false;
         }
 
+        // Only if textDocument/selectionRange is supported for the file
         return LSPFileSupport.getSupport(file).getSelectionRangeSupport() != null;
     }
 
@@ -65,12 +69,14 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             return null;
         }
 
+        // Get the selection ranges
         Document document = editor.getDocument();
         List<SelectionRange> selectionRanges = getSelectionRanges(file, document, offset);
         if (ContainerUtil.isEmpty(selectionRanges)) {
             return null;
         }
 
+        // Convert the selection ranges into text ranges
         Set<TextRange> textRanges = new LinkedHashSet<>(selectionRanges.size());
         for (SelectionRange selectionRange : selectionRanges) {
             TextRange selectionTextRange = getTextRange(selectionRange, document);
@@ -128,6 +134,13 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
         return selectionRangesFuture.getNow(null);
     }
 
+    /**
+     * Converts the LSP selection range into the IDE text range.
+     *
+     * @param selectionRange the LSP selection range
+     * @param document       the document for for which the selection range applies
+     * @return the corresponding text range
+     */
     private static @NotNull TextRange getTextRange(@NotNull SelectionRange selectionRange,
                                                    @NotNull Document document) {
         Range range = selectionRange.getRange();
