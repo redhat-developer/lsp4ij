@@ -22,7 +22,10 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.SelectionRange;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -108,7 +111,7 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
         TextDocumentIdentifier textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile());
 
         Position position = LSPIJUtils.toPosition(offset, document);
-        var params = new SelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position));
+        var params = new LSPSelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position), offset);
         CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);
         try {
             waitUntilDone(selectionRangesFuture, file);

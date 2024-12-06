@@ -17,7 +17,6 @@ import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.SelectionRange;
-import org.eclipse.lsp4j.SelectionRangeParams;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
@@ -32,30 +31,31 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/selectionRange' requests</li>
  * </ul>
  */
-public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<SelectionRangeParams, List<SelectionRange>> {
+public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<LSPSelectionRangeParams, List<SelectionRange>> {
+
+    private Integer previousOffset;
 
     public LSPSelectionRangeSupport(@NotNull PsiFile file) {
         super(file);
     }
 
-    public CompletableFuture<List<SelectionRange>> getSelectionRanges(SelectionRangeParams params) {
+    public CompletableFuture<List<SelectionRange>> getSelectionRanges(LSPSelectionRangeParams params) {
+        int offset = params.getOffset();
+        if ((previousOffset != null) && !previousOffset.equals(offset)) {
+            super.cancel();
+        }
+        previousOffset = offset;
         return super.getFeatureData(params);
     }
 
     @Override
-    protected boolean isValidLSPFuture() {
-        // Disable caching until/unless it can take into account the params, in this case, the caret offset
-        return false;
-    }
-
-    @Override
-    protected CompletableFuture<List<SelectionRange>> doLoad(SelectionRangeParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<SelectionRange>> doLoad(LSPSelectionRangeParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return getSelectionRanges(file, params, cancellationSupport);
     }
 
     private static @NotNull CompletableFuture<List<SelectionRange>> getSelectionRanges(@NotNull PsiFile file,
-                                                                                       @NotNull SelectionRangeParams params,
+                                                                                       @NotNull LSPSelectionRangeParams params,
                                                                                        @NotNull CancellationSupport cancellationSupport) {
 
         return getLanguageServers(file,
@@ -79,7 +79,7 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
                 });
     }
 
-    private static CompletableFuture<List<SelectionRange>> getSelectionRangesFor(SelectionRangeParams params,
+    private static CompletableFuture<List<SelectionRange>> getSelectionRangesFor(LSPSelectionRangeParams params,
                                                                                  LanguageServerItem languageServer,
                                                                                  CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
