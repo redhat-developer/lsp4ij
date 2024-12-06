@@ -10,30 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 
-import org.eclipse.lsp4j.SymbolKind;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.Set;
 
 /**
  * LSP workspace goto class contributor.
  */
 public class LSPWorkspaceGotoClassContributor extends AbstractLSPWorkspaceSymbolContributor {
 
-    private final static Set<SymbolKind> TYPE_SYMBOL_KINDS = Set.of(
-            SymbolKind.Class,
-            SymbolKind.Interface,
-            SymbolKind.Enum,
-            SymbolKind.Struct
-    );
-
-    public LSPWorkspaceGotoClassContributor() {
-        super(LSPWorkspaceRequestedSymbolTypes.TYPE_SYMBOLS);
-    }
-
     @Override
-    protected boolean accept(@NotNull WorkspaceSymbolData item) {
-        // Include only type symbols
-        return TYPE_SYMBOL_KINDS.contains(item.getSymbolKind());
+    protected @NotNull LSPWorkspaceSymbolParams createWorkspaceSymbolParams(@NotNull String query) {
+        return new LSPWorkspaceSymbolForClassesParams(query);
     }
 }

@@ -20,13 +20,11 @@ import com.intellij.util.Processor;
 import com.intellij.util.indexing.FindSymbolParameters;
 import com.intellij.util.indexing.IdFilter;
 import com.redhat.devtools.lsp4ij.LSPWorkspaceSupport;
-import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -41,12 +39,6 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameContributorEx {
 
     private final static Logger LOGGER = LoggerFactory.getLogger(AbstractLSPWorkspaceSymbolContributor.class);
-
-    private final LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes;
-
-    protected AbstractLSPWorkspaceSymbolContributor(@NotNull LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes) {
-        this.requestedSymbolTypes = requestedSymbolTypes;
-    }
 
     @Override
     public void processNames(@NotNull Processor<? super String> processor,
@@ -88,7 +80,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
         if (cancel) {
             workspaceSymbolSupport.cancel();
         }
-        WorkspaceSymbolParams params = new LSPWorkspaceSymbolParams(name, requestedSymbolTypes);
+        LSPWorkspaceSymbolParams params = createWorkspaceSymbolParams(name);
         CompletableFuture<List<WorkspaceSymbolData>> workspaceSymbolFuture = workspaceSymbolSupport.getWorkspaceSymbol(params);
         try {
             waitUntilDone(workspaceSymbolFuture);
@@ -108,26 +100,17 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
 
         if (isDoneNormally(workspaceSymbolFuture)) {
             // workspace/symbol has been collected correctly
-            return filter(workspaceSymbolFuture.getNow(null));
+            return workspaceSymbolFuture.getNow(null);
         }
         return null;
     }
 
-    private @Nullable List<WorkspaceSymbolData> filter(@Nullable List<WorkspaceSymbolData> items) {
-        if (items != null) {
-            List<WorkspaceSymbolData> mutableItems = new ArrayList<>(items);
-            mutableItems.removeIf(item -> (item == null) || !accept(item));
-            return mutableItems;
-        } else {
-            return null;
-        }
-    }
-
     /**
-     * Determines whether or not the provided symbol should be included in the contributor's symbol list.
+     * Creates the {@link LSPWorkspaceSymbolParams} implementation for this symbol contributor.
      *
-     * @param item the symbol
-     * @return true if the symbol should be include; otherwise false
+     * @param name the (partial) name being requested
+     * @return the LSP workspace symbol params
      */
-    protected abstract boolean accept(@NotNull WorkspaceSymbolData item);
+    @NotNull
+    protected abstract LSPWorkspaceSymbolParams createWorkspaceSymbolParams(@NotNull String name);
 }

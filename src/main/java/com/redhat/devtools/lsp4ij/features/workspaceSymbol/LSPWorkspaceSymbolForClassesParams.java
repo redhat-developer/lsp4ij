@@ -12,40 +12,40 @@ package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceSymbolFeature;
 import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.WorkspaceSymbol;
-import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.jetbrains.annotations.NotNull;
 
-/**
- * Extension of {@link WorkspaceSymbolParams} that includes additional parameters specific to LSP4IJ.
- */
-public class LSPWorkspaceSymbolParams extends WorkspaceSymbolParams {
+import java.util.Set;
 
-    LSPWorkspaceSymbolParams(@NotNull String query) {
+/**
+ * LSP workspace/symbol params for selection of only type symbols in support of the IDE's Go To Class action.
+ */
+public class LSPWorkspaceSymbolForClassesParams extends LSPWorkspaceSymbolParams {
+
+    private final static Set<SymbolKind> TYPE_SYMBOL_KINDS = Set.of(
+            SymbolKind.Class,
+            SymbolKind.Interface,
+            SymbolKind.Enum,
+            SymbolKind.Struct
+    );
+
+    LSPWorkspaceSymbolForClassesParams(@NotNull String query) {
         super(query);
     }
 
+    @Override
     public boolean canSupport(@NotNull LSPWorkspaceSymbolFeature feature) {
-        return true;
+        return feature.supportsGotoClass();
     }
 
-    /**
-     * Determines whether or not the provided symbol should be included in the contributor's symbol list.
-     *
-     * @param symbol the symbol
-     * @return true if the symbol should be include; otherwise false
-     */
+    @Override
     public boolean accept(@NotNull WorkspaceSymbol symbol) {
-        return true;
+        return TYPE_SYMBOL_KINDS.contains(symbol.getKind());
     }
 
-    /**
-     * Determines whether or not the provided symbol should be included in the contributor's symbol list.
-     *
-     * @param symbol the symbol
-     * @return true if the symbol should be include; otherwise false
-     */
+    @Override
     public boolean accept(SymbolInformation symbol) {
-        return true;
+        return (symbol != null) && TYPE_SYMBOL_KINDS.contains(symbol.getKind());
     }
 }
