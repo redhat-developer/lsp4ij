@@ -172,7 +172,21 @@ tasks {
         //TODO inject changelog into plugin.xml change-notes
     }
 
+    // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally
+    fun supportsEnhancedClassRedefinition(): Boolean {
+        val platformVersion = properties("platformVersion").getOrNull()
+        return when (platformVersion) {
+            // Versions before 2024.1 don't support enhanced class redefinition
+            "2023.2", "2023.3" -> false
+            else -> true
+        }
+    }
+
     runIde {
+        // Improved hotswap for the IDE's JVM
+        if (supportsEnhancedClassRedefinition()) {
+            jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
+        }
         //Use "debug" to send telemetry to dev source at segment.com
         systemProperties["com.redhat.devtools.intellij.telemetry.mode"] = "debug" // "disabled"
     }
