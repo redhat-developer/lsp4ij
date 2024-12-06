@@ -375,6 +375,10 @@ Here is an example with the [Go Language Server](./user-defined-ls/gopls.md) sho
 [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange) is implemented with
 the `extendWordSelectionHandler` extension point and used via the IDE's **Extend Selection** and **Shrink Selection** actions.
 
+Here is an example with the [TypeScript Language Server](https://github.com/typescript-language-server/typescript-language-server) showing **Extend/Shrink Selection** using `textDocument/selectionRange`:
+
+![textDocument/selectionRange](./images/lsp-support/textDocument_selectionRange.gif)
+
 ### Publish Diagnostics
 
 [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) is implemented with an `externalAnnotator` extension point. As this extension point supports `any` language, it works out-of-the-box.
