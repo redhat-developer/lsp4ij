@@ -10,6 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceSymbolFeature;
+import org.eclipse.lsp4j.SymbolInformation;
+import org.eclipse.lsp4j.WorkspaceSymbol;
 import org.eclipse.lsp4j.WorkspaceSymbolParams;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,20 +20,32 @@ import org.jetbrains.annotations.NotNull;
  * Extension of {@link WorkspaceSymbolParams} that includes additional parameters specific to LSP4IJ.
  */
 class LSPWorkspaceSymbolParams extends WorkspaceSymbolParams {
-    private final LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes;
 
-    LSPWorkspaceSymbolParams(@NotNull String query, @NotNull LSPWorkspaceRequestedSymbolTypes requestedSymbolTypes) {
+    LSPWorkspaceSymbolParams(@NotNull String query) {
         super(query);
-        this.requestedSymbolTypes = requestedSymbolTypes;
+    }
+
+    public boolean canSupport(@NotNull LSPWorkspaceSymbolFeature feature) {
+        return true;
     }
 
     /**
-     * Returns the types of symbols being requested.
+     * Determines whether or not the provided symbol should be included in the contributor's symbol list.
      *
-     * @return the types of symbols being requested
+     * @param symbol the symbol
+     * @return true if the symbol should be include; otherwise false
      */
-    @NotNull
-    LSPWorkspaceRequestedSymbolTypes getRequestedSymbolTypes() {
-        return requestedSymbolTypes;
+    public boolean accept(@NotNull WorkspaceSymbol symbol) {
+        return true;
+    }
+
+    /**
+     * Determines whether or not the provided symbol should be included in the contributor's symbol list.
+     *
+     * @param symbol the symbol
+     * @return true if the symbol should be include; otherwise false
+     */
+    public boolean accept(SymbolInformation symbol) {
+        return true;
     }
 }

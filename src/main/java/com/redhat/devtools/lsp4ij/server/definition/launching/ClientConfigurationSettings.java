@@ -47,5 +47,5 @@ public class ClientConfigurationSettings {
     /**
      * Client-side code workspace symbol settings
      */
-    public @NotNull ClientConfigurationWorkspaceSymbolSettings workspaceSymbols = new ClientConfigurationWorkspaceSymbolSettings();
+    public @NotNull ClientConfigurationWorkspaceSymbolSettings workspaceSymbol = new ClientConfigurationWorkspaceSymbolSettings();
 }

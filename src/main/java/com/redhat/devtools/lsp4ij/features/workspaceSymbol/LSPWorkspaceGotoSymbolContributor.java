@@ -17,13 +17,8 @@ import org.jetbrains.annotations.NotNull;
  */
 public class LSPWorkspaceGotoSymbolContributor extends AbstractLSPWorkspaceSymbolContributor {
 
-    public LSPWorkspaceGotoSymbolContributor() {
-        super(LSPWorkspaceRequestedSymbolTypes.ALL_SYMBOLS);
-    }
-
     @Override
-    protected boolean accept(@NotNull WorkspaceSymbolData item) {
-        // Include all symbols
-        return true;
+    protected @NotNull LSPWorkspaceSymbolParams createWorkspaceSymbolParams(@NotNull String query) {
+        return new LSPWorkspaceSymbolParams(query);
     }
 }

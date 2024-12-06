@@ -24,6 +24,6 @@ public class UserDefinedWorkspaceSymbolFeature extends LSPWorkspaceSymbolFeature
     public boolean supportsGotoClass() {
         UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getClientFeatures().getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return clientConfiguration != null ? clientConfiguration.workspaceSymbols.supportsGotoClass : super.supportsGotoClass();
+        return clientConfiguration != null ? clientConfiguration.workspaceSymbol.supportsGotoClass : super.supportsGotoClass();
     }
 }
