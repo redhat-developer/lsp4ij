@@ -11,20 +11,13 @@
 package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 
 import com.intellij.codeInsight.CodeInsightBundle;
-import com.intellij.codeInsight.hint.HintManager;
-import com.intellij.codeInsight.hint.HintUtil;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.searches.DefinitionsScopedSearch;
-import com.intellij.psi.util.PsiEditorUtil;
-import com.intellij.ui.awt.RelativePoint;
 import com.intellij.util.Processor;
 import com.intellij.util.QueryExecutor;
 import com.intellij.util.containers.ContainerUtil;
@@ -36,12 +29,12 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationParams;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
+import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.*;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -114,19 +107,7 @@ public class LSPWorkspaceImplementationsSearch implements QueryExecutor<PsiEleme
             List<Location> implementations = implementationsFuture.getNow(null);
             if (ContainerUtil.isEmpty(implementations)) {
                 // No implementations found
-                Editor editor = PsiEditorUtil.findEditor(file);
-                if (editor != null) {
-                    ApplicationManager.getApplication().invokeLater(() -> {
-                        String notFoundMessage = CodeInsightBundle.message("goto.implementation.notFound");
-                        JComponent label = HintUtil.createErrorLabel(notFoundMessage);
-                        label.setBorder(HintUtil.createHintBorder());
-                        RelativePoint relativePoint = JBPopupFactory.getInstance().guessBestPopupLocation(editor);
-                        int flags = HintManager.HIDE_BY_ANY_KEY | HintManager.HIDE_BY_TEXT_CHANGE | HintManager.HIDE_BY_SCROLLING;
-                        HintManager.getInstance().showHint(label, relativePoint, flags, 0);
-                    });
-                } else {
-                    LOGGER.warn("No implementations found but could not find an active editor for file '{}' to show the hint.", file.getName());
-                }
+                LSP4IJUiUtils.showErrorHint(file, CodeInsightBundle.message("goto.implementation.notFound"));
             } else {
                 // textDocument/implementations has been collected correctly
                 for (Location implementation : implementations) {
