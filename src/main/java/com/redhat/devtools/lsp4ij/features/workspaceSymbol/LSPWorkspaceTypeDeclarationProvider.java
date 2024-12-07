@@ -22,12 +22,14 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionParams;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
+import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -103,7 +105,10 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
 
         if (isDoneNormally(typeDefinitionsFuture)) {
             List<Location> typeDefinitions = typeDefinitionsFuture.getNow(null);
-            if (!ContainerUtil.isEmpty(typeDefinitions)) {
+            if (ContainerUtil.isEmpty(typeDefinitions)) {
+                // No type declarations found
+                LSP4IJUiUtils.showErrorHint(file, LanguageServerBundle.message("goto.typeDeclaration.notFound"));
+            } else {
                 // textDocument/typeDefinition has been collected correctly
                 List<PsiElement> typeDefinitionElements = new ArrayList<>(typeDefinitions.size());
                 for (Location typeDefinition : typeDefinitions) {
@@ -115,4 +120,5 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
 
         return PsiElement.EMPTY_ARRAY;
     }
+
 }
