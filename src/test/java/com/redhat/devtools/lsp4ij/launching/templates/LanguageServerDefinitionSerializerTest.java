@@ -39,6 +39,7 @@ public class LanguageServerDefinitionSerializerTest {
                 false,
                 "",
                 "",
+                "",
                 "");
 
         Gson gson = new GsonBuilder()
@@ -60,6 +61,7 @@ public class LanguageServerDefinitionSerializerTest {
                 "./start.sh",
                 Map.of(),
                 false,
+                "",
                 "",
                 "",
                 "");
@@ -87,6 +89,7 @@ public class LanguageServerDefinitionSerializerTest {
                 "./start.sh",
                 Map.of(),
                 false,
+                "",
                 "",
                 "",
                 "");
@@ -121,6 +124,7 @@ public class LanguageServerDefinitionSerializerTest {
                 "./start.sh",
                 Map.of(),
                 false,
+                "",
                 "",
                 "",
                 "");

@@ -45,6 +45,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private boolean includeSystemEnvironmentVariables;
     private String configurationContent;
     private Object configuration;
+    private String configurationSchemaContent;
     private String initializationOptionsContent;
     private Object initializationOptions;
     private String clientConfigurationContent;
@@ -57,6 +58,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
                                                @Nullable String configurationContent,
+                                               @Nullable String configurationSchemaContent,
                                                @Nullable String initializationOptionsContent,
                                                @Nullable String clientConfigurationContent) {
         super(id, name, description, true, null, false);
@@ -65,6 +67,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.userEnvironmentVariables = userEnvironmentVariables;
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
         this.configurationContent = configurationContent;
+        this.configurationSchemaContent = configurationSchemaContent;
         this.initializationOptionsContent = initializationOptionsContent;
         this.clientConfigurationContent = clientConfigurationContent;
     }
@@ -85,6 +88,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
                 configurationContent,
+                null,
                 initializationOptionsContent,
                 null);
     }
@@ -155,6 +159,14 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     public void setConfigurationContent(String configurationContent) {
         this.configurationContent = configurationContent;
         this.configuration = null;
+    }
+
+    public String getConfigurationSchemaContent() {
+        return configurationSchemaContent;
+    }
+
+    public void setConfigurationSchemaContent(String configurationSchemaContent) {
+        this.configurationSchemaContent = configurationSchemaContent;
     }
 
     public String getInitializationOptionsContent() {
