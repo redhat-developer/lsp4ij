@@ -110,6 +110,7 @@ public class LanguageServerTemplateManagerTest {
                 false,
                 null,
                 null,
+                null,
                 null);
     }
 }

@@ -18,17 +18,21 @@ import com.jetbrains.jsonSchema.extension.JsonSchemaFileProvider;
 import com.jetbrains.jsonSchema.extension.JsonSchemaProviderFactory;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Factory for JSON schema file providers that are based on JSON schema files bundled in the plugin distribution.
  */
 public class LSPJsonSchemaProviderFactory implements JsonSchemaProviderFactory {
+
     @NotNull
     @Override
     public List<JsonSchemaFileProvider> getProviders(@NotNull Project project) {
-        return List.of(
-                new LSPClientConfigurationJsonSchemaFileProvider()
-        );
+        List<JsonSchemaFileProvider> providers = new ArrayList<>();
+        providers.add(new LSPClientConfigurationJsonSchemaFileProvider());
+        // Create 100 dummy JsonSchemaFileProvider used by Server / Configuration editors.
+        providers.addAll(LSPServerConfigurationJsonSchemaManager.getInstance(project).getProviders());
+        return providers;
     }
 }

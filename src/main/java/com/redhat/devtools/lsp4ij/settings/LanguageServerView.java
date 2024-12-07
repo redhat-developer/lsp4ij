@@ -103,6 +103,7 @@ public class LanguageServerView implements Disposable {
                     && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
                     && Objects.equals(this.getMappings(), settings.getMappings())
                     && isEquals(this.getConfigurationContent(), settings.getConfigurationContent())
+                    && isEquals(this.getConfigurationSchemaContent(), settings.getConfigurationSchemaContent())
                     && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent())
                     && isEquals(this.getClientConfigurationContent(), settings.getClientConfigurationContent()))) {
                 return true;
@@ -171,6 +172,7 @@ public class LanguageServerView implements Disposable {
                         userDefinedLanguageServerSettings.getUserEnvironmentVariables(),
                         userDefinedLanguageServerSettings.isIncludeSystemEnvironmentVariables()));
                 this.setConfigurationContent(userDefinedLanguageServerSettings.getConfigurationContent());
+                this.setConfigurationSchemaContent(userDefinedLanguageServerSettings.getConfigurationSchemaContent());
                 this.setInitializationOptionsContent(userDefinedLanguageServerSettings.getInitializationOptionsContent());
                 this.setClientConfigurationContent(userDefinedLanguageServerSettings.getClientConfigurationContent());
 
@@ -256,7 +258,18 @@ public class LanguageServerView implements Disposable {
             // Update user-defined language server settings
             var serverChangedEvent = LanguageServersRegistry.getInstance()
                     .updateServerDefinition(
-                            new LanguageServersRegistry.UpdateServerDefinitionRequest(project, launch, getDisplayName(), getCommandLine(), getEnvData().getEnvs(), getEnvData().isPassParentEnvs(), getMappings(), getConfigurationContent(), getInitializationOptionsContent(), getClientConfigurationContent()), false);
+                            new LanguageServersRegistry.UpdateServerDefinitionRequest(project,
+                                    launch,
+                                    getDisplayName(),
+                                    getCommandLine(),
+                                    getEnvData().getEnvs(),
+                                    getEnvData().isPassParentEnvs(),
+                                    getMappings(),
+                                    getConfigurationContent(),
+                                    getConfigurationSchemaContent(),
+                                    getInitializationOptionsContent(),
+                                    getClientConfigurationContent()),
+                            false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
                 com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings
@@ -400,6 +413,14 @@ public class LanguageServerView implements Disposable {
         configuration.setCaretPosition(0);
     }
 
+    public String getConfigurationSchemaContent() {
+        return languageServerPanel.getConfigurationSchemaContent();
+    }
+
+    public void setConfigurationSchemaContent(String configurationSchemaContent) {
+        languageServerPanel.setConfigurationSchemaContent(configurationSchemaContent);
+    }
+
     public String getInitializationOptionsContent() {
         return languageServerPanel.getInitializationOptionsWidget().getText();
     }
@@ -422,6 +443,7 @@ public class LanguageServerView implements Disposable {
 
     @Override
     public void dispose() {
+        languageServerPanel.dispose();
     }
 
     public List<ServerMappingSettings> getMappings() {
