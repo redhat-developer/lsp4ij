@@ -18,8 +18,8 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.wm.impl.status.StatusBarUtil;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.util.PsiEditorUtil;
 import com.intellij.ui.LightweightHint;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +53,7 @@ public final class LSP4IJUiUtils {
     public static void showHint(@NotNull PsiFile file,
                                 @NotNull String hint,
                                 @NotNull Function<String, JComponent> labelCreator) {
-        Editor editor = PsiEditorUtil.findEditor(file);
+        Editor editor = LSPIJUtils.editorForElement(file);
         if (editor != null) {
             ApplicationManager.getApplication().invokeLater(() -> {
                 JComponent label = labelCreator.apply(hint);
