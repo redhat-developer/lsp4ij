@@ -95,16 +95,6 @@ public final class LSP4IJUiUtils {
     }
 
     /**
-     * Shows the provided hint in the specified file as success.
-     *
-     * @param file the file in which the hint should be shown
-     * @param hint the hint text
-     */
-    public static void showSuccessHint(@NotNull PsiFile file, @NotNull String hint) {
-        showHint(file, hint, HintUtil::createSuccessLabel);
-    }
-
-    /**
      * Shows the provided hint in the specified file as a question.
      *
      * @param file the file in which the hint should be shown
@@ -113,4 +103,6 @@ public final class LSP4IJUiUtils {
     public static void showQuestionHint(@NotNull PsiFile file, @NotNull String hint) {
         showHint(file, hint, HintUtil::createQuestionLabel);
     }
+
+    // TODO: Add support for showSuccessHint() when HintUtil.createSuccessLabel() is available in all supported versions
 }
