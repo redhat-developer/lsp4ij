@@ -16,7 +16,6 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
@@ -74,17 +73,17 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
             return PsiElement.EMPTY_ARRAY;
         }
 
+        Document document = LSPIJUtils.getDocument(file);
+        if (document == null) {
+            return PsiElement.EMPTY_ARRAY;
+        }
+
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             return PsiElement.EMPTY_ARRAY;
         }
 
         if (!LanguageServiceAccessor.getInstance(project)
                 .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getTypeDefinitionFeature().isTypeDefinitionSupported(file))) {
-            return PsiElement.EMPTY_ARRAY;
-        }
-
-        Document document = PsiDocumentManager.getInstance(project).getDocument(file);
-        if (document == null) {
             return PsiElement.EMPTY_ARRAY;
         }
 
