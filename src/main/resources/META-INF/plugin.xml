@@ -315,6 +315,13 @@
                              language="textmate"
                              implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
                              order="first"/>
+        <!-- The code block providers are based on the same information from textDocument/folding -->
+        <codeBlockProvider language="TEXT"
+                           implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPCodeBlockProvider"
+                           order="first"/>
+        <codeBlockProvider language="textmate"
+                           implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPCodeBlockProvider"
+                           order="first"/>
 
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo
