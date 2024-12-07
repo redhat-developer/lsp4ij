@@ -38,10 +38,6 @@ public final class LSP4IJUiUtils {
         // Pure utility class
     }
 
-    public enum HintType {
-
-    }
-
     /**
      * Shows the provided hint in the specified file.
      *
