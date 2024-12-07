@@ -12,6 +12,9 @@ package com.redhat.devtools.lsp4ij.client.indexing;
 
 import com.intellij.ide.AppLifecycleListener;
 import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
 
 /**
  * <p>The proxy that implements ProjectIndexingActivityHistoryListener is registered via topic subscribe
@@ -32,7 +35,8 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.Internal
 public class ProjectIndexingAppLifecycleListener implements AppLifecycleListener {
 
-    ProjectIndexingAppLifecycleListener() {
+    @Override
+    public  void appFrameCreated(@NotNull List<String> commandLineArgs) {
         ProjectIndexingDumbAndScanningStrategy.getInstance();
     }
 }
