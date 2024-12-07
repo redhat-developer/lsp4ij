@@ -14,7 +14,6 @@ import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.searches.DefinitionsScopedSearch;
@@ -67,6 +66,11 @@ public class LSPWorkspaceImplementationsSearch implements QueryExecutor<PsiEleme
             return true;
         }
 
+        Document document = LSPIJUtils.getDocument(file);
+        if (document == null) {
+            return true;
+        }
+
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             // The file is not associated to a language server
             return true;
@@ -75,11 +79,6 @@ public class LSPWorkspaceImplementationsSearch implements QueryExecutor<PsiEleme
         // Check if the file can support the feature
         if (!LanguageServiceAccessor.getInstance(project)
                 .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getImplementationFeature().isImplementationSupported(file))) {
-            return true;
-        }
-
-        Document document = PsiDocumentManager.getInstance(project).getDocument(file);
-        if (document == null) {
             return true;
         }
 
