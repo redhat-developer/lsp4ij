@@ -12,14 +12,16 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.SpellCheckingEditorCustomizationProvider;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.*;
+import com.intellij.util.PsiErrorElementUtil;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -31,6 +33,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Wrapper for EditorTextField configured for JSON.
@@ -43,6 +46,7 @@ public class JsonTextField extends JPanel {
     private static final String DEFAULT_VALUE = "{}";
 
     private final EditorTextField editorTextField;
+    private final List<Consumer<Boolean>> validationHandlers;
 
     public JsonTextField(@NotNull Project project) {
         // Create and initialize the editor text field
@@ -64,6 +68,17 @@ public class JsonTextField extends JPanel {
         // Add it to this panel
         setLayout(new BorderLayout());
         add(editorTextField, BorderLayout.CENTER);
+
+        validationHandlers = new ArrayList<>();
+        editorTextField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void documentChanged(@NotNull DocumentEvent event) {
+                boolean hasErrors = hasErrors();
+                for (var handler : validationHandlers) {
+                    handler.accept(hasErrors);
+                }
+            }
+        });
     }
 
     /**
@@ -73,8 +88,7 @@ public class JsonTextField extends JPanel {
      */
     public void setJsonFilename(@NotNull String jsonFilename) {
         try {
-            Document document = editorTextField.getDocument();
-            VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+            VirtualFile file = LSPIJUtils.getFile(editorTextField.getDocument());
             if (file != null) {
                 file.rename(this, jsonFilename);
             } else {
@@ -97,5 +111,22 @@ public class JsonTextField extends JPanel {
 
     public void setCaretPosition(int position) {
         editorTextField.setCaretPosition(position);
+    }
+
+    public JComponent getComponent() {
+        return editorTextField.getComponent();
+    }
+
+    public boolean hasErrors() {
+        VirtualFile file = LSPIJUtils.getFile(editorTextField.getDocument());
+        return PsiErrorElementUtil.hasErrors(getProject(), file);
+    }
+
+    public @NotNull Project getProject() {
+        return editorTextField.getProject();
+    }
+
+    public void addValidationHandler(Consumer<Boolean> handler) {
+        validationHandlers.add(handler);
     }
 }

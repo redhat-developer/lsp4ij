@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPServerConfigurationJsonSchemaManager"/>
+    </extensions>
     <extensions defaultExtensionNs="JavaScript.JsonSchema">
         <ProviderFactory
                 implementation="com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPJsonSchemaProviderFactory"/>
