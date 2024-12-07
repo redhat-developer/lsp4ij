@@ -39,6 +39,10 @@ import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
+import com.redhat.devtools.lsp4ij.client.features.LSPRenameFeature;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import com.redhat.devtools.lsp4ij.features.refactoring.WorkspaceEditData;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
@@ -165,8 +169,7 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                          @NotNull Editor editor) {
         // Before having the language server perform the rename, see if there are any external references that should
         // also be updated upon successful completion by the language server
-        int offset = editor.getCaretModel().getOffset();
-        Set<PsiReference> externalReferences = getExternalReferences(psiFile, offset);
+        Set<PsiReference> externalReferences = getExternalReferences(renameParams, psiFile, editor);
 
         CompletableFuture<List<WorkspaceEditData>> future = LSPFileSupport.getSupport(psiFile)
                 .getRenameSupport()
@@ -229,10 +232,13 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
     }
 
     @NotNull
-    private static Set<PsiReference> getExternalReferences(@NotNull PsiFile file, int offset) {
+    private static Set<PsiReference> getExternalReferences(@NotNull LSPRenameParams renameParams,
+                                                           @NotNull PsiFile file,
+                                                           @NotNull Editor editor) {
         Set<PsiReference> externalReferences = new LinkedHashSet<>();
 
         Document document = LSPIJUtils.getDocument(file);
+        int offset = editor.getCaretModel().getOffset();
         TextRange wordTextRange = document != null ? LSPIJUtils.getWordRangeAt(document, file, offset) : null;
         if (wordTextRange != null) {
             LSPPsiElement wordElement = new LSPPsiElement(file, wordTextRange);
@@ -240,7 +246,7 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
             if (StringUtil.isNotEmpty(wordText)) {
                 // When testing, just collect references on the current thread
                 if (ApplicationManager.getApplication().isUnitTestMode()) {
-                    ContainerUtil.addAllNotNull(externalReferences, collectExternalReferences(file, wordText, wordTextRange, null));
+                    ContainerUtil.addAllNotNull(externalReferences, collectExternalReferences(renameParams, file, wordText, wordTextRange, null));
                 } else {
                     // This should happen on a progress indicator since it's performing a textual search of project
                     // sources, and it must be modal as we need the results synchronously
@@ -249,7 +255,7 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                         @Override
                         public void run(@NotNull ProgressIndicator progressIndicator) {
                             progressIndicator.setIndeterminate(true);
-                            ContainerUtil.addAllNotNull(externalReferences, collectExternalReferences(file, wordText, wordTextRange, progressIndicator));
+                            ContainerUtil.addAllNotNull(externalReferences, collectExternalReferences(renameParams, file, wordText, wordTextRange, progressIndicator));
                         }
                     });
                 }
@@ -260,11 +266,15 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
     }
 
     @NotNull
-    private static Collection<PsiReference> collectExternalReferences(@NotNull PsiFile file,
+    private static Collection<PsiReference> collectExternalReferences(@NotNull LSPRenameParams renameParams,
+                                                                      @NotNull PsiFile file,
                                                                       @NotNull String wordText,
                                                                       @NotNull TextRange wordTextRange,
                                                                       @Nullable ProgressIndicator progressIndicator) {
         Map<String, PsiReference> externalReferencesByKey = new LinkedHashMap<>();
+
+        // Determine whether or not to search/match in a case-sensitive manner based on client configuration
+        boolean caseSensitive = isCaseSensitive(renameParams, file);
 
         PsiSearchHelper.getInstance(file.getProject()).processElementsWithWord(
                 (element, offsetInElement) -> {
@@ -281,8 +291,13 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                                 PsiElement targetElement = reference.resolve();
                                 PsiFile targetFile = targetElement != null ? targetElement.getContainingFile() : null;
                                 TextRange targetTextRange = targetFile != null ? targetElement.getTextRange() : null;
+                                String targetText = reference.getCanonicalText();
+                                // Files match
                                 if ((targetFile != null) && Objects.equals(file, targetFile) &&
-                                        (targetTextRange != null) && Objects.equals(wordTextRange, targetTextRange)) {
+                                        // Text ranges match
+                                        (targetTextRange != null) && Objects.equals(wordTextRange, targetTextRange) &&
+                                        // Text matches according to case-sensitivity
+                                        (caseSensitive ? wordText.equals(targetText) : wordText.equalsIgnoreCase(targetText))) {
                                     externalReferencesByKey.put(referenceKey, reference);
                                 }
                             }
@@ -296,12 +311,33 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                 file.getUseScope(),
                 wordText,
                 UsageSearchContext.ANY,
-                // TODO: This should use the client-config caseSensitive setting for the file; what's
-                //  the best way to get that from here?
-                true
+                caseSensitive
         );
 
         return externalReferencesByKey.values();
+    }
+
+    private static boolean isCaseSensitive(@NotNull LSPRenameParams renameParams,
+                                           @NotNull PsiFile psiFile) {
+        List<LanguageServerItem> languageServers = renameParams.getLanguageServers();
+        if (!ContainerUtil.isEmpty(languageServers)) {
+            // If any supporting language server is case-sensitive, the search must be case-sensitive; it's better to
+            // miss changing things that should have been changed than to change things that should not
+            for (LanguageServerItem languageServer : languageServers) {
+                LSPClientFeatures clientFeatures = languageServer.getClientFeatures();
+                if (clientFeatures != null) {
+                    LSPRenameFeature renameFeature = clientFeatures.getRenameFeature();
+                    if (renameFeature.isRenameSupported(psiFile)) {
+                        LSPCompletionFeature completionFeature = clientFeatures.getCompletionFeature();
+                        if (completionFeature.isCaseSensitive(psiFile)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     @Nullable
