@@ -24,11 +24,22 @@ import java.util.List;
 public class ClientCapabilitiesFactory {
 
     public static ClientCapabilities create(Object experimental) {
-        return new ClientCapabilities(
+        ClientCapabilities clientCapabilities = new ClientCapabilities(
                 getWorkspaceClientCapabilities(),
                 getTextDocumentClientCapabilities(),
                 getWindowClientCapabilities(),
                 experimental);
+        clientCapabilities.setGeneral(getGeneralClientCapabilities());
+        return clientCapabilities;
+    }
+
+    private static GeneralClientCapabilities getGeneralClientCapabilities() {
+        GeneralClientCapabilities generalCapabilities = new GeneralClientCapabilities();
+        StaleRequestCapabilities staleRequestCapabilities = new StaleRequestCapabilities();
+        staleRequestCapabilities.setCancel(true);
+        generalCapabilities.setStaleRequestSupport(staleRequestCapabilities);
+        generalCapabilities.setPositionEncodings(List.of(PositionEncodingKind.UTF16));
+        return generalCapabilities;
     }
 
     private static @NotNull WorkspaceClientCapabilities getWorkspaceClientCapabilities() {

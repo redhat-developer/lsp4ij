@@ -161,4 +161,80 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
         );
     }
 
+    public void testNoHoverOnWhitespaceWithEmptyContents() {
+        assertHover("test.ts",
+                """
+                        const s = "";<caret>
+                        s.charAt(0);
+                        """,
+                """
+                                {
+                                    "contents": []     
+                                }  
+                        """,
+                null
+        );
+
+        assertHover("test.ts",
+                """
+                        const s = "";<caret>
+                        s.charAt(0);
+                        """,
+                """
+                                {
+                                    "contents": {}     
+                                }  
+                        """,
+                null
+        );
+    }
+
+    public void testNoHoverOnWhitespaceWithInvalidMarkupContent() {
+        assertHover("test.ts",
+                """
+                        const s = "";<caret>
+                        s.charAt(0);
+                        """,
+                """
+                                {
+                                  "contents": {
+                                    "kind": "markdown",
+                                    "value": ""
+                                  },
+                                  "range": {
+                                    "start": {
+                                      "line": 1,
+                                      "character": 2
+                                    },
+                                    "end": {
+                                      "line": 1,
+                                      "character": 8
+                                    }
+                                  }
+                                }  
+                        """,
+                null
+        );
+    }
+
+    public void testNoHoverOnWhitespaceWithInvalidMarkedString() {
+        assertHover("test.ts",
+                """
+                        const s = "";<caret>
+                        s.charAt(0);
+                        """,
+                """
+                        {
+                            "contents": [
+                                 {
+                                     "language": "java",
+                                     "value": ""
+                                 },
+                                 ""
+                            ]
+                        }  
+                        """,
+                null
+        );
+    }
 }

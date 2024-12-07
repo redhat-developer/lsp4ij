@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.usages;
 
 import com.intellij.find.findUsages.PsiElement2UsageTargetAdapter;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
@@ -24,8 +23,6 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import static com.redhat.devtools.lsp4ij.LSPIJUtils.getWordRangeAt;
 
 /**
  * LSP Usage target provider.
@@ -66,24 +63,14 @@ public class LSPUsageTargetProvider implements UsageTargetProvider {
 
     @NotNull
     private static UsageTarget[] getLSPTargets(@NotNull Editor editor, @NotNull PsiFile file) {
-        int offset = editor.getCaretModel().getOffset();
-        Document document = editor.getDocument();
-        if (offset < 0 ||
-                offset > document.getTextLength() ||
-                offset > file.getTextLength() /* PsiFile and document could have different contents */) {
+        TextRange targetTextRange = LSPIJUtils.getWordRangeAt(editor.getDocument(), file, editor.getCaretModel().getOffset());
+        if (targetTextRange == null) {
             return UsageTarget.EMPTY_ARRAY;
         }
-        // Try to get the token range (ex : foo.ba|r() --> foo.[bar]())
-        TextRange tokenRange = getWordRangeAt(document, file, offset);
-        if (tokenRange == null) {
-            // Get range only for the offset
-            tokenRange = new TextRange(offset > 0 ? offset - 1 : offset, offset);
-        }
-        LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, tokenRange);
+        LSPUsageTriggeredPsiElement triggeredElement = new LSPUsageTriggeredPsiElement(file, targetTextRange);
         // force to compute of the name by using token range
         triggeredElement.getName();
         UsageTarget target = new PsiElement2UsageTargetAdapter(triggeredElement, true);
         return new UsageTarget[]{target};
     }
-
 }
