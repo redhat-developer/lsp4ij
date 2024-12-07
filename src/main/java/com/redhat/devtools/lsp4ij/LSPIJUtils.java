@@ -413,8 +413,9 @@ public class LSPIJUtils {
 
 
     /**
-     * Returns the virtual file corresponding to the Psi file.
+     * Returns the virtual file corresponding to the PSI element.
      *
+     * @param element the PSI element
      * @return the virtual file, or {@code null} if the file exists only in memory.
      */
     public static @Nullable VirtualFile getFile(@NotNull PsiElement element) {
@@ -422,11 +423,28 @@ public class LSPIJUtils {
         return psFile != null ? psFile.getVirtualFile() : null;
     }
 
+    /**
+     * Returns the document corresponding to the virtual file.
+     *
+     * @param file the virtual file
+     * @return the document corresponding to the virtual file, or {@code null} if no document could be found
+     */
     public static @Nullable Document getDocument(@NotNull VirtualFile file) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return FileDocumentManager.getInstance().getDocument(file);
         }
         return ReadAction.compute(() -> FileDocumentManager.getInstance().getDocument(file));
+    }
+
+    /**
+     * Returns the document corresponding to the PSI element
+     *
+     * @param element the PSI element
+     * @return the document corresponding to the PSI element, or {@code null} if no document could be found
+     */
+    public static @Nullable Document getDocument(@NotNull PsiElement element) {
+        VirtualFile virtualFile = getFile(element);
+        return virtualFile != null ? getDocument(virtualFile) : null;
     }
 
     /**
