@@ -44,6 +44,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<DocumentLink> mockDocumentLinks;
     private Map<Position, List<? extends DocumentHighlight>> mockDocumentHighlights;
     private LinkedEditingRanges mockLinkedEditingRanges;
+    private List<SelectionRange> mockSelectionRanges;
 
     private CompletableFuture<DidOpenTextDocumentParams> didOpenCallback;
     private CompletableFuture<DidSaveTextDocumentParams> didSaveCallback;
@@ -368,6 +369,15 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void setWillSaveWaitUntilCallback(List<TextEdit> textEdits) {
         this.mockWillSaveWaitUntilTextEdits = textEdits;
+    }
+
+    public void setMockSelectionRanges(List<SelectionRange> mockSelectionRanges) {
+        this.mockSelectionRanges = mockSelectionRanges;
+    }
+
+    @Override
+    public CompletableFuture<List<SelectionRange>> selectionRange(SelectionRangeParams params) {
+        return CompletableFuture.completedFuture(mockSelectionRanges);
     }
 
     public void setSemanticTokens(final SemanticTokens semanticTokens) {

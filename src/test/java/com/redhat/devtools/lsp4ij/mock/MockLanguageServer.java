@@ -124,6 +124,7 @@ public final class MockLanguageServer implements LanguageServer {
 		capabilities.setTypeDefinitionProvider(Boolean.TRUE);
 		capabilities.setReferencesProvider(true);
 		capabilities.setDocumentFormattingProvider(true);
+		capabilities.setSelectionRangeProvider(true);
 		capabilities.setCodeActionProvider(Boolean.TRUE);
 		capabilities.setCodeLensProvider(new CodeLensOptions(true));
 		capabilities.setDocumentLinkProvider(new DocumentLinkOptions());
@@ -196,6 +197,10 @@ public final class MockLanguageServer implements LanguageServer {
 
 	public void setFormattingTextEdits(List<? extends TextEdit> formattingTextEdits) {
 		this.textDocumentService.setMockFormattingTextEdits(formattingTextEdits);
+	}
+
+	public void setSelectionRanges(List<SelectionRange> selectionRanges) {
+		this.textDocumentService.setMockSelectionRanges(selectionRanges);
 	}
 
 	public void setDocumentHighlights(Map<Position, List<? extends DocumentHighlight>> documentHighlights) {

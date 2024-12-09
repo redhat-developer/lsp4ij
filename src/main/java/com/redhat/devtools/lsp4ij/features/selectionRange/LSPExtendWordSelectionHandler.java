@@ -78,7 +78,7 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
         }
 
         Project project = file.getProject();
-        CompletableFuture<@NotNull List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
+        CompletableFuture<List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
                 virtualFile,
                 clientFeatures -> featureAccessor.apply(clientFeatures).isEnabled(file),
                 clientFeatures -> featureAccessor.apply(clientFeatures).isSupported(file)
