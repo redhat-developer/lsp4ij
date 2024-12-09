@@ -1140,95 +1140,74 @@ public class LSPClientFeatures implements Disposable {
 
     @Nullable
     public TextDocumentServerCapabilityRegistry<? extends TextDocumentRegistrationOptions> getCapabilityRegistry(String method) {
-        // TODO: Can these be changed to else/if? Or can this be changed to switch?
-        if (LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION.equals(method)) {
+        if (method == null) {
+            return null;
+        }
+
+        return switch (method) {
             // register 'textDocument/codeAction' capability
-            return getCodeActionFeature().getCodeActionCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION ->
+                    getCodeActionFeature().getCodeActionCapabilityRegistry();
             // register 'textDocument/codeLens' capability
-            return getCodeLensFeature().getCodeLensCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS -> getCodeLensFeature().getCodeLensCapabilityRegistry();
             // register 'textDocument/documentColor' capability
-            return getDocumentColorFeature().getDocumentColorCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_COMPLETION.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR ->
+                    getDocumentColorFeature().getDocumentColorCapabilityRegistry();
             // register 'textDocument/completion' capability
-            return getCompletionFeature().getCompletionCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DECLARATION.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_COMPLETION ->
+                    getCompletionFeature().getCompletionCapabilityRegistry();
             // register 'textDocument/declaration' capability
-            return getDeclarationFeature().getDeclarationCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DEFINITION.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_DECLARATION ->
+                    getDeclarationFeature().getDeclarationCapabilityRegistry();
             // register 'textDocument/definition' capability
-            return getDefinitionFeature().getDefinitionCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_DEFINITION ->
+                    getDefinitionFeature().getDefinitionCapabilityRegistry();
             // register 'textDocument/documentHighlight' capability
-            return getDocumentHighlightFeature().getDocumentHighlightCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_LINK.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT ->
+                    getDocumentHighlightFeature().getDocumentHighlightCapabilityRegistry();
             // register 'textDocument/documentHighLink' capability
-            return getDocumentLinkFeature().getDocumentLinkCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_SYMBOL.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_LINK ->
+                    getDocumentLinkFeature().getDocumentLinkCapabilityRegistry();
             // register 'textDocument/documentSymbol' capability
-            return getDocumentSymbolFeature().getDocumentSymbolCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_FOLDING_RANGE.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_SYMBOL ->
+                    getDocumentSymbolFeature().getDocumentSymbolCapabilityRegistry();
             // register 'textDocument/foldingRange' capability
-            return getFoldingRangeFeature().getFoldingRangeCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_SELECTION_RANGE.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_FOLDING_RANGE ->
+                    getFoldingRangeFeature().getFoldingRangeCapabilityRegistry();
             // register 'textDocument/selectionRange' capability
-            return getSelectionRangeFeature().getSelectionRangeCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_FORMATTING.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_SELECTION_RANGE ->
+                    getSelectionRangeFeature().getSelectionRangeCapabilityRegistry();
             // register 'textDocument/formatting' capability
-            return getFormattingFeature().getFormattingCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_FORMATTING ->
+                    getFormattingFeature().getFormattingCapabilityRegistry();
             // register 'textDocument/rangeFormatting' capability
-            return getFormattingFeature().getRangeFormattingCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_HOVER.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING ->
+                    getFormattingFeature().getRangeFormattingCapabilityRegistry();
             // register 'textDocument/hover' capability
-            return getHoverFeature().getHoverCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_HOVER -> getHoverFeature().getHoverCapabilityRegistry();
             // register 'textDocument/implementation' capability
-            return getImplementationFeature().getImplementationCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION ->
+                    getImplementationFeature().getImplementationCapabilityRegistry();
             // register 'textDocument/inlayHint' capability
-            return getInlayHintFeature().getInlayHintCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT -> getInlayHintFeature().getInlayHintCapabilityRegistry();
             // register 'textDocument/callHierarchy' capability
-            return getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_REFERENCES.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY ->
+                    getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();
             // register 'textDocument/references' capability
-            return getReferencesFeature().getReferencesCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_RENAME.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_REFERENCES ->
+                    getReferencesFeature().getReferencesCapabilityRegistry();
             // register 'textDocument/rename' capability
-            return getRenameFeature().getRenameCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_SIGNATURE_HELP.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_RENAME -> getRenameFeature().getRenameCapabilityRegistry();
             // register 'textDocument/signatureHelp' capability
-            return getSignatureHelpFeature().getSignatureHelpCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_SIGNATURE_HELP ->
+                    getSignatureHelpFeature().getSignatureHelpCapabilityRegistry();
             // register 'textDocument/typeDefinition' capability
-            return getTypeDefinitionFeature().getTypeDefinitionCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_TYPE_HIERARCHY.equals(method)) {
+            case LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION ->
+                    getTypeDefinitionFeature().getTypeDefinitionCapabilityRegistry();
             // register 'textDocument/typeHierarchy' capability
-            return getTypeHierarchyFeature().getTypeHierarchyCapabilityRegistry();
-        }
-        return null;
+            case LSPRequestConstants.TEXT_DOCUMENT_TYPE_HIERARCHY ->
+                    getTypeHierarchyFeature().getTypeHierarchyCapabilityRegistry();
+            default -> null;
+        };
     }
 }
