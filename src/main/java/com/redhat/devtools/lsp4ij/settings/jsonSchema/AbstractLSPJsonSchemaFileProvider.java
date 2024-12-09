@@ -23,8 +23,6 @@ import com.jetbrains.jsonSchema.impl.JsonSchemaVersion;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 
@@ -32,8 +30,6 @@ import java.net.URL;
  * Abstract base class for JSON schema file providers that are based on JSON schema files bundled in the plugin distribution.
  */
 abstract class AbstractLSPJsonSchemaFileProvider implements JsonSchemaFileProvider {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPJsonSchemaFileProvider.class);
 
     private final String jsonSchemaPath;
     private final String jsonFilename;
