@@ -289,15 +289,17 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                             if (!externalReferencesByKey.containsKey(referenceKey)) {
                                 PsiElement targetElement = reference.resolve();
                                 PsiFile targetFile = targetElement != null ? targetElement.getContainingFile() : null;
-                                TextRange targetTextRange = targetFile != null ? targetElement.getTextRange() : null;
-                                String targetText = reference.getCanonicalText();
                                 // Files match
-                                if ((targetFile != null) && Objects.equals(file, targetFile) &&
-                                        // Text ranges match
-                                        (targetTextRange != null) && Objects.equals(wordTextRange, targetTextRange) &&
+                                if ((targetFile != null) && Objects.equals(file, targetFile)) {
+                                    // Text ranges match
+                                    TextRange targetTextRange = targetElement.getTextRange();
+                                    if ((targetTextRange != null) && Objects.equals(wordTextRange, targetTextRange)) {
                                         // Text matches according to case-sensitivity
-                                        (caseSensitive ? wordText.equals(targetText) : wordText.equalsIgnoreCase(targetText))) {
-                                    externalReferencesByKey.put(referenceKey, reference);
+                                        String targetText = reference.getCanonicalText();
+                                        if (caseSensitive ? wordText.equals(targetText) : wordText.equalsIgnoreCase(targetText)) {
+                                            externalReferencesByKey.put(referenceKey, reference);
+                                        }
+                                    }
                                 }
                             }
                         }
