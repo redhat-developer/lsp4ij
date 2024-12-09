@@ -42,7 +42,11 @@ import java.util.*;
 /**
  * Utility class that helps to process/find external references to LSP4IJ-based (pseudo-)elements.
  */
-public class LSPExternalReferencesFinder {
+public final class LSPExternalReferencesFinder {
+
+    private LSPExternalReferencesFinder() {
+        // Pure utility class
+    }
 
     /**
      * Processes all external references for the LSP4IJ element at the offset in the specified file.
