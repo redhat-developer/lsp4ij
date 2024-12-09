@@ -146,7 +146,7 @@ public final class LSPExternalReferencesFinder {
         );
     }
 
-    private static boolean isCaseSensitive(Set<LanguageServerWrapper> languageServerWrappers, @NotNull PsiFile psiFile) {
+    private static boolean isCaseSensitive(@NotNull Set<LanguageServerWrapper> languageServerWrappers, @NotNull PsiFile psiFile) {
         // If any supporting language server is case-sensitive, the search must be case-sensitive; it's better to
         // miss changing things that should have been changed than to change things that should not
         for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
