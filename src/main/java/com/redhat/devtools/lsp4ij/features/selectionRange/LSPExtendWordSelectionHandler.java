@@ -14,13 +14,19 @@ import com.intellij.codeInsight.editorActions.ExtendWordSelectionHandler;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.features.LSPSelectionRangeFeature;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -35,6 +41,7 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Predicate;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -59,7 +66,45 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
         }
 
         // Only if textDocument/selectionRange is supported for the file
-        return LSPFileSupport.getSupport(file).getSelectionRangeSupport() != null;
+        return isSupported(file, clientFeatures -> {
+            LSPSelectionRangeFeature selectionRangeFeature = clientFeatures.getSelectionRangeFeature();
+            return selectionRangeFeature.isEnabled(file) && selectionRangeFeature.isSupported(file);
+        });
+    }
+
+    // TODO: This seems so incredibly boiler-plate that it should already exist somewhere common
+    private static boolean isSupported(@NotNull PsiFile file, @NotNull Predicate<LSPClientFeatures> filter) {
+        VirtualFile virtualFile = file.getVirtualFile();
+        if (virtualFile == null) {
+            return false;
+        }
+
+        Project project = file.getProject();
+        CompletableFuture<@NotNull List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
+                virtualFile,
+                filter,
+                null
+        );
+
+        try {
+            waitUntilDone(languageServersFuture, file);
+        } catch (ProcessCanceledException e) {
+            //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+            return false;
+        } catch (CancellationException e) {
+            return false;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while enumerating language servers for file '{}'.", virtualFile.getPath(), e);
+            return false;
+        }
+
+        if (!isDoneNormally(languageServersFuture)) {
+            return false;
+        }
+
+        List<LanguageServerItem> languageServers = languageServersFuture.getNow(Collections.emptyList());
+        return !ContainerUtil.isEmpty(languageServers);
     }
 
     @Override
@@ -104,19 +149,14 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
 
         // Consume LSP 'textDocument/selectionRanges' request
         LSPSelectionRangeSupport selectionRangeSupport = LSPFileSupport.getSupport(file).getSelectionRangeSupport();
-        if (selectionRangeSupport == null) {
-            return Collections.emptyList();
-        }
-
         TextDocumentIdentifier textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile());
-
         Position position = LSPIJUtils.toPosition(offset, document);
         var params = new LSPSelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position), offset);
         CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);
         try {
             waitUntilDone(selectionRangesFuture, file);
-        } catch (
-                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+        } catch (ProcessCanceledException e) {
+            //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
             selectionRangeSupport.cancel();
             return Collections.emptyList();
@@ -134,7 +174,7 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
         }
 
         // textDocument/selectionRanges has been collected correctly, create list of IJ SelectionDescriptor from LSP SelectionRange list
-        return selectionRangesFuture.getNow(null);
+        return selectionRangesFuture.getNow(Collections.emptyList());
     }
 
     /**
