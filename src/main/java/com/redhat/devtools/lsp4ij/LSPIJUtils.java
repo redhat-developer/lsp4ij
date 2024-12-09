@@ -1239,4 +1239,21 @@ public class LSPIJUtils {
                 .map(l -> new Location(l.getTargetUri(), l.getTargetSelectionRange() != null ? l.getTargetSelectionRange() : l.getTargetRange()))
                 .toList();
     }
+
+    /**
+     * Forces the provided file that is bundled with LSP4IJ to refresh in VFS so that the latest version is used.
+     *
+     * @param bundledFile a file that is contained with the LSP4IJ distribution
+     */
+    public static void refreshBundledFile(@NotNull VirtualFile bundledFile) {
+        // Refresh asynchronously then synchronously because otherwise bundled virtual files won't refresh properly
+        bundledFile.refresh(
+                true,
+                bundledFile.isDirectory(),
+                () -> bundledFile.refresh(
+                        false,
+                        bundledFile.isDirectory()
+                )
+        );
+    }
 }
