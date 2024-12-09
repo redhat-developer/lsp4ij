@@ -366,9 +366,21 @@ the `lang.foldingBuilder` extension point. By default, LSP4IJ registers the `lan
 
 If you use another language, you will have to declare `lang.foldingBuilder` with your language.
 
-Here is an example with the [Go Language Server](./user-defined-ls/gopls.md) showing folding:
+Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing folding:
 
 ![textDocument/foldingRange](./images/lsp-support/textDocument_foldingRange.gif)
+
+Additionally LSP4IJ registers the an implementation of the `codeBlockProvider` extension point with
+[LSPCodeBlockProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/foldingRange/LSPCodeBlockProvider.java) for `TEXT` and `textmate` languages to provide block brace matching and easy navigation to
+the beginning/end of the containing block.
+
+As with `lang.foldingBuilder`, if you use another language, you will have to declare `codeBlockProvider` with your language. 
+
+Below is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing code
+block functionality. The IDE's Presentation Assistant shows the default keyboard shortcuts for each supported operating
+system to trigger these actions.
+
+![codeBlockProvider](./images/lsp-support/codeBlockProvider.gif)
 
 ### Publish Diagnostics
 
