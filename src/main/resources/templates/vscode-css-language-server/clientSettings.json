@@ -1,7 +1,5 @@
 {
-  "completions": {
-    "caseSensitive": true
-  },
+  "caseSensitive": true,
   "workspaceSymbol": {
     "supportsGotoClass": false
   }

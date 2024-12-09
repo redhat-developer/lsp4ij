@@ -2,6 +2,7 @@
 
 The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/LSPClientFeatures.java) API allows you to customize the behavior of LSP features, including:
 
+- [Client-only features](#client-only-features)
 - [LSP codeAction feature](#lsp-codeAction-feature)
 - [LSP codeLens feature](#lsp-codeLens-feature)
 - [LSP color feature](#lsp-color-feature)
@@ -163,6 +164,14 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 }
 ```
 
+## Client-only Features
+
+Client-only features are used to provide information to LSP4IJ that is not available from language servers but is required for proper integration of language server features into the IDE's corresponding features.
+
+| API                                   | Description                                                                          | Default Behaviour          |
+|---------------------------------------|--------------------------------------------------------------------------------------|----------------------------|
+| boolean isCaseSensitive(PsiFile file) | Determines whether or not the language grammar for the given file is case-sensitive. | `false` (case-insensitive) | 
+
 ## LSP CodeAction Feature
 
 | API                                         | Description                                                                                                                                                                                                                        | Default Behaviour           |
@@ -228,7 +237,7 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | boolean isStrikeout(CompletionItem item)                                              | Returns true if the IntelliJ lookup is strike out and false otherwise.                                                                                                                                                             | use `item.getDeprecated()` or `item.getTags().contains(CompletionItemTag.Deprecated)` |
 | String getTailText(CompletionItem item)                                               | Returns the IntelliJ lookup tail text from the given LSP completion item and null otherwise.                                                                                                                                       | `item.getLabelDetails().getDetail()`                                                  |
 | boolean isItemTextBold(CompletionItem item)                                           | Returns the IntelliJ lookup item text bold from the given LSP completion item and null otherwise.                                                                                                                                  | `item.getKind() == CompletionItemKind.Keyword`                                        |
-| boolean isCaseSensitive(PsiFile file)                                                 | Determines whether or not completions should be offered in a case-sensitive manner.                                                                                                                                                | Case-insensitive.                                                                     |
+|
 
 ## LSP Declaration Feature
 

@@ -13,7 +13,9 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Adds client-side configuration features.
@@ -24,7 +26,12 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         super();
 
         // Use the extended feature implementations
-        setCompletionFeature(new UserDefinedCompletionFeature());
         setWorkspaceSymbolFeature(new UserDefinedWorkspaceSymbolFeature());
+    }
+
+    public boolean isCaseSensitive(@NotNull PsiFile file) {
+        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return (clientConfiguration != null) && clientConfiguration.caseSensitive;
     }
 }

@@ -5,18 +5,11 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "completions": {
-      "type": "object",
-      "title": "Client-side completion configuration",
-      "additionalProperties": false,
-      "properties": {
-        "caseSensitive": {
-          "type": "boolean",
-          "title": "Completion case-sensitivity",
-          "description": "Whether or not completions should be offered as case-sensitive.",
-          "default": false
-        }
-      }
+    "caseSensitive": {
+      "type": "boolean",
+      "title": "Language grammar case-sensitivity (LSP4IJ)",
+      "description": "Whether or not the language grammar is case-sensitive.",
+      "default": false
     },
     "workspaceSymbol": {
       "type": "object",

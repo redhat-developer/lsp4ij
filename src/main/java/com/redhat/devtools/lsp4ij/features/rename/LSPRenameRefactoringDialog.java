@@ -41,7 +41,6 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
-import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPRenameFeature;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import com.redhat.devtools.lsp4ij.features.refactoring.WorkspaceEditData;
@@ -327,11 +326,8 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                 LSPClientFeatures clientFeatures = languageServer.getClientFeatures();
                 if (clientFeatures != null) {
                     LSPRenameFeature renameFeature = clientFeatures.getRenameFeature();
-                    if (renameFeature.isRenameSupported(psiFile)) {
-                        LSPCompletionFeature completionFeature = clientFeatures.getCompletionFeature();
-                        if (completionFeature.isCaseSensitive(psiFile)) {
-                            return true;
-                        }
+                    if (renameFeature.isRenameSupported(psiFile) && clientFeatures.isCaseSensitive(psiFile)) {
+                        return true;
                     }
                 }
             }

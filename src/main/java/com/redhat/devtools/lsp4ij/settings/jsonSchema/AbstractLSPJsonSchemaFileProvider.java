@@ -20,8 +20,11 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.jetbrains.jsonSchema.extension.JsonSchemaFileProvider;
 import com.jetbrains.jsonSchema.extension.SchemaType;
 import com.jetbrains.jsonSchema.impl.JsonSchemaVersion;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 
@@ -29,6 +32,9 @@ import java.net.URL;
  * Abstract base class for JSON schema file providers that are based on JSON schema files bundled in the plugin distribution.
  */
 abstract class AbstractLSPJsonSchemaFileProvider implements JsonSchemaFileProvider {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPJsonSchemaFileProvider.class);
+
     private final String jsonSchemaPath;
     private final String jsonFilename;
     private VirtualFile jsonSchemaFile = null;
@@ -47,7 +53,7 @@ abstract class AbstractLSPJsonSchemaFileProvider implements JsonSchemaFileProvid
             jsonSchemaFile = jsonSchemaFileUrl != null ? VirtualFileManager.getInstance().findFileByUrl(jsonSchemaFileUrl) : null;
             // Make sure that the IDE is using the absolute latest version of the JSON schema
             if (jsonSchemaFile != null) {
-                jsonSchemaFile.refresh(true, false);
+                LSPIJUtils.refreshBundledFile(jsonSchemaFile);
             }
         }
         return jsonSchemaFile;

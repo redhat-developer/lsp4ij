@@ -20,29 +20,19 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ClientConfigurationSettings {
     /**
-     * Client-side code completion settings.
-     */
-    public static class ClientConfigurationCompletionSettings {
-        /**
-         * Whether or not completions should be offered as case-sensitive. Defaults to false.
-         */
-        public boolean caseSensitive = false;
-    }
-
-    /**
      * Client-side code workspace symbol settings.
      */
     public static class ClientConfigurationWorkspaceSymbolSettings {
         /**
-         * Whether or not completions should be offered as case-sensitive. Defaults to false.
+         * Whether or not the language server can support the IDE's Go To Class action efficiently. Defaults to false.
          */
         public boolean supportsGotoClass = false;
     }
 
     /**
-     * Client-side code completion settings
+     * Whether or not the language grammar is case-sensitive. Defaults to false.
      */
-    public @NotNull ClientConfigurationCompletionSettings completions = new ClientConfigurationCompletionSettings();
+    public boolean caseSensitive = false;
 
     /**
      * Client-side code workspace symbol settings
