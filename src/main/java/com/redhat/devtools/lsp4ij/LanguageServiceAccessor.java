@@ -424,6 +424,26 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Returns the language server wrappers for the specified file synchronously.
+     *
+     * @param file the file
+     * @return the language server wrappers that apply to the file
+     */
+    @ApiStatus.Internal
+    @NotNull
+    public Set<LanguageServerWrapper> getMatchedLanguageServerWrappersSync(@NotNull VirtualFile file) {
+        Set<LanguageServerWrapper> languageServerWrappers = new LinkedHashSet<>();
+        MatchedLanguageServerDefinitions matchedLanguageServerDefinitions = getMatchedLanguageServerDefinitions(file, project, false);
+        if (matchedLanguageServerDefinitions != null) {
+            Set<LanguageServerDefinition> languageServerDefinitions = matchedLanguageServerDefinitions.getMatched();
+            for (LanguageServerDefinition languageServerDefinition : languageServerDefinitions) {
+                languageServerWrappers.add(new LanguageServerWrapper(project, languageServerDefinition));
+            }
+        }
+        return languageServerWrappers;
+    }
+
+    /**
      * Returns the matched language server definitions for the given file.
      *
      * @param file        the file.
