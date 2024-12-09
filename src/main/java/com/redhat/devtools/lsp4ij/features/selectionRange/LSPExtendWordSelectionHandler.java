@@ -25,8 +25,8 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.features.AbstractLSPDocumentFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
-import com.redhat.devtools.lsp4ij.client.features.LSPSelectionRangeFeature;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -41,7 +41,7 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Predicate;
+import java.util.function.Function;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -66,14 +66,12 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
         }
 
         // Only if textDocument/selectionRange is supported for the file
-        return isSupported(file, clientFeatures -> {
-            LSPSelectionRangeFeature selectionRangeFeature = clientFeatures.getSelectionRangeFeature();
-            return selectionRangeFeature.isEnabled(file) && selectionRangeFeature.isSupported(file);
-        });
+        return isSupported(file, LSPClientFeatures::getSelectionRangeFeature);
     }
 
     // TODO: This seems so incredibly boiler-plate that it should already exist somewhere common
-    private static boolean isSupported(@NotNull PsiFile file, @NotNull Predicate<LSPClientFeatures> filter) {
+    private static boolean isSupported(@NotNull PsiFile file,
+                                       @NotNull Function<@NotNull LSPClientFeatures, @NotNull AbstractLSPDocumentFeature> featureAccessor) {
         VirtualFile virtualFile = file.getVirtualFile();
         if (virtualFile == null) {
             return false;
@@ -82,8 +80,8 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
         Project project = file.getProject();
         CompletableFuture<@NotNull List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
                 virtualFile,
-                filter,
-                null
+                clientFeatures -> featureAccessor.apply(clientFeatures).isEnabled(file),
+                clientFeatures -> featureAccessor.apply(clientFeatures).isSupported(file)
         );
 
         try {
