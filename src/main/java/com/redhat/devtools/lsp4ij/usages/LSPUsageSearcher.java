@@ -15,7 +15,6 @@ import com.intellij.find.findUsages.FindUsagesOptions;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -96,13 +95,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         }
 
         // For completeness' sake, also collect external usages to LSP (pseudo-)elements
-        int offset = ReadAction.compute(() -> {
-            Editor editor = LSPIJUtils.editorForElement(element);
-            return editor != null ? editor.getCaretModel().getOffset() : -1;
-        });
-        if (offset > -1) {
-            LSPExternalReferencesFinder.processExternalReferences(file, offset, reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference))));
-        }
+        LSPExternalReferencesFinder.processExternalReferences(file, element.getTextOffset(), reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference))));
     }
 
     @Nullable
