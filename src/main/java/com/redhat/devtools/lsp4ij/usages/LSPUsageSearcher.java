@@ -15,6 +15,7 @@ import com.intellij.find.findUsages.FindUsagesOptions;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -90,6 +91,8 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                     }
                 }
             }
+        } catch (ProcessCanceledException pce) {
+            throw pce;
         } catch (Exception e) {
             LOGGER.error("Error while collection LSP Usages", e);
         }
