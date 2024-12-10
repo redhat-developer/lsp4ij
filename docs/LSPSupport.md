@@ -385,7 +385,7 @@ system to trigger these actions.
 ### Selection range
 
 [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange) is implemented with
-the `extendWordSelectionHandler` extension point and used via the IDE's **Extend Selection** and **Shrink Selection** actions.
+the `extendWordSelectionHandler` extension point and used via the IDE's **Extend Selection** (**Ctrl+W** on Windows/Linux; **Opt+Up** on Mac) and **Shrink Selection** (**Ctrl+Shift+W** on Windows/Linux; **Opt+Down** on Mac) actions.
 
 Here is an example with the [TypeScript Language Server](https://github.com/typescript-language-server/typescript-language-server) showing **Extend/Shrink Selection** using `textDocument/selectionRange`:
 

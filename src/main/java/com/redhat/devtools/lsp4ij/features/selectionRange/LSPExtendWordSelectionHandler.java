@@ -16,17 +16,13 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
-import com.redhat.devtools.lsp4ij.client.features.AbstractLSPDocumentFeature;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -41,7 +37,6 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -65,44 +60,14 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             return false;
         }
 
-        // Only if textDocument/selectionRange is supported for the file
-        return isSupported(file, LSPClientFeatures::getSelectionRangeFeature);
-    }
-
-    // TODO: This seems so incredibly boiler-plate that it should already exist somewhere common
-    private static boolean isSupported(@NotNull PsiFile file,
-                                       @NotNull Function<@NotNull LSPClientFeatures, @NotNull AbstractLSPDocumentFeature> featureAccessor) {
-        VirtualFile virtualFile = file.getVirtualFile();
-        if (virtualFile == null) {
-            return false;
-        }
-
         Project project = file.getProject();
-        CompletableFuture<List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
-                virtualFile,
-                clientFeatures -> featureAccessor.apply(clientFeatures).isEnabled(file),
-                clientFeatures -> featureAccessor.apply(clientFeatures).isSupported(file)
-        );
-
-        try {
-            waitUntilDone(languageServersFuture, file);
-        } catch (ProcessCanceledException e) {
-            //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            return false;
-        } catch (CancellationException e) {
-            return false;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while enumerating language servers for file '{}'.", virtualFile.getPath(), e);
+        if (project.isDisposed()) {
             return false;
         }
 
-        if (!isDoneNormally(languageServersFuture)) {
-            return false;
-        }
-
-        List<LanguageServerItem> languageServers = languageServersFuture.getNow(Collections.emptyList());
-        return !ContainerUtil.isEmpty(languageServers);
+        // Only if textDocument/selectionRange is supported for the file
+        return LanguageServiceAccessor.getInstance(project)
+                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getSelectionRangeFeature().isSelectionRangeSupported(file));
     }
 
     @Override
