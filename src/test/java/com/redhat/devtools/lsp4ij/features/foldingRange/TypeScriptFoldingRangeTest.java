@@ -11,7 +11,6 @@
 
 package com.redhat.devtools.lsp4ij.features.foldingRange;
 
-import com.intellij.openapi.util.TextRange;
 import com.redhat.devtools.lsp4ij.fixtures.LSPFoldingRangeFixtureTestCase;
 
 /**
@@ -19,29 +18,20 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPFoldingRangeFixtureTestCase;
  */
 public class TypeScriptFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
 
-    private static final String DEMO_TS_FILE_NAME = "demo.ts";
-    // language=typescript
-    private static final String DEMO_TS_FILE_BODY = """
-            export class Demo {
-                demo() {
-                    console.log('demo');
-                }
-            }
-            """;
-
-    // Demo class braced block exclusive of braces
-    private static final TextRange DEMO_CLASS_BODY_TEXT_RANGE = TextRange.create(afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1));
-    // demo() function braced block exclusive of braces
-    private static final TextRange DEMO_METHOD_BODY_TEXT_RANGE = TextRange.create(afterFirst(DEMO_TS_FILE_BODY, "{", 2), beforeLast(DEMO_TS_FILE_BODY, "}", 2));
-
     public TypeScriptFoldingRangeTest() {
         super("*.ts");
     }
 
     public void testFoldingRanges() {
         assertFoldingRanges(
-                DEMO_TS_FILE_NAME,
-                DEMO_TS_FILE_BODY,
+                "demo.ts",
+                """
+                        export class Demo {<start1>
+                            demo() {<start2>
+                                console.log('demo');
+                            <end2>}
+                        <end1>}
+                        """,
                 // language=json
                 """
                         [
@@ -54,16 +44,20 @@ public class TypeScriptFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
                             "endLine": 2
                           }
                         ]
-                        """,
-                DEMO_CLASS_BODY_TEXT_RANGE,
-                DEMO_METHOD_BODY_TEXT_RANGE
+                        """
         );
     }
 
     public void testFoldingRanges_collapsedText() {
         assertFoldingRanges(
-                DEMO_TS_FILE_NAME,
-                DEMO_TS_FILE_BODY,
+                "demo.ts",
+                """
+                        export class Demo {<start1>
+                            demo() {<start2>
+                                console.log('demo');
+                            <end2>}
+                        <end1>}
+                        """,
                 // language=json
                 """
                         [
@@ -78,9 +72,7 @@ public class TypeScriptFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
                             "collapsedText": "methodBody"
                           }
                         ]
-                        """,
-                DEMO_CLASS_BODY_TEXT_RANGE,
-                DEMO_METHOD_BODY_TEXT_RANGE
+                        """
         );
     }
 }

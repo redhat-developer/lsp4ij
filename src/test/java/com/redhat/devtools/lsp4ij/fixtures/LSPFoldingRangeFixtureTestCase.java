@@ -24,13 +24,25 @@ import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.FoldingRange;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Base class test case to test LSP 'textDocument/foldingRange' feature.
  */
 public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtureTestCase {
+
+    private static final String START_TOKEN_TEXT = "start";
+    private static final String END_TOKEN_TEXT = "end";
+    // For simplicity's sake, we only support up to 10 start/end token pairs
+    private static final Pattern TOKEN_PATTERN = Pattern.compile("(?ms)<(" + START_TOKEN_TEXT + "|" + END_TOKEN_TEXT + ")(\\d)>");
+    private static final int START_TOKEN_LENGTH = START_TOKEN_TEXT.length() + 3;
+    private static final int END_TOKEN_LENGTH = END_TOKEN_TEXT.length() + 3;
 
     protected LSPFoldingRangeFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
@@ -38,14 +50,16 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
 
     protected void assertFoldingRanges(@NotNull String fileName,
                                        @NotNull String fileBody,
-                                       @NotNull String mockFoldingRangesJson,
-                                       @NotNull TextRange... expectedFoldingTextRanges) {
+                                       @NotNull String mockFoldingRangesJson) {
+        // Derive the expected text ranges from the tokenized file body
+        List<TextRange> expectedTextRanges = getExpectedTextRanges(fileBody);
+
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());
         MockLanguageServer.INSTANCE.setFoldingRanges(mockFoldingRanges);
 
-        PsiFile file = myFixture.configureByText(fileName, fileBody);
+        PsiFile file = myFixture.configureByText(fileName, removeTokens(fileBody));
         Editor editor = myFixture.getEditor();
 
         // Initialize the language server
@@ -61,19 +75,100 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
         FoldingModel foldingModel = editor.getFoldingModel();
         FoldRegion[] foldRegions = foldingModel.getAllFoldRegions();
 
-        assertEquals(expectedFoldingTextRanges.length, foldRegions.length);
+        // We only need to check against start because we confirmed that start and end are the same length above
+        assertEquals(expectedTextRanges.size(), foldRegions.length);
 
         for (int i = 0; i < foldRegions.length; i++) {
             FoldRegion actualFoldRegion = foldRegions[i];
 
             // Check the text range
-            TextRange expectedFoldingTextRange = expectedFoldingTextRanges[i];
-            assertEquals(expectedFoldingTextRange, actualFoldRegion.getTextRange());
+            TextRange expectedTextRange = expectedTextRanges.get(i);
+            TextRange actualTextRange = actualFoldRegion.getTextRange();
+            assertEquals(expectedTextRange, actualTextRange);
 
             // Check the placeholder text
-            FoldingRange expectedFoldingRange = mockFoldingRanges.get(i);
-            String expectedPlaceholderText = StringUtil.isNotEmpty(expectedFoldingRange.getCollapsedText()) ? expectedFoldingRange.getCollapsedText() : "...";
-            assertEquals(expectedPlaceholderText, actualFoldRegion.getPlaceholderText());
+            FoldingRange mockFoldingRange = mockFoldingRanges.get(i);
+            String mockCollapsedText = mockFoldingRange.getCollapsedText();
+            String expectedPlaceholderText = StringUtil.isNotEmpty(mockCollapsedText) ? mockCollapsedText : "...";
+            String actualPlaceholderText = actualFoldRegion.getPlaceholderText();
+            assertEquals(expectedPlaceholderText, actualPlaceholderText);
         }
+    }
+
+    @NotNull
+    private static List<TextRange> getExpectedTextRanges(@NotNull String fileBody) {
+        // Gather raw start and end token offsets
+        Map<Integer, Integer> rawStartOffsetsByIndex = new LinkedHashMap<>();
+        Map<Integer, Integer> rawEndOffsetsByIndex = new LinkedHashMap<>();
+        Matcher tokenMatcher = TOKEN_PATTERN.matcher(fileBody);
+        while (tokenMatcher.find()) {
+            String tokenText = tokenMatcher.group(1);
+            int tokenIndex = Integer.parseInt(tokenMatcher.group(2));
+            int rawStartOffset = tokenMatcher.start();
+            if (tokenText.contains(START_TOKEN_TEXT)) {
+                if (rawStartOffsetsByIndex.containsKey(tokenIndex)) {
+                    fail("Multiple start tokens were found for index " + tokenIndex + ".");
+                }
+                rawStartOffsetsByIndex.put(tokenIndex, rawStartOffset);
+            } else {
+                if (rawEndOffsetsByIndex.containsKey(tokenIndex)) {
+                    fail("Multiple end tokens were found for index " + tokenIndex + ".");
+                }
+                rawEndOffsetsByIndex.put(tokenIndex, rawStartOffset);
+            }
+        }
+        assertFalse("No start tokens found.", rawStartOffsetsByIndex.isEmpty());
+        assertFalse("No end tokens found.", rawEndOffsetsByIndex.isEmpty());
+        assertEquals("Start and end tokens do not match in length.", rawStartOffsetsByIndex.size(), rawEndOffsetsByIndex.size());
+        assertEquals("Start and end tokens do not have paired indexes.", rawStartOffsetsByIndex.keySet(), rawEndOffsetsByIndex.keySet());
+
+        // Align the raw start and end offset collections
+        List<Integer> rawStartOffsets = new ArrayList<>(rawStartOffsetsByIndex.values());
+        List<Integer> rawEndOffsets = new ArrayList<>(rawStartOffsetsByIndex.size());
+        for (Integer rawStartOffsetIndex : rawStartOffsetsByIndex.keySet()) {
+            Integer rawEndOffset = rawEndOffsetsByIndex.get(rawStartOffsetIndex);
+            assertNotNull("Failed to find the end offset with index " + rawStartOffsetIndex + ".", rawEndOffset);
+            rawEndOffsets.add(rawEndOffset);
+        }
+
+        // Compute final offsets as appropriate based on relative token positioning
+        List<Integer> startOffsets = new ArrayList<>(rawStartOffsets.size());
+        for (int i = 0; i < rawStartOffsets.size(); i++) {
+            int rawStartOffset = rawStartOffsets.get(i);
+            int startOffset = rawStartOffset;
+            for (Integer otherRawStartOffset : rawStartOffsets) {
+                if (rawStartOffset > otherRawStartOffset) startOffset -= START_TOKEN_LENGTH;
+            }
+            for (int rawEndOffset : rawEndOffsets) {
+                if (rawStartOffset > rawEndOffset) startOffset -= END_TOKEN_LENGTH;
+            }
+            startOffsets.add(startOffset);
+        }
+        List<Integer> endOffsets = new ArrayList<>(rawEndOffsets.size());
+        for (int i = 0; i < rawEndOffsets.size(); i++) {
+            int rawEndOffset = rawEndOffsets.get(i);
+            int endOffset = rawEndOffset;
+            for (int rawStartOffset : rawStartOffsets) {
+                if (rawEndOffset > rawStartOffset) endOffset -= START_TOKEN_LENGTH;
+            }
+            for (Integer otherRawEndOffset : rawEndOffsets) {
+                if (rawEndOffset > otherRawEndOffset) endOffset -= END_TOKEN_LENGTH;
+            }
+            endOffsets.add(endOffset);
+        }
+
+        // Create text ranges from the start and end offset pairs
+        List<TextRange> expectedTextRanges = new ArrayList<>(startOffsets.size());
+        for (int i = 0; i < startOffsets.size(); i++) {
+            int startOffset = startOffsets.get(i);
+            int endOffset = endOffsets.get(i);
+            expectedTextRanges.add(TextRange.create(startOffset, endOffset));
+        }
+        return expectedTextRanges;
+    }
+
+    @NotNull
+    private static String removeTokens(@NotNull String fileBody) {
+        return fileBody.replaceAll(TOKEN_PATTERN.pattern(), "");
     }
 }
