@@ -28,11 +28,8 @@ import com.intellij.psi.impl.source.resolve.reference.PsiReferenceUtil;
 import com.intellij.psi.search.PsiSearchHelper;
 import com.intellij.psi.search.UsageSearchContext;
 import com.intellij.util.Processor;
-import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -88,21 +85,17 @@ public final class LSPExternalReferencesFinder {
             return;
         }
 
-        Project project = file.getProject();
-        Set<LanguageServerWrapper> languageServerWrappers = LanguageServiceAccessor.getInstance(project).getMatchedLanguageServerWrappersSync(virtualFile);
-        if (ContainerUtil.isEmpty(languageServerWrappers)) {
-            return;
-        }
-
         // Determine whether or not to search/match in a case-sensitive manner based on client configuration
-        boolean caseSensitive = isCaseSensitive(languageServerWrappers, file);
+        Project project = file.getProject();
+        boolean caseSensitive = LanguageServiceAccessor.getInstance(project)
+                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().isCaseSensitive(file));
 
         if (progressIndicator != null) {
             progressIndicator.setText("Finding usages of '" + wordText + "'");
         }
 
         Set<String> externalReferenceKeys = new HashSet<>();
-        PsiSearchHelper.getInstance(file.getProject()).processElementsWithWord(
+        PsiSearchHelper.getInstance(project).processElementsWithWord(
                 (element, offsetInElement) -> {
                     PsiReference originalReference = element.findReferenceAt(offsetInElement);
                     List<PsiReference> references = originalReference != null ?
@@ -144,19 +137,6 @@ public final class LSPExternalReferencesFinder {
                 UsageSearchContext.ANY,
                 caseSensitive
         );
-    }
-
-    private static boolean isCaseSensitive(@NotNull Set<LanguageServerWrapper> languageServerWrappers, @NotNull PsiFile psiFile) {
-        // If any supporting language server is case-sensitive, the search must be case-sensitive; it's better to
-        // miss changing things that should have been changed than to change things that should not
-        for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
-            LSPClientFeatures clientFeatures = languageServerWrapper.getClientFeatures();
-            if ((clientFeatures != null) && clientFeatures.isCaseSensitive(psiFile)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     @Nullable

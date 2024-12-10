@@ -1169,6 +1169,7 @@ public class LanguageServerWrapper implements Disposable {
         return fileOperationsManager.canDidRenameFiles(LSPIJUtils.toUri(file), file.isDirectory());
     }
 
+    @NotNull
     public LSPClientFeatures getClientFeatures() {
         if (clientFeatures == null) {
             clientFeatures = getOrCreateClientFeatures();
@@ -1176,6 +1177,7 @@ public class LanguageServerWrapper implements Disposable {
         return clientFeatures;
     }
 
+    @NotNull
     private synchronized LSPClientFeatures getOrCreateClientFeatures() {
         if (clientFeatures != null) {
             return clientFeatures;

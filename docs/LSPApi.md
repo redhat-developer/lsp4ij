@@ -2,7 +2,6 @@
 
 The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/LSPClientFeatures.java) API allows you to customize the behavior of LSP features, including:
 
-- [Client-only features](#client-only-features)
 - [LSP codeAction feature](#lsp-codeAction-feature)
 - [LSP codeLens feature](#lsp-codeLens-feature)
 - [LSP color feature](#lsp-color-feature)
@@ -61,6 +60,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 | boolean keepServerAlive()                                    | Returns `true` if the server is kept alive even if all files associated with the language server are closed and `false` otherwise. | `false`           |
 | boolean canStopServerByUser()                                | Returns `true` if the user can stop the language server in LSP console from the context menu and `false` otherwise.                | `true`            |
 | boolean isEnabled(VirtualFile)                               | Returns `true` if the language server is enabled for the given file and `false` otherwise.                                         | `true`            |
+| boolean isCaseSensitive(PsiFile file)                        | Returns `true` if the language grammar for the given file is case-sensitive and `false` otherwise.                                 | `false`           | 
 
 ```java
 package my.language.server;
@@ -163,14 +163,6 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 
 }
 ```
-
-## Client-only Features
-
-Client-only features are used to provide information to LSP4IJ that is not available from language servers but is required for proper integration of language server features into the IDE's corresponding features.
-
-| API                                   | Description                                                                          | Default Behaviour          |
-|---------------------------------------|--------------------------------------------------------------------------------------|----------------------------|
-| boolean isCaseSensitive(PsiFile file) | Determines whether or not the language grammar for the given file is case-sensitive. | `false` (case-insensitive) | 
 
 ## LSP CodeAction Feature
 
