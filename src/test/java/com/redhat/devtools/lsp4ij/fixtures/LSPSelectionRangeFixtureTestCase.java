@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class LSPSelectionRangeFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
-    public LSPSelectionRangeFixtureTestCase(String... fileNamePatterns) {
+    protected LSPSelectionRangeFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
     }
 

@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
-    public LSPFoldingRangeFixtureTestCase(String... fileNamePatterns) {
+    protected LSPFoldingRangeFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
     }
 
