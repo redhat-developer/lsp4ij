@@ -89,5 +89,9 @@ public abstract class LSPSelectionRangeFixtureTestCase extends LSPCodeInsightFix
             String actualSelection = selectionModel.getSelectedText();
             assertEquals(expectedSelection, actualSelection);
         }
+
+        // One more time and there should be no selection again
+        myFixture.performEditorAction(IdeActions.ACTION_EDITOR_UNSELECT_WORD_AT_CARET);
+        assertFalse(selectionModel.hasSelection());
     }
 }
