@@ -35,48 +35,6 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
         super(fileNamePatterns);
     }
 
-    protected static int before(@NotNull String fileBody, @NotNull String snippet, int count) {
-        int fromIndex = 0;
-        for (int i = 0; i < count; i++) {
-            int index = fileBody.indexOf(snippet, fromIndex);
-            assertFalse("Failed to find occurrence " + (i + 1) + " of '" + snippet + "'.", index == -1);
-            if (count == (i + 1)) {
-                return index;
-            } else {
-                fromIndex = index + 1;
-                if (fromIndex == fileBody.length()) {
-                    fail("Failed to find occurrence " + (i + 1) + " of '" + snippet + "'.");
-                }
-            }
-        }
-        return fromIndex;
-    }
-
-    protected static int after(@NotNull String fileBody, @NotNull String snippet, int count) {
-        return before(fileBody, snippet, count) + snippet.length();
-    }
-
-    protected static int beforeLast(@NotNull String fileBody, @NotNull String snippet, int count) {
-        int fromIndex = fileBody.length() - 1;
-        for (int i = 0; i < count; i++) {
-            int index = fileBody.lastIndexOf(snippet, fromIndex);
-            assertFalse("Failed to find last occurrence " + (i + 1) + " of '" + snippet + "'.", index == -1);
-            if (count == (i + 1)) {
-                return index;
-            } else {
-                fromIndex = index - 1;
-                if (fromIndex == 0) {
-                    fail("Failed to find occurrence " + (i + 1) + " of '" + snippet + "'.");
-                }
-            }
-        }
-        return fromIndex;
-    }
-
-    protected static int afterLast(@NotNull String fileBody, @NotNull String snippet, int count) {
-        return beforeLast(fileBody, snippet, count) + snippet.length();
-    }
-
     protected void assertCodeBlocks(@NotNull String fileName,
                                     @NotNull String fileBody,
                                     @NotNull String mockFoldingRangesJson,

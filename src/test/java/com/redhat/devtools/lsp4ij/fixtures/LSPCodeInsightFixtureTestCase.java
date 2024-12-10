@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -71,5 +72,86 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
 
     private void unregisterServer() {
         LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), serverDefinition);
+    }
+
+    // Utility methods for getting the before/after index of the n'th occurrence of a substring of the test file body
+    // from the beginning or end as appropriate. These methods help to avoid hard-coding offsets into the file.
+
+    /**
+     * Returns the index immediately <i>before</i> the {@code count} occurrence of {@code snippet} in {@code fileBody}
+     * searching from the beginning.
+     *
+     * @param fileBody the file body
+     * @param snippet  the search snippet
+     * @param count    the occurrence count
+     * @return the index immediately before the occurrence; fails fast if not found
+     */
+    protected static int beforeFirst(@NotNull String fileBody, @NotNull String snippet, int count) {
+        int fromIndex = 0;
+        for (int i = 0; i < count; i++) {
+            int index = fileBody.indexOf(snippet, fromIndex);
+            assertFalse("Failed to find occurrence " + (i + 1) + " of '" + snippet + "'.", index == -1);
+            if (count == (i + 1)) {
+                return index;
+            } else {
+                fromIndex = index + 1;
+                if (fromIndex == fileBody.length()) {
+                    fail("Failed to find occurrence " + (i + 1) + " of '" + snippet + "'.");
+                }
+            }
+        }
+        return fromIndex;
+    }
+
+    /**
+     * Returns the index immediately <i>after</i> the {@code count} occurrence of {@code snippet} in {@code fileBody}
+     * searching from the beginning.
+     *
+     * @param fileBody the file body
+     * @param snippet  the search snippet
+     * @param count    the occurrence count
+     * @return the index immediately after the occurrence; fails fast if not found
+     */
+    protected static int afterFirst(@NotNull String fileBody, @NotNull String snippet, int count) {
+        return beforeFirst(fileBody, snippet, count) + snippet.length();
+    }
+
+    /**
+     * Returns the index immediately <i>before</i> the {@code count} occurrence of {@code snippet} in {@code fileBody}
+     * searching from the end.
+     *
+     * @param fileBody the file body
+     * @param snippet  the search snippet
+     * @param count    the occurrence count
+     * @return the index immediately before the last occurrence; fails fast if not found
+     */
+    protected static int beforeLast(@NotNull String fileBody, @NotNull String snippet, int count) {
+        int fromIndex = fileBody.length() - 1;
+        for (int i = 0; i < count; i++) {
+            int index = fileBody.lastIndexOf(snippet, fromIndex);
+            assertFalse("Failed to find last occurrence " + (i + 1) + " of '" + snippet + "'.", index == -1);
+            if (count == (i + 1)) {
+                return index;
+            } else {
+                fromIndex = index - 1;
+                if (fromIndex == 0) {
+                    fail("Failed to find occurrence " + (i + 1) + " of '" + snippet + "'.");
+                }
+            }
+        }
+        return fromIndex;
+    }
+
+    /**
+     * Returns the index immediately <i>after</i> the {@code count} occurrence of {@code snippet} in {@code fileBody}
+     * searching from the end.
+     *
+     * @param fileBody the file body
+     * @param snippet  the search snippet
+     * @param count    the occurrence count
+     * @return the index immediately after the last occurrence; fails fast if not found
+     */
+    protected static int afterLast(@NotNull String fileBody, @NotNull String snippet, int count) {
+        return beforeLast(fileBody, snippet, count) + snippet.length();
     }
 }

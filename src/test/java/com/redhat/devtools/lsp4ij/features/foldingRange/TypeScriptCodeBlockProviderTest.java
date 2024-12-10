@@ -52,19 +52,19 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                         """,
                 new int[][]{
                         // From "console" to the begin and end of the "demo()" function's braced block
-                        {before(DEMO_TS_FILE_BODY, "console", 1), after(DEMO_TS_FILE_BODY, "{", 2), beforeLast(DEMO_TS_FILE_BODY, "}", 2)},
+                        {beforeFirst(DEMO_TS_FILE_BODY, "console", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 2), beforeLast(DEMO_TS_FILE_BODY, "}", 2)},
                         // From "demo" to the begin and end of the "Demo" class's braced block
-                        {before(DEMO_TS_FILE_BODY, "demo", 1), after(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
+                        {beforeFirst(DEMO_TS_FILE_BODY, "demo", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
                         // From before the "Demo" class' open brace to the begin and end of the "Demo" class' braced block
-                        {before(DEMO_TS_FILE_BODY, "{", 1), after(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
+                        {beforeFirst(DEMO_TS_FILE_BODY, "{", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
                         // From after the "Demo" class' open brace to the begin and end of the "Demo" class' braced block
-                        {after(DEMO_TS_FILE_BODY, "{", 1), after(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
+                        {afterFirst(DEMO_TS_FILE_BODY, "{", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
                         // From before the "Demo" class' close brace to the begin and end of the "Demo" class' braced block
-                        {beforeLast(DEMO_TS_FILE_BODY, "}", 1), after(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
+                        {beforeLast(DEMO_TS_FILE_BODY, "}", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
                         // From after the "Demo" class' close brace to the begin and end of the "Demo" class' braced block
-                        {afterLast(DEMO_TS_FILE_BODY, "}", 1), after(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
+                        {afterLast(DEMO_TS_FILE_BODY, "}", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
                         // From "Demo" which shouldn't move at all
-                        {before(DEMO_TS_FILE_BODY, "Demo", 1), before(DEMO_TS_FILE_BODY, "Demo", 1), before(DEMO_TS_FILE_BODY, "Demo", 1)}
+                        {beforeFirst(DEMO_TS_FILE_BODY, "Demo", 1), beforeFirst(DEMO_TS_FILE_BODY, "Demo", 1), beforeFirst(DEMO_TS_FILE_BODY, "Demo", 1)}
                 }
         );
     }

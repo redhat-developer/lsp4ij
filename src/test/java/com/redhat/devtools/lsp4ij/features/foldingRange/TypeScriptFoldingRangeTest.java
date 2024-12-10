@@ -30,9 +30,9 @@ public class TypeScriptFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
             """;
 
     // Demo class braced block exclusive of braces
-    private static final TextRange DEMO_CLASS_BODY_TEXT_RANGE = TextRange.create(19, 68);
+    private static final TextRange DEMO_CLASS_BODY_TEXT_RANGE = TextRange.create(afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1));
     // demo() function braced block exclusive of braces
-    private static final TextRange DEMO_METHOD_BODY_TEXT_RANGE = TextRange.create(32, 66);
+    private static final TextRange DEMO_METHOD_BODY_TEXT_RANGE = TextRange.create(afterFirst(DEMO_TS_FILE_BODY, "{", 2), beforeLast(DEMO_TS_FILE_BODY, "}", 2));
 
     public TypeScriptFoldingRangeTest() {
         super("*.ts");
