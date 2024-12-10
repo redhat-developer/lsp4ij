@@ -40,9 +40,9 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
         super(fileNamePatterns);
     }
 
-    protected void assertCodeBlocks(@NotNull String fileName,
-                                    @NotNull String fileBody,
-                                    @NotNull String mockFoldingRangesJson) {
+    protected void assertCodeBlock(@NotNull String fileName,
+                                   @NotNull String fileBody,
+                                   @NotNull String mockFoldingRangesJson) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());

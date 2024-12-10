@@ -39,7 +39,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 ]
                 """;
 
-        assertCodeBlocks(
+        assertCodeBlock(
                 testFilename,
                 """
                         export class Demo {
@@ -51,7 +51,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 mockFoldingRangesJson
         );
 
-        assertCodeBlocks(
+        assertCodeBlock(
                 testFilename,
                 """
                         export class Demo {<start>
@@ -63,7 +63,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 mockFoldingRangesJson
         );
 
-        assertCodeBlocks(
+        assertCodeBlock(
                 testFilename,
                 """
                         export class Demo {<caret><start>
@@ -75,7 +75,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 mockFoldingRangesJson
         );
 
-        assertCodeBlocks(
+        assertCodeBlock(
                 testFilename,
                 """
                         export class Demo <caret>{<start>
@@ -87,7 +87,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 mockFoldingRangesJson
         );
 
-        assertCodeBlocks(
+        assertCodeBlock(
                 testFilename,
                 """
                         export class Demo {<start>
@@ -99,7 +99,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 mockFoldingRangesJson
         );
 
-        assertCodeBlocks(
+        assertCodeBlock(
                 testFilename,
                 """
                         export class Demo {<start>
@@ -111,7 +111,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 mockFoldingRangesJson
         );
 
-        assertCodeBlocks(
+        assertCodeBlock(
                 testFilename,
                 """
                         export class <caret><start><end>Demo {
