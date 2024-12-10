@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.foldingRange;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.folding.CustomFoldingBuilder;
 import com.intellij.lang.folding.FoldingDescriptor;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
@@ -62,8 +63,8 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     protected void buildLanguageFoldRegions(@NotNull List<FoldingDescriptor> descriptors,
                                             @NotNull PsiElement root,
                                             @NotNull Document document, boolean quick) {
-        // if quick flag is set, we do nothing here
-        if (quick) {
+        // if quick flag is set and not testing, we do nothing here
+        if (quick && !ApplicationManager.getApplication().isUnitTestMode()) {
             return;
         }
 
@@ -219,6 +220,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
     @Override
     public boolean isDumbAware() {
-        return false;
+        // Allow folding in dumb mode only during unit testing
+        return ApplicationManager.getApplication().isUnitTestMode();
     }
 }
