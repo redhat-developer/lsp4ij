@@ -36,7 +36,7 @@ public abstract class LSPSelectionRangeFixtureTestCase extends LSPCodeInsightFix
     }
 
     protected void assertSelectionRanges(@NotNull String fileName,
-                                         @NotNull String text,
+                                         @NotNull String fileBody,
                                          @NotNull String setCaretBefore,
                                          @NotNull String mockSelectionRangesJson,
                                          @NotNull String... selections) {
@@ -45,7 +45,7 @@ public abstract class LSPSelectionRangeFixtureTestCase extends LSPCodeInsightFix
         }.getType());
         MockLanguageServer.INSTANCE.setSelectionRanges(mockSelectionRanges);
 
-        PsiFile file = myFixture.configureByText(fileName, text);
+        PsiFile file = myFixture.configureByText(fileName, fileBody);
         Editor editor = myFixture.getEditor();
 
         // Make sure there's no initial selection
@@ -53,7 +53,7 @@ public abstract class LSPSelectionRangeFixtureTestCase extends LSPCodeInsightFix
         assertFalse(selectionModel.hasSelection());
 
         // Move the caret to the specified text
-        int setCaretBeforeOffset = text.indexOf(setCaretBefore);
+        int setCaretBeforeOffset = fileBody.indexOf(setCaretBefore);
         assertTrue(setCaretBeforeOffset > -1);
         CaretModel caretModel = editor.getCaretModel();
         caretModel.moveToOffset(setCaretBeforeOffset);
@@ -76,10 +76,10 @@ public abstract class LSPSelectionRangeFixtureTestCase extends LSPCodeInsightFix
 
         // If the entire file is selected, extending the selection again should leave it unchanged
         String lastSelection = ArrayUtil.getLastElement(selections);
-        if (text.equals(lastSelection)) {
+        if (fileBody.equals(lastSelection)) {
             myFixture.performEditorAction(IdeActions.ACTION_EDITOR_SELECT_WORD_AT_CARET);
             String actualSelection = selectionModel.getSelectedText();
-            assertEquals(text, actualSelection);
+            assertEquals(fileBody, actualSelection);
         }
 
         // And now do the opposite for the Shrink Selection action; start with the next-to-last selection
