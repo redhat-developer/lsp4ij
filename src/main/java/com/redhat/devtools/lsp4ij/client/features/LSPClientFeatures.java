@@ -34,7 +34,7 @@ public class LSPClientFeatures implements Disposable {
     private LanguageServerWrapper serverWrapper;
 
     private LSPCallHierarchyFeature callHierarchyFeature;
-    
+
     private LSPCodeActionFeature codeActionFeature;
 
     private LSPCodeLensFeature codeLensFeature;
@@ -57,6 +57,8 @@ public class LSPClientFeatures implements Disposable {
 
     private LSPFoldingRangeFeature foldingRangeFeature;
 
+    private LSPSelectionRangeFeature selectionRangeFeature;
+
     private LSPFormattingFeature formattingFeature;
 
     private LSPHoverFeature hoverFeature;
@@ -76,11 +78,11 @@ public class LSPClientFeatures implements Disposable {
     private LSPTypeDefinitionFeature typeDefinitionFeature;
 
     private LSPTypeHierarchyFeature typeHierarchyFeature;
-    
+
     private LSPUsageFeature usageFeature;
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
-    
+
     /**
      * Returns the project.
      *
@@ -166,7 +168,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initCallHierarchyFeature() {
-        if(callHierarchyFeature != null) {
+        if (callHierarchyFeature != null) {
             return;
         }
         setCallHierarchyFeature(new LSPCallHierarchyFeature());
@@ -198,7 +200,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initCodeActionFeature() {
-        if(codeActionFeature != null) {
+        if (codeActionFeature != null) {
             return;
         }
         setCodeActionFeature(new LSPCodeActionFeature());
@@ -230,7 +232,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initCodeLensFeature() {
-        if(codeLensFeature != null) {
+        if (codeLensFeature != null) {
             return;
         }
         setCodeLensFeature(new LSPCodeLensFeature());
@@ -262,7 +264,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initDocumentColorFeature() {
-        if(documentColorFeature != null) {
+        if (documentColorFeature != null) {
             return;
         }
         setDocumentColorFeature(new LSPDocumentColorFeature());
@@ -294,7 +296,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initCompletionFeature() {
-        if(completionFeature != null) {
+        if (completionFeature != null) {
             return;
         }
         setCompletionFeature(new LSPCompletionFeature());
@@ -326,7 +328,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initDeclarationFeature() {
-        if(declarationFeature != null) {
+        if (declarationFeature != null) {
             return;
         }
         setDeclarationFeature(new LSPDeclarationFeature());
@@ -358,7 +360,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initDefinitionFeature() {
-        if(definitionFeature != null) {
+        if (definitionFeature != null) {
             return;
         }
         setDefinitionFeature(new LSPDefinitionFeature());
@@ -390,7 +392,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initDocumentHighlightFeature() {
-        if(documentHighlightFeature != null) {
+        if (documentHighlightFeature != null) {
             return;
         }
         setDocumentHighlightFeature(new LSPDocumentHighlightFeature());
@@ -422,7 +424,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initDocumentLinkFeature() {
-        if(documentLinkFeature != null) {
+        if (documentLinkFeature != null) {
             return;
         }
         setDocumentLinkFeature(new LSPDocumentLinkFeature());
@@ -454,7 +456,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initDocumentSymbolFeature() {
-        if(documentSymbolFeature != null) {
+        if (documentSymbolFeature != null) {
             return;
         }
         setDocumentSymbolFeature(new LSPDocumentSymbolFeature());
@@ -486,7 +488,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initDiagnosticFeature() {
-        if(diagnosticFeature != null) {
+        if (diagnosticFeature != null) {
             return;
         }
         setDiagnosticFeature(new LSPDiagnosticFeature());
@@ -518,7 +520,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initFoldingRangeFeature() {
-        if(foldingRangeFeature != null) {
+        if (foldingRangeFeature != null) {
             return;
         }
         setFoldingRangeFeature(new LSPFoldingRangeFeature());
@@ -537,6 +539,38 @@ public class LSPClientFeatures implements Disposable {
     }
 
     /**
+     * Returns the LSP selectionRange feature.
+     *
+     * @return the LSP selectionRange feature.
+     */
+    @NotNull
+    public final LSPSelectionRangeFeature getSelectionRangeFeature() {
+        if (selectionRangeFeature == null) {
+            initSelectionRangeFeature();
+        }
+        return selectionRangeFeature;
+    }
+
+    private synchronized void initSelectionRangeFeature() {
+        if (selectionRangeFeature != null) {
+            return;
+        }
+        setSelectionRangeFeature(new LSPSelectionRangeFeature());
+    }
+
+    /**
+     * Initialize the LSP selectionRange feature.
+     *
+     * @param selectionRangeFeature the LSP selectionRange feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setSelectionRangeFeature(@NotNull LSPSelectionRangeFeature selectionRangeFeature) {
+        selectionRangeFeature.setClientFeatures(this);
+        this.selectionRangeFeature = selectionRangeFeature;
+        return this;
+    }
+
+    /**
      * Returns the LSP formatting feature.
      *
      * @return the LSP formatting feature.
@@ -550,11 +584,12 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initFormattingFeature() {
-        if(formattingFeature != null) {
+        if (formattingFeature != null) {
             return;
         }
         setFormattingFeature(new LSPFormattingFeature());
     }
+
     /**
      * Initialize the LSP formatting feature.
      *
@@ -581,7 +616,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initHoverFeature() {
-        if(hoverFeature != null) {
+        if (hoverFeature != null) {
             return;
         }
         setHoverFeature(new LSPHoverFeature());
@@ -613,7 +648,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initImplementationFeature() {
-        if(implementationFeature != null) {
+        if (implementationFeature != null) {
             return;
         }
         setImplementationFeature(new LSPImplementationFeature());
@@ -645,7 +680,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initInlayHintFeature() {
-        if(inlayHintFeature != null) {
+        if (inlayHintFeature != null) {
             return;
         }
         setInlayHintFeature(new LSPInlayHintFeature());
@@ -662,7 +697,7 @@ public class LSPClientFeatures implements Disposable {
         this.inlayHintFeature = inlayHintFeature;
         return this;
     }
-    
+
     /**
      * Returns the LSP references feature.
      *
@@ -677,7 +712,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initReferencesFeature() {
-        if(referencesFeature != null) {
+        if (referencesFeature != null) {
             return;
         }
         setReferencesFeature(new LSPReferencesFeature());
@@ -709,7 +744,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initRenameFeature() {
-        if(renameFeature != null) {
+        if (renameFeature != null) {
             return;
         }
         setRenameFeature(new LSPRenameFeature());
@@ -741,7 +776,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initSemanticTokensFeature() {
-        if(semanticTokensFeature != null) {
+        if (semanticTokensFeature != null) {
             return;
         }
         setSemanticTokensFeature(new LSPSemanticTokensFeature());
@@ -773,7 +808,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initSignatureHelpFeature() {
-        if(signatureHelpFeature != null) {
+        if (signatureHelpFeature != null) {
             return;
         }
         setSignatureHelpFeature(new LSPSignatureHelpFeature());
@@ -805,7 +840,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initTypeDefinitionFeature() {
-        if(typeDefinitionFeature != null) {
+        if (typeDefinitionFeature != null) {
             return;
         }
         setTypeDefinitionFeature(new LSPTypeDefinitionFeature());
@@ -837,7 +872,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initTypeHierarchyFeature() {
-        if(typeHierarchyFeature != null) {
+        if (typeHierarchyFeature != null) {
             return;
         }
         setTypeHierarchyFeature(new LSPTypeHierarchyFeature());
@@ -854,7 +889,7 @@ public class LSPClientFeatures implements Disposable {
         this.typeHierarchyFeature = typeHierarchyFeature;
         return this;
     }
-    
+
     /**
      * Returns the LSP usage feature.
      *
@@ -869,7 +904,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initUsageFeature() {
-        if(usageFeature != null) {
+        if (usageFeature != null) {
             return;
         }
         setUsageFeature(new LSPUsageFeature());
@@ -901,7 +936,7 @@ public class LSPClientFeatures implements Disposable {
     }
 
     private synchronized void initWorkspaceSymbolFeature() {
-        if(workspaceSymbolFeature != null) {
+        if (workspaceSymbolFeature != null) {
             return;
         }
         setWorkspaceSymbolFeature(new LSPWorkspaceSymbolFeature());
@@ -1105,91 +1140,74 @@ public class LSPClientFeatures implements Disposable {
 
     @Nullable
     public TextDocumentServerCapabilityRegistry<? extends TextDocumentRegistrationOptions> getCapabilityRegistry(String method) {
-        if (LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION.equals(method)) {
-            // register 'textDocument/codeAction' capability
-            return getCodeActionFeature().getCodeActionCapabilityRegistry();
+        if (method == null) {
+            return null;
         }
-        if (LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS.equals(method)) {
-            // register 'textDocument/codeLens' capability
-            return getCodeLensFeature().getCodeLensCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR.equals(method)) {
-            // register 'textDocument/documentColor' capability
-            return getDocumentColorFeature().getDocumentColorCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_COMPLETION.equals(method)) {
-            // register 'textDocument/completion' capability
-            return getCompletionFeature().getCompletionCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DECLARATION.equals(method)) {
-            // register 'textDocument/declaration' capability
-            return getDeclarationFeature().getDeclarationCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DEFINITION.equals(method)) {
-            // register 'textDocument/definition' capability
-            return getDefinitionFeature().getDefinitionCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT.equals(method)) {
-            // register 'textDocument/documentHighlight' capability
-            return getDocumentHighlightFeature().getDocumentHighlightCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_LINK.equals(method)) {
-            // register 'textDocument/documentHighLink' capability
-            return getDocumentLinkFeature().getDocumentLinkCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_SYMBOL.equals(method)) {
-            // register 'textDocument/documentSymbol' capability
-            return getDocumentSymbolFeature().getDocumentSymbolCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_FOLDING_RANGE.equals(method)) {
-            // register 'textDocument/foldingRange' capability
-            return getFoldingRangeFeature().getFoldingRangeCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_FORMATTING.equals(method)) {
-            // register 'textDocument/formatting' capability
-            return getFormattingFeature().getFormattingCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING.equals(method)) {
-            // register 'textDocument/rangeFormatting' capability
-            return getFormattingFeature().getRangeFormattingCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_HOVER.equals(method)) {
-            // register 'textDocument/hover' capability
-            return getHoverFeature().getHoverCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION.equals(method)) {
-            // register 'textDocument/implementation' capability
-            return getImplementationFeature().getImplementationCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT.equals(method)) {
-            // register 'textDocument/inlayHint' capability
-            return getInlayHintFeature().getInlayHintCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY.equals(method)) {
-            // register 'textDocument/callHierarchy' capability
-            return getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_REFERENCES.equals(method)) {
-            // register 'textDocument/references' capability
-            return getReferencesFeature().getReferencesCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_RENAME.equals(method)) {
-            // register 'textDocument/rename' capability
-            return getRenameFeature().getRenameCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_SIGNATURE_HELP.equals(method)) {
-            // register 'textDocument/signatureHelp' capability
-            return getSignatureHelpFeature().getSignatureHelpCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION.equals(method)) {
-            // register 'textDocument/typeDefinition' capability
-            return getTypeDefinitionFeature().getTypeDefinitionCapabilityRegistry();
-        }
-        if (LSPRequestConstants.TEXT_DOCUMENT_TYPE_HIERARCHY.equals(method)) {
-            // register 'textDocument/typeHierarchy' capability
-            return getTypeHierarchyFeature().getTypeHierarchyCapabilityRegistry();
-        }
-        return null;
-    }
 
+        return switch (method) {
+            // register 'textDocument/codeAction' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION ->
+                    getCodeActionFeature().getCodeActionCapabilityRegistry();
+            // register 'textDocument/codeLens' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS -> getCodeLensFeature().getCodeLensCapabilityRegistry();
+            // register 'textDocument/documentColor' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR ->
+                    getDocumentColorFeature().getDocumentColorCapabilityRegistry();
+            // register 'textDocument/completion' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_COMPLETION ->
+                    getCompletionFeature().getCompletionCapabilityRegistry();
+            // register 'textDocument/declaration' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DECLARATION ->
+                    getDeclarationFeature().getDeclarationCapabilityRegistry();
+            // register 'textDocument/definition' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DEFINITION ->
+                    getDefinitionFeature().getDefinitionCapabilityRegistry();
+            // register 'textDocument/documentHighlight' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT ->
+                    getDocumentHighlightFeature().getDocumentHighlightCapabilityRegistry();
+            // register 'textDocument/documentHighLink' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_LINK ->
+                    getDocumentLinkFeature().getDocumentLinkCapabilityRegistry();
+            // register 'textDocument/documentSymbol' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_SYMBOL ->
+                    getDocumentSymbolFeature().getDocumentSymbolCapabilityRegistry();
+            // register 'textDocument/foldingRange' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_FOLDING_RANGE ->
+                    getFoldingRangeFeature().getFoldingRangeCapabilityRegistry();
+            // register 'textDocument/selectionRange' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_SELECTION_RANGE ->
+                    getSelectionRangeFeature().getSelectionRangeCapabilityRegistry();
+            // register 'textDocument/formatting' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_FORMATTING ->
+                    getFormattingFeature().getFormattingCapabilityRegistry();
+            // register 'textDocument/rangeFormatting' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING ->
+                    getFormattingFeature().getRangeFormattingCapabilityRegistry();
+            // register 'textDocument/hover' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_HOVER -> getHoverFeature().getHoverCapabilityRegistry();
+            // register 'textDocument/implementation' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION ->
+                    getImplementationFeature().getImplementationCapabilityRegistry();
+            // register 'textDocument/inlayHint' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT -> getInlayHintFeature().getInlayHintCapabilityRegistry();
+            // register 'textDocument/callHierarchy' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY ->
+                    getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();
+            // register 'textDocument/references' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_REFERENCES ->
+                    getReferencesFeature().getReferencesCapabilityRegistry();
+            // register 'textDocument/rename' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_RENAME -> getRenameFeature().getRenameCapabilityRegistry();
+            // register 'textDocument/signatureHelp' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_SIGNATURE_HELP ->
+                    getSignatureHelpFeature().getSignatureHelpCapabilityRegistry();
+            // register 'textDocument/typeDefinition' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION ->
+                    getTypeDefinitionFeature().getTypeDefinitionCapabilityRegistry();
+            // register 'textDocument/typeHierarchy' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_TYPE_HIERARCHY ->
+                    getTypeHierarchyFeature().getTypeHierarchyCapabilityRegistry();
+            default -> null;
+        };
+    }
 }
