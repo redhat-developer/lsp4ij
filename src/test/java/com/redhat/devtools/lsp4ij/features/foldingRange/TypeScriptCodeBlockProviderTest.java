@@ -23,8 +23,6 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
     }
 
     public void testCodeBlocks() {
-        String testFilename = "demo.ts";
-
         // language=json
         String mockFoldingRangesJson = """
                 [
@@ -40,7 +38,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 """;
 
         assertCodeBlock(
-                testFilename,
+                "demo.ts",
                 """
                         export class Demo {
                             demo() {<start>
@@ -52,7 +50,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
         );
 
         assertCodeBlock(
-                testFilename,
+                "demo.ts",
                 """
                         export class Demo {<start>
                             <caret>demo() {
@@ -64,7 +62,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
         );
 
         assertCodeBlock(
-                testFilename,
+                "demo.ts",
                 """
                         export class Demo {<caret><start>
                             demo() {
@@ -76,7 +74,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
         );
 
         assertCodeBlock(
-                testFilename,
+                "demo.ts",
                 """
                         export class Demo <caret>{<start>
                             demo() {
@@ -88,7 +86,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
         );
 
         assertCodeBlock(
-                testFilename,
+                "demo.ts",
                 """
                         export class Demo {<start>
                             demo() {
@@ -100,7 +98,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
         );
 
         assertCodeBlock(
-                testFilename,
+                "demo.ts",
                 """
                         export class Demo {<start>
                             demo() {
@@ -112,7 +110,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
         );
 
         assertCodeBlock(
-                testFilename,
+                "demo.ts",
                 """
                         export class <caret><start><end>Demo {
                             demo() {

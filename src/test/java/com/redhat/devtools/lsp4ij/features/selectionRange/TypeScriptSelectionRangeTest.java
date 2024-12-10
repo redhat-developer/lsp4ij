@@ -18,18 +18,15 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPSelectionRangeFixtureTestCase;
  */
 public class TypeScriptSelectionRangeTest extends LSPSelectionRangeFixtureTestCase {
 
-    private static final String DEMO_TS_FILE_NAME = "demo.ts";
-    // language=typescript
-    private static final String DEMO_TS_FILE_BODY = "console.log('message');";
-
     public TypeScriptSelectionRangeTest() {
         super("*.ts");
     }
 
     public void testSelectionRanges_qualifierExpression() {
         assertSelectionRanges(
-                DEMO_TS_FILE_NAME,
-                DEMO_TS_FILE_BODY,
+                "demo.ts",
+                // language=typescript
+                "console.log('message');",
                 // Start on the qualifier
                 "console",
                 // language=json
@@ -94,8 +91,9 @@ public class TypeScriptSelectionRangeTest extends LSPSelectionRangeFixtureTestCa
 
     public void testSelectionRanges_callExpression() {
         assertSelectionRanges(
-                DEMO_TS_FILE_NAME,
-                DEMO_TS_FILE_BODY,
+                "demo.ts",
+                // language=typescript
+                "console.log('message');",
                 // Start at the call to log
                 "log",
                 // language=json
@@ -160,8 +158,9 @@ public class TypeScriptSelectionRangeTest extends LSPSelectionRangeFixtureTestCa
 
     public void testSelectionRanges_stringLiteral() {
         assertSelectionRanges(
-                DEMO_TS_FILE_NAME,
-                DEMO_TS_FILE_BODY,
+                "demo.ts",
+                // language=typescript
+                "console.log('message');",
                 // Start in the string literal
                 "message",
                 // language=json
