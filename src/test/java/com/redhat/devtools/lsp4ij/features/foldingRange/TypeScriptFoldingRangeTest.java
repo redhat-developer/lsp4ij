@@ -44,7 +44,6 @@ public class TypeScriptFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
                 DEMO_TS_FILE_BODY,
                 // language=json
                 """
-                        
                         [
                           {
                             "startLine": 0,
@@ -67,7 +66,6 @@ public class TypeScriptFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
                 DEMO_TS_FILE_BODY,
                 // language=json
                 """
-                        
                         [
                           {
                             "startLine": 0,

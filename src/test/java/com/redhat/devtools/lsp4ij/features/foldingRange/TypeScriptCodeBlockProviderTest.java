@@ -38,7 +38,6 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                 DEMO_TS_FILE_BODY,
                 // language=json
                 """
-                        
                         [
                           {
                             "startLine": 0,
