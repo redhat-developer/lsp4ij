@@ -34,6 +34,7 @@ import com.redhat.devtools.lsp4ij.features.navigation.LSPDefinitionSupport;
 import com.redhat.devtools.lsp4ij.features.references.LSPReferenceSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPPrepareRenameSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPRenameSupport;
+import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensSupport;
 import com.redhat.devtools.lsp4ij.features.signatureHelp.LSPSignatureHelpSupport;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
@@ -61,6 +62,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private final LSPFoldingRangeSupport foldingRangeSupport;
 
+    private final LSPSelectionRangeSupport selectionRangeSupport;
+
     private final LSPFormattingSupport formattingSupport;
 
     private final LSPHighlightSupport highlightSupport;
@@ -84,7 +87,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPReferenceSupport referenceSupport;
 
     private final LSPDefinitionSupport definitionSupport;
-    
+
     private final LSPDeclarationSupport declarationSupport;
 
     private final LSPTypeDefinitionSupport typeDefinitionSupport;
@@ -107,6 +110,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.inlayHintsSupport = new LSPInlayHintsSupport(file);
         this.colorSupport = new LSPColorSupport(file);
         this.foldingRangeSupport = new LSPFoldingRangeSupport(file);
+        this.selectionRangeSupport = new LSPSelectionRangeSupport(file);
         this.formattingSupport = new LSPFormattingSupport(file);
         this.highlightSupport = new LSPHighlightSupport(file);
         this.signatureHelpSupport = new LSPSignatureHelpSupport(file);
@@ -140,6 +144,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getInlayHintsSupport().cancel();
         getColorSupport().cancel();
         getFoldingRangeSupport().cancel();
+        getSelectionRangeSupport().cancel();
         getFormattingSupport().cancel();
         getHighlightSupport().cancel();
         getSignatureHelpSupport().cancel();
@@ -204,6 +209,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPFoldingRangeSupport getFoldingRangeSupport() {
         return foldingRangeSupport;
+    }
+
+    /**
+     * Returns the LSP selection range support.
+     *
+     * @return the LSP selection range support.
+     */
+    public LSPSelectionRangeSupport getSelectionRangeSupport() {
+        return selectionRangeSupport;
     }
 
     /**
@@ -313,7 +327,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     public LSPDefinitionSupport getDefinitionSupport() {
         return definitionSupport;
     }
-    
+
     /**
      * Returns the LSP declaration support.
      *
