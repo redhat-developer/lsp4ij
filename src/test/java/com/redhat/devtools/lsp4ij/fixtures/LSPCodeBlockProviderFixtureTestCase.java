@@ -15,6 +15,7 @@ import com.intellij.codeInsight.editorActions.CodeBlockUtil;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Trinity;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EditorTestUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
@@ -42,38 +43,13 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
     protected void assertCodeBlocks(@NotNull String fileName,
                                     @NotNull String fileBody,
                                     @NotNull String mockFoldingRangesJson) {
-        // Gather the raw token offsets
-        int rawCaretOffset = fileBody.indexOf(CARET_TOKEN);
-        assertFalse("No " + CARET_TOKEN + " found.", rawCaretOffset == -1);
-        int rawStartOffset = fileBody.indexOf(START_TOKEN);
-        assertFalse("No " + START_TOKEN + " found.", rawStartOffset == -1);
-        int rawEndOffset = fileBody.indexOf(END_TOKEN);
-        assertFalse("No " + END_TOKEN + " found.", rawEndOffset == -1);
-
-        // Compute final offsets as appropriate based on relative token positioning
-        int caretOffset = rawCaretOffset;
-        if (rawCaretOffset > rawStartOffset) caretOffset -= START_TOKEN.length();
-        if (rawCaretOffset > rawEndOffset) caretOffset -= END_TOKEN.length();
-        int startOffset = rawStartOffset;
-        if (rawStartOffset > rawCaretOffset) startOffset -= CARET_TOKEN.length();
-        if (rawStartOffset > rawEndOffset) startOffset -= END_TOKEN.length();
-        int endOffset = rawEndOffset;
-        if (rawEndOffset > rawCaretOffset) endOffset -= CARET_TOKEN.length();
-        if (rawEndOffset > rawStartOffset) endOffset -= START_TOKEN.length();
-
-        // Remove the tokens
-        fileBody = fileBody
-                .replace(CARET_TOKEN, "")
-                .replace(START_TOKEN, "")
-                .replace(END_TOKEN, "");
-
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());
         MockLanguageServer.INSTANCE.setFoldingRanges(mockFoldingRanges);
 
         Project project = myFixture.getProject();
-        PsiFile file = myFixture.configureByText(fileName, fileBody);
+        PsiFile file = myFixture.configureByText(fileName, stripTokens(fileBody));
         Editor editor = myFixture.getEditor();
 
         // Initialize the language server
@@ -89,6 +65,12 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
 
         CaretModel caretModel = editor.getCaretModel();
 
+        // Derive the caret, start, and end offsets from tokens in the file body
+        Trinity<Integer, Integer, Integer> offsets = getOffsets(fileBody);
+        int caretOffset = offsets.getFirst();
+        int startOffset = offsets.getSecond();
+        int endOffset = offsets.getThird();
+
         caretModel.moveToOffset(caretOffset);
         CodeBlockUtil.moveCaretToCodeBlockStart(project, editor, false);
         assertEquals(startOffset, caretModel.getOffset());
@@ -96,5 +78,37 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
         caretModel.moveToOffset(caretOffset);
         CodeBlockUtil.moveCaretToCodeBlockEnd(project, editor, false);
         assertEquals(endOffset, caretModel.getOffset());
+    }
+
+    @NotNull
+    private static String stripTokens(@NotNull String fileBody) {
+        return fileBody
+                .replace(CARET_TOKEN, "")
+                .replace(START_TOKEN, "")
+                .replace(END_TOKEN, "");
+    }
+
+    @NotNull
+    private static Trinity<@NotNull Integer, @NotNull Integer, @NotNull Integer> getOffsets(@NotNull String fileBody) {
+        // Gather the raw token offsets
+        int rawCaretOffset = fileBody.indexOf(CARET_TOKEN);
+        assertFalse("No " + CARET_TOKEN + " found.", rawCaretOffset == -1);
+        int rawStartOffset = fileBody.indexOf(START_TOKEN);
+        assertFalse("No " + START_TOKEN + " found.", rawStartOffset == -1);
+        int rawEndOffset = fileBody.indexOf(END_TOKEN);
+        assertFalse("No " + END_TOKEN + " found.", rawEndOffset == -1);
+
+        // Adjust final offsets as appropriate based on relative token positioning
+        int caretOffset = rawCaretOffset;
+        if (rawCaretOffset > rawStartOffset) caretOffset -= START_TOKEN.length();
+        if (rawCaretOffset > rawEndOffset) caretOffset -= END_TOKEN.length();
+        int startOffset = rawStartOffset;
+        if (rawStartOffset > rawCaretOffset) startOffset -= CARET_TOKEN.length();
+        if (rawStartOffset > rawEndOffset) startOffset -= END_TOKEN.length();
+        int endOffset = rawEndOffset;
+        if (rawEndOffset > rawCaretOffset) endOffset -= CARET_TOKEN.length();
+        if (rawEndOffset > rawStartOffset) endOffset -= START_TOKEN.length();
+
+        return Trinity.create(caretOffset, startOffset, endOffset);
     }
 }

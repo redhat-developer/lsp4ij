@@ -51,15 +51,12 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
     protected void assertFoldingRanges(@NotNull String fileName,
                                        @NotNull String fileBody,
                                        @NotNull String mockFoldingRangesJson) {
-        // Derive the expected text ranges from the tokenized file body
-        List<TextRange> expectedTextRanges = getExpectedTextRanges(fileBody);
-
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());
         MockLanguageServer.INSTANCE.setFoldingRanges(mockFoldingRanges);
 
-        PsiFile file = myFixture.configureByText(fileName, removeTokens(fileBody));
+        PsiFile file = myFixture.configureByText(fileName, stripTokens(fileBody));
         Editor editor = myFixture.getEditor();
 
         // Initialize the language server
@@ -75,7 +72,8 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
         FoldingModel foldingModel = editor.getFoldingModel();
         FoldRegion[] foldRegions = foldingModel.getAllFoldRegions();
 
-        // We only need to check against start because we confirmed that start and end are the same length above
+        // Derive the expected text ranges from the tokenized file body
+        List<TextRange> expectedTextRanges = getExpectedTextRanges(fileBody);
         assertEquals(expectedTextRanges.size(), foldRegions.length);
 
         for (int i = 0; i < foldRegions.length; i++) {
@@ -93,6 +91,11 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
             String actualPlaceholderText = actualFoldRegion.getPlaceholderText();
             assertEquals(expectedPlaceholderText, actualPlaceholderText);
         }
+    }
+
+    @NotNull
+    private static String stripTokens(@NotNull String fileBody) {
+        return fileBody.replaceAll(TOKEN_PATTERN.pattern(), "");
     }
 
     @NotNull
@@ -131,28 +134,28 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
             rawEndOffsets.add(rawEndOffset);
         }
 
-        // Compute final offsets as appropriate based on relative token positioning
+        // Adjust final offsets as appropriate based on relative token positioning
         List<Integer> startOffsets = new ArrayList<>(rawStartOffsets.size());
         for (int i = 0; i < rawStartOffsets.size(); i++) {
-            int rawStartOffset = rawStartOffsets.get(i);
-            int startOffset = rawStartOffset;
-            for (Integer otherRawStartOffset : rawStartOffsets) {
-                if (rawStartOffset > otherRawStartOffset) startOffset -= START_TOKEN_LENGTH;
+            int currentRawStartOffset = rawStartOffsets.get(i);
+            int startOffset = currentRawStartOffset;
+            for (Integer rawStartOffset : rawStartOffsets) {
+                if (currentRawStartOffset > rawStartOffset) startOffset -= START_TOKEN_LENGTH;
             }
             for (int rawEndOffset : rawEndOffsets) {
-                if (rawStartOffset > rawEndOffset) startOffset -= END_TOKEN_LENGTH;
+                if (currentRawStartOffset > rawEndOffset) startOffset -= END_TOKEN_LENGTH;
             }
             startOffsets.add(startOffset);
         }
         List<Integer> endOffsets = new ArrayList<>(rawEndOffsets.size());
         for (int i = 0; i < rawEndOffsets.size(); i++) {
-            int rawEndOffset = rawEndOffsets.get(i);
-            int endOffset = rawEndOffset;
+            int currentRawEndOffset = rawEndOffsets.get(i);
+            int endOffset = currentRawEndOffset;
             for (int rawStartOffset : rawStartOffsets) {
-                if (rawEndOffset > rawStartOffset) endOffset -= START_TOKEN_LENGTH;
+                if (currentRawEndOffset > rawStartOffset) endOffset -= START_TOKEN_LENGTH;
             }
-            for (Integer otherRawEndOffset : rawEndOffsets) {
-                if (rawEndOffset > otherRawEndOffset) endOffset -= END_TOKEN_LENGTH;
+            for (Integer rawEndOffset : rawEndOffsets) {
+                if (currentRawEndOffset > rawEndOffset) endOffset -= END_TOKEN_LENGTH;
             }
             endOffsets.add(endOffset);
         }
@@ -165,10 +168,5 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
             expectedTextRanges.add(TextRange.create(startOffset, endOffset));
         }
         return expectedTextRanges;
-    }
-
-    @NotNull
-    private static String removeTokens(@NotNull String fileBody) {
-        return fileBody.replaceAll(TOKEN_PATTERN.pattern(), "");
     }
 }
