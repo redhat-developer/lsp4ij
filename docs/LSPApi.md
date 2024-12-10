@@ -14,6 +14,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP documentSymbol feature](#lsp-documentSymbol-feature)
 - [LSP foldingRange feature](#lsp-foldingRange-feature)
 - [LSP formatting feature](#lsp-formatting-feature)
+- [LSP selection feature](#lsp-selection-feature)
 - [LSP hover feature](#lsp-hover-feature)
 - [LSP implementation feature](#lsp-implementation-feature)
 - [LSP inlayHint feature](#lsp-inlayHint-feature)
@@ -401,6 +402,15 @@ public class MyLSPFormattingFeature extends LSPFormattingFeature {
     }
 }
 ```
+
+## LSP Selection Feature
+
+Integrates the LSP [`textDocument/selectionRange`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange) feature.
+
+| API                                                   | Description                                                                                                                                                                                                                        | Default Behaviour           |
+|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| boolean isEnabled(PsiFile file)                       | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
+| boolean isSupported(PsiFile file)                     | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
 
 ## LSP Hover Feature
 
