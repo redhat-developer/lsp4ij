@@ -31,14 +31,42 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
+    private static final String CARET_TOKEN = "<caret>";
+    private static final String START_TOKEN = "<start>";
+    private static final String END_TOKEN = "<end>";
+
     protected LSPCodeBlockProviderFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
     }
 
     protected void assertCodeBlocks(@NotNull String fileName,
                                     @NotNull String fileBody,
-                                    @NotNull String mockFoldingRangesJson,
-                                    int[][] testOffsetScenarios) {
+                                    @NotNull String mockFoldingRangesJson) {
+        // Gather the raw token offsets
+        int rawCaretOffset = fileBody.indexOf(CARET_TOKEN);
+        assertFalse("No " + CARET_TOKEN + " found.", rawCaretOffset == -1);
+        int rawStartOffset = fileBody.indexOf(START_TOKEN);
+        assertFalse("No " + START_TOKEN + " found.", rawStartOffset == -1);
+        int rawEndOffset = fileBody.indexOf(END_TOKEN);
+        assertFalse("No " + END_TOKEN + " found.", rawEndOffset == -1);
+
+        // Compute final offsets as appropriate based on relative token positioning
+        int caretOffset = rawCaretOffset;
+        if (rawCaretOffset > rawStartOffset) caretOffset -= START_TOKEN.length();
+        if (rawCaretOffset > rawEndOffset) caretOffset -= END_TOKEN.length();
+        int startOffset = rawStartOffset;
+        if (rawStartOffset > rawCaretOffset) startOffset -= CARET_TOKEN.length();
+        if (rawStartOffset > rawEndOffset) startOffset -= END_TOKEN.length();
+        int endOffset = rawEndOffset;
+        if (rawEndOffset > rawCaretOffset) endOffset -= CARET_TOKEN.length();
+        if (rawEndOffset > rawStartOffset) endOffset -= START_TOKEN.length();
+
+        // Remove the tokens
+        fileBody = fileBody
+                .replace(CARET_TOKEN, "")
+                .replace(START_TOKEN, "")
+                .replace(END_TOKEN, "");
+
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());
@@ -60,19 +88,13 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
         EditorTestUtil.buildInitialFoldingsInBackground(editor);
 
         CaretModel caretModel = editor.getCaretModel();
-        for (int[] testOffsetScenario : testOffsetScenarios) {
-            assertEquals("Test offset scenarios must be expressed in triplets.", 3, testOffsetScenario.length);
-            int initialOffset = testOffsetScenario[0];
-            int expectedMoveToStartOffset = testOffsetScenario[1];
-            int expectedMoveToEndOffset = testOffsetScenario[2];
 
-            caretModel.moveToOffset(initialOffset);
-            CodeBlockUtil.moveCaretToCodeBlockStart(project, editor, false);
-            assertEquals(expectedMoveToStartOffset, caretModel.getOffset());
+        caretModel.moveToOffset(caretOffset);
+        CodeBlockUtil.moveCaretToCodeBlockStart(project, editor, false);
+        assertEquals(startOffset, caretModel.getOffset());
 
-            caretModel.moveToOffset(initialOffset);
-            CodeBlockUtil.moveCaretToCodeBlockEnd(project, editor, false);
-            assertEquals(expectedMoveToEndOffset, caretModel.getOffset());
-        }
+        caretModel.moveToOffset(caretOffset);
+        CodeBlockUtil.moveCaretToCodeBlockEnd(project, editor, false);
+        assertEquals(endOffset, caretModel.getOffset());
     }
 }

@@ -18,53 +18,109 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCodeBlockProviderFixtureTestCase;
  */
 public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixtureTestCase {
 
-    private static final String DEMO_TS_FILE_NAME = "demo.ts";
-    // language=typescript
-    private static final String DEMO_TS_FILE_BODY = """
-            export class Demo {
-                demo() {
-                    console.log('demo');
-                }
-            }
-            """;
-
     public TypeScriptCodeBlockProviderTest() {
         super("*.ts");
     }
 
     public void testCodeBlocks() {
+        String testFilename = "demo.ts";
+
+        // language=json
+        String mockFoldingRangesJson = """
+                [
+                  {
+                    "startLine": 0,
+                    "endLine": 3
+                  },
+                  {
+                    "startLine": 1,
+                    "endLine": 2
+                  }
+                ]
+                """;
+
         assertCodeBlocks(
-                DEMO_TS_FILE_NAME,
-                DEMO_TS_FILE_BODY,
-                // language=json
+                testFilename,
                 """
-                        [
-                          {
-                            "startLine": 0,
-                            "endLine": 3
-                          },
-                          {
-                            "startLine": 1,
-                            "endLine": 2
-                          }
-                        ]
+                        export class Demo {
+                            demo() {<start>
+                                <caret>console.log('demo');
+                            <end>}
+                        }
                         """,
-                new int[][]{
-                        // From "console" to the begin and end of the "demo()" function's braced block
-                        {beforeFirst(DEMO_TS_FILE_BODY, "console", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 2), beforeLast(DEMO_TS_FILE_BODY, "}", 2)},
-                        // From "demo" to the begin and end of the "Demo" class's braced block
-                        {beforeFirst(DEMO_TS_FILE_BODY, "demo", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
-                        // From before the "Demo" class' open brace to the begin and end of the "Demo" class' braced block
-                        {beforeFirst(DEMO_TS_FILE_BODY, "{", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
-                        // From after the "Demo" class' open brace to the begin and end of the "Demo" class' braced block
-                        {afterFirst(DEMO_TS_FILE_BODY, "{", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
-                        // From before the "Demo" class' close brace to the begin and end of the "Demo" class' braced block
-                        {beforeLast(DEMO_TS_FILE_BODY, "}", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
-                        // From after the "Demo" class' close brace to the begin and end of the "Demo" class' braced block
-                        {afterLast(DEMO_TS_FILE_BODY, "}", 1), afterFirst(DEMO_TS_FILE_BODY, "{", 1), beforeLast(DEMO_TS_FILE_BODY, "}", 1)},
-                        // From "Demo" which shouldn't move at all
-                        {beforeFirst(DEMO_TS_FILE_BODY, "Demo", 1), beforeFirst(DEMO_TS_FILE_BODY, "Demo", 1), beforeFirst(DEMO_TS_FILE_BODY, "Demo", 1)}
-                }
+                mockFoldingRangesJson
+        );
+
+        assertCodeBlocks(
+                testFilename,
+                """
+                        export class Demo {<start>
+                            <caret>demo() {
+                                console.log('demo');
+                            }
+                        <end>}
+                        """,
+                mockFoldingRangesJson
+        );
+
+        assertCodeBlocks(
+                testFilename,
+                """
+                        export class Demo {<caret><start>
+                            demo() {
+                                console.log('demo');
+                            }
+                        <end>}
+                        """,
+                mockFoldingRangesJson
+        );
+
+        assertCodeBlocks(
+                testFilename,
+                """
+                        export class Demo <caret>{<start>
+                            demo() {
+                                console.log('demo');
+                            }
+                        <end>}
+                        """,
+                mockFoldingRangesJson
+        );
+
+        assertCodeBlocks(
+                testFilename,
+                """
+                        export class Demo {<start>
+                            demo() {
+                                console.log('demo');
+                            }
+                        <end><caret>}
+                        """,
+                mockFoldingRangesJson
+        );
+
+        assertCodeBlocks(
+                testFilename,
+                """
+                        export class Demo {<start>
+                            demo() {
+                                console.log('demo');
+                            }
+                        <end>}<caret>
+                        """,
+                mockFoldingRangesJson
+        );
+
+        assertCodeBlocks(
+                testFilename,
+                """
+                        export class <caret><start><end>Demo {
+                            demo() {
+                                console.log('demo');
+                            }
+                        }
+                        """,
+                mockFoldingRangesJson
         );
     }
 }
