@@ -54,37 +54,37 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
     @Override
     public PsiElement @Nullable [] getSymbolTypeDeclarations(@NotNull PsiElement symbol) {
         // Not much we can do without an offset
-        return PsiElement.EMPTY_ARRAY;
+        return null;
     }
 
     @Override
     public PsiElement @Nullable [] getSymbolTypeDeclarations(@NotNull PsiElement symbol, Editor editor, int offset) {
         if (!symbol.isValid()) {
-            return PsiElement.EMPTY_ARRAY;
+            return null;
         }
 
         Project project = symbol.getProject();
         if (project.isDisposed()) {
-            return PsiElement.EMPTY_ARRAY;
+            return null;
         }
 
         PsiFile file = symbol.getContainingFile();
         if ((file == null) || !file.isValid()) {
-            return PsiElement.EMPTY_ARRAY;
+            return null;
         }
 
         Document document = LSPIJUtils.getDocument(file);
         if (document == null) {
-            return PsiElement.EMPTY_ARRAY;
+            return null;
         }
 
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
-            return PsiElement.EMPTY_ARRAY;
+            return null;
         }
 
         if (!LanguageServiceAccessor.getInstance(project)
                 .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getTypeDefinitionFeature().isTypeDefinitionSupported(file))) {
-            return PsiElement.EMPTY_ARRAY;
+            return null;
         }
 
         LSPTypeDefinitionSupport typeDefinitionSupport = LSPFileSupport.getSupport(file).getTypeDefinitionSupport();
@@ -113,11 +113,12 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
                 for (Location typeDefinition : typeDefinitions) {
                     ContainerUtil.addIfNotNull(typeDefinitionElements, LSPPsiElementFactory.toPsiElement(typeDefinition, project));
                 }
-                return typeDefinitionElements.toArray(PsiElement.EMPTY_ARRAY);
+                if (!ContainerUtil.isEmpty(typeDefinitionElements)) {
+                    return typeDefinitionElements.toArray(PsiElement.EMPTY_ARRAY);
+                }
             }
         }
 
-        return PsiElement.EMPTY_ARRAY;
+        return null;
     }
-
 }
