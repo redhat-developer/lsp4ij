@@ -404,7 +404,8 @@
 
         <!-- LSP textDocument/typeDefinition support -->
         <typeDeclarationProvider
-                implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceTypeDeclarationProvider"/>
+                implementation="com.redhat.devtools.lsp4ij.features.workspaceSymbol.LSPWorkspaceTypeDeclarationProvider"
+                order="last"/>
 
         <!-- LSP textDocument/rename request support -->
         <renameHandler
