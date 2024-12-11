@@ -140,12 +140,13 @@ public class LSPCompletionContributor extends CompletionContributor {
             }
         }
 
-        // If completions were added from LSP and this is auto-completion or the explicit completion trigger was typed
-        // only once, add completions from other all other contributors except for the word completion contributor.
+        // If completions were added from LSP and this is auto-completion or the explicit completion was triggered an
+        // odd number of times (acts as a toggle), add completions from other all other contributors except for the
+        // word completion contributor.
         // Note that the word completion contributor only really kicks in when LSP completions are added in the context
         // of a TextMate file (see TextMateCompletionContributor), but that's going to be very common for LSP usage
         // since it's often adding (pseudo-)language support when not already present in the host JetBrains IDE.
-        if ((size > 0) && (parameters.getInvocationCount() < 2)) {
+        if ((size > 0) && ((parameters.getInvocationCount() == 0) || ((parameters.getInvocationCount() % 2) > 0))) {
             // Don't allow automatic execution of the remaining completion contributors; we'll execute them ourselves below
             result.stopHere();
 
