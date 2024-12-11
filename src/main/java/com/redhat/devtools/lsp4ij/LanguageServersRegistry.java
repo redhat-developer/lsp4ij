@@ -162,6 +162,7 @@ public class LanguageServersRegistry {
                                 launch.getUserEnvironmentVariables(),
                                 launch.isIncludeSystemEnvironmentVariables(),
                                 launch.getConfigurationContent(),
+                                launch.getConfigurationSchemaContent(),
                                 launch.getInitializationOptionsContent(),
                                 launch.getClientConfigurationContent()),
                         mappings);
@@ -365,6 +366,7 @@ public class LanguageServersRegistry {
                 settings.setMappings(toServerMappingSettings(mappings));
             }
             settings.setConfigurationContent(definitionFromSettings.getConfigurationContent());
+            settings.setConfigurationSchemaContent(definitionFromSettings.getConfigurationSchemaContent());
             settings.setInitializationOptionsContent(definitionFromSettings.getInitializationOptionsContent());
             settings.setClientConfigurationContent(definitionFromSettings.getClientConfigurationContent());
             UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
@@ -493,6 +495,7 @@ public class LanguageServersRegistry {
         settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         settings.setConfigurationContent(request.configurationContent());
+        settings.setConfigurationSchemaContent(request.configurationSchemaContent());
         settings.setInitializationOptionsContent(request.initializationOptionsContent());
         settings.setClientConfigurationContent(request.clientConfigurationContent);
         settings.setMappings(request.mappings());
@@ -583,6 +586,7 @@ public class LanguageServersRegistry {
                                                 boolean includeSystemEnvironmentVariables,
                                                 @NotNull List<ServerMappingSettings> mappings,
                                                 @Nullable String configurationContent,
+                                                @Nullable String configurationSchemaContent,
                                                 @Nullable String initializationOptionsContent,
                                                 @Nullable String clientConfigurationContent) {
     }

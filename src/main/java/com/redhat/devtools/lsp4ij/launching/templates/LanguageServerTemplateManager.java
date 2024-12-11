@@ -134,6 +134,7 @@ public class LanguageServerTemplateManager {
     public LanguageServerTemplate createLsTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         String templateJson = null;
         String settingsJson = null;
+        String settingsSchemaJson = null;
         String initializationOptionsJson = null;
         String clientSettingsJson = null;
         String description = null;
@@ -148,6 +149,9 @@ public class LanguageServerTemplateManager {
                     break;
                 case SETTINGS_FILE_NAME:
                     settingsJson = VfsUtilCore.loadText(file);
+                    break;
+                case SETTINGS_SCHEMA_FILE_NAME:
+                    settingsSchemaJson = VfsUtilCore.loadText(file);
                     break;
                 case INITIALIZATION_OPTIONS_FILE_NAME:
                     initializationOptionsJson = VfsUtilCore.loadText(file);
@@ -183,6 +187,7 @@ public class LanguageServerTemplateManager {
 
         LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
         template.setConfiguration(settingsJson);
+        template.setConfigurationSchema(settingsSchemaJson);
         template.setInitializationOptions(initializationOptionsJson);
         template.setClientConfiguration(clientSettingsJson);
         if (StringUtils.isNotBlank(description)) {
@@ -230,12 +235,14 @@ public class LanguageServerTemplateManager {
             String template = gson.toJson(lsDefinition);
             String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
+            String settingsSchema = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationSchemaContent();
             String clientSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getClientConfigurationContent();
             lsName = lsDefinition.getDisplayName();
 
             writeToZip(TEMPLATE_FILE_NAME, template, zos);
             writeToZip(INITIALIZATION_OPTIONS_FILE_NAME, initializationOptions, zos);
             writeToZip(SETTINGS_FILE_NAME, settings, zos);
+            writeToZip(SETTINGS_SCHEMA_FILE_NAME, settingsSchema, zos);
             writeToZip(CLIENT_SETTINGS_FILE_NAME, clientSettings, zos);
             zos.closeEntry();
             count++;
