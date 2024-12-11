@@ -229,8 +229,8 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
                               @NotNull LookupElement lookupItem,
                               int priority,
                               @NotNull CompletionItem item) {
-        // Determine whether or not completions should be case-sensitive
-        boolean caseSensitive = isCaseSensitive(context.getParameters().getOriginalFile());
+        // Determine whether or not completions in this language should be case-sensitive
+        boolean caseSensitive = getClientFeatures().isCaseSensitive(context.getParameters().getOriginalFile());
 
         var prioritizedLookupItem = PrioritizedLookupElement.withPriority(lookupItem, priority);
 
@@ -292,16 +292,5 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         if (completionCapabilityRegistry != null) {
             completionCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
-    }
-
-    /**
-     * Determines whether or not completions for the file should be offered in a case-sensitive manner.
-     *
-     * @param file the file
-     * @return true if completions should be offered in a case-sensitive manner; otherwise false
-     */
-    public boolean isCaseSensitive(@NotNull PsiFile file) {
-        // Default to case-insensitive
-        return false;
     }
 }

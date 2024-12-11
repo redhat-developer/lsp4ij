@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.client.features;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -962,6 +963,17 @@ public class LSPClientFeatures implements Disposable {
      */
     public boolean isEnabled(@NotNull VirtualFile file) {
         return true;
+    }
+
+    /**
+     * Determines whether or not the language grammar for the file is case-sensitive.
+     *
+     * @param file the file
+     * @return true if the file's language grammar is case-sensitive; otherwise false
+     */
+    public boolean isCaseSensitive(@NotNull PsiFile file) {
+        // Default to case-insensitive
+        return false;
     }
 
     /**

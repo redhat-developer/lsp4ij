@@ -61,6 +61,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 | boolean keepServerAlive()                                    | Returns `true` if the server is kept alive even if all files associated with the language server are closed and `false` otherwise. | `false`           |
 | boolean canStopServerByUser()                                | Returns `true` if the user can stop the language server in LSP console from the context menu and `false` otherwise.                | `true`            |
 | boolean isEnabled(VirtualFile)                               | Returns `true` if the language server is enabled for the given file and `false` otherwise.                                         | `true`            |
+| boolean isCaseSensitive(PsiFile file)                        | Returns `true` if the language grammar for the given file is case-sensitive and `false` otherwise.                                 | `false`           | 
 
 ```java
 package my.language.server;
@@ -229,7 +230,7 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | boolean isStrikeout(CompletionItem item)                                              | Returns true if the IntelliJ lookup is strike out and false otherwise.                                                                                                                                                             | use `item.getDeprecated()` or `item.getTags().contains(CompletionItemTag.Deprecated)` |
 | String getTailText(CompletionItem item)                                               | Returns the IntelliJ lookup tail text from the given LSP completion item and null otherwise.                                                                                                                                       | `item.getLabelDetails().getDetail()`                                                  |
 | boolean isItemTextBold(CompletionItem item)                                           | Returns the IntelliJ lookup item text bold from the given LSP completion item and null otherwise.                                                                                                                                  | `item.getKind() == CompletionItemKind.Keyword`                                        |
-| boolean isCaseSensitive(PsiFile file)                                                 | Determines whether or not completions should be offered in a case-sensitive manner.                                                                                                                                                | Case-insensitive.                                                                     |
+|
 
 ## LSP Declaration Feature
 
