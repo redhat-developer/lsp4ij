@@ -116,7 +116,7 @@ public class LSPServerConfigurationJsonSchemaFileProvider extends AbstractLSPJso
         // Update the virtual file content and the modification stamp (used by Json Schema cache)
         file.setContent(content);
         // Synchronize the Psi file from the new content of the virtual file and the modification stamp (used by Json Schema cache)
-        reloadPsi(file, project);
+        reloadPsi(file);
     }
 
 }

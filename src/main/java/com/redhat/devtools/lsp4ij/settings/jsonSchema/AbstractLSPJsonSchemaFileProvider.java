@@ -13,14 +13,8 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.jsonSchema;
 
-import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.WriteAction;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.impl.PsiManagerEx;
-import com.intellij.psi.impl.file.impl.FileManagerImpl;
-import com.intellij.util.ModalityUiUtil;
 import com.jetbrains.jsonSchema.extension.JsonSchemaFileProvider;
 import com.jetbrains.jsonSchema.extension.SchemaType;
 import com.jetbrains.jsonSchema.impl.JsonSchemaVersion;
@@ -70,13 +64,9 @@ abstract class AbstractLSPJsonSchemaFileProvider implements JsonSchemaFileProvid
         return false;
     }
 
-    protected static void reloadPsi(@NotNull VirtualFile file,
-                                  @NotNull Project project) {
-        final FileManagerImpl fileManager = (FileManagerImpl) PsiManagerEx.getInstanceEx(project).getFileManager();
-        if (fileManager.findCachedViewProvider(file) != null) {
-            ModalityUiUtil.invokeLaterIfNeeded(ModalityState.defaultModalityState(), project.getDisposed(),
-                    () -> WriteAction.run(() -> fileManager.forceReload(file))
-            );
+    protected static void reloadPsi(@NotNull VirtualFile file) {
+        if (file != null) {
+            file.refresh(true, false, () -> file.refresh(false, false));
         }
     }
 }
