@@ -19,6 +19,7 @@ import com.jetbrains.jsonSchema.extension.JsonSchemaFileProvider;
 import com.jetbrains.jsonSchema.extension.SchemaType;
 import com.jetbrains.jsonSchema.impl.JsonSchemaVersion;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Abstract base class for JSON schema file providers that are based on JSON schema files bundled in the plugin distribution.
@@ -64,7 +65,7 @@ abstract class AbstractLSPJsonSchemaFileProvider implements JsonSchemaFileProvid
         return false;
     }
 
-    protected static void reloadPsi(@NotNull VirtualFile file) {
+    protected static void reloadPsi(@Nullable VirtualFile file) {
         if (file != null) {
             file.refresh(true, false, () -> file.refresh(false, false));
         }
