@@ -24,6 +24,14 @@ import java.util.List;
  */
 public class DefaultSemanticTokensColorsProvider implements SemanticTokensColorsProvider {
 
+    // Observed token types that aren't included in LSP4J's token types constants
+    private interface AdditionalSemanticTokenTypes {
+        // At a minimum, the TypeScript language server reports class members as "member"
+        String Member = "member";
+        // LSP doesn't define "label", but vscode defines it
+        // See https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#standard-token-types-and-modifiers
+        String Label = "label";
+    }
 
     @Override
     public @Nullable TextAttributesKey getTextAttributesKey(@NotNull String tokenType,
@@ -139,7 +147,8 @@ public class DefaultSemanticTokensColorsProvider implements SemanticTokensColors
                 // with other modifiers
                 return SemanticTokensHighlightingColors.FUNCTION;
 
-            // method: for identifiers that declare a member function or method.
+            // method and member: for identifiers that declare a member function or method.
+            case AdditionalSemanticTokenTypes.Member:
             case SemanticTokenTypes.Method: {
                 if (hasTokenModifiers(tokenModifiers,
                         SemanticTokenModifiers.Declaration,
@@ -161,9 +170,7 @@ public class DefaultSemanticTokensColorsProvider implements SemanticTokensColors
                 return SemanticTokensHighlightingColors.MACRO;
 
             // label: for identifiers that declare a label.
-            case "label":
-                // LSP doesn't define "label", but vscode defines it
-                // See https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#standard-token-types-and-modifiers
+            case AdditionalSemanticTokenTypes.Label:
                 return SemanticTokensHighlightingColors.LABEL;
 
             // comment: for tokens that represent a comment.
