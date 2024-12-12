@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 
 import com.intellij.codeInsight.CodeInsightBundle;
+import com.intellij.openapi.application.QueryExecutorBase;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
@@ -18,7 +19,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.searches.DefinitionsScopedSearch;
 import com.intellij.util.Processor;
-import com.intellij.util.QueryExecutor;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -45,41 +45,47 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 /**
  * Implements the IDE's standard Go To Implementation(s) action using LSP textDocument/implementation. -->
  */
-public class LSPWorkspaceImplementationsSearch implements QueryExecutor<PsiElement, DefinitionsScopedSearch.SearchParameters> {
+public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElement, DefinitionsScopedSearch.SearchParameters> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPWorkspaceImplementationsSearch.class);
 
+    public LSPWorkspaceImplementationsSearch() {
+        // It requires a Read Action,
+        // because call of element.getContainingFile() could require it when element is an PsiLeafElement
+        super(true);
+    }
+
     @Override
-    public boolean execute(@NotNull DefinitionsScopedSearch.SearchParameters queryParameters, @NotNull Processor<? super PsiElement> consumer) {
+    public void processQuery(DefinitionsScopedSearch.@NotNull SearchParameters queryParameters, @NotNull Processor<? super PsiElement> consumer) {
         Project project = queryParameters.getProject();
         if (project.isDisposed()) {
-            return true;
+            return;
         }
 
         PsiElement element = queryParameters.getElement();
         if (!element.isValid()) {
-            return true;
+            return;
         }
 
         PsiFile file = element.getContainingFile();
         if ((file == null) || !file.isValid()) {
-            return true;
-        }
-
-        Document document = LSPIJUtils.getDocument(file);
-        if (document == null) {
-            return true;
+            return;
         }
 
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             // The file is not associated to a language server
-            return true;
+            return;
         }
 
         // Check if the file can support the feature
         if (!LanguageServiceAccessor.getInstance(project)
                 .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getImplementationFeature().isImplementationSupported(file))) {
-            return true;
+            return;
+        }
+
+        Document document = LSPIJUtils.getDocument(file);
+        if (document == null) {
+            return;
         }
 
         int offset = element.getTextRange().getStartOffset();
@@ -111,12 +117,10 @@ public class LSPWorkspaceImplementationsSearch implements QueryExecutor<PsiEleme
                 // textDocument/implementations has been collected correctly
                 for (Location implementation : implementations) {
                     if (!consumer.process(LSPPsiElementFactory.toPsiElement(implementation, project))) {
-                        return false;
+                        return;
                     }
                 }
             }
         }
-
-        return true;
     }
 }
