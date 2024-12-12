@@ -42,7 +42,7 @@ abstract class AbstractLSPJsonSchemaFileSystemProvider extends AbstractLSPJsonSc
             jsonSchemaFile = jsonSchemaFileUrl != null ? VirtualFileManager.getInstance().findFileByUrl(jsonSchemaFileUrl) : null;
             // Make sure that the IDE is using the absolute latest version of the JSON schema
             if (jsonSchemaFile != null) {
-                jsonSchemaFile.refresh(true, false);
+                jsonSchemaFile.refresh(true, false, () -> jsonSchemaFile.refresh(false, false));
             }
         }
         return jsonSchemaFile;
