@@ -262,6 +262,14 @@
                 id="LSPDocumentLinkGotoDeclarationHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
 
+        <!-- LSP file view provider to yield some PSI structure to otherwise flat files -->
+        <lang.fileViewProviderFactory
+                language="TEXT"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentFileViewProviderFactory"/>
+        <lang.fileViewProviderFactory
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentFileViewProviderFactory"/>
+
         <!-- LSP textDocument/documentSymbol request support -->
         <lang.psiStructureViewFactory
                 id="LSPDocumentSymbolStructureViewFactoryForText"
