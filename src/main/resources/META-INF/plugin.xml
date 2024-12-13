@@ -5,6 +5,18 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.9.0</h3>
+    <ul>
+      <li>Support for <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md#selection-range">Selection Range</a></li>
+      <li>Use standard menu Implementation(s) (Ctrl+Alt+B) to execute <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md#implementation">Implementation</a></li>
+      <li>Use standard menu Type Declaration (Ctrl+Shift+B) to execute <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md#type-definition">Type definition</a></li>
+      <li>LSP code folding improvements for braced blocks and code block provider implementation based on that same information</li>
+      <li>Show workspace symbols with Class, Struct, Type kind in the standard Class tab (Ctrl+N)</li>
+      <li>Provide completion, validation, etc for configuring user-defined language servers based on JSON Schema</li>
+      <li>Fixing bugs</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/10?closed=1">changelog</a>.
+L
     <h3>0.8.1</h3>
     <ul>
       <li>Remove using internal API ProjectIndexingActivityHistoryListener</li>
