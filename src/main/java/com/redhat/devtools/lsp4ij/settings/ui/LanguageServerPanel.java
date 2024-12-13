@@ -356,6 +356,8 @@ public class LanguageServerPanel implements Disposable {
 
     @Override
     public void dispose() {
-        getConfiguration().resetJsonSchema();
+        if (configurationWidget != null) {
+            configurationWidget.resetJsonSchema();
+        }
     }
 }
