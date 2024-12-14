@@ -82,11 +82,11 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 			String label1 = item1.getLabel();
 			String label2 = item2.getLabel();
 
-			if (startsWith(currentWord, label1) &&
-				((label2 == null) || !startsWith(currentWord, label2))) {
+			if ((startsWith(currentWord, label1) || startsWith(label1, currentWord)) &&
+				((label2 == null) || !(startsWith(currentWord, label2) || startsWith(label2, currentWord)))) {
 				return -1;
-			} else if (startsWith(currentWord, label2) &&
-					   ((label1 == null) || !startsWith(currentWord, label1))) {
+			} else if ((startsWith(currentWord, label2) || startsWith(label2, currentWord)) &&
+					   ((label1 == null) || !(startsWith(currentWord, label1) || startsWith(label1, currentWord)))) {
 				return 1;
 			}
 		}
