@@ -17,6 +17,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -102,8 +103,6 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
-    private static final CompletionItemComparator completionProposalComparator = new CompletionItemComparator();
-
     private void addCompletionItems(@NotNull CompletionParameters parameters,
                                     @NotNull CompletionPrefix completionPrefix,
                                     @NotNull Either<List<CompletionItem>, CompletionList> completion,
@@ -119,8 +118,10 @@ public class LSPCompletionContributor extends CompletionContributor {
             items.addAll(completionList.getItems());
         }
 
-        // Sort by item.sortText
-        items.sort(completionProposalComparator);
+        // Sort the completions
+        String currentWord = getCurrentWord(parameters);
+        boolean caseSensitive = languageServer.getClientFeatures().isCaseSensitive(parameters.getOriginalFile());
+        items.sort(new CompletionItemComparator(currentWord, caseSensitive));
         int size = items.size();
 
         Set<String> addedLookupStrings = new HashSet<>();
@@ -184,6 +185,23 @@ public class LSPCompletionContributor extends CompletionContributor {
                 }
             }
         }
+    }
+
+    @Nullable
+    private static String getCurrentWord(@NotNull CompletionParameters parameters) {
+        PsiFile originalFile = parameters.getOriginalFile();
+        VirtualFile virtualFile = originalFile.getVirtualFile();
+        Document document = virtualFile != null ? LSPIJUtils.getDocument(virtualFile) : null;
+        if (document != null) {
+            int offset = parameters.getOffset();
+            TextRange wordTextRange = LSPIJUtils.getWordRangeAt(document, originalFile, offset);
+            if (wordTextRange != null) {
+                CharSequence documentChars = document.getCharsSequence();
+                CharSequence wordChars = documentChars.subSequence(wordTextRange.getStartOffset(), wordTextRange.getEndOffset());
+                return wordChars.toString();
+            }
+        }
+        return null;
     }
 
     protected void updateWithItemDefaults(@NotNull CompletionItem item,

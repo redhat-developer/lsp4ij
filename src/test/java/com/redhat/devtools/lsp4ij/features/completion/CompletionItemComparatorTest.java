@@ -16,10 +16,11 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CompletionItemComparatorTest {
-    private final CompletionItemComparator comparator = new CompletionItemComparator();
+    private final CompletionItemComparator comparator = new CompletionItemComparator(null, false);
 
     private final CompletionItem one = newItem("one", "1");
     private final CompletionItem nil = newItem("", null);
