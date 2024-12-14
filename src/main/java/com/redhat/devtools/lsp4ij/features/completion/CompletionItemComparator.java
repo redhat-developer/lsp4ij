@@ -66,6 +66,14 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 		return compare(item1.getLabel(), item2.getLabel());
 	}
 
+	private int compare(@Nullable String string1, @Nullable String string2) {
+		return StringUtil.compare(string1, string2, !caseSensitive);
+	}
+
+	private boolean equals(@Nullable String string1, @Nullable String string2) {
+		return StringUtil.compare(string1, string2, !caseSensitive) == 0;
+	}
+
 	private boolean startsWith(@Nullable String string, @Nullable String prefix) {
 		if ((string == null) || (prefix == null)) {
 			return false;
@@ -73,8 +81,11 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 		return caseSensitive ? StringUtil.startsWith(string, prefix) : StringUtil.startsWithIgnoreCase(string, prefix);
 	}
 
-	private int compare(@Nullable String string1, @Nullable String string2) {
-		return StringUtil.compare(string1, string2, !caseSensitive);
+	private boolean contains(@Nullable String string, @Nullable String substring) {
+		if ((string == null) || (substring == null)) {
+			return false;
+		}
+		return caseSensitive ? StringUtil.contains(string, substring) : StringUtil.containsIgnoreCase(string, substring);
 	}
 
 	private int compareAgainstCurrentWord(@NotNull CompletionItem item1, @NotNull CompletionItem item2) {
@@ -82,11 +93,28 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 			String label1 = item1.getLabel();
 			String label2 = item2.getLabel();
 
-			if ((startsWith(currentWord, label1) || startsWith(label1, currentWord)) &&
+			// Exact match
+			if (equals(currentWord, label1) &&
+				((label2 == null) || !equals(currentWord, label2))) {
+				return -1;
+			} else if (equals(currentWord, label2) &&
+					   ((label1 == null) || !equals(currentWord, label1))) {
+				return 1;
+			}
+			// Starts with
+			else if ((startsWith(currentWord, label1) || startsWith(label1, currentWord)) &&
 				((label2 == null) || !(startsWith(currentWord, label2) || startsWith(label2, currentWord)))) {
 				return -1;
 			} else if ((startsWith(currentWord, label2) || startsWith(label2, currentWord)) &&
 					   ((label1 == null) || !(startsWith(currentWord, label1) || startsWith(label1, currentWord)))) {
+				return 1;
+			}
+			// Contains
+			else if (contains(currentWord, label1) &&
+					 ((label2 == null) || !contains(currentWord, label2))) {
+				return -1;
+			} else if (contains(currentWord, label2) &&
+					   ((label1 == null) || !contains(currentWord, label1))) {
 				return 1;
 			}
 		}
