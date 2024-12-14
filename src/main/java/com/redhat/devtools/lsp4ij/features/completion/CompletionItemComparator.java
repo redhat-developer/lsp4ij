@@ -81,41 +81,30 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 		return caseSensitive ? StringUtil.startsWith(string, prefix) : StringUtil.startsWithIgnoreCase(string, prefix);
 	}
 
-	private boolean contains(@Nullable String string, @Nullable String substring) {
-		if ((string == null) || (substring == null)) {
-			return false;
-		}
-		return caseSensitive ? StringUtil.contains(string, substring) : StringUtil.containsIgnoreCase(string, substring);
-	}
-
 	private int compareAgainstCurrentWord(@NotNull CompletionItem item1, @NotNull CompletionItem item2) {
 		if (currentWord != null) {
 			String label1 = item1.getLabel();
 			String label2 = item2.getLabel();
+			// Don't do this for completion offerings that are quoted strings
+			if (((label1 == null) || !StringUtil.isQuotedString(label1)) &&
+				((label2 == null) || !StringUtil.isQuotedString(label2))) {
+				// Exact match
+				if (equals(currentWord, label1) &&
+					((label2 == null) || !equals(currentWord, label2))) {
+					return -1;
+				} else if (equals(currentWord, label2) &&
+						   ((label1 == null) || !equals(currentWord, label1))) {
+					return 1;
+				}
 
-			// Exact match
-			if (equals(currentWord, label1) &&
-				((label2 == null) || !equals(currentWord, label2))) {
-				return -1;
-			} else if (equals(currentWord, label2) &&
-					   ((label1 == null) || !equals(currentWord, label1))) {
-				return 1;
-			}
-			// Starts with
-			else if ((startsWith(currentWord, label1) || startsWith(label1, currentWord)) &&
-				((label2 == null) || !(startsWith(currentWord, label2) || startsWith(label2, currentWord)))) {
-				return -1;
-			} else if ((startsWith(currentWord, label2) || startsWith(label2, currentWord)) &&
-					   ((label1 == null) || !(startsWith(currentWord, label1) || startsWith(label1, currentWord)))) {
-				return 1;
-			}
-			// Contains
-			else if ((contains(currentWord, label1) || contains(label1, currentWord)) &&
-					 ((label2 == null) || !(contains(currentWord, label2) || contains(label2, currentWord)))) {
-				return -1;
-			} else if ((contains(currentWord, label2) || contains(label2, currentWord)) &&
-					   ((label1 == null) || !(contains(currentWord, label1) || contains(label1, currentWord)))) {
-				return 1;
+				// Starts with
+				else if ((startsWith(currentWord, label1) || startsWith(label1, currentWord)) &&
+						 ((label2 == null) || !(startsWith(currentWord, label2) || startsWith(label2, currentWord)))) {
+					return -1;
+				} else if ((startsWith(currentWord, label2) || startsWith(label2, currentWord)) &&
+						   ((label1 == null) || !(startsWith(currentWord, label1) || startsWith(label1, currentWord)))) {
+					return 1;
+				}
 			}
 		}
 
@@ -127,22 +116,25 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 			String prefix = prefixMatcher.getPrefix();
 			String label1 = item1.getLabel();
 			String label2 = item2.getLabel();
-
-			// Start starts with
-			if (startsWith(label1, prefix) &&
-				(!startsWith(label2, prefix))) {
-				return -1;
-			} else if (startsWith(label2, prefix) &&
-					   (!startsWith(label1, prefix))) {
-				return 1;
-			}
-			// Loose/camel-hump starts with
-			else if ((label1 != null) && prefixMatcher.isStartMatch(label1) &&
-					 ((label2 == null) || !prefixMatcher.isStartMatch(label2))) {
-				return -1;
-			} else if ((label2 != null) && prefixMatcher.isStartMatch(label2) &&
-					   ((label1 == null) || !prefixMatcher.isStartMatch(label1))) {
-				return 1;
+			// Don't do this for completion offerings that are quoted strings
+			if (((label1 == null) || !StringUtil.isQuotedString(label1)) &&
+				((label2 == null) || !StringUtil.isQuotedString(label2))) {
+				// Start starts with
+				if (startsWith(label1, prefix) &&
+					(!startsWith(label2, prefix))) {
+					return -1;
+				} else if (startsWith(label2, prefix) &&
+						   (!startsWith(label1, prefix))) {
+					return 1;
+				}
+				// Loose/camel-hump starts with
+				else if ((label1 != null) && prefixMatcher.isStartMatch(label1) &&
+						 ((label2 == null) || !prefixMatcher.isStartMatch(label2))) {
+					return -1;
+				} else if ((label2 != null) && prefixMatcher.isStartMatch(label2) &&
+						   ((label1 == null) || !prefixMatcher.isStartMatch(label1))) {
+					return 1;
+				}
 			}
 		}
 
