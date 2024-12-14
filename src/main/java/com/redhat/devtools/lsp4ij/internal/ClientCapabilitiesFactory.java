@@ -91,6 +91,9 @@ public class ClientCapabilitiesFactory {
         // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#didChangeConfigurationClientCapabilities
         workspaceClientCapabilities.setDidChangeConfiguration(new DidChangeConfigurationCapabilities(Boolean.TRUE));
 
+        // Refresh support for CodeLens
+        workspaceClientCapabilities.setCodeLens(new CodeLensWorkspaceCapabilities(Boolean.TRUE));
+
         // Refresh support for InlayHint
         workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));
 
