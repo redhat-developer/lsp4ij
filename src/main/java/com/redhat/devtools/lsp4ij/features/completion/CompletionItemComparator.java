@@ -110,11 +110,11 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 				return 1;
 			}
 			// Contains
-			else if (contains(currentWord, label1) &&
-					 ((label2 == null) || !contains(currentWord, label2))) {
+			else if ((contains(currentWord, label1) || contains(label1, currentWord)) &&
+					 ((label2 == null) || !(contains(currentWord, label2) || contains(label2, currentWord)))) {
 				return -1;
-			} else if (contains(currentWord, label2) &&
-					   ((label1 == null) || !contains(currentWord, label1))) {
+			} else if ((contains(currentWord, label2) || contains(label2, currentWord)) &&
+					   ((label1 == null) || !(contains(currentWord, label1) || contains(label1, currentWord)))) {
 				return 1;
 			}
 		}
