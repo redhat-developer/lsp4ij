@@ -119,9 +119,10 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
 
         // Sort the completions
+        PrefixMatcher prefixMatcher = result.getPrefixMatcher();
         String currentWord = getCurrentWord(parameters);
         boolean caseSensitive = languageServer.getClientFeatures().isCaseSensitive(parameters.getOriginalFile());
-        items.sort(new CompletionItemComparator(currentWord, caseSensitive));
+        items.sort(new CompletionItemComparator(prefixMatcher, currentWord, caseSensitive));
         int size = items.size();
 
         Set<String> addedLookupStrings = new HashSet<>();

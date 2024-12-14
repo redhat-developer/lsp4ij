@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.completion;
 
+import com.intellij.codeInsight.completion.PrefixMatcher;
 import com.intellij.openapi.util.text.StringUtil;
 import org.eclipse.lsp4j.CompletionItem;
 import org.jetbrains.annotations.NotNull;
@@ -21,10 +22,14 @@ import java.util.Comparator;
  * Compares {@link CompletionItem}s by their sortText property (falls back to comparing labels)
  */
 public class CompletionItemComparator implements Comparator<CompletionItem> {
+	private final PrefixMatcher prefixMatcher;
 	private final String currentWord;
 	private final boolean caseSensitive;
 
-	public CompletionItemComparator(@Nullable String currentWord, boolean caseSensitive) {
+	public CompletionItemComparator(@Nullable PrefixMatcher prefixMatcher,
+									@Nullable String currentWord,
+									boolean caseSensitive) {
+		this.prefixMatcher = prefixMatcher;
 		this.currentWord = currentWord;
 		this.caseSensitive = caseSensitive;
 	}
@@ -39,18 +44,19 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 			return 1;
 		}
 
-		// If one is a better match for the current word than the other, prioritize it higher
-		// TODO: Take into account case-sensitivity with the following priorities:
-		//  1. Case-sensitive exact match
-		//  2. Case-insensitive exact match if a case-insensitive language
-		//  3. Prefix case-insensitive match if the all upper-case prefix
-		//  4. Prefix case-sensitive camel-hump match
-		//  5. Prefix case-insensitive camel-hump match if a case-insensitive language
+		// If one is a better match for the current word than the other, sort it higher
 		int comparison = compareAgainstCurrentWord(item1, item2);
 		if (comparison != 0) {
 			return comparison;
 		}
 
+		// If one is a better completion for the current prefix than the other, sort it higher
+		comparison = compareAgainstPrefix(item1, item2);
+		if (comparison != 0) {
+			return comparison;
+		}
+
+		// Order by language server-provided sort text
 		comparison = compare(item1.getSortText(), item2.getSortText());
 		if (comparison != 0) {
 			return comparison;
@@ -60,26 +66,54 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 		return compare(item1.getLabel(), item2.getLabel());
 	}
 
-	private boolean startsWith(@Nullable String prefix) {
-		if ((currentWord == null) || (prefix == null)) {
+	private boolean startsWith(@Nullable String string, @Nullable String prefix) {
+		if ((string == null) || (prefix == null)) {
 			return false;
 		}
-		return caseSensitive ? StringUtil.startsWith(currentWord, prefix) : StringUtil.startsWithIgnoreCase(currentWord, prefix);
+		return caseSensitive ? StringUtil.startsWith(string, prefix) : StringUtil.startsWithIgnoreCase(string, prefix);
 	}
 
-	private int compare(@Nullable String s1, @Nullable String s2) {
-		return StringUtil.compare(s1, s2, !caseSensitive);
+	private int compare(@Nullable String string1, @Nullable String string2) {
+		return StringUtil.compare(string1, string2, !caseSensitive);
 	}
 
 	private int compareAgainstCurrentWord(@NotNull CompletionItem item1, @NotNull CompletionItem item2) {
 		if (currentWord != null) {
 			String label1 = item1.getLabel();
 			String label2 = item2.getLabel();
-			if ((label1 != null) && startsWith(label1) &&
-				((label2 == null) || !startsWith(label2))) {
+
+			if (startsWith(currentWord, label1) &&
+				((label2 == null) || !startsWith(currentWord, label2))) {
 				return -1;
-			} else if ((label2 != null) && startsWith(label2) &&
-					   ((label1 == null) || !startsWith(label1))) {
+			} else if (startsWith(currentWord, label2) &&
+					   ((label1 == null) || !startsWith(currentWord, label1))) {
+				return 1;
+			}
+		}
+
+		return 0;
+	}
+
+	private int compareAgainstPrefix(@NotNull CompletionItem item1, @NotNull CompletionItem item2) {
+		if (prefixMatcher != null) {
+			String prefix = prefixMatcher.getPrefix();
+			String label1 = item1.getLabel();
+			String label2 = item2.getLabel();
+
+			// Start starts with
+			if (startsWith(label1, prefix) &&
+				(!startsWith(label2, prefix))) {
+				return -1;
+			} else if (startsWith(label2, prefix) &&
+					   (!startsWith(label1, prefix))) {
+				return 1;
+			}
+			// Loose/camel-hump starts with
+			else if ((label1 != null) && prefixMatcher.isStartMatch(label1) &&
+					 ((label2 == null) || !prefixMatcher.isStartMatch(label2))) {
+				return -1;
+			} else if ((label2 != null) && prefixMatcher.isStartMatch(label2) &&
+					   ((label1 == null) || !prefixMatcher.isStartMatch(label1))) {
 				return 1;
 			}
 		}

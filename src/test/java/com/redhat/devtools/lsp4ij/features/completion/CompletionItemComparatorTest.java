@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CompletionItemComparatorTest {
-    private final CompletionItemComparator comparator = new CompletionItemComparator(null, false);
+    private final CompletionItemComparator comparator = new CompletionItemComparator(null, null, false);
 
     private final CompletionItem one = newItem("one", "1");
     private final CompletionItem nil = newItem("", null);
