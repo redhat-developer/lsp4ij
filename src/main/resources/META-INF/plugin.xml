@@ -249,6 +249,17 @@ L
                 id="LSPDiagnosticAnnotator"
                 language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
+        <localInspection
+                shortName="LSPDiagnosticAnnotatorInspection"
+                groupBundle="messages.LanguageServerBundle"
+                groupKey="lsp4ij.project.name"
+                bundle="messages.LanguageServerBundle"
+                key="lsp.diagnostic.inspection.display.name"
+                hasStaticDescription="true"
+                language=""
+                enabledByDefault="true"
+                unfair="true"
+                implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotatorInspection"/>
 
         <!-- LSP textDocument/completion request support -->
         <typedHandler id="LSPTypedHandlerDelegate"

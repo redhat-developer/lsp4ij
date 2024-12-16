@@ -635,8 +635,8 @@ public class LanguageServerWrapper implements Disposable {
      *                 by using a blocking read action.
      * @return the completable future with the language server instance or null.
      */
-    CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
-                                                        @Nullable Document document) {
+    public CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
+                                                               @Nullable Document document) {
         if (file != null && file.exists()) {
             return connect(LSPIJUtils.toUri(file), file, document);
         }

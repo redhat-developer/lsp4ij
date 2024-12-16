@@ -60,9 +60,9 @@ public class LSPDiagnosticsForServer {
         return languageServer.getClientFeatures();
     }
     /**
-     * Update the new LSP published diagnosics.
+     * Update the new LSP published diagnostics.
      *
-     * @param diagnostics the new LSP published diagnosics
+     * @param diagnostics the new LSP published diagnostics
      */
     public void update(List<Diagnostic> diagnostics) {
         // initialize diagnostics map
@@ -77,7 +77,9 @@ public class LSPDiagnosticsForServer {
         List<Diagnostic> sortedDiagnostics = diagnostics
                 .stream()
                 .sorted((d1, d2) -> {
-                    if (Ranges.containsRange(d1.getRange(), d2.getRange())) {
+                    if (Objects.equals(d1.getRange(), d2.getRange())) {
+                        return 0;
+                    } else if (Ranges.containsRange(d1.getRange(), d2.getRange())) {
                         return -1;
                     }
                     return 1;
