@@ -1,3 +1,448 @@
 {
-
+  "rust-analyzer": {
+    "restartServerOnConfigChange": false,
+    "showUnlinkedFileNotification": true,
+    "showRequestFailedErrorNotification": true,
+    "showDependenciesExplorer": true,
+    "testExplorer": false,
+    "initializeStopped": false,
+    "runnables": {
+      "extraEnv": null,
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "command": null,
+      "extraArgs": [],
+      "extraTestBinaryArgs": [
+        "--show-output"
+      ]
+    },
+    "statusBar": {
+      "clickAction": "openLogs",
+      "documentSelector": [
+        {
+          "language": "rust"
+        },
+        {
+          "pattern": "**/Cargo.toml"
+        },
+        {
+          "pattern": "**/Cargo.lock"
+        }
+      ]
+    },
+    "server": {
+      "path": null,
+      "extraEnv": null
+    },
+    "trace": {
+      "server": "verbose",
+      "extension": false
+    },
+    "debug": {
+      "engine": "auto",
+      "sourceFileMap": {
+        "/rustc/<id>": "${env:USERPROFILE}/.rustup/toolchains/<toolchain-id>/lib/rustlib/src/rust"
+      },
+      "openDebugPane": false,
+      "buildBeforeRestart": false,
+      "engineSettings": {}
+    },
+    "typing": {
+      "continueCommentsOnNewline": true,
+      "excludeChars": "<"
+    },
+    "diagnostics": {
+      "previewRustcOutput": false,
+      "useRustcErrorCode": false,
+      "disabled": [],
+      "enable": true,
+      "experimental": {
+        "enable": false
+      },
+      "remapPrefix": {},
+      "styleLints": {
+        "enable": false
+      },
+      "warningsAsHint": [],
+      "warningsAsInfo": []
+    },
+    "assist": {
+      "emitMustUse": false,
+      "expressionFillDefault": "todo",
+      "termSearch": {
+        "borrowcheck": true,
+        "fuel": 1800
+      }
+    },
+    "cachePriming": {
+      "enable": true,
+      "numThreads": "physical"
+    },
+    "cargo": {
+      "allTargets": true,
+      "autoreload": true,
+      "buildScripts": {
+        "enable": true,
+        "invocationStrategy": "per_workspace",
+        "overrideCommand": null,
+        "rebuildOnSave": true,
+        "useRustcWrapper": true
+      },
+      "cfgs": {
+        "miri": null,
+        "debug_assertions": null
+      },
+      "extraArgs": [],
+      "extraEnv": {},
+      "features": [],
+      "noDefaultFeatures": false,
+      "sysroot": "discover",
+      "sysrootQueryMetadata": "cargo_metadata",
+      "sysrootSrc": null,
+      "target": null,
+      "targetDir": null
+    },
+    "cfg": {
+      "setTest": true
+    },
+    "checkOnSave": true,
+    "check": {
+      "allTargets": null,
+      "command": "check",
+      "extraArgs": [],
+      "extraEnv": {},
+      "features": null,
+      "ignore": [],
+      "invocationStrategy": "per_workspace",
+      "noDefaultFeatures": null,
+      "overrideCommand": null,
+      "targets": null,
+      "workspace": true
+    },
+    "completion": {
+      "addSemicolonToUnit": true,
+      "autoimport": {
+        "enable": true
+      },
+      "autoself": {
+        "enable": true
+      },
+      "callable": {
+        "snippets": "fill_arguments"
+      },
+      "fullFunctionSignatures": {
+        "enable": false
+      },
+      "hideDeprecated": false,
+      "limit": null,
+      "postfix": {
+        "enable": true
+      },
+      "privateEditable": {
+        "enable": false
+      },
+      "snippets": {
+        "custom": {
+          "Ok": {
+            "postfix": "ok",
+            "body": "Ok(${receiver})",
+            "description": "Wrap the expression in a `Result::Ok`",
+            "scope": "expr"
+          },
+          "Box::pin": {
+            "postfix": "pinbox",
+            "body": "Box::pin(${receiver})",
+            "requires": "std::boxed::Box",
+            "description": "Put the expression into a pinned `Box`",
+            "scope": "expr"
+          },
+          "Arc::new": {
+            "postfix": "arc",
+            "body": "Arc::new(${receiver})",
+            "requires": "std::sync::Arc",
+            "description": "Put the expression into an `Arc`",
+            "scope": "expr"
+          },
+          "Some": {
+            "postfix": "some",
+            "body": "Some(${receiver})",
+            "description": "Wrap the expression in an `Option::Some`",
+            "scope": "expr"
+          },
+          "Err": {
+            "postfix": "err",
+            "body": "Err(${receiver})",
+            "description": "Wrap the expression in a `Result::Err`",
+            "scope": "expr"
+          },
+          "Rc::new": {
+            "postfix": "rc",
+            "body": "Rc::new(${receiver})",
+            "requires": "std::rc::Rc",
+            "description": "Put the expression into an `Rc`",
+            "scope": "expr"
+          }
+        }
+      },
+      "termSearch": {
+        "enable": false,
+        "fuel": 1000
+      }
+    },
+    "files": {
+      "excludeDirs": [],
+      "watcher": "client"
+    },
+    "highlightRelated": {
+      "breakPoints": {
+        "enable": true
+      },
+      "closureCaptures": {
+        "enable": true
+      },
+      "exitPoints": {
+        "enable": true
+      },
+      "references": {
+        "enable": true
+      },
+      "yieldPoints": {
+        "enable": true
+      }
+    },
+    "hover": {
+      "actions": {
+        "debug": {
+          "enable": true
+        },
+        "enable": true,
+        "gotoTypeDef": {
+          "enable": true
+        },
+        "implementations": {
+          "enable": true
+        },
+        "references": {
+          "enable": false
+        },
+        "run": {
+          "enable": true
+        }
+      },
+      "documentation": {
+        "enable": true,
+        "keywords": {
+          "enable": true
+        }
+      },
+      "links": {
+        "enable": true
+      },
+      "memoryLayout": {
+        "alignment": "hexadecimal",
+        "enable": true,
+        "niches": false,
+        "offset": "hexadecimal",
+        "size": "both"
+      },
+      "show": {
+        "enumVariants": 5,
+        "fields": 5,
+        "traitAssocItems": null
+      }
+    },
+    "imports": {
+      "granularity": {
+        "enforce": false,
+        "group": "crate"
+      },
+      "group": {
+        "enable": true
+      },
+      "merge": {
+        "glob": true
+      },
+      "preferNoStd": false,
+      "preferPrelude": false,
+      "prefix": "plain",
+      "prefixExternPrelude": false
+    },
+    "inlayHints": {
+      "bindingModeHints": {
+        "enable": false
+      },
+      "chainingHints": {
+        "enable": true
+      },
+      "closingBraceHints": {
+        "enable": true,
+        "minLines": 25
+      },
+      "closureCaptureHints": {
+        "enable": false
+      },
+      "closureReturnTypeHints": {
+        "enable": "never"
+      },
+      "closureStyle": "impl_fn",
+      "discriminantHints": {
+        "enable": "never"
+      },
+      "expressionAdjustmentHints": {
+        "enable": "never",
+        "hideOutsideUnsafe": false,
+        "mode": "prefix"
+      },
+      "genericParameterHints": {
+        "const": {
+          "enable": true
+        },
+        "lifetime": {
+          "enable": false
+        },
+        "type": {
+          "enable": false
+        }
+      },
+      "implicitDrops": {
+        "enable": false
+      },
+      "lifetimeElisionHints": {
+        "enable": "never",
+        "useParameterNames": false
+      },
+      "maxLength": 25,
+      "parameterHints": {
+        "enable": true
+      },
+      "rangeExclusiveHints": {
+        "enable": false
+      },
+      "reborrowHints": {
+        "enable": "never"
+      },
+      "renderColons": true,
+      "typeHints": {
+        "enable": true,
+        "hideClosureInitialization": false,
+        "hideNamedConstructor": false
+      }
+    },
+    "interpret": {
+      "tests": false
+    },
+    "joinLines": {
+      "joinAssignments": true,
+      "joinElseIf": true,
+      "removeTrailingComma": true,
+      "unwrapTrivialBlock": true
+    },
+    "lens": {
+      "debug": {
+        "enable": false
+      },
+      "enable": true,
+      "implementations": {
+        "enable": true
+      },
+      "location": "above_name",
+      "references": {
+        "adt": {
+          "enable": false
+        },
+        "enumVariant": {
+          "enable": false
+        },
+        "method": {
+          "enable": false
+        },
+        "trait": {
+          "enable": false
+        }
+      },
+      "run": {
+        "enable": true
+      }
+    },
+    "linkedProjects": [],
+    "lru": {
+      "capacity": null,
+      "query": {
+        "capacities": {}
+      }
+    },
+    "notifications": {
+      "cargoTomlNotFound": true
+    },
+    "numThreads": null,
+    "procMacro": {
+      "attributes": {
+        "enable": true
+      },
+      "enable": true,
+      "ignored": {},
+      "server": null
+    },
+    "references": {
+      "excludeImports": false,
+      "excludeTests": false
+    },
+    "rustc": {
+      "source": null
+    },
+    "rustfmt": {
+      "extraArgs": [],
+      "overrideCommand": null,
+      "rangeFormatting": {
+        "enable": false
+      }
+    },
+    "semanticHighlighting": {
+      "doc": {
+        "comment": {
+          "inject": {
+            "enable": true
+          }
+        }
+      },
+      "nonStandardTokens": true,
+      "operator": {
+        "enable": true,
+        "specialization": {
+          "enable": false
+        }
+      },
+      "punctuation": {
+        "enable": false,
+        "separate": {
+          "macro": {
+            "bang": false
+          }
+        },
+        "specialization": {
+          "enable": false
+        }
+      },
+      "strings": {
+        "enable": true
+      }
+    },
+    "signatureInfo": {
+      "detail": "full",
+      "documentation": {
+        "enable": true
+      }
+    },
+    "workspace": {
+      "discoverConfig": null,
+      "symbol": {
+        "search": {
+          "kind": "only_types",
+          "limit": 128,
+          "scope": "workspace"
+        }
+      }
+    }
+  }
 }
