@@ -85,6 +85,8 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
                                                                              @NotNull LanguageServerItem languageServer,
                                                                              @NotNull CancellationSupport cancellationSupport) {
 
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         params.setContext(createCompletionContext(params, file, languageServer));
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()

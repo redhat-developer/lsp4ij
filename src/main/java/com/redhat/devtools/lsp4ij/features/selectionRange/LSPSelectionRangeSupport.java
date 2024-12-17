@@ -71,7 +71,7 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
                     // Collect list of textDocument/selectionRange future for each language servers
                     List<CompletableFuture<List<SelectionRange>>> selectionRangesPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getSelectionRangesFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getSelectionRangesFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/selectionRange future in one future which return the list of selection ranges
@@ -79,9 +79,12 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
                 });
     }
 
-    private static CompletableFuture<List<SelectionRange>> getSelectionRangesFor(LSPSelectionRangeParams params,
-                                                                                 LanguageServerItem languageServer,
-                                                                                 CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<SelectionRange>> getSelectionRangesFor(@NotNull LSPSelectionRangeParams params,
+                                                                                 @NotNull PsiFile file,
+                                                                                 @NotNull LanguageServerItem languageServer,
+                                                                                 @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .selectionRange(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_SELECTION_RANGE)

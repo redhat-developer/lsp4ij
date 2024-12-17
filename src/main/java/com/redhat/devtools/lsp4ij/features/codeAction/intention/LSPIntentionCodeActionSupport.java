@@ -78,7 +78,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
                     // Collect list of textDocument/codeAction future for each language servers
                     List<CompletableFuture<List<CodeActionData>>> codeActionPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getCodeActionsFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getCodeActionsFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/codeAction future in one future which return the list of code actions
@@ -87,8 +87,11 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
     }
 
     private static CompletableFuture<List<CodeActionData>> getCodeActionsFor(@NotNull CodeActionParams params,
+                                                                             @NotNull PsiFile file,
                                                                              @NotNull LanguageServerItem languageServer,
                                                                              @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .codeAction(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION)

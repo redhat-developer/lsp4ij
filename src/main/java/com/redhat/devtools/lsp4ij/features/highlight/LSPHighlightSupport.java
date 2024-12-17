@@ -71,7 +71,7 @@ public class LSPHighlightSupport extends AbstractLSPDocumentFeatureSupport<Docum
                     // Collect list of textDocument/highlights future for each language servers
                     List<CompletableFuture<List<? extends org.eclipse.lsp4j.DocumentHighlight>>> highlightsPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getHighlightsFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getHighlightsFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/highlights future in one future which return the list of highlights
@@ -80,8 +80,11 @@ public class LSPHighlightSupport extends AbstractLSPDocumentFeatureSupport<Docum
     }
 
     private static CompletableFuture<List<? extends org.eclipse.lsp4j.DocumentHighlight>> getHighlightsFor(@NotNull DocumentHighlightParams params,
+                                                                                                           @NotNull PsiFile file,
                                                                                                            @NotNull LanguageServerItem languageServer,
                                                                                                            @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .documentHighlight(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT)

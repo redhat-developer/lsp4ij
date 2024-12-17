@@ -21,6 +21,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ArrayUtilRt;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -71,8 +72,9 @@ public abstract class LSPHierarchyTreeStructureBase<T> extends HierarchyTreeStru
     @Nullable
     protected PsiElement createPsiElement(@Nullable String uri,
                                           @Nullable Range range,
-                                          @NotNull String name) {
-        VirtualFile file = LSPIJUtils.findResourceFor(uri);
+                                          @NotNull String name,
+                                          @Nullable FileUriSupport fileUriSupport) {
+        VirtualFile file = FileUriSupport.findFileByUri(uri, fileUriSupport);
         if (file == null) {
             return null;
         }

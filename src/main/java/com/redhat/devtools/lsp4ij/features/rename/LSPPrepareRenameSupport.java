@@ -78,7 +78,7 @@ public class LSPPrepareRenameSupport extends AbstractLSPDocumentFeatureSupport<L
                     for (var languageServer : languageServers) {
                         CompletableFuture<List<PrepareRenameResultData>> future = null;
                         if (languageServer.isPrepareRenameSupported()) {
-                            future = getPrepareRenamesFor(params, defaultPrepareRenameResult, languageServer, cancellationSupport);
+                            future = getPrepareRenamesFor(params, file, defaultPrepareRenameResult, languageServer, cancellationSupport);
                         } else {
                             var result = defaultPrepareRenameResult.apply(languageServer);
                             if (result != null) {
@@ -97,9 +97,12 @@ public class LSPPrepareRenameSupport extends AbstractLSPDocumentFeatureSupport<L
     }
 
     private static CompletableFuture<List<PrepareRenameResultData>> getPrepareRenamesFor(@NotNull PrepareRenameParams params,
+                                                                                         @NotNull PsiFile file,
                                                                                          @NotNull DefaultPrepareRenameResultProvider defaultPrepareRenameResultProvider,
                                                                                          @NotNull LanguageServerItem languageServer,
                                                                                          @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                                 .getTextDocumentService()
                                 .prepareRename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_PREPARE_RENAME,

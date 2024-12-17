@@ -61,8 +61,8 @@ public class LSPPrepareTypeHierarchySupport extends AbstractLSPDocumentFeatureSu
                                                                                                      @NotNull CancellationSupport cancellationSupport) {
 
         return getLanguageServers(file,
-                        f -> f.getTypeHierarchyFeature().isEnabled(file),
-                        f -> f.getTypeHierarchyFeature().isSupported(file))
+                f -> f.getTypeHierarchyFeature().isEnabled(file),
+                f -> f.getTypeHierarchyFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have type hierarchy capability
@@ -86,6 +86,8 @@ public class LSPPrepareTypeHierarchySupport extends AbstractLSPDocumentFeatureSu
                                                                                         @NotNull PsiFile file,
                                                                                         @NotNull CancellationSupport cancellationSupport) {
 
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .prepareTypeHierarchy(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_PREPARE_TYPE_HIERARCHY)

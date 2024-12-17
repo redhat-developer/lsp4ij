@@ -15,6 +15,7 @@ import com.intellij.platform.backend.documentation.DocumentationLinkHandler;
 import com.intellij.platform.backend.documentation.DocumentationTarget;
 import com.intellij.platform.backend.documentation.LinkResolveResult;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -33,7 +34,8 @@ public class LSPDocumentationLinkHandler implements DocumentationLinkHandler {
             ApplicationManager.getApplication()
                     .executeOnPooledThread(() -> {
                         var file = lspTarget.getFile();
-                        LSPIJUtils.openInEditor(url, null, true, true, file.getProject());
+                        FileUriSupport fileUriSupport = lspTarget.getLanguageServer().getClientFeatures();;
+                        LSPIJUtils.openInEditor(url, null, true, true, fileUriSupport, file.getProject());
                     });
             return LinkResolveResult.resolvedTarget(target);
         }

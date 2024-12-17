@@ -16,10 +16,13 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommand;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LSPUsagesManager;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 
@@ -79,14 +82,21 @@ public class ShowReferencesAction extends LSPCommandAction {
         if (array == null) {
             return;
         }
-        // Get LSP4J Location from the JSON locations array
-        final List<Location> locations = new ArrayList<>();
-        for (int i = 0; i < array.size(); i++) {
-            locations.add(JSONUtils.toModel(array.get(i), Location.class));
-        }
+
         DataContext dataContext = e.getDataContext();
+        LanguageServerItem languageServer = dataContext.getData(CommandExecutor.LSP_COMMAND_LANGUAGE_SERVER);
+
+        // Get LSP4J Location from the JSON locations array
+        final List<LocationData> locations = new ArrayList<>();
+        for (int i = 0; i < array.size(); i++) {
+            locations.add(new LocationData(JSONUtils.toModel(array.get(i), Location.class), languageServer));
+        }
+
         // Call "Find Usages" in popup mode.
-        LSPUsagesManager.getInstance(project).findShowUsagesInPopup(locations, LSPUsageType.References, dataContext, (MouseEvent) e.getInputEvent());
+        LSPUsagesManager.getInstance(project).findShowUsagesInPopup(locations,
+                LSPUsageType.References,
+                dataContext,
+                (MouseEvent) e.getInputEvent());
     }
 
     @Override

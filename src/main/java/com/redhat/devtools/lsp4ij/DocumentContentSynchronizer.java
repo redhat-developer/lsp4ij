@@ -22,7 +22,6 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -46,12 +45,12 @@ public class DocumentContentSynchronizer implements DocumentListener {
     @NotNull final CompletableFuture<Void> didOpenFuture;
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
-                                       @NotNull URI fileUri,
+                                       @NotNull String fileUri,
                                        @NotNull VirtualFile file,
                                        @NotNull Document document,
                                        @Nullable TextDocumentSyncKind syncKind) {
         this.languageServerWrapper = languageServerWrapper;
-        this.fileUri = fileUri.toASCIIString();
+        this.fileUri = fileUri;
         this.syncKind = syncKind != null ? syncKind : TextDocumentSyncKind.Full;
 
         this.document = document;
