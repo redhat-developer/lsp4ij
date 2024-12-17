@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPWorkspaceFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -91,14 +92,14 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
                         for (var si : s) {
                             if (params.accept(si)) {
                                 items.add(new WorkspaceSymbolData(
-                                        si.getName(), si.getKind(), si.getLocation(), project));
+                                        si.getName(), si.getKind(), si.getLocation(), languageServer.getClientFeatures(), project));
                             }
                         }
                     } else if (symbols.isRight()) {
                         List<? extends WorkspaceSymbol> ws = symbols.getRight();
                         for (var si : ws) {
                             if (params.accept(si)) {
-                                WorkspaceSymbolData item = createItem(si, project);
+                                WorkspaceSymbolData item = createItem(si, languageServer.getClientFeatures(),project);
                                 items.add(item);
                             }
                         }
@@ -107,14 +108,16 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
                 });
     }
 
-    private static WorkspaceSymbolData createItem(WorkspaceSymbol si, Project project) {
+    private static WorkspaceSymbolData createItem(WorkspaceSymbol si,
+                                                  FileUriSupport fileUriSupport,
+                                                  Project project) {
         String name = si.getName();
         SymbolKind symbolKind = si.getKind();
         if (si.getLocation().isLeft()) {
             return new WorkspaceSymbolData(
-                    name, symbolKind, si.getLocation().getLeft(), project);
+                    name, symbolKind, si.getLocation().getLeft(), fileUriSupport, project);
         }
         return new WorkspaceSymbolData(
-                name, symbolKind, si.getLocation().getRight().getUri(), null, project);
+                name, symbolKind, si.getLocation().getRight().getUri(), null, fileUriSupport, project);
     }
 }

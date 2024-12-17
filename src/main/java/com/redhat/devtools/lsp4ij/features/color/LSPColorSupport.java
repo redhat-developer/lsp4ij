@@ -65,7 +65,7 @@ public class LSPColorSupport extends AbstractLSPDocumentFeatureSupport<DocumentC
                     // Collect list of textDocument/documentColor future for each language servers
                     List<CompletableFuture<List<ColorData>>> colorInformationPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getColorsFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getColorsFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/documentColor future in one future which return the list of color information
@@ -74,8 +74,12 @@ public class LSPColorSupport extends AbstractLSPDocumentFeatureSupport<DocumentC
     }
 
     private static CompletableFuture<List<ColorData>> getColorsFor(@NotNull DocumentColorParams params,
+                                                                   @NotNull PsiFile file,
                                                                    @NotNull LanguageServerItem languageServer,
                                                                    @NotNull CancellationSupport cancellationSupport) {
+
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .documentColor(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR)

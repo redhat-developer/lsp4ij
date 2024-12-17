@@ -57,7 +57,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             if (elt.getLSPReferences() != null) {
                 elt.getLSPReferences()
                         .forEach(ref -> {
-                            var psiElement = LSPUsagesManager.toPsiElement(ref, LSPUsagePsiElement.UsageKind.references, element.getProject());
+                            var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, element.getProject());
                             if (psiElement != null) {
                                 processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(psiElement))));
                             }

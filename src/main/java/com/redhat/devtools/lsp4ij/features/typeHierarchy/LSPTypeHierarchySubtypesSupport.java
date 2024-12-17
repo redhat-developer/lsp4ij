@@ -54,8 +54,8 @@ public class LSPTypeHierarchySubtypesSupport extends AbstractLSPDocumentFeatureS
                                                                                                     @NotNull CancellationSupport cancellationSupport) {
 
         return getLanguageServers(file,
-                        f -> f.getTypeHierarchyFeature().isEnabled(file),
-                        f -> f.getTypeHierarchyFeature().isSupported(file))
+                f -> f.getTypeHierarchyFeature().isEnabled(file),
+                f -> f.getTypeHierarchyFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have type hierarchy capability
@@ -66,7 +66,7 @@ public class LSPTypeHierarchySubtypesSupport extends AbstractLSPDocumentFeatureS
                     // Collect list of typeHierarchy/subtypes future for each language servers
                     List<CompletableFuture<List<TypeHierarchyItemData>>> typeHierarchyPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getTypeHierarchiesFor(params, languageServer, file, cancellationSupport))
+                            .map(languageServer -> getTypeHierarchiesFor(params, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of typeHierarchy/subtypes future in one future which return the list of type hierarchy items
@@ -76,7 +76,6 @@ public class LSPTypeHierarchySubtypesSupport extends AbstractLSPDocumentFeatureS
 
     private static CompletableFuture<List<TypeHierarchyItemData>> getTypeHierarchiesFor(@NotNull TypeHierarchySubtypesParams params,
                                                                                         @NotNull LanguageServerItem languageServer,
-                                                                                        @NotNull PsiFile file,
                                                                                         @NotNull CancellationSupport cancellationSupport) {
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()

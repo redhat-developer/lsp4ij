@@ -18,6 +18,7 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
@@ -40,6 +41,7 @@ public class WorkspaceSymbolData implements NavigationItem {
     private final Project project;
     private final VirtualFile file;
     private final LSPItemPresentation presentation;
+    private final FileUriSupport fileUriSupport;
 
     private record LSPItemPresentation(String name, SymbolKind symbolKind, String locationString) implements ItemPresentation {
 
@@ -64,16 +66,26 @@ public class WorkspaceSymbolData implements NavigationItem {
 
     }
 
-    public WorkspaceSymbolData(String name, SymbolKind symbolKind, Location location, Project project) {
-        this(name, symbolKind, location.getUri(), location.getRange().getStart(), project);
+    public WorkspaceSymbolData(String name,
+                               SymbolKind symbolKind,
+                               Location location,
+                               FileUriSupport fileUriSupport,
+                               Project project) {
+        this(name, symbolKind, location.getUri(), location.getRange().getStart(), fileUriSupport, project);
     }
 
-    public WorkspaceSymbolData(String name, SymbolKind symbolKind, String fileUri, Position position, Project project) {
+    public WorkspaceSymbolData(String name,
+                               SymbolKind symbolKind,
+                               String fileUri,
+                               Position position,
+                               FileUriSupport fileUriSupport,
+                               Project project) {
         this.symbolKind = symbolKind;
         this.fileUri = fileUri;
         this.position = position;
         this.project = project;
-        this.file = LSPIJUtils.findResourceFor(fileUri);
+        this.file = FileUriSupport.findFileByUri(fileUri, fileUriSupport);
+        this.fileUriSupport = fileUriSupport;
         String locationString = file != null ? getLocationString(project, file) : fileUri;
         this.presentation = new LSPItemPresentation(name, symbolKind, locationString);
     }
@@ -98,7 +110,7 @@ public class WorkspaceSymbolData implements NavigationItem {
 
     @Override
     public void navigate(boolean requestFocus) {
-        LSPIJUtils.openInEditor(fileUri, position, requestFocus, project);
+        LSPIJUtils.openInEditor(fileUri, position, requestFocus, false, fileUriSupport, project);
     }
 
     @Override

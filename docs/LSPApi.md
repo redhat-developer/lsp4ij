@@ -53,15 +53,18 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 
 | API                                                          | Description                                                                                                                        | Default Behaviour |
 |--------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|-------------------|
+| boolean isEnabled(VirtualFile)                               | Returns `true` if the language server is enabled for the given file and `false` otherwise.                                         | `true`            |
+| boolean isEnabled(VirtualFile)                               | Returns `true` if the language server is enabled for the given file and `false` otherwise.                                         | `true`            |
+| URI getFileUri(VirtualFile file)                             | Returns the file Uri from the given virtual file and null otherwise (to use default `FileUriSupport.DEFAULT.getFileUri`).          | `null`            |
+| VirtualFile findFileByUri(String fileUri)                    | Returns the virtual file found by the given file Uri and null otherwise (to use default `FileUriSupport.DEFAULT.findFileByUri`).   | `null`            |
+| boolean isCaseSensitive(PsiFile file)                        | Returns `true` if the language grammar for the given file is case-sensitive and `false` otherwise.                                 | `false`           | 
+| boolean keepServerAlive()                                    | Returns `true` if the server is kept alive even if all files associated with the language server are closed and `false` otherwise. | `false`           |
+| boolean canStopServerByUser()                                | Returns `true` if the user can stop the language server in LSP console from the context menu and `false` otherwise.                | `true`            |
 | Project getProject()                                         | Returns the project.                                                                                                               |                   |
 | LanguageServerDefinition getServerDefinition()               | Returns the language server definition.                                                                                            |                   |
 | boolean isServerDefinition(@NotNull String languageServerId) | Returns `true` if the given language server id matches the server definition and `false` otherwise.                                |                   |
 | ServerStatus getServerStatus()                               | Returns the server status.                                                                                                         |                   |
 | LanguageServer getLanguageServer()                           | Returns the LSP4J language server.                                                                                                 |                   |
-| boolean keepServerAlive()                                    | Returns `true` if the server is kept alive even if all files associated with the language server are closed and `false` otherwise. | `false`           |
-| boolean canStopServerByUser()                                | Returns `true` if the user can stop the language server in LSP console from the context menu and `false` otherwise.                | `true`            |
-| boolean isEnabled(VirtualFile)                               | Returns `true` if the language server is enabled for the given file and `false` otherwise.                                         | `true`            |
-| boolean isCaseSensitive(PsiFile file)                        | Returns `true` if the language grammar for the given file is case-sensitive and `false` otherwise.                                 | `false`           | 
 
 ```java
 package my.language.server;

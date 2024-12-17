@@ -20,7 +20,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
-import org.eclipse.lsp4j.Location;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,10 +44,10 @@ public class LSPGoToImplementationAction extends AbstractLSPGoToAction {
     }
 
     @Override
-    protected CompletableFuture<List<Location>> getLocations(PsiFile psiFile, Document document, Editor editor, int offset) {
+    protected CompletableFuture<List<LocationData>> getLocations(PsiFile psiFile, Document document, Editor editor, int offset) {
         LSPImplementationSupport implementationSupport = LSPFileSupport.getSupport(psiFile).getImplementationSupport();
         var params = new LSPImplementationParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<Location>> implementationsFuture = implementationSupport.getImplementations(params);
+        CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
         try {
             waitUntilDone(implementationsFuture, psiFile);
         } catch (ProcessCanceledException ex) {

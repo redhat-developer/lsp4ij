@@ -29,7 +29,7 @@ import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationParams;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
 import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
-import org.eclipse.lsp4j.Location;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,7 +95,7 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
                 offset
         );
         LSPImplementationSupport implementationSupport = LSPFileSupport.getSupport(file).getImplementationSupport();
-        CompletableFuture<List<Location>> implementationsFuture = implementationSupport.getImplementations(params);
+        CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
         try {
             waitUntilDone(implementationsFuture, file);
         } catch (ProcessCanceledException ex) {
@@ -109,14 +109,14 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
         }
 
         if (isDoneNormally(implementationsFuture)) {
-            List<Location> implementations = implementationsFuture.getNow(null);
+            List<LocationData> implementations = implementationsFuture.getNow(null);
             if (ContainerUtil.isEmpty(implementations)) {
                 // No implementations found
                 LSP4IJUiUtils.showErrorHint(file, CodeInsightBundle.message("goto.implementation.notFound"));
             } else {
                 // textDocument/implementations has been collected correctly
-                for (Location implementation : implementations) {
-                    if (!consumer.process(LSPPsiElementFactory.toPsiElement(implementation, project))) {
+                for (LocationData implementation : implementations) {
+                    if (!consumer.process(LSPPsiElementFactory.toPsiElement(implementation.location(), implementation.languageServer().getClientFeatures(), project))) {
                         return;
                     }
                 }

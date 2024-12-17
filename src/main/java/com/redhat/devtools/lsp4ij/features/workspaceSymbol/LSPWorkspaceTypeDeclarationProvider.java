@@ -29,6 +29,7 @@ import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionParams;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
 import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -89,7 +90,7 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
 
         LSPTypeDefinitionSupport typeDefinitionSupport = LSPFileSupport.getSupport(file).getTypeDefinitionSupport();
         var params = new LSPTypeDefinitionParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<Location>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
+        CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
         try {
             waitUntilDone(typeDefinitionsFuture, file);
         } catch (ProcessCanceledException ex) {
@@ -103,15 +104,16 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         }
 
         if (isDoneNormally(typeDefinitionsFuture)) {
-            List<Location> typeDefinitions = typeDefinitionsFuture.getNow(null);
+            List<LocationData> typeDefinitions = typeDefinitionsFuture.getNow(null);
             if (ContainerUtil.isEmpty(typeDefinitions)) {
                 // No type declarations found
                 LSP4IJUiUtils.showErrorHint(file, LanguageServerBundle.message("goto.typeDeclaration.notFound"));
             } else {
                 // textDocument/typeDefinition has been collected correctly
                 List<PsiElement> typeDefinitionElements = new ArrayList<>(typeDefinitions.size());
-                for (Location typeDefinition : typeDefinitions) {
-                    ContainerUtil.addIfNotNull(typeDefinitionElements, LSPPsiElementFactory.toPsiElement(typeDefinition, project));
+                for (LocationData typeDefinition : typeDefinitions) {
+                    ContainerUtil.addIfNotNull(typeDefinitionElements,
+                            LSPPsiElementFactory.toPsiElement(typeDefinition.location(), typeDefinition.languageServer().getClientFeatures(), project));
                 }
                 if (!ContainerUtil.isEmpty(typeDefinitionElements)) {
                     return typeDefinitionElements.toArray(PsiElement.EMPTY_ARRAY);

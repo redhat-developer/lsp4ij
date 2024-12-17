@@ -22,6 +22,7 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.awt.RelativePoint;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
@@ -54,7 +55,7 @@ public class LSPUsagesManager {
 
     // Show references, implementation, etc in Popup
 
-    public void findShowUsagesInPopup(@NotNull List<Location> locations,
+    public void findShowUsagesInPopup(@NotNull List<LocationData> locations,
                                       @NotNull LSPUsageType usageType,
                                       @NotNull DataContext dataContext,
                                       @Nullable MouseEvent event) {
@@ -65,28 +66,29 @@ public class LSPUsagesManager {
             }
             case 1: {
                 // On response, open editor with the given location
-                Location ref = locations.get(0);
-                openLocation(ref, project);
+                LocationData ref = locations.get(0);
+                openLocation(ref.location(), ref.languageServer().getClientFeatures(), project);
                 break;
             }
             default: {
                 // Open locations in a Popup
                 @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
-                Location ref = locations.get(0);
-                LSPUsageTriggeredPsiElement element = toUsageTriggeredPsiElement(ref, project);
-                if(element != null) {
+                LocationData ref = locations.get(0);
+                LSPUsageTriggeredPsiElement element = toUsageTriggeredPsiElement(ref.location(), ref.languageServer().getClientFeatures(), project);
+                if (element != null) {
                     element.setLSPReferences(locations);
-                    GotoDeclarationAction.startFindUsages(editor, element.getProject(), element, event == null ? null : new RelativePoint(event));
                 }
+                GotoDeclarationAction.startFindUsages(editor, element.getProject(), element, event == null ? null : new RelativePoint(event));
             }
         }
     }
 
     @Nullable
     public static LSPUsagePsiElement toPsiElement(@NotNull Location location,
+                                                  @Nullable FileUriSupport fileUriSupport,
                                                   @NotNull LSPUsagePsiElement.UsageKind kind,
                                                   @NotNull Project project) {
-        LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, project, USAGE_ELEMENT_FACTORY);
+        LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, fileUriSupport, project, USAGE_ELEMENT_FACTORY);
         if (element != null) {
             element.setKind(kind);
         }
@@ -95,9 +97,10 @@ public class LSPUsagesManager {
 
     @Nullable
     public static LSPUsagePsiElement toPsiElement(@NotNull LocationLink location,
+                                                  @Nullable FileUriSupport fileUriSupport,
                                                   @NotNull LSPUsagePsiElement.UsageKind kind,
                                                   @NotNull Project project) {
-        LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, project, USAGE_ELEMENT_FACTORY);
+        LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, fileUriSupport, project, USAGE_ELEMENT_FACTORY);
         if (element != null) {
             element.setKind(kind);
         }
@@ -106,8 +109,9 @@ public class LSPUsagesManager {
 
     @Nullable
     public static LSPUsageTriggeredPsiElement toUsageTriggeredPsiElement(@NotNull Location location,
+                                                                         @Nullable FileUriSupport fileUriSupport,
                                                                          @NotNull Project project) {
-        return LSPPsiElementFactory.toPsiElement(location, project, USAGE_TRIGGERED_ELEMENT_FACTORY);
+        return LSPPsiElementFactory.toPsiElement(location, fileUriSupport, project, USAGE_TRIGGERED_ELEMENT_FACTORY);
     }
 
     private void showNoUsage(@NotNull LSPUsageType usageType, DataContext dataContext) {
@@ -139,7 +143,9 @@ public class LSPUsagesManager {
         return null;
     }
 
-    private static void openLocation(@NotNull Location location, @NotNull Project project) {
-        ApplicationManager.getApplication().invokeLater(() -> LSPIJUtils.openInEditor(location, project));
+    private static void openLocation(@NotNull Location location,
+                                     @Nullable FileUriSupport fileUriSupport,
+                                     @NotNull Project project) {
+        ApplicationManager.getApplication().invokeLater(() -> LSPIJUtils.openInEditor(location, fileUriSupport, project));
     }
 }

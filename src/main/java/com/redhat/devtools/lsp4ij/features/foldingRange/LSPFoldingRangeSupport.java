@@ -65,7 +65,7 @@ public class LSPFoldingRangeSupport extends AbstractLSPDocumentFeatureSupport<Fo
                     // Collect list of textDocument/foldingRange future for each language servers
                     List<CompletableFuture<List<FoldingRange>>> foldingRangesPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getFoldingRangesFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getFoldingRangesFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/foldingRange future in one future which return the list of folding ranges
@@ -73,9 +73,12 @@ public class LSPFoldingRangeSupport extends AbstractLSPDocumentFeatureSupport<Fo
                 });
     }
 
-    private static CompletableFuture<List<FoldingRange>> getFoldingRangesFor(FoldingRangeRequestParams params,
-                                                                             LanguageServerItem languageServer,
-                                                                             CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<FoldingRange>> getFoldingRangesFor(@NotNull FoldingRangeRequestParams params,
+                                                                             @NotNull PsiFile file,
+                                                                             @NotNull LanguageServerItem languageServer,
+                                                                             @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .foldingRange(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_FOLDING_RANGE)
