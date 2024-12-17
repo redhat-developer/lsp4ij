@@ -26,6 +26,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.jetbrains.annotations.Nullable;
@@ -90,13 +91,14 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                         // The Ctrl+Click has been done in a LSP document link,try to open the document.
                         final String target = documentLink.getTarget();
                         if (target != null && !target.isEmpty()) {
-                            VirtualFile targetFile = LSPIJUtils.findResourceFor(target);
+                            FileUriSupport fileUriSupport = documentLinkData.languageServer().getClientFeatures();
+                            VirtualFile targetFile = FileUriSupport.findFileByUri(target, fileUriSupport );
                             if (targetFile == null) {
                                 // The LSP document link file doesn't exist, open a file dialog
                                 // which asks if user want to create the file.
                                 // At this step we cannot open a dialog directly, we need to open the dialog
                                 // with invoke later.
-                                LSPIJUtils.openInEditor(target, null, true, true, project);
+                                LSPIJUtils.openInEditor(target, null, true, true, fileUriSupport, project);
                                 // Return an empty response here.
                                 // If user accepts to create the file, the open is done after the creation of the file.
                                 return PsiElement.EMPTY_ARRAY;

@@ -64,7 +64,7 @@ public class LSPDocumentLinkSupport extends AbstractLSPDocumentFeatureSupport<Do
                     // Collect list of textDocument/documentLink future for each language servers
                     List<CompletableFuture<List<DocumentLinkData>>> linkInformationPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getDocumentLinksFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getDocumentLinksFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/documentLink future in one future which return the list of document link
@@ -73,8 +73,11 @@ public class LSPDocumentLinkSupport extends AbstractLSPDocumentFeatureSupport<Do
     }
 
     private static CompletableFuture<List<DocumentLinkData>> getDocumentLinksFor(@NotNull DocumentLinkParams params,
+                                                                                 @NotNull PsiFile file,
                                                                                  @NotNull LanguageServerItem languageServer,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .documentLink(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_LINK)

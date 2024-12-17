@@ -71,6 +71,7 @@ Here are some projects that use LSP4IJ:
  * [Intellij Gleam](https://github.com/themartdev/intellij-gleam)
  * [Liberty Tools for IntelliJ](https://github.com/OpenLiberty/liberty-tools-intellij)
  * [Vespa Schema Language Support](https://github.com/vespa-engine/vespa/tree/master/integration/schema-language-server/clients/intellij)
+ * [Jimmer DTO LSP](https://github.com/Enaium/jimmer-dto-lsp)
 
 ## Requirements
 

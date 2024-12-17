@@ -21,7 +21,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import org.eclipse.lsp4j.Location;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +63,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         // Consume LSP 'textDocument/definition' request
         LSPDefinitionSupport definitionSupport = LSPFileSupport.getSupport(psiFile).getDefinitionSupport();
         var params = new LSPDefinitionParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<Location>> definitionsFuture = definitionSupport.getDefinitions(params);
+        CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
         try {
             waitUntilDone(definitionsFuture, psiFile);
         } catch (ProcessCanceledException ex) {
@@ -77,12 +77,12 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         }
 
         if (isDoneNormally(definitionsFuture)) {
-            // textDocument/implementations has been collected correctly
-            List<Location> locations = definitionsFuture.getNow(null);
+            // textDocument/definition has been collected correctly
+            List<LocationData> locations = definitionsFuture.getNow(null);
             if (locations != null) {
                 return locations
                         .stream()
-                        .map(location -> toPsiElement(location, project))
+                        .map(location -> toPsiElement(location.location(), location.languageServer().getClientFeatures(), project))
                         .filter(Objects::nonNull)
                         .toArray(PsiElement[]::new);
             }

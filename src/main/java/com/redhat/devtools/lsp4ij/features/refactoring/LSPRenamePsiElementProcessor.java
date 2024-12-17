@@ -22,7 +22,11 @@ import com.intellij.refactoring.listeners.RefactoringElementListener;
 import com.intellij.refactoring.rename.RenamePsiElementProcessor;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.util.IncorrectOperationException;
-import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.FileRename;
@@ -100,7 +104,8 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
             // Wait until the future of LSP 'workspace/willRenameFiles' request
             // is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(willRenameFilesFuture, file);
-        } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+        } catch (
+                ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
@@ -115,6 +120,7 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                 LSPRenameFilesContextHolder.set(new LSPRenameFilesContext(params, Collections.singletonList(editData.languageServer()), file));
 
                 var edit = editData.edit();
+                var fileUriSupport = editData.languageServer().getClientFeatures();
                 var documentChanges = edit.getDocumentChanges();
                 if (documentChanges != null) {
                     for (var documentChange : documentChanges) {
@@ -122,7 +128,7 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                             var ed = documentChange.getLeft();
                             String uri = ed.getTextDocument().getUri();
                             List<TextEdit> textEdits = ed.getEdits();
-                            addPsiElementRename(uri, textEdits, allRenames, project);
+                            addPsiElementRename(uri, textEdits, allRenames, fileUriSupport, project);
                         }
                     }
                 }
@@ -132,7 +138,7 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                     changes.entrySet().forEach(entry -> {
                         String uri = entry.getKey();
                         List<TextEdit> textEdits = entry.getValue();
-                        addPsiElementRename(uri, textEdits, allRenames, project);
+                        addPsiElementRename(uri, textEdits, allRenames, fileUriSupport, project);
                     });
                 }
             }
@@ -142,8 +148,9 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
     private static void addPsiElementRename(@NotNull String uri,
                                             @NotNull List<TextEdit> textEdits,
                                             @NotNull Map<PsiElement, String> allRenames,
+                                            @Nullable FileUriSupport fileUriSupport,
                                             @NotNull Project project) {
-        VirtualFile file = LSPIJUtils.findResourceFor(uri);
+        VirtualFile file = FileUriSupport.findFileByUri(uri, fileUriSupport);
         if (file != null) {
             Document document = LSPIJUtils.getDocument(file);
             PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);

@@ -70,7 +70,7 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
                     // Collect list of textDocument/hover future for each language servers
                     List<CompletableFuture<HoverData>> hoverPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getHoverFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getHoverFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/hover future in one future which return the list of highlights
@@ -95,8 +95,11 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
     }
 
     private static CompletableFuture<@Nullable HoverData> getHoverFor(@NotNull HoverParams params,
+                                                                      @NotNull PsiFile file,
                                                                       @NotNull LanguageServerItem languageServer,
                                                                       @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .hover(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_HOVER)

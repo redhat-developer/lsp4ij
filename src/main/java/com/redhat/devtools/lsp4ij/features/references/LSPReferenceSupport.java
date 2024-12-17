@@ -16,6 +16,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 
@@ -30,7 +31,7 @@ import java.util.concurrent.CompletableFuture;
  *      <li>textDocument/reference</li>
  *  </ul>
  */
-public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPReferenceParams, List<Location>> {
+public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPReferenceParams, List<LocationData>> {
 
     private Integer previousOffset;
 
@@ -38,7 +39,7 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
         super(file);
     }
 
-    public CompletableFuture<List<Location>> getReferences(LSPReferenceParams params) {
+    public CompletableFuture<List<LocationData>> getReferences(LSPReferenceParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
             super.cancel();
@@ -48,12 +49,12 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
     }
 
     @Override
-    protected CompletableFuture<List<Location>> doLoad(LSPReferenceParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LocationData>> doLoad(LSPReferenceParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return collectReferences(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectReferences(@NotNull PsiFile file,
+    private static @NotNull CompletableFuture<List<LocationData>> collectReferences(@NotNull PsiFile file,
                                                                                 @NotNull LSPReferenceParams params,
                                                                                 @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
@@ -67,9 +68,9 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
                     }
 
                     // Collect list of textDocument/reference future for each language servers
-                    List<CompletableFuture<List<Location>>> referencesPerServerFutures = languageServers
+                    List<CompletableFuture<List<LocationData>>> referencesPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getReferenceFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getReferenceFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/reference future in one future which return the list of reference ranges
@@ -77,9 +78,12 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
                 });
     }
 
-    private static CompletableFuture<List<Location>> getReferenceFor(LSPReferenceParams params,
-                                                                     LanguageServerItem languageServer,
-                                                                     CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<LocationData>> getReferenceFor(@NotNull LSPReferenceParams params,
+                                                                     @NotNull PsiFile file,
+                                                                     @NotNull LanguageServerItem languageServer,
+                                                                     @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .references(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_REFERENCES)
@@ -90,7 +94,7 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
                     }
                     return locations
                             .stream()
-                            .map(l -> new Location(l.getUri(), l.getRange()))
+                            .map(l -> new LocationData(new Location(l.getUri(), l.getRange()), languageServer))
                             .toList();
                 });
     }

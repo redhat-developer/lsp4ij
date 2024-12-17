@@ -66,7 +66,7 @@ public class LSPCallHierarchyIncomingCallsSupport extends AbstractLSPDocumentFea
                     // Collect list of callHierarchy/incomingCalls future for each language servers
                     List<CompletableFuture<List<CallHierarchyItemData>>> callHierarchyPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getCallHierarchyIncomingCalls(params, languageServer, file, cancellationSupport))
+                            .map(languageServer -> getCallHierarchyIncomingCalls(params, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of callHierarchy/incomingCalls future in one future which return the list of call hierarchy items
@@ -76,7 +76,6 @@ public class LSPCallHierarchyIncomingCallsSupport extends AbstractLSPDocumentFea
 
     private static CompletableFuture<List<CallHierarchyItemData>> getCallHierarchyIncomingCalls(@NotNull CallHierarchyIncomingCallsParams params,
                                                                                                 @NotNull LanguageServerItem languageServer,
-                                                                                                @NotNull PsiFile file,
                                                                                                 @NotNull CancellationSupport cancellationSupport) {
 
         return cancellationSupport.execute(languageServer

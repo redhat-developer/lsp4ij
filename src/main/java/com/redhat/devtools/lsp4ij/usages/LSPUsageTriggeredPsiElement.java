@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.usages;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
-import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,18 +25,18 @@ import java.util.List;
  */
 public class LSPUsageTriggeredPsiElement extends LSPPsiElement {
 
-    private List<Location> references;
+    private List<LocationData> references;
 
     public LSPUsageTriggeredPsiElement(@NotNull PsiFile file, @NotNull TextRange textRange) {
         super(file, textRange);
     }
 
     @Nullable
-    public List<Location> getLSPReferences() {
+    public List<LocationData> getLSPReferences() {
         return references;
     }
 
-    public void setLSPReferences(List<Location> references) {
+    public void setLSPReferences(List<LocationData> references) {
         this.references = references;
     }
 }
