@@ -98,7 +98,11 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         }
 
         // For completeness' sake, also collect external usages to LSP (pseudo-)elements
-        LSPExternalReferencesFinder.processExternalReferences(file, element.getTextOffset(), reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference))));
+        ReadAction.run(() -> LSPExternalReferencesFinder.processExternalReferences(
+                file,
+                element.getTextOffset(),
+                reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
+        ));
     }
 
     @Nullable
