@@ -119,7 +119,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                 file,
                 ReadAction.compute(element::getTextOffset),
                 options.searchScope,
-                reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
+                reference -> processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(reference))))
         );
     }
 
