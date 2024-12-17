@@ -17,7 +17,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import org.eclipse.lsp4j.Location;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -25,12 +25,12 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * LSP declaration support which collect:
- * 
+ *
  * <ul>
  *      <li>textDocument/declaration</li>
  *  </ul>
  */
-public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSPDeclarationParams, List<Location>> {
+public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSPDeclarationParams, List<LocationData>> {
 
     private Integer previousOffset;
 
@@ -38,7 +38,7 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
         super(file);
     }
 
-    public CompletableFuture<List<Location>> getDeclarations(LSPDeclarationParams params) {
+    public CompletableFuture<List<LocationData>> getDeclarations(LSPDeclarationParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
             super.cancel();
@@ -48,17 +48,17 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
     }
 
     @Override
-    protected CompletableFuture<List<Location>> doLoad(LSPDeclarationParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LocationData>> doLoad(LSPDeclarationParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return collectDeclarations(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectDeclarations(@NotNull PsiFile file,
-                                                                                     @NotNull LSPDeclarationParams params,
-                                                                                     @NotNull CancellationSupport cancellationSupport) {
+    private static @NotNull CompletableFuture<List<LocationData>> collectDeclarations(@NotNull PsiFile file,
+                                                                                  @NotNull LSPDeclarationParams params,
+                                                                                  @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
-                        f -> f.getDeclarationFeature().isEnabled(file),
-                        f -> f.getDeclarationFeature().isSupported(file))
+                f -> f.getDeclarationFeature().isEnabled(file),
+                f -> f.getDeclarationFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have declaration capability
@@ -67,9 +67,9 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
                     }
 
                     // Collect list of textDocument/declaration future for each language servers
-                    List<CompletableFuture<List<Location>>> declarationsPerServerFutures = languageServers
+                    List<CompletableFuture<List<LocationData>>> declarationsPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getDeclarationFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getDeclarationFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/declaration future in one future which return the list of declaration ranges
@@ -77,12 +77,15 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
                 });
     }
 
-    private static CompletableFuture<List<Location>> getDeclarationFor(LSPDeclarationParams params,
-                                                                          LanguageServerItem languageServer,
-                                                                          CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<LocationData>> getDeclarationFor(@NotNull LSPDeclarationParams params,
+                                                                           @NotNull PsiFile file,
+                                                                           @NotNull LanguageServerItem languageServer,
+                                                                           @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .declaration(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
-                .thenApplyAsync(LSPIJUtils::getLocations);
+                .thenApplyAsync(locations -> LSPIJUtils.getLocations(locations, languageServer));
     }
 }

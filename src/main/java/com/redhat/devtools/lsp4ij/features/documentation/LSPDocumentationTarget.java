@@ -67,4 +67,8 @@ public class LSPDocumentationTarget implements DocumentationTarget {
     public PsiFile getFile() {
         return file;
     }
+
+    public LanguageServerItem getLanguageServer() {
+        return languageServer;
+    }
 }

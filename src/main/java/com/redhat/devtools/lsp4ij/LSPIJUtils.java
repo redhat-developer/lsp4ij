@@ -29,13 +29,16 @@ import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.*;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -56,7 +59,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Utilities class for LSP.
  */
 public class LSPIJUtils {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPIJUtils.class);
+
+    private static final Key<URI> DEFAULT_LSP_FILE_URI_KEY = Key.create("lsp.file.uri");
 
     private static final String JAR_PROTOCOL = "jar";
 
@@ -88,6 +94,9 @@ public class LSPIJUtils {
 
     /**
      * Open the LSP location in an editor.
+     * <p>
+     * Not used but declared to support backward compatibility.
+     * </p>
      *
      * @param location the LSP location.
      * @param project  the project.
@@ -95,14 +104,31 @@ public class LSPIJUtils {
      */
     public static boolean openInEditor(@Nullable Location location,
                                        @NotNull Project project) {
+        return openInEditor(location, null, project);
+    }
+
+    /**
+     * Open the LSP location in an editor.
+     *
+     * @param location       the LSP location.
+     * @param fileUriSupport the file Uri support.
+     * @param project        the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@Nullable Location location,
+                                       @Nullable FileUriSupport fileUriSupport,
+                                       @NotNull Project project) {
         if (location == null) {
             return false;
         }
-        return openInEditor(location.getUri(), location.getRange() != null ? location.getRange().getStart() : null, project);
+        return openInEditor(location.getUri(), location.getRange() != null ? location.getRange().getStart() : null, fileUriSupport, project);
     }
 
     /**
      * Open the given fileUri with the given position in an editor.
+     * <p>
+     * Not used but declared to support backward compatibility.
+     * </p>
      *
      * @param fileUri  the file Uri.
      * @param position the position.
@@ -112,11 +138,30 @@ public class LSPIJUtils {
     public static boolean openInEditor(@NotNull String fileUri,
                                        @Nullable Position position,
                                        @NotNull Project project) {
-        return openInEditor(fileUri, position, true, project);
+        return openInEditor(fileUri, position, null, project);
     }
 
     /**
      * Open the given fileUri with the given position in an editor.
+     *
+     * @param fileUri        the file Uri.
+     * @param position       the position.
+     * @param fileUriSupport the file Uri support.
+     * @param project        the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@NotNull String fileUri,
+                                       @Nullable Position position,
+                                       @Nullable FileUriSupport fileUriSupport,
+                                       @NotNull Project project) {
+        return openInEditor(fileUri, position, true, fileUriSupport, project);
+    }
+
+    /**
+     * Open the given fileUri with the given position in an editor.
+     * <p>
+     * Not used but declared to support backward compatibility.
+     * </p>
      *
      * @param fileUri     the file Uri.
      * @param position    the position.
@@ -128,11 +173,32 @@ public class LSPIJUtils {
                                        @Nullable Position position,
                                        boolean focusEditor,
                                        @NotNull Project project) {
-        return openInEditor(fileUri, position, focusEditor, false, project);
+        return openInEditor(fileUri, position, focusEditor, null, project);
+    }
+
+    /**
+     * Open the given fileUri with the given position in an editor.
+     *
+     * @param fileUri        the file Uri.
+     * @param position       the position.
+     * @param focusEditor    true if editor will take the focus and false otherwise.
+     * @param fileUriSupport the file Uri support.
+     * @param project        the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@NotNull String fileUri,
+                                       @Nullable Position position,
+                                       boolean focusEditor,
+                                       @Nullable FileUriSupport fileUriSupport,
+                                       @NotNull Project project) {
+        return openInEditor(fileUri, position, focusEditor, false, fileUriSupport, project);
     }
 
     /**
      * Open the given fileUrl in an editor.
+     * <p>
+     * Not used but declared to support backward compatibility.
+     * </p>
      *
      * <p>
      * the following syntax is supported for fileUrl:
@@ -155,6 +221,35 @@ public class LSPIJUtils {
                                        boolean focusEditor,
                                        boolean createFileIfNeeded,
                                        @NotNull Project project) {
+        return openInEditor(fileUri, position, focusEditor, createFileIfNeeded, null, project);
+    }
+
+    /**
+     * Open the given fileUrl in an editor.
+     *
+     * <p>
+     * the following syntax is supported for fileUrl:
+     *     <ul>
+     *         <li>file:///C:/Users/username/foo.txt</li>
+     *         <li>C:/Users/username/foo.txt</li>
+     *         <li>file:///C:/Users/username/foo.txt#L1:5</li>
+     *     </ul>
+     * </p>
+     *
+     * @param fileUri            the file Uri to open.
+     * @param position           the position.
+     * @param focusEditor        true if editor will take the focus and false otherwise.
+     * @param createFileIfNeeded true if file must be created if doesn't exist and false otherwise.
+     * @param fileUriSupport     the file Uri support.
+     * @param project            the project.
+     * @return true if file Url can be opened and false otherwise.
+     */
+    public static boolean openInEditor(@NotNull String fileUri,
+                                       @Nullable Position position,
+                                       boolean focusEditor,
+                                       boolean createFileIfNeeded,
+                                       @Nullable FileUriSupport fileUriSupport,
+                                       @NotNull Project project) {
         if (position == null) {
             // Try to get position information from the fileUri
             // ex :
@@ -173,7 +268,7 @@ public class LSPIJUtils {
                 fileUri = fileUri.substring(0, hashIndex);
             }
         }
-        VirtualFile file = findResourceFor(fileUri);
+        VirtualFile file = FileUriSupport.findFileByUri(fileUri, fileUriSupport);
         if (file == null && createFileIfNeeded) {
             // The file doesn't exist,
             // open a dialog to confirm the creation of the file.
@@ -348,7 +443,13 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull VirtualFile file) {
-        return toUri(VfsUtilCore.virtualToIoFile(file));
+        URI fileUri = file.getUserData(DEFAULT_LSP_FILE_URI_KEY);
+        if (fileUri == null) {
+            // Cache the file Uri to avoid recomputing again
+            fileUri = toUri(VfsUtilCore.virtualToIoFile(file));
+            file.putUserData(DEFAULT_LSP_FILE_URI_KEY, fileUri);
+        }
+        return fileUri;
     }
 
     public static @Nullable String toUriAsString(@NotNull PsiFile psFile) {
@@ -969,11 +1070,7 @@ public class LSPIJUtils {
     }
 
     public static TextDocumentIdentifier toTextDocumentIdentifier(VirtualFile file) {
-        return toTextDocumentIdentifier(toUri(file));
-    }
-
-    public static TextDocumentIdentifier toTextDocumentIdentifier(final URI uri) {
-        return new TextDocumentIdentifier(uri.toASCIIString());
+        return new TextDocumentIdentifier(toUriAsString(file));
     }
 
     /**
@@ -1222,7 +1319,8 @@ public class LSPIJUtils {
      * @param locations the locations/links
      * @return the most specific location information that was found based on the provided locations/links
      */
-    public static @NotNull List<Location> getLocations(@Nullable Either<List<? extends Location>, List<? extends LocationLink>> locations) {
+    public static @NotNull List<LocationData> getLocations(@Nullable Either<List<? extends Location>, List<? extends LocationLink>> locations,
+                                                           @Nullable LanguageServerItem languageServer) {
         if (locations == null) {
             // textDocument/definition may return null
             return Collections.emptyList();
@@ -1230,13 +1328,13 @@ public class LSPIJUtils {
         if (locations.isLeft()) {
             return locations.getLeft()
                     .stream()
-                    .map(l -> new Location(l.getUri(), l.getRange()))
+                    .map(l -> new LocationData(new Location(l.getUri(), l.getRange()), languageServer))
                     .toList();
 
         }
         return locations.getRight()
                 .stream()
-                .map(l -> new Location(l.getTargetUri(), l.getTargetSelectionRange() != null ? l.getTargetSelectionRange() : l.getTargetRange()))
+                .map(l -> new LocationData(new Location(l.getTargetUri(), l.getTargetSelectionRange() != null ? l.getTargetSelectionRange() : l.getTargetRange()), languageServer))
                 .toList();
     }
 }

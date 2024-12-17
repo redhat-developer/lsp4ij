@@ -86,6 +86,8 @@ public class LSPPrepareCallHierarchySupport extends AbstractLSPDocumentFeatureSu
                                                                                    @NotNull PsiFile file,
                                                                                    @NotNull CancellationSupport cancellationSupport) {
 
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .prepareCallHierarchy(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_PREPARE_CALL_HIERARCHY)

@@ -55,7 +55,11 @@ public abstract class LSPCallHierarchyTreeStructureBase extends LSPHierarchyTree
     }
 
     @Override
-    protected void buildRoot(@NotNull HierarchyNodeDescriptor descriptor, PsiFile psiFile, Document document, int offset, List<LSPHierarchyNodeDescriptor> descriptors) {
+    protected void buildRoot(@NotNull HierarchyNodeDescriptor descriptor,
+                             @NotNull PsiFile psiFile,
+                             @NotNull Document document,
+                             int offset,
+                             @NotNull List<LSPHierarchyNodeDescriptor> descriptors) {
         // Consume LSP 'textDocument/prepareCallHierarchy' request
         LSPPrepareCallHierarchySupport prepareCallHierarchySupport = LSPFileSupport.getSupport(psiFile).getPrepareCallHierarchySupport();
         var params = new LSPCallHierarchyPrepareParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
@@ -82,7 +86,10 @@ public abstract class LSPCallHierarchyTreeStructureBase extends LSPHierarchyTree
             if (items != null) {
                 for (var item : items) {
                     var callHierarchyItem = item.callHierarchyItem();
-                    PsiElement element = createPsiElement(callHierarchyItem.getUri(), callHierarchyItem.getRange(), callHierarchyItem.getName());
+                    PsiElement element = createPsiElement(callHierarchyItem.getUri(),
+                            callHierarchyItem.getRange(),
+                            callHierarchyItem.getName(),
+                            item.languageServer().getClientFeatures());
                     if (element != null) {
                         descriptors.add(createHierarchyNodeDescriptor(myProject, descriptor, element, callHierarchyItem));
                     }

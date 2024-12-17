@@ -64,7 +64,7 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
                     // Collect list of textDocument/documentSymbol future for each language servers
                     List<CompletableFuture<List<DocumentSymbolData>>> documentSymbolInformationPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getDocumentSymbolsFor(params, languageServer, file, cancellationSupport))
+                            .map(languageServer -> getDocumentSymbolsFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/documentSymbol future in one future which return the list of document link
@@ -73,9 +73,11 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     private static CompletableFuture<List<DocumentSymbolData>> getDocumentSymbolsFor(@NotNull DocumentSymbolParams params,
+                                                                                     @NotNull PsiFile file,
                                                                                      @NotNull LanguageServerItem languageServer,
-                                                                                     @NotNull PsiFile psiFile,
                                                                                      @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .documentSymbol(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_SYMBOL)
@@ -89,9 +91,9 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
                             .map(symbol -> {
                                 if (symbol.isLeft()) {
                                     var si = symbol.getLeft();
-                                    return new DocumentSymbolData(convertToDocumentSymbol(si), psiFile, languageServer);
+                                    return new DocumentSymbolData(convertToDocumentSymbol(si), file, languageServer);
                                 } else {
-                                    return new DocumentSymbolData(symbol.getRight(), psiFile, languageServer);
+                                    return new DocumentSymbolData(symbol.getRight(), file, languageServer);
                                 }
                             })
                             .toList();

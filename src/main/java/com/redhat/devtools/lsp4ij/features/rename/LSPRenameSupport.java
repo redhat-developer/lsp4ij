@@ -52,15 +52,16 @@ public class LSPRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPRenam
     @Override
     protected CompletableFuture<List<WorkspaceEditData>> doLoad(@NotNull LSPRenameParams params,
                                                                 @NotNull CancellationSupport cancellationSupport) {
-        return getRename(params, cancellationSupport);
+        return getRename(params, getFile(), cancellationSupport);
     }
 
     private static @NotNull CompletableFuture<List<WorkspaceEditData>> getRename(@NotNull LSPRenameParams params,
+                                                                                 @NotNull PsiFile file,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
         // Collect list of textDocument/rename future for each language servers
         List<CompletableFuture<List<WorkspaceEditData>>> renamePerServerFutures = params.getLanguageServers()
                 .stream()
-                .map(languageServer -> getRenameFor(params, languageServer, cancellationSupport))
+                .map(languageServer -> getRenameFor(params, file, languageServer, cancellationSupport))
                 .toList();
 
         // Merge list of textDocument/rename future in one future which return the list of workspace edit
@@ -68,8 +69,11 @@ public class LSPRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPRenam
     }
 
     private static CompletableFuture<List<WorkspaceEditData>> getRenameFor(@NotNull RenameParams params,
+                                                                           @NotNull PsiFile file,
                                                                            @NotNull LanguageServerItem languageServer,
                                                                            @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                                 .getTextDocumentService()
                                 .rename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RENAME,

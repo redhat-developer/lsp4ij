@@ -26,11 +26,13 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.net.URI;
+
 /**
  * LSP  client features.
  */
 @ApiStatus.Experimental
-public class LSPClientFeatures implements Disposable {
+public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LanguageServerWrapper serverWrapper;
 
@@ -85,6 +87,71 @@ public class LSPClientFeatures implements Disposable {
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
     /**
+     * Returns true if the language server is enabled for the given file and false otherwise. Default to true
+     *
+     * @param file the file for test
+     * @return true if the language server is enabled for the input and false otherwise. Default to true
+     */
+    public boolean isEnabled(@NotNull VirtualFile file) {
+        return true;
+    }
+
+    /**
+     * Overrides this method if you need to generate custom URI.
+     *
+     * @param file the virtual file.
+     *
+     * @return the file Uri and null otherwise.
+     */
+    @Override
+    public @Nullable URI getFileUri(@NotNull VirtualFile file) {
+        return null;
+    }
+
+    /**
+     * Overrides this method if you need to support custom file uri.
+     *
+     * @param fileUri the file Uri.
+     * @return the virtual file and null otherwise.
+     */
+    @Override
+    public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
+        return null;
+    }
+
+    /**
+     * Determines whether or not the language grammar for the file is case-sensitive.
+     *
+     * @param file the file
+     * @return true if the file's language grammar is case-sensitive; otherwise false
+     */
+    public boolean isCaseSensitive(@NotNull PsiFile file) {
+        // Default to case-insensitive
+        return false;
+    }
+
+    /**
+     * Returns true if the server is kept alive even if all files associated with the language server are closed and false otherwise.
+     *
+     * @return true if the server is kept alive even if all files associated with the language server are closed and false otherwise.
+     */
+    public boolean keepServerAlive() {
+        return false;
+    }
+
+    /**
+     * Returns true if the user can stop the language server in LSP console from the context menu and false otherwise.
+     * <p>
+     * By default, user can stop the server.
+     * </p>
+     *
+     * @return true if the user can stop the language server in LSP console from the context menu and false otherwise.
+     */
+    public boolean canStopServerByUser() {
+        return true;
+    }
+
+    /**
      * Returns the project.
      *
      * @return the project.
@@ -132,27 +199,6 @@ public class LSPClientFeatures implements Disposable {
     @Nullable
     public final LanguageServer getLanguageServer() {
         return getServerWrapper().getLanguageServer();
-    }
-
-    /**
-     * Returns true if the server is kept alive even if all files associated with the language server are closed and false otherwise.
-     *
-     * @return true if the server is kept alive even if all files associated with the language server are closed and false otherwise.
-     */
-    public boolean keepServerAlive() {
-        return false;
-    }
-
-    /**
-     * Returns true if the user can stop the language server in LSP console from the context menu and false otherwise.
-     * <p>
-     * By default, user can stop the server.
-     * </p>
-     *
-     * @return true if the user can stop the language server in LSP console from the context menu and false otherwise.
-     */
-    public boolean canStopServerByUser() {
-        return true;
     }
 
     /**
@@ -953,27 +999,6 @@ public class LSPClientFeatures implements Disposable {
         workspaceSymbolFeature.setClientFeatures(this);
         this.workspaceSymbolFeature = workspaceSymbolFeature;
         return this;
-    }
-
-    /**
-     * Returns true if the language server is enabled for the given file and false otherwise. Default to true
-     *
-     * @param file the file for test
-     * @return true if the language server is enabled for the input and false otherwise. Default to true
-     */
-    public boolean isEnabled(@NotNull VirtualFile file) {
-        return true;
-    }
-
-    /**
-     * Determines whether or not the language grammar for the file is case-sensitive.
-     *
-     * @param file the file
-     * @return true if the file's language grammar is case-sensitive; otherwise false
-     */
-    public boolean isCaseSensitive(@NotNull PsiFile file) {
-        // Default to case-insensitive
-        return false;
     }
 
     /**
