@@ -16,6 +16,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -24,6 +25,7 @@ import com.intellij.usages.Usage;
 import com.intellij.usages.UsageInfo2UsageAdapter;
 import com.intellij.util.Processor;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -53,11 +55,30 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
 
     @Override
     public void processElementUsages(@NotNull PsiElement element, @NotNull Processor<? super Usage> processor, @NotNull FindUsagesOptions options) {
+
+        PsiFile file = element.getContainingFile();
+        if (file == null) {
+            return;
+        }
+
+        VirtualFile virtualFile = file.getVirtualFile();
+        if (virtualFile == null) {
+            return;
+        }
+
+        Project project = element.getProject();
+        if (!LanguageServiceAccessor.getInstance(project).hasAny(
+                virtualFile,
+                l -> l.getClientFeatures().getUsageFeature().isSupported(file)
+        )) {
+            return;
+        }
+
         if (element instanceof LSPUsageTriggeredPsiElement elt) {
             if (elt.getLSPReferences() != null) {
                 elt.getLSPReferences()
                         .forEach(ref -> {
-                            var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, element.getProject());
+                            var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, project);
                             if (psiElement != null) {
                                 processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(psiElement))));
                             }
@@ -66,10 +87,6 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             }
         }
 
-        PsiFile file = element.getContainingFile();
-        if (file == null) {
-            return;
-        }
         // Get position where the "Find Usages" has been triggered
         Position position = getPosition(element, file);
         if (position == null) {
@@ -98,11 +115,12 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         }
 
         // For completeness' sake, also collect external usages to LSP (pseudo-)elements
-        ReadAction.run(() -> LSPExternalReferencesFinder.processExternalReferences(
+        LSPExternalReferencesFinder.processExternalReferences(
                 file,
-                element.getTextOffset(),
+                ReadAction.compute(element::getTextOffset),
+                options.searchScope,
                 reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
-        ));
+        );
     }
 
     @Nullable
