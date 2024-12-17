@@ -59,13 +59,16 @@ public class LSPSignatureHelpSupport extends AbstractLSPDocumentFeatureSupport<S
 
                     // Get signature help for the first language server
                     LanguageServerItem languageServer = languageServers.get(0);
-                    return getSignatureHelpFor(params, languageServer, cancellationSupport);
+                    return getSignatureHelpFor(params, file, languageServer, cancellationSupport);
                 });
     }
 
     private static CompletableFuture<SignatureHelp> getSignatureHelpFor(@NotNull SignatureHelpParams params,
+                                                                        @NotNull PsiFile file,
                                                                         @NotNull LanguageServerItem languageServer,
                                                                         @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                 .getTextDocumentService()
                 .signatureHelp(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_SIGNATURE_HELP);

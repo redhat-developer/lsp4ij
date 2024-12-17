@@ -13,7 +13,9 @@ package com.redhat.devtools.lsp4ij.features;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -81,5 +83,11 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
                 .getLanguageServers(file.getVirtualFile(),
                         beforeStartingServerFilter,
                         afterStartingServerFilter);
+    }
+
+    protected static void updateTextDocumentUri(@NotNull TextDocumentIdentifier textDocument,
+                                                @NotNull PsiFile file,
+                                                @NotNull LanguageServerItem languageServer) {
+        textDocument.setUri(FileUriSupport.getFileUri(file.getVirtualFile(), languageServer.getClientFeatures()).toASCIIString());
     }
 }

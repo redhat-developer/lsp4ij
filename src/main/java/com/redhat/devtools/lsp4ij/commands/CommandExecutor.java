@@ -27,13 +27,13 @@ import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -110,9 +110,9 @@ public class CommandExecutor {
 
         // 3. tentative fallback
         if (file != null && command.getArguments() != null) {
-            Document document = LSPIJUtils.getDocument(file);
-            if (document != null) {
-                WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), document);
+                LanguageServerItem languageServer = context.getPreferredLanguageServer();
+                FileUriSupport fileUriSupport = languageServer != null ? languageServer.getClientFeatures() : null;
+                WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), file, fileUriSupport);
                 if (edit != null) {
                     if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
                         LSPIJUtils.applyWorkspaceEdit(edit);
@@ -123,7 +123,6 @@ public class CommandExecutor {
                         });
                     }
                     return LSPCommandResponse.FOUND;
-                }
             }
         }
         if (context.isShowNotificationError()) {
@@ -152,9 +151,9 @@ public class CommandExecutor {
      *                                  do nothing.
      * @param languageServer            the language server for which the {@code command} is
      *                                  applicable.
-     * @param preferredLanguageServerId
-     * @param project
-     * @return true if the LSP command on server side has been executed successfully and false otherwise.
+     * @param preferredLanguageServerId the preferred language server Id.
+     * @param project the project.
+     * @return the LSP command response.
      */
     private static LSPCommandResponse executeCommandServerSide(@NotNull Command command,
                                                                @Nullable LanguageServerItem languageServer,
@@ -297,9 +296,11 @@ public class CommandExecutor {
      * workspace edit...
      */
     @Nullable
-    private static WorkspaceEdit createWorkspaceEdit(List<Object> commandArguments, @NotNull Document document) {
+    private static WorkspaceEdit createWorkspaceEdit(@NotNull List<Object> commandArguments,
+                                                     @NotNull VirtualFile initialFile,
+                                                     @Nullable FileUriSupport fileUriSupport) {
         Map<String, List<TextEdit>> changes = new HashMap<>();
-        URI initialUri = LSPIJUtils.toUri(document);
+        URI initialUri = FileUriSupport.getFileUri(initialFile, fileUriSupport);
         Pair<URI, List<TextEdit>> currentEntry = new Pair<>(initialUri, new ArrayList<>());
         commandArguments.stream().flatMap(item -> {
             if (item instanceof List) {
@@ -309,10 +310,10 @@ public class CommandExecutor {
             }
         }).forEach(arg -> {
             if (arg instanceof String) {
-                changes.put(currentEntry.key.toString(), currentEntry.value);
-                VirtualFile resource = LSPIJUtils.findResourceFor((String) arg);
+                changes.put(currentEntry.key.toASCIIString(), currentEntry.value);
+                VirtualFile resource = FileUriSupport.findFileByUri((String) arg, fileUriSupport);
                 if (resource != null) {
-                    currentEntry.key = LSPIJUtils.toUri(resource);
+                    currentEntry.key = FileUriSupport.getFileUri(resource, fileUriSupport);
                     currentEntry.value = new ArrayList<>();
                 }
             } else if (arg instanceof WorkspaceEdit) {
@@ -327,10 +328,10 @@ public class CommandExecutor {
                 }
             } else if (arg instanceof JsonPrimitive json) {
                 if (json.isString()) {
-                    changes.put(currentEntry.key.toString(), currentEntry.value);
-                    VirtualFile resource = LSPIJUtils.findResourceFor(json.getAsString());
+                    changes.put(currentEntry.key.toASCIIString(), currentEntry.value);
+                    VirtualFile resource = FileUriSupport.findFileByUri(json.getAsString(), fileUriSupport);
                     if (resource != null) {
-                        currentEntry.key = LSPIJUtils.toUri(resource);
+                        currentEntry.key = FileUriSupport.getFileUri(resource, fileUriSupport);
                         currentEntry.value = new ArrayList<>();
                     }
                 }
@@ -357,7 +358,7 @@ public class CommandExecutor {
             }
         });
         if (!currentEntry.value.isEmpty()) {
-            changes.put(currentEntry.key.toString(), currentEntry.value);
+            changes.put(currentEntry.key.toASCIIString(), currentEntry.value);
         }
         if (changes.isEmpty()) {
             return null;

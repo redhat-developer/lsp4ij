@@ -85,6 +85,8 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                                                                           @NotNull PsiFile file,
                                                                           @NotNull CancellationSupport cancellationSupport) {
 
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .codeLens(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS)

@@ -86,7 +86,7 @@ public abstract class LSPTypeHierarchyTreeStructureBase extends LSPHierarchyTree
             if (items != null) {
                 for (var item : items) {
                     var typeHierarchyItem = item.typeHierarchyItem();
-                    PsiElement element = createPsiElement(typeHierarchyItem.getUri(), typeHierarchyItem.getRange(), typeHierarchyItem.getName());
+                    PsiElement element = createPsiElement(typeHierarchyItem.getUri(), typeHierarchyItem.getRange(), typeHierarchyItem.getName(), item.languageServer().getClientFeatures());
                     if (element != null) {
                         descriptors.add(createHierarchyNodeDescriptor(myProject, descriptor, element, typeHierarchyItem));
                     }

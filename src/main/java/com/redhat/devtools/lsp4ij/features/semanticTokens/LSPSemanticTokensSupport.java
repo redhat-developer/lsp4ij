@@ -64,7 +64,7 @@ public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<
                     // Collect list of textDocument/semanticTokens future for each language servers
                     List<CompletableFuture<SemanticTokensData>> semanticTokensPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getSemanticTokensFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getSemanticTokensFor(params, file, languageServer, cancellationSupport))
                             .filter(Objects::nonNull)
                             .toList();
 
@@ -73,9 +73,12 @@ public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<
                 });
     }
 
-    private static CompletableFuture<SemanticTokensData> getSemanticTokensFor(SemanticTokensParams params,
-                                                                              LanguageServerItem languageServer,
-                                                                              CancellationSupport cancellationSupport) {
+    private static CompletableFuture<SemanticTokensData> getSemanticTokensFor(@NotNull SemanticTokensParams params,
+                                                                              @NotNull PsiFile file,
+                                                                              @NotNull LanguageServerItem languageServer,
+                                                                              @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .semanticTokensFull(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_SEMANTIC_TOKENS_FULL)

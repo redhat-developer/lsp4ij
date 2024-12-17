@@ -29,6 +29,7 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LSPUsagesManager;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 
@@ -82,21 +83,24 @@ public abstract class AbstractLSPGoToAction extends AnAction {
         ProgressManager.getInstance().run(new Task.Backgroundable(project, getProgressTitle(psiFile, offset), true) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                List<Location> locations = null;
+                List<LocationData> locations = null;
                 try {
-                    CompletableFuture<List<Location>> locationsFuture = getLocations(psiFile, document, editor, offset);
+                    CompletableFuture<List<LocationData>> locationsFuture = getLocations(psiFile, document, editor, offset);
 
                     if (isDoneNormally(locationsFuture)) {
                         // textDocument/(declaration|implementation|references|typeDefinition) has been collected correctly
                         locations = locationsFuture.getNow(null);
                     }
                 } finally {
-                    final List<Location> resultLocations = locations != null ? locations : Collections.emptyList();
+                    final List<LocationData> resultLocations = locations != null ? locations : Collections.emptyList();
                     DataContext dataContext = e.getDataContext();
                     // Call "Find Usages" in popup mode.
                     ApplicationManager.getApplication()
                             .invokeLater(() ->
-                                    LSPUsagesManager.getInstance(project).findShowUsagesInPopup(resultLocations, usageType, dataContext, null)
+                                    LSPUsagesManager.getInstance(project).findShowUsagesInPopup(resultLocations,
+                                            usageType,
+                                            dataContext,
+                                            null)
                             );
                 }
             }
@@ -148,10 +152,10 @@ public abstract class AbstractLSPGoToAction extends AnAction {
      * @param offset   the offset.
      * @return the LSP {@link Location} list result of the execution of the LSP GoTo feature.
      */
-    protected abstract CompletableFuture<List<Location>> getLocations(@NotNull PsiFile psiFile,
-                                                                      @NotNull Document document,
-                                                                      @NotNull Editor editor,
-                                                                      int offset);
+    protected abstract CompletableFuture<List<LocationData>> getLocations(@NotNull PsiFile psiFile,
+                                                                          @NotNull Document document,
+                                                                          @NotNull Editor editor,
+                                                                          int offset);
 
     /**
      * Returns true if the action is supported by the client features of the language server and false otherwise.

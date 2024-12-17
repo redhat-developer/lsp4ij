@@ -17,16 +17,14 @@ import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 public class IndexAwareLanguageClient extends LanguageClientImpl {
-    private static final Logger LOGGER = LoggerFactory.getLogger(IndexAwareLanguageClient.class);
 
     public IndexAwareLanguageClient(Project project) {
         super(project);
@@ -68,7 +66,7 @@ public class IndexAwareLanguageClient extends LanguageClientImpl {
      * @return the file path to display in the progress bar.
      */
     protected String getFilePath(String fileUri) {
-        VirtualFile file = LSPIJUtils.findResourceFor(fileUri);
+        VirtualFile file = FileUriSupport.findFileByUri(fileUri, getClientFeatures());
         if (file != null) {
             Module module = LSPIJUtils.getModule(file, getProject());
             if (module != null) {

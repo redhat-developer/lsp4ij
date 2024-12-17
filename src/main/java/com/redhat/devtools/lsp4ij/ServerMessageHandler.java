@@ -26,12 +26,14 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopupListener;
 import com.intellij.openapi.ui.popup.LightweightWindowEvent;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.concurrent.CompletableFuture;
@@ -157,6 +159,7 @@ public class ServerMessageHandler {
     }
 
     public static CompletableFuture<ShowDocumentResult> showDocument(@NotNull ShowDocumentParams params,
+                                                                     @Nullable FileUriSupport fileUriSupport,
                                                                      @NotNull Project project) {
         String uri = params.getUri();
         if (StringUtils.isEmpty(uri)) {
@@ -180,7 +183,7 @@ public class ServerMessageHandler {
         CompletableFuture<ShowDocumentResult> future = new CompletableFuture<>();
         ApplicationManager.getApplication()
                 .executeOnPooledThread(() -> {
-                    if (LSPIJUtils.openInEditor(uri, position, focusEditor, project)) {
+                    if (LSPIJUtils.openInEditor(uri, position, focusEditor, false, fileUriSupport, project)) {
                         future.complete(SHOW_DOCUMENT_RESULT_WITH_SUCCESS);
                     }
                     future.complete(SHOW_DOCUMENT_RESULT_WITH_FAILURE);

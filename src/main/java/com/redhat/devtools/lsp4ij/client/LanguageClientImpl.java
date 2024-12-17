@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
@@ -21,6 +20,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
@@ -79,6 +79,10 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return wrapper.getServerDefinition();
     }
 
+    public LSPClientFeatures getClientFeatures() {
+        return wrapper.getClientFeatures();
+    }
+
     @Override
     public void telemetryEvent(Object object) {
         // TODO
@@ -96,7 +100,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<ShowDocumentResult> showDocument(ShowDocumentParams params) {
-        return ServerMessageHandler.showDocument(params, getProject());
+        return ServerMessageHandler.showDocument(params, getClientFeatures(), getProject());
     }
 
     @Override

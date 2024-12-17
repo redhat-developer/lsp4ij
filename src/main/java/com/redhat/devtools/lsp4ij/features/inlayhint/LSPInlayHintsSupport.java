@@ -79,6 +79,8 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
                                                                            @NotNull PsiFile file,
                                                                            @NotNull LanguageServerItem languageServer,
                                                                            @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .inlayHint(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT)

@@ -19,6 +19,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -110,14 +111,14 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
 
                     if (isRangeFormatting && languageServer.isDocumentRangeFormattingSupported()) {
                         // Range formatting
-                        DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.tabSize(), params.insertSpaces(), params.textRange(), params.document());
+                        DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.tabSize(), params.insertSpaces(), params.textRange(), params.document(), languageServer);
                         return cancellationSupport.execute(languageServer
                                 .getTextDocumentService()
                                 .rangeFormatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING);
                     }
 
                     // Full document formatting
-                    DocumentFormattingParams lspParams = createDocumentFormattingParams(params.tabSize(), params.insertSpaces());
+                    DocumentFormattingParams lspParams = createDocumentFormattingParams(params.tabSize(), params.insertSpaces(), languageServer);
                     return cancellationSupport.execute(languageServer
                             .getTextDocumentService()
                             .formatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_FORMATTING);
@@ -139,9 +140,11 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         return languageServers.get(0);
     }
 
-    private @NotNull DocumentFormattingParams createDocumentFormattingParams(Integer tabSize, Boolean insertSpaces) {
+    private @NotNull DocumentFormattingParams createDocumentFormattingParams(@Nullable Integer tabSize,
+                                                                             @Nullable Boolean insertSpaces,
+                                                                             @NotNull LanguageServerItem languageServer) {
         DocumentFormattingParams params = new DocumentFormattingParams();
-        params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(getFile().getVirtualFile()));
+        params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.getFileUri(getFile().getVirtualFile(), languageServer.getClientFeatures()).toASCIIString()));
         FormattingOptions options = new FormattingOptions();
         if (tabSize != null) {
             options.setTabSize(tabSize);
@@ -153,9 +156,12 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         return params;
     }
 
-    private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(Integer tabSize, Boolean insertSpaces, @NotNull TextRange textRange, Document document) {
+    private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(@Nullable Integer tabSize,
+                                                                                       @Nullable Boolean insertSpaces,
+                                                                                       @NotNull TextRange textRange,
+                                                                                       @NotNull Document document, LanguageServerItem languageServer) {
         DocumentRangeFormattingParams params = new DocumentRangeFormattingParams();
-        params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(getFile().getVirtualFile()));
+        params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.getFileUri(getFile().getVirtualFile(), languageServer.getClientFeatures()).toASCIIString()));
         FormattingOptions options = new FormattingOptions();
         if (tabSize != null) {
             options.setTabSize(tabSize);

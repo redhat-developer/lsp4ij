@@ -17,7 +17,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import org.eclipse.lsp4j.Location;
+import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture;
  *      <li>textDocument/definition</li>
  *  </ul>
  */
-public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPDefinitionParams, List<Location>> {
+public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPDefinitionParams, List<LocationData>> {
 
     private Integer previousOffset;
 
@@ -38,7 +38,7 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
         super(file);
     }
 
-    public CompletableFuture<List<Location>> getDefinitions(LSPDefinitionParams params) {
+    public CompletableFuture<List<LocationData>> getDefinitions(LSPDefinitionParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
             super.cancel();
@@ -48,17 +48,17 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
     }
 
     @Override
-    protected CompletableFuture<List<Location>> doLoad(LSPDefinitionParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LocationData>> doLoad(LSPDefinitionParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return collectDefinitions(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<Location>> collectDefinitions(@NotNull PsiFile psiFile,
+    private static @NotNull CompletableFuture<List<LocationData>> collectDefinitions(@NotNull PsiFile file,
                                                                                  @NotNull LSPDefinitionParams params,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
-        return getLanguageServers(psiFile,
-                f -> f.getDefinitionFeature().isEnabled(psiFile),
-                f -> f.getDefinitionFeature().isSupported(psiFile))
+        return getLanguageServers(file,
+                f -> f.getDefinitionFeature().isEnabled(file),
+                f -> f.getDefinitionFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have definition capability
@@ -67,9 +67,9 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
                     }
 
                     // Collect list of textDocument/definition future for each language servers
-                    List<CompletableFuture<List<Location>>> definitionsPerServerFutures = languageServers
+                    List<CompletableFuture<List<LocationData>>> definitionsPerServerFutures = languageServers
                             .stream()
-                            .map(languageServer -> getDefinitionFor(params, languageServer, cancellationSupport))
+                            .map(languageServer -> getDefinitionFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
                     // Merge list of textDocument/definition future in one future which return the list of definition ranges
@@ -77,12 +77,15 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
                 });
     }
 
-    private static CompletableFuture<List<Location>> getDefinitionFor(LSPDefinitionParams params,
-                                                                      LanguageServerItem languageServer,
-                                                                      CancellationSupport cancellationSupport) {
+    private static CompletableFuture<List<LocationData>> getDefinitionFor(@NotNull LSPDefinitionParams params,
+                                                                      @NotNull PsiFile file,
+                                                                      @NotNull LanguageServerItem languageServer,
+                                                                      @NotNull CancellationSupport cancellationSupport) {
+        // Update textDocument Uri with custom file Uri if needed
+        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .definition(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
-                .thenApplyAsync(LSPIJUtils::getLocations);
+                .thenApplyAsync(locations -> LSPIJUtils.getLocations(locations, languageServer));
     }
 }

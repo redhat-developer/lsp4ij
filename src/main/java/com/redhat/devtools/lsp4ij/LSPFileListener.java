@@ -20,7 +20,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,14 +54,11 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
             return;
         }
         // Manage textDocument/didClose
-        URI uri = LSPIJUtils.toUri(file);
-        if (uri != null) {
-            try {
-                // Disconnect the given file from the current language servers
-                languageServerWrapper.disconnect(uri, !languageServerWrapper.isDisposed());
-            } catch (Exception e) {
-                LOGGER.warn("Error while disconnecting the file '" + uri + "' from all language servers", e);
-            }
+        try {
+            // Disconnect the given file from the current language servers
+            languageServerWrapper.disconnect(file, !languageServerWrapper.isDisposed());
+        } catch (Exception e) {
+            LOGGER.warn("Error while disconnecting the file '" + file.getUrl() + "' from language server '" + languageServerWrapper.getServerDefinition().getDisplayName() + "'.", e);
         }
     }
 
@@ -96,7 +92,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
             if (isMatchFilePatterns(oldFileUri, WatchKind.Delete)) {
                 changes.add(fe(oldFileUri, FileChangeType.Deleted));
             }
-            URI newFileUri = LSPIJUtils.toUri(newFile);
+            URI newFileUri = languageServerWrapper.toUri(newFile);
             if (isMatchFilePatterns(newFileUri, WatchKind.Create)) {
                 changes.add(fe(newFileUri, FileChangeType.Created));
             }
@@ -109,7 +105,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     @Override
     public void contentsChanged(@NotNull VirtualFileEvent event) {
         VirtualFile file = event.getFile();
-        URI uri = LSPIJUtils.toUri(file);
+        URI uri = languageServerWrapper.toUri(file);
         if (uri != null) {
             LSPVirtualFileData documentListener = languageServerWrapper.connectedDocuments.get(uri);
             if (documentListener != null) {
@@ -126,7 +122,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     @Override
     public void fileCreated(@NotNull VirtualFileEvent event) {
         VirtualFile file = event.getFile();
-        URI uri = LSPIJUtils.toUri(file);
+        URI uri = languageServerWrapper.toUri(file);
         if (isMatchFilePatterns(uri, WatchKind.Create)) {
             // 2. Send a workspace/didChangeWatchedFiles with 'Created' file change type.
             didChangeWatchedFiles(fe(uri, FileChangeType.Created));
@@ -136,7 +132,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     @Override
     public void fileDeleted(@NotNull VirtualFileEvent event) {
         VirtualFile file = event.getFile();
-        URI uri = LSPIJUtils.toUri(file);
+        URI uri = languageServerWrapper.toUri(file);
         if (isMatchFilePatterns(uri, WatchKind.Delete)) {
             // Send a workspace/didChangeWatchedFiles with 'Deleted' file change type.
             didChangeWatchedFiles(fe(uri, FileChangeType.Deleted));
@@ -166,20 +162,21 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
      * to a different directory.
      *
      * @param virtualParentFile directory of the file after renaming
-     * @param oldFileName file name before renaming
-     * @param virtualNewFile virtual file after renaming
+     * @param oldFileName       file name before renaming
+     * @param virtualNewFile    virtual file after renaming
      * @return URI of the file before renaming
      */
-    private @NotNull URI didRename(VirtualFile virtualParentFile, String oldFileName, VirtualFile virtualNewFile) {
-        File parentFile = VfsUtilCore.virtualToIoFile(virtualParentFile);
-        URI oldUri = LSPIJUtils.toUri(new File(parentFile, oldFileName));
+    private @NotNull URI didRename(@NotNull VirtualFile virtualParentFile,
+                                      @NotNull String oldFileName,
+                                      @NotNull VirtualFile virtualNewFile) {
+        URI parentFileUri = languageServerWrapper.toUri(virtualParentFile);
+        URI oldUri = parentFileUri.resolve(oldFileName);
         boolean docIsConnected = languageServerWrapper.isConnectedTo(oldUri);
         if (docIsConnected) {
             // 1. Send a textDocument/didClose for the old file name
             languageServerWrapper.disconnect(oldUri, false);
             // 2. Send a textDocument/didOpen for the new file name
-            File newFile = VfsUtilCore.virtualToIoFile(virtualNewFile);
-            URI newUri = LSPIJUtils.toUri(newFile);
+            URI newUri = languageServerWrapper.toUri(virtualNewFile);
             if (!languageServerWrapper.isConnectedTo(newUri)) {
                 languageServerWrapper.connect(virtualNewFile, null);
             }

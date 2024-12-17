@@ -25,6 +25,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.client.CoalesceByKey;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.jetbrains.annotations.NotNull;
 
@@ -74,7 +75,7 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
         if (project.isDisposed()) {
             return;
         }
-        VirtualFile file = LSPIJUtils.findResourceFor(params.getUri());
+        VirtualFile file = FileUriSupport.findFileByUri(params.getUri(), languageServerWrapper.getClientFeatures());
         if (file == null) {
             return;
         }
