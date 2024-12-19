@@ -1,0 +1,8 @@
+{
+    "typescript": {
+        "tsdk": "C:/Users/${user.name}/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib"
+    },
+    "vue": {
+        "hybridMode": false
+    }
+}
