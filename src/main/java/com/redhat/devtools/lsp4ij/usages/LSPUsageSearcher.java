@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.usages;
 
 import com.intellij.find.findUsages.CustomUsageSearcher;
 import com.intellij.find.findUsages.FindUsagesOptions;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -55,84 +54,78 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
 
     @Override
     public void processElementUsages(@NotNull PsiElement element, @NotNull Processor<? super Usage> processor, @NotNull FindUsagesOptions options) {
-
-        PsiFile file = element.getContainingFile();
-        if (file == null) {
-            return;
-        }
-
-        VirtualFile virtualFile = file.getVirtualFile();
-        if (virtualFile == null) {
-            return;
-        }
-
-        Project project = element.getProject();
-        if (!LanguageServiceAccessor.getInstance(project).hasAny(
-                virtualFile,
-                l -> l.getClientFeatures().getUsageFeature().isSupported(file)
-        )) {
-            return;
-        }
-
-        if (element instanceof LSPUsageTriggeredPsiElement elt) {
-            if (elt.getLSPReferences() != null) {
-                elt.getLSPReferences()
-                        .forEach(ref -> {
-                            var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, project);
-                            if (psiElement != null) {
-                                processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(psiElement))));
-                            }
-                        });
+        // Ensure that LSP process elements usage is executed in a ReadAction.
+        ReadAction.run(() -> {
+            PsiFile file = element.getContainingFile();
+            if (file == null) {
                 return;
             }
-        }
 
-        // Get position where the "Find Usages" has been triggered
-        Position position = getPosition(element, file);
-        if (position == null) {
-            return;
-        }
-         // Collect textDocument/definition, textDocument/references, etc
-        LSPUsageSupport usageSupport = new LSPUsageSupport(ReadAction.compute(() -> file));
-        LSPUsageSupport.LSPUsageSupportParams params = new LSPUsageSupport.LSPUsageSupportParams(position);
-        CompletableFuture<List<LSPUsagePsiElement>> usagesFuture = usageSupport.getFeatureData(params);
-        try {
-            // Wait for completion of textDocument/definition, textDocument/references, etc
-            waitUntilDone(usagesFuture);
-            if (usagesFuture.isDone()) {
-                // Show response of textDocument/definition, textDocument/references, etc as usage info.
-                List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
-                if (usages != null) {
-                    for (LSPUsagePsiElement usage : usages) {
-                        processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(usage))));
-                    }
+            VirtualFile virtualFile = file.getVirtualFile();
+            if (virtualFile == null) {
+                return;
+            }
+
+            Project project = element.getProject();
+            if (!LanguageServiceAccessor.getInstance(project).hasAny(
+                    virtualFile,
+                    l -> l.getClientFeatures().getUsageFeature().isSupported(file)
+            )) {
+                return;
+            }
+
+            if (element instanceof LSPUsageTriggeredPsiElement elt) {
+                if (elt.getLSPReferences() != null) {
+                    elt.getLSPReferences()
+                            .forEach(ref -> {
+                                var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, project);
+                                if (psiElement != null) {
+                                    processor.process(new UsageInfo2UsageAdapter(new UsageInfo(psiElement)));
+                                }
+                            });
+                    return;
                 }
             }
-        } catch (ProcessCanceledException pce) {
-            throw pce;
-        } catch (Exception e) {
-            LOGGER.error("Error while collection LSP Usages", e);
-        }
 
-        // For completeness' sake, also collect external usages to LSP (pseudo-)elements
-        LSPExternalReferencesFinder.processExternalReferences(
-                file,
-                ReadAction.compute(element::getTextOffset),
-                options.searchScope,
-                reference -> processor.process(ReadAction.compute(() -> new UsageInfo2UsageAdapter(new UsageInfo(reference))))
-        );
+            // Get position where the "Find Usages" has been triggered
+            Position position = getPosition(element, file);
+            if (position == null) {
+                return;
+            }
+            // Collect textDocument/definition, textDocument/references, etc
+            LSPUsageSupport usageSupport = new LSPUsageSupport(file);
+            LSPUsageSupport.LSPUsageSupportParams params = new LSPUsageSupport.LSPUsageSupportParams(position);
+            CompletableFuture<List<LSPUsagePsiElement>> usagesFuture = usageSupport.getFeatureData(params);
+            try {
+                // Wait for completion of textDocument/definition, textDocument/references, etc
+                waitUntilDone(usagesFuture);
+                if (usagesFuture.isDone()) {
+                    // Show response of textDocument/definition, textDocument/references, etc as usage info.
+                    List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
+                    if (usages != null) {
+                        for (LSPUsagePsiElement usage : usages) {
+                            processor.process(new UsageInfo2UsageAdapter(new UsageInfo(usage)));
+                        }
+                    }
+                }
+            } catch (ProcessCanceledException pce) {
+                throw pce;
+            } catch (Exception e) {
+                LOGGER.error("Error while collection LSP Usages", e);
+            }
+
+            // For completeness' sake, also collect external usages to LSP (pseudo-)elements
+            LSPExternalReferencesFinder.processExternalReferences(
+                    file,
+                    element.getTextOffset(),
+                    options.searchScope,
+                    reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
+            );
+        });
     }
 
     @Nullable
     private static Position getPosition(@NotNull PsiElement element, @NotNull PsiFile psiFile) {
-        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return doGetPosition(element, psiFile);
-        }
-        return ReadAction.compute(() -> doGetPosition(element, psiFile));
-    }
-
-    @Nullable
-    private static Position doGetPosition(@NotNull PsiElement element, @NotNull PsiFile psiFile) {
         VirtualFile file = psiFile.getVirtualFile();
         if (file == null) {
             return null;
@@ -144,3 +137,4 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         return LSPIJUtils.toPosition(Math.min(element.getTextRange().getStartOffset() + 1, element.getTextRange().getEndOffset()), document);
     }
 }
+
