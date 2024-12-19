@@ -13,7 +13,6 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.usages;
 
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -56,7 +55,7 @@ public final class LSPExternalReferencesFinder {
     public static void processExternalReferences(@NotNull PsiFile file,
                                                  int offset,
                                                  @NotNull Processor<PsiReference> processor) {
-        processExternalReferences(file, offset, ReadAction.compute(file::getUseScope), processor);
+        processExternalReferences(file, offset, file.getUseScope(), processor);
     }
 
     /**
@@ -77,7 +76,7 @@ public final class LSPExternalReferencesFinder {
             TextRange wordTextRange = document != null ? LSPIJUtils.getWordRangeAt(document, file, offset) : null;
             if (wordTextRange != null) {
                 LSPPsiElement wordElement = new LSPPsiElement(file, wordTextRange);
-                String wordText = ReadAction.compute(wordElement::getText);
+                String wordText = wordElement.getText();
                 if (StringUtil.isNotEmpty(wordText)) {
                     processExternalReferences(
                             file,
@@ -113,7 +112,7 @@ public final class LSPExternalReferencesFinder {
         }
 
         Set<String> externalReferenceKeys = new HashSet<>();
-        ReadAction.run(() -> PsiSearchHelper.getInstance(project).processElementsWithWord(
+        PsiSearchHelper.getInstance(project).processElementsWithWord(
                 (element, offsetInElement) -> {
                     PsiReference originalReference = element.findReferenceAt(offsetInElement);
                     List<PsiReference> references = originalReference != null ?
@@ -154,7 +153,7 @@ public final class LSPExternalReferencesFinder {
                 wordText,
                 UsageSearchContext.ANY,
                 caseSensitive
-        ));
+        );
     }
 
     @Nullable
