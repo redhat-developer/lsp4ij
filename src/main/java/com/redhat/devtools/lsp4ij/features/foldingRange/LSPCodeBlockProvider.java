@@ -16,65 +16,179 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport;
 import org.eclipse.lsp4j.FoldingRange;
+import org.eclipse.lsp4j.SelectionRange;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 import static com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder.*;
 
 /**
- * Code block provider that uses the folding range information from {@link LSPFoldingRangeBuilder}.
+ * Code block provider that uses information from {@link LSPSelectionRangeSupport} and {@link LSPFoldingRangeBuilder}.
  */
 public class LSPCodeBlockProvider implements CodeBlockProvider {
 
     @Override
-    public @Nullable TextRange getCodeBlockRange(Editor editor, PsiFile file) {
+    @Nullable
+    public TextRange getCodeBlockRange(Editor editor, PsiFile file) {
+        Document document = editor.getDocument();
+        CharSequence documentChars = document.getCharsSequence();
+        int documentLength = documentChars.length();
+
+        // Adjust the offset slightly based on before/after brace to ensure evaluation occurs "within" the braced block
+        int offset = editor.getCaretModel().getOffset();
+        Character beforeCharacter = offset > 0 ? documentChars.charAt(offset - 1) : null;
+        Character afterCharacter = offset < documentLength ? documentChars.charAt(offset) : null;
+        if (isOpenBraceChar(afterCharacter)) {
+            offset++;
+        } else if (isCloseBraceChar(beforeCharacter)) {
+            offset--;
+        }
+
+        // See if we're anchored by a known brace character
+        int openBraceOffset = -1;
+        Character openBraceChar = null;
+        int closeBraceOffset = -1;
+        Character closeBraceChar = null;
+        if ((offset > 0) && isOpenBraceChar(documentChars.charAt(offset - 1))) {
+            openBraceOffset = offset - 1;
+            openBraceChar = documentChars.charAt(offset - 1);
+            closeBraceChar = getCloseBraceChar(openBraceChar);
+        } else if (isCloseBraceChar(documentChars.charAt(offset))) {
+            closeBraceOffset = offset;
+            closeBraceChar = documentChars.charAt(offset);
+            openBraceChar = getOpenBraceChar(closeBraceChar);
+        } else if ((offset < (documentLength - 1)) && isCloseBraceChar(documentChars.charAt(offset + 1))) {
+            closeBraceOffset = offset + 1;
+            closeBraceChar = documentChars.charAt(offset + 1);
+            openBraceChar = getOpenBraceChar(closeBraceChar);
+        }
+
+        // Try to find it first using the selection ranges which tend to be more accurate; we must use the effective
+        // offset for selection ranges to act as if we're in the adjusted braced block
+        TextRange codeBlockRange = getUsingSelectionRanges(
+                file, editor,
+                offset,
+                openBraceChar,
+                openBraceOffset,
+                closeBraceChar,
+                closeBraceOffset
+        );
+        if (codeBlockRange != null) {
+            return codeBlockRange;
+        }
+
+        // Failing that, try to find it using the folding ranges
+        return getUsingFoldingRanges(
+                file,
+                document,
+                offset,
+                openBraceChar,
+                closeBraceChar
+        );
+    }
+
+    @Nullable
+    private TextRange getUsingSelectionRanges(@NotNull PsiFile file,
+                                              @NotNull Editor editor,
+                                              int offset,
+                                              @Nullable Character openBraceChar,
+                                              int openBraceOffset,
+                                              @Nullable Character closeBraceChar,
+                                              int closeBraceOffset) {
+        Document document = editor.getDocument();
+        List<SelectionRange> selectionRanges = LSPSelectionRangeSupport.getSelectionRanges(file, document, offset);
+        if (!ContainerUtil.isEmpty(selectionRanges)) {
+            // Convert the selection ranges into text ranges
+            Set<TextRange> textRanges = new LinkedHashSet<>(selectionRanges.size());
+            for (SelectionRange selectionRange : selectionRanges) {
+                textRanges.add(LSPSelectionRangeSupport.getTextRange(selectionRange, document));
+                for (SelectionRange parentSelectionRange = selectionRange.getParent();
+                     parentSelectionRange != null;
+                     parentSelectionRange = parentSelectionRange.getParent()) {
+                    textRanges.add(LSPSelectionRangeSupport.getTextRange(parentSelectionRange, document));
+                }
+            }
+
+            // Find containing text ranges that are bounded by brace pairs
+            CharSequence documentChars = document.getCharsSequence();
+            List<TextRange> containingTextRanges = new ArrayList<>(textRanges.size());
+            for (TextRange textRange : textRanges) {
+                if (textRange.getLength() > 1) {
+                    int startOffset = textRange.getStartOffset();
+                    int endOffset = textRange.getEndOffset();
+
+                    char startChar = documentChars.charAt(startOffset);
+                    char endChar = documentChars.charAt(endOffset - 1);
+
+                    // If aligned on an open brace and this ends with the expected close brace, use it
+                    if ((startOffset == openBraceOffset)) {
+                        if ((closeBraceChar != null) && (closeBraceChar == endChar)) {
+                            return textRange;
+                        } else {
+                            return null;
+                        }
+                    }
+                    // If aligned on a close brace and this starts with the expected open brace, use it
+                    else if (((endOffset - 1) == closeBraceOffset)) {
+                        if ((openBraceChar != null) && (openBraceChar == startChar)) {
+                            return textRange;
+                        } else {
+                            return null;
+                        }
+                    }
+                    // Otherwise see if it starts and ends with a known brace pair and we'll find the "closest" below
+                    else if ((openBraceOffset == -1) && (closeBraceOffset == -1) && isOpenBraceChar(startChar)) {
+                        Character pairedCloseBraceChar = getCloseBraceChar(startChar);
+                        if ((pairedCloseBraceChar != null) && (pairedCloseBraceChar == endChar)) {
+                            containingTextRanges.add(textRange);
+                        }
+                    }
+                }
+            }
+
+            // Return the closest (i.e., smallest) containing text range
+            if (!ContainerUtil.isEmpty(containingTextRanges)) {
+                containingTextRanges.sort(Comparator.comparingInt(TextRange::getLength));
+                return ContainerUtil.getFirstItem(containingTextRanges);
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
+    private static TextRange getUsingFoldingRanges(@NotNull PsiFile file,
+                                                   @NotNull Document document,
+                                                   int offset,
+                                                   @Nullable Character openBraceChar,
+                                                   @Nullable Character closeBraceChar) {
         List<FoldingRange> foldingRanges = LSPFoldingRangeBuilder.getFoldingRanges(file);
         if (!ContainerUtil.isEmpty(foldingRanges)) {
-            Document document = editor.getDocument();
-            CharSequence documentChars = document.getCharsSequence();
-            int documentLength = documentChars.length();
-
-            // Adjust the offset slightly based on before/after brace
-            int offset = editor.getCaretModel().getOffset();
-            Character beforeCharacter = offset > 0 ? documentChars.charAt(offset - 1) : null;
-            Character afterCharacter = offset < documentLength ? documentChars.charAt(offset) : null;
-            if (isOpenBraceChar(afterCharacter)) {
-                offset++;
-            } else if (isCloseBraceChar(beforeCharacter)) {
-                offset--;
-            }
-
-            // See if we're anchored by a known brace character
-            Character openBraceChar = null;
-            Character closeBraceChar = null;
-            if ((offset > 0) && isOpenBraceChar(documentChars.charAt(offset - 1))) {
-                openBraceChar = documentChars.charAt(offset - 1);
-                closeBraceChar = getCloseBraceChar(openBraceChar);
-            } else if ((offset < (documentLength - 1)) && isCloseBraceChar(documentChars.charAt(offset + 1))) {
-                closeBraceChar = documentChars.charAt(offset + 1);
-                openBraceChar = getOpenBraceChar(closeBraceChar);
-            }
-
             List<TextRange> containingTextRanges = new ArrayList<>(foldingRanges.size());
             for (FoldingRange foldingRange : foldingRanges) {
-                TextRange textRange = LSPFoldingRangeBuilder.getTextRange(foldingRange, document, openBraceChar, closeBraceChar);
+                TextRange textRange = LSPFoldingRangeBuilder.getTextRange(
+                        foldingRange,
+                        document,
+                        openBraceChar,
+                        closeBraceChar
+                );
                 if (textRange != null) {
                     // If this is the exact range for which a matching brace was requested, return it
                     if ((textRange.getStartOffset() == offset) || (textRange.getEndOffset() == offset)) {
                         return textRange;
                     }
-                    // Otherwise add it to the list of containing ranges and we'll find the smallest at the end
+                    // Otherwise add it to the list of containing ranges and we'll find the "closest" below
                     else if (textRange.contains(offset)) {
                         containingTextRanges.add(textRange);
                     }
                 }
             }
 
-            // If we made it here and found containing text ranges, return the smallest one
+            // Return the closest (i.e., smallest) containing text range
             if (!ContainerUtil.isEmpty(containingTextRanges)) {
                 containingTextRanges.sort(Comparator.comparingInt(TextRange::getLength));
                 return ContainerUtil.getFirstItem(containingTextRanges);
