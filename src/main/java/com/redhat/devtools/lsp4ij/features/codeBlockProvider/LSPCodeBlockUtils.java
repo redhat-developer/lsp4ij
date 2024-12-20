@@ -105,7 +105,10 @@ public final class LSPCodeBlockUtils {
         return CachedValuesManager.getCachedValue(file, () -> {
             Map<Character, Character> bracePairs = file instanceof TextMateFile ? LSPIJTextMateUtils.getBracePairs(file) :
                     file.getFileType() instanceof AbstractFileType ? getAbstractFileTypeBracePairs(file) :
-                            DEFAULT_BRACE_PAIRS;
+                            null;
+            if (bracePairs == null) {
+                bracePairs = DEFAULT_BRACE_PAIRS;
+            }
             return Result.create(bracePairs, file);
         });
     }

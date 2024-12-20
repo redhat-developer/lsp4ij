@@ -11,23 +11,16 @@
 
 package com.redhat.devtools.lsp4ij;
 
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.psi.PsiFile;
-import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.plugins.textmate.Constants;
-import org.jetbrains.plugins.textmate.TextMateService;
-import org.jetbrains.plugins.textmate.editor.TextMateEditorUtils;
-import org.jetbrains.plugins.textmate.language.preferences.Preferences;
-import org.jetbrains.plugins.textmate.language.preferences.TextMateBracePair;
-import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
-import org.jetbrains.plugins.textmate.psi.TextMateFile;
 
-import java.util.*;
+import java.util.Map;
 
+/**
+ * Utilities for working with TextMate files in LSP4IJ.
+ */
 @ApiStatus.Internal
 public final class LSPIJTextMateUtils {
 
@@ -44,34 +37,38 @@ public final class LSPIJTextMateUtils {
     @Nullable
     @ApiStatus.Internal
     public static Map<Character, Character> getBracePairs(@NotNull PsiFile file) {
+        // TODO: Unfortunately the interface changed in this commit:
+        //  https://github.com/JetBrains/intellij-community/commit/8df3d04be0db4c54732a15250b789aa5d9a6de47#diff-08fc4fd41510ee4662c41d3f2a671ae2f654d1a2f6ff7608765f427c26eaeae7
+        //  and would now require reflection to work in 2023.2 and later versions. Specifically it used to be
+        //  "bracePair.left/right" which returned "char", but now it's "bracePair.getLeft()/getRight()" which return
+        //  "CharSequence". I think it's worth leaving this in but commented out and returning "null" -- existing usages
+        //  will degrade gracefully -- and then when all supported IDE versions have the same interface, this can be
+        //  restored. Perhaps this even prompts removal of support for the oldest versions that have this issue?
+        return null;
+
+/*
         if (!(file instanceof TextMateFile)) {
             return null;
         }
 
         Map<Character, Character> bracePairs = new LinkedHashMap<>();
-        for (TextMateBracePair bracePair : getTextMateBracePairs(file)) {
-            CharSequence openBrace = bracePair.getLeft();
-            CharSequence closeBrace = bracePair.getRight();
-            if ((openBrace.length() == 1) && (closeBrace.length() == 1)) {
-                bracePairs.put(openBrace.charAt(0), closeBrace.charAt(0));
+        Editor editor = LSPIJUtils.editorForElement(file);
+        TextMateScope selector = editor instanceof EditorEx ? TextMateEditorUtils.getCurrentScopeSelector((EditorEx) editor) : null;
+        if (selector != null) {
+            for (TextMateBracePair bracePair : getAllPairsForMatcher(selector)) {
+                CharSequence openBrace = bracePair.getLeft();
+                CharSequence closeBrace = bracePair.getRight();
+                if ((openBrace.length() == 1) && (closeBrace.length() == 1)) {
+                    bracePairs.put(openBrace.charAt(0), closeBrace.charAt(0));
+                }
             }
         }
         return bracePairs;
+*/
     }
 
-    @NotNull
-    @ApiStatus.Internal
-    private static Set<TextMateBracePair> getTextMateBracePairs(@NotNull PsiFile file) {
-        Set<TextMateBracePair> bracePairs = new LinkedHashSet<>();
-        if (file instanceof TextMateFile) {
-            Editor editor = LSPIJUtils.editorForElement(file);
-            TextMateScope selector = editor instanceof EditorEx ? TextMateEditorUtils.getCurrentScopeSelector((EditorEx) editor) : null;
-            ContainerUtil.addAllNotNull(bracePairs, getAllPairsForMatcher(selector));
-        }
-        return bracePairs;
-    }
+/*
     // NOTE: Cloned from TextMateEditorUtils where this is private
-
     @NotNull
     private static Set<TextMateBracePair> getAllPairsForMatcher(@Nullable TextMateScope selector) {
         if (selector == null) {
@@ -91,4 +88,5 @@ public final class LSPIJTextMateUtils {
         }
         return result;
     }
+*/
 }
