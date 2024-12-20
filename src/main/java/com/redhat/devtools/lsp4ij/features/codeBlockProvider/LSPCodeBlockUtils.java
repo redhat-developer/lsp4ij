@@ -11,16 +11,21 @@
 
 package com.redhat.devtools.lsp4ij.features.codeBlockProvider;
 
+import com.intellij.ide.highlighter.custom.SyntaxTable;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.util.CachedValueProvider.Result;
+import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJTextMateUtils;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.plugins.textmate.language.preferences.TextMateBracePair;
+import org.jetbrains.plugins.textmate.psi.TextMateFile;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Utilities for deriving information about code blocks.
@@ -28,15 +33,18 @@ import java.util.Set;
 @ApiStatus.Internal
 public final class LSPCodeBlockUtils {
 
+    private static final Map.Entry<Character, Character> BRACES_ENTRY = Map.entry('{', '}');
+    private static final Map.Entry<Character, Character> BRACKETS_ENTRY = Map.entry('[', ']');
+    private static final Map.Entry<Character, Character> PARENTHESES_ENTRY = Map.entry('(', ')');
+
     // NOTE: JetBrains has maintained a long assumption that these are the primary structural block delimiters via
     // AbstractFileType's explicit support for them. If/when other structural block delimiters are discovered for
     // languages supported by LSP, we can revisit this hard-coded assumption.
-    private static final Map<Character, Character> BRACE_PAIR_CHARS_FWD = Map.of(
-            '{', '}',
-            '[', ']',
-            '(', ')'
+    private static final Map<Character, Character> DEFAULT_BRACE_PAIRS = Map.ofEntries(
+            BRACES_ENTRY,
+            BRACKETS_ENTRY,
+            PARENTHESES_ENTRY
     );
-    private static final Map<Character, Character> BRACE_PAIR_CHARS_BWD = ContainerUtil.reverseMap(BRACE_PAIR_CHARS_FWD);
 
     private LSPCodeBlockUtils() {
         // Pure utility class
@@ -51,20 +59,7 @@ public final class LSPCodeBlockUtils {
      */
     @ApiStatus.Internal
     public static boolean isCodeBlockStartChar(@NotNull PsiFile file, @Nullable Character character) {
-        if (character == null) {
-            return false;
-        }
-
-        Set<TextMateBracePair> bracePairs = LSPIJTextMateUtils.getSimpleTextMateBracePairs(file);
-        if (!bracePairs.isEmpty()) {
-            String characterString = String.valueOf(character);
-            return ContainerUtil.exists(
-                    bracePairs,
-                    bracePair -> characterString.equals(String.valueOf(bracePair.getLeft()))
-            );
-        }
-
-        return BRACE_PAIR_CHARS_FWD.containsKey(character);
+        return (character != null) && getBracePairsFwd(file).containsKey(character);
     }
 
     /**
@@ -76,20 +71,7 @@ public final class LSPCodeBlockUtils {
      */
     @ApiStatus.Internal
     public static boolean isCodeBlockEndChar(@NotNull PsiFile file, @Nullable Character character) {
-        if (character == null) {
-            return false;
-        }
-
-        Set<TextMateBracePair> bracePairs = LSPIJTextMateUtils.getSimpleTextMateBracePairs(file);
-        if (!bracePairs.isEmpty()) {
-            String characterString = String.valueOf(character);
-            return ContainerUtil.exists(
-                    bracePairs,
-                    bracePair -> characterString.equals(String.valueOf(bracePair.getRight()))
-            );
-        }
-
-        return BRACE_PAIR_CHARS_BWD.containsKey(character);
+        return (character != null) && getBracePairsBwd(file).containsKey(character);
     }
 
     /**
@@ -102,21 +84,7 @@ public final class LSPCodeBlockUtils {
     @Nullable
     @ApiStatus.Internal
     public static Character getCodeBlockStartChar(@NotNull PsiFile file, @Nullable Character codeBlockEndChar) {
-        if (codeBlockEndChar == null) {
-            return null;
-        }
-
-        Set<TextMateBracePair> bracePairs = LSPIJTextMateUtils.getSimpleTextMateBracePairs(file);
-        if (!bracePairs.isEmpty()) {
-            String closeBraceCharString = String.valueOf(codeBlockEndChar);
-            TextMateBracePair bracePair = ContainerUtil.find(
-                    bracePairs,
-                    bracePairCandidate -> closeBraceCharString.equals(String.valueOf(bracePairCandidate.getRight()))
-            );
-            return bracePair != null ? bracePair.getLeft().charAt(0) : null;
-        }
-
-        return BRACE_PAIR_CHARS_BWD.get(codeBlockEndChar);
+        return codeBlockEndChar != null ? getBracePairsBwd(file).get(codeBlockEndChar) : null;
     }
 
     /**
@@ -129,20 +97,42 @@ public final class LSPCodeBlockUtils {
     @Nullable
     @ApiStatus.Internal
     public static Character getCodeBlockEndChar(@NotNull PsiFile file, @Nullable Character codeBlockStartChar) {
-        if (codeBlockStartChar == null) {
+        return codeBlockStartChar != null ? getBracePairsFwd(file).get(codeBlockStartChar) : null;
+    }
+
+    @NotNull
+    private static Map<Character, Character> getBracePairsFwd(@NotNull PsiFile file) {
+        return CachedValuesManager.getCachedValue(file, () -> {
+            Map<Character, Character> bracePairs = file instanceof TextMateFile ? LSPIJTextMateUtils.getBracePairs(file) :
+                    file.getFileType() instanceof AbstractFileType ? getAbstractFileTypeBracePairs(file) :
+                            DEFAULT_BRACE_PAIRS;
+            return Result.create(bracePairs, file);
+        });
+    }
+
+    @NotNull
+    private static Map<Character, Character> getBracePairsBwd(@NotNull PsiFile file) {
+        return CachedValuesManager.getCachedValue(file, () -> Result.create(ContainerUtil.reverseMap(getBracePairsFwd(file)), file));
+    }
+
+    @Nullable
+    private static Map<Character, Character> getAbstractFileTypeBracePairs(@NotNull PsiFile file) {
+        FileType fileType = file.getFileType();
+        if (!(fileType instanceof AbstractFileType abstractFileType)) {
             return null;
         }
 
-        Set<TextMateBracePair> bracePairs = LSPIJTextMateUtils.getSimpleTextMateBracePairs(file);
-        if (!bracePairs.isEmpty()) {
-            String openBraceCharString = String.valueOf(codeBlockStartChar);
-            TextMateBracePair bracePair = ContainerUtil.find(
-                    bracePairs,
-                    bracePairCandidate -> openBraceCharString.equals(String.valueOf(bracePairCandidate.getLeft()))
-            );
-            return bracePair != null ? bracePair.getRight().charAt(0) : null;
+        Map<Character, Character> bracePairs = new HashMap<>();
+        SyntaxTable syntaxTable = abstractFileType.getSyntaxTable();
+        if (syntaxTable.isHasBraces()) {
+            bracePairs.put(BRACES_ENTRY.getKey(), BRACES_ENTRY.getValue());
         }
-
-        return BRACE_PAIR_CHARS_FWD.get(codeBlockStartChar);
+        if (syntaxTable.isHasBrackets()) {
+            bracePairs.put(BRACKETS_ENTRY.getKey(), BRACKETS_ENTRY.getValue());
+        }
+        if (syntaxTable.isHasParens()) {
+            bracePairs.put(PARENTHESES_ENTRY.getKey(), PARENTHESES_ENTRY.getValue());
+        }
+        return bracePairs;
     }
 }

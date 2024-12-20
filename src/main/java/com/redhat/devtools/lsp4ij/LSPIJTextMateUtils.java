@@ -35,9 +35,33 @@ public final class LSPIJTextMateUtils {
         // Pure utility class
     }
 
+    /**
+     * Returns the simple/single-character brace pairs for the file if it's a TextMate file.
+     *
+     * @param file the PSI file
+     * @return the simple brace pairs for the file if it's a TextMate file; otherwise null
+     */
+    @Nullable
+    @ApiStatus.Internal
+    public static Map<Character, Character> getBracePairs(@NotNull PsiFile file) {
+        if (!(file instanceof TextMateFile)) {
+            return null;
+        }
+
+        Map<Character, Character> bracePairs = new LinkedHashMap<>();
+        for (TextMateBracePair bracePair : getTextMateBracePairs(file)) {
+            CharSequence openBrace = bracePair.getLeft();
+            CharSequence closeBrace = bracePair.getRight();
+            if ((openBrace.length() == 1) && (closeBrace.length() == 1)) {
+                bracePairs.put(openBrace.charAt(0), closeBrace.charAt(0));
+            }
+        }
+        return bracePairs;
+    }
+
     @NotNull
     @ApiStatus.Internal
-    public static Set<TextMateBracePair> getTextMateBracePairs(@NotNull PsiFile file) {
+    private static Set<TextMateBracePair> getTextMateBracePairs(@NotNull PsiFile file) {
         Set<TextMateBracePair> bracePairs = new LinkedHashSet<>();
         if (file instanceof TextMateFile) {
             Editor editor = LSPIJUtils.editorForElement(file);
@@ -46,8 +70,8 @@ public final class LSPIJTextMateUtils {
         }
         return bracePairs;
     }
-
     // NOTE: Cloned from TextMateEditorUtils where this is private
+
     @NotNull
     private static Set<TextMateBracePair> getAllPairsForMatcher(@Nullable TextMateScope selector) {
         if (selector == null) {
@@ -66,14 +90,5 @@ public final class LSPIJTextMateUtils {
             }
         }
         return result;
-    }
-
-    @NotNull
-    @ApiStatus.Internal
-    public static Set<TextMateBracePair> getSimpleTextMateBracePairs(@NotNull PsiFile file) {
-        Set<TextMateBracePair> bracePairs = getTextMateBracePairs(file);
-        // We can only handle single character brace pairs here, so remove anything else
-        bracePairs.removeIf(bracePair -> (bracePair.getLeft().length() != 1) || (bracePair.getRight().length() != 1));
-        return bracePairs;
     }
 }
