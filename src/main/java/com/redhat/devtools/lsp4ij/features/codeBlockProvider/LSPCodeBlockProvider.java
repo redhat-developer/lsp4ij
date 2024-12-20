@@ -8,7 +8,8 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.foldingRange;
+
+package com.redhat.devtools.lsp4ij.features.codeBlockProvider;
 
 import com.intellij.codeInsight.editorActions.CodeBlockProvider;
 import com.intellij.openapi.editor.Document;
@@ -16,6 +17,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder;
 import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.SelectionRange;
@@ -23,8 +25,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-
-import static com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder.*;
 
 /**
  * Code block provider that uses information from {@link LSPSelectionRangeSupport} and {@link LSPFoldingRangeBuilder}.
@@ -42,9 +42,9 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
         int offset = editor.getCaretModel().getOffset();
         Character beforeCharacter = offset > 0 ? documentChars.charAt(offset - 1) : null;
         Character afterCharacter = offset < documentLength ? documentChars.charAt(offset) : null;
-        if (isOpenBraceChar(afterCharacter)) {
+        if (LSPCodeBlockUtils.isCodeBlockStartChar(file, afterCharacter)) {
             offset++;
-        } else if (isCloseBraceChar(beforeCharacter)) {
+        } else if (LSPCodeBlockUtils.isCodeBlockEndChar(file, beforeCharacter)) {
             offset--;
         }
 
@@ -53,24 +53,25 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
         Character openBraceChar = null;
         int closeBraceOffset = -1;
         Character closeBraceChar = null;
-        if ((offset > 0) && isOpenBraceChar(documentChars.charAt(offset - 1))) {
+        if ((offset > 0) && LSPCodeBlockUtils.isCodeBlockStartChar(file, documentChars.charAt(offset - 1))) {
             openBraceOffset = offset - 1;
             openBraceChar = documentChars.charAt(offset - 1);
-            closeBraceChar = getCloseBraceChar(openBraceChar);
-        } else if (isCloseBraceChar(documentChars.charAt(offset))) {
+            closeBraceChar = LSPCodeBlockUtils.getCodeBlockEndChar(file, openBraceChar);
+        } else if (LSPCodeBlockUtils.isCodeBlockEndChar(file, documentChars.charAt(offset))) {
             closeBraceOffset = offset;
             closeBraceChar = documentChars.charAt(offset);
-            openBraceChar = getOpenBraceChar(closeBraceChar);
-        } else if ((offset < (documentLength - 1)) && isCloseBraceChar(documentChars.charAt(offset + 1))) {
+            openBraceChar = LSPCodeBlockUtils.getCodeBlockStartChar(file, closeBraceChar);
+        } else if ((offset < (documentLength - 1)) && LSPCodeBlockUtils.isCodeBlockEndChar(file, documentChars.charAt(offset + 1))) {
             closeBraceOffset = offset + 1;
             closeBraceChar = documentChars.charAt(offset + 1);
-            openBraceChar = getOpenBraceChar(closeBraceChar);
+            openBraceChar = LSPCodeBlockUtils.getCodeBlockStartChar(file, closeBraceChar);
         }
 
         // Try to find it first using the selection ranges which tend to be more accurate; we must use the effective
         // offset for selection ranges to act as if we're in the adjusted braced block
         TextRange codeBlockRange = getUsingSelectionRanges(
-                file, editor,
+                file,
+                editor,
                 offset,
                 openBraceChar,
                 openBraceOffset,
@@ -141,8 +142,8 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                         }
                     }
                     // Otherwise see if it starts and ends with a known brace pair and we'll find the "closest" below
-                    else if ((openBraceOffset == -1) && (closeBraceOffset == -1) && isOpenBraceChar(startChar)) {
-                        Character pairedCloseBraceChar = getCloseBraceChar(startChar);
+                    else if ((openBraceOffset == -1) && (closeBraceOffset == -1) && LSPCodeBlockUtils.isCodeBlockStartChar(file, startChar)) {
+                        Character pairedCloseBraceChar = LSPCodeBlockUtils.getCodeBlockEndChar(file, startChar);
                         if ((pairedCloseBraceChar != null) && (pairedCloseBraceChar == endChar)) {
                             containingTextRanges.add(textRange);
                         }
@@ -172,7 +173,7 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
             for (FoldingRange foldingRange : foldingRanges) {
                 TextRange textRange = LSPFoldingRangeBuilder.getTextRange(
                         foldingRange,
-                        document,
+                        file, document,
                         openBraceChar,
                         closeBraceChar
                 );
