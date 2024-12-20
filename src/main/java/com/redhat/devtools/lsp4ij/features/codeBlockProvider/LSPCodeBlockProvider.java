@@ -88,7 +88,9 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                 document,
                 offset,
                 openBraceChar,
-                closeBraceChar
+                openBraceOffset,
+                closeBraceChar,
+                closeBraceOffset
         );
     }
 
@@ -114,8 +116,10 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                 }
             }
 
-            // Find containing text ranges that are bounded by brace pairs
             CharSequence documentChars = document.getCharsSequence();
+            int documentLength = documentChars.length();
+
+            // Find containing text ranges that are bounded by brace pairs
             List<TextRange> containingTextRanges = new ArrayList<>(textRanges.size());
             for (TextRange textRange : textRanges) {
                 if (textRange.getLength() > 1) {
@@ -148,6 +152,18 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                             containingTextRanges.add(textRange);
                         }
                     }
+                    // Also try to see if these are exactly the contents of a code block
+                    else if ((openBraceOffset == -1) && (closeBraceOffset == -1) && (startOffset > 0) && (endOffset < documentLength)) {
+                        startChar = documentChars.charAt(startOffset - 1);
+                        endChar = documentChars.charAt(endOffset);
+
+                        if (LSPCodeBlockUtils.isCodeBlockStartChar(file, startChar)) {
+                            Character pairedCloseBraceChar = LSPCodeBlockUtils.getCodeBlockEndChar(file, startChar);
+                            if ((pairedCloseBraceChar != null) && (pairedCloseBraceChar == endChar)) {
+                                containingTextRanges.add(textRange);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -166,25 +182,59 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                                                    @NotNull Document document,
                                                    int offset,
                                                    @Nullable Character openBraceChar,
-                                                   @Nullable Character closeBraceChar) {
+                                                   int openBraceOffset,
+                                                   @Nullable Character closeBraceChar,
+                                                   int closeBraceOffset) {
         List<FoldingRange> foldingRanges = LSPFoldingRangeBuilder.getFoldingRanges(file);
         if (!ContainerUtil.isEmpty(foldingRanges)) {
+            CharSequence documentChars = document.getCharsSequence();
+            int documentLength = documentChars.length();
+
             List<TextRange> containingTextRanges = new ArrayList<>(foldingRanges.size());
             for (FoldingRange foldingRange : foldingRanges) {
                 TextRange textRange = LSPFoldingRangeBuilder.getTextRange(
                         foldingRange,
-                        file, document,
+                        file,
+                        document,
                         openBraceChar,
                         closeBraceChar
                 );
-                if (textRange != null) {
-                    // If this is the exact range for which a matching brace was requested, return it
-                    if ((textRange.getStartOffset() == offset) || (textRange.getEndOffset() == offset)) {
-                        return textRange;
+                if ((textRange != null) && (textRange.getLength() > 1)) {
+                    int startOffset = Math.max(0, textRange.getStartOffset() - 1);
+                    int endOffset = Math.min(documentLength - 1, textRange.getEndOffset());
+                    // These ranges can tend to add whitespace at the end, so trim that before looking for braces
+                    while ((endOffset > startOffset) && Character.isWhitespace(documentChars.charAt(endOffset))) {
+                        endOffset--;
                     }
-                    // Otherwise add it to the list of containing ranges and we'll find the "closest" below
-                    else if (textRange.contains(offset)) {
-                        containingTextRanges.add(textRange);
+
+                    char startChar = documentChars.charAt(startOffset);
+                    char endChar = documentChars.charAt(endOffset);
+
+                    // If aligned on an open brace and this ends with the expected close brace, use it
+                    if ((startOffset == openBraceOffset)) {
+                        if ((closeBraceChar != null) && (closeBraceChar == endChar)) {
+                            return textRange;
+                        } else {
+                            return null;
+                        }
+                    }
+                    // If aligned on a close brace and this starts with the expected open brace, use it
+                    else if ((endOffset == closeBraceOffset)) {
+                        if ((openBraceChar != null) && (openBraceChar == startChar)) {
+                            return textRange;
+                        } else {
+                            return null;
+                        }
+                    }
+                    // Otherwise see if it starts and ends with a known brace pair and we'll find the "closest" below
+                    else if (textRange.containsOffset(offset) &&
+                             (openBraceOffset == -1) &&
+                             (closeBraceOffset == -1) &&
+                             LSPCodeBlockUtils.isCodeBlockStartChar(file, startChar)) {
+                        Character pairedCloseBraceChar = LSPCodeBlockUtils.getCodeBlockEndChar(file, startChar);
+                        if ((pairedCloseBraceChar != null) && (pairedCloseBraceChar == endChar)) {
+                            containingTextRanges.add(textRange);
+                        }
                     }
                 }
             }

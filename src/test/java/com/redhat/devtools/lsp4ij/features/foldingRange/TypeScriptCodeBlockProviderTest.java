@@ -22,31 +22,31 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
         super("*.ts");
     }
 
-    public void testSimpleCodeBlocks() {
-        // language=json
-        String mockFoldingRangesJson = """
-                [
-                  {
-                    "startLine": 0,
-                    "endLine": 3
-                  },
-                  {
-                    "startLine": 1,
-                    "endLine": 2
-                  }
-                ]
-                """;
+    // language=json
+    private static final String SIMPLE_MOCK_FOLDING_RANGES_JSON = """
+            [
+              {
+                "startLine": 0,
+                "endLine": 3
+              },
+              {
+                "startLine": 1,
+                "endLine": 2
+              }
+            ]
+            """;
 
+    public void testSimpleMethodBodyCaretBeforeStatement() {
         assertCodeBlock(
                 "demo.ts",
                 """
                         export class Demo {
-                            demo() <start>{
+                            demo() {<start>
                                 <caret>console.log('demo');
-                            }<end>
+                            <end>}
                         }
                         """,
-                mockFoldingRangesJson,
+                SIMPLE_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -172,7 +172,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testSimpleClassBodyCaretBeforeMethod() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -182,7 +184,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                             }
                         <end>}
                         """,
-                mockFoldingRangesJson,
+                SIMPLE_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -248,7 +250,24 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testSimpleClassBodyCaretBeforeOpenBrace() {
+        assertCodeBlock(
+                "demo.ts",
+                """
+                        export class Demo <caret>{<start>
+                            demo() {
+                                console.log('demo');
+                            }
+                        <end>}
+                        """,
+                SIMPLE_MOCK_FOLDING_RANGES_JSON,
+                // language=json
+                "[]");
+    }
+
+    public void testSimpleClassBodyCaretAfterOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -258,7 +277,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                             }
                         <end>}
                         """,
-                mockFoldingRangesJson,
+                SIMPLE_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -300,20 +319,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
-        assertCodeBlock(
-                "demo.ts",
-                """
-                        export class Demo <caret>{<start>
-                            demo() {
-                                console.log('demo');
-                            }
-                        <end>}
-                        """,
-                mockFoldingRangesJson,
-                // language=json
-                "[]");
-
+    public void testSimpleClassBodyCaretBeforeCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -323,7 +331,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                             }
                         <end><caret>}
                         """,
-                mockFoldingRangesJson,
+                SIMPLE_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -365,7 +373,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testSimpleClassBodyCaretAfterCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -375,10 +385,12 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                             }
                         <end>}<caret>
                         """,
-                mockFoldingRangesJson,
+                SIMPLE_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 "[]");
+    }
 
+    public void testSimpleCaretBeforeClassName() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -388,7 +400,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                             }
                         }
                         """,
-                mockFoldingRangesJson,
+                SIMPLE_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -432,39 +444,37 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                         """);
     }
 
-    public void testComplexCodeBlocks() {
-        // language=json
-        String mockFoldingRangesJson = """
-                [
-                  {
-                    "startLine": 0,
-                    "endLine": 7
-                  },
-                  {
-                    "startLine": 1,
-                    "endLine": 1
-                  },
-                  {
-                    "startLine": 2,
-                    "endLine": 4
-                  },
-                  {
-                    "startLine": 2,
-                    "endLine": 3
-                  },
-                  {
-                    "startLine": 5,
-                    "endLine": 7
-                  },
-                  {
-                    "startLine": 5,
-                    "endLine": 6
-                  }
-                ]
-                """;
+    // language=json
+    private static final String COMPLEX_MOCK_FOLDING_RANGES_JSON = """
+            [
+              {
+                "startLine": 0,
+                "endLine": 7
+              },
+              {
+                "startLine": 1,
+                "endLine": 1
+              },
+              {
+                "startLine": 2,
+                "endLine": 4
+              },
+              {
+                "startLine": 2,
+                "endLine": 3
+              },
+              {
+                "startLine": 5,
+                "endLine": 7
+              },
+              {
+                "startLine": 5,
+                "endLine": 6
+              }
+            ]
+            """;
 
-        // OUTER-MOST BLOCK
-
+    public void testComplexCaretAfterOutermostOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -478,7 +488,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         <end>}
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -520,7 +530,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforeOutermostOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -534,7 +546,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         <end>}
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -576,7 +588,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforeOutermostCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -590,7 +604,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         <caret><end>}
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -632,7 +646,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretAfterOutermostCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -646,7 +662,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         <end>}<caret>
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -688,7 +704,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforeOutermostBlockStatement() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -702,7 +720,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         <end>}
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -828,9 +846,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
-        // OBJECT LITERAL BLOCK
-
+    public void testComplexCaretAfterObjectLiteralOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -844,7 +862,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -1006,7 +1024,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforeObjectLiteralOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -1020,7 +1040,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -1182,7 +1202,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforeObjectLiteralCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -1196,7 +1218,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -1358,7 +1380,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretAfterObjectLiteralCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -1372,7 +1396,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -1534,12 +1558,14 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforeObjectLiteralProperty() {
         assertCodeBlock(
                 "demo.ts",
                 """
                         if (condition) {
-                            invokePromise(<start>{foo: '', <caret>bar: 10}<end>)
+                            invokePromise({<start>foo: '', <caret>bar: 10<end>})
                                 .then(() => {
                                     console.log('demo');
                                 })
@@ -1548,7 +1574,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -1710,9 +1736,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
-        // PROMISE THEN BLOCK
-
+    public void testComplexCaretAfterPromiseThenOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -1726,7 +1752,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -1852,7 +1878,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforePromiseThenOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -1866,7 +1894,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -1992,7 +2020,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforePromiseThenCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -2006,7 +2036,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -2132,7 +2162,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretAfterPromiseThenCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -2146,7 +2178,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -2272,21 +2304,23 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforePromiseThenStatement() {
         assertCodeBlock(
                 "demo.ts",
                 """
                         if (condition) {
                             invokePromise({foo: '', bar: 10})
-                                .then(() => <start>{
+                                .then(() => {<start>
                                     <caret>console.log('demo');
-                                }<end>)
+                                <end>})
                                 .catch((error) => {
                                     console.error(error);
                                 });
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -2460,9 +2494,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
-        // PROMISE CATCH BLOCK
-
+    public void testComplexCaretAfterPromiseCatchOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -2476,7 +2510,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 }<end>);
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -2578,7 +2612,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforePromiseCatchOpenBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -2592,7 +2628,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 }<end>);
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -2694,7 +2730,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforePromiseCatchCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -2708,7 +2746,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 <caret>}<end>);
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -2810,7 +2848,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretAfterPromiseCatchCloseBrace() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -2824,7 +2864,7 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 }<caret><end>);
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
@@ -2926,7 +2966,9 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                           }
                         ]
                         """);
+    }
 
+    public void testComplexCaretBeforePromiseCatchStatement() {
         assertCodeBlock(
                 "demo.ts",
                 """
@@ -2935,12 +2977,12 @@ public class TypeScriptCodeBlockProviderTest extends LSPCodeBlockProviderFixture
                                 .then(() => {
                                     console.log('demo');
                                 })
-                                .catch((error) => <start>{
+                                .catch((error) => {<start>
                                     <caret>console.error(error);
-                                }<end>);
+                                <end>});
                         }
                         """,
-                mockFoldingRangesJson,
+                COMPLEX_MOCK_FOLDING_RANGES_JSON,
                 // language=json
                 """
                         [
