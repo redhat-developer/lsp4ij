@@ -260,11 +260,11 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Returns true if completion item must be resolved and false otherwise when completion item is used.
+     * Returns true if completion item must be resolved and false otherwise when completion item is applied.
      *
-     * @param item the completion item which is used.
+     * @param item the completion item which is applied.
      * @param file the file.
-     * @return true if completion item must be resolved and false otherwise when completion item is used.
+     * @return true if completion item must be resolved and false otherwise when completion item is applied.
      */
     public boolean shouldResolveOnApply(@NotNull CompletionItem item,
                                         @NotNull PsiFile file) {
