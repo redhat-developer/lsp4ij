@@ -26,6 +26,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
@@ -118,15 +119,19 @@ public class LSPCompletionContributor extends CompletionContributor {
             items.addAll(completionList.getItems());
         }
 
-        // Sort the completions
-        PrefixMatcher prefixMatcher = result.getPrefixMatcher();
-        String currentWord = getCurrentWord(parameters);
-        boolean caseSensitive = languageServer.getClientFeatures().isCaseSensitive(parameters.getOriginalFile());
+        PsiFile originalFile = parameters.getOriginalFile();
+        LSPClientFeatures clientFeatures = languageServer.getClientFeatures();
+
+        // Sort the completions as appropriate based on client configuration
+        boolean useContextAwareSorting = clientFeatures.getCompletionFeature().useContextAwareSorting(originalFile);
+        PrefixMatcher prefixMatcher = useContextAwareSorting ? result.getPrefixMatcher() : null;
+        String currentWord = useContextAwareSorting ? getCurrentWord(parameters) : null;
+        boolean caseSensitive = clientFeatures.isCaseSensitive(originalFile);
         items.sort(new CompletionItemComparator(prefixMatcher, currentWord, caseSensitive));
         int size = items.size();
 
         Set<String> addedLookupStrings = new HashSet<>();
-        var completionFeature = languageServer.getClientFeatures().getCompletionFeature();
+        var completionFeature = clientFeatures.getCompletionFeature();
         LSPCompletionFeature.LSPCompletionContext context = new LSPCompletionFeature.LSPCompletionContext(parameters, languageServer);
         // Items now sorted by priority, low index == high priority
         for (int i = 0; i < size; i++) {

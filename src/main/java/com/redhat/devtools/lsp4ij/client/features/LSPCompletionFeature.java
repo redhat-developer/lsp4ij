@@ -97,7 +97,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @param file the file.
      * @return true the file associated with a language server can support resolve completion and false otherwise.
      */
-    public boolean isResolveCompletionSupported(@Nullable PsiFile file) {
+    public boolean isResolveCompletionSupported(@NotNull PsiFile file) {
         return getCompletionCapabilityRegistry().isResolveCompletionSupported(file);
     }
 
@@ -182,7 +182,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     /**
      * Returns true if the IntelliJ lookup is strike out and false otherwise.
      *
-     * @param item
+     * @param item the completion item
      * @return true if the IntelliJ lookup is strike out and false otherwise.
      */
     public boolean isStrikeout(@NotNull CompletionItem item) {
@@ -215,12 +215,12 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     /**
      * Don't override this method, we need to revisit the API and the prefix computation (to customize it).
      *
-     * @param context
-     * @param completionPrefix
-     * @param result
-     * @param lookupItem
-     * @param priority
-     * @param item
+     * @param context the completion context
+     * @param completionPrefix the completion prefix
+     * @param result the completion result set
+     * @param lookupItem the lookup item
+     * @param priority the completion priority
+     * @param item the completion item
      */
     @ApiStatus.Internal
     public void addLookupItem(@NotNull LSPCompletionContext context,
@@ -260,11 +260,11 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Returns true if completion item must be resolved and false otherwise when completion item is applied.
+     * Returns true if completion item must be resolved and false otherwise when completion item is used.
      *
-     * @param item the completion item which is applied.
+     * @param item the completion item which is used.
      * @param file the file.
-     * @return true if completion item must be resolved and false otherwise when completion item is applied.
+     * @return true if completion item must be resolved and false otherwise when completion item is used.
      */
     public boolean shouldResolveOnApply(@NotNull CompletionItem item,
                                         @NotNull PsiFile file) {
@@ -292,5 +292,16 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
         if (completionCapabilityRegistry != null) {
             completionCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
+    }
+
+    /**
+     * Determines whether or not client-side context-aware completion sorting should be used for the specified file.
+     *
+     * @param file the file
+     * @return true if client-side context-aware completion sorting should be used; otherwise false
+     */
+    public boolean useContextAwareSorting(@NotNull PsiFile file) {
+        // Default to disabled
+        return false;
     }
 }
