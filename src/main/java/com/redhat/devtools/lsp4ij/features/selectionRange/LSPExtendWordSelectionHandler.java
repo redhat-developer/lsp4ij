@@ -67,9 +67,25 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             return null;
         }
 
-        // Get the selection ranges
+        // If the caret is at a line start, try to find the first non-whitespace character in the line and get the
+        // selection ranges for it
+        int effectiveOffset = offset;
         Document document = editor.getDocument();
-        List<SelectionRange> selectionRanges = LSPSelectionRangeSupport.getSelectionRanges(file, document, offset);
+        int lineNumber = document.getLineNumber(offset);
+        int lineStartOffset = document.getLineStartOffset(lineNumber);
+        if (offset == lineStartOffset) {
+            int lineEndOffset = document.getLineEndOffset(lineNumber);
+            int selectionStartOffset = offset;
+            while (Character.isWhitespace(editorText.charAt(selectionStartOffset)) && selectionStartOffset <= lineEndOffset) {
+                selectionStartOffset++;
+            }
+            if (selectionStartOffset <= lineEndOffset) {
+                effectiveOffset = selectionStartOffset;
+            }
+        }
+
+        // Get the selection ranges
+        List<SelectionRange> selectionRanges = LSPSelectionRangeSupport.getSelectionRanges(file, document, effectiveOffset);
         if (ContainerUtil.isEmpty(selectionRanges)) {
             return null;
         }
@@ -87,6 +103,18 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
                 textRanges.addAll(expandToWholeLinesWithBlanks(editorText, parentSelectionTextRange));
             }
         }
+
+        // If the original offset was at line start and the effective offset was not, remove all text ranges that are
+        // not also at a line start
+        if ((offset == lineStartOffset) && (offset != effectiveOffset)) {
+            textRanges.removeIf(textRange -> {
+                int startOffset = textRange.getStartOffset();
+                int startLineNumber = document.getLineNumber(startOffset);
+                int startLineStartOffset = document.getLineStartOffset(startLineNumber);
+                return startOffset != startLineStartOffset;
+            });
+        }
+
         return new ArrayList<>(textRanges);
     }
 }
