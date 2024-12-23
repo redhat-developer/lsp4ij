@@ -22,6 +22,7 @@ import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.FoldingRange;
+import org.eclipse.lsp4j.SelectionRange;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -42,11 +43,17 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
 
     protected void assertCodeBlock(@NotNull String fileName,
                                    @NotNull String fileBody,
-                                   @NotNull String mockFoldingRangesJson) {
+                                   @NotNull String mockFoldingRangesJson,
+                                   @NotNull String mockSelectionRangesJson) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
+
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());
         MockLanguageServer.INSTANCE.setFoldingRanges(mockFoldingRanges);
+
+        List<SelectionRange> mockSelectionRanges = JSONUtils.getLsp4jGson().fromJson(mockSelectionRangesJson, new TypeToken<List<SelectionRange>>() {
+        }.getType());
+        MockLanguageServer.INSTANCE.setSelectionRanges(mockSelectionRanges);
 
         Project project = myFixture.getProject();
         PsiFile file = myFixture.configureByText(fileName, stripTokens(fileBody));
