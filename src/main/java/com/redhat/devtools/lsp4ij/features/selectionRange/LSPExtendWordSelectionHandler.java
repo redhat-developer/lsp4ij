@@ -104,15 +104,9 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             }
         }
 
-        // If the original offset was at line start and the effective offset was not, remove all text ranges that are
-        // not also at a line start
+        // If the original offset was at line start and the effective offset was not, remove smaller text ranges
         if ((offset == lineStartOffset) && (offset != effectiveOffset)) {
-            textRanges.removeIf(textRange -> {
-                int startOffset = textRange.getStartOffset();
-                int startLineNumber = document.getLineNumber(startOffset);
-                int startLineStartOffset = document.getLineStartOffset(startLineNumber);
-                return startOffset != startLineStartOffset;
-            });
+            textRanges.removeIf(textRange -> textRange.getStartOffset() > lineStartOffset);
         }
 
         return new ArrayList<>(textRanges);
