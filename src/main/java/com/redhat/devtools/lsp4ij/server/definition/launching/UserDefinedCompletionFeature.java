@@ -28,4 +28,11 @@ public class UserDefinedCompletionFeature extends LSPCompletionFeature {
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
         return clientConfiguration != null ? clientConfiguration.completion.useContextAwareSorting : super.useContextAwareSorting(file);
     }
+
+    @Override
+    public boolean useTemplateForSingleArgument(@NotNull PsiFile file) {
+        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getClientFeatures().getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.completion.useTemplateForSingleArgument : super.useTemplateForSingleArgument(file);
+    }
 }
