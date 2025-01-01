@@ -90,6 +90,7 @@ public class WorkspaceSymbolData implements NavigationItem {
         this.presentation = new LSPItemPresentation(name, symbolKind, locationString);
     }
 
+    @Nullable
     public VirtualFile getFile() {
         return file;
     }
