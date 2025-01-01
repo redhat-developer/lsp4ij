@@ -55,7 +55,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
         List<WorkspaceSymbolData> items = getWorkspaceSymbols(queryString, true, project);
         if (items != null) {
             items.stream()
-                    .filter(data -> scope.accept(data.getFile()))
+                    .filter(data -> data.getFile() != null && scope.accept(data.getFile()))
                     .map(NavigationItem::getName)
                     .forEach(processor::process);
         }
