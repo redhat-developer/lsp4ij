@@ -165,7 +165,8 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      */
     @Nullable
     public String getTypeText(CompletionItem item) {
-        return item.getDetail();
+        var labelDetails = item.getLabelDetails();
+        return labelDetails != null ? labelDetails.getDescription() : null;
     }
 
     /**
@@ -199,7 +200,7 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     @Nullable
     public String getTailText(@NotNull CompletionItem item) {
         var labelDetails = item.getLabelDetails();
-        return labelDetails != null ? labelDetails.getDetail() : null;
+        return labelDetails != null ? labelDetails.getDetail() : item.getDetail();
     }
 
     /**
