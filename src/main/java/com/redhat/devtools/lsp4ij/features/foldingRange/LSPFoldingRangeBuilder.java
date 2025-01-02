@@ -8,6 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
+
 package com.redhat.devtools.lsp4ij.features.foldingRange;
 
 import com.intellij.lang.ASTNode;
@@ -24,9 +25,11 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -34,7 +37,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -49,20 +51,11 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPFoldingRangeBuilder.class);
 
-    // NOTE: JetBrains has maintained a long assumption that these are the primary structural block delimiters via
-    // AbstractFileType's explicit support for them. If/when other structural block delimiters are discovered for
-    // languages supported by LSP, we can revisit this hard-coded assumption.
-    private static final Map<Character, Character> BRACE_PAIR_CHARS_FWD = Map.of(
-            '{', '}',
-            '[', ']',
-            '(', ')'
-    );
-    private static final Map<Character, Character> BRACE_PAIR_CHARS_BWD = ContainerUtil.reverseMap(BRACE_PAIR_CHARS_FWD);
-
     @Override
     protected void buildLanguageFoldRegions(@NotNull List<FoldingDescriptor> descriptors,
                                             @NotNull PsiElement root,
-                                            @NotNull Document document, boolean quick) {
+                                            @NotNull Document document,
+                                            boolean quick) {
         // if quick flag is set and not testing, we do nothing here
         if (quick && !ApplicationManager.getApplication().isUnitTestMode()) {
             return;
@@ -72,7 +65,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         List<FoldingRange> foldingRanges = getFoldingRanges(file);
         if (!ContainerUtil.isEmpty(foldingRanges)) {
             for (FoldingRange foldingRange : foldingRanges) {
-                TextRange textRange = getTextRange(foldingRange, document);
+                TextRange textRange = getTextRange(foldingRange, file, document);
                 if ((textRange != null) && (textRange.getLength() > 0)) {
                     String collapsedText = foldingRange.getCollapsedText();
                     if (collapsedText != null) {
@@ -86,7 +79,8 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     }
 
     @NotNull
-    static List<FoldingRange> getFoldingRanges(@Nullable PsiFile file) {
+    @ApiStatus.Internal
+    public static List<FoldingRange> getFoldingRanges(@Nullable PsiFile file) {
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             return Collections.emptyList();
         }
@@ -124,22 +118,27 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     }
 
     @Nullable
-    private static TextRange getTextRange(@NotNull FoldingRange foldingRange, @NotNull Document document) {
-        return getTextRange(foldingRange, document, null, null);
+    private static TextRange getTextRange(@NotNull FoldingRange foldingRange,
+                                          @NotNull PsiFile file,
+                                          @NotNull Document document) {
+        return getTextRange(foldingRange, file, document, null, null);
     }
 
     /**
      * Returns the IDE text range for the LSP folding range, optionally bounded by the expected paired open/close braces.
      *
      * @param foldingRange   the LSP folding range
+     * @param file           the PSI file
      * @param document       the document
      * @param openBraceChar  the optional open brace character
      * @param closeBraceChar the optional paired close brace character
      * @return the corresponding IDE text range, or null if no valid text range could be derived
      */
     @Nullable
-    static TextRange getTextRange(
+    @ApiStatus.Internal
+    public static TextRange getTextRange(
             @NotNull FoldingRange foldingRange,
+            @NotNull PsiFile file,
             @NotNull Document document,
             @Nullable Character openBraceChar,
             @Nullable Character closeBraceChar
@@ -153,9 +152,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         Character startChar = start > 0 ? documentChars.charAt(start - 1) : null;
         if ((startChar != null) && ((openBraceChar == null) || (startChar == openBraceChar))) {
             // If necessary, infer the braces for this block
-            if ((openBraceChar == null) && isOpenBraceChar(startChar)) {
+            if ((openBraceChar == null) && LSPCodeBlockUtils.isCodeBlockStartChar(file, startChar)) {
                 openBraceChar = startChar;
-                closeBraceChar = getCloseBraceChar(openBraceChar);
+                closeBraceChar = LSPCodeBlockUtils.getCodeBlockEndChar(file, openBraceChar);
             }
 
             int end = getEndOffset(foldingRange, document);
@@ -174,24 +173,6 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         }
 
         return textRange;
-    }
-
-    static boolean isOpenBraceChar(@Nullable Character character) {
-        return (character != null) && BRACE_PAIR_CHARS_FWD.containsKey(character);
-    }
-
-    static boolean isCloseBraceChar(@Nullable Character character) {
-        return (character != null) && BRACE_PAIR_CHARS_BWD.containsKey(character);
-    }
-
-    @Nullable
-    static Character getOpenBraceChar(@Nullable Character closeBraceChar) {
-        return closeBraceChar != null ? BRACE_PAIR_CHARS_BWD.get(closeBraceChar) : null;
-    }
-
-    @Nullable
-    static Character getCloseBraceChar(@Nullable Character openBraceChar) {
-        return openBraceChar != null ? BRACE_PAIR_CHARS_FWD.get(openBraceChar) : null;
     }
 
     private static int getStartOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
