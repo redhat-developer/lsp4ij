@@ -1,0 +1,6 @@
+{
+  "type": "pwa-node",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}"
+}
