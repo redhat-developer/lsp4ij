@@ -1,0 +1,79 @@
+{
+  "id": "swift-lldb",
+  "name": "Swift lldb-dap",
+  "programArgs": {
+    "default": "lldb-dap -p ${port}"
+  },
+  "waitForTimeout": "500",
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "C++"
+      },
+      "languageId": "cpp"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.swiftinterface",
+          "*.swift"
+        ]
+      },
+      "languageId": "swift"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.m"
+        ]
+      },
+      "languageId": "objective-c"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.mm"
+        ]
+      },
+      "languageId": "objective-cpp"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.c",
+          "*.i"
+        ]
+      },
+      "languageId": "c"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.cpp",
+          "*.cppm",
+          "*.cc",
+          "*.ccm",
+          "*.cxx",
+          "*.cxxm",
+          "*.c++",
+          "*.c++m",
+          "*.hpp",
+          "*.hh",
+          "*.hxx",
+          "*.h++",
+          "*.h",
+          "*.ii",
+          "*.ino",
+          "*.inl",
+          "*.ipp",
+          "*.ixx",
+          "*.tpp",
+          "*.txx",
+          "*.hpp.in",
+          "*.h.in"
+        ]
+      },
+      "languageId": "cpp"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "type": "swift-lldb",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}"
+}

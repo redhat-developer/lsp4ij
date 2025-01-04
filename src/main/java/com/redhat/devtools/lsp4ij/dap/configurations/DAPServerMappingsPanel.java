@@ -1,25 +1,25 @@
 /*******************************************************************************
- * Copyright (c) 2024 Red Hat Inc. and others.
- *
- * This program and the accompanying materials are made available under the
- * terms of the Eclipse Public License v. 2.0 which is available at
- * http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
- * which is available at https://www.apache.org/licenses/LICENSE-2.0.
- *
- * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+ * Copyright (c) 2025 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at http://www.eclipse.org/legal/epl-v20.html
  *
  * Contributors:
- *     Red Hat Inc. - initial API and implementation
- *******************************************************************************/
-package com.redhat.devtools.lsp4ij.settings.ui;
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.FormBuilder;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
+import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import com.redhat.devtools.lsp4ij.settings.ui.FileNamePatternServerMappingTablePanel;
+import com.redhat.devtools.lsp4ij.settings.ui.FileTypeServerMappingTablePanel;
+import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerMappingTablePanel;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -33,7 +33,7 @@ import java.util.*;
  *     <li>a tab which show list of file name pattern mappings.</li>
  * </ul>
  */
-public class ServerMappingsPanel {
+public class DAPServerMappingsPanel {
 
     private static final int LANGUAGE_TAB_INDEX = 0;
     private static final int FILE_TYPE_TAB_INDEX = 1;
@@ -44,13 +44,13 @@ public class ServerMappingsPanel {
     private FileNamePatternServerMappingTablePanel fileNamePatternMappingsPanel;
     private JBTabbedPane tabbedPane;
 
-    public ServerMappingsPanel(FormBuilder builder, boolean editable) {
+    public DAPServerMappingsPanel(FormBuilder builder, boolean editable) {
         createContent(builder, editable);
     }
 
     private void createContent(FormBuilder builder, boolean editable) {
         tabbedPane = new JBTabbedPane();
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.mappings.title"), tabbedPane, true);
+        builder.addLabeledComponent(DAPBundle.message("dap.settings.editor.mappings.title"), tabbedPane, true);
 
         // Language mappings
         createLanguageMappingsContent(tabbedPane, editable);
@@ -63,29 +63,29 @@ public class ServerMappingsPanel {
     private void createLanguageMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
         languageMappingsPanel = new LanguageServerMappingTablePanel(editable);
         languageMappingsPanel.addChangeHandler(() -> updateTabTitleAt(LANGUAGE_TAB_INDEX));
-        tabbedPane.add(LanguageServerBundle.message("language.server.mappings.language"), languageMappingsPanel);
+        tabbedPane.add(DAPBundle.message("dap.settings.editor.mappings.language"), languageMappingsPanel);
     }
 
     private void createFileTypeMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
         fileTypeMappingsPanel = new FileTypeServerMappingTablePanel(editable);
         fileTypeMappingsPanel.addChangeHandler(() -> updateTabTitleAt(FILE_TYPE_TAB_INDEX));
-        tabbedPane.add(LanguageServerBundle.message("language.server.mappings.fileType"), fileTypeMappingsPanel);
+        tabbedPane.add(DAPBundle.message("dap.settings.editor.mappings.fileType"), fileTypeMappingsPanel);
     }
 
     private void createFileNamePatternMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
         fileNamePatternMappingsPanel = new FileNamePatternServerMappingTablePanel(editable);
         fileNamePatternMappingsPanel.addChangeHandler(() -> updateTabTitleAt(FILE_NAME_PATTERN_TAB_INDEX));
-        tabbedPane.add(LanguageServerBundle.message("language.server.mappings.fileNamePattern"), fileNamePatternMappingsPanel);
+        tabbedPane.add(DAPBundle.message("dap.settings.editor.mappings.fileNamePattern"), fileNamePatternMappingsPanel);
     }
 
     /**
-     * Refresh the language, file type, file name pattern mappings defined by the language server template.
+     * Refresh the language, file type, file name pattern mappings defined by the DAP factory.
      *
-     * @param template the language server template.
+     * @param dapFactory the DAP factory.
      */
-    public void refreshMappings(LanguageServerTemplate template) {
+    public void refreshMappings(UserDefinedDebugAdapterDescriptorFactory dapFactory) {
         // refresh language mappings list
-        setLanguageMappings(template.getLanguageMappings());
+        setLanguageMappings(dapFactory.getLanguageMappings());
 
         // refresh file type mappings
         List<ServerMappingSettings> fileTypeMappings = new ArrayList<>();
@@ -104,7 +104,7 @@ public class ServerMappingsPanel {
         // Collect them by following this strategy:
         // - case 1: if fileType can be retrieved by the name, create a fileType mapping.
         // - case 2: if fileType cannot be retrieved, create file name pattern mapping.
-        for (var mapping : template.getFileTypeMappings()) {
+        for (var mapping : dapFactory.getFileTypeMappings()) {
             boolean add = false;
             String fileType = mapping.getFileType();
             if (!StringUtils.isEmpty(fileType)) {
@@ -186,15 +186,15 @@ public class ServerMappingsPanel {
         List<ServerMappingSettings> mappings = null;
         switch (tabIndex) {
             case LANGUAGE_TAB_INDEX:
-                baseTabTitle = LanguageServerBundle.message("language.server.mappings.language");
+                baseTabTitle = DAPBundle.message("dap.settings.editor.mappings.language");
                 mappings = languageMappingsPanel.getServerMappings();
                 break;
             case FILE_TYPE_TAB_INDEX:
-                baseTabTitle = LanguageServerBundle.message("language.server.mappings.fileType");
+                baseTabTitle = DAPBundle.message("dap.settings.editor.mappings.fileType");
                 mappings = fileTypeMappingsPanel.getServerMappings();
                 break;
             case FILE_NAME_PATTERN_TAB_INDEX:
-                baseTabTitle = LanguageServerBundle.message("language.server.mappings.fileNamePattern");
+                baseTabTitle = DAPBundle.message("dap.settings.editor.mappings.fileNamePattern");
                 mappings = fileNamePatternMappingsPanel.getServerMappings();
                 break;
         }
