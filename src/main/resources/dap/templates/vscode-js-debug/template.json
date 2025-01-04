@@ -1,0 +1,47 @@
+{
+  "id": "vscode-js-debug",
+  "name": "VSCode JS Debug",
+  "programArgs": {
+    "default": "node ${BASE_DIR}/js-debug/src/dapDebugServer.js ${port} 127.0.0.1"
+  },
+  "waitForTrace": "Debug server listening at ",
+  "download": {
+    "page": "https://github.com/microsoft/vscode-js-debug/releases/",
+    "url": "https://github.com/microsoft/vscode-js-debug/releases/download/v1.96.0/js-debug-dap-v1.96.0.tar.gz"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "JavaScript"
+      },
+      "languageId": "javascript"
+    },
+    {
+      "fileType": {
+        "name": "JavaScript-React",
+        "patterns": [
+          "*.jsx"
+        ]
+      },
+      "languageId": "javascriptreact"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript",
+        "patterns": [
+          "*.ts"
+        ]
+      },
+      "languageId": "typescript"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript-React",
+        "patterns": [
+          "*.tsx"
+        ]
+      },
+      "languageId": "typescriptreact"
+    }
+  ]
+}
