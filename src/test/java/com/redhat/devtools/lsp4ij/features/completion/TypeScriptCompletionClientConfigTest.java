@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionClientConfigFixtureTestC
 public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientConfigFixtureTestCase {
 
     private static final String TEST_FILE_NAME = "test.ts";
+    private static final String TEST_FILE_BODY_BEFORE = "Math.<caret>";
 
     public TypeScriptCompletionClientConfigTest() {
         super("*.ts");
@@ -26,7 +27,6 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
 
     // SINGLE ARGUMENT TESTS
 
-    private static final String ABS_FILE_BODY_BEFORE = "Math.<caret>";
     // language=json
     private static final String ABS_MOCK_TEXT_COMPLETION_JSON = """
             {
@@ -71,7 +71,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
     public void testUseTemplateForSingleArgumentDefault_singleArg() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
-                ABS_FILE_BODY_BEFORE,
+                TEST_FILE_BODY_BEFORE,
                 "Math.abs(x)<caret>",
                 ABS_MOCK_TEXT_COMPLETION_JSON,
                 ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
@@ -82,7 +82,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
     public void testUseTemplateForSingleArgumentDisabled_singleArg() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
-                ABS_FILE_BODY_BEFORE,
+                TEST_FILE_BODY_BEFORE,
                 "Math.abs(<caret>)",
                 ABS_MOCK_TEXT_COMPLETION_JSON,
                 ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
@@ -92,7 +92,6 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
 
     // MULTIPLE ARGUMENTS TESTS
 
-    private static final String POW_FILE_BODY_BEFORE = "Math.<caret>";
     // language=json
     private static final String POW_MOCK_TEXT_COMPLETION_JSON = """
             {
@@ -165,7 +164,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
     public void testUseTemplateForSingleArgumentDefault_multipleArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
-                POW_FILE_BODY_BEFORE,
+                TEST_FILE_BODY_BEFORE,
                 "Math.pow(x, y)<caret>",
                 POW_MOCK_TEXT_COMPLETION_JSON,
                 POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
@@ -176,11 +175,92 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
     public void testUseTemplateForSingleArgumentDisabled_multipleArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
-                POW_FILE_BODY_BEFORE,
+                TEST_FILE_BODY_BEFORE,
                 // Because this has multiple arguments, the template will still be used
                 "Math.pow(x, y)<caret>",
                 POW_MOCK_TEXT_COMPLETION_JSON,
                 POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
+        );
+    }
+
+    // NO ARGUMENTS TESTS
+
+    // language=json
+    private static final String RANDOM_MOCK_TEXT_COMPLETION_JSON = """
+            {
+              "isIncomplete": false,
+              "items": [
+                {
+                  "label": "random",
+                  "kind": 2,
+                  "sortText": "11",
+                  "filterText": ".random",
+                  "insertTextFormat": 2,
+                  "textEdit": {
+                    "range": {
+                      "start": {
+                        "line": 0,
+                        "character": 4
+                      },
+                      "end": {
+                        "line": 0,
+                        "character": 5
+                      }
+                    },
+                    "newText": ".random"
+                  },
+                  "data": {
+                    "cacheId": 33
+                  }
+                }
+              ]
+            }
+            """;
+    // language=json
+    private static final String RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON = """
+            {
+              "label": "random",
+              "kind": 2,
+              "detail": "(method) Math.random(): number",
+              "documentation": {
+                "kind": "markdown",
+                "value": "Returns a pseudorandom number between 0 and 1."
+              },
+              "sortText": "11",
+              "insertText": "random()$0",
+              "insertTextFormat": 2,
+              "data": {
+                "file": "test.ts",
+                "line": 1,
+                "offset": 7,
+                "entryNames": [
+                  "random"
+                ]
+              }
+            }
+            """;
+
+    public void testUseTemplateForSingleArgumentDefault_noArgs() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                // Because this has no arguments, no template will be used and the caret will be placed outside of the argument list
+                "Math.random()<caret>",
+                RANDOM_MOCK_TEXT_COMPLETION_JSON,
+                RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                null // Use default configuration which has single arg templates enabled
+        );
+    }
+
+    public void testUseTemplateForSingleArgumentDisabled_noArgs() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                // Because this has no arguments, no template will be used and the caret will be placed outside of the argument list
+                "Math.random()<caret>",
+                RANDOM_MOCK_TEXT_COMPLETION_JSON,
+                RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
                 clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
         );
     }
