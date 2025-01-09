@@ -21,14 +21,8 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
     private static final String TEST_FILE_NAME = "test.ts";
     private static final String TEST_FILE_BODY_BEFORE = "Math.<caret>";
 
-    public TypeScriptCompletionClientConfigTest() {
-        super("*.ts");
-    }
-
-    // SINGLE ARGUMENT TESTS
-
     // language=json
-    private static final String ABS_MOCK_TEXT_COMPLETION_JSON = """
+    private static final String MOCK_TEXT_COMPLETION_JSON = """
             {
               "isIncomplete": false,
               "items": [
@@ -36,67 +30,25 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                   "label": "abs",
                   "kind": 2,
                   "sortText": "11",
+                  "filterText": ".abs",
                   "insertTextFormat": 2,
+                  "textEdit": {
+                    "range": {
+                      "start": {
+                        "line": 0,
+                        "character": 4
+                      },
+                      "end": {
+                        "line": 0,
+                        "character": 5
+                      }
+                    },
+                    "newText": ".abs"
+                  },
                   "data": {
                     "cacheId": 1
                   }
-                }
-              ]
-            }
-            """;
-    // language=json
-    private static final String ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON = """
-            {
-              "label": "abs",
-              "kind": 2,
-              "detail": "(method) Math.abs(x: number): number",
-              "documentation": {
-                "kind": "markdown",
-                "value": "Returns the absolute value of a number (the value without regard to whether it is positive or negative).\\nFor example, the absolute value of -5 is the same as the absolute value of 5.\\n\\n*@param* `x` — A numeric expression for which the absolute value is needed."
-              },
-              "sortText": "11",
-              "insertText": "abs(${1:x})$0",
-              "insertTextFormat": 2,
-              "data": {
-                "file": "test.ts",
-                "line": 1,
-                "offset": 9,
-                "entryNames": [
-                  "abs"
-                ]
-              }
-            }
-            """;
-
-    public void testUseTemplateForSingleArgumentDefault_singleArg() {
-        assertTemplateForArguments(
-                TEST_FILE_NAME,
-                TEST_FILE_BODY_BEFORE,
-                "Math.abs(x)<caret>",
-                ABS_MOCK_TEXT_COMPLETION_JSON,
-                ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                null // Use default configuration which has single arg templates enabled
-        );
-    }
-
-    public void testUseTemplateForSingleArgumentDisabled_singleArg() {
-        assertTemplateForArguments(
-                TEST_FILE_NAME,
-                TEST_FILE_BODY_BEFORE,
-                "Math.abs(<caret>)",
-                ABS_MOCK_TEXT_COMPLETION_JSON,
-                ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
-        );
-    }
-
-    // MULTIPLE ARGUMENTS TESTS
-
-    // language=json
-    private static final String POW_MOCK_TEXT_COMPLETION_JSON = """
-            {
-              "isIncomplete": false,
-              "items": [
+                },
                 {
                   "label": "pow",
                   "kind": 2,
@@ -119,10 +71,103 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                   "data": {
                     "cacheId": 32
                   }
+                },
+                {
+                  "label": "random",
+                  "kind": 2,
+                  "sortText": "11",
+                  "filterText": ".random",
+                  "insertTextFormat": 2,
+                  "textEdit": {
+                    "range": {
+                      "start": {
+                        "line": 0,
+                        "character": 4
+                      },
+                      "end": {
+                        "line": 0,
+                        "character": 5
+                      }
+                    },
+                    "newText": ".random"
+                  },
+                  "data": {
+                    "cacheId": 33
+                  }
                 }
               ]
             }
             """;
+
+    public TypeScriptCompletionClientConfigTest() {
+        super("*.ts");
+    }
+
+    // SINGLE ARGUMENT TESTS
+
+    // language=json
+    private static final String ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON = """
+            {
+              "label": "abs",
+              "kind": 2,
+              "detail": "(method) Math.abs(x: number): number",
+              "documentation": {
+                "kind": "markdown",
+                "value": "Returns the absolute value of a number (the value without regard to whether it is positive or negative).\\nFor example, the absolute value of -5 is the same as the absolute value of 5.\\n\\n*@param* `x` — A numeric expression for which the absolute value is needed."
+              },
+              "sortText": "11",
+              "filterText": ".abs",
+              "insertText": ".abs(${1:x})$0",
+              "insertTextFormat": 2,
+              "textEdit": {
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 4
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 5
+                  }
+                },
+                "newText": ".abs(${1:x})$0"
+              },
+              "data": {
+                "file": "test.ts",
+                "line": 1,
+                "offset": 6,
+                "entryNames": [
+                  "abs"
+                ]
+              }
+            }
+            """;
+
+    public void testUseTemplateForSingleArgumentDefault_singleArg() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                "Math.abs(x)<caret>",
+                MOCK_TEXT_COMPLETION_JSON,
+                ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                // Default config uses templates for single arg
+                null
+        );
+    }
+
+    public void testUseTemplateForSingleArgumentDisabled_singleArg() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                "Math.abs(<caret>)",
+                MOCK_TEXT_COMPLETION_JSON,
+                ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
+        );
+    }
+
+    // MULTIPLE ARGUMENTS TESTS
+
     // language=json
     private static final String POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON = """
             {
@@ -166,9 +211,10 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
                 "Math.pow(x, y)<caret>",
-                POW_MOCK_TEXT_COMPLETION_JSON,
+                MOCK_TEXT_COMPLETION_JSON,
                 POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                null // Use default configuration which has single arg templates enabled
+                // Default config uses templates for single arg
+                null
         );
     }
 
@@ -178,7 +224,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 TEST_FILE_BODY_BEFORE,
                 // Because this has multiple arguments, the template will still be used
                 "Math.pow(x, y)<caret>",
-                POW_MOCK_TEXT_COMPLETION_JSON,
+                MOCK_TEXT_COMPLETION_JSON,
                 POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
                 clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
         );
@@ -186,37 +232,6 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
 
     // NO ARGUMENTS TESTS
 
-    // language=json
-    private static final String RANDOM_MOCK_TEXT_COMPLETION_JSON = """
-            {
-              "isIncomplete": false,
-              "items": [
-                {
-                  "label": "random",
-                  "kind": 2,
-                  "sortText": "11",
-                  "filterText": ".random",
-                  "insertTextFormat": 2,
-                  "textEdit": {
-                    "range": {
-                      "start": {
-                        "line": 0,
-                        "character": 4
-                      },
-                      "end": {
-                        "line": 0,
-                        "character": 5
-                      }
-                    },
-                    "newText": ".random"
-                  },
-                  "data": {
-                    "cacheId": 33
-                  }
-                }
-              ]
-            }
-            """;
     // language=json
     private static final String RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON = """
             {
@@ -228,12 +243,26 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 "value": "Returns a pseudorandom number between 0 and 1."
               },
               "sortText": "11",
-              "insertText": "random()$0",
+              "filterText": ".random",
+              "insertText": ".random()$0",
               "insertTextFormat": 2,
+              "textEdit": {
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 4
+                  },
+                  "end": {
+                    "line": 0,
+                    "character": 5
+                  }
+                },
+                "newText": ".random()$0"
+              },
               "data": {
                 "file": "test.ts",
                 "line": 1,
-                "offset": 7,
+                "offset": 6,
                 "entryNames": [
                   "random"
                 ]
@@ -247,9 +276,10 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 TEST_FILE_BODY_BEFORE,
                 // Because this has no arguments, no template will be used and the caret will be placed outside of the argument list
                 "Math.random()<caret>",
-                RANDOM_MOCK_TEXT_COMPLETION_JSON,
+                MOCK_TEXT_COMPLETION_JSON,
                 RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                null // Use default configuration which has single arg templates enabled
+                // Default config uses templates for single arg
+                null
         );
     }
 
@@ -259,7 +289,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 TEST_FILE_BODY_BEFORE,
                 // Because this has no arguments, no template will be used and the caret will be placed outside of the argument list
                 "Math.random()<caret>",
-                RANDOM_MOCK_TEXT_COMPLETION_JSON,
+                MOCK_TEXT_COMPLETION_JSON,
                 RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
                 clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
         );
