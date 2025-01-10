@@ -21,6 +21,12 @@
           "title": "Use context-aware completion sorting",
           "description": "Whether or not client-side context-aware completion sorting should be used.",
           "default": false
+        },
+        "useTemplateForSingleArgument": {
+          "type": "boolean",
+          "title": "Use editor template for single invocation argument",
+          "description": "Whether or not an editor template should be used for a single invocation argument.",
+          "default": true
         }
       }
     },

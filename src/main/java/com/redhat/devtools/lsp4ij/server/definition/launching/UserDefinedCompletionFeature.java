@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -24,8 +25,15 @@ public class UserDefinedCompletionFeature extends LSPCompletionFeature {
 
     @Override
     public boolean useContextAwareSorting(@NotNull PsiFile file) {
-        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getClientFeatures().getServerDefinition();
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
         return clientConfiguration != null ? clientConfiguration.completion.useContextAwareSorting : super.useContextAwareSorting(file);
+    }
+
+    @Override
+    public boolean useTemplateForSingleArgument(@NotNull PsiFile file) {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.completion.useTemplateForSingleArgument : super.useTemplateForSingleArgument(file);
     }
 }

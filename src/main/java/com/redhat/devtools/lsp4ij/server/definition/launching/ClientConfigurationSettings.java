@@ -27,6 +27,10 @@ public class ClientConfigurationSettings {
          * Whether or not client-side context-aware completion sorting should be used. Defaults to false.
          */
         public boolean useContextAwareSorting = false;
+        /**
+         * Whether or not an editor template should be used for a single invocation argument. Defaults to true.
+         */
+        public boolean useTemplateForSingleArgument = true;
     }
 
     /**
