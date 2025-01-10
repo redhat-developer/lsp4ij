@@ -165,7 +165,8 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      */
     @Nullable
     public String getTypeText(CompletionItem item) {
-        return item.getDetail();
+        var labelDetails = item.getLabelDetails();
+        return labelDetails != null ? labelDetails.getDescription() : item.getDetail();
     }
 
     /**

@@ -1,0 +1,18 @@
+{
+  "id": "vue-js-language-server",
+  "name": "Vue.js Language Server",
+  "programArgs": {
+    "windows": "vue-language-server.cmd --stdio",
+    "default": "vue-language-server --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.vue"
+        ]
+      },
+      "languageId": "vue"
+    }
+  ]
+}
