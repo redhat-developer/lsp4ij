@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceSymbolFeature;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 
 /**
  * Adds client-side workspace symbol configuration features.
@@ -22,7 +23,7 @@ public class UserDefinedWorkspaceSymbolFeature extends LSPWorkspaceSymbolFeature
 
     @Override
     public boolean supportsGotoClass() {
-        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getClientFeatures().getServerDefinition();
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
         return clientConfiguration != null ? clientConfiguration.workspaceSymbol.supportsGotoClass : super.supportsGotoClass();
     }
