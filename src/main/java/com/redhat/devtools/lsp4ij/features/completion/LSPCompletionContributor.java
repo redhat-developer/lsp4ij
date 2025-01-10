@@ -20,6 +20,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.patterns.StandardPatterns;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -124,6 +125,10 @@ public class LSPCompletionContributor extends CompletionContributor {
 
         // Sort the completions as appropriate based on client configuration
         boolean useContextAwareSorting = clientFeatures.getCompletionFeature().useContextAwareSorting(originalFile);
+        if (useContextAwareSorting) {
+            // Cache-buster for prefix changes since that can affect ordering
+            result.restartCompletionOnPrefixChange(StandardPatterns.string().longerThan(0));
+        }
         PrefixMatcher prefixMatcher = useContextAwareSorting ? result.getPrefixMatcher() : null;
         String currentWord = useContextAwareSorting ? getCurrentWord(parameters) : null;
         boolean caseSensitive = clientFeatures.isCaseSensitive(originalFile);

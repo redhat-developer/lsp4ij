@@ -248,12 +248,13 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
                         .addElement(prioritizedLookupItem);
             }
         } else {
-            // Should happen rarely, only when text edit is for multi-lines or if completion is triggered outside the text edit range.
-            // Add the IJ completion item (lookup item) which will use the IJ prefix respecting the language's case-sensitivity
+            // Add the IJ completion item (lookup item) by using the prefix matcher respecting the language's case-sensitivity
             if (caseSensitive) {
-                result.addElement(prioritizedLookupItem);
+                result.withPrefixMatcher(result.getPrefixMatcher())
+                        .addElement(prioritizedLookupItem);
             } else {
-                result.caseInsensitive()
+                result.withPrefixMatcher(result.getPrefixMatcher())
+                        .caseInsensitive()
                         .addElement(prioritizedLookupItem);
             }
         }
@@ -301,8 +302,8 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @return true if client-side context-aware completion sorting should be used; otherwise false
      */
     public boolean useContextAwareSorting(@NotNull PsiFile file) {
-        // Default to disabled
-        return false;
+        // Default to enabled
+        return true;
     }
 
     /**

@@ -134,6 +134,10 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 				} else if ((label2 != null) && prefixMatcher.isStartMatch(label2) &&
 						   ((label1 == null) || !prefixMatcher.isStartMatch(label1))) {
 					return 1;
+				} else if ((label1 != null) && prefixMatcher.isStartMatch(label1) &&
+						   ((label2 != null) && prefixMatcher.isStartMatch(label2))) {
+					// Better matches are ranked higher and we want those ordered earlier
+					return prefixMatcher.matchingDegree(label2) - prefixMatcher.matchingDegree(label1);
 				}
 			}
 		}
