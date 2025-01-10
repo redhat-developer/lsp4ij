@@ -11,6 +11,19 @@
       "description": "Whether or not the language grammar is case-sensitive.",
       "default": false
     },
+    "completion": {
+      "type": "object",
+      "title": "Client-side completion configuration",
+      "additionalProperties": false,
+      "properties": {
+        "useContextAwareSorting": {
+          "type": "boolean",
+          "title": "Use context-aware completion sorting",
+          "description": "Whether or not client-side context-aware completion sorting should be used.",
+          "default": false
+        }
+      }
+    },
     "workspaceSymbol": {
       "type": "object",
       "title": "Client-side workspace symbol configuration",

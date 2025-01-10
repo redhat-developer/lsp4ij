@@ -20,7 +20,17 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ClientConfigurationSettings {
     /**
-     * Client-side code workspace symbol settings.
+     * Client-side code completion settings.
+     */
+    public static class ClientConfigurationCompletionSettings {
+        /**
+         * Whether or not client-side context-aware completion sorting should be used. Defaults to false.
+         */
+        public boolean useContextAwareSorting = false;
+    }
+
+    /**
+     * Client-side workspace symbol settings.
      */
     public static class ClientConfigurationWorkspaceSymbolSettings {
         /**
@@ -35,7 +45,12 @@ public class ClientConfigurationSettings {
     public boolean caseSensitive = false;
 
     /**
-     * Client-side code workspace symbol settings
+     * Client-side code completion settings
+     */
+    public @NotNull ClientConfigurationCompletionSettings completion = new ClientConfigurationCompletionSettings();
+
+    /**
+     * Client-side workspace symbol settings
      */
     public @NotNull ClientConfigurationWorkspaceSymbolSettings workspaceSymbol = new ClientConfigurationWorkspaceSymbolSettings();
 }

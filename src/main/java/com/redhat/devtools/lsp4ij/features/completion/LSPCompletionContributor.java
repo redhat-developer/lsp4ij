@@ -17,14 +17,17 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.patterns.StandardPatterns;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
@@ -102,8 +105,6 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
-    private static final CompletionItemComparator completionProposalComparator = new CompletionItemComparator();
-
     private void addCompletionItems(@NotNull CompletionParameters parameters,
                                     @NotNull CompletionPrefix completionPrefix,
                                     @NotNull Either<List<CompletionItem>, CompletionList> completion,
@@ -119,12 +120,23 @@ public class LSPCompletionContributor extends CompletionContributor {
             items.addAll(completionList.getItems());
         }
 
-        // Sort by item.sortText
-        items.sort(completionProposalComparator);
+        PsiFile originalFile = parameters.getOriginalFile();
+        LSPClientFeatures clientFeatures = languageServer.getClientFeatures();
+
+        // Sort the completions as appropriate based on client configuration
+        boolean useContextAwareSorting = clientFeatures.getCompletionFeature().useContextAwareSorting(originalFile);
+        if (useContextAwareSorting) {
+            // Cache-buster for prefix changes since that can affect ordering
+            result.restartCompletionOnPrefixChange(StandardPatterns.string().longerThan(0));
+        }
+        PrefixMatcher prefixMatcher = useContextAwareSorting ? result.getPrefixMatcher() : null;
+        String currentWord = useContextAwareSorting ? getCurrentWord(parameters) : null;
+        boolean caseSensitive = clientFeatures.isCaseSensitive(originalFile);
+        items.sort(new CompletionItemComparator(prefixMatcher, currentWord, caseSensitive));
         int size = items.size();
 
         Set<String> addedLookupStrings = new HashSet<>();
-        var completionFeature = languageServer.getClientFeatures().getCompletionFeature();
+        var completionFeature = clientFeatures.getCompletionFeature();
         LSPCompletionFeature.LSPCompletionContext context = new LSPCompletionFeature.LSPCompletionContext(parameters, languageServer);
         // Items now sorted by priority, low index == high priority
         for (int i = 0; i < size; i++) {
@@ -184,6 +196,23 @@ public class LSPCompletionContributor extends CompletionContributor {
                 }
             }
         }
+    }
+
+    @Nullable
+    private static String getCurrentWord(@NotNull CompletionParameters parameters) {
+        PsiFile originalFile = parameters.getOriginalFile();
+        VirtualFile virtualFile = originalFile.getVirtualFile();
+        Document document = virtualFile != null ? LSPIJUtils.getDocument(virtualFile) : null;
+        if (document != null) {
+            int offset = parameters.getOffset();
+            TextRange wordTextRange = LSPIJUtils.getWordRangeAt(document, originalFile, offset);
+            if (wordTextRange != null) {
+                CharSequence documentChars = document.getCharsSequence();
+                CharSequence wordChars = documentChars.subSequence(wordTextRange.getStartOffset(), wordTextRange.getEndOffset());
+                return wordChars.toString();
+            }
+        }
+        return null;
     }
 
     protected void updateWithItemDefaults(@NotNull CompletionItem item,
