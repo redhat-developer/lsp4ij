@@ -112,14 +112,14 @@ public class CompletionItemComparatorTest {
         PrefixMatcher prefixMatcher = createPrefixMatcher("f", caseSensitive);
         CompletionItemComparator comparator = new CompletionItemComparator(prefixMatcher, null, caseSensitive);
         mutableItems.sort(comparator);
-        assertSortOrder(mutableItems, feItem, fiItem, foItem, fooItem, fumItem, barItem, bazItem);
+        assertSortOrder(mutableItems, foItem, fooItem, feItem, fiItem, fumItem, barItem, bazItem);
 
         // Then with a single upper-cased letter which should yield the exact same results
         mutableItems = new ArrayList<>(items);
         prefixMatcher = createPrefixMatcher("F", caseSensitive);
         comparator = new CompletionItemComparator(prefixMatcher, null, caseSensitive);
         mutableItems.sort(comparator);
-        assertSortOrder(mutableItems, feItem, fiItem, foItem, fooItem, fumItem, barItem, bazItem);
+        assertSortOrder(mutableItems, feItem, fiItem, fumItem, foItem, fooItem, barItem, bazItem);
 
         // Then with a second letter with mixed case
         mutableItems = new ArrayList<>(items);
@@ -153,6 +153,39 @@ public class CompletionItemComparatorTest {
         comparator = new CompletionItemComparator(prefixMatcher, null, caseSensitive);
         mutableItems.sort(comparator);
         assertSortOrder(mutableItems, feItem, bazItem, fiItem, fumItem, barItem, foItem, fooItem);
+    }
+
+    @Test
+    public void compareLabelsAgainstComplexPrefixCaseSensitive() {
+        boolean caseSensitive = true;
+
+        CompletionItem toLocaleLowerCaseItem = newItem("toLocaleLowerCase", null);
+        CompletionItem toLocaleUpperCaseItem = newItem("toLocaleUpperCase", null);
+        CompletionItem toLowerCaseItem = newItem("toLowerCase", null);
+        CompletionItem toStringItem = newItem("toString", null);
+        CompletionItem toUpperCaseItem = newItem("toUpperCase", null);
+        List<CompletionItem> items = List.of(toLocaleLowerCaseItem, toLocaleUpperCaseItem, toLowerCaseItem, toStringItem, toUpperCaseItem);
+
+        // First with a prefix of "to"
+        List<CompletionItem> mutableItems = new ArrayList<>(items);
+        PrefixMatcher prefixMatcher = createPrefixMatcher("to", caseSensitive);
+        CompletionItemComparator comparator = new CompletionItemComparator(prefixMatcher, null, caseSensitive);
+        mutableItems.sort(comparator);
+        assertSortOrder(mutableItems, toLocaleLowerCaseItem, toLocaleUpperCaseItem, toLowerCaseItem, toStringItem, toUpperCaseItem);
+
+        // Then with a prefix of "toU"
+        mutableItems = new ArrayList<>(items);
+        prefixMatcher = createPrefixMatcher("toU", caseSensitive);
+        comparator = new CompletionItemComparator(prefixMatcher, null, caseSensitive);
+        mutableItems.sort(comparator);
+        assertSortOrder(mutableItems, toUpperCaseItem, toLocaleUpperCaseItem, toLocaleLowerCaseItem, toLowerCaseItem, toStringItem);
+
+        // Then with a prefix of "toUC"
+        mutableItems = new ArrayList<>(items);
+        prefixMatcher = createPrefixMatcher("toUC", caseSensitive);
+        comparator = new CompletionItemComparator(prefixMatcher, null, caseSensitive);
+        mutableItems.sort(comparator);
+        assertSortOrder(mutableItems, toUpperCaseItem, toLocaleUpperCaseItem, toLocaleLowerCaseItem, toLowerCaseItem, toStringItem);
     }
 
     // Current word tests
@@ -235,6 +268,11 @@ public class CompletionItemComparatorTest {
             @Override
             public boolean prefixMatches(@NotNull String name) {
                 return minusculeMatcher.isStartMatch(name);
+            }
+
+            @Override
+            public int matchingDegree(String string) {
+                return minusculeMatcher.matchingDegree(string);
             }
 
             @Override
