@@ -1,5 +1,8 @@
 {
   "caseSensitive": false,
+  "completion": {
+    "useContextAwareSorting": true
+  },
   "workspaceSymbol": {
     "supportsGotoClass": false
   }

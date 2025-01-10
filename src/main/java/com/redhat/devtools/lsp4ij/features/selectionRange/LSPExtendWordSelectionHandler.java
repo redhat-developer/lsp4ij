@@ -15,6 +15,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
@@ -41,19 +42,23 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             return false;
         }
 
-        PsiFile file = element.getContainingFile();
-        if ((file == null) || !file.isValid()) {
+        PsiFile psiFile = element.getContainingFile();
+        if ((psiFile == null) || !psiFile.isValid()) {
             return false;
         }
 
-        Project project = file.getProject();
+        Project project = psiFile.getProject();
         if (project.isDisposed()) {
             return false;
         }
 
+        VirtualFile file = psiFile.getVirtualFile();
+        if (file == null) {
+            return false;
+        }
         // Only if textDocument/selectionRange is supported for the file
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getSelectionRangeFeature().isSelectionRangeSupported(file));
+                .hasAny(file, ls -> ls.getClientFeatures().getSelectionRangeFeature().isSelectionRangeSupported(psiFile));
     }
 
     @Override
@@ -63,7 +68,7 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
                                   int offset,
                                   @NotNull Editor editor) {
         PsiFile file = element.getContainingFile();
-        if (file == null) {
+        if (file == null || file.getVirtualFile() == null) {
             return null;
         }
 
