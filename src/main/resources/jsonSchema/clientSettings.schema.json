@@ -20,7 +20,7 @@
           "type": "boolean",
           "title": "Use context-aware completion sorting",
           "description": "Whether or not client-side context-aware completion sorting should be used.",
-          "default": true
+          "default": false
         }
       }
     },

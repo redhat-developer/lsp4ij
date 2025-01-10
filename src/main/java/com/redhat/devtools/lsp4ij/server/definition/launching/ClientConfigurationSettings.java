@@ -24,9 +24,9 @@ public class ClientConfigurationSettings {
      */
     public static class ClientConfigurationCompletionSettings {
         /**
-         * Whether or not client-side context-aware completion sorting should be used. Defaults to true.
+         * Whether or not client-side context-aware completion sorting should be used. Defaults to false.
          */
-        public boolean useContextAwareSorting = true;
+        public boolean useContextAwareSorting = false;
     }
 
     /**
