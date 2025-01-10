@@ -235,7 +235,6 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | boolean isItemTextBold(CompletionItem item)                                           | Returns the IntelliJ lookup item text bold from the given LSP completion item and null otherwise.                                                                                                                                  | `item.getKind() == CompletionItemKind.Keyword`                                        |
 | boolean useContextAwareSorting(PsiFile file)                                          | Returns `true` if client-side context-aware completion sorting should be used for the specified file and `false` otherwise.                                                                                                        | `true`                                                                                |
 | boolean useTemplateForSingleArgument(PsiFile file)                                    | Returns `true` if an editor template should be used for a single invocation argument and `false` otherwise.                                                                                                                        | `true`                                                                                |
-|
 
 ## LSP Declaration Feature
 
