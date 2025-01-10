@@ -79,7 +79,7 @@ public abstract class LSPCallHierarchyTreeStructureBase extends LSPHierarchyTree
     }
 
     protected void fillChildren(@NotNull HierarchyNodeDescriptor descriptor,
-                                @NotNull CompletableFuture<List<CallHierarchyItemData>> callHierarchyFuture,
+                                @Nullable CompletableFuture<List<CallHierarchyItemData>> callHierarchyFuture,
                                 @NotNull List<LSPHierarchyNodeDescriptor> descriptors) {
         if (isDoneNormally(callHierarchyFuture)) {
             List<CallHierarchyItemData> items = callHierarchyFuture.getNow(null);

@@ -63,7 +63,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
             return;
         }
         try {
-            List<? extends TextEdit> edits = formatFuture.getNow(null);
+            List<? extends TextEdit> edits = formatFuture != null ? formatFuture.getNow(null) : null;
             String formatted = edits != null ? applyEdits(editor.getDocument(), edits) : formattingRequest.getDocumentText();
             formattingRequest.onTextReady(formatted);
         } catch (Exception e) {
