@@ -302,8 +302,8 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
      * @return true if client-side context-aware completion sorting should be used; otherwise false
      */
     public boolean useContextAwareSorting(@NotNull PsiFile file) {
-        // Default to enabled
-        return true;
+        // Default to disabled
+        return false;
     }
 
     /**
