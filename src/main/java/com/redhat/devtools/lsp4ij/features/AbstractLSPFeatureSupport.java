@@ -38,8 +38,10 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * Returns the (cached or not) LSP requests for all language servers applying to a given Psi file or project.
      *
      * @param params the LSP parameters expected to execute LSP requests.
-     * @return the (cached or not) LSP requests for all language servers applying to a given Psi file or project.
+     * @return the (cached or not) LSP requests for all language servers applying to a given Psi file or project and null otherwise
+     * (rare case when the future is loaded and cancel is occurred in the same time which set the future to null).
      */
+    @Nullable
     public CompletableFuture<Result> getFeatureData(Params params) {
         if (!isValidLSPFuture()) {
             // - the LSP requests have never been executed

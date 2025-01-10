@@ -79,7 +79,7 @@ public abstract class LSPTypeHierarchyTreeStructureBase extends LSPHierarchyTree
     }
 
     protected void fillChildren(@NotNull HierarchyNodeDescriptor descriptor,
-                                @NotNull CompletableFuture<List<TypeHierarchyItemData>> typeHierarchyFuture,
+                                @Nullable CompletableFuture<List<TypeHierarchyItemData>> typeHierarchyFuture,
                                 @NotNull List<LSPHierarchyNodeDescriptor> descriptors) {
         if (isDoneNormally(typeHierarchyFuture)) {
             List<TypeHierarchyItemData> items = typeHierarchyFuture.getNow(null);
