@@ -73,8 +73,8 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
 
-    private static final Pattern TEMPLATE_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d:.+?}|\\d+)");
     // These patterns should match code snippets that look like parenthesized, comma-delimited invocation arg lists
+    private static final Pattern TEMPLATE_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d:.+?}|\\d+)");
     // TODO: What supported language grammars would not be supported by these pattern?
     private static final Pattern INVOCATION_ARGS_SNIPPET_PATTERN = Pattern.compile("\\(\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + "(?:,\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + ")*\\s*\\)");
     private static final String END_VARIABLE = "$0";
@@ -179,7 +179,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     @NotNull
     private String adjustSnippetContent(@NotNull String snippetContent) {
         // If configured not to use a template for snippets that look like invocation arguments, simplify the snippet
-        if (!completionFeature.useTemplateForInvocationOnlyCodeSnippet(this.file)) {
+        if (!completionFeature.useTemplateForInvocationOnlySnippet(this.file)) {
             Matcher invocationArgsSnippetMatcher = INVOCATION_ARGS_SNIPPET_PATTERN.matcher(snippetContent);
             if (invocationArgsSnippetMatcher.find()) {
                 int invocationArgsStartIndex = invocationArgsSnippetMatcher.start();

@@ -143,7 +143,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
             }
             """;
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_default_singleArg() {
+    public void testUseTemplateForInvocationOnlySnippet_default_singleArg() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -155,14 +155,14 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
         );
     }
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_singleArg() {
+    public void testUseTemplateForInvocationOnlySnippet_disabled_singleArg() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
                 "Math.abs(<caret>)",
                 MOCK_TEXT_COMPLETION_JSON,
                 ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlySnippet = false
         );
     }
 
@@ -170,7 +170,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
 
     private static final String ABS_NO_VARIABLE_VALUE_MOCK_COMPLETION_ITEM_RESOLVE_JSON = ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON.replace("${1:x}", "$1");
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_default_singleArg_noVariableValue() {
+    public void testUseTemplateForInvocationOnlySnippet_default_singleArg_noVariableValue() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -183,14 +183,14 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
         );
     }
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_singleArg_noVariableValue() {
+    public void testUseTemplateForInvocationOnlySnippet_disabled_singleArg_noVariableValue() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
                 "Math.abs(<caret>)",
                 MOCK_TEXT_COMPLETION_JSON,
                 ABS_NO_VARIABLE_VALUE_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlySnippet = false
         );
     }
 
@@ -234,7 +234,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
             }
             """;
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_default_multipleArgs() {
+    public void testUseTemplateForInvocationOnlySnippet_default_multipleArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -246,14 +246,14 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
         );
     }
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_multipleArgs() {
+    public void testUseTemplateForInvocationOnlySnippet_disabled_multipleArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
                 "Math.pow(<caret>)",
                 MOCK_TEXT_COMPLETION_JSON,
                 POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlySnippet = false
         );
     }
 
@@ -297,7 +297,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
             }
             """;
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_default_noArgs() {
+    public void testUseTemplateForInvocationOnlySnippet_default_noArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -310,7 +310,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
         );
     }
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_noArgs() {
+    public void testUseTemplateForInvocationOnlySnippet_disabled_noArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -318,7 +318,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 "Math.random()<caret>",
                 MOCK_TEXT_COMPLETION_JSON,
                 RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlySnippet = false
         );
     }
 
@@ -327,7 +327,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
 
     private static final String NON_ARGUMENT_TAB_STOPS_MOCK_COMPLETION_ITEM_RESOLVE_JSON = POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON.replace("$0", " /* Enter text ${3:here} */$0");
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_default_nonArgumentTabStops() {
+    public void testUseTemplateForInvocationOnlySnippet_default_nonArgumentTabStops() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -339,7 +339,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
         );
     }
 
-    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_nonArgumentTabStops() {
+    public void testUseTemplateForInvocationOnlySnippet_disabled_nonArgumentTabStops() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -347,7 +347,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 "Math.pow(x, y) /* Enter text here */<caret>",
                 MOCK_TEXT_COMPLETION_JSON,
                 NON_ARGUMENT_TAB_STOPS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlySnippet = false
         );
     }
 }

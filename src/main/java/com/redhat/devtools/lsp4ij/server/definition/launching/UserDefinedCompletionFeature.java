@@ -31,9 +31,9 @@ public class UserDefinedCompletionFeature extends LSPCompletionFeature {
     }
 
     @Override
-    public boolean useTemplateForInvocationOnlyCodeSnippet(@NotNull PsiFile file) {
+    public boolean useTemplateForInvocationOnlySnippet(@NotNull PsiFile file) {
         ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return clientConfiguration != null ? clientConfiguration.completion.useTemplateForInvocationOnlyCodeSnippet : super.useTemplateForInvocationOnlyCodeSnippet(file);
+        return clientConfiguration != null ? clientConfiguration.completion.useTemplateForInvocationOnlySnippet : super.useTemplateForInvocationOnlySnippet(file);
     }
 }
