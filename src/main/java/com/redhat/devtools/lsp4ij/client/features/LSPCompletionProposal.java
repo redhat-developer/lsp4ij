@@ -56,6 +56,8 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHtml;
@@ -70,6 +72,12 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 public class LSPCompletionProposal extends LookupElement implements Pointer<LSPCompletionProposal>, Symbol, DocumentationTarget {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
+
+    private static final Pattern TEMPLATE_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d:.+?}|\\d+)");
+    // These patterns should match code snippets that look like parenthesized, comma-delimited invocation arg lists
+    // TODO: What supported language grammars would not be supported by these pattern?
+    private static final Pattern INVOCATION_ARGS_SNIPPET_PATTERN = Pattern.compile("\\(\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + "(?:,\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + ")*\\s*\\)");
+    private static final String END_VARIABLE = "$0";
 
     private CompletionItem item; // can be replaced with resolved
     private final PsiFile file;
@@ -106,14 +114,16 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         updateCompletionItemFromResolved();
         Template template = null;
         if (item.getInsertTextFormat() == InsertTextFormat.Snippet) {
+            // Adjust the snippet content as appropriate based on client config
+            String snippetContent = adjustSnippetContent(getInsertText());
+
             // Insert text has snippet syntax, ex : ${1:name}
-            String snippetContent = getInsertText();
             // Get the indentation settings
             LspSnippetIndentOptions indentOptions = CompletionProposalTools.createLspIndentOptions(snippetContent, file);
             // Load the insert text to build:
             // - an IJ Template instance which will take care of replacement of placeholders
             // - the insert text without placeholders
-            template = SnippetTemplateFactory.createTemplate(snippetContent, context.getProject(), name -> getVariableValue(name), indentOptions);
+            template = SnippetTemplateFactory.createTemplate(snippetContent, context.getProject(), this::getVariableValue, indentOptions);
             // Update the TextEdit with the content snippet content without placeholders
             // ex : ${1:name} --> name
             updateInsertTextForTemplateProcessing(template.getTemplateText());
@@ -122,8 +132,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         // Apply all text edits
         apply(context.getDocument(), context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
 
-        // Move to the first tab stop if there's a single invocation argument with no default value or templates are
-        // disabled for single argument invocations
+        // Just move to the first tab stop if there's a single invocation argument with no default value
         if (shouldMoveToFirstTabStop(template)) {
             int segmentOffset = template.getSegmentOffset(0);
             EditorModificationUtil.moveCaretRelatively(editor, -template.getTemplateText().length());
@@ -167,14 +176,48 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         this.item = resolved;
     }
 
+    @NotNull
+    private String adjustSnippetContent(@NotNull String snippetContent) {
+        // If configured not to use a template for snippets that look like invocation arguments, simplify the snippet
+        if (!completionFeature.useTemplateForInvocationOnlyCodeSnippet(this.file)) {
+            Matcher invocationArgsSnippetMatcher = INVOCATION_ARGS_SNIPPET_PATTERN.matcher(snippetContent);
+            if (invocationArgsSnippetMatcher.find()) {
+                int invocationArgsStartIndex = invocationArgsSnippetMatcher.start();
+                int invocationArgsEndIndex = invocationArgsSnippetMatcher.end();
+
+                // Make sure that there are no other snippet variables aside from end outside of the invocation arguments
+                Matcher templateVariableMatcher = TEMPLATE_VARIABLE_PATTERN.matcher(snippetContent);
+                while (templateVariableMatcher.find()) {
+                    if ((templateVariableMatcher.start() < invocationArgsStartIndex) ||
+                        (templateVariableMatcher.start() > invocationArgsEndIndex) ||
+                        (templateVariableMatcher.end() < invocationArgsStartIndex) ||
+                        (templateVariableMatcher.end() > invocationArgsEndIndex)) {
+                        // If we found a non-end variable outside of the invocation args, don't change the snippet
+                        if (!END_VARIABLE.equals(templateVariableMatcher.group())) {
+                            return snippetContent;
+                        }
+                    }
+                }
+
+                // Update the snippet should be updated so that only $0 ends up between the invocation parens
+                String beforeInvocationArgs = snippetContent.substring(0, invocationArgsStartIndex + 1);
+                String afterInvocationArgs = snippetContent.substring(invocationArgsEndIndex - 1);
+                snippetContent = beforeInvocationArgs.replace(END_VARIABLE, "") + END_VARIABLE + afterInvocationArgs.replace(END_VARIABLE, "");
+            }
+        }
+
+        return snippetContent;
+    }
+
     @Contract("null -> false")
     private boolean shouldMoveToFirstTabStop(@Nullable Template template) {
+        // Move to the first tab stop if there are no template variables or the only template variable has no value
         List<Variable> templateVariables = template != null ? template.getVariables() : Collections.emptyList();
         Variable templateVariable = (templateVariables != null) && (templateVariables.size() == 1) ? ContainerUtil.getFirstItem(templateVariables) : null;
         Expression templateVariableExpression = templateVariable != null ? templateVariable.getExpression() : null;
         Result templateVariableResult = templateVariableExpression != null ? templateVariableExpression.calculateResult(null) : null;
         String templateVariableValue = templateVariableResult != null ? templateVariableResult.toString() : null;
-        return (templateVariableResult != null) && (StringUtil.isEmpty(templateVariableValue) || !completionFeature.useTemplateForSingleArgument(file));
+        return (templateVariableResult != null) && StringUtil.isEmpty(templateVariableValue);
     }
 
     /**

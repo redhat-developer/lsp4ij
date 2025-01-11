@@ -28,9 +28,9 @@ public class ClientConfigurationSettings {
          */
         public boolean useContextAwareSorting = false;
         /**
-         * Whether or not an editor template should be used for a single invocation argument. Defaults to true.
+         * Whether or not an editor template should be used for invocation-only code snippets. Defaults to true.
          */
-        public boolean useTemplateForSingleArgument = true;
+        public boolean useTemplateForInvocationOnlyCodeSnippet = true;
     }
 
     /**
