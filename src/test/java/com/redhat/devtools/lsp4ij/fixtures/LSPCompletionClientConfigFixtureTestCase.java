@@ -44,7 +44,6 @@ import java.util.function.Consumer;
  */
 public abstract class LSPCompletionClientConfigFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
-    private static final String TEMPLATE = "<template>";
     private static final String CARET = "<caret>";
 
     public LSPCompletionClientConfigFixtureTestCase(String... fileNamePatterns) {
@@ -136,10 +135,13 @@ public abstract class LSPCompletionClientConfigFixtureTestCase extends LSPCodeIn
         myFixture.selectItem(lookupElement);
 
         // Confirm that the file body has been reformatted as expected
-        int caretOffset = caretOffset(fileBodyAfter);
-        assertTrue(caretOffset > -1);
         assertEquals(removeCaret(fileBodyAfter), editor.getDocument().getText());
-        assertEquals(caretOffset, caretModel.getOffset());
+
+        // And if a final caret was specified, confirm it
+        int caretOffset = caretOffset(fileBodyAfter);
+        if (caretOffset > -1) {
+            assertEquals(caretOffset, caretModel.getOffset());
+        }
     }
 
     @NotNull

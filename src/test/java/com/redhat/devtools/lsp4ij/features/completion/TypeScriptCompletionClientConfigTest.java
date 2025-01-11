@@ -323,7 +323,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
     }
 
 
-    // NON-ARGUMENT TAB STOPS TESTS
+    // NON-ARGUMENT TAB STOP TESTS
 
     private static final String NON_ARGUMENT_TAB_STOPS_MOCK_COMPLETION_ITEM_RESOLVE_JSON = POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON.replace("$0", " /* Enter text ${3:here} */$0");
 
