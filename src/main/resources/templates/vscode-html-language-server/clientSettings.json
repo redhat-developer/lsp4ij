@@ -2,7 +2,7 @@
   "caseSensitive": false,
   "completion": {
     "useContextAwareSorting": true,
-    "useTemplateForInvocationOnlyCodeSnippet": false
+    "useTemplateForInvocationOnlySnippet": false
   },
   "workspaceSymbol": {
     "supportsGotoClass": false
