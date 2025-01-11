@@ -73,10 +73,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
 
-    // These patterns should match code snippets that look like parenthesized, comma-delimited invocation arg lists
-    private static final Pattern TEMPLATE_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d:.+?}|\\d+)");
+    // These patterns should match code snippets that look like parenthesized, comma-/whitespace-delimited invocation arg lists
+    private static final Pattern TEMPLATE_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d[:|].+?}|\\d+)");
     // TODO: What supported language grammars would not be supported by these pattern?
-    private static final Pattern INVOCATION_ARGS_SNIPPET_PATTERN = Pattern.compile("\\(\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + "(?:,\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + ")*\\s*\\)");
+    private static final Pattern INVOCATION_ARGS_SNIPPET_PATTERN = Pattern.compile("\\(\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + "(?:(?:,\\s*|\\s+)" + TEMPLATE_VARIABLE_PATTERN.pattern() + ")*\\s*\\)");
     private static final String END_VARIABLE = "$0";
 
     private CompletionItem item; // can be replaced with resolved
