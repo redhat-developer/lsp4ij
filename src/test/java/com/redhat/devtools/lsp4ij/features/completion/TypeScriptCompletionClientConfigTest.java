@@ -143,26 +143,54 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
             }
             """;
 
-    public void testUseTemplateForSingleArgumentDefault_singleArg() {
+    public void testUseTemplateForInvocationOnlyCodeSnippet_default_singleArg() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
                 "Math.abs(x)<caret>",
                 MOCK_TEXT_COMPLETION_JSON,
                 ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                // Default config uses templates for single arg
+                // Default config
                 null
         );
     }
 
-    public void testUseTemplateForSingleArgumentDisabled_singleArg() {
+    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_singleArg() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
                 "Math.abs(<caret>)",
                 MOCK_TEXT_COMPLETION_JSON,
                 ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
+        );
+    }
+
+    // SINGLE ARGUMENT TESTS WITH NO VARIABLE VALUES
+
+    private static final String ABS_NO_VARIABLE_VALUE_MOCK_COMPLETION_ITEM_RESOLVE_JSON = ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON.replace("${1:x}", "$1");
+
+    public void testUseTemplateForInvocationOnlyCodeSnippet_default_singleArg_noVariableValue() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                // Even when disabled, the caret should be placed in the parens because there's no variable value
+                "Math.abs(<caret>)",
+                MOCK_TEXT_COMPLETION_JSON,
+                ABS_NO_VARIABLE_VALUE_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                // Default config
+                null
+        );
+    }
+
+    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_singleArg_noVariableValue() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                "Math.abs(<caret>)",
+                MOCK_TEXT_COMPLETION_JSON,
+                ABS_NO_VARIABLE_VALUE_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
         );
     }
 
@@ -206,27 +234,26 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
             }
             """;
 
-    public void testUseTemplateForSingleArgumentDefault_multipleArgs() {
+    public void testUseTemplateForInvocationOnlyCodeSnippet_default_multipleArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
                 "Math.pow(x, y)<caret>",
                 MOCK_TEXT_COMPLETION_JSON,
                 POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                // Default config uses templates for single arg
+                // Default config
                 null
         );
     }
 
-    public void testUseTemplateForSingleArgumentDisabled_multipleArgs() {
+    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_multipleArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
-                // Because this has multiple arguments, the template will still be used
-                "Math.pow(x, y)<caret>",
+                "Math.pow(<caret>)",
                 MOCK_TEXT_COMPLETION_JSON,
                 POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
         );
     }
 
@@ -270,7 +297,7 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
             }
             """;
 
-    public void testUseTemplateForSingleArgumentDefault_noArgs() {
+    public void testUseTemplateForInvocationOnlyCodeSnippet_default_noArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -278,12 +305,12 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 "Math.random()<caret>",
                 MOCK_TEXT_COMPLETION_JSON,
                 RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                // Default config uses templates for single arg
+                // Default config
                 null
         );
     }
 
-    public void testUseTemplateForSingleArgumentDisabled_noArgs() {
+    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_noArgs() {
         assertTemplateForArguments(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY_BEFORE,
@@ -291,7 +318,36 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 "Math.random()<caret>",
                 MOCK_TEXT_COMPLETION_JSON,
                 RANDOM_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
-                clientConfig -> clientConfig.completion.useTemplateForSingleArgument = false
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
+        );
+    }
+
+
+    // NON-ARGUMENT TAB STOPS TESTS
+
+    private static final String NON_ARGUMENT_TAB_STOPS_MOCK_COMPLETION_ITEM_RESOLVE_JSON = POW_MOCK_COMPLETION_ITEM_RESOLVE_JSON.replace("$0", " /* Enter text ${3:here} */$0");
+
+    public void testUseTemplateForInvocationOnlyCodeSnippet_default_nonArgumentTabStops() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                "Math.pow(x, y) /* Enter text here */<caret>",
+                MOCK_TEXT_COMPLETION_JSON,
+                NON_ARGUMENT_TAB_STOPS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                // Default config
+                null
+        );
+    }
+
+    public void testUseTemplateForInvocationOnlyCodeSnippet_disabled_nonArgumentTabStops() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                // Because there are arguments outside of the invocation args, the template will be used
+                "Math.pow(x, y) /* Enter text here */<caret>",
+                MOCK_TEXT_COMPLETION_JSON,
+                NON_ARGUMENT_TAB_STOPS_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlyCodeSnippet = false
         );
     }
 }

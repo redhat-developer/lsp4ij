@@ -308,12 +308,12 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Whether or not an editor template should be used for a single invocation argument.
+     * Whether or not an editor template should be used for invocation-only code snippets.
      *
      * @param file the file
-     * @return true an editor template should be used for a single invocation argument; otherwise false
+     * @return true an editor template should be used for invocation-only code snippets; otherwise false
      */
-    public boolean useTemplateForSingleArgument(@NotNull PsiFile file) {
+    public boolean useTemplateForInvocationOnlyCodeSnippet(@NotNull PsiFile file) {
         // Default to enabled
         return true;
     }
