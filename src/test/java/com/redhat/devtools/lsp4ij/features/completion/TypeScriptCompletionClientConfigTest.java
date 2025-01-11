@@ -194,6 +194,33 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
         );
     }
 
+    // OPTIONAL ARGUMENT TESTS
+
+    private static final String OPTIONAL_ARG_MOCK_COMPLETION_ITEM_RESOLVE_JSON = ABS_MOCK_COMPLETION_ITEM_RESOLVE_JSON.replace("${1:x}", "${1:x}$2");
+
+    public void testUseTemplateForInvocationOnlySnippet_default_optionalArg() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                "Math.abs(x)<caret>",
+                MOCK_TEXT_COMPLETION_JSON,
+                OPTIONAL_ARG_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                // Default config
+                null
+        );
+    }
+
+    public void testUseTemplateForInvocationOnlySnippet_disabled_optionalArg() {
+        assertTemplateForArguments(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY_BEFORE,
+                "Math.abs(<caret>)",
+                MOCK_TEXT_COMPLETION_JSON,
+                OPTIONAL_ARG_MOCK_COMPLETION_ITEM_RESOLVE_JSON,
+                clientConfig -> clientConfig.completion.useTemplateForInvocationOnlySnippet = false
+        );
+    }
+
     // MULTIPLE ARGUMENTS TESTS
 
     // language=json
@@ -321,7 +348,6 @@ public class TypeScriptCompletionClientConfigTest extends LSPCompletionClientCon
                 clientConfig -> clientConfig.completion.useTemplateForInvocationOnlySnippet = false
         );
     }
-
 
     // NON-ARGUMENT TAB STOP TESTS
 
