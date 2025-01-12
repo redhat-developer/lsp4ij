@@ -308,7 +308,10 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         }
     }
 
-    private static ConsoleViewContentType getContentType(MessageType type) {
+    private static ConsoleViewContentType getContentType(@Nullable MessageType type) {
+        if (type == null) {
+            return ConsoleViewContentType.LOG_INFO_OUTPUT;
+        }
         return switch (type) {
             case Error -> ConsoleViewContentType.LOG_ERROR_OUTPUT;
             case Info -> ConsoleViewContentType.LOG_INFO_OUTPUT;
