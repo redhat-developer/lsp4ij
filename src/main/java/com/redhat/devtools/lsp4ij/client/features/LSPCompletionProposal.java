@@ -74,9 +74,9 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
 
     // These patterns should match code snippets that look like parenthesized, comma-/whitespace-delimited invocation arg lists
-    private static final Pattern TEMPLATE_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d[:|].+?}|\\d+)");
+    private static final Pattern SNIPPET_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d[:|].+?}|\\d+)");
     // TODO: What supported language grammars would not be supported by these pattern?
-    private static final Pattern INVOCATION_ARGS_SNIPPET_PATTERN = Pattern.compile("\\(\\s*" + TEMPLATE_VARIABLE_PATTERN.pattern() + "(?:(?:,\\s*|\\s*)" + TEMPLATE_VARIABLE_PATTERN.pattern() + ")*\\s*\\)");
+    private static final Pattern INVOCATION_ARGS_SNIPPET_PATTERN = Pattern.compile("\\(\\s*" + SNIPPET_VARIABLE_PATTERN.pattern() + "(?:(?:,\\s*|\\s*)" + SNIPPET_VARIABLE_PATTERN.pattern() + ")*\\s*\\)");
     private static final String END_VARIABLE = "$0";
 
     private CompletionItem item; // can be replaced with resolved
@@ -186,14 +186,14 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                 int invocationArgsEndIndex = invocationArgsSnippetMatcher.end();
 
                 // Make sure that there are no other snippet variables aside from end outside of the invocation arguments
-                Matcher templateVariableMatcher = TEMPLATE_VARIABLE_PATTERN.matcher(snippetContent);
-                while (templateVariableMatcher.find()) {
-                    if ((templateVariableMatcher.start() < invocationArgsStartIndex) ||
-                        (templateVariableMatcher.start() > invocationArgsEndIndex) ||
-                        (templateVariableMatcher.end() < invocationArgsStartIndex) ||
-                        (templateVariableMatcher.end() > invocationArgsEndIndex)) {
+                Matcher snippetVariableMatcher = SNIPPET_VARIABLE_PATTERN.matcher(snippetContent);
+                while (snippetVariableMatcher.find()) {
+                    if ((snippetVariableMatcher.start() < invocationArgsStartIndex) ||
+                        (snippetVariableMatcher.start() > invocationArgsEndIndex) ||
+                        (snippetVariableMatcher.end() < invocationArgsStartIndex) ||
+                        (snippetVariableMatcher.end() > invocationArgsEndIndex)) {
                         // If we found a non-end variable outside of the invocation args, don't change the snippet
-                        if (!END_VARIABLE.equals(templateVariableMatcher.group())) {
+                        if (!END_VARIABLE.equals(snippetVariableMatcher.group())) {
                             return snippetContent;
                         }
                     }
