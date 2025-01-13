@@ -72,6 +72,7 @@ Here are some projects that use LSP4IJ:
  * [Liberty Tools for IntelliJ](https://github.com/OpenLiberty/liberty-tools-intellij)
  * [Vespa Schema Language Support](https://github.com/vespa-engine/vespa/tree/master/integration/schema-language-server/clients/intellij)
  * [Jimmer DTO LSP](https://github.com/Enaium/jimmer-dto-lsp)
+ * [Qt Tools for Android Studio](https://code.qt.io/cgit/qt-labs/android-studio-tools.git/)
 
 ## Requirements
 
