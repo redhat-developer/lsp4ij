@@ -1,5 +1,8 @@
-plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.7.0"
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
 }
 
 rootProject.name = "lsp4ij"
