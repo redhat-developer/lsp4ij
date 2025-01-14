@@ -11,6 +11,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
+
 package com.redhat.devtools.lsp4ij.features.completion;
 
 import com.intellij.codeInsight.template.Template;
@@ -33,15 +34,25 @@ public class SnippetTemplateFactory {
     /**
      * Returns an Intellij Template instanced loaded from the given LSP snippet content.
      *
-     * @param snippetContent    the LSP snippet content
-     * @param project           the project.
-     * @param variableResolver the LSP variable resolvers (ex to resolve ${TM_SELECTED_TEXT}).
+     * @param snippetContent                      the LSP snippet content
+     * @param project                             the project.
+     * @param variableResolver                    the LSP variable resolvers (ex to resolve ${TM_SELECTED_TEXT}).
+     * @param useTemplateForInvocationOnlySnippet whether or not a template should be used for an invocation-only snippet
      * @return an Intellij Template instanced loaded from the given LSP snippet content.
      */
-    public static @NotNull Template createTemplate(@NotNull String snippetContent, @NotNull Project project, @NotNull Function<String, String> variableResolver, LspSnippetIndentOptions indentOptions) {
+    public static @NotNull Template createTemplate(@NotNull String snippetContent,
+                                                   @NotNull Project project,
+                                                   @NotNull Function<String, String> variableResolver,
+                                                   LspSnippetIndentOptions indentOptions,
+                                                   boolean useTemplateForInvocationOnlySnippet) {
         Template template = TemplateManager.getInstance(project).createTemplate("", "");
         template.setInline(true);
-        LspSnippetParser parser = new LspSnippetParser(new SnippetTemplateLoader(template, variableResolver, indentOptions));
+        LspSnippetParser parser = new LspSnippetParser(new SnippetTemplateLoader(
+                template,
+                variableResolver,
+                indentOptions,
+                useTemplateForInvocationOnlySnippet
+        ));
         parser.parse(snippetContent);
         return template;
     }

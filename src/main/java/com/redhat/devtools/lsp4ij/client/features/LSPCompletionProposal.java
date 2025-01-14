@@ -8,6 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
+
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.codeInsight.AutoPopupController;
@@ -56,8 +57,6 @@ import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHtml;
@@ -72,12 +71,6 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 public class LSPCompletionProposal extends LookupElement implements Pointer<LSPCompletionProposal>, Symbol, DocumentationTarget {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPCompletionProposal.class);
-
-    // These patterns should match code snippets that look like parenthesized, comma-/whitespace-delimited invocation arg lists
-    private static final Pattern SNIPPET_VARIABLE_PATTERN = Pattern.compile("\\$(?:\\{\\d[:|].+?}|\\d+)");
-    // TODO: What supported language grammars would not be supported by these pattern?
-    private static final Pattern INVOCATION_ARGS_SNIPPET_PATTERN = Pattern.compile("\\(\\s*" + SNIPPET_VARIABLE_PATTERN.pattern() + "(?:(?:,\\s*|\\s*)" + SNIPPET_VARIABLE_PATTERN.pattern() + ")*\\s*\\)");
-    private static final String END_VARIABLE = "$0";
 
     private CompletionItem item; // can be replaced with resolved
     private final PsiFile file;
@@ -114,16 +107,24 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         updateCompletionItemFromResolved();
         Template template = null;
         if (item.getInsertTextFormat() == InsertTextFormat.Snippet) {
-            // Adjust the snippet content as appropriate based on client config
-            String snippetContent = adjustSnippetContent(getInsertText());
-
             // Insert text has snippet syntax, ex : ${1:name}
+            String snippetContent = getInsertText();
+
+            // Use client config to determine how the snippet should be transformed into a template
+            boolean useTemplateForInvocationOnlySnippet = completionFeature.useTemplateForInvocationOnlySnippet(file);
+
             // Get the indentation settings
             LspSnippetIndentOptions indentOptions = CompletionProposalTools.createLspIndentOptions(snippetContent, file);
             // Load the insert text to build:
             // - an IJ Template instance which will take care of replacement of placeholders
             // - the insert text without placeholders
-            template = SnippetTemplateFactory.createTemplate(snippetContent, context.getProject(), this::getVariableValue, indentOptions);
+            template = SnippetTemplateFactory.createTemplate(
+                    snippetContent,
+                    context.getProject(),
+                    this::getVariableValue,
+                    indentOptions,
+                    useTemplateForInvocationOnlySnippet
+            );
             // Update the TextEdit with the content snippet content without placeholders
             // ex : ${1:name} --> name
             updateInsertTextForTemplateProcessing(template.getTemplateText());
@@ -174,39 +175,6 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         // Before resolve -> bar
         // After resolve -> bar()$0
         this.item = resolved;
-    }
-
-    @NotNull
-    private String adjustSnippetContent(@NotNull String snippetContent) {
-        // If configured not to use a template for snippets that look like invocation arguments, simplify the snippet
-        if (!completionFeature.useTemplateForInvocationOnlySnippet(this.file)) {
-            Matcher invocationArgsSnippetMatcher = INVOCATION_ARGS_SNIPPET_PATTERN.matcher(snippetContent);
-            if (invocationArgsSnippetMatcher.find()) {
-                int invocationArgsStartIndex = invocationArgsSnippetMatcher.start();
-                int invocationArgsEndIndex = invocationArgsSnippetMatcher.end();
-
-                // Make sure that there are no other snippet variables aside from end outside of the invocation arguments
-                Matcher snippetVariableMatcher = SNIPPET_VARIABLE_PATTERN.matcher(snippetContent);
-                while (snippetVariableMatcher.find()) {
-                    if ((snippetVariableMatcher.start() < invocationArgsStartIndex) ||
-                        (snippetVariableMatcher.start() > invocationArgsEndIndex) ||
-                        (snippetVariableMatcher.end() < invocationArgsStartIndex) ||
-                        (snippetVariableMatcher.end() > invocationArgsEndIndex)) {
-                        // If we found a non-end variable outside of the invocation args, don't change the snippet
-                        if (!END_VARIABLE.equals(snippetVariableMatcher.group())) {
-                            return snippetContent;
-                        }
-                    }
-                }
-
-                // Update the snippet should be updated so that only $0 ends up between the invocation parens
-                String beforeInvocationArgs = snippetContent.substring(0, invocationArgsStartIndex + 1);
-                String afterInvocationArgs = snippetContent.substring(invocationArgsEndIndex - 1);
-                snippetContent = beforeInvocationArgs.replace(END_VARIABLE, "") + END_VARIABLE + afterInvocationArgs.replace(END_VARIABLE, "");
-            }
-        }
-
-        return snippetContent;
     }
 
     @Contract("null -> false")
