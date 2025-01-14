@@ -10,19 +10,37 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.selectionRange;
 
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SelectionRange;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP selectionRange support which loads and caches selection ranges by consuming:
@@ -33,10 +51,70 @@ import java.util.concurrent.CompletableFuture;
  */
 public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<LSPSelectionRangeParams, List<SelectionRange>> {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPSelectionRangeSupport.class);
+
     private Integer previousOffset;
 
     public LSPSelectionRangeSupport(@NotNull PsiFile file) {
         super(file);
+    }
+
+    @NotNull
+    @ApiStatus.Internal
+    public static List<SelectionRange> getSelectionRanges(@NotNull PsiFile file,
+                                                          @NotNull Document document,
+                                                          int offset) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
+            return Collections.emptyList();
+        }
+
+        // Consume LSP 'textDocument/selectionRanges' request
+        LSPSelectionRangeSupport selectionRangeSupport = LSPFileSupport.getSupport(file).getSelectionRangeSupport();
+        TextDocumentIdentifier textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile());
+        Position position = LSPIJUtils.toPosition(offset, document);
+        var params = new LSPSelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position), offset);
+        CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);
+        try {
+            waitUntilDone(selectionRangesFuture, file);
+        } catch (ProcessCanceledException e) {
+            //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+            selectionRangeSupport.cancel();
+            return Collections.emptyList();
+        } catch (CancellationException e) {
+            // cancel the LSP requests textDocument/selectionRanges
+            selectionRangeSupport.cancel();
+            return Collections.emptyList();
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/selectionRanges' request", e);
+            return Collections.emptyList();
+        }
+
+        if (!isDoneNormally(selectionRangesFuture)) {
+            return Collections.emptyList();
+        }
+
+        // textDocument/selectionRanges has been collected correctly, create list of IJ SelectionDescriptor from LSP SelectionRange list
+        return selectionRangesFuture.getNow(Collections.emptyList());
+    }
+
+    /**
+     * Converts the LSP selection range into the IDE text range.
+     *
+     * @param selectionRange the LSP selection range
+     * @param document       the document for for which the selection range applies
+     * @return the corresponding text range
+     */
+    @NotNull
+    @ApiStatus.Internal
+    public static TextRange getTextRange(@NotNull SelectionRange selectionRange,
+                                         @NotNull Document document) {
+        Range range = selectionRange.getRange();
+        Position rangeStart = range.getStart();
+        Position rangeEnd = range.getEnd();
+        int startOffset = LSPIJUtils.toOffset(rangeStart, document);
+        int endOffset = LSPIJUtils.toOffset(rangeEnd, document);
+        return TextRange.create(startOffset, endOffset);
     }
 
     public CompletableFuture<List<SelectionRange>> getSelectionRanges(LSPSelectionRangeParams params) {
@@ -57,7 +135,6 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
     private static @NotNull CompletableFuture<List<SelectionRange>> getSelectionRanges(@NotNull PsiFile file,
                                                                                        @NotNull LSPSelectionRangeParams params,
                                                                                        @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getSelectionRangeFeature().isEnabled(file),
                 f -> f.getSelectionRangeFeature().isSupported(file))
