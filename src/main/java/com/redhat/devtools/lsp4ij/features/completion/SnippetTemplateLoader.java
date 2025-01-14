@@ -36,6 +36,13 @@ import java.util.function.Function;
  */
 public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
+    // NOTE: These are quite simple now and basically help look for a segment that ends with "(" (ignoring trailing
+    // white space) to determine that an invocation has started and one that begins with ")" (again, ignore leading
+    // white space) to determine that an invocation has ended. If LSP languages with more complex invocation patterns
+    // are found these will need to be updated accordingly.
+    private static final char INVOCATION_START = '(';
+    private static final char INVOCATION_END = ')';
+
     private final Template template;
     private final boolean useTemplateForInvocationOnlySnippet;
 
@@ -81,28 +88,48 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
                 // Keep track of invocations
                 if (templateSegment.isTextSegment()) {
                     String textSegment = templateSegment.getTextSegment();
-                    if (isInvocationStart(textSegment)) {
+                    if (StringUtil.trimTrailing(textSegment).endsWith(String.valueOf(INVOCATION_START))) {
                         // Increment the invocation depth
-                        nestedInvocationCount++;
+                        nestedInvocationCount += StringUtil.countChars(textSegment, INVOCATION_START);
 
                         // Only add segments for the top-level invocation
                         if (nestedInvocationCount == 1) {
                             topLevelInvocationCount++;
-                            simplifiedTemplateSegments.add(templateSegment);
+
+                            // Only add the portion starting with the first open paren
+                            int firstOpenParenIndex = textSegment.indexOf(INVOCATION_START);
+                            if (firstOpenParenIndex > -1) {
+                                simplifiedTemplateSegments.add(SnippetTemplateSegment.textSegment(textSegment.substring(0, firstOpenParenIndex + 1)));
+                            } else {
+                                topLevelInvocationCount = 0;
+                                break;
+                            }
+
                             simplifiedTemplateSegments.add(SnippetTemplateSegment.endVariable());
                         }
-                    } else if ((nestedInvocationCount > 0) && isInvocationEnd(textSegment)) {
-                        // Decrement the invocation depth
-                        nestedInvocationCount--;
+                    } else {
+                        if ((nestedInvocationCount > 0)) {
+                            if (StringUtil.trimLeading(textSegment).startsWith(String.valueOf(INVOCATION_END))) {
+                                // Decrement the invocation depth
+                                nestedInvocationCount -= StringUtil.countChars(textSegment, INVOCATION_END);
 
-                        // Add the invocation end text segment if this completes a top-level invocation
-                        if (nestedInvocationCount == 0) {
+                                // Add the invocation end text segment if this completes a top-level invocation
+                                if (nestedInvocationCount == 0) {
+                                    // Only add the portion starting with the last close paren
+                                    int lastCloseParenIndex = textSegment.lastIndexOf(INVOCATION_END);
+                                    if (lastCloseParenIndex > -1) {
+                                        simplifiedTemplateSegments.add(SnippetTemplateSegment.textSegment(textSegment.substring(lastCloseParenIndex)));
+                                    } else {
+                                        topLevelInvocationCount = 0;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        // Otherwise only add text segments outside an invocation as invocations should only contain an end variable
+                        else if (nestedInvocationCount == 0) {
                             simplifiedTemplateSegments.add(templateSegment);
                         }
-                    }
-                    // Otherwise only add text segments outside an invocation as invocations should only contain an end variable
-                    else if (nestedInvocationCount == 0) {
-                        simplifiedTemplateSegments.add(templateSegment);
                     }
                 }
                 // If we find a variable not inside an invocation, we can't simplify this template
@@ -139,19 +166,6 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
                 template.addEndVariable();
             }
         }
-    }
-
-    // NOTE: These are quite simple now and basically look for a segment that ends with "(" (ignoring trailing white
-    // space) to determine that an invocation has started and one that begins with ")" (again, ignore leading white
-    // space) to determine that an invocation has ended. If LSP languages with more complex invocation patterns are
-    // found these will need to be updated accordingly.
-
-    private static boolean isInvocationStart(@NotNull String text) {
-        return StringUtil.trimTrailing(text).endsWith("(");
-    }
-
-    private static boolean isInvocationEnd(@NotNull String text) {
-        return StringUtil.trimLeading(text).startsWith(")");
     }
 
     @Override
