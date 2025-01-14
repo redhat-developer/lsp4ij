@@ -24,6 +24,67 @@
         }
       }
     },
+    "format": {
+      "type": "object",
+      "title": "Client-side formatter configuration",
+      "additionalProperties": false,
+      "properties": {
+        "formatOnCloseBrace": {
+          "type": "boolean",
+          "title": "Format on close brace",
+          "description": "Whether or not to format on close brace.",
+          "default": false
+        },
+        "formatOnCloseBraceCharacters": {
+          "type": "string",
+          "title": "Close brace characters that should trigger on-type formatting",
+          "description": "The specific close brace characters that should trigger on-type formatting. Defaults to the language's close brace characters."
+        },
+        "formatOnCloseBraceScope": {
+          "type": "string",
+          "enum": [
+            "CODE_BLOCK",
+            "FILE"
+          ],
+          "title": "The scope to format when close brace is typed",
+          "description": "The scope that should be formatted when a close brace is typed.",
+          "default": "CODE_BLOCK"
+        },
+        "formatOnStatementTerminator": {
+          "type": "boolean",
+          "title": "Format on statement terminator",
+          "description": "Whether or not to format on statement terminator.",
+          "default": false
+        },
+        "formatOnStatementTerminatorCharacters": {
+          "type": "string",
+          "title": "Statement terminator characters that should trigger on-type formatting",
+          "description": "The specific statement terminator characters that should trigger on-type formatting."
+        },
+        "formatOnStatementTerminatorScope": {
+          "type": "string",
+          "enum": [
+            "STATEMENT",
+            "CODE_BLOCK",
+            "FILE"
+          ],
+          "title": "The scope to format when statement terminator is typed",
+          "description": "The scope that should be formatted when a statement terminator is typed.",
+          "default": "STATEMENT"
+        },
+        "formatOnCompletionTrigger": {
+          "type": "boolean",
+          "title": "Format on completion trigger",
+          "description": "Whether or not to format on completion trigger.",
+          "default": false
+        },
+        "formatOnCompletionTriggerCharacters": {
+          "type": "string",
+          "title": "Completion trigger characters that should trigger on-type formatting",
+          "description": "The specific completion trigger characters that should trigger on-type formatting. Defaults to the language's completion trigger characters."
+        }
+      }
+    },
     "workspaceSymbol": {
       "type": "object",
       "title": "Client-side workspace symbol configuration",

@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,7 +35,7 @@ import java.util.Map;
  * {@link com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition} implementation to start a
  * language server with a process command defined by the user.
  */
-public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition {
+public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition implements ClientConfigurableLanguageServerDefinition {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);//$NON-NLS-1$
 
@@ -209,6 +210,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         return initializationOptions;
     }
 
+    @Override
+    @Nullable
     public ClientConfigurationSettings getLanguageServerClientConfiguration() {
         if ((clientConfiguration == null) && (clientConfigurationContent != null) && !clientConfigurationContent.isBlank()) {
             try {

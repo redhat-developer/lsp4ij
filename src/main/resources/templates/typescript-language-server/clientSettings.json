@@ -3,6 +3,12 @@
   "completion": {
     "useContextAwareSorting": true
   },
+  "format": {
+    "formatOnCloseBrace": true,
+    "formatOnStatementTerminator": true,
+    "formatOnStatementTerminatorCharacters": ";",
+    "formatOnCompletionTrigger": true
+  },
   "workspaceSymbol": {
     "supportsGotoClass": true
   }

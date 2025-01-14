@@ -17,6 +17,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -58,7 +59,8 @@ public class LSPTypedHandlerDelegate extends TypedHandlerDelegate {
         return result;
     }
 
-    private static boolean hasLanguageServerSupportingCompletionTriggerCharacters(char charTyped, Project project, PsiFile file) {
+    @ApiStatus.Internal
+    public static boolean hasLanguageServerSupportingCompletionTriggerCharacters(char charTyped, Project project, PsiFile file) {
         return LanguageServiceAccessor.getInstance(project)
                 .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures()
                         .getCompletionFeature()
