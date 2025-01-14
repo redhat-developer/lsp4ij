@@ -72,41 +72,44 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
         // If we should not use a template for an invocation-only snippet, see whether this fits the pattern
         if (!useTemplateForInvocationOnlySnippet) {
             boolean hasInvocation = false;
-            boolean inInvocation = false;
+            // While it's unlikely to happen in a typical invocation arg list scenario, this helps ensure we're only
+            // reacting to the contents of balanced parentheses
+            int nestedInvocationCount = 0;
             boolean hasVariablesOutsideInvocation = false;
             List<SnippetTemplateSegment> simplifiedTemplateSegments = new ArrayList<>(templateSegments.size());
             for (SnippetTemplateSegment templateSegment : templateSegments) {
                 // Keep track of invocations
                 if (templateSegment.isTextSegment()) {
                     String textSegment = templateSegment.getTextSegment();
-                    if (!inInvocation && isInvocationStart(textSegment)) {
-                        // Mark us as having an invocation and being in it now
+                    if ((nestedInvocationCount == 0) && isInvocationStart(textSegment)) {
+                        // Mark us as having seen an invocation and increment the invocation depth
                         hasInvocation = true;
-                        inInvocation = true;
+                        nestedInvocationCount++;
 
                         // Add the invocation start text segment and an end variable inside the invocation
                         simplifiedTemplateSegments.add(templateSegment);
                         simplifiedTemplateSegments.add(SnippetTemplateSegment.endVariable());
-                    } else if (inInvocation && isInvocationEnd(textSegment)) {
-                        // Mark us as no longer being in an invocation
-                        inInvocation = false;
+                    } else if ((nestedInvocationCount > 0) && isInvocationEnd(textSegment)) {
+                        // Decrement the invocation depth
+                        nestedInvocationCount--;
+
                         // Add the invocation end text segment
                         simplifiedTemplateSegments.add(templateSegment);
                     }
                     // Otherwise only add text segments outside the invocation as the invocation should only contain the end variable
-                    else if (!inInvocation) {
+                    else if (nestedInvocationCount == 0) {
                         simplifiedTemplateSegments.add(templateSegment);
                     }
                 }
-                // If we find a variable not in an invocation, we can't simplify this template
-                else if ((templateSegment.isVariable() || templateSegment.isNamedVariable()) && !inInvocation) {
+                // If we find a variable not inside an invocation, we can't simplify this template
+                else if ((templateSegment.isVariable() || templateSegment.isNamedVariable()) && (nestedInvocationCount == 0)) {
                     hasVariablesOutsideInvocation = true;
                     break;
                 }
             }
 
-            // If we found an invocation and all variables were inside of it, use the simplified template segments
-            if (hasInvocation && !hasVariablesOutsideInvocation) {
+            // If we found an invocation (including balanced parens) and all variables were inside of it, use the simplified template segments
+            if (hasInvocation && (nestedInvocationCount == 0) && !hasVariablesOutsideInvocation) {
                 effectiveTemplateSegments = simplifiedTemplateSegments;
             }
         }
