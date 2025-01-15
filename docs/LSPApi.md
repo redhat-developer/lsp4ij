@@ -234,7 +234,7 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | String getTailText(CompletionItem item)                                               | Returns the IntelliJ lookup tail text from the given LSP completion item and null otherwise.                                                                                                                                       | `item.getLabelDetails().getDetail()`                                                  |
 | boolean isItemTextBold(CompletionItem item)                                           | Returns the IntelliJ lookup item text bold from the given LSP completion item and null otherwise.                                                                                                                                  | `item.getKind() == CompletionItemKind.Keyword`                                        |
 | boolean useContextAwareSorting(PsiFile file)                                          | Returns `true` if client-side context-aware completion sorting should be used for the specified file and `false` otherwise.                                                                                                        | `false`                                                                               |
-|
+| boolean useTemplateForInvocationOnlySnippet(PsiFile file)                             | Returns `true` if an editor template should be used for invocation-only snippets and `false` otherwise.                                                                                                                            | `true`                                                                                |
 
 ## LSP Declaration Feature
 

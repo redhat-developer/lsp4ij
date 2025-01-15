@@ -12,15 +12,20 @@ package com.redhat.devtools.lsp4ij.mock;
 
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * {@link LanguageServerDefinition} implementation to register the mock language server.
  */
-public class MockLanguageServerDefinition extends LanguageServerDefinition {
+public class MockLanguageServerDefinition extends LanguageServerDefinition implements ClientConfigurableLanguageServerDefinition {
 
     private static final String SERVER_ID = "mock-server-id";
+
+    private final ClientConfigurationSettings clientConfigurationSettings = new ClientConfigurationSettings();
 
     public MockLanguageServerDefinition() {
         this(SERVER_ID);
@@ -33,5 +38,11 @@ public class MockLanguageServerDefinition extends LanguageServerDefinition {
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
         return new MockConnectionProvider();
+    }
+
+    @Override
+    @Nullable
+    public ClientConfigurationSettings getLanguageServerClientConfiguration() {
+        return clientConfigurationSettings;
     }
 }
