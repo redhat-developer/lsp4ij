@@ -35,26 +35,25 @@ public class SettingsHelperTest extends BasePlatformTestCase {
                         "subsettingA": 1,
                         "subsettingB": 2
                     }
-                }
+                },
+                "flat.scalar.value": "flat value",
+                "flat.scalar.value2": "flat value2",
+                "JimmerDTO.Classpath.FindBuilder": false,
+                "JimmerDTO.Classpath.FindConfiguration": false
             }
             """;
 
-    private static void assertFindSettings(@NotNull String json, @NotNull String[] sections, @Nullable String expectedJsonText) {
+    private static void assertFindSettings(@NotNull String json, @NotNull String section, @Nullable String expectedJsonText) {
         JsonObject jsonObject = JsonParser.parseReader(new StringReader(json)).getAsJsonObject();
         JsonElement expectedJson = expectedJsonText == null ? null : JsonParser.parseReader(new StringReader(expectedJsonText));
 
-        JsonElement result = SettingsHelper.findSettings(sections, jsonObject);
+        JsonElement result = SettingsHelper.findSettings(section, jsonObject);
 
         assertEquals(result, expectedJson);
     }
 
-    public void testGetSettingsIdentityOnEmptySections() {
-        String[] requestedPath = new String[0];
-        assertFindSettings(testJson, requestedPath, testJson);
-    }
-
     public void testGetSettingsObjectValue() {
-        String[] requestedPath = new String[]{"mylsp"};
+        var requestedPath = "mylsp";
         assertFindSettings(testJson, requestedPath, """
                 {
                     "myscalarsetting": "value",
@@ -67,22 +66,67 @@ public class SettingsHelperTest extends BasePlatformTestCase {
     }
 
     public void testGetSettingsPrimitiveValue() {
-        String[] requestedPath = new String[]{"mylsp", "myscalarsetting"};
+        var requestedPath = "mylsp.myscalarsetting";
         assertFindSettings(testJson, requestedPath, "\"value\"");
     }
 
     public void testGetSettingsDeepPrimitiveValue() {
-        String[] requestedPath = new String[]{"mylsp", "myobjectsettings", "subsettingA"};
+        var requestedPath = "mylsp.myobjectsettings.subsettingA";
         assertFindSettings(testJson, requestedPath, "1");
     }
 
     public void testGetSettingsNonExistingValue() {
-        String[] requestedPath = new String[]{"mylsp", "nonexistant"};
+        var requestedPath = "mylsp.nonexistant";
         assertFindSettings(testJson, requestedPath, null);
     }
 
     public void testGetSettingsEmptyJson() {
-        String[] requestedPath = new String[]{"mylsp", "myobjectsettings", "subsettingA"};
+        var requestedPath = "mylsp.myobjectsettings.subsettingA";
         assertFindSettings("{}", requestedPath, null);
+    }
+
+    public void testFlatScalarValue() {
+        var requestedPath = "flat.scalar.value";
+        assertFindSettings(testJson, requestedPath, "\"flat value\"");
+    }
+
+    public void testFlatScalar() {
+        var requestedPath = "flat.scalar";
+        assertFindSettings(testJson, requestedPath, """
+                {
+                    "flat.scalar.value": "flat value",
+                    "flat.scalar.value2": "flat value2"
+                }
+                """);
+    }
+
+    public void testFlatScalarNonExisting() {
+        var requestedPath = "flat.scalar.nonexistant";
+        assertFindSettings(testJson, requestedPath, null);
+    }
+
+    public void testJimmerDTO() {
+        var requestedPath = "JimmerDTO";
+        assertFindSettings(testJson, requestedPath, """
+                {
+                    "JimmerDTO.Classpath.FindBuilder": false,
+                    "JimmerDTO.Classpath.FindConfiguration": false
+                }
+                """);
+    }
+
+    public void testJimmerDTOClasspath() {
+        var requestedPath = "JimmerDTO.Classpath";
+        assertFindSettings(testJson, requestedPath, """
+                {
+                    "JimmerDTO.Classpath.FindBuilder": false,
+                    "JimmerDTO.Classpath.FindConfiguration": false
+                }
+                """);
+    }
+
+    public void testJimmerDTOClasspathFindBuilder() {
+        var requestedPath = "JimmerDTO.Classpath.FindBuilder";
+        assertFindSettings(testJson, requestedPath, "false");
     }
 }
