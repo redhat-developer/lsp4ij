@@ -28,6 +28,10 @@ public class ClientConfigurationSettings {
          * Whether or not client-side context-aware completion sorting should be used. Defaults to false.
          */
         public boolean useContextAwareSorting = false;
+        /**
+         * Whether or not an editor template should be used for invocation-only snippets. Defaults to true.
+         */
+        public boolean useTemplateForInvocationOnlySnippet = true;
     }
 
     /**

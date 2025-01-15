@@ -162,6 +162,10 @@ public final class MockLanguageServer implements LanguageServer {
 		this.textDocumentService.setMockCompletionList(completionList);
 	}
 
+	public void setCompletionItem(CompletionItem completionItem) {
+		this.textDocumentService.setMockCompletionItem(completionItem);
+	}
+
 	public void setSemanticTokens(SemanticTokens semanticTokens) {
 		this.textDocumentService.setSemanticTokens(semanticTokens);
 	}

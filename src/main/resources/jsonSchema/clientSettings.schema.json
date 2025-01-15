@@ -21,6 +21,12 @@
           "title": "Use context-aware completion sorting",
           "description": "Whether or not client-side context-aware completion sorting should be used.",
           "default": false
+        },
+        "useTemplateForInvocationOnlySnippet": {
+          "type": "boolean",
+          "title": "Use editor template for invocation-only snippets",
+          "description": "Whether or not an editor template should be used for invocation-only snippets.",
+          "default": true
         }
       }
     },

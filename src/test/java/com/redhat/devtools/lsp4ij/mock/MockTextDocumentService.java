@@ -35,6 +35,7 @@ import java.util.function.Function;
 public class MockTextDocumentService implements TextDocumentService {
 
     private CompletionList mockCompletionList;
+    private CompletionItem mockCompletionItem;
     private Hover mockHover;
     private List<? extends Location> mockDefinitionLocations;
     private List<? extends LocationLink> mockTypeDefinitions;
@@ -67,10 +68,11 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
         this._futureFactory = futureFactory;
-        // Some default values for mocks, can be overriden
+        // Some default values for mocks, can be overridden
         CompletionItem item = new CompletionItem();
         item.setLabel("Mock completion item");
         mockCompletionList = new CompletionList(false, Collections.singletonList(item));
+        mockCompletionItem = null;
         mockHover = new Hover(Collections.singletonList(Either.forLeft("Mock hover")), null);
         this.remoteProxies = new ArrayList<>();
         this.documentSymbols = Collections.emptyList();
@@ -88,7 +90,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(mockCompletionItem);
     }
 
     @Override
@@ -267,6 +269,10 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockCompletionList = completionList;
     }
 
+    public void setMockCompletionItem(CompletionItem mockCompletionItem) {
+        this.mockCompletionItem = mockCompletionItem;
+    }
+
     public void setDidOpenCallback(CompletableFuture<DidOpenTextDocumentParams> didOpenExpectation) {
         this.didOpenCallback = didOpenExpectation;
     }
@@ -309,6 +315,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void reset() {
         this.mockCompletionList = new CompletionList();
+        this.mockCompletionItem = null;
         this.mockDefinitionLocations = Collections.emptyList();
         this.mockTypeDefinitions = Collections.emptyList();
         this.mockHover = null;
