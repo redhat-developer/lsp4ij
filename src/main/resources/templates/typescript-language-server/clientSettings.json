@@ -4,6 +4,12 @@
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
   },
+  "format": {
+    "formatOnCloseBrace": true,
+    "formatOnStatementTerminator": true,
+    "formatOnStatementTerminatorCharacters": ";",
+    "formatOnCompletionTrigger": true
+  },
   "workspaceSymbol": {
     "supportsGotoClass": true
   }

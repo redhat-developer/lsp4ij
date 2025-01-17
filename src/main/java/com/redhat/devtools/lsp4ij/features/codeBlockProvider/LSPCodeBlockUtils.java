@@ -101,6 +101,12 @@ public final class LSPCodeBlockUtils {
     }
 
     @NotNull
+    @ApiStatus.Internal
+    public static Map<Character, Character> getBracePairs(@NotNull PsiFile file) {
+        return getBracePairsFwd(file);
+    }
+
+    @NotNull
     private static Map<Character, Character> getBracePairsFwd(@NotNull PsiFile file) {
         return CachedValuesManager.getCachedValue(file, () -> {
             Map<Character, Character> bracePairs = file instanceof TextMateFile ? LSPIJTextMateUtils.getBracePairs(file) :

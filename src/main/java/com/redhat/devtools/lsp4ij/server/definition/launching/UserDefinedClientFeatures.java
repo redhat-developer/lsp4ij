@@ -27,6 +27,7 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
 
         // Use the extended feature implementations
         setCompletionFeature(new UserDefinedCompletionFeature());
+        setFormattingFeature(new UserDefinedFormattingFeature());
         setWorkspaceSymbolFeature(new UserDefinedWorkspaceSymbolFeature());
     }
 

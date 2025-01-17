@@ -20,11 +20,13 @@ import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder;
 import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport;
 import org.eclipse.lsp4j.FoldingRange;
-import org.eclipse.lsp4j.SelectionRange;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Code block provider that uses information from {@link LSPSelectionRangeSupport} and {@link LSPFoldingRangeBuilder}.
@@ -34,12 +36,24 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
     @Override
     @Nullable
     public TextRange getCodeBlockRange(Editor editor, PsiFile file) {
+        if ((editor == null) || (file == null)) {
+            return null;
+        }
+
+        int offset = editor.getCaretModel().getOffset();
+        return getCodeBlockRange(editor, file, offset);
+    }
+
+    @Nullable
+    @ApiStatus.Internal
+    public static TextRange getCodeBlockRange(@NotNull Editor editor,
+                                              @NotNull PsiFile file,
+                                              int offset) {
         Document document = editor.getDocument();
         CharSequence documentChars = document.getCharsSequence();
         int documentLength = documentChars.length();
 
         // Adjust the offset slightly based on before/after brace to ensure evaluation occurs "within" the braced block
-        int offset = editor.getCaretModel().getOffset();
         Character beforeCharacter = offset > 0 ? documentChars.charAt(offset - 1) : null;
         Character afterCharacter = offset < documentLength ? documentChars.charAt(offset) : null;
         if (LSPCodeBlockUtils.isCodeBlockStartChar(file, afterCharacter)) {
@@ -78,50 +92,65 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                 closeBraceChar,
                 closeBraceOffset
         );
-        if (codeBlockRange != null) {
-            return codeBlockRange;
-        }
 
         // Failing that, try to find it using the folding ranges
-        return getUsingFoldingRanges(
-                file,
-                document,
-                offset,
-                openBraceChar,
-                openBraceOffset,
-                closeBraceChar,
-                closeBraceOffset
-        );
+        if (codeBlockRange == null) {
+            codeBlockRange = getUsingFoldingRanges(
+                    file,
+                    document,
+                    offset,
+                    openBraceChar,
+                    openBraceOffset,
+                    closeBraceChar,
+                    closeBraceOffset
+            );
+        }
+
+        // If those failed and we're seemingly anchored by a brace character, try to search unanchored
+        if ((codeBlockRange == null) && (openBraceChar != null) && (closeBraceChar != null)) {
+            codeBlockRange = getUsingSelectionRanges(
+                    file,
+                    editor,
+                    offset,
+                    null,
+                    -1,
+                    null,
+                    -1
+            );
+
+            if (codeBlockRange == null) {
+                codeBlockRange = getUsingFoldingRanges(
+                        file,
+                        document,
+                        offset,
+                        null,
+                        -1,
+                        null,
+                        -1
+                );
+            }
+        }
+
+        return codeBlockRange;
     }
 
     @Nullable
-    private TextRange getUsingSelectionRanges(@NotNull PsiFile file,
-                                              @NotNull Editor editor,
-                                              int offset,
-                                              @Nullable Character openBraceChar,
-                                              int openBraceOffset,
-                                              @Nullable Character closeBraceChar,
-                                              int closeBraceOffset) {
+    private static TextRange getUsingSelectionRanges(@NotNull PsiFile file,
+                                                     @NotNull Editor editor,
+                                                     int offset,
+                                                     @Nullable Character openBraceChar,
+                                                     int openBraceOffset,
+                                                     @Nullable Character closeBraceChar,
+                                                     int closeBraceOffset) {
         Document document = editor.getDocument();
-        List<SelectionRange> selectionRanges = LSPSelectionRangeSupport.getSelectionRanges(file, document, offset);
-        if (!ContainerUtil.isEmpty(selectionRanges)) {
-            // Convert the selection ranges into text ranges
-            Set<TextRange> textRanges = new LinkedHashSet<>(selectionRanges.size());
-            for (SelectionRange selectionRange : selectionRanges) {
-                textRanges.add(LSPSelectionRangeSupport.getTextRange(selectionRange, document));
-                for (SelectionRange parentSelectionRange = selectionRange.getParent();
-                     parentSelectionRange != null;
-                     parentSelectionRange = parentSelectionRange.getParent()) {
-                    textRanges.add(LSPSelectionRangeSupport.getTextRange(parentSelectionRange, document));
-                }
-            }
-
+        List<TextRange> selectionTextRanges = LSPSelectionRangeSupport.getSelectionTextRanges(file, editor, offset);
+        if (!ContainerUtil.isEmpty(selectionTextRanges)) {
             CharSequence documentChars = document.getCharsSequence();
             int documentLength = documentChars.length();
 
             // Find containing text ranges that are bounded by brace pairs
-            List<TextRange> containingTextRanges = new ArrayList<>(textRanges.size());
-            for (TextRange textRange : textRanges) {
+            List<TextRange> containingTextRanges = new ArrayList<>(selectionTextRanges.size());
+            for (TextRange textRange : selectionTextRanges) {
                 if (textRange.getLength() > 1) {
                     int startOffset = textRange.getStartOffset();
                     int endOffset = textRange.getEndOffset();

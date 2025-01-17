@@ -172,7 +172,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends TextEdit>> rangeFormatting(DocumentRangeFormattingParams params) {
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(mockFormattingTextEdits);
     }
 
     @Override

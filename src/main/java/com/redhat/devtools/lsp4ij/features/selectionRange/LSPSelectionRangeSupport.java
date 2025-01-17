@@ -11,9 +11,11 @@
 package com.redhat.devtools.lsp4ij.features.selectionRange;
 
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
@@ -32,9 +34,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -115,6 +115,30 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
         int startOffset = LSPIJUtils.toOffset(rangeStart, document);
         int endOffset = LSPIJUtils.toOffset(rangeEnd, document);
         return TextRange.create(startOffset, endOffset);
+    }
+
+    @NotNull
+    @ApiStatus.Internal
+    public static List<TextRange> getSelectionTextRanges(@NotNull PsiFile file,
+                                                         @NotNull Editor editor,
+                                                         int offset) {
+        Document document = editor.getDocument();
+        List<SelectionRange> selectionRanges = getSelectionRanges(file, document, offset);
+        if (ContainerUtil.isEmpty(selectionRanges)) {
+            return Collections.emptyList();
+        }
+
+        // Convert the selection ranges into text ranges
+        Set<TextRange> textRanges = new LinkedHashSet<>(selectionRanges.size());
+        for (SelectionRange selectionRange : selectionRanges) {
+            textRanges.add(getTextRange(selectionRange, document));
+            for (SelectionRange parentSelectionRange = selectionRange.getParent();
+                 parentSelectionRange != null;
+                 parentSelectionRange = parentSelectionRange.getParent()) {
+                textRanges.add(getTextRange(parentSelectionRange, document));
+            }
+        }
+        return new ArrayList<>(textRanges);
     }
 
     public CompletableFuture<List<SelectionRange>> getSelectionRanges(LSPSelectionRangeParams params) {
