@@ -248,14 +248,13 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
             if (section == null) {
                 return config;
             }
-            String[] sections = section.split("[.]");
-            return findSettings(sections, json);
+            return findSettings(section, json);
         }
         return null;
     }
 
-    protected static Object findSettings(String[] sections, JsonObject jsonObject) {
-        return SettingsHelper.findSettings(sections, jsonObject);
+    protected static Object findSettings(String section, JsonObject jsonObject) {
+        return SettingsHelper.findSettings(section, jsonObject);
     }
 
     /**

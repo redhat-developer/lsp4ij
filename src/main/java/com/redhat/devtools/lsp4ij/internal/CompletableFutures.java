@@ -123,7 +123,7 @@ public class CompletableFutures {
                 // wait for 25 ms
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
-                if (!future.isDone() && System.currentTimeMillis() - start > 5000 && ProjectIndexingManager.isIndexingAll()){
+                if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 && ProjectIndexingManager.isIndexingAll()){
                     // When some projects are being indexed,
                     // the language server startup can take a long time
                     // and the LSP feature (ex: codeLens)

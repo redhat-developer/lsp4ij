@@ -24,4 +24,13 @@ public enum ServerTrace {
     public static ServerTrace getDefaultValue() {
         return off;
     }
+
+    public static ServerTrace get(String value) {
+        try {
+            return ServerTrace.valueOf(value);
+        }
+        catch(Exception e) {
+            return getDefaultValue();
+        }
+    }
 }

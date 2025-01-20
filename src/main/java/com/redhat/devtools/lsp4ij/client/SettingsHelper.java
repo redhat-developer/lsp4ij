@@ -15,8 +15,9 @@ package com.redhat.devtools.lsp4ij.client;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Set;
 
 /**
  * Helpers for extracting nested settings from json
@@ -28,20 +29,45 @@ public class SettingsHelper {
 
     /**
      * Extract nested settings from json.
-     * @param sections path to the json element to retrieve
-     * @param parent Json to look for settings in
+     *
+     * @param section path to the json element to retrieve
+     * @param parent  Json to look for settings in
      * @return the settings retrieved in the specified section and null if the section was not found.
      */
-    public static @Nullable JsonElement findSettings(@NotNull String[] sections, @Nullable JsonObject parent) {
+    public static @Nullable JsonElement findSettings(@Nullable String section, @Nullable JsonObject parent) {
+        if (section == null || parent == null) {
+            return null;
+        }
+
+        if (parent.has(section)) {
+            return parent.get(section);
+        }
+
+        final var sections = section.split("[.]");
         JsonElement current = parent;
-        for (String section : sections) {
+        for (var split : sections) {
             if (current instanceof JsonObject currentObject) {
-                current = currentObject.get(section);
-                if (current == null) {
-                    return null;
+                current = currentObject.get(split);
+            }
+        }
+
+        if (current != null) {
+            return current;
+        }
+
+        for (var key : Set.copyOf(parent.keySet())) {
+            var keySplit = key.split("[.]");
+            if (sections.length > keySplit.length) {
+                parent.remove(key);
+                continue;
+            }
+            for (int i = 0; i < sections.length; i++) {
+                if (!sections[i].equals(keySplit[i])) {
+                    parent.remove(key);
+                    break;
                 }
             }
         }
-        return current;
+        return parent.isEmpty() ? null : parent;
     }
 }

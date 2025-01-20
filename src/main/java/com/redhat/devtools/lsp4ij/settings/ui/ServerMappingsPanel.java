@@ -44,10 +44,6 @@ public class ServerMappingsPanel {
     private FileNamePatternServerMappingTablePanel fileNamePatternMappingsPanel;
     private JBTabbedPane tabbedPane;
 
-    public ServerMappingsPanel(FormBuilder builder) {
-        this(builder, true);
-    }
-
     public ServerMappingsPanel(FormBuilder builder, boolean editable) {
         createContent(builder, editable);
     }

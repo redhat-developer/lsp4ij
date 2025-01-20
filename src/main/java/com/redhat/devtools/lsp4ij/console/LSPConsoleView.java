@@ -37,7 +37,8 @@ public class LSPConsoleView extends ConsoleViewImpl {
 
     private final LanguageServerDefinition serverDefinition;
 
-    public LSPConsoleView(@NotNull LanguageServerDefinition serverDefinition, @NotNull Project project,
+    public LSPConsoleView(@NotNull LanguageServerDefinition serverDefinition,
+                          @NotNull Project project,
                           @NotNull GlobalSearchScope searchScope,
                           boolean viewer,
                           boolean usePredefinedMessageFilter) {
@@ -47,7 +48,7 @@ public class LSPConsoleView extends ConsoleViewImpl {
 
     @Override
     public AnAction @NotNull [] createConsoleActions() {
-        // Don't call super.createConsoleActions() to avoid having some action action like previous occurrence that we don't need.
+        // Don't call super.createConsoleActions() to avoid having some action like previous occurrence that we don't need.
         List<AnAction> consoleActions = new ArrayList<>();
         consoleActions.add(new AutoFoldingAction(getEditor()));
         consoleActions.add(new ScrollToTheEndToolbarAction(getEditor()));

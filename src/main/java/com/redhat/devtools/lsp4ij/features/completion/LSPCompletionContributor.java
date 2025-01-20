@@ -132,7 +132,7 @@ public class LSPCompletionContributor extends CompletionContributor {
         PrefixMatcher prefixMatcher = useContextAwareSorting ? result.getPrefixMatcher() : null;
         String currentWord = useContextAwareSorting ? getCurrentWord(parameters) : null;
         boolean caseSensitive = clientFeatures.isCaseSensitive(originalFile);
-        items.sort(new CompletionItemComparator(prefixMatcher, currentWord, caseSensitive));
+        items.sort(new LSPCompletionItemComparator(prefixMatcher, currentWord, caseSensitive));
         int size = items.size();
 
         Set<String> addedLookupStrings = new HashSet<>();
@@ -199,7 +199,7 @@ public class LSPCompletionContributor extends CompletionContributor {
     }
 
     @Nullable
-    private static String getCurrentWord(@NotNull CompletionParameters parameters) {
+    public static String getCurrentWord(@NotNull CompletionParameters parameters) {
         PsiFile originalFile = parameters.getOriginalFile();
         VirtualFile virtualFile = originalFile.getVirtualFile();
         Document document = virtualFile != null ? LSPIJUtils.getDocument(virtualFile) : null;
