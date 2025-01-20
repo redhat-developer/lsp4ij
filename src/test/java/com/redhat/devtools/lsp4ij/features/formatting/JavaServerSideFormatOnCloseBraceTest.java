@@ -19,11 +19,11 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPServerSideOnTypeFormattingFixtureT
  * included as supported on-type formatting characters in the language server initialization response. Both of those
  * characters seem to yield empty text edit lists to be applied.
  */
-public class JavaClientSideFormatOnCloseBraceTest extends LSPServerSideOnTypeFormattingFixtureTestCase {
+public class JavaServerSideFormatOnCloseBraceTest extends LSPServerSideOnTypeFormattingFixtureTestCase {
 
     private static final String TEST_FILE_NAME = "Test.java";
 
-    public JavaClientSideFormatOnCloseBraceTest() {
+    public JavaServerSideFormatOnCloseBraceTest() {
         super("*.java");
         // On-type formatting trigger characters for jdtls
         setTriggerCharacters(";", "\n", "}");
