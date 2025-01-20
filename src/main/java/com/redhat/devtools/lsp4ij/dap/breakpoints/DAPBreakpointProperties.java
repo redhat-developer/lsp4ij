@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2024 Red Hat, Inc.
+ * Copyright (c) 2025 Red Hat, Inc.
  * Distributed under license by Red Hat, Inc. All rights reserved.
  * This program is made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution,
@@ -8,24 +8,24 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.launching.templates;
+package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
+import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Language server templates which hosts language server templates.
+ *  Debug Adapter Protocol (DAP) breakpoint properties.
  */
-public class LanguageServerTemplates {
+public class DAPBreakpointProperties extends XBreakpointProperties<DAPBreakpointProperties> {
 
-    protected List<LanguageServerTemplate> templates;
+    @Override
+    public @Nullable DAPBreakpointProperties getState() {
+        return this;
+    }
 
-    public @NotNull List<LanguageServerTemplate> getTemplates() {
-        if (templates == null) {
-            templates = new ArrayList<>();
-        }
-        return templates;
+    @Override
+    public void loadState(@NotNull DAPBreakpointProperties state) {
+
     }
 }

@@ -12,30 +12,29 @@ package com.redhat.devtools.lsp4ij.features.completion;
 
 import com.intellij.codeInsight.completion.PrefixMatcher;
 import com.intellij.openapi.util.text.StringUtil;
-import org.eclipse.lsp4j.CompletionItem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Comparator;
 
 /**
- * Compares {@link CompletionItem}s by their sortText property (falls back to comparing labels)
+ * Compares LSP CompletionItems / DAP CompletionItems by their sortText property (falls back to comparing labels)
  */
-public class CompletionItemComparator implements Comparator<CompletionItem> {
+public abstract class AbstractCompletionItemComparator<T> implements Comparator<T> {
 	private final PrefixMatcher prefixMatcher;
 	private final String currentWord;
 	private final boolean caseSensitive;
 
-	public CompletionItemComparator(@Nullable PrefixMatcher prefixMatcher,
-									@Nullable String currentWord,
-									boolean caseSensitive) {
+	public AbstractCompletionItemComparator(@Nullable PrefixMatcher prefixMatcher,
+                                            @Nullable String currentWord,
+                                            boolean caseSensitive) {
 		this.prefixMatcher = prefixMatcher;
 		this.currentWord = currentWord;
 		this.caseSensitive = caseSensitive;
 	}
 
 	@Override
-	public int compare(CompletionItem item1, CompletionItem item2) {
+	public int compare(T item1, T item2) {
 		if (item1 == item2) {
 			return 0;
 		} else if (item1 == null) {
@@ -57,13 +56,13 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 		}
 
 		// Order by language server-provided sort text
-		comparison = compare(item1.getSortText(), item2.getSortText());
+		comparison = compare(getSortText(item1), getSortText(item2));
 		if (comparison != 0) {
 			return comparison;
 		}
 
 		// If sortText is equal, fall back to comparing labels
-		return compare(item1.getLabel(), item2.getLabel());
+		return compare(getLabel(item1), getLabel(item2));
 	}
 
 	private int compare(@Nullable String string1, @Nullable String string2) {
@@ -81,10 +80,10 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 		return caseSensitive ? StringUtil.startsWith(string, prefix) : StringUtil.startsWithIgnoreCase(string, prefix);
 	}
 
-	private int compareAgainstCurrentWord(@NotNull CompletionItem item1, @NotNull CompletionItem item2) {
+	private int compareAgainstCurrentWord(@NotNull T item1, @NotNull T item2) {
 		if (currentWord != null) {
-			String label1 = item1.getLabel();
-			String label2 = item2.getLabel();
+			String label1 = getLabel(item1);
+			String label2 = getLabel(item2);
 			// Don't do this for completion offerings that are quoted strings
 			if (((label1 == null) || !StringUtil.isQuotedString(label1)) &&
 				((label2 == null) || !StringUtil.isQuotedString(label2))) {
@@ -111,11 +110,11 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 		return 0;
 	}
 
-	private int compareAgainstPrefix(@NotNull CompletionItem item1, @NotNull CompletionItem item2) {
+	private int compareAgainstPrefix(@NotNull T item1, @NotNull T item2) {
 		if (prefixMatcher != null) {
 			String prefix = prefixMatcher.getPrefix();
-			String label1 = item1.getLabel();
-			String label2 = item2.getLabel();
+			String label1 = getLabel(item1);
+			String label2 = getLabel(item2);
 			// Don't do this for completion offerings that are quoted strings
 			if (((label1 == null) || !StringUtil.isQuotedString(label1)) &&
 				((label2 == null) || !StringUtil.isQuotedString(label2))) {
@@ -144,4 +143,8 @@ public class CompletionItemComparator implements Comparator<CompletionItem> {
 
 		return 0;
 	}
+
+	protected abstract String getLabel(@NotNull T item);
+
+	protected abstract String getSortText(@NotNull T item);
 }
