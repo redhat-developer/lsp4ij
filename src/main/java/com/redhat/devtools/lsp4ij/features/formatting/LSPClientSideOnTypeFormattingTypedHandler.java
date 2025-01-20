@@ -32,10 +32,9 @@ import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSuppo
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+
+import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
 
 /**
  * Typed handler for LSP4IJ-managed files that performs automatic on-type formatting for specific keystrokes.
@@ -157,13 +156,17 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                 if ((startOffset > 0) && (documentChars.charAt(startOffset) != openBraceChar)) {
                     startOffset--;
                 }
+                if ((endOffset > 0) && (documentChars.charAt(endOffset) != closeBraceChar) && (documentChars.charAt(endOffset - 1) == closeBraceChar)) {
+                    endOffset--;
+                }
                 if ((endOffset < (documentChars.length() - 1)) && (documentChars.charAt(endOffset) != closeBraceChar)) {
                     endOffset++;
                 }
 
                 // If the range is now the braced block, format it
                 if ((documentChars.charAt(startOffset) == openBraceChar) && (documentChars.charAt(endOffset) == closeBraceChar)) {
-                    formatTextRange = TextRange.create(startOffset, endOffset);
+                    // If appropriate, make sure that the range includes the close brace that was just typed
+                    formatTextRange = TextRange.create(startOffset, endOffset == beforeOffset ? offset : endOffset);
                 }
             }
         }
@@ -198,11 +201,19 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         if (formattingScope == FormattingScope.STATEMENT) {
             List<TextRange> selectionTextRanges = LSPSelectionRangeSupport.getSelectionTextRanges(file, editor, beforeOffset);
             if (!ContainerUtil.isEmpty(selectionTextRanges)) {
-                // Find the closest selection range that is extended to line start/end; that should be the statement
                 Document document = editor.getDocument();
                 CharSequence documentChars = document.getCharsSequence();
+
+                // Extend these to full lines for evaluation below
+                Set<TextRange> extendedSelectionTextRanges = new LinkedHashSet<>();
+                for (TextRange selectionTextRange : selectionTextRanges) {
+                    ContainerUtil.addAllNotNull(extendedSelectionTextRanges, expandToWholeLinesWithBlanks(documentChars, selectionTextRange));
+                }
+                System.out.println("Extended selection text ranges:\n" + StringUtil.join(extendedSelectionTextRanges, "\n"));
+
+                // Find the closest selection range that is extended to line start/end; that should be the statement
                 formatTextRange = ContainerUtil.find(
-                        selectionTextRanges,
+                        extendedSelectionTextRanges,
                         selectionTextRange -> {
                             int startOffset = selectionTextRange.getStartOffset();
                             int endOffset = selectionTextRange.getEndOffset();
@@ -241,6 +252,11 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                             return false;
                         }
                 );
+                // If we found a statement text range, make sure that we include only up to the terminator as some
+                // formatters will react to additional trailing whitespace to do things like open an extraneous newline
+                if (formatTextRange != null) {
+                    formatTextRange = TextRange.create(formatTextRange.getStartOffset(), offset);
+                }
             }
         }
 
