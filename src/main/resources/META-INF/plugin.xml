@@ -354,6 +354,16 @@ L
                 id="LSPFormattingAndRangeBothService"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingAndRangeBothService"/>
 
+        <!-- LSP textDocument/onTypeFormatting support -->
+        <typedHandler
+                id="LSPServerSideOnTypeFormattingTypedHandler"
+                order="first"
+                implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPServerSideOnTypeFormattingTypedHandler"/>
+        <enterHandlerDelegate
+                id="LSPServerSideOnTypeFormattingEnterHandler"
+                order="first"
+                implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPServerSideOnTypeFormattingEnterHandler"/>
+
         <!-- LSP textDocument/selectionRange request support -->
         <extendWordSelectionHandler
                 implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPExtendWordSelectionHandler"
