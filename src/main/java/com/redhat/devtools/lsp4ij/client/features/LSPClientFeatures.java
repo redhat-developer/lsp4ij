@@ -64,6 +64,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPFormattingFeature formattingFeature;
 
+    private LSPOnTypeFormattingFeature onTypeFormattingFeature;
+
     private LSPHoverFeature hoverFeature;
 
     private LSPImplementationFeature implementationFeature;
@@ -646,6 +648,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public final LSPClientFeatures setFormattingFeature(@NotNull LSPFormattingFeature formattingFeature) {
         formattingFeature.setClientFeatures(this);
         this.formattingFeature = formattingFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP on-type formatting feature.
+     *
+     * @return the LSP on-type formatting feature.
+     */
+    @NotNull
+    public final LSPOnTypeFormattingFeature getOnTypeFormattingFeature() {
+        if (onTypeFormattingFeature == null) {
+            initOnTypeFormattingFeature();
+        }
+        return onTypeFormattingFeature;
+    }
+
+    private synchronized void initOnTypeFormattingFeature() {
+        if (onTypeFormattingFeature != null) {
+            return;
+        }
+        setOnTypeFormattingFeature(new LSPOnTypeFormattingFeature());
+    }
+
+    /**
+     * Initialize the LSP formatting feature.
+     *
+     * @param onTypeFormattingFeature the LSP formatting feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setOnTypeFormattingFeature(@NotNull LSPOnTypeFormattingFeature onTypeFormattingFeature) {
+        onTypeFormattingFeature.setClientFeatures(this);
+        this.onTypeFormattingFeature = onTypeFormattingFeature;
         return this;
     }
 

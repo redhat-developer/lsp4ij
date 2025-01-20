@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolSuppo
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
 import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeSupport;
 import com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingSupport;
+import com.redhat.devtools.lsp4ij.features.formatting.LSPOnTypeFormattingSupport;
 import com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightSupport;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSupport;
@@ -65,6 +66,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPSelectionRangeSupport selectionRangeSupport;
 
     private final LSPFormattingSupport formattingSupport;
+
+    private final LSPOnTypeFormattingSupport onTypeFormattingSupport;
 
     private final LSPHighlightSupport highlightSupport;
 
@@ -112,6 +115,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.foldingRangeSupport = new LSPFoldingRangeSupport(file);
         this.selectionRangeSupport = new LSPSelectionRangeSupport(file);
         this.formattingSupport = new LSPFormattingSupport(file);
+        this.onTypeFormattingSupport = new LSPOnTypeFormattingSupport(file);
         this.highlightSupport = new LSPHighlightSupport(file);
         this.signatureHelpSupport = new LSPSignatureHelpSupport(file);
         this.documentLinkSupport = new LSPDocumentLinkSupport(file);
@@ -146,6 +150,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getFoldingRangeSupport().cancel();
         getSelectionRangeSupport().cancel();
         getFormattingSupport().cancel();
+        getOnTypeFormattingSupport().cancel();
         getHighlightSupport().cancel();
         getSignatureHelpSupport().cancel();
         getDocumentLinkSupport().cancel();
@@ -227,6 +232,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPFormattingSupport getFormattingSupport() {
         return formattingSupport;
+    }
+
+    /**
+     * Returns the LSP on-type formatting support.
+     *
+     * @return the LSP on-type formatting support.
+     */
+    public LSPOnTypeFormattingSupport getOnTypeFormattingSupport() {
+        return onTypeFormattingSupport;
     }
 
     /**
