@@ -70,8 +70,13 @@ As you have selected `VSCode JS Debug` server, it will automatically populate th
 
 ## Configure the JavaScript file to run/debug
 
-1. Fill in the `Configuration` tab to specify the `working directory` (usually the project's root directory) 
-and the path to the `test.js` file.
+1. Fill in the `Configuration` tab:
+
+- the `working directory` (usually the project's root directory) 
+- the path to the `test.js` file.
+
+![DAP Configuration Type/Configuration](../images/DAP_config_type_configuration.png)
+
 2. Select `Launch` as debugging type.
 3. The DAP parameters of the launch should look like this:
 
