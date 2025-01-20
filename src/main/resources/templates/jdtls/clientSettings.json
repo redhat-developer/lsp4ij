@@ -4,9 +4,6 @@
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
   },
-  "format": {
-    "formatOnCloseBrace": true
-  },
   "workspaceSymbol": {
     "supportsGotoClass": true
   }
