@@ -11,6 +11,7 @@
 
 package com.redhat.devtools.lsp4ij.client.features;
 
+import com.intellij.lang.LanguageFormatting;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.server.capabilities.OnTypeFormattingCapabilityRegistry;
 import org.eclipse.lsp4j.ServerCapabilities;
@@ -25,6 +26,16 @@ import org.jetbrains.annotations.Nullable;
 public class LSPOnTypeFormattingFeature extends AbstractLSPDocumentFeature {
 
     private OnTypeFormattingCapabilityRegistry onTypeFormattingCapabilityRegistry;
+
+    @Override
+    public boolean isEnabled(@NotNull PsiFile file) {
+        // Need to perform the same check as in LSPFormattingFeature.isEnabled() to ensure that LSP formatting should be used
+        if (!getClientFeatures().getFormattingFeature().isExistingFormatterOverrideable(file) &&
+            (LanguageFormatting.INSTANCE.forContext(file) != null)) {
+            return false;
+        }
+        return super.isEnabled(file);
+    }
 
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
