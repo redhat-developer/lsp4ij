@@ -1,0 +1,6 @@
+{
+  "type": "go",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}"
+}

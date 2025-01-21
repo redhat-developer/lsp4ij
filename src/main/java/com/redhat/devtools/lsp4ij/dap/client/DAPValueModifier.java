@@ -38,7 +38,9 @@ public class DAPValueModifier extends XValueModifier {
                         return;
                     }
                     // Update the DAP variable with the response
-                    variable.setVariablesReference(setVariableResponse.getVariablesReference());
+                    if (setVariableResponse.getVariablesReference() != null) {
+                        variable.setVariablesReference(setVariableResponse.getVariablesReference());
+                    }
                     variable.setIndexedVariables(setVariableResponse.getIndexedVariables());
                     variable.setNamedVariables(setVariableResponse.getNamedVariables());
                     variable.setValue(setVariableResponse.getValue());

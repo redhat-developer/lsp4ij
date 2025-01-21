@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
+import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -18,6 +19,6 @@ import org.jetbrains.annotations.Nullable;
  * @param waitForTrace
  * @param waitForTimeout
  */
-public record ServerReadyConfig(@Nullable String waitForTrace, @Nullable Integer waitForTimeout) {
+public record ServerReadyConfig(@Nullable NetworkAddressExtractor waitForTrace, @Nullable Integer waitForTimeout) {
 
 }

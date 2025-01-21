@@ -8,7 +8,7 @@ with the `Debug Adapter Protocol` run/debug configuration type:
 After configuring the [DAP configuration type](#dap-configuration-type), you can debug your file.  
 Here is an example with `JavaScript debugging`, which uses the [VSCode JS Debug DAP server](./user-defined-dap/vscode-js-debug.md):
 
-![DAP Configuration Type](./images/DAP_vscode_js_debug_overview.png)
+![DAP Configuration Type](./images/DAP_debugging_overview.png)
 
 ## DAP Configuration Type:
 
@@ -23,10 +23,12 @@ To configure debugging with DAP, you need to fill in:
 ![DAP Configuration Type/Mappings](./images/DAP_config_type_mappings.png)
 
 - The `Server` tab to specify the DAP server:
-
+ 
   ![DAP Configuration Type/Server](./images/DAP_config_type_server.png)
 
 ## Templates
 
-- [VSCode JS Debug DAP Server](./user-defined-dap/vscode-js-debug.md)
+- [Go Delv DAP server](./user-defined-dap/go-delve)
 - [Swift DAP Server](./user-defined-dap/swift-lldb.md)
+- [VSCode JS Debug DAP Server](./user-defined-dap/vscode-js-debug.md)
+

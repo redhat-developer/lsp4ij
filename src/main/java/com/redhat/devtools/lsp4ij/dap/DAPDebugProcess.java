@@ -97,7 +97,10 @@ public class DAPDebugProcess extends XDebugProcess {
                         // 1. get socket stream or simple stream
                         streamsSupplier = () -> {
                             try {
-                                return getTransportStreams(executionResult, port);
+                                // Call again serverReadyFuture.getPort() because the trace tracker could extract it.
+                                // ex: with Go DAP server, the server start command doesn't define some port, but the DAP server generates
+                                // the following trace "DAP server listening at: 127.0.0.1:51694"
+                                return getTransportStreams(executionResult, serverReadyFuture.getPort());
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }

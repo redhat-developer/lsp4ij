@@ -373,7 +373,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
 
         boolean shouldSendTerminateRequest = !sentTerminateRequest
-                && isSupportsTerminateRequest(getCapabilities())
+                && isSupportsTerminateRequest()
                 && debuggingType == DebuggingType.LAUNCH;
         if (shouldSendTerminateRequest) {
             sentTerminateRequest = true;
@@ -383,10 +383,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             arguments.setTerminateDebuggee(true);
             server.disconnect(arguments).thenRunAsync(this::dispose);
         }
-    }
-
-    private static boolean isSupportsTerminateRequest(@Nullable Capabilities capabilities) {
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
     }
 
     XDebugSession getSession() {
@@ -468,6 +464,17 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         args.setValue(value);
         args.setFormat(new ValueFormat());
         return debugProtocolServer.setVariable(args);
+    }
+
+    // Capabilities
+
+
+    public boolean isSupportsTerminateRequest() {
+        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
+    }
+
+    public boolean isSupportsCompletionsRequest() {
+        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsCompletionsRequest());
     }
 
     @NotNull

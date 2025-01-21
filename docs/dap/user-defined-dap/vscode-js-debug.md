@@ -2,14 +2,14 @@
 
 To debug JavaScript or TypeScript files, you can use the [VSCode JS Debug](https://github.com/microsoft/vscode-js-debug) DAP server.
 
-Lets debugging the `test.js` file:
+Let’s debugging the following `test.js` file:
 
 ```js
 const s = "foo";
 console.log(s);
 ```
 
-![Set Breakpoint](../images/vscode-js-debug/vscode-js-debug_set_breakpoint.png)
+![Set Breakpoint](../images/vscode-js-debug/set_breakpoint.png)
 
 ## Configure DAP server
 
@@ -24,7 +24,7 @@ console.log(s);
 
 4. In the `Server` tab, select `VSCode JS Debug`.
 
-   ![DAP Configuration Type/Program](../images/vscode-js-debug/vscode-js-debug_template.png)
+   ![DAP Configuration/Server](../images/vscode-js-debug/server_tab.png)
 
 This will automatically populate: 
 
@@ -43,11 +43,16 @@ node /home/path/to/dap/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
 
 The `${port}` argument will be replaced with a free port when the run configuration starts.
 
- * the `Connecting to the server` is set with `after finding trace` option with `Debug server listening at` which indicates 
-than DAP client will connect to the DAP server when this trace will appear in the console:
+ * the `Connecting to the server` option is set to `after finding trace`, with:
+
+ ```
+ Debug server listening at
+```
+
+This means the DAP (Debug Adapter Protocol) client will connect to the DAP server when this trace appears in the console:
 
 ```
-node /home/path/to/dap/js-debug-dap-v1.96.0/js-debug/src/dapDebugServer.js 56425
+node /home/path/to/dap/js-debug-dap-v1.96.0/js-debug/src/dapDebugServer.js 56425 127.0.0.1
 Debug server listening at 127.0.0.1:56425
 ```
 
@@ -55,11 +60,11 @@ Debug server listening at 127.0.0.1:56425
 
 If you wish to show DAP request/response traces when you will debug:
 
-![Show DAP traces](../images/vscode-js-debug/vscode-js-debug_traces.png)
+![Show DAP traces](../images/vscode-js-debug/traces_in_console.png)
 
-you need to select `Traces` with `verbose`.
+you need to select `Trace` with `verbose`.
 
-![Set verbose traces](../images/vscode-js-debug/vscode-js-debug_traces_verbose.png)
+![Set verbose traces](../images/vscode-js-debug/set_traces.png)
 
 ## Configure file mappings
 
@@ -99,17 +104,17 @@ When the run configuration starts:
 After applying the run configuration, you should set a breakpoint to files which matches file mappings.
 Set a breakpoint in the `test.js` file:
 
-![Set Breakpoint](../images/vscode-js-debug/vscode-js-debug_set_breakpoint.png)
+![Set Breakpoint](../images/vscode-js-debug/set_breakpoint.png)
 
 # Debugging
 
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console:
 
-![Debugging / Console](../images/vscode-js-debug/vscode-js-debug_console.png)
+![Debugging / Console](../images/vscode-js-debug/debug_console_tab.png)
 
 You will also see `Threads` and `Variables`:
 
-![Debugging / Threads](../images/vscode-js-debug/vscode-js-debug_threads.png)
+![Debugging / Threads](../images/vscode-js-debug/debug_threads_tab.png)
 
 ## Configure the TypeScript file to run/debug
 
