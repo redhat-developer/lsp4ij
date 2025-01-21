@@ -209,7 +209,6 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                 for (TextRange selectionTextRange : selectionTextRanges) {
                     ContainerUtil.addAllNotNull(extendedSelectionTextRanges, expandToWholeLinesWithBlanks(documentChars, selectionTextRange));
                 }
-                System.out.println("Extended selection text ranges:\n" + StringUtil.join(extendedSelectionTextRanges, "\n"));
 
                 // Find the closest selection range that is extended to line start/end; that should be the statement
                 formatTextRange = ContainerUtil.find(
