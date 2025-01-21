@@ -59,14 +59,18 @@ public class DAPCompletionProcessor extends CompletionContributor {
             if (stackFrame == null) {
                 return;
             }
-
+            DAPClient client = stackFrame.getClient();
+            if (!client.isSupportsCompletionsRequest()) {
+                // DAP server doesn't support "completion" request.
+                return;
+            }
             Editor editor = parameters.getEditor();
             Document document = editor.getDocument();
             int offset = parameters.getOffset();
 
             Position position = LSPIJUtils.toPosition(offset, document);
             String text = document.getText();
-            DAPClient client = stackFrame.getClient();
+
             int frameId = stackFrame.getFrameId();
 
             CompletableFuture<CompletionsResponse> future =

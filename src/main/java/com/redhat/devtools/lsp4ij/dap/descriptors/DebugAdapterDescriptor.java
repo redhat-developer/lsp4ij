@@ -147,7 +147,7 @@ public class DebugAdapterDescriptor {
                 case TIMEOUT:
                     return new ServerReadyConfig(null, dapOptions.getWaitForTimeout());
                 case TRACE:
-                    return new ServerReadyConfig(dapOptions.getWaitForTrace(), 0);
+                    return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor(), 0);
                 default:
                     return new ServerReadyConfig(null, 0);
             }
