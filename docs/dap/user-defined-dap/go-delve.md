@@ -79,7 +79,7 @@ you need to select `Trace` with `verbose`.
 
 ## Configure file mappings
 
-To allows settings breakpoints to JavaScript, TypeScript, etc files, you need configure mappings in the `Mappings` tab.
+To allows settings breakpoints to Go files, you need configure mappings in the `Mappings` tab.
 As you have selected `Go - Delve` server, it will automatically populate the file mappings like this:
 
 ![File mappings](../images/go-delve/file_mappings_tab.png)
