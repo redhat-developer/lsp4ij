@@ -151,6 +151,24 @@ tasks {
     publishPlugin {
         dependsOn(patchChangelog)
     }
+
+    // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally
+    fun supportsEnhancedClassRedefinition(): Boolean {
+        val platformVersion = providers.gradleProperty("platformVersion").get()
+        // Versions before 2024.1 don't support enhanced class redefinition
+        return !platformVersion.startsWith("2023.")
+    }
+
+    runIde {
+        // Improved hotswap for the IDE's JVM
+        if (supportsEnhancedClassRedefinition()) {
+            println("Enabling enhanced class redefinition.")
+            jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
+        }
+
+        //Use "debug" to send telemetry to dev source at segment.com
+        systemProperties["com.redhat.devtools.intellij.telemetry.mode"] = "debug" // "disabled"
+    }
 }
 
 intellijPlatformTesting {
