@@ -244,10 +244,10 @@ public class DAPDebugProcess extends XDebugProcess {
         if (port != null) {
             return new TransportStreams.SocketTransportStreams(InetAddress.getLoopbackAddress().getHostAddress(), port);
         }
-
+        var processHandler = executionResult.getProcessHandler();
         DAPProcessListener processListener = new DAPProcessListener();
-        executionResult.getProcessHandler().addProcessListener(processListener);
-        return new TransportStreams.DefaultTransportStreams(processListener.getInputStream(), processListener.getOutputStream());
+        processHandler.addProcessListener(processListener);
+        return new TransportStreams.DefaultTransportStreams(processListener.getInputStream(), processHandler.getProcessInput());
     }
 
     public Supplier<TransportStreams> getStreamsSupplier() {
