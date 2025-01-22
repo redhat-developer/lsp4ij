@@ -28,7 +28,7 @@ To configure debugging with DAP, you need to fill in:
 
 ## Templates
 
-- [Go Delv DAP server](./user-defined-dap/go-delve)
+- [Go Delv DAP server](./user-defined-dap/go-delve.md)
 - [Swift DAP Server](./user-defined-dap/swift-lldb.md)
 - [VSCode JS Debug DAP Server](./user-defined-dap/vscode-js-debug.md)
 
