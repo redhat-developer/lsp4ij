@@ -16,7 +16,7 @@
       <li>Fixing bugs</li>
     </ul>
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/10?closed=1">changelog</a>.
-L
+
     <h3>0.8.1</h3>
     <ul>
       <li>Remove using internal API ProjectIndexingActivityHistoryListener</li>
@@ -176,7 +176,7 @@ L
     <depends optional="true">com.redhat.devtools.intellij.telemetry</depends>
     <depends optional="true" config-file="plugin-json.xml">com.intellij.modules.json</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-    <idea-version since-build="232.*"/>
+    <idea-version since-build="233.*"/>
 
     <!-- LSP extension points -->
     <extensionPoints>
