@@ -15,7 +15,6 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -62,13 +61,13 @@ final class LSPServerSideOnTypeFormattingHelper {
     static boolean applyOnTypeFormatting(char charTyped,
                                          @NotNull Editor editor,
                                          @NotNull PsiFile file) {
-        Pair<DocumentOnTypeFormattingOptions, LSPOnTypeFormattingSupport> onTypeFormattingInfo = getOnTypeFormattingInfo(file);
+        OnTypeFormattingInfo onTypeFormattingInfo = getOnTypeFormattingInfo(file);
         if (onTypeFormattingInfo == null) {
             return false;
         }
 
-        DocumentOnTypeFormattingOptions onTypeFormattingOptions = onTypeFormattingInfo.getFirst();
-        LSPOnTypeFormattingSupport onTypeFormattingSupport = onTypeFormattingInfo.getSecond();
+        DocumentOnTypeFormattingOptions onTypeFormattingOptions = onTypeFormattingInfo.onTypeFormattingOptions();
+        LSPOnTypeFormattingSupport onTypeFormattingSupport = onTypeFormattingInfo.onTypeFormattingSupport();
 
         // Make sure the typed character should trigger on-type formatting for this language
         Set<String> triggerCharacters = new LinkedHashSet<>();
@@ -120,6 +119,13 @@ final class LSPServerSideOnTypeFormattingHelper {
     }
 
     /**
+     * Simple record type for the composite return value of {@link #getOnTypeFormattingInfo(PsiFile)}.
+     */
+    private record OnTypeFormattingInfo(@NotNull DocumentOnTypeFormattingOptions onTypeFormattingOptions,
+                                        @NotNull LSPOnTypeFormattingSupport onTypeFormattingSupport) {
+    }
+
+    /**
      * Returns the LSP on-type formatting information for the provided file if supported. This includes the on-type
      * formatting options and the on-type formatting support.
      *
@@ -127,7 +133,7 @@ final class LSPServerSideOnTypeFormattingHelper {
      * @return the LSP on-type formatting information for the file if supported; otherwise null
      */
     @Nullable
-    private static Pair<DocumentOnTypeFormattingOptions, LSPOnTypeFormattingSupport> getOnTypeFormattingInfo(@NotNull PsiFile file) {
+    private static OnTypeFormattingInfo getOnTypeFormattingInfo(@NotNull PsiFile file) {
         // On-type formatting shouldn't trigger a language server to start
         Project project = file.getProject();
         Set<LanguageServerWrapper> startedLanguageServers = LanguageServiceAccessor.getInstance(project).getStartedServers();
@@ -140,7 +146,7 @@ final class LSPServerSideOnTypeFormattingHelper {
                     DocumentOnTypeFormattingOptions onTypeFormattingProvider = serverCapabilities != null ? serverCapabilities.getDocumentOnTypeFormattingProvider() : null;
                     if (onTypeFormattingProvider != null) {
                         LSPOnTypeFormattingSupport onTypeFormattingSupport = LSPFileSupport.getSupport(file).getOnTypeFormattingSupport();
-                        return Pair.create(onTypeFormattingProvider, onTypeFormattingSupport);
+                        return new OnTypeFormattingInfo(onTypeFormattingProvider, onTypeFormattingSupport);
                     }
                 }
             }

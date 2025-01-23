@@ -54,13 +54,13 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
                                                                                @NotNull DocumentOnTypeFormattingParams params,
                                                                                @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
-                f -> f.getFoldingRangeFeature().isEnabled(file),
-                f -> f.getFoldingRangeFeature().isSupported(file))
+                f -> f.getOnTypeFormattingFeature().isEnabled(file),
+                f -> f.getOnTypeFormattingFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have on-type formatting capability
                     if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedStage(Collections.emptyList());
+                        return CompletableFuture.completedFuture(Collections.emptyList());
                     }
 
                     // Collect list of textDocument/onTypeFormatting future for each language servers
@@ -69,7 +69,7 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
                             .map(languageServer -> getTextEditsFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
-                    // Merge list of textDocument/onTypeFormatting future in one future which return the list of folding ranges
+                    // Merge list of textDocument/onTypeFormatting future in one future which return the list of text edits
                     return CompletableFutures.mergeInOneFuture(textEditsPerServerFutures, cancellationSupport);
                 });
     }

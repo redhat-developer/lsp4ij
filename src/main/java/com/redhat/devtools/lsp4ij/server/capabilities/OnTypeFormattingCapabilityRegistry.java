@@ -15,7 +15,6 @@ import com.google.gson.JsonObject;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.DocumentOnTypeFormattingRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
@@ -33,7 +32,7 @@ public class OnTypeFormattingCapabilityRegistry extends TextDocumentServerCapabi
             sc.getDocumentOnTypeFormattingProvider() != null;
 
     public OnTypeFormattingCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures) {
-        super(clientFeatures, EditorFeatureType.FOLDING);
+        super(clientFeatures);
     }
 
     class ExtendedOnTypeFormattingProviderOptions extends DocumentOnTypeFormattingRegistrationOptions implements ExtendedDocumentSelector.DocumentFilersProvider {
