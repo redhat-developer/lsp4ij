@@ -469,12 +469,34 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Capabilities
 
 
+    /**
+     * Returns true if the debug adapter supports the 'terminate' request and false otherwise.
+     *
+     * @return true if the debug adapter supports the 'terminate' request and false otherwise.
+     */
     public boolean isSupportsTerminateRequest() {
+        var capabilities = getCapabilities();
         return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
     }
 
+    /**
+     * Returns true if the debug adapter supports the 'completions' request and false otherwise.
+     *
+     * @return true if the debug adapter supports the 'completions' request and false otherwise.
+     */
     public boolean isSupportsCompletionsRequest() {
+        var capabilities = getCapabilities();
         return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsCompletionsRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports setting a variable to a value and false otherwise.
+     *
+     * @return true if the debug adapter supports setting a variable to a value and false otherwise.
+     */
+    public boolean isSupportsSetVariable() {
+        var capabilities = getCapabilities();
+        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsSetVariable());
     }
 
     @NotNull

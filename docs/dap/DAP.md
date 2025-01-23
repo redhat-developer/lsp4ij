@@ -26,9 +26,38 @@ To configure debugging with DAP, you need to fill in:
  
   ![DAP Configuration Type/Server](./images/DAP_config_type_server.png)
 
+## Evaluate expression
+
+Evaluate expression is available by consuming the [Evaluate request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) 
+
+![Evaluate expression](./images/DAP_debugging_evaluate.png)
+
+### Completion
+
+If debug adapter [supports the `completions` request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),
+completion should be available in the expression editor by consuming the
+[Completion request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions):
+
+![Completion](images/DAP_debugging_completion.png)
+
+## Set value
+
+If debug adapter [supports setting a variable to a value](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),
+the `Set Value...` contextual menu should be available: 
+
+![Set Value/Menu](images/DAP_debugging_setValue_menu.png)
+
+You should edit the variable:
+
+![Set Value/Edit](images/DAP_debugging_setValue_edit.png)
+
+the edit apply will consume the
+[SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
+
 ## Templates
 
-- [Go Delv DAP server](./user-defined-dap/go-delve.md)
-- [Swift DAP Server](./user-defined-dap/swift-lldb.md)
-- [VSCode JS Debug DAP Server](./user-defined-dap/vscode-js-debug.md)
+LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:
 
+- [Go Delve DAP server](./user-defined-dap/go-delve.md) which allows you to debug `Go` files.
+- [Swift DAP Server](./user-defined-dap/swift-lldb.md) which allows you to debug `Swift` files.
+- [VSCode JS Debug DAP Server](./user-defined-dap/vscode-js-debug.md) which allows you to debug `JavaScript/TypeScript` files.
