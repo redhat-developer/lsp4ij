@@ -90,7 +90,7 @@ public class LSPOnTypeFormattingFeature extends AbstractLSPDocumentFeature {
      * @param charTyped the typed character.
      * @return true if the given character is an on-type formatting trigger for the file and false otherwise.
      */
-    public boolean isOnTypeTriggerCharacter(@NotNull PsiFile file, @Nullable String charTyped) {
-        return getOnTypeFormattingCapabilityRegistry().isOnTypeTriggerCharacter(file, charTyped);
+    public boolean isOnTypeFormattingTriggerCharacter(@NotNull PsiFile file, @Nullable String charTyped) {
+        return getOnTypeFormattingCapabilityRegistry().isOnTypeFormattingTriggerCharacter(file, charTyped);
     }
 }

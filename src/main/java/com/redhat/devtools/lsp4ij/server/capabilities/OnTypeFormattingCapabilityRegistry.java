@@ -76,18 +76,18 @@ public class OnTypeFormattingCapabilityRegistry extends TextDocumentServerCapabi
      * @param charTyped the typed character.
      * @return true if the given character is an on-type formatting trigger for the file and false otherwise.
      */
-    public boolean isOnTypeTriggerCharacter(@NotNull PsiFile file,
-                                            @Nullable String charTyped) {
+    public boolean isOnTypeFormattingTriggerCharacter(@NotNull PsiFile file,
+                                                      @Nullable String charTyped) {
         return (charTyped != null) && super.isSupported(
                 file,
                 sc -> {
-                    Set<String> onTypeTriggerCharacters = new LinkedHashSet<>();
+                    Set<String> onTypeFormattingTriggerCharacters = new LinkedHashSet<>();
                     DocumentOnTypeFormattingOptions onTypeFormattingOptions = sc.getDocumentOnTypeFormattingProvider();
                     if (onTypeFormattingOptions != null) {
-                        ContainerUtil.addIfNotNull(onTypeTriggerCharacters, onTypeFormattingOptions.getFirstTriggerCharacter());
-                        ContainerUtil.addAllNotNull(onTypeTriggerCharacters, onTypeFormattingOptions.getMoreTriggerCharacter());
+                        ContainerUtil.addIfNotNull(onTypeFormattingTriggerCharacters, onTypeFormattingOptions.getFirstTriggerCharacter());
+                        ContainerUtil.addAllNotNull(onTypeFormattingTriggerCharacters, onTypeFormattingOptions.getMoreTriggerCharacter());
                     }
-                    return onTypeTriggerCharacters.contains(charTyped);
+                    return onTypeFormattingTriggerCharacters.contains(charTyped);
                 }
         );
     }

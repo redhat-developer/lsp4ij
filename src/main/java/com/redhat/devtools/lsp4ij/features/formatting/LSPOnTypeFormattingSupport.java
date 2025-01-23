@@ -53,8 +53,9 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
     private static @NotNull CompletableFuture<List<TextEdit>> onTypeFormatting(@NotNull PsiFile file,
                                                                                @NotNull DocumentOnTypeFormattingParams params,
                                                                                @NotNull CancellationSupport cancellationSupport) {
+        String charTyped = params.getCh();
         return getLanguageServers(file,
-                f -> f.getOnTypeFormattingFeature().isEnabled(file) && f.getOnTypeFormattingFeature().isOnTypeTriggerCharacter(file, params.getCh()),
+                f -> f.getOnTypeFormattingFeature().isEnabled(file) && f.getOnTypeFormattingFeature().isOnTypeFormattingTriggerCharacter(file, charTyped),
                 f -> f.getOnTypeFormattingFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
