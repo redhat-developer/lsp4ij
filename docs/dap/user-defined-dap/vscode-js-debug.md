@@ -80,7 +80,7 @@ As you have selected `VSCode JS Debug` server, it will automatically populate th
 - the `working directory` (usually the project's root directory) 
 - the path to the `test.js` file.
 
-![DAP Configuration Type/Configuration](../images/DAP_config_type_configuration.png)
+![DAP Configuration Type/Configuration](../images/vscode-js-debug/configuration_tab.png)
 
 2. Select `Launch` as debugging type.
 3. The DAP parameters of the launch should look like this:
@@ -118,4 +118,72 @@ You will also see `Threads` and `Variables`:
 
 ## Configure the TypeScript file to run/debug
 
-TODO : how to configure source maps?
+Let’s debugging the following `test.ts` file:
+
+```ts
+class Greeter {
+  greeting: string;
+
+  constructor(message: string) {
+    this.greeting = message;
+  }
+
+  greet() {
+    return "Hello, " + this.greeting;
+  }
+}
+
+let greeter = new Greeter("world");
+console.log(greeter.greet())
+```
+
+![Set Breakpoint](../images/vscode-js-debug/set_breakpoint_ts.png)
+
+### Compile TypeScript
+
+Create a `tsconfig.json` file like this:
+
+```json
+{
+   "compilerOptions": {
+      "target": "ES6",
+      "module": "CommonJS",
+      "outDir": "out",
+      "sourceMap": true
+   }
+}
+```
+
+Execute `tsc` command to generate source maps in the `out` folder:
+
+ * `test.js`
+ * `test.js.map`
+
+## Configure the TypeScript file to run/debug
+
+Update the DAP parameters like this:
+
+```json
+{
+   "type": "pwa-node",
+   "request": "launch",
+   "program": "${file}",
+   "cwd": "${workspaceFolder}",
+   "outFiles": [
+      "${workspaceFolder}/**/*.(m|c|)js",
+      "!**/node_modules/**"
+   ],
+   "sourceMaps": true,
+   "__workspaceFolder": "${workspaceFolder}"
+}
+```
+
+Update the path with the `test.ts` file. 
+
+![DAP Configuration Type/Configuration](../images/vscode-js-debug/configuration_ts_tab.png)
+
+### Debugging
+
+TypeScript debugging should be available:
+
+![Debugging TypeScript](../images/vscode-js-debug/debug_ts.png)

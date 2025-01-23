@@ -26,6 +26,9 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
+import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFileName;
+import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
+
 /**
  *  Debug Adapter Protocol (DAP) breakpoint handler.
  */
@@ -85,8 +88,8 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
             var sourcePosition = breakpoint.getSourcePosition();
 
             Source source = new Source();
-            source.setPath(getFilePath(sourcePosition));
-            source.setName(getFileName(sourcePosition));
+            source.setPath(getFilePath(sourcePosition.getFile()));
+            source.setName(getFileName(sourcePosition.getFile()));
 
             List<SourceBreakpoint> sourceBreakpoints = targetBreakpoints
                     .computeIfAbsent(source, s -> new ArrayList<>());
@@ -141,14 +144,6 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
         return sourcePosition.getLine() + 1;
     }
 
-
-    private static String getFilePath(@NotNull XSourcePosition sourcePosition) {
-        return sourcePosition.getFile().getPath();
-    }
-
-    private static String getFileName(@NotNull XSourcePosition sourcePosition) {
-        return sourcePosition.getFile().getName();
-    }
 
     @Nullable
     public XBreakpoint<DAPBreakpointProperties> findBreakPoint(@NotNull StackFrame stackFrame) {
