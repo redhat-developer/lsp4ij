@@ -14,24 +14,20 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.client.features.LSPOnTypeFormattingFeature;
-import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.DocumentOnTypeFormattingParams;
+import org.eclipse.lsp4j.FormattingOptions;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.TextEdit;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -61,23 +57,6 @@ final class LSPServerSideOnTypeFormattingHelper {
     static boolean applyOnTypeFormatting(char charTyped,
                                          @NotNull Editor editor,
                                          @NotNull PsiFile file) {
-        OnTypeFormattingInfo onTypeFormattingInfo = getOnTypeFormattingInfo(file);
-        if (onTypeFormattingInfo == null) {
-            return false;
-        }
-
-        DocumentOnTypeFormattingOptions onTypeFormattingOptions = onTypeFormattingInfo.onTypeFormattingOptions();
-        LSPOnTypeFormattingSupport onTypeFormattingSupport = onTypeFormattingInfo.onTypeFormattingSupport();
-
-        // Make sure the typed character should trigger on-type formatting for this language
-        Set<String> triggerCharacters = new LinkedHashSet<>();
-        ContainerUtil.addIfNotNull(triggerCharacters, onTypeFormattingOptions.getFirstTriggerCharacter());
-        ContainerUtil.addAllNotNull(triggerCharacters, onTypeFormattingOptions.getMoreTriggerCharacter());
-        String charTypedAsString = String.valueOf(charTyped);
-        if (!triggerCharacters.contains(charTypedAsString)) {
-            return false;
-        }
-
         // If so, issue a request for on-type formatting
         int offset = editor.getCaretModel().getOffset();
         Document document = editor.getDocument();
@@ -86,8 +65,9 @@ final class LSPServerSideOnTypeFormattingHelper {
                 LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()),
                 new FormattingOptions(LSPIJUtils.getTabSize(editor), LSPIJUtils.isInsertSpaces(editor)),
                 position,
-                charTypedAsString
+                String.valueOf(charTyped)
         );
+        LSPOnTypeFormattingSupport onTypeFormattingSupport = LSPFileSupport.getSupport(file).getOnTypeFormattingSupport();
         CompletableFuture<List<TextEdit>> onTypeFormattingFutures = onTypeFormattingSupport.onTypeFormatting(onTypeFormattingParams);
         try {
             waitUntilDone(onTypeFormattingFutures, file);
@@ -116,42 +96,5 @@ final class LSPServerSideOnTypeFormattingHelper {
 
         LSPIJUtils.applyEdits(editor, document, textEdits);
         return true;
-    }
-
-    /**
-     * Simple record type for the composite return value of {@link #getOnTypeFormattingInfo(PsiFile)}.
-     */
-    private record OnTypeFormattingInfo(@NotNull DocumentOnTypeFormattingOptions onTypeFormattingOptions,
-                                        @NotNull LSPOnTypeFormattingSupport onTypeFormattingSupport) {
-    }
-
-    /**
-     * Returns the LSP on-type formatting information for the provided file if supported. This includes the on-type
-     * formatting options and the on-type formatting support.
-     *
-     * @param file the PSI file
-     * @return the LSP on-type formatting information for the file if supported; otherwise null
-     */
-    @Nullable
-    private static OnTypeFormattingInfo getOnTypeFormattingInfo(@NotNull PsiFile file) {
-        // On-type formatting shouldn't trigger a language server to start
-        Project project = file.getProject();
-        Set<LanguageServerWrapper> startedLanguageServers = LanguageServiceAccessor.getInstance(project).getStartedServers();
-        for (LanguageServerWrapper startedLanguageServer : startedLanguageServers) {
-            // TODO: Is there a better way to ask if this started language server supports the file?
-            if (startedLanguageServer.isConnectedTo(LSPIJUtils.toUri(file))) {
-                LSPOnTypeFormattingFeature onTypeFormattingFeature = startedLanguageServer.getClientFeatures().getOnTypeFormattingFeature();
-                if (onTypeFormattingFeature.isEnabled(file) && onTypeFormattingFeature.isSupported(file)) {
-                    ServerCapabilities serverCapabilities = startedLanguageServer.getServerCapabilities();
-                    DocumentOnTypeFormattingOptions onTypeFormattingProvider = serverCapabilities != null ? serverCapabilities.getDocumentOnTypeFormattingProvider() : null;
-                    if (onTypeFormattingProvider != null) {
-                        LSPOnTypeFormattingSupport onTypeFormattingSupport = LSPFileSupport.getSupport(file).getOnTypeFormattingSupport();
-                        return new OnTypeFormattingInfo(onTypeFormattingProvider, onTypeFormattingSupport);
-                    }
-                }
-            }
-        }
-
-        return null;
     }
 }

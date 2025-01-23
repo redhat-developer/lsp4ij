@@ -13,14 +13,18 @@ package com.redhat.devtools.lsp4ij.server.capabilities;
 
 import com.google.gson.JsonObject;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.eclipse.lsp4j.DocumentOnTypeFormattingOptions;
 import org.eclipse.lsp4j.DocumentOnTypeFormattingRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -62,5 +66,29 @@ public class OnTypeFormattingCapabilityRegistry extends TextDocumentServerCapabi
      */
     public boolean isOnTypeFormattingSupported(@NotNull PsiFile file) {
         return super.isSupported(file, SERVER_CAPABILITIES_PREDICATE);
+    }
+
+    /**
+     * Determines whether or not the given character is an on-type formatting trigger for the file according to its
+     * language server.
+     *
+     * @param file      the file.
+     * @param charTyped the typed character.
+     * @return true if the given character is an on-type formatting trigger for the file and false otherwise.
+     */
+    public boolean isOnTypeTriggerCharacter(@NotNull PsiFile file,
+                                            @Nullable String charTyped) {
+        return (charTyped != null) && super.isSupported(
+                file,
+                sc -> {
+                    Set<String> onTypeTriggerCharacters = new LinkedHashSet<>();
+                    DocumentOnTypeFormattingOptions onTypeFormattingOptions = sc.getDocumentOnTypeFormattingProvider();
+                    if (onTypeFormattingOptions != null) {
+                        ContainerUtil.addIfNotNull(onTypeTriggerCharacters, onTypeFormattingOptions.getFirstTriggerCharacter());
+                        ContainerUtil.addAllNotNull(onTypeTriggerCharacters, onTypeFormattingOptions.getMoreTriggerCharacter());
+                    }
+                    return onTypeTriggerCharacters.contains(charTyped);
+                }
+        );
     }
 }

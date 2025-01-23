@@ -54,7 +54,7 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
                                                                                @NotNull DocumentOnTypeFormattingParams params,
                                                                                @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
-                f -> f.getOnTypeFormattingFeature().isEnabled(file),
+                f -> f.getOnTypeFormattingFeature().isEnabled(file) && f.getOnTypeFormattingFeature().isOnTypeTriggerCharacter(file, params.getCh()),
                 f -> f.getOnTypeFormattingFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file

@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.lang.LanguageFormatting;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.server.capabilities.OnTypeFormattingCapabilityRegistry;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
@@ -29,11 +30,17 @@ public class LSPOnTypeFormattingFeature extends AbstractLSPDocumentFeature {
 
     @Override
     public boolean isEnabled(@NotNull PsiFile file) {
+        // This feature should only be enabled if the server is already started
+        if (getServerStatus() != ServerStatus.started) {
+            return false;
+        }
+
         // Need to perform the same check as in LSPFormattingFeature.isEnabled() to ensure that LSP formatting should be used
         if (!getClientFeatures().getFormattingFeature().isExistingFormatterOverrideable(file) &&
             (LanguageFormatting.INSTANCE.forContext(file) != null)) {
             return false;
         }
+
         return super.isEnabled(file);
     }
 
@@ -73,5 +80,17 @@ public class LSPOnTypeFormattingFeature extends AbstractLSPDocumentFeature {
         if (onTypeFormattingCapabilityRegistry != null) {
             onTypeFormattingCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
+    }
+
+    /**
+     * Determines whether or not the given character is an on-type formatting trigger for the file according to its
+     * language server.
+     *
+     * @param file      the file.
+     * @param charTyped the typed character.
+     * @return true if the given character is an on-type formatting trigger for the file and false otherwise.
+     */
+    public boolean isOnTypeTriggerCharacter(@NotNull PsiFile file, @Nullable String charTyped) {
+        return getOnTypeFormattingCapabilityRegistry().isOnTypeTriggerCharacter(file, charTyped);
     }
 }
