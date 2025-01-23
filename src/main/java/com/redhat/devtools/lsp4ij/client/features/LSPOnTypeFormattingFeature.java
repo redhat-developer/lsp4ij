@@ -30,7 +30,7 @@ public class LSPOnTypeFormattingFeature extends AbstractLSPDocumentFeature {
 
     @Override
     public boolean isEnabled(@NotNull PsiFile file) {
-        // This feature should only be enabled if the server is already started
+        // Don't suspend typing to wait for a server to start
         if (getServerStatus() != ServerStatus.started) {
             return false;
         }
