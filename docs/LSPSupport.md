@@ -433,6 +433,10 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 [LSPServerSideOnTypeFormattingTypedHandler](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPServerSideOnTypeFormattingTypedHandler.java) (`typedHandler`extension point) and
 [LSPServerSideOnTypeFormattingEnterHandler](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPServerSideOnTypeFormattingEnterHandler.java) (`enterHandlerDelegate` extension point).
 
+Here is an example with the [Java Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls) showing automatic formatting of a code block when the close brace for a surrounding conditional statement is typed:
+
+![textDocument/onTypeFormatting](./images/lsp-support/textDocument_onTypeFormatting.gif)
+
 ### Show Message
 
 [window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage) supports Markdown messages and clickable links.
