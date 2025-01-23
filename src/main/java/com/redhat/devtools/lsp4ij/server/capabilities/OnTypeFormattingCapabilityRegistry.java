@@ -35,7 +35,7 @@ public class OnTypeFormattingCapabilityRegistry extends TextDocumentServerCapabi
         super(clientFeatures);
     }
 
-    class ExtendedOnTypeFormattingProviderOptions extends DocumentOnTypeFormattingRegistrationOptions implements ExtendedDocumentSelector.DocumentFilersProvider {
+    static class ExtendedOnTypeFormattingProviderOptions extends DocumentOnTypeFormattingRegistrationOptions implements ExtendedDocumentSelector.DocumentFilersProvider {
         private transient ExtendedDocumentSelector documentSelector;
 
         @Override
