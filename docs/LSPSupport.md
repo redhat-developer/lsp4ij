@@ -1,6 +1,7 @@
 # LSP support
 
-The current implementation of `LSP4IJ` does not yet fully adhere to the LSP (Language Server Protocol) specification. This section provides an overview of the supported LSP features for IntelliJ:
+The current implementation of `LSP4IJ` does not yet fully adhere to the [LSP (Language Server Protocol) specification](https://microsoft.github.io/language-server-protocol/). 
+This section provides an overview of the supported LSP features for IntelliJ:
 
 ## Base support
 
