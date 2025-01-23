@@ -1,7 +1,9 @@
 # Debug Adapter Protocol
 
-LSP4IJ provides [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) support
-with the `Debug Adapter Protocol` run/debug configuration type:
+LSP4IJ provides [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) support. 
+You can read [the DAP Support overview](./DAPSupport.md), describing which DAP features are implemented, and how.
+
+The DAP support is available with the `Debug Adapter Protocol` run/debug configuration type:
 
 ![DAP Configuration Type](./images/DAP_config_type.png)
 
