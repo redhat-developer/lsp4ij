@@ -11,6 +11,7 @@
 
 package com.redhat.devtools.lsp4ij.features.foldingRange;
 
+import com.intellij.codeInsight.folding.CodeFoldingSettings;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.folding.CustomFoldingBuilder;
 import com.intellij.lang.folding.FoldingDescriptor;
@@ -27,6 +28,7 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
 import org.eclipse.lsp4j.FoldingRange;
+import org.eclipse.lsp4j.FoldingRangeKind;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.ApiStatus;
@@ -67,12 +69,15 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
             for (FoldingRange foldingRange : foldingRanges) {
                 TextRange textRange = getTextRange(foldingRange, file, document);
                 if ((textRange != null) && (textRange.getLength() > 0)) {
-                    String collapsedText = foldingRange.getCollapsedText();
-                    if (collapsedText != null) {
-                        descriptors.add(new FoldingDescriptor(root.getNode(), textRange, null, collapsedText));
-                    } else {
-                        descriptors.add(new FoldingDescriptor(root.getNode(), textRange));
-                    }
+                    descriptors.add(new FoldingDescriptor(
+                            root.getNode(),
+                            textRange,
+                            null,
+                            Collections.emptySet(),
+                            false,
+                            foldingRange.getCollapsedText(),
+                            isCollapsedByDefault(foldingRange)
+                    ));
                 }
             }
         }
@@ -192,6 +197,29 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     @Override
     protected String getLanguagePlaceholderText(@NotNull ASTNode node, @NotNull TextRange range) {
         return null;
+    }
+
+    private static boolean isCollapsedByDefault(@NotNull FoldingRange foldingRange) {
+        String foldingRangeKind = foldingRange.getKind();
+        if (foldingRangeKind != null) {
+            CodeFoldingSettings codeFoldingSettings = CodeFoldingSettings.getInstance();
+
+            // Imports
+            if (codeFoldingSettings.COLLAPSE_IMPORTS &&
+                FoldingRangeKind.Imports.equals(foldingRangeKind)) {
+                return true;
+            }
+
+            // File header comments
+            else if (codeFoldingSettings.COLLAPSE_FILE_HEADER &&
+                     FoldingRangeKind.Comment.equals(foldingRangeKind) &&
+                     // TODO: Ideally we'd also confirm that the first line in the file starts a comment
+                     (foldingRange.getStartLine() == 0)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     @Override
