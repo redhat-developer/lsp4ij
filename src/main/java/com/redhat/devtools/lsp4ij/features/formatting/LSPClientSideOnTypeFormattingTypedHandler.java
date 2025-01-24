@@ -27,7 +27,7 @@ import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockProvider;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
-import com.redhat.devtools.lsp4ij.features.completion.LSPTypedHandlerDelegate;
+import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionTriggerTypedHandler;
 import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -91,7 +91,7 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
             // Completion triggers
             if (formattingFeature.isFormatOnCompletionTrigger(file) &&
                 // It must be a completion trigger character for the language no matter what
-                LSPTypedHandlerDelegate.hasLanguageServerSupportingCompletionTriggerCharacters(charTyped, project, file)) {
+                LSPCompletionTriggerTypedHandler.hasLanguageServerSupportingCompletionTriggerCharacters(charTyped, project, file)) {
                 // But the subset that should trigger completion can be configured
                 String formatOnCompletionTriggerCharacters = formattingFeature.getFormatOnCompletionTriggerCharacters(file);
                 if (StringUtil.isEmpty(formatOnCompletionTriggerCharacters) ||

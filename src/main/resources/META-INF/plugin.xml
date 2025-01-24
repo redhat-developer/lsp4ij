@@ -255,9 +255,9 @@ L
                 implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
 
         <!-- LSP textDocument/completion request support -->
-        <typedHandler id="LSPTypedHandlerDelegate"
+        <typedHandler id="LSPCompletionTriggerTypedHandler"
                       order="last"
-                      implementation="com.redhat.devtools.lsp4ij.features.completion.LSPTypedHandlerDelegate"/>
+                      implementation="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionTriggerTypedHandler"/>
         <completion.contributor
                 id="LSPCompletionContributor"
                 language="any"
@@ -370,6 +370,8 @@ L
 
         <!-- Client-side on-type formatting -->
         <typedHandler
+                id="LSPClientSideOnTypeFormattingTypedHandler"
+                order="first, before LSPServerSideOnTypeFormattingTypedHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPClientSideOnTypeFormattingTypedHandler"/>
 
         <!-- LSP textDocument/selectionRange request support -->
