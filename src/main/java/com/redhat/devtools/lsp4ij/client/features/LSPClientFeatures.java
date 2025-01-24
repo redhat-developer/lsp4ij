@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.TextDocumentRegistrationOptions;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -96,6 +97,16 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     public boolean isEnabled(@NotNull VirtualFile file) {
         return true;
+    }
+
+    /**
+     * This method is invoked just before {@link LanguageServer#initialize(InitializeParams)}
+     * to enable customization of the language server's initialization parameters
+     * (e.g., {@link InitializeParams#getWorkDoneToken()}).
+     *
+     * @param initializeParams the initialize parameters.
+     */
+    public void initializeParams(@NotNull InitializeParams initializeParams) {
     }
 
     /**
@@ -1281,4 +1292,5 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             default -> null;
         };
     }
+
 }
