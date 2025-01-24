@@ -1,6 +1,7 @@
 # LSP support
 
-The current implementation of `LSP4IJ` does not yet fully adhere to the LSP (Language Server Protocol) specification. This section provides an overview of the supported LSP features for IntelliJ:
+The current implementation of `LSP4IJ` does not yet fully adhere to the [LSP (Language Server Protocol) specification](https://microsoft.github.io/language-server-protocol/). 
+This section provides an overview of the supported LSP features for IntelliJ:
 
 ## Base support
 
@@ -66,7 +67,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ❌ [textDocument/pullDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics).
  * ✅ [textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting) (see [implementation details](#formatting))
  * ✅ [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) (see [implementation details](#formatting)).
- * ❌ [textDocument/onTypeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting).
+ * ✅ [textDocument/onTypeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting) (see [implementation details](#on-type-formatting)).
  * ✅ [textDocument/prepareRename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename).
  * ✅ [textDocument/rename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename) (see [implementation details](#rename)).
  * ❌ [textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange).
@@ -426,6 +427,16 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 [textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) / [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) are implemented with 
 [LSPFormattingOnlyService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingOnlyService.java) /
 [LSPFormattingAndRangeBothService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingAndRangeBothService.java) with the `formattingService` extension point.
+
+### On-Type Formatting
+
+[textDocument/onTypeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting) is implemented with 
+[LSPServerSideOnTypeFormattingTypedHandler](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPServerSideOnTypeFormattingTypedHandler.java) (`typedHandler`extension point) and
+[LSPServerSideOnTypeFormattingEnterHandler](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPServerSideOnTypeFormattingEnterHandler.java) (`enterHandlerDelegate` extension point).
+
+Here is an example with the [Java Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls) showing automatic formatting of a code block when the close brace for a surrounding conditional statement is typed:
+
+![textDocument/onTypeFormatting](./images/lsp-support/textDocument_onTypeFormatting.gif)
 
 ### Show Message
 

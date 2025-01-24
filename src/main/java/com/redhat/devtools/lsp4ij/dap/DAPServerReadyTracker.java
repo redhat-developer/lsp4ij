@@ -14,9 +14,9 @@ import com.intellij.execution.process.ProcessEvent;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.process.ProcessListener;
 import com.intellij.openapi.util.Key;
+import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.ServerReadyConfig;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,7 +36,7 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
 
     private final @NotNull ServerReadyConfig config;
     private final @NotNull ProcessHandler processHandler;
-    private final @Nullable Integer port;
+    private @Nullable Integer port;
     private boolean foundedTrace;
 
     public DAPServerReadyTracker(@NotNull ServerReadyConfig config,
@@ -131,15 +131,25 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
         return false;
     }
 
-
     private boolean waitForTrace(@Nullable String text) {
         try {
             if (!foundedTrace) {
-                String waitForTrace = config.waitForTrace();
-                if (StringUtils.isNotBlank(waitForTrace)) {
-                    foundedTrace = text != null && text.startsWith(waitForTrace);
-                    return true;
+                NetworkAddressExtractor trackTrace = config.waitForTrace();
+                if (trackTrace != null) {
+                    var result = trackTrace.extract(text);
+                    if (result.matches()) {
+                        // ex : text=DAP server listening at: 127.0.0.1:61537
+                        if (port == null) {
+                           String extractedPort = result.port();
+                           if (extractedPort != null) {
+                               // ex: extractedPort=61537
+                               port = Integer.valueOf(extractedPort);
+                           }
+                        }
+                        foundedTrace = true;
+                    }
                 }
+                return trackTrace != null;
             }
         } finally {
             if (foundedTrace) {
@@ -148,4 +158,5 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
         }
         return false;
     }
+
 }

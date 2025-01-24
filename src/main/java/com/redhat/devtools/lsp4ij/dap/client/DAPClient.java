@@ -373,7 +373,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
 
         boolean shouldSendTerminateRequest = !sentTerminateRequest
-                && isSupportsTerminateRequest(getCapabilities())
+                && isSupportsTerminateRequest()
                 && debuggingType == DebuggingType.LAUNCH;
         if (shouldSendTerminateRequest) {
             sentTerminateRequest = true;
@@ -383,10 +383,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             arguments.setTerminateDebuggee(true);
             server.disconnect(arguments).thenRunAsync(this::dispose);
         }
-    }
-
-    private static boolean isSupportsTerminateRequest(@Nullable Capabilities capabilities) {
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
     }
 
     XDebugSession getSession() {
@@ -468,6 +464,39 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         args.setValue(value);
         args.setFormat(new ValueFormat());
         return debugProtocolServer.setVariable(args);
+    }
+
+    // Capabilities
+
+
+    /**
+     * Returns true if the debug adapter supports the 'terminate' request and false otherwise.
+     *
+     * @return true if the debug adapter supports the 'terminate' request and false otherwise.
+     */
+    public boolean isSupportsTerminateRequest() {
+        var capabilities = getCapabilities();
+        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports the 'completions' request and false otherwise.
+     *
+     * @return true if the debug adapter supports the 'completions' request and false otherwise.
+     */
+    public boolean isSupportsCompletionsRequest() {
+        var capabilities = getCapabilities();
+        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsCompletionsRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports setting a variable to a value and false otherwise.
+     *
+     * @return true if the debug adapter supports setting a variable to a value and false otherwise.
+     */
+    public boolean isSupportsSetVariable() {
+        var capabilities = getCapabilities();
+        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsSetVariable());
     }
 
     @NotNull

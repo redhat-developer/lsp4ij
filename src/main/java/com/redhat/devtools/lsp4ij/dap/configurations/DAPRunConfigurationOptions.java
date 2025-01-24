@@ -14,6 +14,8 @@ import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.openapi.components.StoredProperty;
 import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
 import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.Nullable;
@@ -24,6 +26,9 @@ import java.util.List;
  * Debug Adapter Protocol (DAP) run configuration options.
  */
 public class DAPRunConfigurationOptions extends RunConfigurationOptions {
+
+    @Nullable
+    private NetworkAddressExtractor networkAddressExtractor;
 
     // Configuration settings
     private final StoredProperty<String> file = string("")
@@ -188,6 +193,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
 
     public void setWaitForTrace(String waitForTrace) {
         this.waitForTrace.setValue(this, waitForTrace);
+        this.networkAddressExtractor = null;
     }
     
     public int getWaitForTimeout() {
@@ -206,4 +212,14 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
         this.serverTrace.setValue(this, serverTrace.name());
     }
 
+    public @Nullable NetworkAddressExtractor getNetworkAddressExtractor() {
+        if (networkAddressExtractor != null) {
+            return networkAddressExtractor;
+        }
+        String trackTrace = getWaitForTrace();
+        if (StringUtils.isNotBlank(trackTrace)) {
+            networkAddressExtractor = new NetworkAddressExtractor(trackTrace);
+        }
+        return networkAddressExtractor;
+    }
 }

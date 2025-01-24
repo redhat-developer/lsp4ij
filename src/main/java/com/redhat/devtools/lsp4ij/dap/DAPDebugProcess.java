@@ -97,7 +97,10 @@ public class DAPDebugProcess extends XDebugProcess {
                         // 1. get socket stream or simple stream
                         streamsSupplier = () -> {
                             try {
-                                return getTransportStreams(executionResult, port);
+                                // Call again serverReadyFuture.getPort() because the trace tracker could extract it.
+                                // ex: with Go DAP server, the server start command doesn't define some port, but the DAP server generates
+                                // the following trace "DAP server listening at: 127.0.0.1:51694"
+                                return getTransportStreams(executionResult, serverReadyFuture.getPort());
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
@@ -241,10 +244,10 @@ public class DAPDebugProcess extends XDebugProcess {
         if (port != null) {
             return new TransportStreams.SocketTransportStreams(InetAddress.getLoopbackAddress().getHostAddress(), port);
         }
-
+        var processHandler = executionResult.getProcessHandler();
         DAPProcessListener processListener = new DAPProcessListener();
-        executionResult.getProcessHandler().addProcessListener(processListener);
-        return new TransportStreams.DefaultTransportStreams(processListener.getInputStream(), processListener.getOutputStream());
+        processHandler.addProcessListener(processListener);
+        return new TransportStreams.DefaultTransportStreams(processListener.getInputStream(), processHandler.getProcessInput());
     }
 
     public Supplier<TransportStreams> getStreamsSupplier() {

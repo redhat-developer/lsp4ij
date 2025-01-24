@@ -177,7 +177,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends TextEdit>> onTypeFormatting(DocumentOnTypeFormattingParams params) {
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(mockFormattingTextEdits);
     }
 
     @Override

@@ -74,6 +74,10 @@ public class DAPValue extends XNamedValue {
     @Nullable
     @Override
     public XValueModifier getModifier() {
+        if (!client.isSupportsSetVariable()) {
+            // The DAP server doesn't support the setting variable, Disable the 'Set Value...' menu.
+            return null;
+        }
         return new DAPValueModifier(this);
     }
 

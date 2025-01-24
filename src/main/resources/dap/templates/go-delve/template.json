@@ -1,0 +1,56 @@
+{
+  "id": "go-delve",
+  "name": "Go - Delve",
+  "programArgs": {
+    "default": "dlv dap"
+  },
+  "waitForTrace": "DAP server listening at: ${address}:${port}",
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Go",
+        "patterns": [
+          "*.go"
+        ]
+      },
+      "languageId": "go"
+    },
+    {
+      "fileType": {
+        "name": "Go Module File",
+        "patterns": [
+          "go.mod"
+        ]
+      },
+      "languageId": "go.mod"
+    },
+    {
+      "fileType": {
+        "name": "Go Work File",
+        "patterns": [
+          "go.work"
+        ]
+      },
+      "languageId": "go.work"
+    },
+    {
+      "fileType": {
+        "name": "Go Checksum File",
+        "patterns": [
+          "go.sum"
+        ]
+      },
+      "languageId": "go.sum"
+    },
+    {
+      "fileType": {
+        "name": "Go Template File",
+        "patterns": [
+          ".tmpl",
+          ".gotmpl"
+        ]
+      },
+      "languageId": "gotmpl"
+    }
+  ]
+}

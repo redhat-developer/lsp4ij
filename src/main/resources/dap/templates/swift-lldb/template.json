@@ -2,9 +2,8 @@
   "id": "swift-lldb",
   "name": "Swift lldb-dap",
   "programArgs": {
-    "default": "lldb-dap -p ${port}"
+    "default": "lldb-dap"
   },
-  "waitForTimeout": "1000",
   "fileTypeMappings": [
     {
       "fileType": {
