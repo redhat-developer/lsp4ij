@@ -50,10 +50,21 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
         super(fileNamePatterns);
     }
 
+    /**
+     * Verifies that the folding ranges are as-expected by matching them against expected
+     * <code>&lt;start<i>N</i>&gt;</code> / <code>&lt;end<i>N</i>&gt;</code> tag pairs that represent the start/end
+     * offsets of the corresponding {@link FoldRegion fold regions}.
+     *
+     * @param fileName                       the file name
+     * @param fileBody                       the file body with embedded tag pairs for expected fold regions
+     * @param mockFoldingRangesJson          the mock <code>textDocument/foldingRange</code> response
+     * @param collapsedByDefaultRangeNumbers the optional 1-based numbers of the expected ranges which should be
+     *                                       collapsed initially
+     */
     protected void assertFoldingRanges(@NotNull String fileName,
                                        @NotNull String fileBody,
                                        @NotNull String mockFoldingRangesJson,
-                                       @NotNull Integer... defaultFoldedRanges) {
+                                       @NotNull Integer... collapsedByDefaultRangeNumbers) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());
@@ -110,8 +121,8 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
             String actualPlaceholderText = actualFoldRegion.getPlaceholderText();
             assertEquals(expectedPlaceholderText, actualPlaceholderText);
 
-            // Check the initial folded state
-            assertEquals("Incorrect expansion state for region " + (i + 1) + ".", ArrayUtil.contains(i + 1, defaultFoldedRanges), !actualFoldRegion.isExpanded());
+            // Check the initial expansion state
+            assertEquals("Incorrect expansion state for region " + (i + 1) + ".", ArrayUtil.contains(i + 1, collapsedByDefaultRangeNumbers), !actualFoldRegion.isExpanded());
         }
     }
 
