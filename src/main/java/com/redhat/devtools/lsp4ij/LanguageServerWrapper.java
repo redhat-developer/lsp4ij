@@ -388,6 +388,9 @@ public class LanguageServerWrapper implements Disposable {
         var folders = LSPIJUtils.toWorkspaceFolders(initialProject);
         initParams.setWorkspaceFolders(folders);
 
+        // Customize initialize params if needed
+        getClientFeatures().initializeParams(initParams);
+
         // no then...Async future here as we want this chain of operation to be sequential and "atomic"-ish
         return languageServer.initialize(initParams);
     }
