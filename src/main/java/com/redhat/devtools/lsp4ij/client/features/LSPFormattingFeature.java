@@ -157,7 +157,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
 
     /**
      * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
-     * supported by the server. Defaults to true.
+     * supported by the language server. Defaults to true.
      *
      * @param file the file
      * @return true if server-side on-type formatting should be enabled for the file; otherwise false

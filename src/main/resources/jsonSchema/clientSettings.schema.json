@@ -35,6 +35,12 @@
       "title": "Client-side formatter configuration",
       "additionalProperties": false,
       "properties": {
+        "textDocumentOnTypeFormattingEnabled": {
+          "type": "boolean",
+          "title": "Server-side on-type formatting enabled",
+          "description": "Whether or not server-side on-type formatting is enabled if 'textDocument/onTypeFormatting' is supported by the language server.",
+          "default": true
+        },
         "formatOnCloseBrace": {
           "type": "boolean",
           "title": "Format on close brace",

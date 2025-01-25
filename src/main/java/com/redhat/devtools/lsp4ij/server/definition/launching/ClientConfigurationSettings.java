@@ -40,7 +40,7 @@ public class ClientConfigurationSettings {
     public static class ClientConfigurationFormatSettings {
         /**
          * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
-         * supported by the server. Defaults to true.
+         * supported by the language server. Defaults to true.
          */
         public boolean textDocumentOnTypeFormattingEnabled = true;
 
