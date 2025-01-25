@@ -134,4 +134,18 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
             rangeFormattingCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
     }
+
+    // Client configuration settings
+
+    /**
+     * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
+     * supported by the language server. Defaults to true.
+     *
+     * @param file the file
+     * @return true if server-side on-type formatting should be enabled for the file; otherwise false
+     */
+    public boolean isTextDocumentOnTypeFormattingEnabled(@NotNull PsiFile file) {
+        // Default to enabled
+        return true;
+    }
 }

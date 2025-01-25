@@ -34,6 +34,17 @@ public class ClientConfigurationSettings {
     }
 
     /**
+     * Client-side format settings.
+     */
+    public static class ClientConfigurationFormatSettings {
+        /**
+         * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
+         * supported by the language server. Defaults to true.
+         */
+        public boolean textDocumentOnTypeFormattingEnabled = true;
+    }
+
+    /**
      * Client-side workspace symbol settings.
      */
     public static class ClientConfigurationWorkspaceSymbolSettings {
@@ -52,6 +63,11 @@ public class ClientConfigurationSettings {
      * Client-side code completion settings
      */
     public @NotNull ClientConfigurationCompletionSettings completion = new ClientConfigurationCompletionSettings();
+
+    /**
+     * Client-side format settings.
+     */
+    public @NotNull ClientConfigurationFormatSettings format = new ClientConfigurationFormatSettings();
 
     /**
      * Client-side workspace symbol settings
