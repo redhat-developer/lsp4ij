@@ -10,12 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Template {@link DebugAdapterDescriptorFactory}.
+ * Template {@link com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory}.
  */
 public class TemplateDebugAdapterDescriptorFactory extends UserDefinedDebugAdapterDescriptorFactory {
 

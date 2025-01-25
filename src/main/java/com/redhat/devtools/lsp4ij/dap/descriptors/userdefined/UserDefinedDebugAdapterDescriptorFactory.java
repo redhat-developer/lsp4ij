@@ -10,10 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.descriptors.userdefined;
 
+import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
+import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
@@ -21,6 +24,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * User defined {@link DebugAdapterDescriptorFactory}.
@@ -176,4 +180,39 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         return false;
     }
 
+    @Override
+    public boolean prepareConfiguration(@NotNull RunConfiguration configuration,
+                                        @NotNull VirtualFile file,
+                                        @NotNull Project project) {
+        if(super.prepareConfiguration(configuration, file, project)) {
+            if (configuration instanceof DAPRunConfiguration dapConfiguration) {
+                // Configuration
+                dapConfiguration.setLaunchParameters(getLaunchConfiguration());
+                dapConfiguration.setAttachParameters(getAttachConfiguration());
+
+                // Mappings
+                dapConfiguration.setServerMappings(Stream.concat(getLanguageMappings().stream(),
+                        getFileTypeMappings().stream())
+                        .toList());
+
+                // Server
+                dapConfiguration.setCommand(getCommandLine());
+                ConnectingServerStrategy connectingServerStrategy = ConnectingServerStrategy.NONE;
+                String waitFor = getWaitForTimeout();
+                if (StringUtils.isNotBlank(waitFor)) {
+                    connectingServerStrategy = ConnectingServerStrategy.TIMEOUT;
+                    dapConfiguration.setWaitForTimeout(Integer.parseInt(waitFor));
+                } else {
+                    String trackTrace = getWaitForTrace();
+                    if (StringUtils.isNotBlank(trackTrace)) {
+                        connectingServerStrategy = ConnectingServerStrategy.TRACE;
+                        dapConfiguration.setWaitForTrace(trackTrace);
+                    }
+                }
+                dapConfiguration.setConnectingServerStrategy(connectingServerStrategy);
+            }
+            return true;
+        }
+        return false;
+    }
 }
