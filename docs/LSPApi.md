@@ -18,6 +18,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP hover feature](#lsp-hover-feature)
 - [LSP implementation feature](#lsp-implementation-feature)
 - [LSP inlayHint feature](#lsp-inlayHint-feature)
+- [LSP progress feature](#lsp-progress-feature) 
 - [LSP references feature](#lsp-references-feature)
 - [LSP rename feature](#lsp-rename-feature)
 - [LSP semanticTokens feature](#lsp-semanticTokens-feature)
@@ -438,6 +439,13 @@ Integrates the LSP [`textDocument/selectionRange`](https://microsoft.github.io/l
 |-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
 | boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
 | boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+
+## LSP Progress Feature
+
+| API                                                             | Description                                                     | Default Behaviour |
+|-----------------------------------------------------------------|-----------------------------------------------------------------|-------------------|
+| String getProgressTaskTitle(String title)                       | Returns the progress task title.                                |                   |
+| void updateMessage(String message, ProgressIndicator indicator) | Update the given progress indicator text with the given message |                   |
 
 ## LSP References Feature
 
