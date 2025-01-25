@@ -73,6 +73,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPInlayHintFeature inlayHintFeature;
 
+    private LSPProgressFeature progressFeature;
+    
     private LSPReferencesFeature referencesFeature;
 
     private LSPRenameFeature renameFeature;
@@ -787,6 +789,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public final LSPClientFeatures setInlayHintFeature(@NotNull LSPInlayHintFeature inlayHintFeature) {
         inlayHintFeature.setClientFeatures(this);
         this.inlayHintFeature = inlayHintFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP progress feature.
+     *
+     * @return the LSP progress feature.
+     */
+    @NotNull
+    public final LSPProgressFeature getProgressFeature() {
+        if (progressFeature == null) {
+            initProgressFeature();
+        }
+        return progressFeature;
+    }
+
+    private synchronized void initProgressFeature() {
+        if (progressFeature != null) {
+            return;
+        }
+        setProgressFeature(new LSPProgressFeature());
+    }
+
+    /**
+     * Initialize the LSP progress feature.
+     *
+     * @param progressFeature the LSP progress feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setProgressFeature(@NotNull LSPProgressFeature progressFeature) {
+        progressFeature.setClientFeatures(this);
+        this.progressFeature = progressFeature;
         return this;
     }
 

@@ -20,7 +20,6 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -72,8 +71,8 @@ public class LSPProgressManager implements Disposable {
             progressMap.remove(token);
             return;
         }
-        String name = this.languageServerWrapper.getServerDefinition().getDisplayName();
-        String title = name + ": " + progressInfo.getTitle();
+        String title = languageServerWrapper.getClientFeatures().getProgressFeature()
+                .getProgressTaskTitle(progressInfo.getTitle());
         boolean cancellable = progressInfo.isCancellable();
         ProgressManager.getInstance().run(new Task.Backgroundable(languageServerWrapper.getProject(), title, cancellable) {
             @Override
@@ -106,9 +105,9 @@ public class LSPProgressManager implements Disposable {
                             WorkDoneProgressKind kind = progressNotification.getKind();
                             switch (kind) {
                                 case begin -> // 'begin' has been notified
-                                        begin((WorkDoneProgressBegin) progressNotification, indicator);
+                                        onProgressBegin((WorkDoneProgressBegin) progressNotification, indicator);
                                 case report -> // 'report' has been notified
-                                        report((WorkDoneProgressReport) progressNotification, indicator);
+                                        onProgressReport((WorkDoneProgressReport) progressNotification, indicator);
                             }
                         }
                     }
@@ -123,27 +122,21 @@ public class LSPProgressManager implements Disposable {
         return progressInfo.isDone() || progressInfo.isCancelled() || isDisposed();
     }
 
-    private void begin(@NotNull WorkDoneProgressBegin begin,
-                       @NotNull ProgressIndicator progressIndicator) {
-        Integer percentage = begin.getPercentage();
-        progressIndicator.setIndeterminate(percentage == null);
-        updateProgressIndicator(begin.getMessage(), percentage, progressIndicator);
+    private void onProgressBegin(@NotNull WorkDoneProgressBegin begin,
+                                 @NotNull ProgressIndicator progressIndicator) {
+        languageServerWrapper.getClientFeatures().getProgressFeature()
+                .onProgressBegin(begin, progressIndicator);
     }
 
-    private void report(@NotNull WorkDoneProgressReport report,
-                        @NotNull ProgressIndicator progressIndicator) {
-        updateProgressIndicator(report.getMessage(), report.getPercentage(), progressIndicator);
+    private void onProgressReport(@NotNull WorkDoneProgressReport report,
+                                  @NotNull ProgressIndicator progressIndicator) {
+        languageServerWrapper.getClientFeatures().getProgressFeature()
+                .onProgressReport(report, progressIndicator);
     }
 
-    private void updateProgressIndicator(@Nullable String message,
-                                         @Nullable Integer percentage,
-                                         @NotNull ProgressIndicator progressIndicator) {
-        if (message != null && !message.isBlank()) {
-            progressIndicator.setText2(message);
-        }
-        if (percentage != null) {
-            progressIndicator.setFraction(percentage.doubleValue() / 100);
-        }
+    private void onProgressEnd(@NotNull WorkDoneProgressEnd end) {
+        languageServerWrapper.getClientFeatures().getProgressFeature()
+                .onProgressEnd(end);
     }
 
     /**
@@ -197,7 +190,11 @@ public class LSPProgressManager implements Disposable {
                 // the Task with the 'begin' title.
                 createTask(progress);
             }
-            case end -> progress.setDone(true);
+            case end -> {
+                WorkDoneProgressEnd end = (WorkDoneProgressEnd) progressNotification;
+                onProgressEnd(end);
+                progress.setDone(true);
+            }
         }
     }
 
