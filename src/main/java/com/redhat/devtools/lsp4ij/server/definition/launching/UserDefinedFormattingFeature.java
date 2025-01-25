@@ -34,6 +34,12 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
     }
 
     @Override
+    public boolean isTextDocumentOnTypeFormattingEnabled(@NotNull PsiFile file) {
+        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
+        return formatSettings != null ? formatSettings.textDocumentOnTypeFormattingEnabled : super.isTextDocumentOnTypeFormattingEnabled(file);
+    }
+
+    @Override
     public boolean isFormatOnCloseBrace(@NotNull PsiFile file) {
         ClientConfigurationFormatSettings formatSettings = getFormatSettings();
         return formatSettings != null ? formatSettings.formatOnCloseBrace : super.isFormatOnCloseBrace(file);

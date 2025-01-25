@@ -38,50 +38,55 @@ public class ClientConfigurationSettings {
      * Client-side format settings.
      */
     public static class ClientConfigurationFormatSettings {
+        /**
+         * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
+         * supported by the server. Defaults to true.
+         */
+        public boolean textDocumentOnTypeFormattingEnabled = true;
 
         /**
-         * Whether or not to format on close brace. Defaults to false.
+         * Whether or not to format on close brace using client-side on-type formatting. Defaults to false.
          */
         public boolean formatOnCloseBrace = false;
 
         /**
-         * The specific close brace characters that should trigger on-type formatting. Defaults to the language's close
-         * brace characters.
+         * The specific close brace characters that should trigger client-side on-type formatting. Defaults to the
+         * language's close brace characters.
          */
         public String formatOnCloseBraceCharacters = null;
 
         /**
-         * The scope that should be formatted when a close brace is typed. Allowed values are
-         * {@link FormattingScope#CODE_BLOCK CODE_BLOCK} and {@link FormattingScope#FILE FILE}. Defaults to
+         * The scope that should be formatted using client-side on-type formatting when a close brace is typed. Allowed
+         * values are {@link FormattingScope#CODE_BLOCK CODE_BLOCK} and {@link FormattingScope#FILE FILE}. Defaults to
          * {@link FormattingScope#CODE_BLOCK CODE_BLOCK}.
          */
         public FormattingScope formatOnCloseBraceScope = FormattingScope.CODE_BLOCK;
 
         /**
-         * Whether or not to format on statement terminator. Defaults to false.
+         * Whether or not to format on statement terminator using client-side on-type formatting. Defaults to false.
          */
         public boolean formatOnStatementTerminator = false;
 
         /**
-         * The specific statement terminator characters that should trigger on-type formatting.
+         * The specific statement terminator characters that should trigger client-side on-type formatting.
          */
         public String formatOnStatementTerminatorCharacters = null;
 
         /**
-         * The scope that should be formatted when a statement terminator is typed. Allowed values are
-         * {@link FormattingScope#STATEMENT STATEMENT}, {@link FormattingScope#CODE_BLOCK CODE_BLOCK}, and
-         * {@link FormattingScope#FILE FILE}. Defaults to {@link FormattingScope#STATEMENT STATEMENT}.
+         * The scope that should be formatted using client-side on-type formatting when a statement terminator is typed.
+         * Allowed values are {@link FormattingScope#STATEMENT STATEMENT}, {@link FormattingScope#CODE_BLOCK CODE_BLOCK},
+         * and {@link FormattingScope#FILE FILE}. Defaults to {@link FormattingScope#STATEMENT STATEMENT}.
          */
         public FormattingScope formatOnStatementTerminatorScope = FormattingScope.STATEMENT;
 
         /**
-         * Whether or not to format on completion trigger. Defaults to false.
+         * Whether or not to format using client-side on-type formatting on completion trigger. Defaults to false.
          */
         public boolean formatOnCompletionTrigger = false;
 
         /**
-         * The specific completion trigger characters that should trigger on-type formatting. Defaults to the language's
-         * completion trigger characters.
+         * The specific completion trigger characters that should trigger client-side on-type formatting. Defaults to
+         * the language's completion trigger characters.
          */
         public String formatOnCompletionTriggerCharacters = null;
     }

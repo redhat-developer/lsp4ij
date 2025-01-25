@@ -156,7 +156,19 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Whether or not to format the file when close braces are typed. Defaults to false.
+     * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
+     * supported by the server. Defaults to true.
+     *
+     * @param file the file
+     * @return true if server-side on-type formatting should be enabled for the file; otherwise false
+     */
+    public boolean isTextDocumentOnTypeFormattingEnabled(@NotNull PsiFile file) {
+        // Default to enabled
+        return true;
+    }
+
+    /**
+     * Whether or not to format on close brace using client-side on-type formatting. Defaults to false.
      *
      * @param file the file
      * @return true if the file should be formatted when close braces are typed; otherwise false
@@ -167,7 +179,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * The specific close brace characters that should trigger on-type formatting in the file.
+     * The specific close brace characters that should trigger client-side on-type formatting.
      *
      * @param file the file
      * @return the close brace characters that should trigger on-type formatting or null if the language's standard
@@ -180,8 +192,8 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * The scope that should be formatted when a close brace is typed. Allowed values are
-     * {@link FormattingScope#CODE_BLOCK CODE_BLOCK} and {@link FormattingScope#FILE FILE}. Defaults to
+     * The scope that should be formatted using client-side on-type formatting when a close brace is typed. Allowed
+     * values are {@link FormattingScope#CODE_BLOCK CODE_BLOCK} and {@link FormattingScope#FILE FILE}. Defaults to
      * {@link FormattingScope#CODE_BLOCK CODE_BLOCK}.
      *
      * @param file the file
@@ -194,7 +206,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Whether or not to format the file when statement terminators are typed. Defaults to false.
+     * Whether or not to format on statement terminator using client-side on-type formatting. Defaults to false.
      *
      * @param file the file
      * @return true if the file should be formatted when statement terminators are typed; otherwise false
@@ -205,7 +217,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * The specific statement terminator characters that should trigger on-type formatting in the file.
+     * The specific statement terminator characters that should trigger client-side on-type formatting.
      *
      * @param file the file
      * @return the statement terminator characters that should trigger on-type formatting
@@ -217,9 +229,9 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * The scope that should be formatted when a statement terminator is typed. Allowed values are
-     * {@link FormattingScope#STATEMENT STATEMENT}, {@link FormattingScope#CODE_BLOCK CODE_BLOCK}, and
-     * {@link FormattingScope#FILE FILE}. Defaults to {@link FormattingScope#STATEMENT STATEMENT}.
+     * The scope that should be formatted using client-side on-type formatting when a statement terminator is typed.
+     * Allowed values are {@link FormattingScope#STATEMENT STATEMENT}, {@link FormattingScope#CODE_BLOCK CODE_BLOCK},
+     * and {@link FormattingScope#FILE FILE}. Defaults to {@link FormattingScope#STATEMENT STATEMENT}.
      *
      * @param file the file
      * @return the format scope
@@ -231,7 +243,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Whether or not to format the file when completion triggers are typed. Defaults to false.
+     * Whether or not to format using client-side on-type formatting on completion trigger. Defaults to false.
      *
      * @param file the file
      * @return true if the file should be formatted when completion triggers are typed; otherwise false
@@ -242,7 +254,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * The specific completion trigger characters that should trigger on-type formatting in the file.
+     * The specific completion trigger characters that should trigger client-side on-type formatting.
      *
      * @param file the file
      * @return the completion trigger characters that should trigger on-type formatting or null if the language's

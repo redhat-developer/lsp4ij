@@ -29,17 +29,39 @@ public class JavaServerSideFormatOnCloseBraceTest extends LSPServerSideOnTypeFor
         setTriggerCharacters(";", "\n", "}");
     }
 
-    public void testSimple() {
+    // Simple tests
+
+    // No language injection here because there are syntax errors
+    private static final String SIMPLE_FILE_BODY_BEFORE = """
+            public class Hello {
+                public static void main(String[] args) {
+            System.out.println("Hello, world.");
+                // type }
+            }
+            """;
+    // language=json
+    private static final String SIMPLE_MOCK_ON_TYPE_FORMATTING_JSON = """
+            [
+              {
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 44
+                  },
+                  "end": {
+                    "line": 2,
+                    "character": 0
+                  }
+                },
+                "newText": "\\n        "
+              }
+            ]
+            """;
+
+    public void testSimple_default() {
         assertOnTypeFormatting(
                 TEST_FILE_NAME,
-                // No language injection here because there are syntax errors
-                """
-                        public class Hello {
-                            public static void main(String[] args) {
-                        System.out.println("Hello, world.");
-                            // type }
-                        }
-                        """,
+                SIMPLE_FILE_BODY_BEFORE,
                 // language=java
                 """
                         public class Hello {
@@ -48,90 +70,118 @@ public class JavaServerSideFormatOnCloseBraceTest extends LSPServerSideOnTypeFor
                             }
                         }
                         """,
-                // language=json
-                """
-                        [
-                          {
-                            "range": {
-                              "start": {
-                                "line": 1,
-                                "character": 44
-                              },
-                              "end": {
-                                "line": 2,
-                                "character": 0
-                              }
-                            },
-                            "newText": "\\n        "
-                          }
-                        ]
-                        """
+                SIMPLE_MOCK_ON_TYPE_FORMATTING_JSON,
+                // No-op as the default is enabled
+                null
         );
     }
 
-    public void testComplex() {
+    public void testSimple_disabled() {
         assertOnTypeFormatting(
                 TEST_FILE_NAME,
                 // No language injection here because there are syntax errors
+                SIMPLE_FILE_BODY_BEFORE,
+                // language=java
+                """
+                        public class Hello {
+                            public static void main(String[] args) {
+                        System.out.println("Hello, world.");
+                            }
+                        }
+                        """,
+                SIMPLE_MOCK_ON_TYPE_FORMATTING_JSON,
+                clientConfig -> clientConfig.format.textDocumentOnTypeFormattingEnabled = false
+        );
+    }
+
+    // Complex tests
+
+    // No language injection here because there are syntax errors
+    private static final String COMPLEX_FILE_BODY_BEFORE = """
+            public class Hello {
+            public static void main(String[] args) {
+            System.out.println("Hello, world.");
+            }
+            // type }
+            """;
+
+    // language=json
+    private static final String COMPLEX_MOCK_ON_TYPE_FORMATTING_JSON = """
+            [
+              {
+                "range": {
+                  "start": {
+                    "line": 0,
+                    "character": 20
+                  },
+                  "end": {
+                    "line": 1,
+                    "character": 0
+                  }
+                },
+                "newText": "\\n    "
+              },
+              {
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 40
+                  },
+                  "end": {
+                    "line": 2,
+                    "character": 0
+                  }
+                },
+                "newText": "\\n        "
+              },
+              {
+                "range": {
+                  "start": {
+                    "line": 2,
+                    "character": 36
+                  },
+                  "end": {
+                    "line": 3,
+                    "character": 0
+                  }
+                },
+                "newText": "\\n    "
+              }
+            ]
+            """;
+
+    public void testComplex_default() {
+        assertOnTypeFormatting(
+                TEST_FILE_NAME,
+                COMPLEX_FILE_BODY_BEFORE,
+                // language=java
+                """
+                        public class Hello {
+                            public static void main(String[] args) {
+                                System.out.println("Hello, world.");
+                            }
+                        }
+                        """,
+                COMPLEX_MOCK_ON_TYPE_FORMATTING_JSON,
+                // No-op as the default is enabled
+                null
+        );
+    }
+
+    public void testComplex_disabled() {
+        assertOnTypeFormatting(
+                TEST_FILE_NAME,
+                COMPLEX_FILE_BODY_BEFORE,
+                // language=java
                 """
                         public class Hello {
                         public static void main(String[] args) {
                         System.out.println("Hello, world.");
                         }
-                        // type }
-                        """,
-                // language=java
-                """
-                        public class Hello {
-                            public static void main(String[] args) {
-                                System.out.println("Hello, world.");
-                            }
                         }
                         """,
-                // language=json
-                """
-                        [
-                          {
-                            "range": {
-                              "start": {
-                                "line": 0,
-                                "character": 20
-                              },
-                              "end": {
-                                "line": 1,
-                                "character": 0
-                              }
-                            },
-                            "newText": "\\n    "
-                          },
-                          {
-                            "range": {
-                              "start": {
-                                "line": 1,
-                                "character": 40
-                              },
-                              "end": {
-                                "line": 2,
-                                "character": 0
-                              }
-                            },
-                            "newText": "\\n        "
-                          },
-                          {
-                            "range": {
-                              "start": {
-                                "line": 2,
-                                "character": 36
-                              },
-                              "end": {
-                                "line": 3,
-                                "character": 0
-                              }
-                            },
-                            "newText": "\\n    "
-                          }
-                        ]
-                        """
+                COMPLEX_MOCK_ON_TYPE_FORMATTING_JSON,
+                clientConfig -> clientConfig.format.textDocumentOnTypeFormattingEnabled = false
         );
     }
 }
