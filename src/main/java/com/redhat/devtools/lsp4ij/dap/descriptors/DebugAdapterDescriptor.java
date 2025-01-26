@@ -28,6 +28,7 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -204,21 +205,22 @@ public class DebugAdapterDescriptor {
     }
 
     public @NotNull InitializeRequestArguments createInitializeRequestArguments(@NotNull Map<String, Object> dapParameters) {
-        final var arguments = new InitializeRequestArguments();
-        arguments.setClientID("lsp4ij.debug");
+        final var args = new InitializeRequestArguments();
+        args.setClientID("lsp4ij.debug");
+        args.setClientName(IntelliJPlatformUtils.getClientInfo().getName());
         String adapterId = "adapterId";
         if (dapParameters.get("type") instanceof String type) {
             adapterId = type;
         }
-        arguments.setAdapterID(adapterId);
-        arguments.setPathFormat(InitializeRequestArgumentsPathFormat.PATH);
-        arguments.setSupportsVariableType(true);
-        arguments.setSupportsVariablePaging(false);
-        arguments.setLinesStartAt1(true);
-        arguments.setColumnsStartAt1(true);
+        args.setAdapterID(adapterId);
+        args.setPathFormat(InitializeRequestArgumentsPathFormat.PATH);
+        args.setSupportsVariableType(true);
+        args.setSupportsVariablePaging(false);
+        args.setLinesStartAt1(true);
+        args.setColumnsStartAt1(true);
         // arguments.setSupportsRunInTerminalRequest(true);
-        arguments.setSupportsStartDebuggingRequest(true);
-        return arguments;
+        args.setSupportsStartDebuggingRequest(true);
+        return args;
     }
 
     /**
