@@ -11,24 +11,25 @@
 
 package com.redhat.devtools.lsp4ij.features.foldingRange;
 
-import com.intellij.codeInsight.folding.CodeFoldingSettings;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.folding.CustomFoldingBuilder;
 import com.intellij.lang.folding.FoldingDescriptor;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
 import org.eclipse.lsp4j.FoldingRange;
-import org.eclipse.lsp4j.FoldingRangeKind;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.ApiStatus;
@@ -66,6 +67,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         PsiFile file = root.getContainingFile();
         List<FoldingRange> foldingRanges = getFoldingRanges(file);
         if (!ContainerUtil.isEmpty(foldingRanges)) {
+            Project project = file.getProject();
+            VirtualFile virtualFile = file.getVirtualFile();
+
             for (FoldingRange foldingRange : foldingRanges) {
                 TextRange textRange = getTextRange(foldingRange, file, document);
                 if ((textRange != null) && (textRange.getLength() > 0)) {
@@ -76,7 +80,10 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
                             Collections.emptySet(),
                             false,
                             foldingRange.getCollapsedText(),
-                            isCollapsedByDefault(foldingRange)
+                            LanguageServiceAccessor.getInstance(project).hasAny(
+                                    virtualFile,
+                                    ls -> ls.getClientFeatures().getFoldingRangeFeature().isCollapsedByDefault(file, foldingRange)
+                            )
                     ));
                 }
             }
@@ -199,31 +206,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         return null;
     }
 
-    private static boolean isCollapsedByDefault(@NotNull FoldingRange foldingRange) {
-        String foldingRangeKind = foldingRange.getKind();
-        if (foldingRangeKind != null) {
-            CodeFoldingSettings codeFoldingSettings = CodeFoldingSettings.getInstance();
-
-            // Imports
-            if (codeFoldingSettings.COLLAPSE_IMPORTS &&
-                FoldingRangeKind.Imports.equals(foldingRangeKind)) {
-                return true;
-            }
-
-            // File header comments
-            else if (codeFoldingSettings.COLLAPSE_FILE_HEADER &&
-                     FoldingRangeKind.Comment.equals(foldingRangeKind) &&
-                     // TODO: Ideally we'd also confirm that the first line in the file starts a comment
-                     (foldingRange.getStartLine() == 0)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     @Override
     protected boolean isRegionCollapsedByDefault(@NotNull ASTNode node) {
+        // This is specified in the regions are they're created
         return false;
     }
 
