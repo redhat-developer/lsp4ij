@@ -19,7 +19,6 @@ import org.eclipse.lsp4j.ClientInfo;
 public class IntelliJPlatformUtils {
 
     private static final boolean IN_DEV_MODE = Boolean.getBoolean("idea.plugin.in.sandbox.mode");
-    private static final String CLIENT_NAME = "IntelliJ";
 
     private static ClientInfo INTELLIJ_CLIENT_INFO;
 
@@ -50,10 +49,11 @@ public class IntelliJPlatformUtils {
             return INTELLIJ_CLIENT_INFO;
         }
         ApplicationInfo applicationInfo = ApplicationInfo.getInstance();
+        String clientName = applicationInfo.getFullApplicationName();
         String versionName = applicationInfo.getVersionName();
         String buildNumber = applicationInfo.getBuild().asString();
 
         String intellijVersion = versionName + " (build " + buildNumber + ")";
-        return new ClientInfo(CLIENT_NAME, intellijVersion);
+        return new ClientInfo(clientName, intellijVersion);
     }
 }

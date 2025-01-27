@@ -15,6 +15,8 @@ import com.intellij.openapi.components.StoredProperty;
 import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
 import com.redhat.devtools.lsp4ij.dap.DebuggingType;
 import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -47,7 +49,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
             .provideDelegate(this, "attachParameters");
 
     // Mappings settings
-    private final StoredProperty<List<ServerMappingSettings>> serverMappings = this.<ServerMappingSettings >list()
+    private final StoredProperty<List<ServerMappingSettings>> serverMappings = this.<ServerMappingSettings>list()
             .provideDelegate(this, "serverMappings");
 
     // Server settings
@@ -59,10 +61,10 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
 
     private final StoredProperty<String> command = string("")
             .provideDelegate(this, "command");
-    
+
     private final StoredProperty<String> connectingServerStrategy = string(ConnectingServerStrategy.NONE.name())
             .provideDelegate(this, "connectingServerStrategy");
-    
+
     private final StoredProperty<Integer> waitForTimeout = property(0)
             .provideDelegate(this, "waitForTimeout");
 
@@ -195,7 +197,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
         this.waitForTrace.setValue(this, waitForTrace);
         this.networkAddressExtractor = null;
     }
-    
+
     public int getWaitForTimeout() {
         return waitForTimeout.getValue(this);
     }
@@ -221,5 +223,18 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
             networkAddressExtractor = new NetworkAddressExtractor(trackTrace);
         }
         return networkAddressExtractor;
+    }
+
+    /**
+     * Returns the server DAP factory descriptor and null otherwise.
+     *
+     * @return the server DAP factory descriptor and null otherwise.
+     */
+    public @Nullable DebugAdapterDescriptorFactory getServerFactory() {
+        String serverId = getServerId();
+        if (StringUtils.isBlank(serverId)) {
+            return null;
+        }
+        return DebugAdapterManager.getInstance().getFactoryById(serverId);
     }
 }

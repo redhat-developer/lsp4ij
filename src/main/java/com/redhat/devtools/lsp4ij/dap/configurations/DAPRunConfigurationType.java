@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.execution.configurations.ConfigurationTypeBase;
+import com.intellij.execution.configurations.ConfigurationTypeUtil;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.util.NotNullLazyValue;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
@@ -21,6 +22,10 @@ import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 final class DAPRunConfigurationType extends ConfigurationTypeBase {
 
     public static final String ID = "DAPRunConfiguration";
+
+    public static DAPRunConfigurationType getInstance() {
+        return ConfigurationTypeUtil.findConfigurationType(DAPRunConfigurationType.class);
+    }
 
     DAPRunConfigurationType() {
         super(ID,

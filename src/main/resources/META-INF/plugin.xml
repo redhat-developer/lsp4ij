@@ -736,7 +736,7 @@ L
     <!-- DAP Support -->
     <extensions defaultExtensionNs="com.intellij">
         <applicationService
-                serviceImplementation="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactoryRegistry"/>
+                serviceImplementation="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager"/>
         <programRunner id="DAPDebugRunner"
                        implementation="com.redhat.devtools.lsp4ij.dap.DAPDebugRunner"/>
         <configurationType
@@ -746,6 +746,8 @@ L
         <completion.contributor id="DAPCompletionProcessor"
                                 language="any"
                                 implementationClass="com.redhat.devtools.lsp4ij.dap.completion.DAPCompletionProcessor"/>
+        <runConfigurationProducer id="DAPRunConfigurationProvider"
+                                  implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationProvider" />
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager"/>
     </extensions>

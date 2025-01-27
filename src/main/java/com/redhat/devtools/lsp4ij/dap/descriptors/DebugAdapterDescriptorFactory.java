@@ -15,6 +15,8 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPSettingsEditor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
@@ -23,6 +25,8 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
+
+import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
 
 /**
  * Debug Adapter Protocol (DAP) server descriptor factory.
@@ -80,5 +84,23 @@ public abstract class DebugAdapterDescriptorFactory {
 
     public boolean canRun(@NotNull String executorId) {
         return true;
+    }
+
+    public boolean prepareConfiguration(@NotNull RunConfiguration configuration,
+                                        @NotNull VirtualFile file,
+                                        @NotNull Project project) {
+        if (configuration instanceof DAPRunConfiguration dapConfiguration) {
+            configuration.setName(file.getName());
+
+            // Configuration
+            dapConfiguration.setFile(getFilePath(file));
+            dapConfiguration.setDebuggingType(DebuggingType.LAUNCH);
+
+            // Server
+            dapConfiguration.setServerId(this.getId());
+            dapConfiguration.setServerName(this.getName());
+            return true;
+        }
+        return false;
     }
 }
