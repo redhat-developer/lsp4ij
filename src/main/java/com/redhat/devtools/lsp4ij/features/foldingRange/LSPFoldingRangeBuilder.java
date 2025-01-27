@@ -17,15 +17,12 @@ import com.intellij.lang.folding.FoldingDescriptor;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
@@ -67,9 +64,6 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         PsiFile file = root.getContainingFile();
         List<FoldingRange> foldingRanges = getFoldingRanges(file);
         if (!ContainerUtil.isEmpty(foldingRanges)) {
-            Project project = file.getProject();
-            VirtualFile virtualFile = file.getVirtualFile();
-
             for (FoldingRange foldingRange : foldingRanges) {
                 TextRange textRange = getTextRange(foldingRange, file, document);
                 if ((textRange != null) && (textRange.getLength() > 0)) {
@@ -80,10 +74,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
                             Collections.emptySet(),
                             false,
                             foldingRange.getCollapsedText(),
-                            LanguageServiceAccessor.getInstance(project).hasAny(
-                                    virtualFile,
-                                    ls -> ls.getClientFeatures().getFoldingRangeFeature().isCollapsedByDefault(file, foldingRange)
-                            )
+                            (foldingRange instanceof LSPFoldingRange lspFoldingRange) && lspFoldingRange.isCollapsedByDefault()
                     ));
                 }
             }

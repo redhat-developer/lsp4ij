@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.foldingRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.LSPFoldingRangeFeature;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -87,10 +88,14 @@ public class LSPFoldingRangeSupport extends AbstractLSPDocumentFeatureSupport<Fo
                         // textDocument/foldingRange may return null
                         return Collections.emptyList();
                     }
-                    return foldingRanges.stream()
+
+                    // Add whether or not the folding range should be collapsed by default
+                    LSPFoldingRangeFeature foldingRangeFeature = languageServer.getClientFeatures().getFoldingRangeFeature();
+                    return foldingRanges
+                            .stream()
                             .filter(Objects::nonNull)
+                            .map(foldingRange -> (FoldingRange) new LSPFoldingRange(foldingRange, foldingRangeFeature.isCollapsedByDefault(file, foldingRange)))
                             .toList();
                 });
     }
-
 }
