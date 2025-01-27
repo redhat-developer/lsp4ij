@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
-import com.google.common.collect.Streams;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
@@ -23,7 +22,7 @@ import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebuggingType;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactoryRegistry;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -71,7 +70,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
 
     private DAPTemplate currentTemplate;
     private DebugAdapterDescriptorFactory currentServerFactory;
-    private boolean formLoaded;
+    private boolean initialized;
 
     public DAPSettingsEditor(@NotNull Project project) {
         this.project = project;
@@ -158,14 +157,6 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
                 }
             }
         });
-        serverFactoryCombo.addItemListener(e -> {
-            currentServerFactory = (DebugAdapterDescriptorFactory) e.getItem();
-            if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory dapFactory) {
-                if (dapFactory != UserDefinedDebugAdapterDescriptorFactory.NONE) {
-                    loadFromDapFactory(dapFactory);
-                }
-            }
-        });
 
         serverTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.factory.field"), serverFactoryCombo);
 
@@ -188,7 +179,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
     private static DebugAdapterDescriptorFactory[] getDapServerFactories() {
         List<DebugAdapterDescriptorFactory> templates = new ArrayList<>();
         templates.add(DebugAdapterDescriptorFactory.NONE);
-        templates.addAll(DebugAdapterDescriptorFactoryRegistry.getInstance().getFactories());
+        templates.addAll(DebugAdapterManager.getInstance().getFactories());
         return templates.toArray(new DebugAdapterDescriptorFactory[0]);
     }
 
@@ -273,7 +264,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         // Sever settings
         String serverId = runConfiguration.getServerId();
         if (StringUtils.isNotBlank(serverId)) {
-            DebugAdapterDescriptorFactory factory = DebugAdapterDescriptorFactoryRegistry.getInstance().getFactoryById(serverId);
+            DebugAdapterDescriptorFactory factory = DebugAdapterManager.getInstance().getFactoryById(serverId);
             if (factory != null) {
                 currentServerFactory = factory;
                 serverFactoryCombo.setSelectedItem(factory);
@@ -287,10 +278,27 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         serverTraceComboBox.setSelectedItem(runConfiguration.getServerTrace());
 
         // If DAP server is not configured, select 'Server' tab
-        if (!formLoaded && StringUtils.isEmpty(serverId) && commandField.getText().isEmpty()) {
+        if (!initialized) {
+            initializeEditor(runConfiguration);
+        }
+        initialized = true;
+    }
+
+    private void initializeEditor(DAPRunConfiguration runConfiguration) {
+        // Add Listener when server is selected, it must update Configuration / Mappings and Server tabs
+        serverFactoryCombo.addItemListener(e -> {
+            currentServerFactory = (DebugAdapterDescriptorFactory) e.getItem();
+            if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory dapFactory) {
+                if (dapFactory != UserDefinedDebugAdapterDescriptorFactory.NONE) {
+                    loadFromDapFactory(dapFactory);
+                }
+            }
+        });
+        // If DAP server is not configured, the Server tab must be selected
+        String serverId = runConfiguration.getServerId();
+        if (StringUtils.isEmpty(serverId) && commandField.getText().isEmpty()) {
             mainTabbedPane.setSelectedIndex(2);
         }
-        formLoaded = true;
     }
 
     @Override
@@ -315,21 +323,6 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
 
         if (currentServerFactory != null) {
             runConfiguration.setServerId(currentServerFactory.getId());
-            currentServerFactory.setServerTrace((ServerTrace) serverTraceComboBox.getSelectedItem());
-            if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory dapFactory) {
-                runConfiguration.setServerId(dapFactory.getId());
-                if (dapFactory != UserDefinedDebugAdapterDescriptorFactory.NONE) {
-                    dapFactory.setName(serverNameField.getText());
-                    dapFactory.setCommandLine(commandField.getText());
-                    dapFactory.setWaitForTimeout(connectingServerConfigurationPanel.getTimeout());
-                    dapFactory.setWaitForTrace(connectingServerConfigurationPanel.getTrace());
-                    dapFactory.setLanguageMappings(mappingsPanel.getLanguageMappings());
-                    dapFactory.setFileTypeMappings(Streams.concat(
-                            mappingsPanel.getFileTypeMappings().stream(),
-                            mappingsPanel.getFileNamePatternMappings().stream()
-                            ).toList());
-                }
-            }
         }
     }
 

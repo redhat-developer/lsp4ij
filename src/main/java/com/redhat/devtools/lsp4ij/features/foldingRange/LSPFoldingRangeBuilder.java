@@ -67,12 +67,15 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
             for (FoldingRange foldingRange : foldingRanges) {
                 TextRange textRange = getTextRange(foldingRange, file, document);
                 if ((textRange != null) && (textRange.getLength() > 0)) {
-                    String collapsedText = foldingRange.getCollapsedText();
-                    if (collapsedText != null) {
-                        descriptors.add(new FoldingDescriptor(root.getNode(), textRange, null, collapsedText));
-                    } else {
-                        descriptors.add(new FoldingDescriptor(root.getNode(), textRange));
-                    }
+                    descriptors.add(new FoldingDescriptor(
+                            root.getNode(),
+                            textRange,
+                            null,
+                            Collections.emptySet(),
+                            false,
+                            foldingRange.getCollapsedText(),
+                            (foldingRange instanceof LSPFoldingRange lspFoldingRange) && lspFoldingRange.isCollapsedByDefault()
+                    ));
                 }
             }
         }
@@ -196,6 +199,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
     @Override
     protected boolean isRegionCollapsedByDefault(@NotNull ASTNode node) {
+        // This is specified in the regions are they're created
         return false;
     }
 

@@ -371,6 +371,26 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 
 ![textDocument/foldingRange](./images/lsp-support/textDocument_foldingRange.gif)
 
+#### Automatic code folding
+
+LSP4IJ's folding range support also includes the ability to designate certain folding ranges as _collapsed by default_
+based on a combination of the IDE's **Code Folding** settings:
+
+![Code Folding settings](./images/lsp-support/codeFoldingSettings.png)
+
+and how the folding ranges are categorized by the language server via the `kind` attribute. By default, the following
+folding ranges are folded by default:
+
+* Those with `kind=imports` when **Imports** are configured to be folded by default in the IDE.
+* Those with `kind=comment` found on the first line of a file when **File header** is configured to be folded by default in the IDE. 
+
+Here is an example of collapse by default behavior with the [Java Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls)
+showing automatic folding of both the file header comment and imports when the file is opened:
+
+![textDocument/foldingRange_collapseByDefault](./images/lsp-support/textDocument_foldingRange_collapseByDefault.gif)
+
+#### Code block provider
+
 Additionally LSP4IJ registers the an implementation of the `codeBlockProvider` extension point with
 [LSPCodeBlockProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/foldingRange/LSPCodeBlockProvider.java) for `TEXT` and `textmate` languages to provide block brace matching and easy navigation to
 the beginning/end of the containing block.

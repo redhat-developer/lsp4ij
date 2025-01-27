@@ -22,7 +22,6 @@ import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
 import com.redhat.devtools.lsp4ij.dap.DebuggingType;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactoryRegistry;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -220,11 +219,16 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         return false;
     }
 
+    /**
+     * Returns true if the given executor id (ex: 'Debug') can be executed and false otherwise.
+     *
+     * @param executorId the executor id (ex: 'Debug').
+     * @return true if the given executor id (ex: 'Debug') can be executed and false otherwise.
+     */
     public boolean canRun(@NotNull String executorId) {
         var serverFactory = getServerFactory();
         return serverFactory != null ? serverFactory.canRun(executorId) : true;
     }
-
 
     @Override
     public void checkConfiguration() throws RuntimeConfigurationException {
@@ -233,13 +237,39 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         }
     }
 
+    /**
+     * Returns the server DAP factory descriptor and null otherwise.
+     *
+     * @return the server DAP factory descriptor and null otherwise.
+     */
     @Nullable
-    private DebugAdapterDescriptorFactory getServerFactory() {
-        String serverId = getOptions().getServerId();
-        if (StringUtils.isBlank(serverId)) {
-            return null;
-        }
-        return DebugAdapterDescriptorFactoryRegistry.getInstance().getFactoryById(serverId);
+    public DebugAdapterDescriptorFactory getServerFactory() {
+        return getOptions().getServerFactory();
     }
 
+    /**
+     * Copy the configuration into the given configuration.
+     *
+     * @param configuration the configuration where values must be copied.
+     */
+    public void copyTo(@NotNull DAPRunConfiguration configuration) {
+        // Configuration
+        configuration.setWorkingDirectory(getWorkingDirectory());
+        configuration.setFile(getFile());
+        configuration.setDebuggingType(getDebuggingType());
+        configuration.setLaunchParameters(getLaunchParameters());
+        configuration.setAttachParameters(getAttachParameters());
+
+        // Mappings
+        configuration.setServerMappings(getServerMappings());
+
+        // Server
+        configuration.setServerId(getServerId());
+        configuration.setServerName(getServerName());
+        configuration.setCommand(getCommand());
+        configuration.setConnectingServerStrategy(getConnectingServerStrategy());
+        configuration.setWaitForTimeout(getWaitForTimeout());
+        configuration.setWaitForTrace(getWaitForTrace());
+        configuration.setServerTrace(getServerTrace());
+    }
 }

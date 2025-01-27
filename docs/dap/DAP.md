@@ -56,6 +56,12 @@ You should edit the variable:
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
 
+# Contextual Menu
+
+Click on right button open existing / new DAP run configuration:
+
+![Run/Debug menu](images/DAP_contextual_menu.png)
+
 ## Templates
 
 LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:
