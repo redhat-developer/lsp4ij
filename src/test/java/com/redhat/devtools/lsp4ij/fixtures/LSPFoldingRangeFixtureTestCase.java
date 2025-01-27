@@ -18,6 +18,8 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EditorTestUtil;
+import com.intellij.util.ArrayUtil;
+import com.intellij.util.text.TextRangeUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -48,12 +50,40 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
         super(fileNamePatterns);
     }
 
+    /**
+     * Verifies that the folding ranges are as-expected by matching them against expected
+     * <code>&lt;start<i>N</i>&gt;</code> / <code>&lt;end<i>N</i>&gt;</code> tag pairs that represent the start/end
+     * offsets of the corresponding {@link FoldRegion fold regions}.
+     *
+     * @param fileName                       the file name
+     * @param fileBody                       the file body with embedded tag pairs for expected fold regions
+     * @param mockFoldingRangesJson          the mock <code>textDocument/foldingRange</code> response
+     * @param collapsedByDefaultRangeNumbers the optional 1-based numbers of the expected ranges which should be
+     *                                       collapsed initially
+     */
     protected void assertFoldingRanges(@NotNull String fileName,
                                        @NotNull String fileBody,
-                                       @NotNull String mockFoldingRangesJson) {
+                                       @NotNull String mockFoldingRangesJson,
+                                       @NotNull Integer... collapsedByDefaultRangeNumbers) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         List<FoldingRange> mockFoldingRanges = JSONUtils.getLsp4jGson().fromJson(mockFoldingRangesJson, new TypeToken<List<FoldingRange>>() {
         }.getType());
+        // Sort for stability
+        mockFoldingRanges.sort((foldingRange1, foldingRange2) -> {
+            int startLine1 = foldingRange1.getStartLine();
+            int startLine2 = foldingRange2.getStartLine();
+            if (startLine1 != startLine2) {
+                return startLine1 - startLine2;
+            }
+
+            int startCharacter1 = foldingRange1.getStartCharacter();
+            int startCharacter2 = foldingRange2.getStartCharacter();
+            if (startCharacter1 != startCharacter2) {
+                return startCharacter1 - startCharacter2;
+            }
+
+            return 0;
+        });
         MockLanguageServer.INSTANCE.setFoldingRanges(mockFoldingRanges);
 
         PsiFile file = myFixture.configureByText(fileName, stripTokens(fileBody));
@@ -90,6 +120,9 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
             String expectedPlaceholderText = StringUtil.isNotEmpty(mockCollapsedText) ? mockCollapsedText : "...";
             String actualPlaceholderText = actualFoldRegion.getPlaceholderText();
             assertEquals(expectedPlaceholderText, actualPlaceholderText);
+
+            // Check the initial expansion state
+            assertEquals("Incorrect expansion state for region " + (i + 1) + ".", ArrayUtil.contains(i + 1, collapsedByDefaultRangeNumbers), !actualFoldRegion.isExpanded());
         }
     }
 
@@ -167,6 +200,9 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
             int endOffset = endOffsets.get(i);
             expectedTextRanges.add(TextRange.create(startOffset, endOffset));
         }
+
+        // Sort for stability
+        expectedTextRanges.sort(TextRangeUtil.RANGE_COMPARATOR);
         return expectedTextRanges;
     }
 }

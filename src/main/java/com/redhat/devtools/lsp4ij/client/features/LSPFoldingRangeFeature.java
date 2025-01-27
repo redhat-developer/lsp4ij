@@ -10,8 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client.features;
 
+import com.intellij.codeInsight.folding.CodeFoldingSettings;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.server.capabilities.FoldingRangeCapabilityRegistry;
+import org.eclipse.lsp4j.FoldingRange;
+import org.eclipse.lsp4j.FoldingRangeKind;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -61,5 +64,43 @@ public class LSPFoldingRangeFeature extends AbstractLSPDocumentFeature {
         if (foldingRangeCapabilityRegistry != null) {
             foldingRangeCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
+    }
+
+    /**
+     * Whether or not the specified folding range should be collapsed by default. The default implementation returns
+     * true for folding ranges when:
+     * <ul>
+     *     <li><code>kind</code> is {@link FoldingRangeKind#Imports} and {@link CodeFoldingSettings#COLLAPSE_IMPORTS}
+     *         is true
+     *     </li>
+     *     <li><code>kind</code> is {@link FoldingRangeKind#Comment}, {@link CodeFoldingSettings#COLLAPSE_FILE_HEADER}
+     *         is true, and the folding range starts on the file's first line
+     *     </li>
+     * </ul>
+     *
+     * @param file         the PSI file
+     * @param foldingRange the folding range
+     * @return true if the folding range should be collapsed by default; otherwise false
+     */
+    public boolean isCollapsedByDefault(@NotNull PsiFile file, @NotNull FoldingRange foldingRange) {
+        String foldingRangeKind = foldingRange.getKind();
+        if (foldingRangeKind != null) {
+            CodeFoldingSettings codeFoldingSettings = CodeFoldingSettings.getInstance();
+
+            // Imports
+            if (codeFoldingSettings.COLLAPSE_IMPORTS &&
+                FoldingRangeKind.Imports.equals(foldingRangeKind)) {
+                return true;
+            }
+
+            // File header comments
+            else if (codeFoldingSettings.COLLAPSE_FILE_HEADER &&
+                     FoldingRangeKind.Comment.equals(foldingRangeKind) &&
+                     (foldingRange.getStartLine() == 0)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
