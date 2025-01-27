@@ -33,7 +33,7 @@ public class EditJsonSchemaDialog extends DialogWrapper {
     private String jsonSchemaContent;
     private JsonTextField jsonSchemaWidget;
 
-    protected EditJsonSchemaDialog(@NotNull Project project, String jsonSchemaContent) {
+    public EditJsonSchemaDialog(@NotNull Project project, String jsonSchemaContent) {
         super(true);
         this.project = project;
         this.jsonSchemaContent = jsonSchemaContent;

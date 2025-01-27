@@ -14,7 +14,6 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
-import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ui.FileNamePatternServerMappingTablePanel;
@@ -81,11 +80,13 @@ public class DAPServerMappingsPanel {
     /**
      * Refresh the language, file type, file name pattern mappings defined by the DAP factory.
      *
-     * @param dapFactory the DAP factory.
+     * @param languageMappings language mappings.
+     * @param allFileTypeMappings file type and pattern mappings.
      */
-    public void refreshMappings(UserDefinedDebugAdapterDescriptorFactory dapFactory) {
+    public void refreshMappings(@NotNull List<ServerMappingSettings> languageMappings,
+                                @NotNull List<ServerMappingSettings> allFileTypeMappings) {
         // refresh language mappings list
-        setLanguageMappings(dapFactory.getLanguageMappings());
+        setLanguageMappings(languageMappings);
 
         // refresh file type mappings
         List<ServerMappingSettings> fileTypeMappings = new ArrayList<>();
@@ -104,7 +105,7 @@ public class DAPServerMappingsPanel {
         // Collect them by following this strategy:
         // - case 1: if fileType can be retrieved by the name, create a fileType mapping.
         // - case 2: if fileType cannot be retrieved, create file name pattern mapping.
-        for (var mapping : dapFactory.getFileTypeMappings()) {
+        for (var mapping : allFileTypeMappings) {
             boolean add = false;
             String fileType = mapping.getFileType();
             if (!StringUtils.isEmpty(fileType)) {
