@@ -1,5 +1,5 @@
 {
-  "type": "pwa-node",
+  "type": "go",
   "request": "attach",
   "program": "${file}",
   "cwd": "${workspaceFolder}"

@@ -11,7 +11,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.settings;
+package com.redhat.devtools.lsp4ij.dap.settings;
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -25,12 +25,12 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.IconUtil;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.launching.ui.NewLanguageServerDialog;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactoryListener;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
+import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.dap.settings.ui.NewDebugAdapterDescriptorFactoryDialog;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,43 +43,39 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- * UI settings which show:
- *
- * <ul>
- *     <li>list of language server as master on the left</li>
- *     <li>the settings detail of the selected language server on the right</li>
- * </ul>
+ *  Show list of Debug Adapter descriptor factories as master.
  */
-public class LanguageServerListConfigurable extends MasterDetailsComponent implements SearchableConfigurable {
+public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetailsComponent implements SearchableConfigurable {
 
     @NonNls
-    private static final String ID = "LanguageServers";
+    private static final String ID = "debugAdapterDescriptorFactories";
     private String displayNodeName = null;
-
     private final Project project;
-    private final LanguageServerDefinitionListener listener = new LanguageServerDefinitionListener() {
+
+    private final DebugAdapterDescriptorFactoryListener listener = new DebugAdapterDescriptorFactoryListener() {
 
         @Override
-        public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
+        public void handleAdded(@NotNull DebugAdapterDescriptorFactoryAddedEvent event) {
             reloadTree();
         }
 
         @Override
-        public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
+        public void handleRemoved(@NotNull DebugAdapterDescriptorFactoryRemovedEvent event) {
             reloadTree();
         }
 
         @Override
-        public void handleChanged(@NotNull LanguageServerChangedEvent event) {
+        public void handleChanged(@NotNull DebugAdapterDescriptorFactoryChangedEvent event) {
             // Do nothing
         }
+
     };
 
     private boolean isTreeInitialized;
 
-    public LanguageServerListConfigurable(@NotNull Project project) {
+    public DebugAdapterDescriptorFactoryListConfigurable(@NotNull Project project) {
         this.project = project;
-        LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(listener);
+        DebugAdapterManager.getInstance().addDebugAdapterDescriptorFactoryListener(listener);
     }
 
     @Override
@@ -99,7 +95,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     @Override
     public @NlsContexts.ConfigurableName String getDisplayName() {
-        return LanguageServerBundle.message("language.servers");
+        return DAPBundle.message("debug.adapter");
     }
 
     @Nullable
@@ -117,10 +113,10 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
 
     @Override
     protected @Nullable List<AnAction> createActions(boolean fromPopup) {
-        var addAction = new DumbAwareAction(LanguageServerBundle.message("language.server.action.add"), null, IconUtil.getAddIcon()) {
+        var addAction = new DumbAwareAction(DAPBundle.message("debug.adapter.action.add"), null, IconUtil.getAddIcon()) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
-                NewLanguageServerDialog dialog = new NewLanguageServerDialog(project);
+                var dialog = new NewDebugAdapterDescriptorFactoryDialog(project);
                 dialog.show();
             }
 
@@ -129,14 +125,14 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                 return ActionUpdateThread.BGT;
             }
         };
-        var removeAction = new DumbAwareAction(LanguageServerBundle.message("language.server.action.remove"), null, IconUtil.getRemoveIcon()) {
+        var removeAction = new DumbAwareAction(DAPBundle.message("debug.adapter.action.remove"), null, IconUtil.getRemoveIcon()) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
                 MyNode[] selectedNodes = myTree.getSelectedNodes(MyNode.class, null);
                 for (var selectedNode : selectedNodes) {
-                    if (isUserDefinedLanguageServerDefinition(selectedNode)) {
-                        var serverDefinition = ((LanguageServerConfigurable) selectedNode.getConfigurable()).getEditableObject();
-                        LanguageServersRegistry.getInstance().removeServerDefinition(project, serverDefinition);
+                    if (isUserDefined(selectedNode)) {
+                        var descriptorFactory = ((DebugAdapterDescriptorFactoryConfigurable) selectedNode.getConfigurable()).getEditableObject();
+                        DebugAdapterManager.getInstance().removeDebugAdapterDescriptorFactory(descriptorFactory);
                     }
                 }
             }
@@ -145,7 +141,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
             public void update(@NotNull AnActionEvent e) {
                 MyNode[] selectedNodes = myTree.getSelectedNodes(MyNode.class, null);
                 boolean enabled = selectedNodes.length > 0 && Stream.of(selectedNodes)
-                        .anyMatch(LanguageServerListConfigurable::isUserDefinedLanguageServerDefinition);
+                        .anyMatch(DebugAdapterDescriptorFactoryListConfigurable::isUserDefined);
                 e.getPresentation().setEnabled(enabled);
             }
 
@@ -158,20 +154,20 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         return Arrays.asList(addAction, removeAction);
     }
 
-    private static boolean isUserDefinedLanguageServerDefinition(MyNode node) {
-        var serverDefinition = ((LanguageServerConfigurable) node.getConfigurable()).getEditableObject();
-        return serverDefinition instanceof UserDefinedLanguageServerDefinition;
+    private static boolean isUserDefined(MyNode node) {
+        var descriptorFactory = ((DebugAdapterDescriptorFactoryConfigurable) node.getConfigurable()).getEditableObject();
+        return descriptorFactory instanceof UserDefinedDebugAdapterDescriptorFactory;
     }
 
-    private void addLanguageServerDefinitionNode(LanguageServerDefinition languageServerDefinition) {
-        MyNode node = new MyNode(new LanguageServerConfigurable(languageServerDefinition, TREE_UPDATER, project));
+    private void addDebugAdapterProtocolDefinitionNode(DebugAdapterDescriptorFactory descriptorFactory) {
+        MyNode node = new MyNode(new DebugAdapterDescriptorFactoryConfigurable(descriptorFactory, TREE_UPDATER, project));
         addNode(node, myRoot);
     }
 
     private void reloadTree() {
         myRoot.removeAllChildren();
-        for (LanguageServerDefinition languageServerDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
-            addLanguageServerDefinitionNode(languageServerDefinition);
+        for (var descriptorFactory : DebugAdapterManager.getInstance().getFactories()) {
+            addDebugAdapterProtocolDefinitionNode(descriptorFactory);
         }
         ((DefaultTreeModel) myTree.getModel()).reload();
 
@@ -201,7 +197,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     @Override
     public void disposeUIResources() {
         super.disposeUIResources();
-        LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(listener);
+        DebugAdapterManager.getInstance().removeDebugAdapterDescriptorFactoryListener(listener);
     }
 
 }

@@ -348,8 +348,8 @@ public class LanguageServersRegistry {
         }
     }
 
-
-    private void addServerDefinitionWithoutNotification(@NotNull LanguageServerDefinition serverDefinition, @NotNull List<ServerMapping> mappings) {
+    private void addServerDefinitionWithoutNotification(@NotNull LanguageServerDefinition serverDefinition,
+                                                        @NotNull List<ServerMapping> mappings) {
         String languageServerId = serverDefinition.getId();
         serverDefinitions.put(languageServerId, serverDefinition);
         // Update associations
