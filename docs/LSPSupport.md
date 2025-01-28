@@ -458,6 +458,67 @@ Here is an example with the [Java Language Server](https://github.com/eclipse-jd
 
 ![textDocument/onTypeFormatting](./images/lsp-support/textDocument_onTypeFormatting.gif)
 
+If desired &mdash; for example, for those who want to control when formatting is performed &mdash; server-side/LSP-based
+on-type formatting can be disabled via client configuration as follows:
+
+```json
+{
+  "format": {
+    "onTypeFormatting": {
+      "serverSide": {
+        "enabled": false
+      }
+    }
+  }
+}
+```
+
+#### Client-side On-Type Formatting
+
+Not all language servers support the `textDocument/onTypeFormatting` feature. To provide an improved editor experience
+for users of those that do not, LSP4IJ includes support for _client-side on-type formatting_. Client-side on-type
+formatting can be enabled via client configuration with the following settings:
+
+* `format.onTypeFormatting.clientSide.formatOnCloseBrace` - When set to `true`, formatting is automatically applied when a close brace character is typed. Defaults to `false`.
+* `format.onTypeFormatting.clientSide.formatOnCloseBraceCharacters` - Specifies the exact characters that should treated as a close brace character for purposes of client-side on-type formatting. Defaults to the close brace characters for the language, typically `}`, `]`, and `)`.
+* `format.onTypeFormatting.clientSide.formatOnCloseBraceScope` - Specifies the scope that should be formatted when a close brace is typed. Valid values are `CODE_BLOCK` and `FILE`. Defaults to `CODE_BLOCK`. `FILE` is most useful for language servers that do not support range formatting or yield incorrect results for range formatting.
+* `format.onTypeFormatting.clientSide.formatOnStatementTerminator` - When set to `true`, formatting is automatically applied when a statement terminator character is typed. Defaults to `false`.
+* `format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters` - Specifies the exact characters that should treated as a statement terminator character for purposes of client-side on-type formatting. Defaults to empty and must be specified if `formatOnStatementTerminator` is enabled.
+* `format.onTypeFormatting.clientSide.formatOnStatementTerminatorScope` - Specifies the scope that should be formatted when a statement terminator is typed. Valid values are `STATEMENT`, `CODE_BLOCK` and `FILE`. Defaults to `STATEMENT`. The other values are most useful for language servers that do not support range formatting or yield incorrect results for range formatting.
+* `format.onTypeFormatting.clientSide.formatOnCompletionTrigger` - When set to `true`, formatting is automatically applied when a completion trigger character is typed. Defaults to `false`.
+* `format.onTypeFormatting.clientSide.formatOnCompletionTriggerCharacters` - Specifies the exact characters that should treated as a completion trigger character for purposes of client-side on-type formatting. Defaults to the completion trigger characters specified by the language server.
+* Note that there is no configurable scope for completion trigger-based formatting. Exactly the type completion trigger character is formatted. As above, support for this may vary by language server.
+
+For example, the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) does not support server-side on-type formatting, but client-side
+on-type formatting is included in its language server configuration template as:
+
+```json
+{
+  "format": {
+    "onTypeFormatting": {
+      "clientSide": {
+        "formatOnCloseBrace": true,
+        "formatOnStatementTerminator": true,
+        "formatOnStatementTerminatorCharacters": ";",
+        "formatOnCompletionTrigger": true
+      }
+    }
+  }
+}
+```
+
+Here is an example for client-side on-type formatting with that configuration showing automatic indentation of a
+statement continuation when the completion trigger character `.` is typed and automatic formatting of an entire code
+block when the closing brace character `}` is typed for a surrounding conditional statement:
+
+![Client-side on-type formatting](./images/lsp-support/clientSideOnTypeFormatting.gif)
+
+#### Server-side / Client-side On-Type Formatting Relationship
+
+If server-side on-type formatting is supported by the language server and enabled _and_ client-side on-type formatting
+is enabled for specific trigger characters, _only client-side on-type formatting will be applied_ when those specific
+trigger characters are typed.
+
 ### Show Message
 
 [window/showMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessage) supports Markdown messages and clickable links.
