@@ -389,20 +389,6 @@ showing automatic folding of both the file header comment and imports when the f
 
 ![textDocument/foldingRange_collapseByDefault](./images/lsp-support/textDocument_foldingRange_collapseByDefault.gif)
 
-#### Code block provider
-
-Additionally LSP4IJ registers the an implementation of the `codeBlockProvider` extension point with
-[LSPCodeBlockProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/foldingRange/LSPCodeBlockProvider.java) for `TEXT` and `textmate` languages to provide block brace matching and easy navigation to
-the beginning/end of the containing block.
-
-As with `lang.foldingBuilder`, if you use another language, you will have to declare `codeBlockProvider` with your language. 
-
-Below is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing code
-block functionality. The IDE's Presentation Assistant shows the default keyboard shortcuts for each supported operating
-system to trigger these actions.
-
-![codeBlockProvider](./images/lsp-support/codeBlockProvider.gif)
-
 ### Selection range
 
 [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange) is implemented with
@@ -411,6 +397,22 @@ the `extendWordSelectionHandler` extension point and used via the IDE's **Extend
 Here is an example with the [TypeScript Language Server](https://github.com/typescript-language-server/typescript-language-server) showing **Extend/Shrink Selection** using `textDocument/selectionRange`:
 
 ![textDocument/selectionRange](./images/lsp-support/textDocument_selectionRange.gif)
+
+### Code block provider
+
+LSP4IJ registers the an implementation of the `codeBlockProvider` extension point with
+[LSPCodeBlockProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/foldingRange/LSPCodeBlockProvider.java) for `TEXT` and `textmate` languages to provide block brace matching and easy navigation to
+the beginning/end of the containing block. For maximum flexibility in the absence of a true AST in the LSP client, code
+blocks are derived from `textDocument/selectionRange` first and, failing that, from `textDocument/foldingRange`.
+
+As with other language-specific EP implementations, if you use another language, you will have to declare
+`codeBlockProvider` with your language.
+
+Below is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing code
+block functionality. The IDE's Presentation Assistant shows the default keyboard shortcuts for each supported operating
+system to trigger these actions.
+
+![codeBlockProvider](./images/lsp-support/codeBlockProvider.gif)
 
 ### Publish Diagnostics
 
