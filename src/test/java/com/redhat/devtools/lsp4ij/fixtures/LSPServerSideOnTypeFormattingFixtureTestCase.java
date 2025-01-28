@@ -22,7 +22,12 @@ import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedFormattingFeature;
 import org.eclipse.lsp4j.DocumentOnTypeFormattingOptions;
 import org.eclipse.lsp4j.TextEdit;
 import org.jetbrains.annotations.NotNull;
@@ -32,6 +37,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -62,11 +68,14 @@ public abstract class LSPServerSideOnTypeFormattingFixtureTestCase extends LSPCo
      * @param fileBodyBefore           the file body before including the embedded typing imperative comment
      * @param fileBodyAfter            the file body after the character has been typed and formatting applied
      * @param mockOnTypeFormattingJson the mock on-type formatting JSON response
+     * @param clientConfigCustomizer   a function that allows the caller to customize the client configuration as needed
+     *                                 for the test scenario
      */
     protected void assertOnTypeFormatting(@NotNull String fileName,
                                           @NotNull String fileBodyBefore,
                                           @NotNull String fileBodyAfter,
-                                          @NotNull String mockOnTypeFormattingJson) {
+                                          @NotNull String mockOnTypeFormattingJson,
+                                          @Nullable Consumer<ClientConfigurationSettings> clientConfigCustomizer) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
 
         List<TextEdit> mockTextEdits = JSONUtils.getLsp4jGson().fromJson(mockOnTypeFormattingJson, new TypeToken<List<TextEdit>>() {
@@ -91,11 +100,25 @@ public abstract class LSPServerSideOnTypeFormattingFixtureTestCase extends LSPCo
         LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
         assertNotNull(languageServer);
 
+        // Use a configurable formatting feature
+        LSPClientFeatures clientFeatures = languageServer.getClientFeatures();
+        clientFeatures.setFormattingFeature(new UserDefinedFormattingFeature());
+
         // Enable on-type formatting with the specified trigger characters
         String firstTriggerCharacter = ContainerUtil.getFirstItem(triggerCharacters);
         assertNotNull("At least one trigger character must be specified.", firstTriggerCharacter);
         List<String> moreTriggerCharacters = triggerCharacters.size() > 1 ? triggerCharacters.subList(1, triggerCharacters.size()) : Collections.emptyList();
         languageServer.getServerCapabilities().setDocumentOnTypeFormattingProvider(new DocumentOnTypeFormattingOptions(firstTriggerCharacter, moreTriggerCharacters));
+
+        // Update client configuration as required for this test scenario
+        if (clientConfigCustomizer != null) {
+            LanguageServerDefinition languageServerDefinition = languageServer.getServerDefinition();
+            assertInstanceOf(languageServerDefinition, ClientConfigurableLanguageServerDefinition.class);
+            ClientConfigurableLanguageServerDefinition configurableLanguageServerDefinition = (ClientConfigurableLanguageServerDefinition) languageServerDefinition;
+            ClientConfigurationSettings clientConfiguration = configurableLanguageServerDefinition.getLanguageServerClientConfiguration();
+            assertNotNull(clientConfiguration);
+            clientConfigCustomizer.accept(clientConfiguration);
+        }
 
         EditorTestUtil.buildInitialFoldingsInBackground(editor);
 

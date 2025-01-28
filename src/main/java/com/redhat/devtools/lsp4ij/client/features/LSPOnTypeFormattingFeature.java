@@ -34,8 +34,14 @@ public class LSPOnTypeFormattingFeature extends AbstractLSPDocumentFeature {
             return false;
         }
 
+        // Make sure the feature is enabled in client config
+        LSPFormattingFeature formattingFeature = getClientFeatures().getFormattingFeature();
+        if (!formattingFeature.isOnTypeFormattingEnabled(file)) {
+            return false;
+        }
+
         // Need to perform the same check as in LSPFormattingFeature.isEnabled() to ensure that LSP formatting should be used
-        if (!getClientFeatures().getFormattingFeature().isExistingFormatterOverrideable(file) &&
+        if (!formattingFeature.isExistingFormatterOverrideable(file) &&
             (LanguageFormatting.INSTANCE.forContext(file) != null)) {
             return false;
         }
