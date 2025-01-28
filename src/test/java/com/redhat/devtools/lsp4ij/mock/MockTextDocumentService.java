@@ -25,8 +25,7 @@ import org.eclipse.lsp4j.services.TextDocumentService;
 import java.io.File;
 import java.net.URI;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 /**
@@ -66,6 +65,10 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<FoldingRange> foldingRanges;
     public int codeActionRequests = 0;
     private Function<CodeActionParams, CompletableFuture<List<Either<Command, CodeAction>>>> codeActionProvider;
+
+    private volatile CompletableFuture<List<Either<Command, CodeAction>>> currentCodeActionFuture;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
         this._futureFactory = futureFactory;
@@ -145,10 +148,22 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
         codeActionRequests++;
-        if (codeActionProvider != null) {
-            return (CompletableFuture<List<Either<Command, CodeAction>>>) codeActionProvider.apply(params);
+
+        if (currentCodeActionFuture != null && !currentCodeActionFuture.isDone()) {
+            currentCodeActionFuture.cancel(true);
         }
-        return futureFactory(this.mockCodeActions);
+
+        currentCodeActionFuture = new CompletableFuture<>();
+        scheduler.schedule(() -> {
+            if (!currentCodeActionFuture.isCancelled()) {
+                List<Either<Command, CodeAction>> actions = this.mockCodeActions != null
+                        ? this.mockCodeActions
+                        : Collections.emptyList();
+                currentCodeActionFuture.complete(actions);
+            }
+        }, 5, TimeUnit.SECONDS);
+
+        return currentCodeActionFuture;
     }
 
     @Override
