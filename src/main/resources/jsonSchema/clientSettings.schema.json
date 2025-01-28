@@ -30,12 +30,12 @@
         }
       }
     },
-    "format": {
+    "onTypeFormatting": {
       "type": "object",
-      "title": "Client-side formatter configuration",
+      "title": "textDocument/onTypeFormatting feature configuration",
       "additionalProperties": false,
       "properties": {
-        "textDocumentOnTypeFormattingEnabled": {
+        "enabled": {
           "type": "boolean",
           "title": "Server-side on-type formatting enabled",
           "description": "Whether or not server-side on-type formatting is enabled if 'textDocument/onTypeFormatting' is supported by the language server.",

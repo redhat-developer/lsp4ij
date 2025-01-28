@@ -34,14 +34,14 @@ public class ClientConfigurationSettings {
     }
 
     /**
-     * Client-side format settings.
+     * <code>textDocument/onTypeFormatting</code> feature settings.
      */
-    public static class ClientConfigurationFormatSettings {
+    public static class ClientConfigurationOnTypeFormattingSettings {
         /**
          * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
          * supported by the language server. Defaults to true.
          */
-        public boolean textDocumentOnTypeFormattingEnabled = true;
+        public boolean enabled = true;
     }
 
     /**
@@ -65,9 +65,9 @@ public class ClientConfigurationSettings {
     public @NotNull ClientConfigurationCompletionSettings completion = new ClientConfigurationCompletionSettings();
 
     /**
-     * Client-side format settings.
+     * <code>textDocument/onTypeFormatting</code> feature settings.
      */
-    public @NotNull ClientConfigurationFormatSettings format = new ClientConfigurationFormatSettings();
+    public @NotNull ClientConfigurationOnTypeFormattingSettings onTypeFormatting = new ClientConfigurationOnTypeFormattingSettings();
 
     /**
      * Client-side workspace symbol settings

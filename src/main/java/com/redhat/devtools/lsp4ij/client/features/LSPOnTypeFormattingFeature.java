@@ -37,7 +37,7 @@ public class LSPOnTypeFormattingFeature extends AbstractLSPDocumentFeature {
 
         // Make sure the feature is enabled in client config
         LSPFormattingFeature formattingFeature = getClientFeatures().getFormattingFeature();
-        if (!formattingFeature.isTextDocumentOnTypeFormattingEnabled(file)) {
+        if (!formattingFeature.isOnTypeFormattingEnabled(file)) {
             return false;
         }
 

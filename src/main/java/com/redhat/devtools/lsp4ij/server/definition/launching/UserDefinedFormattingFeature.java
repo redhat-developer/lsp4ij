@@ -17,7 +17,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ClientConfigurationFormatSettings;
+import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ClientConfigurationOnTypeFormattingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,15 +27,15 @@ import org.jetbrains.annotations.Nullable;
 public class UserDefinedFormattingFeature extends LSPFormattingFeature {
 
     @Nullable
-    private ClientConfigurationFormatSettings getFormatSettings() {
+    private ClientConfigurationOnTypeFormattingSettings getOnTypeFormattingSettings() {
         ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return clientConfiguration != null ? clientConfiguration.format : null;
+        return clientConfiguration != null ? clientConfiguration.onTypeFormatting : null;
     }
 
     @Override
-    public boolean isTextDocumentOnTypeFormattingEnabled(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.textDocumentOnTypeFormattingEnabled : super.isTextDocumentOnTypeFormattingEnabled(file);
+    public boolean isOnTypeFormattingEnabled(@NotNull PsiFile file) {
+        ClientConfigurationOnTypeFormattingSettings onTypeFormattingSettings = getOnTypeFormattingSettings();
+        return onTypeFormattingSettings != null ? onTypeFormattingSettings.enabled : super.isOnTypeFormattingEnabled(file);
     }
 }
