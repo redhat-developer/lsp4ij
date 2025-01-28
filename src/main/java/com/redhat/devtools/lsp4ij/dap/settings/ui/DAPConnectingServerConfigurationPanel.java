@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.configurations;
+package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
 import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
@@ -71,7 +71,7 @@ public class DAPConnectingServerConfigurationPanel extends JPanel {
         JPanel traceStrategyPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         traceRadio = new JRadioButton(DAPBundle.message("dap.settings.editor.server.connecting.strategy.trace"));
         buttonGroup.add(traceRadio);
-        traceField = new JTextField(50);
+        traceField = new JTextField(30);
         traceStrategyPanel.add(traceRadio);
         traceStrategyPanel.add(traceField);
         super.add(traceStrategyPanel);

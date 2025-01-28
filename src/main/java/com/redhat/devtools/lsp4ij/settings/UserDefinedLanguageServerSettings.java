@@ -100,6 +100,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
      * @param newSettings      the language server settings for the given language server id with the given settings.
      * @param notify           true if a handle changed must be done and false otherwise.
      */
+    @Nullable
     public UserDefinedLanguageServerSettingsListener.LanguageServerSettingsChangedEvent updateSettings(@NotNull String languageServerId,
                                                                                                        @NotNull LanguageServerDefinitionSettings newSettings,
                                                                                                        boolean notify) {

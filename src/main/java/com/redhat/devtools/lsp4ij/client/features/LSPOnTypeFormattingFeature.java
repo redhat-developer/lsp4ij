@@ -8,7 +8,6 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.lang.LanguageFormatting;

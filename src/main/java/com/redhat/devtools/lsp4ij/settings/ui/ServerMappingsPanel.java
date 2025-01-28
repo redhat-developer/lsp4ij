@@ -83,7 +83,7 @@ public class ServerMappingsPanel {
      *
      * @param template the language server template.
      */
-    public void refreshMappings(LanguageServerTemplate template) {
+    public void refreshMappings(@NotNull LanguageServerTemplate template) {
         // refresh language mappings list
         setLanguageMappings(template.getLanguageMappings());
 

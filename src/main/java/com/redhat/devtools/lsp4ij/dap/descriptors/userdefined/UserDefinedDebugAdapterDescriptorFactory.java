@@ -23,7 +23,9 @@ import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -31,19 +33,24 @@ import java.util.stream.Stream;
  */
 public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescriptorFactory {
 
-
+    // Server
     private final @NotNull String id;
     private @NotNull String name;
+    private Map<String, String> userEnvironmentVariables;
+    private boolean includeSystemEnvironmentVariables;
     private String commandLine;
+    private String waitForTimeout;
+    private String waitForTrace;
+
+    // Mappings
     private @NotNull List<ServerMappingSettings> languageMappings;
     private @NotNull List<ServerMappingSettings> fileTypeMappings;
 
+    // Configuration
     private String launchConfiguration;
     private String launchConfigurationSchema;
     private String attachConfiguration;
     private String attachConfigurationSchema;
-    private String waitForTimeout;
-    private String waitForTrace;
 
     public UserDefinedDebugAdapterDescriptorFactory(@NotNull String id,
                                                     @NotNull String name,
@@ -69,6 +76,43 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
 
     public void setName(@NotNull String name) {
         this.name = name;
+    }
+
+    /**
+     * Returns the User environment variables used to start the language server process.
+     *
+     * @return the User environment variables used to start the language server process.
+     */
+    @NotNull
+    public Map<String, String> getUserEnvironmentVariables() {
+        return userEnvironmentVariables != null ? userEnvironmentVariables : Collections.emptyMap();
+    }
+
+    /**
+     * Set the User environment variables used to start the language server process.
+     *
+     * @param userEnvironmentVariables the User environment variables.
+     */
+    public void setUserEnvironmentVariables(Map<String, String> userEnvironmentVariables) {
+        this.userEnvironmentVariables = userEnvironmentVariables;
+    }
+
+    /**
+     * Returns true if System environment variables must be included when language server process starts and false otherwise.
+     *
+     * @return true if System environment variables must be included when language server process starts and false otherwise.
+     */
+    public boolean isIncludeSystemEnvironmentVariables() {
+        return includeSystemEnvironmentVariables;
+    }
+
+    /**
+     * Set true if System environment variables must be included when language server process starts and false otherwise.
+     *
+     * @param includeSystemEnvironmentVariables true if System environment variables must be included when language server process starts and false otherwise.
+     */
+    public void setIncludeSystemEnvironmentVariables(boolean includeSystemEnvironmentVariables) {
+        this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
     }
 
     public String getCommandLine() {

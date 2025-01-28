@@ -23,7 +23,9 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAd
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import javax.swing.*;
 import java.util.Collections;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
@@ -102,5 +104,19 @@ public abstract class DebugAdapterDescriptorFactory {
             return true;
         }
         return false;
+    }
+
+    public @NotNull String getDisplayName() {
+        return getName();
+    }
+
+    @Nullable
+    public Icon getIcon() {
+        return null;
+    }
+
+    @Nullable
+    public String getDescription() {
+        return null;
     }
 }

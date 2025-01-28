@@ -750,6 +750,15 @@ L
                                   implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationProvider" />
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager"/>
+        <projectConfigurable
+                groupId="debugger"
+                id="debugAdapterDescriptorFactories"
+                bundle="messages.DAPBundle"
+                nonDefaultProject="true"
+                key="debug.adapter"
+                instance="com.redhat.devtools.lsp4ij.dap.settings.DebugAdapterDescriptorFactoryListConfigurable"/>
+        <applicationService id="UserDefinedDAPServerSettings"
+                            serviceImplementation="com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterDescriptorFactorySettings"/>
     </extensions>
 
 </idea-plugin>

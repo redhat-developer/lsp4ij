@@ -35,6 +35,7 @@ import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPClientConfigurationJsonSchemaFileProvider;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -79,7 +80,10 @@ public class LanguageServerPanel implements Disposable {
     private JsonTextField initializationOptionsWidget;
     private JsonTextField clientConfigurationWidget;
 
-    public LanguageServerPanel(FormBuilder builder, JComponent description, EditionMode mode, Project project) {
+    public LanguageServerPanel(@NotNull FormBuilder builder,
+                               @Nullable JComponent description,
+                               @NotNull EditionMode mode,
+                               @NotNull Project project) {
         this.project = project;
         createUI(builder, description, mode);
     }
