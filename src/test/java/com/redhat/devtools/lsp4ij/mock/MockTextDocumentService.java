@@ -68,7 +68,6 @@ public class MockTextDocumentService implements TextDocumentService {
     private volatile CompletableFuture<List<Either<Command, CodeAction>>> currentCodeActionFuture;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
         this._futureFactory = futureFactory;
         // Some default values for mocks, can be overridden
