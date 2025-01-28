@@ -162,7 +162,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
      * @param file the file
      * @return true if server-side on-type formatting should be enabled for the file; otherwise false
      */
-    public boolean isTextDocumentOnTypeFormattingEnabled(@NotNull PsiFile file) {
+    public boolean isOnTypeFormattingEnabled(@NotNull PsiFile file) {
         // Default to enabled
         return true;
     }
