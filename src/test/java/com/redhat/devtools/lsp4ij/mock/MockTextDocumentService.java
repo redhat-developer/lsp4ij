@@ -64,7 +64,6 @@ public class MockTextDocumentService implements TextDocumentService {
     private SemanticTokens mockSemanticTokens;
     private List<FoldingRange> foldingRanges;
     public int codeActionRequests = 0;
-    private Function<CodeActionParams, CompletableFuture<List<Either<Command, CodeAction>>>> codeActionProvider;
 
     private volatile CompletableFuture<List<Either<Command, CodeAction>>> currentCodeActionFuture;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -447,11 +446,4 @@ public class MockTextDocumentService implements TextDocumentService {
         return CompletableFuture.completedFuture(this.foldingRanges);
     }
 
-    public void setCodeActionProvider(Function<CodeActionParams, CompletableFuture<List<Either<Command, CodeAction>>>> provider) {
-        this.codeActionProvider = provider;
-    }
-
-    public CompletableFuture<List<Either<Command, CodeAction>>> getCodeActions(CodeActionParams params) {
-        return codeAction(params);
-    }
 }
