@@ -86,7 +86,7 @@ public class TypeScriptClientSideFormatOnCompletionTriggerTest extends LSPClient
                 "[]",
                 "[]",
                 MOCK_RANGE_FORMATTING_JSON,
-                clientConfiguration -> clientConfiguration.format.formatOnCompletionTrigger = true
+                clientConfiguration -> clientConfiguration.format.onTypeFormatting.clientSide.formatOnCompletionTrigger = true
         );
     }
 
@@ -106,8 +106,8 @@ public class TypeScriptClientSideFormatOnCompletionTriggerTest extends LSPClient
                 "[]",
                 MOCK_RANGE_FORMATTING_JSON,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnCompletionTrigger = true;
-                    clientConfiguration.format.formatOnCompletionTriggerCharacters = "/";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCompletionTrigger = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCompletionTriggerCharacters = "/";
                 }
         );
     }

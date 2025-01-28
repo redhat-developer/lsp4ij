@@ -148,7 +148,7 @@ public class JavaClientSideFormatOnCloseBraceTest extends LSPClientSideOnTypeFor
                 SIMPLE_MOCK_SELECTION_RANGE_JSON,
                 SIMPLE_MOCK_FOLDING_RANGE_JSON,
                 SIMPLE_MOCK_RANGE_FORMATTING_JSON,
-                clientConfiguration -> clientConfiguration.format.formatOnCloseBrace = true
+                clientConfiguration -> clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBrace = true
         );
     }
 
@@ -168,9 +168,9 @@ public class JavaClientSideFormatOnCloseBraceTest extends LSPClientSideOnTypeFor
                 SIMPLE_MOCK_FOLDING_RANGE_JSON,
                 SIMPLE_MOCK_RANGE_FORMATTING_JSON,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnCloseBrace = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBrace = true;
                     // Explicitly specify close brace characters that don't include right curly brace
-                    clientConfiguration.format.formatOnCloseBraceCharacters = "])";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBraceCharacters = "])";
                 }
         );
     }
@@ -309,7 +309,7 @@ public class JavaClientSideFormatOnCloseBraceTest extends LSPClientSideOnTypeFor
                 COMPLEX_MOCK_SELECTION_RANGE_JSON,
                 COMPLEX_MOCK_FOLDING_RANGE_JSON,
                 COMPLEX_MOCK_RANGE_FORMATTING_JSON,
-                clientConfiguration -> clientConfiguration.format.formatOnCloseBrace = true
+                clientConfiguration -> clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBrace = true
         );
     }
 
@@ -329,9 +329,9 @@ public class JavaClientSideFormatOnCloseBraceTest extends LSPClientSideOnTypeFor
                 COMPLEX_MOCK_FOLDING_RANGE_JSON,
                 COMPLEX_MOCK_RANGE_FORMATTING_JSON,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnCloseBrace = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBrace = true;
                     // Explicitly specify close brace characters that don't include right curly brace
-                    clientConfiguration.format.formatOnCloseBraceCharacters = "])";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBraceCharacters = "])";
                 }
         );
     }
@@ -438,8 +438,8 @@ public class JavaClientSideFormatOnCloseBraceTest extends LSPClientSideOnTypeFor
                 "[]",
                 mockRangeFormattingJson,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnCloseBrace = true;
-                    clientConfiguration.format.formatOnCloseBraceScope = FormattingScope.FILE;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBrace = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBraceScope = FormattingScope.FILE;
                 }
         );
     }

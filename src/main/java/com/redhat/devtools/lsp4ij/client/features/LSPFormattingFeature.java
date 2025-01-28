@@ -135,7 +135,21 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
         }
     }
 
-    // Client configuration settings
+    // Server-side on-type formatting
+
+    /**
+     * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
+     * supported by the language server. Defaults to true.
+     *
+     * @param file the file
+     * @return true if server-side on-type formatting should be enabled for the file; otherwise false
+     */
+    public boolean isOnTypeFormattingEnabled(@NotNull PsiFile file) {
+        // Default to enabled
+        return true;
+    }
+
+    // Client-side on-type formatting
 
     /**
      * Supported formatting scopes.
@@ -153,18 +167,6 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
          * The current file.
          */
         FILE
-    }
-
-    /**
-     * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
-     * supported by the language server. Defaults to true.
-     *
-     * @param file the file
-     * @return true if server-side on-type formatting should be enabled for the file; otherwise false
-     */
-    public boolean isOnTypeFormattingEnabled(@NotNull PsiFile file) {
-        // Default to enabled
-        return true;
     }
 
     /**

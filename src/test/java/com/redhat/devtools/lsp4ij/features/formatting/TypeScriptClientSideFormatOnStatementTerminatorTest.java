@@ -192,8 +192,8 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 "[]",
                 SIMPLE_MOCK_RANGE_FORMATTING_JSON,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnStatementTerminator = true;
-                    clientConfiguration.format.formatOnStatementTerminatorCharacters = ";";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters = ";";
                 }
         );
     }
@@ -213,7 +213,7 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 SIMPLE_MOCK_SELECTION_RANGE_JSON,
                 "[]",
                 SIMPLE_MOCK_RANGE_FORMATTING_JSON,
-                clientConfiguration -> clientConfiguration.format.formatOnStatementTerminator = true
+                clientConfiguration -> clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true
         );
     }
 
@@ -468,8 +468,8 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 COMPLEX_MOCK_FOLDING_RANGE_JSON,
                 COMPLEX_MOCK_RANGE_FORMATTING_JSON,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnStatementTerminator = true;
-                    clientConfiguration.format.formatOnStatementTerminatorCharacters = ";";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters = ";";
                 }
         );
     }
@@ -494,7 +494,7 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 COMPLEX_MOCK_SELECTION_RANGE_JSON,
                 COMPLEX_MOCK_FOLDING_RANGE_JSON,
                 COMPLEX_MOCK_RANGE_FORMATTING_JSON,
-                clientConfiguration -> clientConfiguration.format.formatOnStatementTerminator = true
+                clientConfiguration -> clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true
         );
     }
 
@@ -763,9 +763,9 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 "[]",
                 mockRangeFormattingJson,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnStatementTerminator = true;
-                    clientConfiguration.format.formatOnStatementTerminatorCharacters = ";";
-                    clientConfiguration.format.formatOnStatementTerminatorScope = FormattingScope.CODE_BLOCK;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters = ";";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorScope = FormattingScope.CODE_BLOCK;
                 }
         );
     }
@@ -959,9 +959,9 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 "[]",
                 mockRangeFormattingJson,
                 clientConfiguration -> {
-                    clientConfiguration.format.formatOnStatementTerminator = true;
-                    clientConfiguration.format.formatOnStatementTerminatorCharacters = ";";
-                    clientConfiguration.format.formatOnStatementTerminatorScope = FormattingScope.FILE;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters = ";";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorScope = FormattingScope.FILE;
                 }
         );
     }

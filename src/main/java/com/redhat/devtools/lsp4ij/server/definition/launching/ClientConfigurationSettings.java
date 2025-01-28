@@ -11,6 +11,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
+
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
@@ -35,9 +36,9 @@ public class ClientConfigurationSettings {
     }
 
     /**
-     * <code>textDocument/onTypeFormatting</code> feature settings.
+     * Server-side (LSP) <code>textDocument/onTypeFormatting</code> feature settings.
      */
-    public static class ClientConfigurationOnTypeFormattingSettings {
+    public static class ServerSideOnTypeFormattingSettings {
         /**
          * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
          * supported by the language server. Defaults to true.
@@ -46,15 +47,9 @@ public class ClientConfigurationSettings {
     }
 
     /**
-     * Client-side format settings.
+     * Client-side on-type formatting feature settings.
      */
-    public static class ClientConfigurationFormatSettings {
-        /**
-         * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
-         * supported by the language server. Defaults to true.
-         */
-        public boolean textDocumentOnTypeFormattingEnabled = true;
-
+    public static class ClientSideOnTypeFormattingSettings {
         /**
          * Whether or not to format on close brace using client-side on-type formatting. Defaults to false.
          */
@@ -103,6 +98,31 @@ public class ClientConfigurationSettings {
     }
 
     /**
+     * On-type formatting settings
+     */
+    public static class OnTypeFormattingSettings {
+        /**
+         * Server-side (LSP) <code>textDocument/onTypeFormatting</code> feature settings.
+         */
+        public @NotNull ServerSideOnTypeFormattingSettings serverSide = new ServerSideOnTypeFormattingSettings();
+
+        /**
+         * Client-side on-type formatting feature settings.
+         */
+        public @NotNull ClientSideOnTypeFormattingSettings clientSide = new ClientSideOnTypeFormattingSettings();
+    }
+
+    /**
+     * Client-side formatter settings.
+     */
+    public static class ClientConfigurationFormatSettings {
+        /**
+         * On-type formatting settings
+         */
+        public @NotNull OnTypeFormattingSettings onTypeFormatting = new OnTypeFormattingSettings();
+    }
+
+    /**
      * Client-side workspace symbol settings.
      */
     public static class ClientConfigurationWorkspaceSymbolSettings {
@@ -121,11 +141,6 @@ public class ClientConfigurationSettings {
      * Client-side code completion settings
      */
     public @NotNull ClientConfigurationCompletionSettings completion = new ClientConfigurationCompletionSettings();
-
-    /**
-     * <code>textDocument/onTypeFormatting</code> feature settings.
-     */
-    public @NotNull ClientConfigurationOnTypeFormattingSettings onTypeFormatting = new ClientConfigurationOnTypeFormattingSettings();
 
     /**
      * Client-side format settings.

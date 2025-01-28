@@ -5,10 +5,14 @@
     "useTemplateForInvocationOnlySnippet": false
   },
   "format": {
-    "formatOnCloseBrace": true,
-    "formatOnStatementTerminator": true,
-    "formatOnStatementTerminatorCharacters": ";",
-    "formatOnCompletionTrigger": true
+    "onTypeFormatting": {
+      "clientSide": {
+        "formatOnCloseBrace": true,
+        "formatOnStatementTerminator": true,
+        "formatOnStatementTerminatorCharacters": ";",
+        "formatOnCompletionTrigger": true
+      }
+    }
   },
   "workspaceSymbol": {
     "supportsGotoClass": true

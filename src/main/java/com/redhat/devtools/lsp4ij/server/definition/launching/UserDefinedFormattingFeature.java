@@ -17,8 +17,8 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ClientConfigurationFormatSettings;
-import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ClientConfigurationOnTypeFormattingSettings;
+import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ClientSideOnTypeFormattingSettings;
+import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ServerSideOnTypeFormattingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,76 +27,80 @@ import org.jetbrains.annotations.Nullable;
  */
 public class UserDefinedFormattingFeature extends LSPFormattingFeature {
 
+    // Server-side on-type formatting
+
     @Nullable
-    private ClientConfigurationOnTypeFormattingSettings getOnTypeFormattingSettings() {
+    private ServerSideOnTypeFormattingSettings getServerSideOnTypeFormattingSettings() {
         ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return clientConfiguration != null ? clientConfiguration.onTypeFormatting : null;
+        return clientConfiguration != null ? clientConfiguration.format.onTypeFormatting.serverSide : null;
     }
 
     @Override
     public boolean isOnTypeFormattingEnabled(@NotNull PsiFile file) {
-        ClientConfigurationOnTypeFormattingSettings onTypeFormattingSettings = getOnTypeFormattingSettings();
-        return onTypeFormattingSettings != null ? onTypeFormattingSettings.enabled : super.isOnTypeFormattingEnabled(file);
+        ServerSideOnTypeFormattingSettings settings = getServerSideOnTypeFormattingSettings();
+        return settings != null ? settings.enabled : super.isOnTypeFormattingEnabled(file);
     }
 
+    // Client-side on-type formatting
+
     @Nullable
-    private ClientConfigurationFormatSettings getFormatSettings() {
+    private ClientSideOnTypeFormattingSettings getClientSideOnTypeFormattingSettings() {
         ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return clientConfiguration != null ? clientConfiguration.format : null;
+        return clientConfiguration != null ? clientConfiguration.format.onTypeFormatting.clientSide : null;
     }
 
     @Override
     public boolean isFormatOnCloseBrace(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.formatOnCloseBrace : super.isFormatOnCloseBrace(file);
+        ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
+        return settings != null ? settings.formatOnCloseBrace : super.isFormatOnCloseBrace(file);
     }
 
     @Override
     @Nullable
     public String getFormatOnCloseBraceCharacters(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.formatOnCloseBraceCharacters : super.getFormatOnCloseBraceCharacters(file);
+        ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
+        return settings != null ? settings.formatOnCloseBraceCharacters : super.getFormatOnCloseBraceCharacters(file);
     }
 
     @Override
     @NotNull
     public FormattingScope getFormatOnCloseBraceScope(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
+        ClientSideOnTypeFormattingSettings formatSettings = getClientSideOnTypeFormattingSettings();
         return formatSettings != null ? formatSettings.formatOnCloseBraceScope : super.getFormatOnCloseBraceScope(file);
     }
 
     @Override
     public boolean isFormatOnStatementTerminator(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.formatOnStatementTerminator : super.isFormatOnStatementTerminator(file);
+        ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
+        return settings != null ? settings.formatOnStatementTerminator : super.isFormatOnStatementTerminator(file);
     }
 
     @Override
     @Nullable
     public String getFormatOnStatementTerminatorCharacters(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.formatOnStatementTerminatorCharacters : super.getFormatOnStatementTerminatorCharacters(file);
+        ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
+        return settings != null ? settings.formatOnStatementTerminatorCharacters : super.getFormatOnStatementTerminatorCharacters(file);
     }
 
     @Override
     @NotNull
     public FormattingScope getFormatOnStatementTerminatorScope(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.formatOnStatementTerminatorScope : super.getFormatOnStatementTerminatorScope(file);
+        ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
+        return settings != null ? settings.formatOnStatementTerminatorScope : super.getFormatOnStatementTerminatorScope(file);
     }
 
     @Override
     public boolean isFormatOnCompletionTrigger(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.formatOnCompletionTrigger : super.isFormatOnCompletionTrigger(file);
+        ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
+        return settings != null ? settings.formatOnCompletionTrigger : super.isFormatOnCompletionTrigger(file);
     }
 
     @Override
     @Nullable
     public String getFormatOnCompletionTriggerCharacters(@NotNull PsiFile file) {
-        ClientConfigurationFormatSettings formatSettings = getFormatSettings();
-        return formatSettings != null ? formatSettings.formatOnCompletionTriggerCharacters : super.getFormatOnCompletionTriggerCharacters(file);
+        ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
+        return settings != null ? settings.formatOnCompletionTriggerCharacters : super.getFormatOnCompletionTriggerCharacters(file);
     }
 }

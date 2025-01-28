@@ -90,7 +90,7 @@ public class JavaServerSideFormatOnCloseBraceTest extends LSPServerSideOnTypeFor
                         }
                         """,
                 SIMPLE_MOCK_ON_TYPE_FORMATTING_JSON,
-                clientConfig -> clientConfig.onTypeFormatting.enabled = false
+                clientConfig -> clientConfig.format.onTypeFormatting.serverSide.enabled = false
         );
     }
 
@@ -181,7 +181,7 @@ public class JavaServerSideFormatOnCloseBraceTest extends LSPServerSideOnTypeFor
                         }
                         """,
                 COMPLEX_MOCK_ON_TYPE_FORMATTING_JSON,
-                clientConfig -> clientConfig.onTypeFormatting.enabled = false
+                clientConfig -> clientConfig.format.onTypeFormatting.serverSide.enabled = false
         );
     }
 }
