@@ -49,8 +49,19 @@ public abstract class LSPClientSideOnTypeFormattingFixtureTestCase extends LSPCo
 
     private static final Pattern TYPE_INFO_PATTERN = Pattern.compile("(?ms)//\\s*type\\s*(\\S)[\\t ]*");
 
+    private boolean supportsRangeFormatting = true;
+
     public LSPClientSideOnTypeFormattingFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
+    }
+
+    /**
+     * Sets whether or not the tested language server supports range formatting. The default value is true.
+     *
+     * @param supportsRangeFormatting true if the tested language server supports range formatting, otherwise false
+     */
+    protected void setSupportsRangeFormatting(boolean supportsRangeFormatting) {
+        this.supportsRangeFormatting = supportsRangeFormatting;
     }
 
     /**
@@ -113,8 +124,10 @@ public abstract class LSPClientSideOnTypeFormattingFixtureTestCase extends LSPCo
         LSPClientFeatures clientFeatures = languageServer.getClientFeatures();
         clientFeatures.setFormattingFeature(new UserDefinedFormattingFeature());
 
-        // Enable range formatting
-        languageServer.getServerCapabilities().setDocumentRangeFormattingProvider(true);
+        // Enable range formatting if supported by the language server
+        if (supportsRangeFormatting) {
+            languageServer.getServerCapabilities().setDocumentRangeFormattingProvider(true);
+        }
 
         // Enable dot as a completion trigger character
         languageServer.getServerCapabilities().getCompletionProvider().setTriggerCharacters(List.of("."));

@@ -14,15 +14,17 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 import com.intellij.codeInsight.editorActions.TypedHandlerDelegate;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockProvider;
@@ -33,8 +35,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Typed handler for LSP4IJ-managed files that performs automatic on-type formatting for specific keystrokes.
@@ -47,10 +54,14 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                             @NotNull Project project,
                             @NotNull Editor editor,
                             @NotNull PsiFile file) {
-        LSPFormattingFeature formattingFeature = getClientConfigurationSettings(file);
+        LSPFormattingFeature formattingFeature = getFormattingFeature(file);
         if (formattingFeature != null) {
+            boolean rangeFormattingSupported = formattingFeature.isRangeFormattingSupported(file);
+
             // Close braces
-            if (formattingFeature.isFormatOnCloseBrace(file)) {
+            if (formattingFeature.isFormatOnCloseBrace(file) &&
+                // Make sure the formatter supports formatting of the configured scope
+                ((formattingFeature.getFormatOnCloseBraceScope(file) == FormattingScope.FILE) || rangeFormattingSupported)) {
                 Map.Entry<Character, Character> bracePair = ContainerUtil.find(
                         LSPCodeBlockUtils.getBracePairs(file).entrySet(),
                         entry -> entry.getValue() == charTyped
@@ -74,7 +85,9 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
             }
 
             // Statement terminators
-            if (formattingFeature.isFormatOnStatementTerminator(file)) {
+            if (formattingFeature.isFormatOnStatementTerminator(file) &&
+                // Make sure the formatter supports formatting of the configured scope
+                ((formattingFeature.getFormatOnStatementTerminatorScope(file) == FormattingScope.FILE) || rangeFormattingSupported)) {
                 String formatOnStatementTerminatorCharacters = formattingFeature.getFormatOnStatementTerminatorCharacters(file);
                 if (StringUtil.isNotEmpty(formatOnStatementTerminatorCharacters) &&
                     (formatOnStatementTerminatorCharacters.indexOf(charTyped) > -1)) {
@@ -90,6 +103,8 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
 
             // Completion triggers
             if (formattingFeature.isFormatOnCompletionTrigger(file) &&
+                // Make sure the formatter supports range formatting
+                rangeFormattingSupported &&
                 // It must be a completion trigger character for the language no matter what
                 LSPCompletionTriggerTypedHandler.hasLanguageServerSupportingCompletionTriggerCharacters(charTyped, project, file)) {
                 // But the subset that should trigger completion can be configured
@@ -109,21 +124,39 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
     }
 
     @Nullable
-    private static LSPFormattingFeature getClientConfigurationSettings(@NotNull PsiFile file) {
+    private static LSPFormattingFeature getFormattingFeature(@NotNull PsiFile file) {
         Project project = file.getProject();
-        // Client-side on-type formatting shouldn't trigger a language server to start
-        Set<LanguageServerWrapper> startedLanguageServers = LanguageServiceAccessor.getInstance(project).getStartedServers();
-        for (LanguageServerWrapper startedLanguageServer : startedLanguageServers) {
-            // TODO: Is there a better way to ask if this language server supports the file?
-            if (startedLanguageServer.isConnectedTo(LSPIJUtils.toUri(file))) {
-                LSPFormattingFeature formattingFeature = startedLanguageServer.getClientFeatures().getFormattingFeature();
-                if (formattingFeature.isEnabled(file) && formattingFeature.isSupported(file)) {
-                    // TODO: This returns the first match. Is that okay?
-                    return formattingFeature;
-                }
-            }
+        VirtualFile virtualFile = file.getVirtualFile();
+
+        CompletableFuture<@NotNull List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
+                virtualFile,
+                // Client-side on-type formatting shouldn't trigger a language server to start
+                f -> (f.getServerStatus() == ServerStatus.started) &&
+                     f.getFormattingFeature().isEnabled(file) &&
+                     // Must support formatting
+                     f.getFormattingFeature().isFormattingSupported(file),
+                null
+        );
+
+        //noinspection TryWithIdenticalCatches
+        try {
+            waitUntilDone(languageServersFuture, file);
+        } catch (ProcessCanceledException e) {
+            return null;
+        } catch (CancellationException e) {
+            return null;
+        } catch (ExecutionException e) {
+            return null;
         }
-        return null;
+
+        if (!isDoneNormally(languageServersFuture)) {
+            return null;
+        }
+
+        // Just return the first matching language server, if any
+        List<LanguageServerItem> languageServers = languageServersFuture.getNow(Collections.emptyList());
+        LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
+        return languageServer != null ? languageServer.getClientFeatures().getFormattingFeature() : null;
     }
 
     @NotNull
@@ -178,7 +211,7 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
 
         // If we have a text range now, format it
         if (formatTextRange != null) {
-            CodeStyleManager.getInstance(project).reformatText(file, Collections.singletonList(formatTextRange));
+            format(project, file, formatTextRange);
             return Result.STOP;
         }
 
@@ -271,7 +304,7 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
 
         // If we have a text range now, format it
         if (formatTextRange != null) {
-            CodeStyleManager.getInstance(project).reformatText(file, Collections.singletonList(formatTextRange));
+            format(project, file, formatTextRange);
             return Result.STOP;
         }
 
@@ -286,7 +319,18 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         int offset = editor.getCaretModel().getOffset();
         // NOTE: Right now all completion triggers are single characters, so this is safe/accurate
         int beforeOffset = offset - 1;
-        CodeStyleManager.getInstance(project).reformatText(file, beforeOffset, offset);
+        format(project, file, TextRange.create(beforeOffset, offset));
         return Result.STOP;
+    }
+
+    private static void format(@NotNull Project project,
+                               @NotNull PsiFile file,
+                               @NotNull TextRange textRange) {
+        // If formatting the entire file, don't specify a range
+        if (textRange.equals(file.getTextRange())) {
+            CodeStyleManager.getInstance(project).reformat(file);
+        } else {
+            CodeStyleManager.getInstance(project).reformatText(file, Collections.singletonList(textRange));
+        }
     }
 }
