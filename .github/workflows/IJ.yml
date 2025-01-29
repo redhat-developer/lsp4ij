@@ -39,7 +39,7 @@ jobs:
       # Run Verify Plugin task and IntelliJ Plugin Verifier tool
       - name: Run Plugin Verification tasks
         run: |
-          ./gradlew runPluginVerifier -Dplugin.verifier.home.dir=~/.pluginVerifier
+          ./gradlew verifyPlugin -Dplugin.verifier.home.dir=~/.pluginVerifier
           REPORTS=$(cat ${{ github.workspace }}/build/reports/pluginVerifier/*/report.md | sed 's/^#/##/')
           echo "$REPORTS" >> $GITHUB_STEP_SUMMARY
 

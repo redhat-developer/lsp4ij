@@ -1,20 +1,23 @@
 [versions]
 # libraries
 junit = "4.13.2"
+junit-jupiter = "5.10.3"
 
 # plugins
 testlogger = "3.2.0"
+kotlin = "2.0.20"
 changelog = "2.2.1"
-intelliJPlatform = "2.2.1"
-kotlin = "1.9.25"
+gradleIntelliJPlugin = "2.2.1"
 kover = "0.8.3"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
 
 [plugins]
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
-intelliJPlatform = { id = "org.jetbrains.intellij.platform", version.ref = "intelliJPlatform" }
+gradleIntelliJPlugin = { id = "org.jetbrains.intellij.platform", version.ref = "gradleIntelliJPlugin" }
 kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 testLogger = { id = "com.adarshr.test-logger", version.ref = "testlogger" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+
