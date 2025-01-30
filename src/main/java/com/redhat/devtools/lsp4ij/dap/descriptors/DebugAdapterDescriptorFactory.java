@@ -16,6 +16,7 @@ import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPSettingsEditor;
@@ -26,7 +27,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
 
@@ -36,7 +39,39 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
 @ApiStatus.Experimental
 public abstract class DebugAdapterDescriptorFactory {
 
-    public static final DebugAdapterDescriptorFactory NONE = new UserDefinedDebugAdapterDescriptorFactory("none", "NONE","", Collections.emptyList(), Collections.emptyList());
+    public static final DebugAdapterDescriptorFactory NONE = new UserDefinedDebugAdapterDescriptorFactory("none", "NONE", "", Collections.emptyList(), Collections.emptyList());
+
+    private static final LaunchConfiguration DEFAULT_LAUNCH_CONFIGURATION = new LaunchConfiguration("default_launch", "Launch file",
+            // language=json
+            """                        
+                    {
+                       "type": "undefined",
+                       "name": "Launch file",
+                       "request": "launch",
+                       "program": "${file}",
+                       "cwd": "${workspaceFolder}"
+                     }
+                    """, DebuggingType.LAUNCH);
+
+    private static final LaunchConfiguration DEFAULT_ATTACH_CONFIGURATION = new LaunchConfiguration("default_attach", "Attach file",
+            // language=json
+            """                        
+                    {
+                       "type": "undefined",
+                       "name": "Attach to process",
+                       "request": "attach",
+                       "port": 5858
+                     }
+                    """, DebuggingType.ATTACH);
+
+    public static final LaunchConfiguration[] DEFAULT_LAUNCH_CONFIGURATION_ARRAY = new LaunchConfiguration[] {DEFAULT_LAUNCH_CONFIGURATION};
+
+    public static final LaunchConfiguration[] DEFAULT_ATTACH_CONFIGURATION_ARRAY = new LaunchConfiguration[] {DEFAULT_ATTACH_CONFIGURATION};
+
+    public static final List<LaunchConfiguration> DEFAULT_LAUNCH_CONFIGURATIONS = Arrays.asList(
+            DEFAULT_LAUNCH_CONFIGURATION,
+            DEFAULT_ATTACH_CONFIGURATION
+    );
 
     private ServerTrace serverTrace;
 
@@ -47,7 +82,7 @@ public abstract class DebugAdapterDescriptorFactory {
     public abstract String getName();
 
     public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull DAPRunConfigurationOptions options,
-                                                                        @NotNull ExecutionEnvironment environment) {
+                                                               @NotNull ExecutionEnvironment environment) {
         return new DebugAdapterDescriptor(options, environment, this);
     }
 
@@ -73,7 +108,7 @@ public abstract class DebugAdapterDescriptorFactory {
     /**
      * Returns true if the given file can be debugged (to add/remove breakpoints) and false otherwise.
      *
-     * @param file the file to debug.
+     * @param file    the file to debug.
      * @param project the project.
      * @return true if the given file can be debugged (to add/remove breakpoints) and false otherwise.
      */
@@ -118,5 +153,10 @@ public abstract class DebugAdapterDescriptorFactory {
     @Nullable
     public String getDescription() {
         return null;
+    }
+
+    @NotNull
+    public List<LaunchConfiguration> getLaunchConfigurations() {
+        return DEFAULT_LAUNCH_CONFIGURATIONS;
     }
 }

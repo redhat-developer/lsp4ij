@@ -21,6 +21,7 @@ import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
@@ -94,11 +95,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                     && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
                     && isEquals(this.getWaitForTimeout(), settings.getWaitForTimeout())
                     && isEquals(this.getWaitForTrace(), settings.getWaitForTrace())
-                    && Objects.equals(this.getMappings(), settings.getMappings())
-                    && isEquals(this.getLaunchConfiguration(), settings.getLaunchConfiguration())
-                    && isEquals(this.getLaunchConfigurationSchema(), settings.getLaunchConfigurationSchema())
-                    && isEquals(this.getAttachConfiguration(), settings.getAttachConfiguration())
-                    && isEquals(this.getAttachConfigurationSchema(), settings.getAttachConfigurationSchema()))) {
+                    && Objects.equals(this.getMappings(), settings.getMappings()))) {
                 return true;
             }
         }
@@ -151,9 +148,6 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                         .filter(mapping -> mapping.getFileNamePatterns() != null)
                         .collect(Collectors.toList());
                 this.setFileNamePatternMappings(fileNamePatternMappings);
-
-                this.setLaunchConfiguration(settings.getLaunchConfiguration());
-                this.setAttachConfiguration(settings.getLaunchConfiguration());
             }
         } else {
             // TODO : extension point
@@ -194,14 +188,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                     .collect(Collectors.toList());
             this.setFileNamePatternMappings(fileNamePatternMappings);*/
         }
-    }
-
-    public void setLaunchConfiguration(String launchConfiguration) {
-        dapDescriptorFactoryPanel.setLaunchConfiguration(launchConfiguration);
-    }
-
-    public void setAttachConfiguration(String attachConfiguration) {
-        dapDescriptorFactoryPanel.setAttachConfiguration(attachConfiguration);
+        dapDescriptorFactoryPanel.setServerId(descriptorFactoryId);
     }
 
     private static int getInt(String text) {
@@ -236,10 +223,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                                     getWaitForTrace(),
                                     getLanguageMappings(),
                                     getFileTypeMappings(),
-                                    getLaunchConfiguration(),
-                                    getLaunchConfigurationSchema(),
-                                    getAttachConfiguration(),
-                                    getAttachConfigurationSchema()),
+                                    getLaunchConfigurations()),
                             false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -364,19 +348,12 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                 .toList();
     }
 
-    public @Nullable String getLaunchConfiguration() {
-        return dapDescriptorFactoryPanel.getLaunchConfiguration();
+    public void refreshLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+        dapDescriptorFactoryPanel.refreshLaunchConfigurations(launchConfigurations);
     }
 
-    public @Nullable String getLaunchConfigurationSchema() {
-        return null;
+    public @Nullable List<LaunchConfiguration> getLaunchConfigurations() {
+        return dapDescriptorFactoryPanel.getLaunchConfigurations();
     }
 
-    public @Nullable String getAttachConfiguration() {
-        return dapDescriptorFactoryPanel.getAttachConfiguration();
-    }
-
-    public @Nullable String getAttachConfigurationSchema() {
-        return null;
-    }
 }

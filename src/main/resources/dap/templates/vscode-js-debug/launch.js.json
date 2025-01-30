@@ -1,6 +1,7 @@
 {
   "type": "pwa-node",
-  "request": "attach",
+  "name": "Launch JavaScript file",
+  "request": "launch",
   "program": "${file}",
   "cwd": "${workspaceFolder}"
 }

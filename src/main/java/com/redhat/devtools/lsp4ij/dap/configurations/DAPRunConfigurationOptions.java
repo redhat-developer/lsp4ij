@@ -42,11 +42,17 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
     private final StoredProperty<String> debuggingType = string(DebuggingType.LAUNCH.name())
             .provideDelegate(this, "debuggingType");
 
-    private final StoredProperty<String> launchParameters = string("")
-            .provideDelegate(this, "launchParameters");
+    private final StoredProperty<String> launchConfigurationId = string("")
+            .provideDelegate(this, "launchConfigurationId");
 
-    private final StoredProperty<String> attachParameters = string("")
-            .provideDelegate(this, "attachParameters");
+    private final StoredProperty<String> launchConfiguration = string("")
+            .provideDelegate(this, "launchConfiguration");
+
+    private final StoredProperty<String> attachConfigurationId = string("")
+            .provideDelegate(this, "attachConfigurationId");
+
+    private final StoredProperty<String> attachConfiguration = string("")
+            .provideDelegate(this, "attachConfiguration");
 
     // Mappings settings
     private final StoredProperty<List<ServerMappingSettings>> serverMappings = this.<ServerMappingSettings>list()
@@ -102,20 +108,36 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
         this.debuggingType.setValue(this, debuggingType.name());
     }
 
-    public String getLaunchParameters() {
-        return launchParameters.getValue(this);
+    public String getLaunchConfigurationId() {
+        return launchConfigurationId.getValue(this);
     }
 
-    public void setLaunchParameters(String launchParameters) {
-        this.launchParameters.setValue(this, launchParameters);
+    public void setLaunchConfigurationId(String launchConfigurationId) {
+        this.launchConfigurationId.setValue(this, launchConfigurationId);
     }
 
-    public String getAttachParameters() {
-        return attachParameters.getValue(this);
+    public String getLaunchConfiguration() {
+        return launchConfiguration.getValue(this);
     }
 
-    public void setAttachParameters(String attachParameters) {
-        this.attachParameters.setValue(this, attachParameters);
+    public void setLaunchConfiguration(String launchConfiguration) {
+        this.launchConfiguration.setValue(this, launchConfiguration);
+    }
+
+    public String getAttachConfigurationId() {
+        return attachConfigurationId.getValue(this);
+    }
+
+    public void setAttachConfigurationId(String attachConfigurationId) {
+        this.attachConfigurationId.setValue(this, attachConfigurationId);
+    }
+
+    public String getAttachConfiguration() {
+        return attachConfiguration.getValue(this);
+    }
+
+    public void setAttachConfiguration(String attachConfiguration) {
+        this.attachConfiguration.setValue(this, attachConfiguration);
     }
 
     /**
@@ -124,7 +146,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
      * @return the DAP launch/attach parameters according the debugging type.
      */
     public String getDapParameters() {
-        return getDebuggingType() == DebuggingType.ATTACH ? getAttachParameters() : getLaunchParameters();
+        return getDebuggingType() == DebuggingType.ATTACH ? getAttachConfiguration() : getLaunchConfiguration();
     }
 
     // Mappings settings

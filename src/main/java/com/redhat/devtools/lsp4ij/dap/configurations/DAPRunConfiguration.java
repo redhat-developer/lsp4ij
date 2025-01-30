@@ -50,60 +50,6 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         return (DAPRunConfigurationOptions) super.getOptions();
     }
 
-    // Configuration settings
-
-    public String getWorkingDirectory() {
-        return getOptions().getWorkingDirectory();
-    }
-
-    public void setWorkingDirectory(String workingDirectory) {
-        getOptions().setWorkingDirectory(workingDirectory);
-    }
-
-    public String getFile() {
-        return getOptions().getFile();
-    }
-
-    public void setFile(String file) {
-        getOptions().setFile(file);
-    }
-
-    public String getLaunchParameters() {
-        return getOptions().getLaunchParameters();
-    }
-
-    public void setLaunchParameters(String launchParameters) {
-        getOptions().setLaunchParameters(launchParameters);
-    }
-
-    public String getAttachParameters() {
-        return getOptions().getAttachParameters();
-    }
-
-    public void setAttachParameters(String attachParameters) {
-        getOptions().setAttachParameters(attachParameters);
-    }
-
-    public DebuggingType getDebuggingType() {
-        return getOptions().getDebuggingType();
-    }
-
-    public void setDebuggingType(DebuggingType debuggingType) {
-        getOptions().setDebuggingType(debuggingType);
-    }
-
-
-    // Mappings settings
-
-    @NotNull
-    public List<ServerMappingSettings> getServerMappings() {
-        return getOptions().getServerMappings();
-    }
-
-    public void setServerMappings(@NotNull List<ServerMappingSettings> serverMappings) {
-        getOptions().setServerMappings(serverMappings);
-    }
-
     // Server settings
 
     public String getServerId() {
@@ -160,6 +106,75 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
 
     public void setServerTrace(ServerTrace serverTrace) {
         getOptions().setServerTrace(serverTrace);
+    }
+
+    // Mappings settings
+
+    @NotNull
+    public List<ServerMappingSettings> getServerMappings() {
+        return getOptions().getServerMappings();
+    }
+
+    public void setServerMappings(@NotNull List<ServerMappingSettings> serverMappings) {
+        getOptions().setServerMappings(serverMappings);
+    }
+
+    // Configuration settings
+
+    public String getWorkingDirectory() {
+        return getOptions().getWorkingDirectory();
+    }
+
+    public void setWorkingDirectory(String workingDirectory) {
+        getOptions().setWorkingDirectory(workingDirectory);
+    }
+
+    public String getFile() {
+        return getOptions().getFile();
+    }
+
+    public void setFile(String file) {
+        getOptions().setFile(file);
+    }
+    
+    public DebuggingType getDebuggingType() {
+        return getOptions().getDebuggingType();
+    }
+
+    public void setDebuggingType(DebuggingType debuggingType) {
+        getOptions().setDebuggingType(debuggingType);
+    }
+
+    public String getLaunchConfigurationId() {
+        return getOptions().getLaunchConfigurationId();
+    }
+
+    public void setLaunchConfigurationId(String launchConfigurationId) {
+        getOptions().setLaunchConfigurationId(launchConfigurationId);
+    }
+
+    public String getLaunchConfiguration() {
+        return getOptions().getLaunchConfiguration();
+    }
+
+    public void setLaunchConfiguration(String launchConfiguration) {
+        getOptions().setLaunchConfiguration(launchConfiguration);
+    }
+
+    public String getAttachConfigurationId() {
+        return getOptions().getAttachConfigurationId();
+    }
+
+    public void setAttachConfigurationId(String attachConfigurationId) {
+        getOptions().setAttachConfigurationId(attachConfigurationId);
+    }
+
+    public String getAttachConfiguration() {
+        return getOptions().getAttachConfiguration();
+    }
+
+    public void setAttachConfiguration(String attachConfiguration) {
+        getOptions().setAttachConfiguration(attachConfiguration);
     }
 
     @NotNull
@@ -257,8 +272,8 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         configuration.setWorkingDirectory(getWorkingDirectory());
         configuration.setFile(getFile());
         configuration.setDebuggingType(getDebuggingType());
-        configuration.setLaunchParameters(getLaunchParameters());
-        configuration.setAttachParameters(getAttachParameters());
+        configuration.setLaunchConfiguration(getLaunchConfiguration());
+        configuration.setAttachConfiguration(getAttachConfiguration());
 
         // Mappings
         configuration.setServerMappings(getServerMappings());
@@ -272,4 +287,5 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         configuration.setWaitForTrace(getWaitForTrace());
         configuration.setServerTrace(getServerTrace());
     }
+
 }

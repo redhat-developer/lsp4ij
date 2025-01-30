@@ -18,6 +18,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterDescriptorFactorySettings;
@@ -49,13 +50,7 @@ public class DebugAdapterManager {
 
     private final Map<String, DebugAdapterDescriptorFactory> factories = new HashMap<>();
 
-    /*public DebugAdapterManager() {
-        /*DAPTemplateManager.getInstance()
-                .getTemplates()
-                .forEach(template -> addDebugAdapterDescriptorFactory(new TemplateDebugAdapterDescriptorFactory(template)));*/
-    //}*/
-
-   public DebugAdapterManager() {
+    public DebugAdapterManager() {
         initialize();
     }
 
@@ -94,12 +89,10 @@ public class DebugAdapterManager {
             settings.setWaitForTimeout(userDefinedFactory.getWaitForTimeout());
             settings.setWaitForTrace(userDefinedFactory.getWaitForTrace());
             List<ServerMappingSettings> mappings = Stream.concat(userDefinedFactory.getLanguageMappings().stream(),
-                    userDefinedFactory.getFileTypeMappings().stream())
+                            userDefinedFactory.getFileTypeMappings().stream())
                     .toList();
             settings.setMappings(mappings);
-            settings.setLaunchConfiguration(userDefinedFactory.getLaunchConfiguration());
-            settings.setAttachConfiguration(userDefinedFactory.getAttachConfiguration());
-
+            settings.setLaunchConfigurations(userDefinedFactory.getLaunchConfigurations());
             UserDefinedDebugAdapterDescriptorFactorySettings.getInstance().setSettings(factoryId, settings);
         }
     }
@@ -129,19 +122,17 @@ public class DebugAdapterManager {
         return Collections.unmodifiableCollection(factories.values());
     }
 
-    public record UpdateDebugAdapterDescriptorFactoryRequest(@NotNull UserDefinedDebugAdapterDescriptorFactory descriptorFactory,
-                                                             @Nullable String name,
-                                                             @Nullable Map<String, String> userEnvironmentVariables,
-                                                             boolean includeSystemEnvironmentVariables,
-                                                             @Nullable String commandLine,
-                                                             @Nullable String  waitForTimeout,
-                                                             @Nullable String  waitForTrace,
-                                                             @NotNull List<ServerMappingSettings> languageMappings,
-                                                             @NotNull List<ServerMappingSettings> fileTypeMappings,
-                                                             @Nullable String launchConfiguration,
-                                                             @Nullable String launchConfigurationSchema,
-                                                             @Nullable String attachConfiguration,
-                                                             @Nullable String attachConfigurationSchema) {
+    public record UpdateDebugAdapterDescriptorFactoryRequest(
+            @NotNull UserDefinedDebugAdapterDescriptorFactory descriptorFactory,
+            @Nullable String name,
+            @Nullable Map<String, String> userEnvironmentVariables,
+            boolean includeSystemEnvironmentVariables,
+            @Nullable String commandLine,
+            @Nullable String waitForTimeout,
+            @Nullable String waitForTrace,
+            @NotNull List<ServerMappingSettings> languageMappings,
+            @NotNull List<ServerMappingSettings> fileTypeMappings,
+            @Nullable List<LaunchConfiguration> launchConfigurations) {
     }
 
     @Nullable
@@ -159,10 +150,7 @@ public class DebugAdapterManager {
         descriptorFactory.setLanguageMappings(request.languageMappings());
         descriptorFactory.setFileTypeMappings(request.fileTypeMappings());
 
-        descriptorFactory.setLaunchConfiguration(request.launchConfiguration());
-        descriptorFactory.setLaunchConfigurationSchema(request.launchConfigurationSchema());
-        descriptorFactory.setAttachConfiguration(request.attachConfiguration());
-        descriptorFactory.setAttachConfigurationSchema(request.attachConfigurationSchema());
+        descriptorFactory.setLaunchConfigurations(request.launchConfigurations());
 
         List<ServerMappingSettings> mappings = Stream.concat(request.languageMappings().stream(), request.fileTypeMappings().stream()).toList();
         UserDefinedDebugAdapterDescriptorFactorySettings.ItemSettings settings = UserDefinedDebugAdapterDescriptorFactorySettings.getInstance().getSettings(descriptorFactoryId);
@@ -173,8 +161,7 @@ public class DebugAdapterManager {
         boolean waitForTimeoutChanged = !Objects.equals(settings.getWaitForTimeout(), request.waitForTimeout());
         boolean waitForTraceChanged = !Objects.equals(settings.getWaitForTrace(), request.waitForTrace());
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
-        boolean launchConfigurationChanged = !Objects.equals(settings.getLaunchConfiguration(), request.launchConfiguration());
-        boolean attachConfigurationChanged = !Objects.equals(settings.getAttachConfiguration(), request.attachConfiguration());
+        boolean launchConfigurationChanged = !Objects.equals(settings.getLaunchConfigurations(), request.launchConfigurations());
         // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
 
         settings.setServerName(request.name());
@@ -184,12 +171,11 @@ public class DebugAdapterManager {
         settings.setWaitForTimeout(request.waitForTimeout);
         settings.setWaitForTrace(request.waitForTrace);
         settings.setMappings(mappings);
-        settings.setLaunchConfiguration(request.launchConfiguration());
-        settings.setAttachConfiguration(request.attachConfiguration());
+        settings.setLaunchConfigurations(request.launchConfigurations());
 
         if (nameChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
                 commandChanged || waitForTimeoutChanged || waitForTraceChanged ||
-                mappingsChanged || launchConfigurationChanged || attachConfigurationChanged) {
+                mappingsChanged || launchConfigurationChanged) {
             // Notifications
             DebugAdapterDescriptorFactoryListener.DebugAdapterDescriptorFactoryChangedEvent event = new DebugAdapterDescriptorFactoryListener.DebugAdapterDescriptorFactoryChangedEvent(
                     descriptorFactory,
@@ -200,8 +186,7 @@ public class DebugAdapterManager {
                     waitForTimeoutChanged,
                     waitForTraceChanged,
                     mappingsChanged,
-                    launchConfigurationChanged,
-                    attachConfigurationChanged);
+                    launchConfigurationChanged);
             if (notify) {
                 handleChangeEvent(event);
             }
@@ -352,8 +337,7 @@ public class DebugAdapterManager {
                 factory.setIncludeSystemEnvironmentVariables(setting.isIncludeSystemEnvironmentVariables());
                 factory.setWaitForTimeout(setting.getWaitForTimeout());
                 factory.setWaitForTrace(setting.getWaitForTrace());
-                factory.setLaunchConfiguration(setting.getLaunchConfiguration());
-                factory.setAttachConfiguration(setting.getAttachConfiguration());
+                factory.setLaunchConfigurations(setting.getLaunchConfigurations());
                 addDebugAdapterDescriptorFactoryWithoutNotification(factory);
             }
         } catch (Exception e) {

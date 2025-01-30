@@ -20,6 +20,7 @@ import com.intellij.openapi.components.Storage;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.XCollection;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -135,10 +136,8 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
 
-        private String launchConfiguration;
-        private String launchConfigurationSchema;
-        private String attachConfiguration;
-        private String attachConfigurationSchema;
+        @XCollection(elementTypes = LaunchConfiguration.class)
+        private List<LaunchConfiguration> launchConfigurations;
 
         public String getServerId() {
             return serverId;
@@ -225,37 +224,14 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
             this.mappings = mappings;
         }
 
-        public String getLaunchConfiguration() {
-            return launchConfiguration;
+        public List<LaunchConfiguration> getLaunchConfigurations() {
+            return launchConfigurations;
         }
 
-        public void setLaunchConfiguration(String launchConfiguration) {
-            this.launchConfiguration = launchConfiguration;
+        public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+            this.launchConfigurations = launchConfigurations;
         }
 
-        public String getLaunchConfigurationSchema() {
-            return launchConfigurationSchema;
-        }
-
-        public void setLaunchConfigurationSchema(String launchConfigurationSchema) {
-            this.launchConfigurationSchema = launchConfigurationSchema;
-        }
-
-        public String getAttachConfiguration() {
-            return attachConfiguration;
-        }
-
-        public void setAttachConfiguration(String attachConfiguration) {
-            this.attachConfiguration = attachConfiguration;
-        }
-
-        public String getAttachConfigurationSchema() {
-            return attachConfigurationSchema;
-        }
-
-        public void setAttachConfigurationSchema(String attachConfigurationSchema) {
-            this.attachConfigurationSchema = attachConfigurationSchema;
-        }
     }
 
     public static class MyState {
