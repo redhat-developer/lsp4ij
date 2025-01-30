@@ -377,7 +377,12 @@ L
         <!-- LSP textDocument/selectionRange request support -->
         <extendWordSelectionHandler
                 implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPExtendWordSelectionHandler"
+                id="LSPExtendWordSelectionHandler"
                 order="first"/>
+        <extendWordSelectionHandler
+                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPCodeBlockExtendWordSelectionHandler"
+                id="LSPCodeBlockExtendWordSelectionHandler"
+                order="first, before LSPExtendWordSelectionHandler"/>
 
         <!-- LSP textDocument/semanticTokens request support -->
         <highlightVisitor
