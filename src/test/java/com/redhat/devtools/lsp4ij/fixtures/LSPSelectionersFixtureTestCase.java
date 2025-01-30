@@ -28,12 +28,27 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Base class for language-specific testing of selectioner behavior.
+ */
 public abstract class LSPSelectionersFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
     protected LSPSelectionersFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
     }
 
+    /**
+     * Confirms selection ranges for the <b>Extend Selection</b> action.
+     *
+     * @param fileName                   the file name
+     * @param fileBody                   the file body
+     * @param mockSelectionRangesJson    mock {@code textDocument/selectionRange} response JSON
+     * @param mockFoldingRangesJson      mock {@code textDocument/foldingRange} response JSON
+     * @param startLineNumber            the line number at the beginning of which the <b>Extend Selection</b> action
+     *                                   will be invoked
+     * @param expectedSelectedLineRanges the expected selection ranges for each subsequent invocation of the
+     *                                   <b>Extend Selection</b> action from from {@code startLineNumber}
+     */
     protected void testSelectioner(@NotNull String fileName,
                                    @NotNull String fileBody,
                                    @NotNull String mockSelectionRangesJson,

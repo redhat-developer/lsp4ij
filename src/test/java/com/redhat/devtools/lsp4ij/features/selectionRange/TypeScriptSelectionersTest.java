@@ -13,6 +13,9 @@ package com.redhat.devtools.lsp4ij.features.selectionRange;
 
 import com.redhat.devtools.lsp4ij.fixtures.LSPSelectionersFixtureTestCase;
 
+/**
+ * TypeScript test for {@link LSPCodeBlockStatementGroupSelectioner} and {@link LSPCodeBlockBodySelectioner}.
+ */
 public class TypeScriptSelectionersTest extends LSPSelectionersFixtureTestCase {
 
     private static final String TEST_FILE_NAME = "test.ts";
