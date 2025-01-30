@@ -180,14 +180,16 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
     private static int getStartOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
         if (foldingRange.getStartCharacter() == null) {
-            return document.getLineEndOffset(foldingRange.getStartLine());
+            // Be defensive against language servers that return lines that are out of bounds for the document
+            return document.getLineEndOffset(Math.max(foldingRange.getStartLine(), 0));
         }
         return LSPIJUtils.toOffset(new Position(foldingRange.getStartLine(), foldingRange.getStartCharacter()), document);
     }
 
     private static int getEndOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
         if (foldingRange.getEndCharacter() == null) {
-            return document.getLineEndOffset(foldingRange.getEndLine());
+            // Be defensive against language servers that return lines that are out of bounds for the document
+            return document.getLineEndOffset(Math.min(foldingRange.getEndLine(), document.getLineCount() - 1));
         }
         return LSPIJUtils.toOffset(new Position(foldingRange.getEndLine(), foldingRange.getEndCharacter()), document);
     }

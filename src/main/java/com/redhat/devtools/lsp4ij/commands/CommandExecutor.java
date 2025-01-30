@@ -36,6 +36,7 @@ import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -109,19 +110,19 @@ public class CommandExecutor {
 
         // 3. tentative fallback
         if (file != null && command.getArguments() != null) {
-            LanguageServerItem languageServer = context.getPreferredLanguageServer();
-            FileUriSupport fileUriSupport = languageServer != null ? languageServer.getClientFeatures() : null;
-            WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), file, fileUriSupport);
-            if (edit != null) {
-                if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
-                    LSPIJUtils.applyWorkspaceEdit(edit);
-                } else {
-                    return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<LSPCommandResponse>) () -> {
+                LanguageServerItem languageServer = context.getPreferredLanguageServer();
+                FileUriSupport fileUriSupport = languageServer != null ? languageServer.getClientFeatures() : null;
+                WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), file, fileUriSupport);
+                if (edit != null) {
+                    if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
                         LSPIJUtils.applyWorkspaceEdit(edit);
-                        return LSPCommandResponse.FOUND;
-                    });
-                }
-                return LSPCommandResponse.FOUND;
+                    } else {
+                        return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<LSPCommandResponse>) () -> {
+                            LSPIJUtils.applyWorkspaceEdit(edit);
+                            return LSPCommandResponse.FOUND;
+                        });
+                    }
+                    return LSPCommandResponse.FOUND;
             }
         }
         if (context.isShowNotificationError()) {
@@ -151,14 +152,14 @@ public class CommandExecutor {
      * @param languageServer            the language server for which the {@code command} is
      *                                  applicable.
      * @param preferredLanguageServerId the preferred language server Id.
-     * @param project                   the project.
+     * @param project the project.
      * @return the LSP command response.
      */
     private static LSPCommandResponse executeCommandServerSide(@NotNull Command command,
                                                                @Nullable LanguageServerItem languageServer,
                                                                @Nullable String preferredLanguageServerId,
                                                                @NotNull Project project) {
-        CompletableFuture<LanguageServerItem> languageServerFuture = getLanguageServerForCommand(command, languageServer, preferredLanguageServerId, project);
+        CompletableFuture<LanguageServer> languageServerFuture = getLanguageServerForCommand(command, languageServer, preferredLanguageServerId, project);
         if (languageServerFuture == null) {
             return LSPCommandResponse.NOT_FOUND;
         }
@@ -179,7 +180,7 @@ public class CommandExecutor {
                                 // Language server throws an error when executing a command
                                 // Display it with an IntelliJ notification.
                                 MessageParams messageParams = new MessageParams(MessageType.Error, error.getMessage());
-                                ServerMessageHandler.showMessage(server.getServerDefinition().getDisplayName(), messageParams, project);
+                                ServerMessageHandler.showMessage(languageServer.getServerDefinition().getDisplayName(), messageParams, project);
                                 return error;
                             });
                 });
@@ -187,19 +188,19 @@ public class CommandExecutor {
     }
 
     @Nullable
-    private static CompletableFuture<LanguageServerItem> getLanguageServerForCommand(@NotNull Command command,
-                                                                                     @Nullable LanguageServerItem languageServer,
-                                                                                     @Nullable String preferredLanguageServerId,
-                                                                                     @NotNull Project project) {
+    private static CompletableFuture<LanguageServer> getLanguageServerForCommand(@NotNull Command command,
+                                                                                 @Nullable LanguageServerItem languageServer,
+                                                                                 @Nullable String preferredLanguageServerId,
+                                                                                 @NotNull Project project) {
 
         if (languageServer != null && languageServer.supportsCommand(command)) {
             return languageServer
-                    .getInitializedServer()
-                    .thenApply(ls -> new LanguageServerItem(ls, languageServer.getServerWrapper()));
+                    .getInitializedServer();
         }
         if (preferredLanguageServerId != null) {
             return LanguageServerManager.getInstance(project)
-                    .getLanguageServer(preferredLanguageServerId);
+                    .getLanguageServer(preferredLanguageServerId)
+                    .thenApply(ls -> ls != null ? ls.getServer() : null);
         }
         return null;
     }
