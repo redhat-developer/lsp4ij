@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - fixed duplicate inlay hints
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features;
 
@@ -65,22 +66,15 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         final long modificationStamp = psiFile.getModificationStamp();
         return new FactoryInlayHintsCollector(editor) {
 
-            private boolean processed;
-
             @Override
             public boolean collect(@NotNull PsiElement psiElement, @NotNull Editor editor, @NotNull InlayHintsSink inlayHintsSink) {
-                if (processed) {
-                    // Before IJ 2023-3, FactoryInlayHintsCollector#collect(PsiElement element.. is called once time with PsiFile as element.
-                    // Since IJ 2023-3, FactoryInlayHintsCollector#collect(PsiElement element.. is called several times for each token of the PsiFile
-                    // which causes the problem of codelens/inlay hint which are not displayed because there are too many call of LSP request codelens/inlayHint which are cancelled.
-                    // With IJ 2023-3 we need to collect LSP CodeLens/InlayHint just for the first call.
-                    return false;
+                if (!(psiElement instanceof PsiFile psiFile)) {
+                    return true;
                 }
-                processed = true;
                 Project project = psiFile.getProject();
                 if (project.isDisposed()) {
                     // InlayHint must not be collected
-                    return false;
+                    return true;
                 }
 
                 try {
@@ -105,7 +99,7 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                 } catch (CancellationException e) {
                     // Do nothing
                 }
-                return false;
+                return true;
             }
         };
     }
