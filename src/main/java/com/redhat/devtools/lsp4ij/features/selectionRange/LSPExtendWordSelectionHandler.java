@@ -20,7 +20,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import org.eclipse.lsp4j.SelectionRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -89,24 +88,11 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             }
         }
 
-        // Get the selection ranges
-        List<SelectionRange> selectionRanges = LSPSelectionRangeSupport.getSelectionRanges(file, document, effectiveOffset);
-        if (ContainerUtil.isEmpty(selectionRanges)) {
-            return null;
-        }
-
-        // Convert the selection ranges into text ranges
-        Set<TextRange> textRanges = new LinkedHashSet<>(selectionRanges.size());
-        for (SelectionRange selectionRange : selectionRanges) {
-            TextRange selectionTextRange = LSPSelectionRangeSupport.getTextRange(selectionRange, document);
-            textRanges.addAll(expandToWholeLinesWithBlanks(editorText, selectionTextRange));
-
-            for (SelectionRange parentSelectionRange = selectionRange.getParent();
-                 parentSelectionRange != null;
-                 parentSelectionRange = parentSelectionRange.getParent()) {
-                TextRange parentSelectionTextRange = LSPSelectionRangeSupport.getTextRange(parentSelectionRange, document);
-                textRanges.addAll(expandToWholeLinesWithBlanks(editorText, parentSelectionTextRange));
-            }
+        // Get the selection ranges and extend them to whole lines
+        Set<TextRange> textRanges = new LinkedHashSet<>();
+        List<TextRange> selectionTextRanges = LSPSelectionRangeSupport.getSelectionTextRanges(file, editor, effectiveOffset);
+        for (TextRange selectionTextRange : selectionTextRanges) {
+            ContainerUtil.addAllNotNull(textRanges, expandToWholeLinesWithBlanks(editorText, selectionTextRange));
         }
 
         // If the original offset was at line start and the effective offset was not, remove smaller text ranges
