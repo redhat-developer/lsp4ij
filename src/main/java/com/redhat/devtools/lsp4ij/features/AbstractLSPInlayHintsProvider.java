@@ -78,23 +78,13 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                 }
 
                 try {
-                    final List<CompletableFuture> pendingFutures = new ArrayList<>();
+                    final List<CompletableFuture<?>> pendingFutures = new ArrayList<>();
                     doCollect(psiFile, editor, getFactory(), inlayHintsSink, pendingFutures);
                     if (!pendingFutures.isEmpty()) {
                         // Some LSP requests:
-                        // - textDocument/inlayHint, inlayHint/resolve
                         // - textDocument/colorInformation
                         // are pending, wait for their completion and refresh the inlay hints UI to render them
-                        CompletableFuture.allOf(pendingFutures.toArray(new CompletableFuture[0]))
-                                .thenApplyAsync(_unused -> {
-                                    // Check if PsiFile was not modified
-                                    if (modificationStamp == psiFile.getModificationStamp()) {
-                                        // All pending futures are finished, refresh the inlay hints
-                                        EditorFeatureManager.getInstance(project)
-                                                        .refreshEditorFeature(psiFile.getVirtualFile(), EditorFeatureType.INLAY_HINT, false);
-                                    }
-                                    return null;
-                                });
+                        EditorFeatureManager.getInstance(project).refreshEditorFeatureWhenAllDone(pendingFutures, modificationStamp, psiFile, EditorFeatureType.INLAY_HINT);
                     }
                 } catch (CancellationException e) {
                     // Do nothing
@@ -171,6 +161,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                                       @NotNull Editor editor,
                                       @NotNull PresentationFactory factory,
                                       @NotNull InlayHintsSink inlayHintsSink,
-                                      @NotNull List<CompletableFuture> pendingFutures);
+                                      @NotNull List<CompletableFuture<?>> pendingFutures);
 
 }

@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.internal.editor;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import org.jetbrains.annotations.ApiStatus;
@@ -59,7 +60,7 @@ public class InlayHintsEditorFeature implements EditorFeature {
     }
 
     @Override
-    public void clearEditorCache(@NotNull Editor editor) {
+    public void clearEditorCache(@NotNull Editor editor, @NotNull Project project) {
         // old class: com.intellij.codeInsight.hints.InlayHintsPassFactory
         // --> InlayHintsPassFactory.Companion.clearModificationStamp(editor);
         //
@@ -78,9 +79,8 @@ public class InlayHintsEditorFeature implements EditorFeature {
 
     @Override
     public void clearLSPCache(PsiFile file) {
-        // Evict the cache of LSP requests from inlayHint and color support
+        // Evict the cache of LSP requests from color support
         var fileSupport = LSPFileSupport.getSupport(file);
-        fileSupport.getInlayHintsSupport().cancel();
         fileSupport.getColorSupport().cancel();
     }
 

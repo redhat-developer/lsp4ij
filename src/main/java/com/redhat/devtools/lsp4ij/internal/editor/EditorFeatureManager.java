@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - added refreshEditorFeatureWhenAllDone
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal.editor;
 
@@ -28,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Editor feature manager used to refresh IntelliJ visible feature of editors from a given project:
@@ -55,6 +57,7 @@ public class EditorFeatureManager implements Disposable {
         addEditorFeature(new CodeVisionEditorFeature());
         addEditorFeature(new FoldingEditorFeature());
         addEditorFeature(new InlayHintsEditorFeature());
+        addEditorFeature(new DeclarativeInlayHintsEditorFeature());
     }
 
     private void addEditorFeature(EditorFeature editorFeature) {
@@ -97,7 +100,7 @@ public class EditorFeatureManager implements Disposable {
                     for (Editor editor : editors) {
                         // Clear editor cache according the feature type
                         // (IntelliJ stores generally the modification time stamp of the Psi file to avoid refreshing the feature if Psi file doesn't change)
-                        clearEditorCache(editor, featureType);
+                        clearEditorCache(editor, project, featureType);
                         // Collect runnable which must be executed on UI step.
                         collectUiRunnables(psiFile, editor, featureType, runnables);
                     }
@@ -116,11 +119,34 @@ public class EditorFeatureManager implements Disposable {
                 }).submit(AppExecutorUtil.getAppExecutorService());
     }
 
-    private void clearEditorCache(Editor editor, @NotNull EditorFeatureType featureType) {
+    /**
+     * Waits for all futures in the provided list to finish, then refreshes the given editor feature if the file has not
+     *  been modified since.
+     * @param pendingFutures    a list of futures to wait for
+     * @param modificationStamp the initial file modification timestamp
+     * @param psiFile           the file to check the timestamp of
+     * @param feature           the editor feature to refresh
+     */
+    public void refreshEditorFeatureWhenAllDone(@NotNull List<CompletableFuture<?>> pendingFutures,
+                                                       long modificationStamp,
+                                                       @NotNull PsiFile psiFile,
+                                                       @NotNull EditorFeatureType feature) {
+        CompletableFuture.allOf(pendingFutures.toArray(new CompletableFuture[0]))
+                .thenApplyAsync(_unused -> {
+                    // Check if PsiFile was not modified
+                    if (modificationStamp == psiFile.getModificationStamp()) {
+                        // All pending futures are finished, refresh the feature
+                        refreshEditorFeature(psiFile.getVirtualFile(), feature, false);
+                    }
+                    return null;
+                });
+    }
+
+    private void clearEditorCache(@NotNull Editor editor, @NotNull Project project, @NotNull EditorFeatureType featureType) {
         if (featureType == EditorFeatureType.ALL) {
-            editorFeatures.values().forEach(feature -> feature.clearEditorCache(editor));
+            editorFeatures.values().forEach(feature -> feature.clearEditorCache(editor, project));
         } else {
-            getEditorFeature(featureType).clearEditorCache(editor);
+            getEditorFeature(featureType).clearEditorCache(editor, project);
         }
     }
 

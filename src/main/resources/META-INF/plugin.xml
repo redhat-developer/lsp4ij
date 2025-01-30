@@ -307,7 +307,16 @@ L
                 id="LSPCodeLensProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider"/>
 
-        <!-- LSP textDocument/inlayHint + textDocument/colorInformation requests support -->
+        <!-- LSP textDocument/inlayHint requests support -->
+        <codeInsight.declarativeInlayProviderFactory
+                id="LSPDeclarativeInlayHintProvidersFactory"
+                implementation="com.redhat.devtools.lsp4ij.features.inlayhint.LSPDeclarativeInlayHintProvidersFactory"/>
+
+        <codeInsight.inlayActionHandler
+                handlerId="LSP4IJ"
+                implementationClass="com.redhat.devtools.lsp4ij.features.inlayhint.LSPDeclarativeInlayActionHandler"/>
+
+        <!-- LSP textDocument/colorInformation requests support -->
         <codeInsight.inlayProviderFactory
                 id="LSPInlayHintProvidersFactory"
                 implementation="com.redhat.devtools.lsp4ij.features.LSPInlayHintProvidersFactory"/>

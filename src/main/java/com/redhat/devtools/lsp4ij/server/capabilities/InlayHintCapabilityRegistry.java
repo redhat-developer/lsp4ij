@@ -44,7 +44,7 @@ public class InlayHintCapabilityRegistry extends TextDocumentServerCapabilityReg
             hasCapability(o.getResolveProvider());
 
     public InlayHintCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures) {
-        super(clientFeatures, EditorFeatureType.INLAY_HINT );
+        super(clientFeatures, EditorFeatureType.DECLARATIVE_INLAY_HINT );
     }
 
     class ExtendedInlayHintRegistrationOptions extends InlayHintRegistrationOptions implements ExtendedDocumentSelector.DocumentFilersProvider {

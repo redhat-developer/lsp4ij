@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.internal.editor;
 
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import org.jetbrains.annotations.ApiStatus;
@@ -43,7 +44,7 @@ public class FoldingEditorFeature implements EditorFeature {
     }
 
     @Override
-    public void clearEditorCache(@NotNull Editor editor) {
+    public void clearEditorCache(@NotNull Editor editor, @NotNull Project project) {
         try {
             // Clear the modification stamp stored in the editor user-data
             // (with the key CODE_FOLDING_KEY)
