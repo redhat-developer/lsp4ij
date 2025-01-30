@@ -10,13 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -125,34 +125,25 @@ public class DAPTemplateManager {
     public DAPTemplate createDapTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         try {
             String templateJson = null;
-            String launchJson = null;
-            String launchSchemaJson = null;
-            String attachJson = null;
-            String attachSchemaJson = null;
-            String description = null;
+            List<LaunchConfiguration> launchConfigurations = new ArrayList<>();
 
             for (VirtualFile file : templateFolder.getChildren()) {
                 if (file.isDirectory()) {
                     continue;
                 }
-                switch (file.getName()) {
-                    case TEMPLATE_FILE_NAME:
-                        templateJson = VfsUtilCore.loadText(file);
-                        break;
-                    case LAUNCH_FILE_NAME:
-                        launchJson = VfsUtilCore.loadText(file);
-                        break;
-                    case LAUNCH_SCHEMA_FILE_NAME:
-                        launchSchemaJson = VfsUtilCore.loadText(file);
-                        break;
-                    case ATTACH_FILE_NAME:
-                        attachJson = VfsUtilCore.loadText(file);
-                        break;
-                    case ATTACH_SCHEMA_FILE_NAME:
-                        attachSchemaJson = VfsUtilCore.loadText(file);
-                        break;
-                    default:
-                        break;
+                String fileName = file.getName();
+                if (TEMPLATE_FILE_NAME.equals(fileName)) {
+                    templateJson = VfsUtilCore.loadText(file);
+                } else {
+                    DebuggingType type = getDebuggingType(fileName);
+                    if (type != null) {
+                        String launchJson = VfsUtilCore.loadText(file);
+                        JsonObject launch = (JsonObject) JsonParser.parseString(launchJson);
+                        JsonElement jsonName = launch.get("name");
+                        String name = jsonName != null ? jsonName.getAsString() : "undefined";
+                        LaunchConfiguration launchConfiguration = new LaunchConfiguration(fileName, name, launchJson, type);
+                        launchConfigurations.add(launchConfiguration);
+                    }
                 }
             }
 
@@ -160,35 +151,30 @@ public class DAPTemplateManager {
                 // Don't continue, if no template.json is found
                 throw new FileNotFoundException("template.json is required");
             }
-            if (launchJson == null) {
-                launchJson = "{}";
-            }
-            if (attachJson == null) {
-                attachJson = "{}";
-            }
-            if (attachSchemaJson == null) {
-                attachSchemaJson = "{}";
-            }
 
             GsonBuilder builder = new GsonBuilder();
             builder.registerTypeAdapter(DAPTemplate.class, new DAPTemplateDeserializer());
             Gson gson = builder.create();
 
             DAPTemplate template = gson.fromJson(templateJson, DAPTemplate.class);
-            template.setLaunchConfiguration(launchJson);
-            template.setLaunchConfigurationSchema(launchSchemaJson);
-            template.setAttachConfiguration(attachJson);
-            template.setAttachConfigurationSchema(attachSchemaJson);
-            if (StringUtils.isNotBlank(description)) {
-                template.setDescription(description);
-            }
-
+            template.setLaunchConfigurations(launchConfigurations);
             return template;
         }
         catch(Exception e) {
             LOGGER.warn("Error while loading DAP template", e);
             return null;
         }
+    }
+
+    @Nullable
+    private DebuggingType getDebuggingType(String fileName) {
+        if (fileName.startsWith(LAUNCH_FILE_START_NAME)) {
+            return DebuggingType.LAUNCH;
+        }
+        if (fileName.startsWith(ATTACH_FILE_START_NAME)) {
+            return DebuggingType.ATTACH;
+        }
+        return null;
     }
 
     /**

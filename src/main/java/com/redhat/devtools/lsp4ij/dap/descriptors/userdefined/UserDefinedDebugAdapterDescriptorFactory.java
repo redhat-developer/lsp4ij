@@ -16,6 +16,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -27,6 +28,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+
+import static com.redhat.devtools.lsp4ij.dap.LaunchConfiguration.findAttachConfiguration;
+import static com.redhat.devtools.lsp4ij.dap.LaunchConfiguration.findLaunchConfiguration;
 
 /**
  * User defined {@link DebugAdapterDescriptorFactory}.
@@ -47,10 +51,7 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
     private @NotNull List<ServerMappingSettings> fileTypeMappings;
 
     // Configuration
-    private String launchConfiguration;
-    private String launchConfigurationSchema;
-    private String attachConfiguration;
-    private String attachConfigurationSchema;
+    private List<LaunchConfiguration> launchConfigurations;
 
     public UserDefinedDebugAdapterDescriptorFactory(@NotNull String id,
                                                     @NotNull String name,
@@ -155,37 +156,13 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         return waitForTrace;
     }
 
-
-    public String getLaunchConfiguration() {
-        return launchConfiguration;
+    @Override
+    public List<LaunchConfiguration> getLaunchConfigurations() {
+        return launchConfigurations;
     }
 
-    public void setLaunchConfiguration(String launchConfiguration) {
-        this.launchConfiguration = launchConfiguration;
-    }
-
-    public String getLaunchConfigurationSchema() {
-        return launchConfigurationSchema;
-    }
-
-    public void setLaunchConfigurationSchema(String launchConfigurationSchema) {
-        this.launchConfigurationSchema = launchConfigurationSchema;
-    }
-
-    public String getAttachConfiguration() {
-        return attachConfiguration;
-    }
-
-    public void setAttachConfiguration(String attachConfiguration) {
-        this.attachConfiguration = attachConfiguration;
-    }
-
-    public String getAttachConfigurationSchema() {
-        return attachConfigurationSchema;
-    }
-
-    public void setAttachConfigurationSchema(String attachConfigurationSchema) {
-        this.attachConfigurationSchema = attachConfigurationSchema;
+    public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+        this.launchConfigurations = launchConfigurations;
     }
 
     @Override
@@ -231,8 +208,10 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         if(super.prepareConfiguration(configuration, file, project)) {
             if (configuration instanceof DAPRunConfiguration dapConfiguration) {
                 // Configuration
-                dapConfiguration.setLaunchParameters(getLaunchConfiguration());
-                dapConfiguration.setAttachParameters(getAttachConfiguration());
+                var launchConfiguration = findLaunchConfiguration(getLaunchConfigurations());
+                dapConfiguration.setLaunchConfiguration(launchConfiguration != null ? launchConfiguration.getContent() : "");
+                var attachConfiguration = findAttachConfiguration(getLaunchConfigurations());
+                dapConfiguration.setAttachConfiguration(attachConfiguration != null ? attachConfiguration.getContent() : "");
 
                 // Mappings
                 dapConfiguration.setServerMappings(Stream.concat(getLanguageMappings().stream(),
@@ -259,4 +238,5 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         }
         return false;
     }
+
 }

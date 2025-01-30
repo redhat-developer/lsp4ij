@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
 import com.intellij.openapi.util.SystemInfo;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 
 import java.util.ArrayList;
@@ -38,10 +39,8 @@ public class DAPTemplate {
     };
 
     public static final String TEMPLATE_FILE_NAME = "template.json";
-    public static final String LAUNCH_FILE_NAME = "launch.json";
-    public static final String LAUNCH_SCHEMA_FILE_NAME = "launch.schema.json";
-    public static final String ATTACH_FILE_NAME = "attach.json";
-    public static final String ATTACH_SCHEMA_FILE_NAME = "attach.schema.json";
+    public static final String LAUNCH_FILE_START_NAME = "launch.";
+    public static final String ATTACH_FILE_START_NAME = "attach.";
 
     public static final String NAME_JSON_PROPERTY = "name";
     public static final String ID_JSON_PROPERTY = "id";
@@ -53,7 +52,6 @@ public class DAPTemplate {
     public static final String PATTERNS_JSON_PROPERTY = "patterns";
     public static final String FILE_TYPE_JSON_PROPERTY = "fileType";
     public static final String FILE_TYPE_MAPPINGS_JSON_PROPERTY = "fileTypeMappings";
-
 
     private static final String WINDOWS_KEY = "windows";
     private static final String MAC_KEY = "mac";
@@ -70,12 +68,7 @@ public class DAPTemplate {
 
     private List<ServerMappingSettings> languageMappings;
 
-    private String description;
-
-    private String launchConfiguration;
-    private String launchConfigurationSchema;
-    private String attachConfiguration;
-    private String attachConfigurationSchema;
+    private List<LaunchConfiguration> launchConfigurations;
     private String waitForTimeout;
     private String waitForTrace;
 
@@ -158,43 +151,11 @@ public class DAPTemplate {
         this.fileTypeMappings.add(s);
     }
 
-    public String getDescription() {
-        return description;
+    public List<LaunchConfiguration> getLaunchConfigurations() {
+        return launchConfigurations;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getLaunchConfiguration() {
-        return launchConfiguration;
-    }
-
-    public void setLaunchConfiguration(String launchConfiguration) {
-        this.launchConfiguration = launchConfiguration;
-    }
-
-    public String getLaunchConfigurationSchema() {
-        return launchConfigurationSchema;
-    }
-
-    public void setLaunchConfigurationSchema(String launchConfigurationSchema) {
-        this.launchConfigurationSchema = launchConfigurationSchema;
-    }
-
-    public String getAttachConfiguration() {
-        return attachConfiguration;
-    }
-
-    public void setAttachConfiguration(String attachConfiguration) {
-        this.attachConfiguration = attachConfiguration;
-    }
-
-    public String getAttachConfigurationSchema() {
-        return attachConfigurationSchema;
-    }
-
-    public void setAttachConfigurationSchema(String attachConfigurationSchema) {
-        this.attachConfigurationSchema = attachConfigurationSchema;
+    public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+        this.launchConfigurations = launchConfigurations;
     }
 }

@@ -1,0 +1,12 @@
+{
+  "type": "undefined",
+  "name": "Attach to process",
+  "request": "attach",
+  "port": 5858,
+  "outFiles": [
+    "${workspaceFolder}/**/*.(m|c|)js",
+    "!**/node_modules/**"
+  ],
+  "sourceMaps": true,
+  "__workspaceFolder": "${workspaceFolder}"
+}

@@ -1,6 +1,6 @@
 {
-  "type": "go",
+  "type": "undefined",
+  "name": "Attach to process",
   "request": "attach",
-  "program": "${file}",
-  "cwd": "${workspaceFolder}"
+  "port": 5858
 }
