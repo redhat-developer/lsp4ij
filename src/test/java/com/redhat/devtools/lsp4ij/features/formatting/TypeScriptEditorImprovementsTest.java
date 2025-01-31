@@ -165,7 +165,7 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
                     values = [];
                     bar() {}
                 }
-                        """,
+                """,
                 useTabCharacter
         );
 
@@ -189,7 +189,7 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
                     ];
                     bar() {}
                 }
-                        """,
+                """,
                 useTabCharacter
         );
         assertEquals(enterBetweenBracketsFileBody.replace(CARET, ""), document.getText());
@@ -210,7 +210,7 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
                         <caret>
                     ) {}
                 }
-                        """,
+                """,
                 useTabCharacter
         );
         assertEquals(enterBetweenParensFileBody.replace(CARET, ""), document.getText());
@@ -233,7 +233,7 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
                         <caret>
                     }
                 }
-                        """,
+                """,
                 useTabCharacter
         );
         assertEquals(enterBetweenBracesFileBody.replace(CARET, ""), document.getText());
