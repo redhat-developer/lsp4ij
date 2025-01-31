@@ -40,7 +40,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
- * LSP textDocument/color support.
+ * LSP textDocument/colorInformation support.
  */
 public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
 
@@ -51,7 +51,7 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                              @NotNull Editor editor,
                              @NotNull PresentationFactory factory,
                              @NotNull InlayHintsSink inlayHintsSink,
-                             @NotNull List<CompletableFuture> pendingFutures) {
+                             @NotNull List<CompletableFuture<?>> pendingFutures) {
         // Get LSP color information from cache or create them
         LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
         var params = new DocumentColorParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));

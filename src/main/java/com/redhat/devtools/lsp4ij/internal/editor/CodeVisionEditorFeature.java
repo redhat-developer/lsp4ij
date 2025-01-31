@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.internal.editor;
 import com.intellij.codeInsight.codeVision.CodeVisionHost;
 import com.intellij.codeInsight.codeVision.CodeVisionInitializer;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.features.codeLens.DummyCodeVisionProviderFactory;
@@ -61,7 +62,7 @@ public class CodeVisionEditorFeature implements EditorFeature {
     }
 
     @Override
-    public void clearEditorCache(@NotNull Editor editor) {
+    public void clearEditorCache(@NotNull Editor editor, @NotNull Project project) {
         try {
             // Clear the modification stamp stored in the editor user-data
             // (with the key PSI_MODIFICATION_STAMP)

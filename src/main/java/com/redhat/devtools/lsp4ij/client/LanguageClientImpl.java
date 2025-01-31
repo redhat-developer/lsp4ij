@@ -170,8 +170,9 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     private void refreshInlayHintsForAllOpenedFiles() {
         for (var fileData : wrapper.getConnectedFiles()) {
             VirtualFile file = fileData.getFile();
-            EditorFeatureManager.getInstance(getProject())
-                    .refreshEditorFeature(file, EditorFeatureType.INLAY_HINT, true);
+            EditorFeatureManager efm = EditorFeatureManager.getInstance(getProject());
+            efm.refreshEditorFeature(file, EditorFeatureType.INLAY_HINT, true);
+            efm.refreshEditorFeature(file, EditorFeatureType.DECLARATIVE_INLAY_HINT, true);
         }
     }
 

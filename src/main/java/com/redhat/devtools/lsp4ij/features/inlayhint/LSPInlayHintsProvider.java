@@ -7,13 +7,11 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - port to declarative inlay hint API
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.inlayhint;
 
-import com.intellij.codeInsight.hints.InlayHintsSink;
-import com.intellij.codeInsight.hints.presentation.InlayPresentation;
-import com.intellij.codeInsight.hints.presentation.PresentationFactory;
-import com.intellij.codeInsight.hints.presentation.SequencePresentation;
+import com.intellij.codeInsight.hints.declarative.*;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -22,7 +20,6 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPInlayHintsProvider;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -30,13 +27,13 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -45,16 +42,17 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 /**
  * LSP textDocument/inlayHint support.
  */
-public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
+public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvider {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPInlayHintsProvider.class);
+
+    public static final String PROVIDER_ID = "LSPInlayHintsProvider";
 
     @Override
     protected void doCollect(@NotNull PsiFile psiFile,
                              @NotNull Editor editor,
-                             @NotNull PresentationFactory factory,
-                             @NotNull InlayHintsSink inlayHintsSink,
-                             @NotNull List<CompletableFuture> pendingFutures) {
+                             @NotNull InlayTreeSink inlayHintsSink,
+                             @NotNull List<CompletableFuture<?>> pendingFutures) {
         // Get LSP inlay hints from cache or create them
         LSPInlayHintsSupport inlayHintSupport = LSPFileSupport.getSupport(psiFile).getInlayHintsSupport();
         Range viewPortRange = getViewPortRange(editor);
@@ -74,12 +72,10 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
                 // Render inlay hints and collect all unfinished inlayHint/resolve futures
                 inlayHints.stream()
                         .collect(Collectors.groupingBy(p -> p.first))
-                        .forEach((offset, list) ->
-                                inlayHintsSink.addInlineElement(
-                                        offset,
-                                        false,
-                                        toPresentation(psiFile, editor, list, factory),
-                                        false));
+                        .forEach((offset, list) -> {
+                            var position = new InlineInlayPosition(offset, false, 0);
+                            buildInlayHints(psiFile, list, position, inlayHintsSink);
+                        });
             }
             return;
         } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
@@ -114,47 +110,87 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
         return new Range(start, end);
     }
 
-    private InlayPresentation toPresentation(@NotNull PsiFile psiFile,
-                                             @NotNull Editor editor,
-                                             @NotNull List<Pair<Integer, InlayHintData>> elements,
-                                             @NotNull PresentationFactory factory) {
-        List<InlayPresentation> presentations = new ArrayList<>();
+    private void buildInlayHints(@NotNull PsiFile psiFile,
+                                 @NotNull List<Pair<Integer, InlayHintData>> elements,
+                                 @NotNull InlayPosition position,
+                                 @NotNull InlayTreeSink sink) {
         elements.forEach(p -> {
             Either<String, List<InlayHintLabelPart>> label = p.second.inlayHint().getLabel();
             if (label.isLeft()) {
-                presentations.add(factory.smallText(label.getLeft()));
+                buildBasicInlayHint(label.getLeft(), position, sink);
             } else {
-                int index = 0;
-                for (InlayHintLabelPart part : label.getRight()) {
-                    InlayPresentation text = createInlayPresentation(psiFile, editor, factory, p, index, part);
-                    if (part.getTooltip() != null && part.getTooltip().isLeft()) {
-                        text = factory.withTooltip(part.getTooltip().getLeft(), text);
-                    }
-                    presentations.add(text);
-                    index++;
-                }
+                buildMultipartInlayHint(psiFile, label.getRight(), p.second, position, sink);
             }
         });
-        return factory.roundWithBackground(new SequencePresentation(presentations));
     }
 
-    @NotNull
-    private InlayPresentation createInlayPresentation(
+    private void buildBasicInlayHint(@NotNull String label,
+                                     @NotNull InlayPosition position,
+                                     @NotNull InlayTreeSink sink) {
+        sink.addPresentation(position, null, null, true, builder -> {
+            builder.text(label, null);
+            return null;
+        });
+    }
+
+    private record InlayHintPartBuildInfo(@Nullable String tooltip,
+                                          @NotNull Consumer<PresentationTreeBuilder> build) {}
+
+    private void buildMultipartInlayHint(@NotNull PsiFile psiFile,
+                                         @NotNull List<InlayHintLabelPart> parts,
+                                         @NotNull InlayHintData hintData,
+                                         @NotNull InlayPosition position,
+                                         @NotNull InlayTreeSink sink) {
+        int index = 0;
+        var builds = new ArrayList<Consumer<PresentationTreeBuilder>>();
+        var tooltip = new StringBuilder();
+        boolean hasTooltip = false;
+        for (InlayHintLabelPart part : parts) {
+            var info = buildSingleInlayHint(psiFile, hintData, index, part);
+            builds.add(info.build);
+            if (info.tooltip != null) {
+                if (hasTooltip) {
+                    tooltip.append('\n');
+                }
+                tooltip.append(info.tooltip);
+                hasTooltip = true;
+            }
+            index++;
+        }
+        sink.addPresentation(position, null, tooltip.toString(), true, builder -> {
+            for (var build: builds) {
+                build.accept(builder);
+            }
+            return null;
+        });
+    }
+
+    private InlayHintPartBuildInfo buildSingleInlayHint(
             PsiFile psiFile,
-            Editor editor,
-            PresentationFactory factory,
-            Pair<Integer, InlayHintData> p,
+            InlayHintData hintData,
             int index,
             InlayHintLabelPart part) {
-        InlayPresentation text = factory.smallText(part.getValue());
+        var tooltip = part.getTooltip();
+        final String tooltipStr;
+        if (tooltip != null && tooltip.isLeft()) {
+            tooltipStr = tooltip.getLeft();
+        } else {
+            tooltipStr = null;
+        }
+        String text = part.getValue();
+        final InlayActionData data;
         if (hasCommand(part)) {
             // InlayHintLabelPart defines a Command, create a clickable inlay hint
-            int finalIndex = index;
-            text = factory.referenceOnHover(text, (event, translated) ->
-                    executeCommand(psiFile, editor, p.second.languageServer(), p.second.inlayHint(), finalIndex, event)
-            );
+            InlayActionPayload payload = LSPDeclarativeInlayActionHandler.createPayload(psiFile.getProject(), editor -> {
+                executeCommand(psiFile, editor, hintData.languageServer(), hintData.inlayHint(), index);
+            });
+            data = new InlayActionData(payload, LSPDeclarativeInlayActionHandler.HANDLER_ID);
+        } else {
+            data = null;
         }
-        return text;
+        return new InlayHintPartBuildInfo(tooltipStr, builder -> {
+            builder.text(text, data);
+        });
     }
 
     private static boolean hasCommand(InlayHintLabelPart part) {
@@ -170,25 +206,23 @@ public class LSPInlayHintsProvider extends AbstractLSPInlayHintsProvider {
      * @param languageServer the language server.
      * @param inlayHint      the inlay hint.
      * @param index          the inlay part index where the command should be defined.
-     * @param event          the Mouse event.
      */
     private void executeCommand(@NotNull PsiFile psiFile,
                                 @NotNull Editor editor,
                                 @NotNull LanguageServerItem languageServer,
                                 @NotNull InlayHint inlayHint,
-                                int index,
-                                @Nullable MouseEvent event) {
+                                int index) {
         if (languageServer.getClientFeatures().getInlayHintFeature().isResolveInlayHintSupported(psiFile)) {
             languageServer.getTextDocumentService()
                     .resolveInlayHint(inlayHint)
                     .thenAcceptAsync(resolvedInlayHint -> {
                                 if (resolvedInlayHint != null) {
-                                    executeCommand(getCommand(resolvedInlayHint, index), psiFile, editor, event, languageServer);
+                                    executeCommand(getCommand(resolvedInlayHint, index), psiFile, editor, null, languageServer);
                                 }
                             }
                     );
         } else {
-            executeCommand(getCommand(inlayHint, index), psiFile, editor, event, languageServer);
+            executeCommand(getCommand(inlayHint, index), psiFile, editor, null, languageServer);
         }
     }
 

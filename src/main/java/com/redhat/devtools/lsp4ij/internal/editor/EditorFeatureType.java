@@ -18,6 +18,7 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.Internal
 public enum EditorFeatureType {
     CODE_VISION,
+    DECLARATIVE_INLAY_HINT,
     INLAY_HINT,
     FOLDING,
     ALL
