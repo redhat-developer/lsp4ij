@@ -16,12 +16,16 @@ import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EditorTestUtil;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.TimeUnit;
+
 /**
- * Tests for LSPTypedHandler, LSPBackspaceHandler, and LSPEnterBetweenBracesHandler.
+ * Tests for LSPEditorImprovementsTypedHandler, LSPEditorImprovementsBackspaceHandler, and LSPEditorImprovementsEnterBetweenBracesHandler.
  */
 public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestCase {
 
@@ -44,7 +48,18 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         super.tearDown();
     }
 
-    // These tests exercise both LSPTypedHandler.handleNestedQuote() and LSPBackspaceHandler
+    private void initializeLanguageServer() {
+        try {
+            PsiFile file = myFixture.getFile();
+            LanguageServiceAccessor.getInstance(file.getProject())
+                    .getLanguageServers(file.getVirtualFile(), null, null)
+                    .get(5000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
+
+    // These tests exercise both LSPEditorImprovementsTypedHandler.handleNestedQuote() and LSPEditorImprovementsBackspaceHandler
 
     public void testNestedQuotesInSingleQuotedStringLiteral() {
         testNestedQuotes('\'', '"');
@@ -66,6 +81,8 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         int initialOffset = fileBody.indexOf("(") + 1;
 
         myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        initializeLanguageServer();
+
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
 
@@ -123,13 +140,15 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         assertEquals(initialOffset, caretModel.getOffset());
     }
 
-    // This exercises LSPTypedHandler.handleStatementTerminator()
+    // These exercise LSPEditorImprovementsTypedHandler.handleStatementTerminator()
 
     public void testStatementTerminator() {
         String fileBody = "console.log()";
         int initialOffset = fileBody.indexOf(")") + 1;
 
         myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        initializeLanguageServer();
+
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
 
@@ -148,7 +167,32 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         assertEquals(initialOffset + 1, caretModel.getOffset());
     }
 
-    // This exercises LSPEnterBetweenBracesHandler
+    public void testStatementTerminatorInStringLiteral() {
+        String fileBody = "console.log('foobar');";
+        int initialOffset = fileBody.indexOf("bar");
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        initializeLanguageServer();
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+
+        CaretModel caretModel = editor.getCaretModel();
+        caretModel.moveToOffset(initialOffset);
+
+        // Typing a statement terminator in a string literal should insert the statement terminator character
+        EditorTestUtil.performTypingAction(editor, ';');
+        assertEquals("console.log('foo;bar');", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+
+        // Move back to just before the statement terminator and type it again; it should insert again
+        caretModel.moveToOffset(initialOffset);
+        EditorTestUtil.performTypingAction(editor, ';');
+        assertEquals("console.log('foo;;bar');", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+    }
+
+    // This exercises LSPEditorImprovementsEnterBetweenBracesHandler
 
     public void testEnterBetweenBraces_spaces() {
         testEnterBetweenSpaces(false);
@@ -170,6 +214,8 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         );
 
         myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        initializeLanguageServer();
+
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
         CaretModel caretModel = editor.getCaretModel();

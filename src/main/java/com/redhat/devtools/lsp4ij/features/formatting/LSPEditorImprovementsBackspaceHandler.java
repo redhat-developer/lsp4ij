@@ -37,7 +37,7 @@ public class LSPEditorImprovementsBackspaceHandler extends BackspaceHandlerDeleg
             char charDeleted,
             @NotNull PsiFile file,
             @NotNull Editor editor) {
-        if (LSPIJEditorUtils.isSupportedPlainTextOrTextMateFile(file) &&
+        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
             isPairOpener(file, charDeleted)) {
             Character pairCloser = getPairCloser(file, charDeleted);
             if (pairCloser != null) {

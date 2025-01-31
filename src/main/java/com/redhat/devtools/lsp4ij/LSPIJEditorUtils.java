@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.ide.highlighter.custom.SyntaxTable;
 import com.intellij.openapi.fileTypes.FileType;
-import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.CachedValueProvider;
@@ -48,17 +47,17 @@ public final class LSPIJEditorUtils {
     }
 
     /**
-     * Determines whether or not the provided file is a plain text file and is supported by a configured language
-     * server. The latter is important for many editor support behaviors because you don't want to suspend something
-     * like end user typing to wait for a server to start.
+     * Determines whether or not the provided file is an abstract file type file and is supported by a configured
+     * language server. The latter is important for many editor support behaviors because you don't want to suspend
+     * something like end user typing to wait for a server to start.
      *
      * @param file the file
-     * @return true if the file is plain text and is supported by a configured language server;
+     * @return true if the file has an abstract file type and is supported by a configured language server;
      * otherwise false
      */
     @ApiStatus.Internal
-    public static boolean isSupportedPlainTextFile(@NotNull PsiFile file) {
-        return isPlainTextFile(file) && LanguageServersRegistry.getInstance().isFileSupported(file);
+    public static boolean isSupportedAbstractFileTypeFile(@NotNull PsiFile file) {
+        return isAbstractFileTypeFile(file) && LanguageServersRegistry.getInstance().isFileSupported(file);
     }
 
     /**
@@ -76,21 +75,21 @@ public final class LSPIJEditorUtils {
     }
 
     /**
-     * Determines whether or not the provided file is a plain text or TextMate file and is supported by a configured
-     * language server. The latter is important for many editor support behaviors because you don't want to suspend
-     * something like end user typing to wait for a server to start.
+     * Determines whether or not the provided file is an abstract file type or TextMate file and is supported by a
+     * configured language server. The latter is important for many editor support behaviors because you don't want to
+     * suspend something like end user typing to wait for a server to start.
      *
      * @param file the file
-     * @return true if the file is either plain text or TextMate and is supported by a configured language server;
-     * otherwise false
+     * @return true if the file is either abstract file type or TextMate and is supported by a configured language
+     * server; otherwise false
      */
     @ApiStatus.Internal
-    public static boolean isSupportedPlainTextOrTextMateFile(@NotNull PsiFile file) {
-        return isSupportedPlainTextFile(file) || isSupportedTextMateFile(file);
+    public static boolean isSupportedAbstractFileTypeOrTextMateFile(@NotNull PsiFile file) {
+        return isSupportedAbstractFileTypeFile(file) || isSupportedTextMateFile(file);
     }
 
-    private static boolean isPlainTextFile(@NotNull PsiFile file) {
-        return file.getFileType() instanceof PlainTextFileType;
+    private static boolean isAbstractFileTypeFile(@NotNull PsiFile file) {
+        return file.getFileType() instanceof AbstractFileType;
     }
 
     private static boolean isTextMateFile(@NotNull PsiFile file) {
@@ -166,6 +165,7 @@ public final class LSPIJEditorUtils {
     private static final Map.Entry<Character, Character> BRACES_ENTRY = Map.entry('{', '}');
     private static final Map.Entry<Character, Character> BRACKETS_ENTRY = Map.entry('[', ']');
     private static final Map.Entry<Character, Character> PARENTHESES_ENTRY = Map.entry('(', ')');
+    @ApiStatus.Internal
     public static final Map<Character, Character> DEFAULT_BRACE_PAIRS = Map.ofEntries(
             BRACES_ENTRY,
             BRACKETS_ENTRY,

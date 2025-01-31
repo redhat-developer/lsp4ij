@@ -367,24 +367,24 @@ L
                 id="LSPFormattingAndRangeBothService"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPFormattingAndRangeBothService"/>
 
-        <!-- These provide an improved editor experience in plain text and TextMate files -->
+        <!-- These provide an improved editor experience in abstract file type and TextMate files -->
         <typedHandler
                 id="LSPEditorImprovementsTypedHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPEditorImprovementsTypedHandler"
-                order="first, before LSPCompletionTriggerTypedHandler"/>
+                order="first, before LSPCompletionTriggerTypedHandler, before LSPClientSideOnTypeFormattingTypedHandler, before LSPServerSideOnTypeFormattingTypedHandler"/>
         <backspaceHandlerDelegate
                 id="LSPEditorImprovementsBackspaceHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPEditorImprovementsBackspaceHandler"
                 order="first"/>
         <typedHandler
                 id="LSPImprovedTextMateTypedHandler"
-                order="first"
+                order="first, before LSPCompletionTriggerTypedHandler, before LSPClientSideOnTypeFormattingTypedHandler, before LSPServerSideOnTypeFormattingTypedHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPImprovedTextMateTypedHandler"/>
         <!-- Workaround for https://youtrack.jetbrains.com/issue/IJPL-159454 -->
         <enterHandlerDelegate
                 id="LSPEditorImprovementsEnterBetweenBracesHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPEditorImprovementsEnterBetweenBracesHandler"
-                order="before EnterBetweenBracesHandler"/>
+                order="first, before EnterBetweenBracesHandler, before LSPServerSideOnTypeFormattingEnterHandler"/>
 
         <!-- LSP textDocument/onTypeFormatting support -->
         <typedHandler

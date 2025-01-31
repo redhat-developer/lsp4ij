@@ -19,12 +19,11 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,12 +40,12 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
                                   @NotNull Editor editor,
                                   @NotNull PsiFile file,
                                   @NotNull FileType fileType) {
-        if (LSPIJEditorUtils.isSupportedPlainTextOrTextMateFile(file)) {
+        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file)) {
             if (LSPIJEditorUtils.isQuoteCharacter(file, charTyped) && handleNestedQuote(file, editor, charTyped)) {
                 return Result.STOP;
             }
             // TODO: Get statement terminator character(s) from client config?
-            else if ((';' == charTyped) && handleStatementTerminator(editor)) {
+            else if ((';' == charTyped) && handleStatementTerminator(file, editor)) {
                 return Result.STOP;
             }
         }
@@ -84,7 +83,8 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
         return false;
     }
 
-    private boolean handleStatementTerminator(@NotNull Editor editor) {
+    private boolean handleStatementTerminator(@NotNull PsiFile file,
+                                              @NotNull Editor editor) {
         Document document = editor.getDocument();
         CaretModel caretModel = editor.getCaretModel();
         int offset = caretModel.getOffset();
@@ -92,9 +92,9 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
             return false;
         }
 
-        CharSequence charsSequence = document.getCharsSequence();
-        char nextCharacter = charsSequence.charAt(offset);
-        if (nextCharacter == ';') {
+        CharSequence documentChars = document.getCharsSequence();
+        char nextCharacter = documentChars.charAt(offset);
+        if ((nextCharacter == ';') && !inStringLiteral(file, documentChars, offset)) {
             caretModel.moveToOffset(offset + 1);
             return true;
         }
@@ -107,20 +107,26 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
                                            @NotNull CharSequence fileChars,
                                            int offset) {
         Set<Character> quoteCharacters = LSPIJEditorUtils.getQuoteCharacters(file);
-        List<String> stringLiteralPatterns = new ArrayList<>(quoteCharacters.size());
-        for (Character quoteCharacter : quoteCharacters) {
-            stringLiteralPatterns.add(quoteCharacter + "(?:[^" + quoteCharacter + "\\\\\\r\\n]|\\\\.)*" + quoteCharacter);
-        }
-        Pattern stringLiteralPattern = Pattern.compile("(" + StringUtil.join(stringLiteralPatterns, "|") + ")");
-        Matcher stringLiteralMatcher = stringLiteralPattern.matcher(fileChars);
-        while (stringLiteralMatcher.find()) {
-            int stringLiteralStart = stringLiteralMatcher.start();
-            int stringLiteralEnd = stringLiteralMatcher.end();
-            if ((stringLiteralStart <= offset) && (offset <= stringLiteralEnd)) {
-                return fileChars.subSequence(stringLiteralStart, stringLiteralEnd).toString();
+        if (!ContainerUtil.isEmpty(quoteCharacters)) {
+            // This pattern is basically from any quote character to the same character with no unescaped same quote
+            // character or line break in between
+            Pattern stringLiteralPattern = Pattern.compile("([" + StringUtil.join(quoteCharacters, "") + "])([^$1\\r\\n]|\\\\\\.)*\\1");
+            Matcher stringLiteralMatcher = stringLiteralPattern.matcher(fileChars);
+            while (stringLiteralMatcher.find()) {
+                int stringLiteralStart = stringLiteralMatcher.start();
+                int stringLiteralEnd = stringLiteralMatcher.end();
+                if ((stringLiteralStart <= offset) && (offset <= stringLiteralEnd)) {
+                    return fileChars.subSequence(stringLiteralStart, stringLiteralEnd).toString();
+                }
             }
         }
 
         return null;
+    }
+
+    private static boolean inStringLiteral(@NotNull PsiFile file,
+                                           @NotNull CharSequence documentChars,
+                                           int offset) {
+        return getStringLiteral(file, documentChars, offset) != null;
     }
 }
