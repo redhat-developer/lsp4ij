@@ -11,12 +11,14 @@
 
 package com.redhat.devtools.lsp4ij.features.formatting;
 
+import com.intellij.application.options.CodeStyle;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.testFramework.EditorTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Tests for LSPTypedHandler, LSPBackspaceHandler, and LSPEnterBetweenBracesHandler.
@@ -29,6 +31,17 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
 
     public TypeScriptEditorImprovementsTest() {
         super("*.ts");
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        // Restore the default code style
+        Editor editor = myFixture.getEditor();
+        if (editor != null) {
+            CodeStyle.getSettings(editor).getIndentOptions().USE_TAB_CHARACTER = false;
+        }
+
+        super.tearDown();
     }
 
     // These tests exercise both LSPTypedHandler.handleNestedQuote() and LSPBackspaceHandler
@@ -137,31 +150,48 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
 
     // This exercises LSPEnterBetweenBracesHandler
 
-    public void testEnterBetweenBraces() {
-        String fileBody = """
+    public void testEnterBetweenBraces_spaces() {
+        testEnterBetweenSpaces(false);
+    }
+
+    public void testEnterBetweenBraces_tabs() {
+        testEnterBetweenSpaces(true);
+    }
+
+    private void testEnterBetweenSpaces(boolean useTabCharacter) {
+        String fileBody = adjustIndent(
+                """
                 export class Foo {
                     values = [];
                     bar() {}
                 }
-                """;
+                        """,
+                useTabCharacter
+        );
 
         myFixture.configureByText(TEST_FILE_NAME, fileBody);
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
         CaretModel caretModel = editor.getCaretModel();
 
+        // Use the appropriate indent
+        CodeStyle.getSettings(editor).getIndentOptions().USE_TAB_CHARACTER = useTabCharacter;
+
         // Move into the empty brackets and type enter
         int bracketsOffset = fileBody.indexOf("[]") + 1;
         caretModel.moveToOffset(bracketsOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
-        String enterBetweenBracketsFileBody = """
+        String enterBetweenBracketsFileBody = adjustIndent(
+                """
                 export class Foo {
                     values = [
                         <caret>
                     ];
                     bar() {}
                 }
-                """;
+                        """,
+                useTabCharacter
+        );
         assertEquals(enterBetweenBracketsFileBody.replace(CARET, ""), document.getText());
         assertEquals(enterBetweenBracketsFileBody.indexOf(CARET), caretModel.getOffset());
 
@@ -170,7 +200,8 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         int parensOffset = fileBody.indexOf("()") + 1;
         caretModel.moveToOffset(parensOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
-        String enterBetweenParensFileBody = """
+        String enterBetweenParensFileBody = adjustIndent(
+                """
                 export class Foo {
                     values = [
                        \s
@@ -179,7 +210,9 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
                         <caret>
                     ) {}
                 }
-                """;
+                        """,
+                useTabCharacter
+        );
         assertEquals(enterBetweenParensFileBody.replace(CARET, ""), document.getText());
         assertEquals(enterBetweenParensFileBody.indexOf(CARET), caretModel.getOffset());
 
@@ -188,7 +221,8 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         int bracesOffset = fileBody.indexOf("{}") + 1;
         caretModel.moveToOffset(bracesOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
-        String enterBetweenBracesFileBody = """
+        String enterBetweenBracesFileBody = adjustIndent(
+                """
                 export class Foo {
                     values = [
                        \s
@@ -199,8 +233,15 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
                         <caret>
                     }
                 }
-                """;
+                        """,
+                useTabCharacter
+        );
         assertEquals(enterBetweenBracesFileBody.replace(CARET, ""), document.getText());
         assertEquals(enterBetweenBracesFileBody.indexOf(CARET), caretModel.getOffset());
+    }
+
+    @NotNull
+    private static String adjustIndent(@NotNull String fileBody, boolean useTabCharacter) {
+        return useTabCharacter ? fileBody.replace("    ", "\t") : fileBody;
     }
 }

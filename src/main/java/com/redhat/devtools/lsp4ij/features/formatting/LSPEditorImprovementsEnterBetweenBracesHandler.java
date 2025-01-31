@@ -90,16 +90,15 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
 
             CharSequence documentChars = document.getCharsSequence();
 
-            int currentIndentSize = getCurrentIndentSize(document, offset);
-            CodeStyleSettings codeStyleSettings = CodeStyle.getSettings(editor);
-            int indentSize = codeStyleSettings != null ? codeStyleSettings.getIndentSize(file.getFileType()) : 0;
+            int currentIndentSize = getCurrentIndentSize(file, document, offset);
+            int indentSize = getIndentSize(file);
             int newIndentSize = currentIndentSize + indentSize;
+            char indentChar = useTab(file) ? '\t' : ' ';
 
-            // TODO: This is still ending up with trailing white space that can/should be eliminated
             if (enterAfterOpenBrace && enterBeforeCloseBrace) {
                 String indentedBracedPair = openBraceCharacter + "\n" +
-                                            StringUtil.repeatSymbol(' ', newIndentSize) + "\n" +
-                                            StringUtil.repeatSymbol(' ', currentIndentSize) + closeBraceCharacter;
+                                            StringUtil.repeatSymbol(indentChar, newIndentSize) + "\n" +
+                                            StringUtil.repeatSymbol(indentChar, currentIndentSize) + closeBraceCharacter;
 
                 int bracedPairStartOffset = StringUtil.lastIndexOf(documentChars, openBraceCharacter, 0, offset + 1);
                 int bracedPairEndOffset = StringUtil.indexOf(documentChars, closeBraceCharacter, offset);
@@ -120,7 +119,7 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
                 }
             } else {
                 int newLineIndentSize = enterAfterOpenBrace ? newIndentSize : currentIndentSize;
-                String indentedNewline = StringUtil.repeatSymbol(' ', newLineIndentSize);
+                String indentedNewline = StringUtil.repeatSymbol(indentChar, newLineIndentSize);
 
                 // Find the first non-whitespace character in the line as we'll only replace up to that point
                 CharSequence lineChars = documentChars.subSequence(lineStartOffset, lineEndOffset);
@@ -153,7 +152,9 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
         return super.postProcessEnter(file, editor, dataContext);
     }
 
-    private static int getCurrentIndentSize(@NotNull Document document, int offset) {
+    private static int getCurrentIndentSize(@NotNull PsiFile file,
+                                            @NotNull Document document,
+                                            int offset) {
         int currentIndentSize = 0;
 
         int lineNumber = document.getLineNumber(offset);
@@ -171,9 +172,26 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
                 }
             }
         } else if (!beforeLineText.isEmpty()) {
-            currentIndentSize = StringUtil.countChars(beforeLineText, ' ');
+            currentIndentSize = StringUtil.countChars(beforeLineText, useTab(file) ? '\t' : ' ');
         }
 
         return currentIndentSize;
+    }
+
+    @NotNull
+    private static CodeStyleSettings getCodeStyleSettings(@NotNull PsiFile file) {
+        CodeStyleSettings codeStyleSettings = CodeStyle.getSettings(file);
+        if (codeStyleSettings == null) {
+            codeStyleSettings = CodeStyle.getDefaultSettings();
+        }
+        return codeStyleSettings;
+    }
+
+    private static boolean useTab(@NotNull PsiFile file) {
+        return getCodeStyleSettings(file).useTabCharacter(file.getFileType());
+    }
+
+    private static int getIndentSize(@NotNull PsiFile file) {
+        return useTab(file) ? 1 : getCodeStyleSettings(file).getIndentSize(file.getFileType());
     }
 }
