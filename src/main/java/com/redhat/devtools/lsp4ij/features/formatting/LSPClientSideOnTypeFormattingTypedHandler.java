@@ -22,13 +22,13 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockProvider;
-import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionTriggerTypedHandler;
 import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport;
 import org.jetbrains.annotations.NotNull;
@@ -63,7 +63,7 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                 // Make sure the formatter supports formatting of the configured scope
                 ((formattingFeature.getFormatOnCloseBraceScope(file) == FormattingScope.FILE) || rangeFormattingSupported)) {
                 Map.Entry<Character, Character> bracePair = ContainerUtil.find(
-                        LSPCodeBlockUtils.getBracePairs(file).entrySet(),
+                        LSPIJEditorUtils.getBracePairs(file).entrySet(),
                         entry -> entry.getValue() == charTyped
                 );
                 if (bracePair != null) {

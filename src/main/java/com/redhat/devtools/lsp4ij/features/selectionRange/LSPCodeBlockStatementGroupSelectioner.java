@@ -15,8 +15,8 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockProvider;
-import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -62,7 +62,7 @@ class LSPCodeBlockStatementGroupSelectioner implements LSPCodeBlockSelectioner {
             while ((currentLineStartOffset <= currentLineEndOffset) && Character.isWhitespace(editorText.charAt(currentLineStartOffset))) {
                 currentLineStartOffset++;
             }
-            if (LSPCodeBlockUtils.isCodeBlockEndChar(file, editorText.charAt(currentLineStartOffset))) {
+            if (LSPIJEditorUtils.isCloseBraceCharacter(file, editorText.charAt(currentLineStartOffset))) {
                 TextRange nestedCodeBlockRange = LSPCodeBlockProvider.getCodeBlockRange(editor, file, currentLineStartOffset - 1);
                 if ((nestedCodeBlockRange != null) && codeBlockRange.contains(nestedCodeBlockRange) && !Objects.equals(codeBlockRange, nestedCodeBlockRange)) {
                     int nestedCodeBlockStartLineNumber = document.getLineNumber(nestedCodeBlockRange.getStartOffset());
@@ -88,7 +88,7 @@ class LSPCodeBlockStatementGroupSelectioner implements LSPCodeBlockSelectioner {
             while ((currentLineEndOffset >= currentLineStartOffset) && Character.isWhitespace(editorText.charAt(currentLineEndOffset))) {
                 currentLineEndOffset--;
             }
-            if (LSPCodeBlockUtils.isCodeBlockStartChar(file, editorText.charAt(currentLineEndOffset))) {
+            if (LSPIJEditorUtils.isOpenBraceCharacter(file, editorText.charAt(currentLineEndOffset))) {
                 TextRange nestedCodeBlockRange = LSPCodeBlockProvider.getCodeBlockRange(editor, file, currentLineEndOffset + 1);
                 if ((nestedCodeBlockRange != null) && codeBlockRange.contains(nestedCodeBlockRange) && !Objects.equals(codeBlockRange, nestedCodeBlockRange)) {
                     int nestedCodeBlockEndLineNumber = document.getLineNumber(nestedCodeBlockRange.getEndOffset());
