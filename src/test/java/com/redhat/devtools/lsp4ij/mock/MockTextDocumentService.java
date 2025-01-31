@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2017, 2022 Rogue Wave Software Inc. and others.
+ * Copyright (c) 2017, 2025 Rogue Wave Software Inc. and others.
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
  * which is available at https://www.eclipse.org/legal/epl-2.0/
@@ -25,8 +25,7 @@ import org.eclipse.lsp4j.services.TextDocumentService;
 import java.io.File;
 import java.net.URI;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.*;
 import java.util.function.Function;
 
 /**
@@ -65,6 +64,9 @@ public class MockTextDocumentService implements TextDocumentService {
     private SemanticTokens mockSemanticTokens;
     private List<FoldingRange> foldingRanges;
     public int codeActionRequests = 0;
+
+    private volatile CompletableFuture<List<Either<Command, CodeAction>>> currentCodeActionFuture;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
         this._futureFactory = futureFactory;
@@ -144,7 +146,22 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
         codeActionRequests++;
-        return futureFactory(this.mockCodeActions);
+
+        if (currentCodeActionFuture != null && !currentCodeActionFuture.isDone()) {
+            currentCodeActionFuture.cancel(true);
+        }
+
+        currentCodeActionFuture = new CompletableFuture<>();
+        scheduler.schedule(() -> {
+            if (!currentCodeActionFuture.isCancelled()) {
+                List<Either<Command, CodeAction>> actions = this.mockCodeActions != null
+                        ? this.mockCodeActions
+                        : Collections.emptyList();
+                currentCodeActionFuture.complete(actions);
+            }
+        }, 5, TimeUnit.SECONDS);
+
+        return currentCodeActionFuture;
     }
 
     @Override
