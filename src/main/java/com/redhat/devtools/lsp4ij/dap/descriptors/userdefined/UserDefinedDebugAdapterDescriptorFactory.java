@@ -43,7 +43,7 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
     private Map<String, String> userEnvironmentVariables;
     private boolean includeSystemEnvironmentVariables;
     private String commandLine;
-    private String waitForTimeout;
+    private int connectTimeout;
     private String waitForTrace;
 
     // Mappings
@@ -140,12 +140,12 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         this.fileTypeMappings = fileTypeMappings;
     }
 
-    public void setWaitForTimeout(String waitForTimeout) {
-        this.waitForTimeout = waitForTimeout;
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
-    public String getWaitForTimeout() {
-        return waitForTimeout;
+    public int getConnectTimeout() {
+        return connectTimeout;
     }
 
     public void setWaitForTrace(String waitForTrace) {
@@ -221,10 +221,10 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
                 // Server
                 dapConfiguration.setCommand(getCommandLine());
                 ConnectingServerStrategy connectingServerStrategy = ConnectingServerStrategy.NONE;
-                String waitFor = getWaitForTimeout();
-                if (StringUtils.isNotBlank(waitFor)) {
+                int connectTimeout = getConnectTimeout();
+                if (connectTimeout > 0) {
                     connectingServerStrategy = ConnectingServerStrategy.TIMEOUT;
-                    dapConfiguration.setWaitForTimeout(Integer.parseInt(waitFor));
+                    dapConfiguration.setConnectTimeout(connectTimeout);
                 } else {
                     String trackTrace = getWaitForTrace();
                     if (StringUtils.isNotBlank(trackTrace)) {

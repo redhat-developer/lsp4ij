@@ -437,7 +437,7 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
         setServerName(dapFactory.getDisplayName());
 
         // Update wait for trace
-        updateConnectingStrategy(null, getInt(dapFactory.getWaitForTimeout()),
+        updateConnectingStrategy(null, dapFactory.getConnectTimeout(),
                 dapFactory.getWaitForTrace());
 
         // Update command

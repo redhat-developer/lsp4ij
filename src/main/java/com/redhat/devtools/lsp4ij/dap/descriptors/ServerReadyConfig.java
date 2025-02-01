@@ -17,8 +17,8 @@ import org.jetbrains.annotations.Nullable;
  * Server ready configuration.
  *
  * @param waitForTrace
- * @param waitForTimeout
+ * @param connectTimeout
  */
-public record ServerReadyConfig(@Nullable NetworkAddressExtractor waitForTrace, @Nullable Integer waitForTimeout) {
+public record ServerReadyConfig(@Nullable NetworkAddressExtractor waitForTrace, @Nullable Integer connectTimeout) {
 
 }

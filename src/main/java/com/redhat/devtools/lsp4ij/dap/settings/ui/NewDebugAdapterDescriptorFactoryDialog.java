@@ -165,7 +165,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
 
         // Update wait for trace
         this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().update(null,
-                getInt(template.getWaitForTimeout()),
+                template.getConnectTimeout(),
                 template.getWaitForTrace());
 
         // Update mappings
@@ -174,14 +174,6 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
 
         // Update launch/attach configuration
         dapDescriptorFactoryPanel.refreshLaunchConfigurations(template.getLaunchConfigurations());;
-    }
-
-    private static int getInt(String text) {
-        try {
-            return Integer.parseInt(text);
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     private static String getCommandLine(DAPTemplate entry) {
@@ -249,7 +241,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
         Map<String, String> userEnvironmentVariables = this.dapDescriptorFactoryPanel.getEnvironmentVariables().getEnvs();
         boolean includeSystemEnvironmentVariables = this.dapDescriptorFactoryPanel.getEnvironmentVariables().isPassParentEnvs();
         String commandLine = this.dapDescriptorFactoryPanel.getCommandLine();
-        String waitFor = this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getTimeout();
+        int connectTimeout = this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getConnectTimeout();
         String trackTrace = this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getTrace();
         var launchConfigurations = this.dapDescriptorFactoryPanel.getLaunchConfigurations();
         var mappingsPanel = dapDescriptorFactoryPanel.getMappingsPanel();
@@ -262,7 +254,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
                         .toList());
         createdFactory.setUserEnvironmentVariables(userEnvironmentVariables);
         createdFactory.setIncludeSystemEnvironmentVariables(includeSystemEnvironmentVariables);
-        createdFactory.setWaitForTimeout(waitFor);
+        createdFactory.setConnectTimeout(connectTimeout);
         createdFactory.setWaitForTrace(trackTrace);
         createdFactory.setLaunchConfigurations(launchConfigurations);
         DebugAdapterManager.getInstance().addDebugAdapterDescriptorFactory(createdFactory);

@@ -45,7 +45,7 @@ public class DAPTemplate {
     public static final String NAME_JSON_PROPERTY = "name";
     public static final String ID_JSON_PROPERTY = "id";
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
-    public static final String WAIT_FOR_TIMEOUT_JSON_PROPERTY = "waitForTimeout";
+    public static final String CONNECT_TIMEOUT_JSON_PROPERTY = "connectTimeout";
     public static final String WAIT_FOR_TRACE_JSON_PROPERTY = "waitForTrace";
     public static final String LANGUAGE_JSON_PROPERTY = "language";
     public static final String LANGUAGE_MAPPINGS_JSON_PROPERTY = "languageMappings";
@@ -69,7 +69,7 @@ public class DAPTemplate {
     private List<ServerMappingSettings> languageMappings;
 
     private List<LaunchConfiguration> launchConfigurations;
-    private String waitForTimeout;
+    private int connectTimeout;
     private String waitForTrace;
 
     public String getId() {
@@ -107,12 +107,12 @@ public class DAPTemplate {
         this.programArgs = programArgs;
     }
 
-    public void setWaitForTimeout(String waitForTimeout) {
-        this.waitForTimeout = waitForTimeout;
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
-    public String getWaitForTimeout() {
-        return waitForTimeout;
+    public int getConnectTimeout() {
+        return connectTimeout;
     }
 
     public void setWaitForTrace(String waitForTrace) {

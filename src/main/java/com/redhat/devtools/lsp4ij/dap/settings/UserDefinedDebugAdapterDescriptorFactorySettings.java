@@ -130,7 +130,7 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
         private Map<String, String> userEnvironmentVariables;
         private boolean includeSystemEnvironmentVariables = true;
         private String commandLine;
-        private String waitForTimeout;
+        private int connectTimeout;
         private String waitForTrace;
 
         @XCollection(elementTypes = ServerMappingSettings.class)
@@ -200,12 +200,12 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
             this.commandLine = commandLine;
         }
 
-        public String getWaitForTimeout() {
-            return waitForTimeout;
+        public int getConnectTimeout() {
+            return connectTimeout;
         }
 
-        public void setWaitForTimeout(String waitForTimeout) {
-            this.waitForTimeout = waitForTimeout;
+        public void setConnectTimeout(int connectTimeout) {
+            this.connectTimeout = connectTimeout;
         }
 
         public String getWaitForTrace() {

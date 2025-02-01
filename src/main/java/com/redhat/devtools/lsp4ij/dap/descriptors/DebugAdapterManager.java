@@ -86,7 +86,7 @@ public class DebugAdapterManager {
             settings.setUserEnvironmentVariables(userDefinedFactory.getUserEnvironmentVariables());
             settings.setIncludeSystemEnvironmentVariables(userDefinedFactory.isIncludeSystemEnvironmentVariables());
             settings.setCommandLine(userDefinedFactory.getCommandLine());
-            settings.setWaitForTimeout(userDefinedFactory.getWaitForTimeout());
+            settings.setConnectTimeout(userDefinedFactory.getConnectTimeout());
             settings.setWaitForTrace(userDefinedFactory.getWaitForTrace());
             List<ServerMappingSettings> mappings = Stream.concat(userDefinedFactory.getLanguageMappings().stream(),
                             userDefinedFactory.getFileTypeMappings().stream())
@@ -128,7 +128,7 @@ public class DebugAdapterManager {
             @Nullable Map<String, String> userEnvironmentVariables,
             boolean includeSystemEnvironmentVariables,
             @Nullable String commandLine,
-            @Nullable String waitForTimeout,
+            int connectTimeout,
             @Nullable String waitForTrace,
             @NotNull List<ServerMappingSettings> languageMappings,
             @NotNull List<ServerMappingSettings> fileTypeMappings,
@@ -142,7 +142,7 @@ public class DebugAdapterManager {
         String descriptorFactoryId = request.descriptorFactory().getId();
         descriptorFactory.setName(request.name());
         descriptorFactory.setCommandLine(request.commandLine());
-        descriptorFactory.setWaitForTimeout(request.waitForTimeout());
+        descriptorFactory.setConnectTimeout(request.connectTimeout());
         descriptorFactory.setWaitForTrace(request.waitForTrace());
         descriptorFactory.setUserEnvironmentVariables(request.userEnvironmentVariables());
         descriptorFactory.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
@@ -158,7 +158,7 @@ public class DebugAdapterManager {
         boolean userEnvironmentVariablesChanged = !Objects.equals(settings.getUserEnvironmentVariables(), request.userEnvironmentVariables());
         boolean includeSystemEnvironmentVariablesChanged = settings.isIncludeSystemEnvironmentVariables() != request.includeSystemEnvironmentVariables();
         boolean commandChanged = !Objects.equals(settings.getCommandLine(), request.commandLine());
-        boolean waitForTimeoutChanged = !Objects.equals(settings.getWaitForTimeout(), request.waitForTimeout());
+        boolean connectTimeoutChanged = !Objects.equals(settings.getConnectTimeout(), request.connectTimeout());
         boolean waitForTraceChanged = !Objects.equals(settings.getWaitForTrace(), request.waitForTrace());
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
         boolean launchConfigurationChanged = !Objects.equals(settings.getLaunchConfigurations(), request.launchConfigurations());
@@ -168,13 +168,13 @@ public class DebugAdapterManager {
         settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         settings.setCommandLine(request.commandLine());
-        settings.setWaitForTimeout(request.waitForTimeout);
+        settings.setConnectTimeout(request.connectTimeout);
         settings.setWaitForTrace(request.waitForTrace);
         settings.setMappings(mappings);
         settings.setLaunchConfigurations(request.launchConfigurations());
 
         if (nameChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-                commandChanged || waitForTimeoutChanged || waitForTraceChanged ||
+                commandChanged || connectTimeoutChanged || waitForTraceChanged ||
                 mappingsChanged || launchConfigurationChanged) {
             // Notifications
             DebugAdapterDescriptorFactoryListener.DebugAdapterDescriptorFactoryChangedEvent event = new DebugAdapterDescriptorFactoryListener.DebugAdapterDescriptorFactoryChangedEvent(
@@ -183,7 +183,7 @@ public class DebugAdapterManager {
                     commandChanged,
                     userEnvironmentVariablesChanged,
                     includeSystemEnvironmentVariablesChanged,
-                    waitForTimeoutChanged,
+                    connectTimeoutChanged,
                     waitForTraceChanged,
                     mappingsChanged,
                     launchConfigurationChanged);
@@ -335,7 +335,7 @@ public class DebugAdapterManager {
                         fileTypeMappings);
                 factory.setUserEnvironmentVariables(setting.getUserEnvironmentVariables());
                 factory.setIncludeSystemEnvironmentVariables(setting.isIncludeSystemEnvironmentVariables());
-                factory.setWaitForTimeout(setting.getWaitForTimeout());
+                factory.setConnectTimeout(setting.getConnectTimeout());
                 factory.setWaitForTrace(setting.getWaitForTrace());
                 factory.setLaunchConfigurations(setting.getLaunchConfigurations());
                 addDebugAdapterDescriptorFactoryWithoutNotification(factory);

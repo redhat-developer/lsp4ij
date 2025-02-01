@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
+import com.intellij.ui.JBIntSpinner;
 import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -34,7 +35,7 @@ public class DAPConnectingServerConfigurationPanel extends JPanel {
     private JRadioButton timeoutRadio;
     private JRadioButton traceRadio;
 
-    private JTextField timeoutField;
+    private JBIntSpinner connectTimeoutField;
     private JTextField traceField;
 
     public DAPConnectingServerConfigurationPanel() {
@@ -61,9 +62,9 @@ public class DAPConnectingServerConfigurationPanel extends JPanel {
         JPanel timeoutStrategyPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         timeoutRadio = new JRadioButton(DAPBundle.message("dap.settings.editor.server.connecting.strategy.timeout"));
         buttonGroup.add(timeoutRadio);
-        timeoutField = new JTextField();
+        connectTimeoutField = new JBIntSpinner(0, 0, Integer.MAX_VALUE);
         timeoutStrategyPanel.add(timeoutRadio);
-        timeoutStrategyPanel.add(timeoutField);
+        timeoutStrategyPanel.add(connectTimeoutField);
         super.add(timeoutStrategyPanel);
     }
 
@@ -78,13 +79,13 @@ public class DAPConnectingServerConfigurationPanel extends JPanel {
     }
 
     public void update(@Nullable ConnectingServerStrategy connectingServerStrategy,
-                       int timeout,
+                       int connectTimeout,
                        String trace) {
-        timeoutField.setText(String.valueOf(timeout));
+        connectTimeoutField.setNumber(connectTimeout);
         traceField.setText(trace);
         if (connectingServerStrategy == null) {
             connectingServerStrategy = ConnectingServerStrategy.NONE;
-            if (timeout > 0) {
+            if (connectTimeout > 0) {
                 connectingServerStrategy = ConnectingServerStrategy.TIMEOUT;
             } else if (StringUtils.isNotBlank(trace)) {
                 connectingServerStrategy = ConnectingServerStrategy.TRACE;
@@ -107,8 +108,8 @@ public class DAPConnectingServerConfigurationPanel extends JPanel {
         return ConnectingServerStrategy.NONE;
     }
 
-    public String getTimeout() {
-        return timeoutField.getText();
+    public int getConnectTimeout() {
+        return connectTimeoutField.getNumber();
     }
 
     public String getTrace() {

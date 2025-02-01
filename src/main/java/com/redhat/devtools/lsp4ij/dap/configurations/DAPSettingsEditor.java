@@ -47,7 +47,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         dapPanel.setServerName(runConfiguration.getServerName());
         dapPanel.setCommandLine(runConfiguration.getCommand());
         dapPanel.updateConnectingStrategy(runConfiguration.getConnectingServerStrategy(),
-                runConfiguration.getWaitForTimeout(),
+                runConfiguration.getConnectTimeout(),
                 runConfiguration.getWaitForTrace());
         dapPanel.setServerTrace(runConfiguration.getServerTrace());
 
@@ -75,7 +75,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         runConfiguration.setServerName(dapPanel.getServerName());
         runConfiguration.setCommand(dapPanel.getCommandLine());
         runConfiguration.setConnectingServerStrategy(dapPanel.getConnectingServerConfigurationPanel().getConnectingServerStrategy());
-        runConfiguration.setWaitForTimeout(getInt(dapPanel.getConnectingServerConfigurationPanel().getTimeout()));
+        runConfiguration.setConnectTimeout(dapPanel.getConnectingServerConfigurationPanel().getConnectTimeout());
         runConfiguration.setWaitForTrace(dapPanel.getConnectingServerConfigurationPanel().getTrace());
         runConfiguration.setServerTrace(dapPanel.getServerTrace());
 
@@ -90,14 +90,6 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         runConfiguration.setLaunchConfiguration(dapPanel.getLaunchConfiguration());
         runConfiguration.setAttachConfigurationId(dapPanel.getAttachConfigurationId());
         runConfiguration.setAttachConfiguration(dapPanel.getAttachConfiguration());
-    }
-
-    private static int getInt(String text) {
-        try {
-            return Integer.parseInt(text);
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     @NotNull
