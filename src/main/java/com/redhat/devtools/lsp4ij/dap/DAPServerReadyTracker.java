@@ -115,16 +115,18 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
     }
 
     private boolean waitForTimeout() {
-        Integer wait = config.waitForTimeout();
-        if (wait != null && wait > 0) {
+        Integer connectTimeout = config.connectTimeout();
+        if (connectTimeout != null && connectTimeout > 0) {
             if (processHandler.isStartNotified()) {
+                // The process is started
                 CompletableFuture.runAsync(() -> {
                     try {
-                        Thread.sleep(wait);
+                        // Wait for some ms...
+                        Thread.sleep(connectTimeout);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
-                }).thenRun(() -> onServerReady());
+                }).thenRun(() -> onServerReady()); // then notify that server is ready
             }
             return true;
         }

@@ -150,7 +150,7 @@ public class DebugAdapterDescriptor {
             var strategy = dapOptions.getConnectingServerStrategy();
             switch (strategy) {
                 case TIMEOUT:
-                    return new ServerReadyConfig(null, dapOptions.getWaitForTimeout());
+                    return new ServerReadyConfig(null, dapOptions.getConnectTimeout());
                 case TRACE:
                     return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor(), 0);
                 default:

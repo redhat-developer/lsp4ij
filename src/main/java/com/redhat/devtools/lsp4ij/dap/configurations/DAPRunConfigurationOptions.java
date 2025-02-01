@@ -71,8 +71,8 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
     private final StoredProperty<String> connectingServerStrategy = string(ConnectingServerStrategy.NONE.name())
             .provideDelegate(this, "connectingServerStrategy");
 
-    private final StoredProperty<Integer> waitForTimeout = property(0)
-            .provideDelegate(this, "waitForTimeout");
+    private final StoredProperty<Integer> connectTimeout = property(0)
+            .provideDelegate(this, "connectTimeout");
 
     private final StoredProperty<String> waitForTrace = string("")
             .provideDelegate(this, "waitForTrace");
@@ -211,6 +211,24 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
         this.connectingServerStrategy.setValue(this, connectingServerStrategy.name());
     }
 
+    /**
+     * Returns the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @return the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     */
+    public int getConnectTimeout() {
+        return connectTimeout.getValue(this);
+    }
+
+    /**
+     * Set the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @param connectTimeout the timeout.
+     */
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout.setValue(this, connectTimeout);
+    }
+
     public String getWaitForTrace() {
         return waitForTrace.getValue(this);
     }
@@ -218,14 +236,6 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
     public void setWaitForTrace(String waitForTrace) {
         this.waitForTrace.setValue(this, waitForTrace);
         this.networkAddressExtractor = null;
-    }
-
-    public int getWaitForTimeout() {
-        return waitForTimeout.getValue(this);
-    }
-
-    public void setWaitForTimeout(int waitForTimeout) {
-        this.waitForTimeout.setValue(this, waitForTimeout);
     }
 
     public ServerTrace getServerTrace() {

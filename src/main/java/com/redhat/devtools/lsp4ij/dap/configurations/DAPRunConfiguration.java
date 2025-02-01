@@ -84,12 +84,22 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setConnectingServerStrategy(connectingServerStrategy);
     }
 
-    public int getWaitForTimeout() {
-        return getOptions().getWaitForTimeout();
+    /**
+     * Returns the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @return the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     */
+    public int getConnectTimeout() {
+        return getOptions().getConnectTimeout();
     }
 
-    public void setWaitForTimeout(int waitForTimeout) {
-        getOptions().setWaitForTimeout(waitForTimeout);
+    /**
+     * Set the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @param connectTimeout the timeout.
+     */
+    public void setConnectTimeout(int connectTimeout) {
+        getOptions().setConnectTimeout(connectTimeout);
     }
 
     public String getWaitForTrace() {
@@ -283,7 +293,7 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         configuration.setServerName(getServerName());
         configuration.setCommand(getCommand());
         configuration.setConnectingServerStrategy(getConnectingServerStrategy());
-        configuration.setWaitForTimeout(getWaitForTimeout());
+        configuration.setConnectTimeout(getConnectTimeout());
         configuration.setWaitForTrace(getWaitForTrace());
         configuration.setServerTrace(getServerTrace());
     }
