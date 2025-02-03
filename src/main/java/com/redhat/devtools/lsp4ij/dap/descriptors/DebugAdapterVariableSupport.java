@@ -15,11 +15,15 @@ import com.intellij.openapi.editor.DefaultLanguageHighlighterColors;
 import com.intellij.xdebugger.frame.presentation.XRegularValuePresentation;
 import com.intellij.xdebugger.frame.presentation.XStringValuePresentation;
 import com.intellij.xdebugger.frame.presentation.XValuePresentation;
+import com.redhat.devtools.lsp4ij.dap.client.variables.providers.HighlighterDebugVariablePositionProvider;
+import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariablePositionProvider;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import java.util.Collection;
+import java.util.Collections;
 
 /**
  * Debug Adapter Protocol (DAP) variable support.
@@ -137,4 +141,7 @@ public class DebugAdapterVariableSupport {
         this.serverDescriptor = serverDescriptor;
     }
 
+    public @NotNull Collection<DebugVariablePositionProvider> getDebugVariablePositionProvider() {
+        return Collections.singletonList(new HighlighterDebugVariablePositionProvider());
+    }
 }

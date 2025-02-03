@@ -8,12 +8,13 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.client;
+package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XValueChildrenList;
 import com.intellij.xdebugger.frame.XValueGroup;
+import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,17 +28,17 @@ import java.util.List;
 public class DAPValueGroup extends XValueGroup {
 
     private final @NotNull List<Variable> variables;
-    private final @NotNull DAPClient client;
+    private final @NotNull DAPStackFrame stackFrame;
     private final int parentVariablesReference;
 
-    public DAPValueGroup(@NotNull DAPClient client,
+    public DAPValueGroup(@NotNull DAPStackFrame stackFrame,
                          @NotNull String name,
                          @NotNull List<Variable> variables,
                          int parentVariablesReference) {
         super(name);
+        this.stackFrame = stackFrame;
         this.variables = variables;
         this.parentVariablesReference = parentVariablesReference;
-        this.client = client;
     }
 
     @Override
@@ -58,7 +59,7 @@ public class DAPValueGroup extends XValueGroup {
         } else {
             XValueChildrenList children = new XValueChildrenList();
             for (Variable variable : variables) {
-                children.add(variable.getName(), new DAPValue(client, variable, getParentVariablesReference()));
+                children.add(variable.getName(), new DAPValue(stackFrame, variable, getParentVariablesReference()));
             }
             node.addChildren(children, true);
         }

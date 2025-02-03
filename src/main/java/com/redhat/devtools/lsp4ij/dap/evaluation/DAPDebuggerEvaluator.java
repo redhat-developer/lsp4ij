@@ -15,7 +15,7 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XValueCallback;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
-import com.redhat.devtools.lsp4ij.dap.client.DAPValue;
+import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValue;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
@@ -50,7 +50,7 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
                     variable.setVariablesReference(evaluateResponse.getVariablesReference());
                     variable.setNamedVariables(evaluateResponse.getNamedVariables());
                     variable.setIndexedVariables(evaluateResponse.getIndexedVariables());
-                    callback.evaluated(new DAPValue(client, variable, null));
+                    callback.evaluated(new DAPValue(stackFrame, variable, null));
                 }).exceptionally(error -> {
                     errorOccurred(error, callback);
                     return null;
