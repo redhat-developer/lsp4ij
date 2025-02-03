@@ -18,6 +18,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.eclipse.lsp4j.DocumentOnTypeFormattingParams;
 import org.eclipse.lsp4j.FormattingOptions;
 import org.eclipse.lsp4j.Position;
@@ -57,6 +58,10 @@ final class LSPServerSideOnTypeFormattingHelper {
     static boolean applyOnTypeFormatting(char charTyped,
                                          @NotNull Editor editor,
                                          @NotNull PsiFile file) {
+        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
+            // The file is not associated to a language server
+            return false;
+        }
         // If so, issue a request for on-type formatting
         int offset = editor.getCaretModel().getOffset();
         Document document = editor.getDocument();
