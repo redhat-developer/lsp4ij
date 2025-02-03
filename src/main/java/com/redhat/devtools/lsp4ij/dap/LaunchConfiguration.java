@@ -37,7 +37,7 @@ public class LaunchConfiguration {
     public LaunchConfiguration(@NotNull String id,
                                @NotNull String name,
                                @NotNull String content,
-                               @NotNull DebuggingType type) {
+                               @NotNull DebugMode type) {
         this.id = id;
         this.name = name;
         this.content = content;
@@ -64,28 +64,28 @@ public class LaunchConfiguration {
         this.content = content;
     }
 
-    public DebuggingType getType() {
-        return DebuggingType.get(type);
+    public DebugMode getType() {
+        return DebugMode.get(type);
     }
 
     @Nullable
     public static LaunchConfiguration findLaunchConfiguration(@Nullable List<LaunchConfiguration> launchConfigurations) {
-        return findConfiguration(launchConfigurations, DebuggingType.LAUNCH);
+        return findConfiguration(launchConfigurations, DebugMode.LAUNCH);
     }
 
     @Nullable
     public static LaunchConfiguration findAttachConfiguration(@Nullable List<LaunchConfiguration> launchConfigurations) {
-        return findConfiguration(launchConfigurations, DebuggingType.ATTACH);
+        return findConfiguration(launchConfigurations, DebugMode.ATTACH);
     }
 
     private static LaunchConfiguration findConfiguration(@Nullable List<LaunchConfiguration> launchConfigurations,
-                                                         @NotNull DebuggingType debuggingType) {
+                                                         @NotNull DebugMode debugMode) {
         if (launchConfigurations == null || launchConfigurations.isEmpty()) {
             return null;
         }
         var result = launchConfigurations
                 .stream()
-                .filter((snippet -> snippet.getType() == debuggingType))
+                .filter((snippet -> snippet.getType() == debugMode))
                 .findFirst();
         return result.isEmpty() ? null : result.get();
     }

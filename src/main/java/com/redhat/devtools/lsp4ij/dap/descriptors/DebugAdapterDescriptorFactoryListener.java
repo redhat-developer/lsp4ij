@@ -55,7 +55,7 @@ public interface DebugAdapterDescriptorFactoryListener {
         public final boolean userEnvironmentVariablesChanged;
         public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean waitForTimeoutChanged;
-        public final boolean waitForTraceChanged;
+        public final boolean debugServerReadyPatternChanged;
         public final boolean mappingsChanged;
         public final boolean launchConfigurationsContentChanged;
 
@@ -65,7 +65,7 @@ public interface DebugAdapterDescriptorFactoryListener {
                                                          boolean userEnvironmentVariablesChanged,
                                                          boolean includeSystemEnvironmentVariablesChanged,
                                                          boolean waitForTimeoutChanged,
-                                                         boolean waitForTraceChanged,
+                                                         boolean debugServerReadyPatternChanged,
                                                          boolean mappingsChanged,
                                                          boolean launchConfigurationsContentChanged) {
             this.descriptorFactory = descriptorFactory;
@@ -74,7 +74,7 @@ public interface DebugAdapterDescriptorFactoryListener {
             this.userEnvironmentVariablesChanged = userEnvironmentVariablesChanged;
             this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.waitForTimeoutChanged = waitForTimeoutChanged;
-            this.waitForTraceChanged = waitForTraceChanged;
+            this.debugServerReadyPatternChanged = debugServerReadyPatternChanged;
             this.mappingsChanged = mappingsChanged;
             this.launchConfigurationsContentChanged = launchConfigurationsContentChanged;
         }

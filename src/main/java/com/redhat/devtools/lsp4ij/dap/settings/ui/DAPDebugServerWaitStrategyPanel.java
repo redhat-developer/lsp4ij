@@ -11,7 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
 import com.intellij.ui.JBIntSpinner;
-import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -23,39 +23,26 @@ import java.awt.*;
  * Connection server configuration panel to choose the strategy to connect to the DAP server:
  *
  *  <ul>
- *      <li>none: connect after starting the server.</li>
- *      <li>timeout: connect after waiting for a given timeout (ms).</li>
- *      <li>timeout: connect after finding some trace (ex: listening...).</li>
+ *      <li>timeout: Wait for a timeout before assuming the server is ready</li>
+ *      <li>timeout: Wait for a specific log message before proceeding</li>
  *  </ul>
  *
  */
-public class DAPConnectingServerConfigurationPanel extends JPanel {
+public class DAPDebugServerWaitStrategyPanel extends JPanel {
 
-    private JRadioButton noneRadio;
     private JRadioButton timeoutRadio;
     private JRadioButton traceRadio;
 
     private JBIntSpinner connectTimeoutField;
     private JTextField traceField;
 
-    public DAPConnectingServerConfigurationPanel() {
+    public DAPDebugServerWaitStrategyPanel() {
         super.setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         ButtonGroup buttonGroup = new ButtonGroup();
-        // - None strategy
-        createNoneStrategyContent(buttonGroup);
         // - Timeout strategy
         createTimeoutStrategyContent(buttonGroup);
         // - Trace strategy
         createTraceStrategyContent(buttonGroup);
-    }
-
-    private void createNoneStrategyContent(ButtonGroup buttonGroup) {
-        JPanel noneStrategyPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        noneRadio = new JRadioButton(DAPBundle.message("dap.settings.editor.server.connecting.strategy.none"));
-        noneRadio.setSelected(true);
-        buttonGroup.add(noneRadio);
-        noneStrategyPanel.add(noneRadio);
-        super.add(noneStrategyPanel);
     }
 
     private void createTimeoutStrategyContent(ButtonGroup buttonGroup) {
@@ -78,34 +65,33 @@ public class DAPConnectingServerConfigurationPanel extends JPanel {
         super.add(traceStrategyPanel);
     }
 
-    public void update(@Nullable ConnectingServerStrategy connectingServerStrategy,
+    public void update(@Nullable DebugServerWaitStrategy debugServerWaitStrategy,
                        int connectTimeout,
-                       String trace) {
+                       @Nullable String trace) {
         connectTimeoutField.setNumber(connectTimeout);
-        traceField.setText(trace);
-        if (connectingServerStrategy == null) {
-            connectingServerStrategy = ConnectingServerStrategy.NONE;
+        traceField.setText(trace != null ? trace : "");
+        if (debugServerWaitStrategy == null) {
+            debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
             if (connectTimeout > 0) {
-                connectingServerStrategy = ConnectingServerStrategy.TIMEOUT;
+                debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
             } else if (StringUtils.isNotBlank(trace)) {
-                connectingServerStrategy = ConnectingServerStrategy.TRACE;
+                debugServerWaitStrategy = DebugServerWaitStrategy.TRACE;
             }
         }
-        switch(connectingServerStrategy) {
-            case NONE -> noneRadio.setSelected(true);
+        switch(debugServerWaitStrategy) {
             case TIMEOUT -> timeoutRadio.setSelected(true);
             case TRACE -> traceRadio.setSelected(true);
         }
     }
 
-    public ConnectingServerStrategy getConnectingServerStrategy() {
+    public DebugServerWaitStrategy getDebugServerWaitStrategy() {
         if (timeoutRadio.isSelected()) {
-            return ConnectingServerStrategy.TIMEOUT;
+            return DebugServerWaitStrategy.TIMEOUT;
         }
         if (traceRadio.isSelected()) {
-            return ConnectingServerStrategy.TRACE;
+            return DebugServerWaitStrategy.TRACE;
         }
-        return ConnectingServerStrategy.NONE;
+        return DebugServerWaitStrategy.TIMEOUT;
     }
 
     public int getConnectTimeout() {

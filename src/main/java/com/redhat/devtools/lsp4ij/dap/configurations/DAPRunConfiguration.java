@@ -18,8 +18,8 @@ import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -76,12 +76,20 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setCommand(command);
     }
 
-    public ConnectingServerStrategy getConnectingServerStrategy() {
-        return getOptions().getConnectingServerStrategy();
+    /**
+     * Retrieves the current strategy used to wait for the debug server.
+     *
+     * @return the current {@link DebugServerWaitStrategy} instance.
+     */
+    public DebugServerWaitStrategy getDebugServerWaitStrategy() {
+        return getOptions().getDebugServerWaitStrategy();
     }
 
-    public void setConnectingServerStrategy(ConnectingServerStrategy connectingServerStrategy) {
-        getOptions().setConnectingServerStrategy(connectingServerStrategy);
+    /**
+     * Set the current strategy used to wait for the debug server.
+     */
+    public void setDebugServerWaitStrategy(DebugServerWaitStrategy debugServerWaitStrategy) {
+        getOptions().setDebugServerWaitStrategy(debugServerWaitStrategy);
     }
 
     /**
@@ -102,12 +110,16 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setConnectTimeout(connectTimeout);
     }
 
-    public String getWaitForTrace() {
-        return getOptions().getWaitForTrace();
+    /**
+     *
+     * @return
+     */
+    public String getDebugServerReadyPattern() {
+        return getOptions().getDebugServerReadyPattern();
     }
 
-    public void setWaitForTrace(String waitForTrace) {
-        getOptions().setWaitForTrace(waitForTrace);
+    public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+        getOptions().setDebugServerReadyPattern(debugServerReadyPattern);
     }
 
     public ServerTrace getServerTrace() {
@@ -147,12 +159,12 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setFile(file);
     }
     
-    public DebuggingType getDebuggingType() {
-        return getOptions().getDebuggingType();
+    public DebugMode getDebugMode() {
+        return getOptions().getDebugMode();
     }
 
-    public void setDebuggingType(DebuggingType debuggingType) {
-        getOptions().setDebuggingType(debuggingType);
+    public void setDebugMode(DebugMode debugMode) {
+        getOptions().setDebugMode(debugMode);
     }
 
     public String getLaunchConfigurationId() {
@@ -281,7 +293,7 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         // Configuration
         configuration.setWorkingDirectory(getWorkingDirectory());
         configuration.setFile(getFile());
-        configuration.setDebuggingType(getDebuggingType());
+        configuration.setDebugMode(getDebugMode());
         configuration.setLaunchConfiguration(getLaunchConfiguration());
         configuration.setAttachConfiguration(getAttachConfiguration());
 
@@ -292,9 +304,9 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         configuration.setServerId(getServerId());
         configuration.setServerName(getServerName());
         configuration.setCommand(getCommand());
-        configuration.setConnectingServerStrategy(getConnectingServerStrategy());
+        configuration.setDebugServerWaitStrategy(getDebugServerWaitStrategy());
         configuration.setConnectTimeout(getConnectTimeout());
-        configuration.setWaitForTrace(getWaitForTrace());
+        configuration.setDebugServerReadyPattern(getDebugServerReadyPattern());
         configuration.setServerTrace(getServerTrace());
     }
 

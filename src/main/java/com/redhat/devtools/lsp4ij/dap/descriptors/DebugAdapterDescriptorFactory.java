@@ -15,7 +15,7 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
@@ -51,7 +51,7 @@ public abstract class DebugAdapterDescriptorFactory {
                        "program": "${file}",
                        "cwd": "${workspaceFolder}"
                      }
-                    """, DebuggingType.LAUNCH);
+                    """, DebugMode.LAUNCH);
 
     private static final LaunchConfiguration DEFAULT_ATTACH_CONFIGURATION = new LaunchConfiguration("default_attach", "Attach file",
             // language=json
@@ -62,7 +62,7 @@ public abstract class DebugAdapterDescriptorFactory {
                        "request": "attach",
                        "port": 5858
                      }
-                    """, DebuggingType.ATTACH);
+                    """, DebugMode.ATTACH);
 
     public static final LaunchConfiguration[] DEFAULT_LAUNCH_CONFIGURATION_ARRAY = new LaunchConfiguration[] {DEFAULT_LAUNCH_CONFIGURATION};
 
@@ -131,7 +131,7 @@ public abstract class DebugAdapterDescriptorFactory {
 
             // Configuration
             dapConfiguration.setFile(getFilePath(file));
-            dapConfiguration.setDebuggingType(DebuggingType.LAUNCH);
+            dapConfiguration.setDebugMode(DebugMode.LAUNCH);
 
             // Server
             dapConfiguration.setServerId(this.getId());

@@ -13,21 +13,20 @@ package com.redhat.devtools.lsp4ij.dap;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Connecting server strategy.
+ * The debug mode ("launch", "attach").
  */
-public enum ConnectingServerStrategy {
+public enum DebugMode {
 
-    NONE,
-    TIMEOUT,
-    TRACE;
+    LAUNCH,
+    ATTACH;
 
     @NotNull
-    public static ConnectingServerStrategy get(String value) {
+    public static DebugMode get(String value) {
         try {
-            return ConnectingServerStrategy.valueOf(value.toUpperCase());
+            return DebugMode.valueOf(value.toUpperCase());
         }
         catch(Exception e) {
-            return ConnectingServerStrategy.NONE;
+            return DebugMode.LAUNCH;
         }
     }
 }

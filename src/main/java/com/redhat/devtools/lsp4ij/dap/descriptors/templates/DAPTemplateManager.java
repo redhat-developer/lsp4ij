@@ -15,7 +15,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -135,7 +135,7 @@ public class DAPTemplateManager {
                 if (TEMPLATE_FILE_NAME.equals(fileName)) {
                     templateJson = VfsUtilCore.loadText(file);
                 } else {
-                    DebuggingType type = getDebuggingType(fileName);
+                    DebugMode type = getDebugMode(fileName);
                     if (type != null) {
                         String launchJson = VfsUtilCore.loadText(file);
                         JsonObject launch = (JsonObject) JsonParser.parseString(launchJson);
@@ -167,12 +167,12 @@ public class DAPTemplateManager {
     }
 
     @Nullable
-    private DebuggingType getDebuggingType(String fileName) {
+    private DebugMode getDebugMode(String fileName) {
         if (fileName.startsWith(LAUNCH_FILE_START_NAME)) {
-            return DebuggingType.LAUNCH;
+            return DebugMode.LAUNCH;
         }
         if (fileName.startsWith(ATTACH_FILE_START_NAME)) {
-            return DebuggingType.ATTACH;
+            return DebugMode.ATTACH;
         }
         return null;
     }

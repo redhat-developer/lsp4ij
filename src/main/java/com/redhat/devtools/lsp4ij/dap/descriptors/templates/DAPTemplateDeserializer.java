@@ -49,9 +49,9 @@ public class DAPTemplateDeserializer implements JsonDeserializer<DAPTemplate> {
             }
         }
 
-        JsonElement waitForTrace = jsonObject.get(WAIT_FOR_TRACE_JSON_PROPERTY);
-        if (waitForTrace != null) {
-            dapTemplate.setWaitForTrace(waitForTrace.getAsString());
+        JsonElement debugServerReadyPattern = jsonObject.get(DEBUG_SERVER_READY_PATTERN_JSON_PROPERTY);
+        if (debugServerReadyPattern != null) {
+            dapTemplate.setDebugServerReadyPattern(debugServerReadyPattern.getAsString());
         }
 
         JsonArray fileTypeMappings = jsonObject.getAsJsonArray(FILE_TYPE_MAPPINGS_JSON_PROPERTY);

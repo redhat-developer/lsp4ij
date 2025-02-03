@@ -46,7 +46,7 @@ public class DAPTemplate {
     public static final String ID_JSON_PROPERTY = "id";
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
     public static final String CONNECT_TIMEOUT_JSON_PROPERTY = "connectTimeout";
-    public static final String WAIT_FOR_TRACE_JSON_PROPERTY = "waitForTrace";
+    public static final String DEBUG_SERVER_READY_PATTERN_JSON_PROPERTY = "debugServerReadyPattern";
     public static final String LANGUAGE_JSON_PROPERTY = "language";
     public static final String LANGUAGE_MAPPINGS_JSON_PROPERTY = "languageMappings";
     public static final String PATTERNS_JSON_PROPERTY = "patterns";
@@ -70,7 +70,7 @@ public class DAPTemplate {
 
     private List<LaunchConfiguration> launchConfigurations;
     private int connectTimeout;
-    private String waitForTrace;
+    private String debugServerReadyPattern;
 
     public String getId() {
         return id;
@@ -115,12 +115,12 @@ public class DAPTemplate {
         return connectTimeout;
     }
 
-    public void setWaitForTrace(String waitForTrace) {
-        this.waitForTrace = waitForTrace;
+    public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+        this.debugServerReadyPattern = debugServerReadyPattern;
     }
 
-    public String getWaitForTrace() {
-        return waitForTrace;
+    public String getDebugServerReadyPattern() {
+        return debugServerReadyPattern;
     }
 
     public List<ServerMappingSettings> getLanguageMappings() {

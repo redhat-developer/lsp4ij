@@ -94,7 +94,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                     && Objects.equals(this.getEnvData().getEnvs(), settings.getUserEnvironmentVariables())
                     && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
                     && this.getConnectTimeout() == settings.getConnectTimeout()
-                    && isEquals(this.getWaitForTrace(), settings.getWaitForTrace())
+                    && isEquals(this.getDebugServerReadyPattern(), settings.getDebugServerReadyPattern())
                     && Objects.equals(this.getMappings(), settings.getMappings()));
         }
         return false;
@@ -121,8 +121,8 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                 this.setEnvData(EnvironmentVariablesData.create(
                         settings.getUserEnvironmentVariables(),
                         settings.isIncludeSystemEnvironmentVariables()));
-                this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel()
-                        .update(null, settings.getConnectTimeout(), settings.getWaitForTrace());
+                this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel()
+                        .update(null, settings.getConnectTimeout(), settings.getDebugServerReadyPattern());
 
                 List<ServerMappingSettings> languageMappings = settings.getMappings()
                         .stream()
@@ -205,7 +205,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                                     getEnvData().isPassParentEnvs(),
                                     getCommandLine(),
                                     getConnectTimeout(),
-                                    getWaitForTrace(),
+                                    getDebugServerReadyPattern(),
                                     getLanguageMappings(),
                                     getFileTypeMappings(),
                                     getLaunchConfigurations()),
@@ -284,11 +284,11 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
     }
 
     public int getConnectTimeout() {
-        return dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getConnectTimeout();
+        return dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
     }
 
-    public String getWaitForTrace() {
-        return dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getTrace();
+    public String getDebugServerReadyPattern() {
+        return dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getTrace();
     }
 
     public ServerTrace getServerTrace() {
