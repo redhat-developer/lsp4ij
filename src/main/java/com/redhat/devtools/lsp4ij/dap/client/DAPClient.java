@@ -14,6 +14,7 @@ import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.project.Project;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.frame.XSuspendContext;
@@ -203,7 +204,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return CompletableFuture.allOf(launchAttachFuture, configurationDoneFuture);
     }
 
-    IDebugProtocolServer getDebugProtocolServer() {
+    public IDebugProtocolServer getDebugProtocolServer() {
         return debugProtocolServer;
     }
 
@@ -504,4 +505,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProcess.getServerDescriptor();
     }
 
+    @NotNull
+    public Project getProject() {
+        return debugProcess.getSession().getProject();
+    }
 }
