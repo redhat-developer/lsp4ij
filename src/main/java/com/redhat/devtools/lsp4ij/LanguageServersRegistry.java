@@ -23,6 +23,7 @@ import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.LightVirtualFile;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
@@ -572,14 +573,26 @@ public class LanguageServersRegistry {
      * @return true if the language of the file is supported by a language server and false otherwise.
      */
     public boolean isFileSupported(@Nullable VirtualFile file, @NotNull Project project) {
-        if (file == null || !file.isInLocalFileSystem()) {
+        if (file == null) {
             return false;
         }
         Language language = LSPIJUtils.getFileLanguage(file, project);
         FileType fileType = file.getFileType();
-        return fileAssociations
+        if (fileAssociations
                 .stream()
-                .anyMatch(mapping -> mapping.match(language, fileType, file.getName()));
+                .anyMatch(mapping -> mapping.match(language, fileType, file.getName()))) {
+            if (!file.isInLocalFileSystem()) {
+                if (file instanceof LightVirtualFile) {
+                    return false;
+                }
+                PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                if (psiFile != null && !psiFile.isPhysical()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -588,6 +601,7 @@ public class LanguageServersRegistry {
     public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos() {
         return inlayHintsProviders;
     }
+
     /**
      * @return the LSP inlayHint inlay hint providers for all languages which are associated with a language server.
      */
