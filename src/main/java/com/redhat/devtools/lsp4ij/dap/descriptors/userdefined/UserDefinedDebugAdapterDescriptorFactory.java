@@ -15,7 +15,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
@@ -44,7 +44,7 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
     private boolean includeSystemEnvironmentVariables;
     private String commandLine;
     private int connectTimeout;
-    private String waitForTrace;
+    private String debugServerReadyPattern;
 
     // Mappings
     private @NotNull List<ServerMappingSettings> languageMappings;
@@ -148,12 +148,12 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         return connectTimeout;
     }
 
-    public void setWaitForTrace(String waitForTrace) {
-        this.waitForTrace = waitForTrace;
+    public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+        this.debugServerReadyPattern = debugServerReadyPattern;
     }
 
-    public String getWaitForTrace() {
-        return waitForTrace;
+    public String getDebugServerReadyPattern() {
+        return debugServerReadyPattern;
     }
 
     @Override
@@ -220,19 +220,19 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
 
                 // Server
                 dapConfiguration.setCommand(getCommandLine());
-                ConnectingServerStrategy connectingServerStrategy = ConnectingServerStrategy.NONE;
+                DebugServerWaitStrategy debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
                 int connectTimeout = getConnectTimeout();
                 if (connectTimeout > 0) {
-                    connectingServerStrategy = ConnectingServerStrategy.TIMEOUT;
+                    debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
                     dapConfiguration.setConnectTimeout(connectTimeout);
                 } else {
-                    String trackTrace = getWaitForTrace();
+                    String trackTrace = getDebugServerReadyPattern();
                     if (StringUtils.isNotBlank(trackTrace)) {
-                        connectingServerStrategy = ConnectingServerStrategy.TRACE;
-                        dapConfiguration.setWaitForTrace(trackTrace);
+                        debugServerWaitStrategy = DebugServerWaitStrategy.TRACE;
+                        dapConfiguration.setDebugServerReadyPattern(trackTrace);
                     }
                 }
-                dapConfiguration.setConnectingServerStrategy(connectingServerStrategy);
+                dapConfiguration.setDebugServerWaitStrategy(debugServerWaitStrategy);
             }
             return true;
         }

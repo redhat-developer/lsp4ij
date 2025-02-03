@@ -17,7 +17,7 @@ import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
 import com.redhat.devtools.lsp4ij.dap.DAPServerReadyTracker;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.console.DAPTextConsoleBuilderImpl;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.ServerReadyConfig;
@@ -69,8 +69,8 @@ public class DAPCommandLineState extends CommandLineState {
         return serverDescriptor;
     }
 
-    public DebuggingType getDebuggingType() {
-        return serverDescriptor.getDebuggingType();
+    public DebugMode getDebugMode() {
+        return serverDescriptor.getDebugMode();
     }
 
     public ServerTrace getServerTrace() {

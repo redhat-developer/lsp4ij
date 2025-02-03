@@ -55,7 +55,7 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
 
     public CompletableFuture<Void> track() {
         if (!waitForTimeout()) {
-            if (!waitForTrace(null)) {
+            if (!debugServerReadyPattern(null)) {
                 if (port == null) {
                     onServerReady();
                 } else {
@@ -111,12 +111,12 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
 
     @Override
     public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
-        waitForTrace(event.getText());
+        debugServerReadyPattern(event.getText());
     }
 
     private boolean waitForTimeout() {
         Integer connectTimeout = config.connectTimeout();
-        if (connectTimeout != null && connectTimeout > 0) {
+        if (connectTimeout != null) {
             if (processHandler.isStartNotified()) {
                 // The process is started
                 CompletableFuture.runAsync(() -> {
@@ -133,10 +133,10 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
         return false;
     }
 
-    private boolean waitForTrace(@Nullable String text) {
+    private boolean debugServerReadyPattern(@Nullable String text) {
         try {
             if (!foundedTrace) {
-                NetworkAddressExtractor trackTrace = config.waitForTrace();
+                NetworkAddressExtractor trackTrace = config.debugServerReadyPattern();
                 if (trackTrace != null) {
                     var result = trackTrace.extract(text);
                     if (result.matches()) {

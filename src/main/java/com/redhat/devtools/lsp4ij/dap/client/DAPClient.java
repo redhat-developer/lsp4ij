@@ -19,7 +19,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointProperties;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
@@ -77,8 +77,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private final @NotNull DAPDebugProcess debugProcess;
     private final @NotNull Map<String, Object> dapParameters;
     private final @Nullable DAPClient parentClient;
-    private final boolean debugMode;
-    private final @NotNull DebuggingType debuggingType;
+    private final boolean isDebug;
+    private final @NotNull DebugMode debugMode;
     private final @NotNull ServerTrace serverTrace;
     private boolean isConnected;
     private Future<Void> debugProtocolFuture;
@@ -90,15 +90,15 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
-                     boolean debugMode,
-                     @NotNull DebuggingType debuggingType,
+                     boolean isDebug,
+                     @NotNull DebugMode debugMode,
                      @NotNull ServerTrace serverTrace,
                      @Nullable DAPClient parentClient) {
         this.transportStreams = debugProcess.getStreamsSupplier().get();
         this.debugProcess = debugProcess;
         this.dapParameters = dapParameters;
+        this.isDebug = isDebug;
         this.debugMode = debugMode;
-        this.debuggingType = debuggingType;
         this.serverTrace = serverTrace;
         this.parentClient = parentClient;
         this.childrenClient = new ArrayList<>();
@@ -163,7 +163,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 }).thenCompose(unused -> {
                     monitor.checkCanceled();
                     monitor.setFraction(20d / 100d);
-                    boolean isLaunchRequest = debuggingType == DebuggingType.LAUNCH;
+                    boolean isLaunchRequest = debugMode == DebugMode.LAUNCH;
                     if (isLaunchRequest) {
                         monitor.setText2("Launching program");
                         return getDebugProtocolServer().launch(dapParameters);
@@ -179,7 +179,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 });
         CompletableFuture<@Nullable Void> configurationDoneFuture = CompletableFuture
                 .allOf(initialized, capabilitiesFuture).thenRun(() -> monitor.setFraction(30d / 100d));
-        if (debugMode) {
+        if (isDebug) {
             configurationDoneFuture = configurationDoneFuture
                     .thenCompose(v -> {
                         monitor.checkCanceled();
@@ -236,7 +236,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public CompletableFuture<Void> startDebugging(StartDebuggingRequestArguments args) {
         final var parameters = new HashMap<String, Object>(args.getConfiguration());
-        DAPClient client = getServerDescriptor().createClient(debugProcess, parameters, debugMode, debuggingType, serverTrace, this);
+        DAPClient client = getServerDescriptor().createClient(debugProcess, parameters, isDebug, debugMode, serverTrace, this);
         childrenClient.add(client);
         return client.connectToServer(new EmptyProgressIndicator());
     }
@@ -374,7 +374,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
         boolean shouldSendTerminateRequest = !sentTerminateRequest
                 && isSupportsTerminateRequest()
-                && debuggingType == DebuggingType.LAUNCH;
+                && debugMode == DebugMode.LAUNCH;
         if (shouldSendTerminateRequest) {
             sentTerminateRequest = true;
             server.terminate(new TerminateArguments()).thenRunAsync(this::dispose);
