@@ -8,6 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
+
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.lang.Language;
@@ -595,16 +596,16 @@ public class LSPIJUtils {
 
         // Adjust position line/character according to this comment https://github.com/microsoft/vscode-languageserver-node/blob/ed3cd0f78c1495913bda7318ace2be7f968008af/textDocument/src/main.ts#L26
         if (line >= document.getLineCount()) {
-            // The line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
+            // The line number is greater than the number of lines in a document, it defaults to the last valid offset in the document.
             return document.getTextLength();
         } else if (line < 0) {
             // The line number is negative, it defaults to 0.
             return 0;
         }
-        int lineOffset = document.getLineStartOffset(line);
-        int nextLineOffset = document.getLineEndOffset(line);
-        // If the character value is greater than the line length it defaults back to the line length
-        return Math.max(Math.min(lineOffset + character, nextLineOffset), lineOffset);
+        int lineStartOffset = document.getLineStartOffset(line);
+        int offset = lineStartOffset + character;
+        // Make sure we don't report an offset that can't exist.
+        return Math.max(Math.min(offset, document.getTextLength()), 0);
     }
 
     /**
