@@ -21,9 +21,9 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
         super("*.java");
     }
 
-    public void testCompletionOnPropertyKeyAtEnd() {
+    public void testWebFilterQuickFix() {
         assertCodeActions("InvalidWebFilter.java",
-                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(<caret>)\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
+                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@<caret>WebFilter()\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
                         """                
                         [
                              {
