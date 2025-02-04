@@ -420,7 +420,7 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         assertEquals(enterBetweenBracesFileBody.indexOf(CARET), caretModel.getOffset());
     }
 
-    // Confirms the default/"broken" behavior when 'enableTextMateEnterBetweenBracesFix' is disabled
+    // Confirms the default/"broken" behavior when 'enableEnterBetweenBracesFix' is disabled
     private void testEnterBetweenSpacesDisabled(boolean useTabCharacter) {
         String fileBody = adjustIndent(
                 """
@@ -436,7 +436,7 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         LanguageServerItem languageServer = initializeLanguageServer();
 
         // Disable the enter-between-braces fix
-        getClientConfigurationSettings(languageServer).editor.enableTextMateEnterBetweenBracesFix = false;
+        getClientConfigurationSettings(languageServer).editor.enableEnterBetweenBracesFix = false;
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();

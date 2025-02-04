@@ -539,8 +539,8 @@ public class MyLSPSemanticTokensFeature extends LSPSemanticTokensFeature {
 
 Unlike the features above, `LSPEditorFeature` does **not** correspond to an LSP feature. Instead it represents IDE editor behavior features, enhancements, and fixes that, alongside the language server-provided features, help provide an optimal editor experience for LSP4IJ-integrated file types.
 
-| API                                                           | Description                                                                                                                 | Default Behaviour |
-|---------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|-------------------|
-| boolean isEnableStringLiteralImprovements(PsiFile file)       | Returns `true` if editor improvements for string literals are enabled and `false` otherwise.                                | `true`            |
-| boolean isEnableStatementTerminatorImprovements(PsiFile file) | Returns `true` if editor improvements for statement terminators are enabled and `false` otherwise.                          | `true`            |
-| boolean isEnableTextMateEnterBetweenBracesFix(PsiFile file)   | Returns `true` if fix for [IJPL-159454](https://youtrack.jetbrains.com/issue/IJPL-159454) is enabled and `false` otherwise. | `true`            |
+| API                                                           | Description                                                                                                                     | Default Behaviour |
+|---------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-------------------|
+| boolean isEnableStringLiteralImprovements(PsiFile file)       | Returns `true` if editor improvements for string literals are enabled and `false` otherwise.                                    | `true`            |
+| boolean isEnableStatementTerminatorImprovements(PsiFile file) | Returns `true` if editor improvements for statement terminators are enabled and `false` otherwise.                              | `true`            |
+| boolean isEnableEnterBetweenBracesFix(PsiFile file)           | Returns `true` if the fix for [IJPL-159454](https://youtrack.jetbrains.com/issue/IJPL-159454) is enabled and `false` otherwise. | `true`            |

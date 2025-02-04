@@ -53,10 +53,10 @@
           "description": "Whether or not editor improvements for statement terminators are enabled.",
           "default": true
         },
-        "enableTextMateEnterBetweenBracesFix": {
+        "enableEnterBetweenBracesFix": {
           "type": "boolean",
-          "title": "Enable TextMate enter-between-braces fix",
-          "description": "Whether or not the fix for enter-between-braces behavior in TextMate files is enabled.",
+          "title": "Enable enter-between-braces fix",
+          "description": "Whether or not the fix for enter-between-braces behavior in TextMate and abstract file type files is enabled.",
           "default": true
         }
       }

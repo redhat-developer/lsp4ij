@@ -54,7 +54,7 @@ public class ClientConfigurationSettings {
          * Whether or not the fix for <a href="https://youtrack.jetbrains.com/issue/IJPL-159454">IJPL-159454</a> is
          * enabled. Default to true.
          */
-        public boolean enableTextMateEnterBetweenBracesFix = true;
+        public boolean enableEnterBetweenBracesFix = true;
     }
 
     /**

@@ -48,8 +48,8 @@ public class UserDefinedEditorBehaviorFeature extends EditorBehaviorFeature {
     }
 
     @Override
-    public boolean isEnableTextMateEnterBetweenBracesFix(@NotNull PsiFile file) {
+    public boolean isEnableEnterBetweenBracesFix(@NotNull PsiFile file) {
         ClientConfigurationEditorSettings editorSettings = getEditorSettings();
-        return editorSettings != null ? editorSettings.enableTextMateEnterBetweenBracesFix : super.isEnableTextMateEnterBetweenBracesFix(file);
+        return editorSettings != null ? editorSettings.enableEnterBetweenBracesFix : super.isEnableEnterBetweenBracesFix(file);
     }
 }

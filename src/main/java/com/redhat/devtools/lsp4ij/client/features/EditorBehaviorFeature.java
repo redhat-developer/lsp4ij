@@ -79,9 +79,9 @@ public class EditorBehaviorFeature {
      * Defaults to true.
      *
      * @param file the file
-     * @return true if the fix for TextMate enter-between-braces behavior is enabled; otherwise false
+     * @return true if the fix for enter-between-braces behavior is enabled; otherwise false
      */
-    public boolean isEnableTextMateEnterBetweenBracesFix(@NotNull PsiFile file) {
+    public boolean isEnableEnterBetweenBracesFix(@NotNull PsiFile file) {
         // Default to enabled
         return true;
     }
@@ -123,10 +123,10 @@ public class EditorBehaviorFeature {
      * @param file the PSI file
      * @return true if the fix is enabled by at least one language server for the file; otherwise false
      */
-    public static boolean enableTextMateEnterBetweenBracesFix(@NotNull PsiFile file) {
+    public static boolean enableEnterBetweenBracesFix(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
                 file.getVirtualFile(),
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateEnterBetweenBracesFix(file)
+                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableEnterBetweenBracesFix(file)
         );
     }
 }

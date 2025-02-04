@@ -47,9 +47,9 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
             @NotNull Ref<Integer> caretAdvance,
             @NotNull DataContext dataContext,
             @Nullable EditorActionHandler originalHandler) {
-        if (LSPIJEditorUtils.isSupportedTextMateFile(file) &&
+        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
             CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER &&
-            EditorBehaviorFeature.enableTextMateEnterBetweenBracesFix(file)) {
+            EditorBehaviorFeature.enableEnterBetweenBracesFix(file)) {
             CaretModel caretModel = editor.getCaretModel();
             int offset = caretModel.getOffset();
             if (offset > 0) {
@@ -78,9 +78,9 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
             @NotNull PsiFile file,
             @NotNull Editor editor,
             @NotNull DataContext dataContext) {
-        if (LSPIJEditorUtils.isSupportedTextMateFile(file) &&
+        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
             CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER &&
-            EditorBehaviorFeature.enableTextMateEnterBetweenBracesFix(file)) {
+            EditorBehaviorFeature.enableEnterBetweenBracesFix(file)) {
             Project project = file.getProject();
             Document document = editor.getDocument();
             PsiDocumentManager.getInstance(project).commitDocument(document);
