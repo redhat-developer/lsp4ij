@@ -24,6 +24,7 @@ import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
@@ -35,13 +36,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Typed handler for LSP4IJ-managed files that performs automatic on-type formatting for specific keystrokes.
@@ -54,6 +52,11 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                             @NotNull Project project,
                             @NotNull Editor editor,
                             @NotNull PsiFile file) {
+        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
+            // The file is not associated to a language server
+            return super.charTyped(charTyped, project, editor, file);
+        }
+
         LSPFormattingFeature formattingFeature = getFormattingFeature(file);
         if (formattingFeature != null) {
             boolean rangeFormattingSupported = formattingFeature.isRangeFormattingSupported(file);
@@ -140,12 +143,19 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
 
         //noinspection TryWithIdenticalCatches
         try {
-            waitUntilDone(languageServersFuture, file);
+            // wait few ms to get formatting features to avoid freezing UI
+            // when server started and didOpen must occur.
+            languageServersFuture.get(500, TimeUnit.MILLISECONDS);
         } catch (ProcessCanceledException e) {
             return null;
         } catch (CancellationException e) {
             return null;
         } catch (ExecutionException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (TimeoutException e) {
             return null;
         }
 

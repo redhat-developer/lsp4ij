@@ -8,12 +8,13 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.client;
+package com.redhat.devtools.lsp4ij.dap.client.variables;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.util.ThreeState;
 import com.intellij.xdebugger.frame.*;
 import com.intellij.xdebugger.frame.presentation.XValuePresentation;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
+import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.jetbrains.annotations.NotNull;
@@ -27,21 +28,21 @@ import javax.swing.*;
 public class DAPValue extends XNamedValue {
 
     @NotNull
-    private final DAPClient client;
+    private final DAPStackFrame stackFrame;
     @NotNull
     private final Variable variable;
     private final @Nullable Integer parentVariablesReference;
     @Nullable
     private final Icon icon;
 
-    public DAPValue(@NotNull DAPClient client,
+    public DAPValue(@NotNull DAPStackFrame stackFrame,
                     @NotNull Variable variable,
                     @Nullable Integer parentVariablesReference) {
         super(variable.getName());
-        this.client = client;
+        this.stackFrame = stackFrame;
         this.variable = variable;
         this.parentVariablesReference = parentVariablesReference;
-        this.icon = client.getServerDescriptor().getVariableSupport().getIcon(variable);
+        this.icon = getClient().getServerDescriptor().getVariableSupport().getIcon(variable);
     }
 
     @Override
@@ -53,7 +54,7 @@ public class DAPValue extends XNamedValue {
 
     @Override
     public void computeChildren(@NotNull XCompositeNode node) {
-        var server = client.getDebugProtocolServer();
+        var server = getClient().getDebugProtocolServer();
         if (server == null) {
             return;
         }
@@ -65,7 +66,7 @@ public class DAPValue extends XNamedValue {
                 .thenAccept(variablesResponse -> {
                     XValueChildrenList list = new XValueChildrenList();
                     for (Variable variable : variablesResponse.getVariables()) {
-                        list.add(variable.getName(), new DAPValue(client, variable, parentVariablesReference));
+                        list.add(variable.getName(), new DAPValue(stackFrame, variable, parentVariablesReference));
                     }
                     node.addChildren(list, true);
                 });
@@ -74,7 +75,7 @@ public class DAPValue extends XNamedValue {
     @Nullable
     @Override
     public XValueModifier getModifier() {
-        if (!client.isSupportsSetVariable()) {
+        if (!getClient().isSupportsSetVariable()) {
             // The DAP server doesn't support the setting variable, Disable the 'Set Value...' menu.
             return null;
         }
@@ -83,19 +84,19 @@ public class DAPValue extends XNamedValue {
 
     @NotNull
     private XValuePresentation getPresentation() {
-        return client.getServerDescriptor().getVariableSupport().getValuePresentation(variable);
+        return getClient().getServerDescriptor().getVariableSupport().getValuePresentation(variable);
     }
 
 
     @Override
     public void computeSourcePosition(@NotNull XNavigatable navigatable) {
-        readActionInPooledThread(new Runnable() {
-
-            @Override
-            public void run() {
-                // TODO : use locationReference
-              //  navigatable.setSourcePosition(findPosition());
-            }
+        stackFrame
+                .getSourcePositionFor(variable)
+                        .thenAccept(sourcePosition -> {
+                            if (sourcePosition != null) {
+                                navigatable.setSourcePosition(sourcePosition);
+                            }
+                        });
 
             /*@Nullable
             private XSourcePosition findPosition() {
@@ -118,12 +119,7 @@ public class DAPValue extends XNamedValue {
                 int offset = 0;
                 return XDebuggerUtil.getInstance().createPositionByOffset(virtualFile, resolved.getTextOffset());
             }*/
-        });
-    }
 
-    private static void readActionInPooledThread(@NotNull Runnable runnable) {
-        ApplicationManager.getApplication().executeOnPooledThread(() ->
-                ApplicationManager.getApplication().runReadAction(runnable));
     }
 
     @NotNull
@@ -149,7 +145,7 @@ public class DAPValue extends XNamedValue {
     }
 
     public @NotNull DAPClient getClient() {
-        return client;
+        return stackFrame.getClient();
     }
 
     public @Nullable Integer getParentVariablesReference() {

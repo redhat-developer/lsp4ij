@@ -20,6 +20,7 @@ import com.intellij.openapi.components.Storage;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.XCollection;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -129,16 +130,14 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
         private Map<String, String> userEnvironmentVariables;
         private boolean includeSystemEnvironmentVariables = true;
         private String commandLine;
-        private String waitForTimeout;
-        private String waitForTrace;
+        private int connectTimeout;
+        private String debugServerReadyPattern;
 
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
 
-        private String launchConfiguration;
-        private String launchConfigurationSchema;
-        private String attachConfiguration;
-        private String attachConfigurationSchema;
+        @XCollection(elementTypes = LaunchConfiguration.class)
+        private List<LaunchConfiguration> launchConfigurations;
 
         public String getServerId() {
             return serverId;
@@ -201,20 +200,20 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
             this.commandLine = commandLine;
         }
 
-        public String getWaitForTimeout() {
-            return waitForTimeout;
+        public int getConnectTimeout() {
+            return connectTimeout;
         }
 
-        public void setWaitForTimeout(String waitForTimeout) {
-            this.waitForTimeout = waitForTimeout;
+        public void setConnectTimeout(int connectTimeout) {
+            this.connectTimeout = connectTimeout;
         }
 
-        public String getWaitForTrace() {
-            return waitForTrace;
+        public String getDebugServerReadyPattern() {
+            return debugServerReadyPattern;
         }
 
-        public void setWaitForTrace(String waitForTrace) {
-            this.waitForTrace = waitForTrace;
+        public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+            this.debugServerReadyPattern = debugServerReadyPattern;
         }
 
         public List<ServerMappingSettings> getMappings() {
@@ -225,37 +224,14 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
             this.mappings = mappings;
         }
 
-        public String getLaunchConfiguration() {
-            return launchConfiguration;
+        public List<LaunchConfiguration> getLaunchConfigurations() {
+            return launchConfigurations;
         }
 
-        public void setLaunchConfiguration(String launchConfiguration) {
-            this.launchConfiguration = launchConfiguration;
+        public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+            this.launchConfigurations = launchConfigurations;
         }
 
-        public String getLaunchConfigurationSchema() {
-            return launchConfigurationSchema;
-        }
-
-        public void setLaunchConfigurationSchema(String launchConfigurationSchema) {
-            this.launchConfigurationSchema = launchConfigurationSchema;
-        }
-
-        public String getAttachConfiguration() {
-            return attachConfiguration;
-        }
-
-        public void setAttachConfiguration(String attachConfiguration) {
-            this.attachConfiguration = attachConfiguration;
-        }
-
-        public String getAttachConfigurationSchema() {
-            return attachConfigurationSchema;
-        }
-
-        public void setAttachConfigurationSchema(String attachConfigurationSchema) {
-            this.attachConfigurationSchema = attachConfigurationSchema;
-        }
     }
 
     public static class MyState {

@@ -18,8 +18,8 @@ import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -50,60 +50,6 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         return (DAPRunConfigurationOptions) super.getOptions();
     }
 
-    // Configuration settings
-
-    public String getWorkingDirectory() {
-        return getOptions().getWorkingDirectory();
-    }
-
-    public void setWorkingDirectory(String workingDirectory) {
-        getOptions().setWorkingDirectory(workingDirectory);
-    }
-
-    public String getFile() {
-        return getOptions().getFile();
-    }
-
-    public void setFile(String file) {
-        getOptions().setFile(file);
-    }
-
-    public String getLaunchParameters() {
-        return getOptions().getLaunchParameters();
-    }
-
-    public void setLaunchParameters(String launchParameters) {
-        getOptions().setLaunchParameters(launchParameters);
-    }
-
-    public String getAttachParameters() {
-        return getOptions().getAttachParameters();
-    }
-
-    public void setAttachParameters(String attachParameters) {
-        getOptions().setAttachParameters(attachParameters);
-    }
-
-    public DebuggingType getDebuggingType() {
-        return getOptions().getDebuggingType();
-    }
-
-    public void setDebuggingType(DebuggingType debuggingType) {
-        getOptions().setDebuggingType(debuggingType);
-    }
-
-
-    // Mappings settings
-
-    @NotNull
-    public List<ServerMappingSettings> getServerMappings() {
-        return getOptions().getServerMappings();
-    }
-
-    public void setServerMappings(@NotNull List<ServerMappingSettings> serverMappings) {
-        getOptions().setServerMappings(serverMappings);
-    }
-
     // Server settings
 
     public String getServerId() {
@@ -130,28 +76,50 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setCommand(command);
     }
 
-    public ConnectingServerStrategy getConnectingServerStrategy() {
-        return getOptions().getConnectingServerStrategy();
+    /**
+     * Retrieves the current strategy used to wait for the debug server.
+     *
+     * @return the current {@link DebugServerWaitStrategy} instance.
+     */
+    public DebugServerWaitStrategy getDebugServerWaitStrategy() {
+        return getOptions().getDebugServerWaitStrategy();
     }
 
-    public void setConnectingServerStrategy(ConnectingServerStrategy connectingServerStrategy) {
-        getOptions().setConnectingServerStrategy(connectingServerStrategy);
+    /**
+     * Set the current strategy used to wait for the debug server.
+     */
+    public void setDebugServerWaitStrategy(DebugServerWaitStrategy debugServerWaitStrategy) {
+        getOptions().setDebugServerWaitStrategy(debugServerWaitStrategy);
     }
 
-    public int getWaitForTimeout() {
-        return getOptions().getWaitForTimeout();
+    /**
+     * Returns the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @return the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     */
+    public int getConnectTimeout() {
+        return getOptions().getConnectTimeout();
     }
 
-    public void setWaitForTimeout(int waitForTimeout) {
-        getOptions().setWaitForTimeout(waitForTimeout);
+    /**
+     * Set the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @param connectTimeout the timeout.
+     */
+    public void setConnectTimeout(int connectTimeout) {
+        getOptions().setConnectTimeout(connectTimeout);
     }
 
-    public String getWaitForTrace() {
-        return getOptions().getWaitForTrace();
+    /**
+     *
+     * @return
+     */
+    public String getDebugServerReadyPattern() {
+        return getOptions().getDebugServerReadyPattern();
     }
 
-    public void setWaitForTrace(String waitForTrace) {
-        getOptions().setWaitForTrace(waitForTrace);
+    public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+        getOptions().setDebugServerReadyPattern(debugServerReadyPattern);
     }
 
     public ServerTrace getServerTrace() {
@@ -160,6 +128,75 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
 
     public void setServerTrace(ServerTrace serverTrace) {
         getOptions().setServerTrace(serverTrace);
+    }
+
+    // Mappings settings
+
+    @NotNull
+    public List<ServerMappingSettings> getServerMappings() {
+        return getOptions().getServerMappings();
+    }
+
+    public void setServerMappings(@NotNull List<ServerMappingSettings> serverMappings) {
+        getOptions().setServerMappings(serverMappings);
+    }
+
+    // Configuration settings
+
+    public String getWorkingDirectory() {
+        return getOptions().getWorkingDirectory();
+    }
+
+    public void setWorkingDirectory(String workingDirectory) {
+        getOptions().setWorkingDirectory(workingDirectory);
+    }
+
+    public String getFile() {
+        return getOptions().getFile();
+    }
+
+    public void setFile(String file) {
+        getOptions().setFile(file);
+    }
+    
+    public DebugMode getDebugMode() {
+        return getOptions().getDebugMode();
+    }
+
+    public void setDebugMode(DebugMode debugMode) {
+        getOptions().setDebugMode(debugMode);
+    }
+
+    public String getLaunchConfigurationId() {
+        return getOptions().getLaunchConfigurationId();
+    }
+
+    public void setLaunchConfigurationId(String launchConfigurationId) {
+        getOptions().setLaunchConfigurationId(launchConfigurationId);
+    }
+
+    public String getLaunchConfiguration() {
+        return getOptions().getLaunchConfiguration();
+    }
+
+    public void setLaunchConfiguration(String launchConfiguration) {
+        getOptions().setLaunchConfiguration(launchConfiguration);
+    }
+
+    public String getAttachConfigurationId() {
+        return getOptions().getAttachConfigurationId();
+    }
+
+    public void setAttachConfigurationId(String attachConfigurationId) {
+        getOptions().setAttachConfigurationId(attachConfigurationId);
+    }
+
+    public String getAttachConfiguration() {
+        return getOptions().getAttachConfiguration();
+    }
+
+    public void setAttachConfiguration(String attachConfiguration) {
+        getOptions().setAttachConfiguration(attachConfiguration);
     }
 
     @NotNull
@@ -256,9 +293,9 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         // Configuration
         configuration.setWorkingDirectory(getWorkingDirectory());
         configuration.setFile(getFile());
-        configuration.setDebuggingType(getDebuggingType());
-        configuration.setLaunchParameters(getLaunchParameters());
-        configuration.setAttachParameters(getAttachParameters());
+        configuration.setDebugMode(getDebugMode());
+        configuration.setLaunchConfiguration(getLaunchConfiguration());
+        configuration.setAttachConfiguration(getAttachConfiguration());
 
         // Mappings
         configuration.setServerMappings(getServerMappings());
@@ -267,9 +304,10 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         configuration.setServerId(getServerId());
         configuration.setServerName(getServerName());
         configuration.setCommand(getCommand());
-        configuration.setConnectingServerStrategy(getConnectingServerStrategy());
-        configuration.setWaitForTimeout(getWaitForTimeout());
-        configuration.setWaitForTrace(getWaitForTrace());
+        configuration.setDebugServerWaitStrategy(getDebugServerWaitStrategy());
+        configuration.setConnectTimeout(getConnectTimeout());
+        configuration.setDebugServerReadyPattern(getDebugServerReadyPattern());
         configuration.setServerTrace(getServerTrace());
     }
+
 }

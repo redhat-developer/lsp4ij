@@ -27,9 +27,10 @@ import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
-import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
@@ -51,6 +52,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory.DEFAULT_ATTACH_CONFIGURATION_ARRAY;
+import static com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory.DEFAULT_LAUNCH_CONFIGURATION_ARRAY;
+
 /**
  * UI panel to define a Debug Adapter descriptor factory.
  */
@@ -59,10 +63,10 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     private static final int COMMAND_LENGTH_MAX = 140;
 
     private final Project project;
-    private HyperlinkLabel editJsonSchemaAction;
     private DebugAdapterDescriptorFactory currentServerFactory;
     private boolean initialized;
     private JBTabbedPane mainTabbedPane;
+    private List<LaunchConfiguration> launchConfigurations;
 
     public enum EditionMode {
         NEW_USER_DEFINED,
@@ -75,7 +79,7 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     private JBTextField serverNameField;
     private EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
-    private DAPConnectingServerConfigurationPanel connectingServerConfigurationPanel;
+    private DAPDebugServerWaitStrategyPanel debugServerWaitStrategyPanel;
     private ComboBox<ServerTrace> serverTraceComboBox;
 
     // Mappings settings
@@ -87,7 +91,9 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     private JBTabbedPane parametersTabbedPane;
     private JRadioButton launchRadioButton;
     private JRadioButton attachRadioButton;
+    private ComboBox<LaunchConfiguration> launchCombo;
     private SchemaBackedJsonTextField launchConfigurationField;
+    private ComboBox<LaunchConfiguration> attachCombo;
     private SchemaBackedJsonTextField attachConfigurationField;
 
     public DebugAdapterDescriptorFactoryPanel(@NotNull FormBuilder builder,
@@ -139,6 +145,16 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
                     }
                 }
             });
+            // Add Listener when server is selected, it must update Configuration / Mappings and Server tabs
+            serverFactoryCombo.addItemListener(e -> {
+                currentServerFactory = (DebugAdapterDescriptorFactory) e.getItem();
+                if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory dapFactory) {
+                    if (dapFactory != UserDefinedDebugAdapterDescriptorFactory.NONE) {
+                        loadFromDapFactory(dapFactory);
+                    }
+                }
+            });
+
             JPanel serverFactoryPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
             serverFactoryPanel.add(serverFactoryCombo);
             serverFactoryPanel.add(new JLabel(DAPBundle.message("dap.settings.editor.server.factory.or")));
@@ -159,8 +175,8 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
             createCommandLineField(serverTab);
         }
         // Connecting server configuration
-        connectingServerConfigurationPanel = new DAPConnectingServerConfigurationPanel();
-        serverTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.connecting.strategy.label"), connectingServerConfigurationPanel, true);
+        debugServerWaitStrategyPanel = new DAPDebugServerWaitStrategyPanel();
+        serverTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.connecting.strategy.label"), debugServerWaitStrategyPanel, true);
 
         serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
         serverTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.serverTrace.field"), serverTraceComboBox);
@@ -206,45 +222,99 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.file.field"), fileField);
 
         ButtonGroup buttonGroup = new ButtonGroup();
-        launchRadioButton = new JRadioButton(DAPBundle.message("dap.settings.editor.configuration.debugging.launch.type"));
+        launchRadioButton = new JRadioButton(DAPBundle.message("dap.settings.editor.configuration.debug.mode.launch"));
         buttonGroup.add(launchRadioButton);
-        attachRadioButton = new JRadioButton(DAPBundle.message("dap.settings.editor.configuration.debugging.attach.type"));
+        attachRadioButton = new JRadioButton(DAPBundle.message("dap.settings.editor.configuration.debug.mode.attach"));
         buttonGroup.add(attachRadioButton);
 
         JPanel radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         radioPanel.add(launchRadioButton);
         radioPanel.add(attachRadioButton);
-        configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.debugging.type.field"), radioPanel);
+        configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.debug.mode"), radioPanel);
 
         parametersTabbedPane = new JBTabbedPane();
         // Launch / Attach DAP parameters
         configurationTab.addComponentFillVertically(parametersTabbedPane, 0);
 
         FormBuilder launchTab = addTab(parametersTabbedPane, DAPBundle.message("dap.settings.editor.configuration.parameters.launch.tab"));
+        launchCombo = createLaunchCombo();
+        launchCombo.addItemListener(e -> {
+            LaunchConfiguration selected = (LaunchConfiguration) e.getItem();
+            setLaunchConfiguration(selected.getContent());
+        });
+        launchTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), launchCombo);
         launchConfigurationField = new SchemaBackedJsonTextField(project);
         launchTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.parameters.field"), launchConfigurationField);
+
         FormBuilder attachTab = addTab(parametersTabbedPane, DAPBundle.message("dap.settings.editor.configuration.parameters.attach.tab"));
+        attachCombo = createLaunchCombo();
+        attachCombo.addItemListener(e -> {
+            LaunchConfiguration selected = (LaunchConfiguration) e.getItem();
+            setAttachConfiguration(selected.getContent());
+        });
+        attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), attachCombo);
         attachConfigurationField = new SchemaBackedJsonTextField(project);
         attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.parameters.field"), attachConfigurationField);
 
         // Select by default launch debugging type.
-        selectLaunchDebuggingType();
+        selectLaunchDebugMode();
         // Add radio listeners.
         launchRadioButton.addActionListener(event -> {
-            selectLaunchDebuggingType();
+            selectLaunchDebugMode();
         });
         attachRadioButton.addActionListener(event -> {
-            selectAttachDebuggingType();
+            selectAttachDebugMode();
         });
 
     }
 
-    private void selectAttachDebuggingType() {
+    private static ComboBox<LaunchConfiguration> createLaunchCombo() {
+        ComboBox<LaunchConfiguration> combo = new ComboBox<>();
+        combo.setRenderer(new SimpleListCellRenderer<>() {
+            @Override
+            public void customize(@NotNull JList list,
+                                  @Nullable LaunchConfiguration launch,
+                                  int index,
+                                  boolean selected,
+                                  boolean hasFocus) {
+                if (launch == null) {
+                    setText("");
+                } else {
+                    setText(launch.getName());
+                }
+            }
+        });
+        return combo;
+    }
+
+    public void refreshLaunchConfigurations(@Nullable List<LaunchConfiguration> launchConfigurations) {
+        this.launchConfigurations = launchConfigurations;
+        if (launchConfigurations != null) {
+            List<LaunchConfiguration> launches = launchConfigurations
+                    .stream()
+                    .filter(l -> l.getType() == DebugMode.LAUNCH)
+                    .toList();
+            launchCombo.setModel(new DefaultComboBoxModel<LaunchConfiguration>(launches.toArray(new LaunchConfiguration[0])));
+            if (!launches.isEmpty()) {
+                setLaunchConfiguration(launches.get(0).getContent());
+            }
+            List<LaunchConfiguration> attaches = launchConfigurations
+                    .stream()
+                    .filter(l -> l.getType() == DebugMode.ATTACH)
+                    .toList();
+            attachCombo.setModel(new DefaultComboBoxModel<LaunchConfiguration>(attaches.toArray(new LaunchConfiguration[0])));
+            if (!attaches.isEmpty()) {
+                setAttachConfiguration(attaches.get(0).getContent());
+            }
+        }
+    }
+
+    private void selectAttachDebugMode() {
         attachRadioButton.setSelected(true);
         parametersTabbedPane.setSelectedIndex(1);
     }
 
-    private void selectLaunchDebuggingType() {
+    private void selectLaunchDebugMode() {
         launchRadioButton.setSelected(true);
         parametersTabbedPane.setSelectedIndex(0);
     }
@@ -331,28 +401,8 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
 
     // Server settings
 
-    public void setServerId(String serverId) {
-        if (StringUtils.isNotBlank(serverId)) {
-            DebugAdapterDescriptorFactory factory = DebugAdapterManager.getInstance().getFactoryById(serverId);
-            if (factory != null) {
-                currentServerFactory = factory;
-                if (serverFactoryCombo != null) {
-                    serverFactoryCombo.setSelectedItem(factory);
-                }
-            }
-        }
+    public void setServerId(@Nullable String serverId) {
         if (!initialized) {
-            // Add Listener when server is selected, it must update Configuration / Mappings and Server tabs
-            if (serverFactoryCombo != null) {
-                serverFactoryCombo.addItemListener(e -> {
-                    currentServerFactory = (DebugAdapterDescriptorFactory) e.getItem();
-                    if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory dapFactory) {
-                        if (dapFactory != UserDefinedDebugAdapterDescriptorFactory.NONE) {
-                            loadFromDapFactory(dapFactory);
-                        }
-                    }
-                });
-            }
             // If DAP server is not configured, the Server tab must be selected
             if (StringUtils.isEmpty(serverId) && getCommandLine().isEmpty()) {
                 mainTabbedPane.setSelectedIndex(0);
@@ -361,16 +411,34 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
             }
             initialized = true;
         }
+        if (StringUtils.isNotBlank(serverId)) {
+            DebugAdapterDescriptorFactory factory = DebugAdapterManager.getInstance().getFactoryById(serverId);
+            if (factory != null) {
+                currentServerFactory = factory;
+                if (serverFactoryCombo != null) {
+                    serverFactoryCombo.setSelectedItem(factory);
+                } else {
+                    if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory userdefined) {
+                        loadFromDapFactory(userdefined);
+                    }
+                }
+            }
+        } else {
+            // Initialize launch configuration with default value
+            launchCombo.setModel(new DefaultComboBoxModel<>(DEFAULT_LAUNCH_CONFIGURATION_ARRAY));
+            setLaunchConfiguration(DEFAULT_LAUNCH_CONFIGURATION_ARRAY[0].getContent());
+            attachCombo.setModel(new DefaultComboBoxModel<>(DEFAULT_ATTACH_CONFIGURATION_ARRAY));
+            setAttachConfiguration(DEFAULT_ATTACH_CONFIGURATION_ARRAY[0].getContent());
+        }
     }
 
     private void loadFromDapFactory(@NotNull UserDefinedDebugAdapterDescriptorFactory dapFactory) {
-        setServerId(dapFactory.getId());
         // Update name
         setServerName(dapFactory.getDisplayName());
 
         // Update wait for trace
-        updateConnectingStrategy(null, getInt(dapFactory.getWaitForTimeout()),
-                dapFactory.getWaitForTrace());
+        updateDebugServerWaitStrategy(null, dapFactory.getConnectTimeout(),
+                dapFactory.getDebugServerReadyPattern());
 
         // Update command
         String command = getCommandLine(dapFactory);
@@ -380,8 +448,8 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
         mappingsPanel.refreshMappings(dapFactory.getLanguageMappings(), dapFactory.getFileTypeMappings());
 
         // Update DAP parameters
-        setLaunchConfiguration(dapFactory.getLaunchConfiguration());
-        setAttachConfiguration(dapFactory.getAttachConfiguration());
+        var launchConfigurations = dapFactory.getLaunchConfigurations();
+        refreshLaunchConfigurations(launchConfigurations);
     }
 
     private static int getInt(String text) {
@@ -409,6 +477,11 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
         return serverNameField;
     }
 
+    public String getServerId() {
+        var factory = (DebugAdapterDescriptorFactory) serverFactoryCombo.getSelectedItem();
+        return factory != null ? factory.getId() : "";
+    }
+
     public String getServerName() {
         if (serverNameField == null) {
             return "";
@@ -417,13 +490,15 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     }
 
     public void setServerName(String serverName) {
-        if(serverNameField != null) {
+        if (serverNameField != null) {
             this.serverNameField.setText(getText(serverName));
         }
     }
 
-    public void updateConnectingStrategy(ConnectingServerStrategy connectingServerStrategy, int waitForTimeout, String waitForTrace) {
-        connectingServerConfigurationPanel.update(connectingServerStrategy, waitForTimeout, waitForTrace);
+    public void updateDebugServerWaitStrategy(@Nullable DebugServerWaitStrategy debugServerWaitStrategy,
+                                              int waitForTimeout,
+                                              @Nullable String debugServerReadyPattern) {
+        debugServerWaitStrategyPanel.update(debugServerWaitStrategy, waitForTimeout, debugServerReadyPattern);
     }
 
     public EnvironmentVariablesComponent getEnvironmentVariables() {
@@ -446,8 +521,8 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
         this.commandLine.setText(getText(commandLine));
     }
 
-    public DAPConnectingServerConfigurationPanel getConnectingServerConfigurationPanel() {
-        return connectingServerConfigurationPanel;
+    public DAPDebugServerWaitStrategyPanel getDebugServerWaitStrategyPanel() {
+        return debugServerWaitStrategyPanel;
     }
 
     public ServerTrace getServerTrace() {
@@ -507,24 +582,36 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     }
 
     @NotNull
-    public DebuggingType getDebuggingType() {
-        return attachRadioButton.isSelected() ? DebuggingType.ATTACH : DebuggingType.LAUNCH;
+    public DebugMode getDebugMode() {
+        return attachRadioButton.isSelected() ? DebugMode.ATTACH : DebugMode.LAUNCH;
     }
 
-    public void setDebuggingType(@Nullable DebuggingType debuggingType) {
-        boolean attachType = debuggingType != null && debuggingType == DebuggingType.ATTACH;
+    public void setDebugMode(@Nullable DebugMode debugMode) {
+        boolean attachType = debugMode != null && debugMode == DebugMode.ATTACH;
         if (attachType) {
-            selectAttachDebuggingType();
+            selectAttachDebugMode();
         } else {
-            selectLaunchDebuggingType();
+            selectLaunchDebugMode();
         }
+    }
+
+    public String getLaunchConfigurationId() {
+        LaunchConfiguration selected = (LaunchConfiguration) launchCombo.getSelectedItem();
+        if (selected != null) {
+            return selected.getId();
+        }
+        return "";
     }
 
     public String getLaunchConfiguration() {
         return launchConfigurationField.getText();
     }
 
-    public void setLaunchConfiguration(String launchConfiguration) {
+    public void setLaunchConfigurationId(@Nullable String launchConfigurationId) {
+        selectLaunchConfigurationById(launchConfigurationId, launchCombo);
+    }
+
+    public void setLaunchConfiguration(@Nullable String launchConfiguration) {
         this.launchConfigurationField.setText(getText(launchConfiguration));
         this.launchConfigurationField.setCaretPosition(0);
     }
@@ -533,9 +620,39 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
         return attachConfigurationField.getText();
     }
 
-    public void setAttachConfiguration(String attachConfiguration) {
+    public void setAttachConfiguration(@Nullable String attachConfiguration) {
         this.attachConfigurationField.setText(getText(attachConfiguration));
         this.attachConfigurationField.setCaretPosition(0);
+    }
+
+    public String getAttachConfigurationId() {
+        LaunchConfiguration selected = (LaunchConfiguration) attachCombo.getSelectedItem();
+        if (selected != null) {
+            return selected.getId();
+        }
+        return "";
+    }
+
+    public void setAttachConfigurationId(@Nullable String attachConfigurationId) {
+        selectLaunchConfigurationById(attachConfigurationId, attachCombo);
+    }
+
+    private void selectLaunchConfigurationById(@Nullable String configurationId,
+                                               @NotNull ComboBox<LaunchConfiguration> combo) {
+        if (configurationId == null || launchConfigurations == null || launchConfigurations.isEmpty()) {
+            return;
+        }
+        var existingConfiguration = launchConfigurations
+                .stream()
+                .filter(l -> l.getId().equals(configurationId))
+                .findFirst();
+        if (existingConfiguration.isPresent()) {
+            combo.setSelectedItem(existingConfiguration.get());
+        }
+    }
+
+    public List<LaunchConfiguration> getLaunchConfigurations() {
+        return launchConfigurations;
     }
 
     public Project getProject() {

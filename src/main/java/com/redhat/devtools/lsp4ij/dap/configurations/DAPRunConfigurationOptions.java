@@ -12,8 +12,8 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.openapi.components.StoredProperty;
-import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
@@ -39,14 +39,20 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
     private final StoredProperty<String> workingDirectory = string("")
             .provideDelegate(this, "workingDirectory");
 
-    private final StoredProperty<String> debuggingType = string(DebuggingType.LAUNCH.name())
-            .provideDelegate(this, "debuggingType");
+    private final StoredProperty<String> debugMode = string(DebugMode.LAUNCH.name())
+            .provideDelegate(this, "debugMode");
 
-    private final StoredProperty<String> launchParameters = string("")
-            .provideDelegate(this, "launchParameters");
+    private final StoredProperty<String> launchConfigurationId = string("")
+            .provideDelegate(this, "launchConfigurationId");
 
-    private final StoredProperty<String> attachParameters = string("")
-            .provideDelegate(this, "attachParameters");
+    private final StoredProperty<String> launchConfiguration = string("")
+            .provideDelegate(this, "launchConfiguration");
+
+    private final StoredProperty<String> attachConfigurationId = string("")
+            .provideDelegate(this, "attachConfigurationId");
+
+    private final StoredProperty<String> attachConfiguration = string("")
+            .provideDelegate(this, "attachConfiguration");
 
     // Mappings settings
     private final StoredProperty<List<ServerMappingSettings>> serverMappings = this.<ServerMappingSettings>list()
@@ -62,14 +68,14 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
     private final StoredProperty<String> command = string("")
             .provideDelegate(this, "command");
 
-    private final StoredProperty<String> connectingServerStrategy = string(ConnectingServerStrategy.NONE.name())
-            .provideDelegate(this, "connectingServerStrategy");
+    private final StoredProperty<String> debugServerWaitStrategy = string(DebugServerWaitStrategy.TIMEOUT.name())
+            .provideDelegate(this, "debugServerWaitStrategy");
 
-    private final StoredProperty<Integer> waitForTimeout = property(0)
-            .provideDelegate(this, "waitForTimeout");
+    private final StoredProperty<Integer> connectTimeout = property(0)
+            .provideDelegate(this, "connectTimeout");
 
-    private final StoredProperty<String> waitForTrace = string("")
-            .provideDelegate(this, "waitForTrace");
+    private final StoredProperty<String> debugServerReadyPattern = string("")
+            .provideDelegate(this, "debugServerReadyPattern");
 
     private final StoredProperty<String> serverTrace = string(ServerTrace.getDefaultValue().name())
             .provideDelegate(this, "serverTrace");
@@ -94,28 +100,44 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
         this.file.setValue(this, file);
     }
 
-    public DebuggingType getDebuggingType() {
-        return DebuggingType.get(debuggingType.getValue(this));
+    public DebugMode getDebugMode() {
+        return DebugMode.get(debugMode.getValue(this));
     }
 
-    public void setDebuggingType(DebuggingType debuggingType) {
-        this.debuggingType.setValue(this, debuggingType.name());
+    public void setDebugMode(DebugMode debugMode) {
+        this.debugMode.setValue(this, debugMode.name());
     }
 
-    public String getLaunchParameters() {
-        return launchParameters.getValue(this);
+    public String getLaunchConfigurationId() {
+        return launchConfigurationId.getValue(this);
     }
 
-    public void setLaunchParameters(String launchParameters) {
-        this.launchParameters.setValue(this, launchParameters);
+    public void setLaunchConfigurationId(String launchConfigurationId) {
+        this.launchConfigurationId.setValue(this, launchConfigurationId);
     }
 
-    public String getAttachParameters() {
-        return attachParameters.getValue(this);
+    public String getLaunchConfiguration() {
+        return launchConfiguration.getValue(this);
     }
 
-    public void setAttachParameters(String attachParameters) {
-        this.attachParameters.setValue(this, attachParameters);
+    public void setLaunchConfiguration(String launchConfiguration) {
+        this.launchConfiguration.setValue(this, launchConfiguration);
+    }
+
+    public String getAttachConfigurationId() {
+        return attachConfigurationId.getValue(this);
+    }
+
+    public void setAttachConfigurationId(String attachConfigurationId) {
+        this.attachConfigurationId.setValue(this, attachConfigurationId);
+    }
+
+    public String getAttachConfiguration() {
+        return attachConfiguration.getValue(this);
+    }
+
+    public void setAttachConfiguration(String attachConfiguration) {
+        this.attachConfiguration.setValue(this, attachConfiguration);
     }
 
     /**
@@ -124,7 +146,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
      * @return the DAP launch/attach parameters according the debugging type.
      */
     public String getDapParameters() {
-        return getDebuggingType() == DebuggingType.ATTACH ? getAttachParameters() : getLaunchParameters();
+        return getDebugMode() == DebugMode.ATTACH ? getAttachConfiguration() : getLaunchConfiguration();
     }
 
     // Mappings settings
@@ -181,29 +203,47 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
         this.command.setValue(this, command);
     }
 
-    public ConnectingServerStrategy getConnectingServerStrategy() {
-        return ConnectingServerStrategy.get(connectingServerStrategy.getValue(this));
+    /**
+     * Retrieves the current strategy used to wait for the debug server.
+     *
+     * @return the current {@link DebugServerWaitStrategy} instance.
+     */
+    public DebugServerWaitStrategy getDebugServerWaitStrategy() {
+        return DebugServerWaitStrategy.get(debugServerWaitStrategy.getValue(this));
     }
 
-    public void setConnectingServerStrategy(ConnectingServerStrategy connectingServerStrategy) {
-        this.connectingServerStrategy.setValue(this, connectingServerStrategy.name());
+    /**
+     * Set the current strategy used to wait for the debug server.
+     */
+    public void setDebugServerWaitStrategy(DebugServerWaitStrategy debugServerWaitStrategy) {
+        this.debugServerWaitStrategy.setValue(this, debugServerWaitStrategy.name());
     }
 
-    public String getWaitForTrace() {
-        return waitForTrace.getValue(this);
+    /**
+     * Returns the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @return the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     */
+    public int getConnectTimeout() {
+        return connectTimeout.getValue(this);
     }
 
-    public void setWaitForTrace(String waitForTrace) {
-        this.waitForTrace.setValue(this, waitForTrace);
+    /**
+     * Set the timeout to use when the DAP client must connect to the DAP server, and 0 otherwise.
+     *
+     * @param connectTimeout the timeout.
+     */
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout.setValue(this, connectTimeout);
+    }
+
+    public String getDebugServerReadyPattern() {
+        return debugServerReadyPattern.getValue(this);
+    }
+
+    public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+        this.debugServerReadyPattern.setValue(this, debugServerReadyPattern);
         this.networkAddressExtractor = null;
-    }
-
-    public int getWaitForTimeout() {
-        return waitForTimeout.getValue(this);
-    }
-
-    public void setWaitForTimeout(int waitForTimeout) {
-        this.waitForTimeout.setValue(this, waitForTimeout);
     }
 
     public ServerTrace getServerTrace() {
@@ -218,7 +258,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
         if (networkAddressExtractor != null) {
             return networkAddressExtractor;
         }
-        String trackTrace = getWaitForTrace();
+        String trackTrace = getDebugServerReadyPattern();
         if (StringUtils.isNotBlank(trackTrace)) {
             networkAddressExtractor = new NetworkAddressExtractor(trackTrace);
         }

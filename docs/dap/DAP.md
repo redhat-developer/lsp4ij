@@ -28,6 +28,18 @@ To configure debugging with DAP, you need to fill in:
  
   ![DAP Configuration Type/Server](./images/DAP_config_type_server.png)
 
+## Inline value
+
+The values of the variables are displayed inline, but this is not perfect because a DAP server generally cannot handle variable positions (only their values). 
+To retrieve the variable positions, LSP4IJ uses the syntax highlighting information from the editor (TextMate or others).
+
+Here a de demo with JavaScript:
+
+![DAP inline value](./images/DAP_inline_value_demo.gif)
+
+Theoretically, inline values should be handled by a language server via [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue)
+but as no language servers seems implement this LSP request for the moment LSP4IJ doesn't use this strategy.
+
 ## Evaluate expression
 
 Evaluate expression is available by consuming the [Evaluate request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) 

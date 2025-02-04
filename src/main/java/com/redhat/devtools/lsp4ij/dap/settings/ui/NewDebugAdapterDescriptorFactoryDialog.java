@@ -24,7 +24,6 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -76,6 +75,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
         createTemplateCombo(builder);
         // Create server name,  command line, mappings, configuration UI
         this.dapDescriptorFactoryPanel = new DebugAdapterDescriptorFactoryPanel(builder, null, DebugAdapterDescriptorFactoryPanel.EditionMode.NEW_USER_DEFINED, project);
+        dapDescriptorFactoryPanel.setServerId("");
 
         // Add validation
         addValidator(this.dapDescriptorFactoryPanel.getServerNameField());
@@ -138,8 +138,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
      */
     private boolean hasValidDescription(@Nullable DAPTemplate template) {
         return template != null && template != DAPTemplate.NONE
-                && template != DAPTemplate.NEW_TEMPLATE
-                && StringUtils.isNotBlank(template.getDescription());
+                && template != DAPTemplate.NEW_TEMPLATE;
     }
 
    /* @Override
@@ -165,28 +164,16 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
         this.dapDescriptorFactoryPanel.setCommandLine(command);
 
         // Update wait for trace
-        this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().update(null,
-                getInt(template.getWaitForTimeout()),
-                template.getWaitForTrace());
+        this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().update(null,
+                template.getConnectTimeout(),
+                template.getDebugServerReadyPattern());
 
         // Update mappings
         var mappingsPanel = this.dapDescriptorFactoryPanel.getMappingsPanel();
         mappingsPanel.refreshMappings(template.getLanguageMappings(), template.getFileTypeMappings());
 
-        // Update launch configuration
-        this.dapDescriptorFactoryPanel.setLaunchConfiguration(template.getLaunchConfiguration());
-
-        // Update attach configuration
-        this.dapDescriptorFactoryPanel.setAttachConfiguration(template.getAttachConfiguration());
-
-    }
-
-    private static int getInt(String text) {
-        try {
-            return Integer.parseInt(text);
-        } catch (Exception e) {
-            return 0;
-        }
+        // Update launch/attach configuration
+        dapDescriptorFactoryPanel.refreshLaunchConfigurations(template.getLaunchConfigurations());;
     }
 
     private static String getCommandLine(DAPTemplate entry) {
@@ -254,24 +241,22 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
         Map<String, String> userEnvironmentVariables = this.dapDescriptorFactoryPanel.getEnvironmentVariables().getEnvs();
         boolean includeSystemEnvironmentVariables = this.dapDescriptorFactoryPanel.getEnvironmentVariables().isPassParentEnvs();
         String commandLine = this.dapDescriptorFactoryPanel.getCommandLine();
-        String waitFor = this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getTimeout();
-        String trackTrace = this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getTrace();
-        String launchConfiguration = this.dapDescriptorFactoryPanel.getLaunchConfiguration();
-        String attachConfiguration = this.dapDescriptorFactoryPanel.getAttachConfiguration();
+        int connectTimeout = this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
+        String trackTrace = this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getTrace();
+        var launchConfigurations = this.dapDescriptorFactoryPanel.getLaunchConfigurations();
         var mappingsPanel = dapDescriptorFactoryPanel.getMappingsPanel();
         createdFactory = new UserDefinedDebugAdapterDescriptorFactory(serverId,
                 serverName,
                 commandLine,
                 mappingsPanel.getLanguageMappings(),
                 Streams.concat(mappingsPanel.getFileTypeMappings().stream(),
-                        mappingsPanel.getFileNamePatternMappings().stream())
+                                mappingsPanel.getFileNamePatternMappings().stream())
                         .toList());
         createdFactory.setUserEnvironmentVariables(userEnvironmentVariables);
         createdFactory.setIncludeSystemEnvironmentVariables(includeSystemEnvironmentVariables);
-        createdFactory.setWaitForTimeout(waitFor);
-        createdFactory.setWaitForTrace(trackTrace);
-        createdFactory.setLaunchConfiguration(launchConfiguration);
-        createdFactory.setAttachConfiguration(attachConfiguration);
+        createdFactory.setConnectTimeout(connectTimeout);
+        createdFactory.setDebugServerReadyPattern(trackTrace);
+        createdFactory.setLaunchConfigurations(launchConfigurations);
         DebugAdapterManager.getInstance().addDebugAdapterDescriptorFactory(createdFactory);
     }
 

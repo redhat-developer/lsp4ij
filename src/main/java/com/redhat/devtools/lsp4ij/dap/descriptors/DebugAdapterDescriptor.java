@@ -23,7 +23,7 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.net.NetUtils;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
@@ -147,12 +147,12 @@ public class DebugAdapterDescriptor {
     @NotNull
     public ServerReadyConfig getServerReadyConfig() {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            var strategy = dapOptions.getConnectingServerStrategy();
+            var strategy = dapOptions.getDebugServerWaitStrategy();
             switch (strategy) {
                 case TIMEOUT:
-                    return new ServerReadyConfig(null, dapOptions.getWaitForTimeout());
+                    return new ServerReadyConfig(null, dapOptions.getConnectTimeout());
                 case TRACE:
-                    return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor(), 0);
+                    return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor(), null);
                 default:
                     return new ServerReadyConfig(null, 0);
             }
@@ -197,11 +197,11 @@ public class DebugAdapterDescriptor {
      * @return the debugging type (launch or attach).
      */
     @NotNull
-    public DebuggingType getDebuggingType() {
+    public DebugMode getDebugMode() {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            return dapOptions.getDebuggingType();
+            return dapOptions.getDebugMode();
         }
-        return DebuggingType.LAUNCH;
+        return DebugMode.LAUNCH;
     }
 
     public @NotNull InitializeRequestArguments createInitializeRequestArguments(@NotNull Map<String, Object> dapParameters) {
@@ -283,11 +283,11 @@ public class DebugAdapterDescriptor {
     @NotNull
     public DAPClient createClient(@NotNull DAPDebugProcess debugProcess,
                                   @NotNull Map<String, Object> dapParameters,
-                                  boolean debugMode,
-                                  @NotNull DebuggingType debuggingType,
+                                  boolean isDebug,
+                                  @NotNull DebugMode debugMode,
                                   @NotNull ServerTrace serverTrace,
                                   @Nullable DAPClient parentClient) {
-        return new DAPClient(debugProcess, dapParameters, debugMode, debuggingType, serverTrace, parentClient);
+        return new DAPClient(debugProcess, dapParameters, isDebug, debugMode, serverTrace, parentClient);
     }
 
     /**

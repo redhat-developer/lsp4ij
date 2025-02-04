@@ -50,6 +50,11 @@ public class DAPExpressionCodeFragment extends PsiFileBase {
         return fileType;
     }
 
+    @Override
+    public boolean isPhysical() {
+        return false;
+    }
+
     public @Nullable DAPStackFrame getCurrentDapStackFrame() {
         return debugProcess.getCurrentDapStackFrame();
     }

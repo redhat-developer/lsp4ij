@@ -15,7 +15,8 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.dap.ConnectingServerStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -28,6 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static com.redhat.devtools.lsp4ij.dap.LaunchConfiguration.findAttachConfiguration;
+import static com.redhat.devtools.lsp4ij.dap.LaunchConfiguration.findLaunchConfiguration;
+
 /**
  * User defined {@link DebugAdapterDescriptorFactory}.
  */
@@ -39,18 +43,15 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
     private Map<String, String> userEnvironmentVariables;
     private boolean includeSystemEnvironmentVariables;
     private String commandLine;
-    private String waitForTimeout;
-    private String waitForTrace;
+    private int connectTimeout;
+    private String debugServerReadyPattern;
 
     // Mappings
     private @NotNull List<ServerMappingSettings> languageMappings;
     private @NotNull List<ServerMappingSettings> fileTypeMappings;
 
     // Configuration
-    private String launchConfiguration;
-    private String launchConfigurationSchema;
-    private String attachConfiguration;
-    private String attachConfigurationSchema;
+    private List<LaunchConfiguration> launchConfigurations;
 
     public UserDefinedDebugAdapterDescriptorFactory(@NotNull String id,
                                                     @NotNull String name,
@@ -139,53 +140,29 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         this.fileTypeMappings = fileTypeMappings;
     }
 
-    public void setWaitForTimeout(String waitForTimeout) {
-        this.waitForTimeout = waitForTimeout;
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
-    public String getWaitForTimeout() {
-        return waitForTimeout;
+    public int getConnectTimeout() {
+        return connectTimeout;
     }
 
-    public void setWaitForTrace(String waitForTrace) {
-        this.waitForTrace = waitForTrace;
+    public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+        this.debugServerReadyPattern = debugServerReadyPattern;
     }
 
-    public String getWaitForTrace() {
-        return waitForTrace;
+    public String getDebugServerReadyPattern() {
+        return debugServerReadyPattern;
     }
 
-
-    public String getLaunchConfiguration() {
-        return launchConfiguration;
+    @Override
+    public List<LaunchConfiguration> getLaunchConfigurations() {
+        return launchConfigurations;
     }
 
-    public void setLaunchConfiguration(String launchConfiguration) {
-        this.launchConfiguration = launchConfiguration;
-    }
-
-    public String getLaunchConfigurationSchema() {
-        return launchConfigurationSchema;
-    }
-
-    public void setLaunchConfigurationSchema(String launchConfigurationSchema) {
-        this.launchConfigurationSchema = launchConfigurationSchema;
-    }
-
-    public String getAttachConfiguration() {
-        return attachConfiguration;
-    }
-
-    public void setAttachConfiguration(String attachConfiguration) {
-        this.attachConfiguration = attachConfiguration;
-    }
-
-    public String getAttachConfigurationSchema() {
-        return attachConfigurationSchema;
-    }
-
-    public void setAttachConfigurationSchema(String attachConfigurationSchema) {
-        this.attachConfigurationSchema = attachConfigurationSchema;
+    public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+        this.launchConfigurations = launchConfigurations;
     }
 
     @Override
@@ -231,8 +208,10 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
         if(super.prepareConfiguration(configuration, file, project)) {
             if (configuration instanceof DAPRunConfiguration dapConfiguration) {
                 // Configuration
-                dapConfiguration.setLaunchParameters(getLaunchConfiguration());
-                dapConfiguration.setAttachParameters(getAttachConfiguration());
+                var launchConfiguration = findLaunchConfiguration(getLaunchConfigurations());
+                dapConfiguration.setLaunchConfiguration(launchConfiguration != null ? launchConfiguration.getContent() : "");
+                var attachConfiguration = findAttachConfiguration(getLaunchConfigurations());
+                dapConfiguration.setAttachConfiguration(attachConfiguration != null ? attachConfiguration.getContent() : "");
 
                 // Mappings
                 dapConfiguration.setServerMappings(Stream.concat(getLanguageMappings().stream(),
@@ -241,22 +220,23 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
 
                 // Server
                 dapConfiguration.setCommand(getCommandLine());
-                ConnectingServerStrategy connectingServerStrategy = ConnectingServerStrategy.NONE;
-                String waitFor = getWaitForTimeout();
-                if (StringUtils.isNotBlank(waitFor)) {
-                    connectingServerStrategy = ConnectingServerStrategy.TIMEOUT;
-                    dapConfiguration.setWaitForTimeout(Integer.parseInt(waitFor));
+                DebugServerWaitStrategy debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
+                int connectTimeout = getConnectTimeout();
+                if (connectTimeout > 0) {
+                    debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
+                    dapConfiguration.setConnectTimeout(connectTimeout);
                 } else {
-                    String trackTrace = getWaitForTrace();
+                    String trackTrace = getDebugServerReadyPattern();
                     if (StringUtils.isNotBlank(trackTrace)) {
-                        connectingServerStrategy = ConnectingServerStrategy.TRACE;
-                        dapConfiguration.setWaitForTrace(trackTrace);
+                        debugServerWaitStrategy = DebugServerWaitStrategy.TRACE;
+                        dapConfiguration.setDebugServerReadyPattern(trackTrace);
                     }
                 }
-                dapConfiguration.setConnectingServerStrategy(connectingServerStrategy);
+                dapConfiguration.setDebugServerWaitStrategy(debugServerWaitStrategy);
             }
             return true;
         }
         return false;
     }
+
 }
