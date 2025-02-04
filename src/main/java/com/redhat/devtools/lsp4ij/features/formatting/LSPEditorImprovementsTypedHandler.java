@@ -21,6 +21,8 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.LSPEditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -41,11 +43,16 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
                                   @NotNull PsiFile file,
                                   @NotNull FileType fileType) {
         if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file)) {
-            if (LSPIJEditorUtils.isQuoteCharacter(file, charTyped) && handleNestedQuote(file, editor, charTyped)) {
+            // String literal improvements
+            if (LSPIJEditorUtils.isQuoteCharacter(file, charTyped) &&
+                LSPEditorBehaviorFeature.enableStringLiteralImprovements(file) &&
+                handleNestedQuote(file, editor, charTyped)) {
                 return Result.STOP;
             }
-            // TODO: Get statement terminator character(s) from client config?
-            else if ((';' == charTyped) && handleStatementTerminator(file, editor)) {
+            // Statement terminator improvements
+            else if (LSPEditorBehaviorFeature.enableStatementTerminatorImprovements(file) &&
+                     isStatementTerminatorCharacter(file, charTyped) &&
+                     handleStatementTerminator(file, editor)) {
                 return Result.STOP;
             }
         }
@@ -83,6 +90,13 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
         return false;
     }
 
+    private static boolean isStatementTerminatorCharacter(@NotNull PsiFile file, char charTyped) {
+        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
+                file.getVirtualFile(),
+                ls -> ls.getClientFeatures().getStatementTerminatorCharacters(file).indexOf(charTyped) > -1
+        );
+    }
+
     private boolean handleStatementTerminator(@NotNull PsiFile file,
                                               @NotNull Editor editor) {
         Document document = editor.getDocument();
@@ -94,7 +108,7 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
 
         CharSequence documentChars = document.getCharsSequence();
         char nextCharacter = documentChars.charAt(offset);
-        if ((nextCharacter == ';') && !inStringLiteral(file, documentChars, offset)) {
+        if (isStatementTerminatorCharacter(file, nextCharacter) && !inStringLiteral(file, documentChars, offset)) {
             caretModel.moveToOffset(offset + 1);
             return true;
         }

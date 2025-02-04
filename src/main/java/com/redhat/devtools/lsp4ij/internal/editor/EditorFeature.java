@@ -25,9 +25,9 @@ import java.util.List;
 public interface EditorFeature {
 
     /**
-     * Returns the editor feature type.
+     * Returns the editor behavior feature type.
      *
-     * @return the editor feature type.
+     * @return the editor behavior feature type.
      */
     EditorFeatureType getFeatureType();
 

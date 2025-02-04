@@ -36,6 +36,28 @@ public class ClientConfigurationSettings {
     }
 
     /**
+     * Client-side editor behavior settings.
+     */
+    public static class ClientConfigurationEditorSettings {
+        /**
+         * Whether or not editor improvements for string literals are enabled. Defaults to true.
+         */
+        public boolean enableStringLiteralImprovements = true;
+
+        /**
+         * Whether or not editor improvements for statement terminators are enabled. Defaults to true. Also requires
+         * {@link ClientConfigurationSettings#statementTerminatorCharacters} to be set properly for the language.
+         */
+        public boolean enableStatementTerminatorImprovements = true;
+
+        /**
+         * Whether or not the fix for <a href="https://youtrack.jetbrains.com/issue/IJPL-159454">IJPL-159454</a> is
+         * enabled. Default to true.
+         */
+        public boolean enableTextMateEnterBetweenBracesFix = true;
+    }
+
+    /**
      * Server-side (LSP) <code>textDocument/onTypeFormatting</code> feature settings.
      */
     public static class ServerSideOnTypeFormattingSettings {
@@ -74,9 +96,10 @@ public class ClientConfigurationSettings {
         public boolean formatOnStatementTerminator = false;
 
         /**
-         * The specific statement terminator characters that should trigger client-side on-type formatting.
+         * The specific statement terminator characters that should trigger client-side on-type formatting. Defaults to
+         * the {@link ClientConfigurationSettings#statementTerminatorCharacters}.
          */
-        public String formatOnStatementTerminatorCharacters = null;
+        public @NotNull String formatOnStatementTerminatorCharacters = "";
 
         /**
          * The scope that should be formatted using client-side on-type formatting when a statement terminator is typed.
@@ -138,9 +161,19 @@ public class ClientConfigurationSettings {
     public boolean caseSensitive = false;
 
     /**
+     * The statement terminator characters in the language grammar. Defaults to none.
+     */
+    public @NotNull String statementTerminatorCharacters = "";
+
+    /**
      * Client-side code completion settings
      */
     public @NotNull ClientConfigurationCompletionSettings completion = new ClientConfigurationCompletionSettings();
+
+    /**
+     * Client-side editor behavior settings
+     */
+    public @NotNull ClientConfigurationEditorSettings editor = new ClientConfigurationEditorSettings();
 
     /**
      * Client-side format settings.

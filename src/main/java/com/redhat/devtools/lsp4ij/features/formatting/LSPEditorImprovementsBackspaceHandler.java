@@ -16,6 +16,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
+import com.redhat.devtools.lsp4ij.client.features.LSPEditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,6 +39,7 @@ public class LSPEditorImprovementsBackspaceHandler extends BackspaceHandlerDeleg
             @NotNull PsiFile file,
             @NotNull Editor editor) {
         if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
+            LSPEditorBehaviorFeature.enableStringLiteralImprovements(file) &&
             isPairOpener(file, charDeleted)) {
             Character pairCloser = getPairCloser(file, charDeleted);
             if (pairCloser != null) {

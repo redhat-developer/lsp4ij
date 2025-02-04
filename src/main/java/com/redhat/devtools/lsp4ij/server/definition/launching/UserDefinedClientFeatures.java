@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -29,11 +30,20 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         setCompletionFeature(new UserDefinedCompletionFeature());
         setFormattingFeature(new UserDefinedFormattingFeature());
         setWorkspaceSymbolFeature(new UserDefinedWorkspaceSymbolFeature());
+        setEditorBehaviorFeature(new UserDefinedEditorBehaviorFeature(this));
     }
 
     public boolean isCaseSensitive(@NotNull PsiFile file) {
-        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getServerDefinition();
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return (clientConfiguration != null) && clientConfiguration.caseSensitive;
+        return clientConfiguration != null ? clientConfiguration.caseSensitive : super.isCaseSensitive(file);
+    }
+
+    @Override
+    @NotNull
+    public String getStatementTerminatorCharacters(@NotNull PsiFile file) {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return (clientConfiguration != null) ? clientConfiguration.statementTerminatorCharacters : super.getStatementTerminatorCharacters(file);
     }
 }

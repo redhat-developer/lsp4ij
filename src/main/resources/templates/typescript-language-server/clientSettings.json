@@ -1,5 +1,6 @@
 {
   "caseSensitive": true,
+  "statementTerminatorCharacters": ";",
   "completion": {
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
@@ -9,7 +10,6 @@
       "clientSide": {
         "formatOnCloseBrace": true,
         "formatOnStatementTerminator": true,
-        "formatOnStatementTerminatorCharacters": ";",
         "formatOnCompletionTrigger": true
       }
     }

@@ -16,12 +16,20 @@ import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EditorTestUtil;
+import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -35,6 +43,7 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
 
     public TypeScriptEditorImprovementsTest() {
         super("*.ts");
+        setClientConfigurable(true);
     }
 
     @Override
@@ -48,15 +57,31 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         super.tearDown();
     }
 
-    private void initializeLanguageServer() {
+    @NotNull
+    private LanguageServerItem initializeLanguageServer() {
+        List<LanguageServerItem> languageServers = new LinkedList<>();
         try {
+            Project project = myFixture.getProject();
             PsiFile file = myFixture.getFile();
-            LanguageServiceAccessor.getInstance(file.getProject())
+            ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
                     .getLanguageServers(file.getVirtualFile(), null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
+                    .get(5000, TimeUnit.MILLISECONDS));
         } catch (Exception e) {
             fail(e.getMessage());
         }
+        LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
+        assertNotNull(languageServer);
+        return languageServer;
+    }
+
+    @NotNull
+    private ClientConfigurationSettings getClientConfigurationSettings(@NotNull LanguageServerItem languageServer) {
+        LanguageServerDefinition languageServerDefinition = languageServer.getServerDefinition();
+        assertInstanceOf(languageServerDefinition, ClientConfigurableLanguageServerDefinition.class);
+        ClientConfigurableLanguageServerDefinition configurableLanguageServerDefinition = (ClientConfigurableLanguageServerDefinition) languageServerDefinition;
+        ClientConfigurationSettings clientConfigurationSettings = configurableLanguageServerDefinition.getLanguageServerClientConfiguration();
+        assertNotNull(clientConfigurationSettings);
+        return clientConfigurationSettings;
     }
 
     // These tests exercise both LSPEditorImprovementsTypedHandler.handleNestedQuote() and LSPEditorImprovementsBackspaceHandler
@@ -66,14 +91,29 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         testNestedQuotes('\'', '`');
     }
 
+    public void testNestedQuotesInSingleQuotedStringLiteralDisabled() {
+        testNestedQuotesDisabled('\'', '"');
+        testNestedQuotesDisabled('\'', '`');
+    }
+
     public void testNestedQuotesInDoubleQuotedStringLiteral() {
         testNestedQuotes('"', '\'');
         testNestedQuotes('"', '`');
     }
 
+    public void testNestedQuotesInDoubleQuotedStringLiteralDisabled() {
+        testNestedQuotesDisabled('"', '\'');
+        testNestedQuotesDisabled('"', '`');
+    }
+
     public void testNestedQuotesInBacktickQuotedStringLiteral() {
         testNestedQuotes('`', '\'');
         testNestedQuotes('`', '"');
+    }
+
+    public void testNestedQuotesInBacktickQuotedStringLiteralDisabled() {
+        testNestedQuotesDisabled('`', '\'');
+        testNestedQuotesDisabled('`', '"');
     }
 
     private void testNestedQuotes(char outerQuote, char innerQuote) {
@@ -140,6 +180,53 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         assertEquals(initialOffset, caretModel.getOffset());
     }
 
+    // Confirms the default/"broken" behavior when 'enableStringLiteralImprovements' is disabled
+    private void testNestedQuotesDisabled(char outerQuote, char innerQuote) {
+        String fileBody = "console.log();";
+        int initialOffset = fileBody.indexOf("(") + 1;
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        LanguageServerItem languageServer = initializeLanguageServer();
+
+        // Disable string literal improvements
+        getClientConfigurationSettings(languageServer).editor.enableStringLiteralImprovements = false;
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+
+        CaretModel caretModel = editor.getCaretModel();
+        caretModel.moveToOffset(initialOffset);
+
+        // Typing an initial outer quote character should result in paired quotes
+        EditorTestUtil.performTypingAction(editor, outerQuote);
+        assertEquals("console.log(" + outerQuote + outerQuote + ");", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+
+        // Typing another outer quote character should just advance the caret outside of the string literal
+        EditorTestUtil.performTypingAction(editor, outerQuote);
+        assertEquals("console.log(" + outerQuote + outerQuote + ");", document.getText());
+        assertEquals(initialOffset + 2, caretModel.getOffset());
+
+        // Return to the interior of the string literal and type an inner quote character which should be inserted
+        // paired with the caret between inner quotes
+        caretModel.moveToOffset(initialOffset + 1);
+        EditorTestUtil.performTypingAction(editor, innerQuote);
+        assertEquals("console.log(" + outerQuote + innerQuote + innerQuote + outerQuote + ");", document.getText());
+        assertEquals(initialOffset + 2, caretModel.getOffset());
+
+        // Typing a backspace should remove the paired inner quotes
+        EditorTestUtil.executeAction(editor, IdeActions.ACTION_EDITOR_BACKSPACE);
+        assertEquals("console.log(" + outerQuote + outerQuote + ");", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+
+        // Now insert an escaped outer quote just before the close outer quote which should result in advancing the
+        // caret outside of the close outer quote
+        EditorTestUtil.performTypingAction(editor, BACKSLASH);
+        EditorTestUtil.performTypingAction(editor, outerQuote);
+        assertEquals("console.log(" + outerQuote + BACKSLASH + outerQuote + ");", document.getText());
+        assertEquals(initialOffset + 3, caretModel.getOffset());
+    }
+
     // These exercise LSPEditorImprovementsTypedHandler.handleStatementTerminator()
 
     public void testStatementTerminator() {
@@ -147,7 +234,10 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         int initialOffset = fileBody.indexOf(")") + 1;
 
         myFixture.configureByText(TEST_FILE_NAME, fileBody);
-        initializeLanguageServer();
+        LanguageServerItem languageServer = initializeLanguageServer();
+
+        // Configure semicolon as a statement terminator character
+        getClientConfigurationSettings(languageServer).statementTerminatorCharacters = ";";
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -167,12 +257,48 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         assertEquals(initialOffset + 1, caretModel.getOffset());
     }
 
+    // Confirms the default/"broken" behavior when 'enableStatementTerminatorImprovements' is disabled
+    public void testStatementTerminatorDisabled() {
+        String fileBody = "console.log()";
+        int initialOffset = fileBody.indexOf(")") + 1;
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        LanguageServerItem languageServer = initializeLanguageServer();
+        ClientConfigurationSettings settings = getClientConfigurationSettings(languageServer);
+
+        // Configure semicolon as a statement terminator character
+        settings.statementTerminatorCharacters = ";";
+
+        // Disable statement terminator improvements
+        settings.editor.enableStatementTerminatorImprovements = false;
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+
+        CaretModel caretModel = editor.getCaretModel();
+        caretModel.moveToOffset(initialOffset);
+
+        // Typing a statement terminator should insert that character and advance the caret
+        EditorTestUtil.performTypingAction(editor, ';');
+        assertEquals("console.log();", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+
+        // Move back to just before the statement terminator and type it again; it should insert another terminator
+        caretModel.moveToOffset(initialOffset);
+        EditorTestUtil.performTypingAction(editor, ';');
+        assertEquals("console.log();;", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+    }
+
     public void testStatementTerminatorInStringLiteral() {
         String fileBody = "console.log('foobar');";
         int initialOffset = fileBody.indexOf("bar");
 
         myFixture.configureByText(TEST_FILE_NAME, fileBody);
-        initializeLanguageServer();
+        LanguageServerItem languageServer = initializeLanguageServer();
+
+        // Configure semicolon as a statement terminator character
+        getClientConfigurationSettings(languageServer).statementTerminatorCharacters = ";";
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -198,8 +324,16 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         testEnterBetweenSpaces(false);
     }
 
+    public void testEnterBetweenBracesDisabled_spaces() {
+        testEnterBetweenSpacesDisabled(false);
+    }
+
     public void testEnterBetweenBraces_tabs() {
         testEnterBetweenSpaces(true);
+    }
+
+    public void testEnterBetweenBracesDisabled_tabs() {
+        testEnterBetweenSpacesDisabled(true);
     }
 
     private void testEnterBetweenSpaces(boolean useTabCharacter) {
@@ -280,6 +414,88 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
                     }
                 }
                 """,
+                useTabCharacter
+        );
+        assertEquals(enterBetweenBracesFileBody.replace(CARET, ""), document.getText());
+        assertEquals(enterBetweenBracesFileBody.indexOf(CARET), caretModel.getOffset());
+    }
+
+    // Confirms the default/"broken" behavior when 'enableTextMateEnterBetweenBracesFix' is disabled
+    private void testEnterBetweenSpacesDisabled(boolean useTabCharacter) {
+        String fileBody = adjustIndent(
+                """
+                        export class Foo {
+                            values = [];
+                            bar() {}
+                        }
+                        """,
+                useTabCharacter
+        );
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        LanguageServerItem languageServer = initializeLanguageServer();
+
+        // Disable the enter-between-braces fix
+        getClientConfigurationSettings(languageServer).editor.enableTextMateEnterBetweenBracesFix = false;
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+        CaretModel caretModel = editor.getCaretModel();
+
+        // Use the appropriate indent
+        CodeStyle.getSettings(editor).getIndentOptions().USE_TAB_CHARACTER = useTabCharacter;
+
+        // Move into the empty brackets and type enter
+        int bracketsOffset = fileBody.indexOf("[]") + 1;
+        caretModel.moveToOffset(bracketsOffset);
+        EditorTestUtil.performTypingAction(editor, '\n');
+        String enterBetweenBracketsFileBody = adjustIndent(
+                """
+                        export class Foo {
+                            values = [
+                            <caret>];
+                            bar() {}
+                        }
+                        """,
+                useTabCharacter
+        );
+        assertEquals(enterBetweenBracketsFileBody.replace(CARET, ""), document.getText());
+        assertEquals(enterBetweenBracketsFileBody.indexOf(CARET), caretModel.getOffset());
+
+        // Move into the empty parens and type enter
+        fileBody = document.getText();
+        int parensOffset = fileBody.indexOf("()") + 1;
+        caretModel.moveToOffset(parensOffset);
+        EditorTestUtil.performTypingAction(editor, '\n');
+        String enterBetweenParensFileBody = adjustIndent(
+                """
+                        export class Foo {
+                            values = [
+                            ];
+                            bar(
+                            <caret>) {}
+                        }
+                        """,
+                useTabCharacter
+        );
+        assertEquals(enterBetweenParensFileBody.replace(CARET, ""), document.getText());
+        assertEquals(enterBetweenParensFileBody.indexOf(CARET), caretModel.getOffset());
+
+        // Move into the empty braces and type enter
+        fileBody = document.getText();
+        int bracesOffset = fileBody.indexOf("{}") + 1;
+        caretModel.moveToOffset(bracesOffset);
+        EditorTestUtil.performTypingAction(editor, '\n');
+        String enterBetweenBracesFileBody = adjustIndent(
+                """
+                        export class Foo {
+                            values = [
+                            ];
+                            bar(
+                            ) {
+                            <caret>}
+                        }
+                        """,
                 useTabCharacter
         );
         assertEquals(enterBetweenBracesFileBody.replace(CARET, ""), document.getText());

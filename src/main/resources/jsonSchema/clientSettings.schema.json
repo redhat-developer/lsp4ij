@@ -11,6 +11,12 @@
       "description": "Whether or not the language grammar is case-sensitive.",
       "default": false
     },
+    "statementTerminatorCharacters": {
+      "type": "string",
+      "title": "Language statement terminator characters",
+      "description": "The statement terminator characters in the language grammar.",
+      "default": ""
+    },
     "completion": {
       "type": "object",
       "title": "Client-side completion configuration",
@@ -26,6 +32,31 @@
           "type": "boolean",
           "title": "Use editor template for invocation-only snippets",
           "description": "Whether or not an editor template should be used for invocation-only snippets.",
+          "default": true
+        }
+      }
+    },
+    "editor": {
+      "type": "object",
+      "title": "Client-side editor behavior configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enableStringLiteralImprovements": {
+          "type": "boolean",
+          "title": "Enable string literal improvements",
+          "description": "Whether or not editor improvements for string literals are enabled.",
+          "default": true
+        },
+        "enableStatementTerminatorImprovements": {
+          "type": "boolean",
+          "title": "Enable statement terminator improvements",
+          "description": "Whether or not editor improvements for statement terminators are enabled.",
+          "default": true
+        },
+        "enableTextMateEnterBetweenBracesFix": {
+          "type": "boolean",
+          "title": "Enable TextMate enter-between-braces fix",
+          "description": "Whether or not the fix for enter-between-braces behavior in TextMate files is enabled.",
           "default": true
         }
       }
@@ -88,7 +119,7 @@
                 "formatOnStatementTerminatorCharacters": {
                   "type": "string",
                   "title": "Statement terminator characters that should trigger on-type formatting",
-                  "description": "The specific statement terminator characters that should trigger on-type formatting."
+                  "description": "The specific statement terminator characters that should trigger on-type formatting. Defaults to 'statementTerminatorCharacters'."
                 },
                 "formatOnStatementTerminatorScope": {
                   "type": "string",

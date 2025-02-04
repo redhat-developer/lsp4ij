@@ -14,6 +14,7 @@
 
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
@@ -78,10 +79,12 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
     }
 
     @Override
-    @Nullable
+    @NotNull
     public String getFormatOnStatementTerminatorCharacters(@NotNull PsiFile file) {
         ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
-        return settings != null ? settings.formatOnStatementTerminatorCharacters : super.getFormatOnStatementTerminatorCharacters(file);
+        return (settings != null) && StringUtil.isNotEmpty(settings.formatOnStatementTerminatorCharacters) ?
+                settings.formatOnStatementTerminatorCharacters :
+                super.getFormatOnStatementTerminatorCharacters(file);
     }
 
     @Override

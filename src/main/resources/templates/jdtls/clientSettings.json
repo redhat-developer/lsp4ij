@@ -1,5 +1,6 @@
 {
   "caseSensitive": true,
+  "statementTerminatorCharacters": ";",
   "completion": {
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false

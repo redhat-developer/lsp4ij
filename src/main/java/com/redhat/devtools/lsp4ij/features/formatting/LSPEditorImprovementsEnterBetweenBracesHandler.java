@@ -26,6 +26,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
+import com.redhat.devtools.lsp4ij.client.features.LSPEditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -46,8 +47,9 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
             @NotNull Ref<Integer> caretAdvance,
             @NotNull DataContext dataContext,
             @Nullable EditorActionHandler originalHandler) {
-        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
-            CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER) {
+        if (LSPIJEditorUtils.isSupportedTextMateFile(file) &&
+            CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER &&
+            LSPEditorBehaviorFeature.enableTextMateEnterBetweenBracesFix(file)) {
             CaretModel caretModel = editor.getCaretModel();
             int offset = caretModel.getOffset();
             if (offset > 0) {
@@ -76,8 +78,9 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
             @NotNull PsiFile file,
             @NotNull Editor editor,
             @NotNull DataContext dataContext) {
-        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
-            CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER) {
+        if (LSPIJEditorUtils.isSupportedTextMateFile(file) &&
+            CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER &&
+            LSPEditorBehaviorFeature.enableTextMateEnterBetweenBracesFix(file)) {
             Project project = file.getProject();
             Document document = editor.getDocument();
             PsiDocumentManager.getInstance(project).commitDocument(document);
