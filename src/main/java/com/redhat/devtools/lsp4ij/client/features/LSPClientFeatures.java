@@ -91,7 +91,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
-    private LSPEditorBehaviorFeature editorBehaviorFeature;
+    private EditorBehaviorFeature editorBehaviorFeature;
 
     /**
      * Returns true if the language server is enabled for the given file and false otherwise. Default to true
@@ -1100,9 +1100,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      * @return the editor behavior feature.
      */
     @NotNull
-    public LSPEditorBehaviorFeature getEditorBehaviorFeature() {
+    public EditorBehaviorFeature getEditorBehaviorFeature() {
         if (editorBehaviorFeature == null) {
-            editorBehaviorFeature = new LSPEditorBehaviorFeature(this);
+            editorBehaviorFeature = new EditorBehaviorFeature(this);
         }
         return editorBehaviorFeature;
     }
@@ -1113,7 +1113,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      * @param editorBehaviorFeature the editor behavior feature
      * @return the LSP client features
      */
-    public LSPClientFeatures setEditorBehaviorFeature(@NotNull LSPEditorBehaviorFeature editorBehaviorFeature) {
+    public LSPClientFeatures setEditorBehaviorFeature(@NotNull EditorBehaviorFeature editorBehaviorFeature) {
         editorBehaviorFeature.setClientFeatures(this);
         this.editorBehaviorFeature = editorBehaviorFeature;
         return this;

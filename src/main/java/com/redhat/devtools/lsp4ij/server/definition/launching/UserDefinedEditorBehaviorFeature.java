@@ -12,8 +12,8 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
-import com.redhat.devtools.lsp4ij.client.features.LSPEditorBehaviorFeature;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ClientConfigurationEditorSettings;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * User-defined editor behavior feature.
  */
-public class UserDefinedEditorBehaviorFeature extends LSPEditorBehaviorFeature {
+public class UserDefinedEditorBehaviorFeature extends EditorBehaviorFeature {
 
     public UserDefinedEditorBehaviorFeature(@NotNull LSPClientFeatures clientFeatures) {
         super(clientFeatures);

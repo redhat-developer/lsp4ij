@@ -22,7 +22,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.client.features.LSPEditorBehaviorFeature;
+import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,12 +45,12 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
         if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file)) {
             // String literal improvements
             if (LSPIJEditorUtils.isQuoteCharacter(file, charTyped) &&
-                LSPEditorBehaviorFeature.enableStringLiteralImprovements(file) &&
+                EditorBehaviorFeature.enableStringLiteralImprovements(file) &&
                 handleNestedQuote(file, editor, charTyped)) {
                 return Result.STOP;
             }
             // Statement terminator improvements
-            else if (LSPEditorBehaviorFeature.enableStatementTerminatorImprovements(file) &&
+            else if (EditorBehaviorFeature.enableStatementTerminatorImprovements(file) &&
                      isStatementTerminatorCharacter(file, charTyped) &&
                      handleStatementTerminator(file, editor)) {
                 return Result.STOP;

@@ -159,9 +159,7 @@ public final class LSPIJEditorUtils {
 
     // Brace pairs
 
-    // NOTE: JetBrains has maintained a long assumption that these are the primary structural block delimiters via
-    // AbstractFileType's explicit support for them. If/when other structural block delimiters are discovered for
-    // languages supported by LSP, we can revisit this hard-coded assumption.
+    // Default brace/bracket/parentheses pairs for when we can't derive them from the file type/language
     private static final Map.Entry<Character, Character> BRACES_ENTRY = Map.entry('{', '}');
     private static final Map.Entry<Character, Character> BRACKETS_ENTRY = Map.entry('[', ']');
     private static final Map.Entry<Character, Character> PARENTHESES_ENTRY = Map.entry('(', ')');

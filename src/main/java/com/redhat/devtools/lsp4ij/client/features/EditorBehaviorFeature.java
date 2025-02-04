@@ -17,10 +17,10 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * LSP client-side editor behavior feature. This does not correspond to an actual LSP feature.
+ * Client-side editor behavior feature. This does not correspond to an actual LSP feature.
  */
 @ApiStatus.Experimental
-public class LSPEditorBehaviorFeature {
+public class EditorBehaviorFeature {
 
     private LSPClientFeatures clientFeatures;
 
@@ -29,7 +29,7 @@ public class LSPEditorBehaviorFeature {
      *
      * @param clientFeatures the client features
      */
-    public LSPEditorBehaviorFeature(@NotNull LSPClientFeatures clientFeatures) {
+    public EditorBehaviorFeature(@NotNull LSPClientFeatures clientFeatures) {
         this.clientFeatures = clientFeatures;
     }
 
