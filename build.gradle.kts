@@ -117,7 +117,7 @@ intellijPlatform {
     }
 
     pluginVerification {
-        failureLevel = listOf(INVALID_PLUGIN, COMPATIBILITY_PROBLEMS, MISSING_DEPENDENCIES )
+        failureLevel = listOf(INVALID_PLUGIN, COMPATIBILITY_PROBLEMS, MISSING_DEPENDENCIES)
         verificationReportsFormats = listOf(MARKDOWN, PLAIN)
         ides {
             recommended()
