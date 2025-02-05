@@ -219,15 +219,16 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * The specific statement terminator characters that should trigger client-side on-type formatting.
+     * The specific statement terminator characters that should trigger client-side on-type formatting. Defaults to
+     * {@link LSPClientFeatures#getStatementTerminatorCharacters(PsiFile)}.
      *
      * @param file the file
      * @return the statement terminator characters that should trigger on-type formatting
      */
-    @Nullable
+    @NotNull
     public String getFormatOnStatementTerminatorCharacters(@NotNull PsiFile file) {
-        // Default to none
-        return null;
+        // Default to the language grammar-specific statement terminator characters
+        return getClientFeatures().getStatementTerminatorCharacters(file);
     }
 
     /**

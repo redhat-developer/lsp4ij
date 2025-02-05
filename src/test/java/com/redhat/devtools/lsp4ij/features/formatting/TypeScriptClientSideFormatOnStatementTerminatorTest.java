@@ -176,7 +176,29 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
         );
     }
 
-    public void testSimpleEnabled() {
+    public void testSimpleEnabled_statementTerminatorCharacters() {
+        assertOnTypeFormatting(
+                TEST_FILE_NAME,
+                SIMPLE_FILE_BODY_BEFORE,
+                // language=typescript
+                """
+                        export class Foo {
+                            bar() {
+                                console.log('Hello, world.');
+                            }
+                        }
+                        """,
+                SIMPLE_MOCK_SELECTION_RANGE_JSON,
+                "[]",
+                SIMPLE_MOCK_RANGE_FORMATTING_JSON,
+                clientConfiguration -> {
+                    clientConfiguration.statementTerminatorCharacters = ";";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
+                }
+        );
+    }
+
+    public void testSimpleEnabled_formatOnStatementTerminatorCharacters() {
         assertOnTypeFormatting(
                 TEST_FILE_NAME,
                 SIMPLE_FILE_BODY_BEFORE,
@@ -198,7 +220,7 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
         );
     }
 
-    public void testSimpleEnabledNoStatementTerminators() {
+    public void testSimpleEnabled_noStatementTerminatorCharacters() {
         assertOnTypeFormatting(
                 TEST_FILE_NAME,
                 SIMPLE_FILE_BODY_BEFORE,
@@ -447,7 +469,34 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
         );
     }
 
-    public void testComplexEnabled() {
+    public void testComplexEnabled_statementTerminatorCharacters() {
+        assertOnTypeFormatting(
+                TEST_FILE_NAME,
+                COMPLEX_FILE_BODY_BEFORE,
+                """
+                        export class Foo {
+                            bar() {
+                                invokePromise()
+                                    .then(() => {
+                                        console.log('test');
+                                    })
+                                    .catch((error) => {
+                                        console.error(error);
+                                    });
+                            }
+                        }
+                        """,
+                COMPLEX_MOCK_SELECTION_RANGE_JSON,
+                COMPLEX_MOCK_FOLDING_RANGE_JSON,
+                COMPLEX_MOCK_RANGE_FORMATTING_JSON,
+                clientConfiguration -> {
+                    clientConfiguration.statementTerminatorCharacters = ";";
+                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
+                }
+        );
+    }
+
+    public void testComplexEnabled_formatOnStatementTerminatorCharacters() {
         assertOnTypeFormatting(
                 TEST_FILE_NAME,
                 COMPLEX_FILE_BODY_BEFORE,
@@ -474,7 +523,7 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
         );
     }
 
-    public void testComplexEnabledNoStatementTerminators() {
+    public void testComplexEnabled_noStatementTerminatorCharacters() {
         assertOnTypeFormatting(
                 TEST_FILE_NAME,
                 COMPLEX_FILE_BODY_BEFORE,
@@ -763,8 +812,8 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 "[]",
                 mockRangeFormattingJson,
                 clientConfiguration -> {
+                    clientConfiguration.statementTerminatorCharacters = ";";
                     clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
-                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters = ";";
                     clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorScope = FormattingScope.CODE_BLOCK;
                 }
         );
@@ -959,8 +1008,8 @@ public class TypeScriptClientSideFormatOnStatementTerminatorTest extends LSPClie
                 "[]",
                 mockRangeFormattingJson,
                 clientConfiguration -> {
+                    clientConfiguration.statementTerminatorCharacters = ";";
                     clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminator = true;
-                    clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters = ";";
                     clientConfiguration.format.onTypeFormatting.clientSide.formatOnStatementTerminatorScope = FormattingScope.FILE;
                 }
         );

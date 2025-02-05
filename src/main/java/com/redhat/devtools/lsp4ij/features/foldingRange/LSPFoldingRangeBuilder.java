@@ -22,10 +22,10 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
+import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockUtils;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
@@ -155,9 +155,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         Character startChar = start > 0 ? documentChars.charAt(start - 1) : null;
         if ((startChar != null) && ((openBraceChar == null) || (startChar == openBraceChar))) {
             // If necessary, infer the braces for this block
-            if ((openBraceChar == null) && LSPCodeBlockUtils.isCodeBlockStartChar(file, startChar)) {
+            if ((openBraceChar == null) && LSPIJEditorUtils.isOpenBraceCharacter(file, startChar)) {
                 openBraceChar = startChar;
-                closeBraceChar = LSPCodeBlockUtils.getCodeBlockEndChar(file, openBraceChar);
+                closeBraceChar = LSPIJEditorUtils.getCloseBraceCharacter(file, openBraceChar);
             }
 
             int end = getEndOffset(foldingRange, document);

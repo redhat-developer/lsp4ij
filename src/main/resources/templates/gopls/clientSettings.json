@@ -1,5 +1,6 @@
 {
   "caseSensitive": true,
+  "lineCommentPrefix": "//",
   "completion": {
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
