@@ -15,7 +15,6 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.google.gson.JsonParser;
 import com.google.gson.annotations.SerializedName;
-import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
@@ -30,6 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.StringReader;
 import java.util.Map;
+
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
  * {@link com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition} implementation to start a
@@ -102,17 +103,6 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 includeSystemEnvironmentVariables,
                 this,
                 project);
-    }
-
-    /**
-     * Returns the resolved command line with expanded macros.
-     *
-     * @param project the project.
-     * @return the resolved command line with expanded macros.
-     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
-     */
-    public static String resolveCommandLine(@NotNull String commandLine, @NotNull Project project) {
-        return ProgramParametersUtil.expandPathAndMacros(commandLine, null, project);
     }
 
     @Override

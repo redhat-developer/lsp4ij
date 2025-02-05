@@ -30,7 +30,6 @@ import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.InitializeRequestArgumentsPathFormat;
@@ -40,7 +39,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.createCommandLine;
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
  * Debug Adapter Protocol (DAP) server descriptor.
@@ -109,12 +112,18 @@ public class DebugAdapterDescriptor {
                     command = userDefinedFactory.getCommandLine();
                 }
             }
-            return generateStartDAPClientCommand(command);
+            // TODO : store env configuration in the options
+            Map<String, String> userEnvironmentVariables = new HashMap<>();
+            boolean includeSystemEnvironmentVariables = true;
+            String resolvedCommandLine = resolveCommandLine(command, environment.getProject());
+            return generateStartDAPClientCommand(resolvedCommandLine, userEnvironmentVariables, includeSystemEnvironmentVariables);
         }
         return null;
     }
 
-    protected @NotNull GeneralCommandLine generateStartDAPClientCommand(@Nullable String command) throws ExecutionException {
+    protected @NotNull GeneralCommandLine generateStartDAPClientCommand(@Nullable String command,
+                                                                        @NotNull Map<String, String> userEnvironmentVariables,
+                                                                        boolean includeSystemEnvironmentVariables) throws ExecutionException {
         if (StringUtils.isBlank(command)) {
             throw new ExecutionException("DAP server command must be specified.");
         }
@@ -124,7 +133,7 @@ public class DebugAdapterDescriptor {
             port = getAvailablePort();
             command = command.replace($_PORT, String.valueOf(port));
         }
-        GeneralCommandLine commandLine = new GeneralCommandLine(CommandUtils.createCommands(command));
+        GeneralCommandLine commandLine = createCommandLine(command, userEnvironmentVariables, includeSystemEnvironmentVariables);
         if (port != null) {
             commandLine.putUserData(SERVER_PORT, port);
         }
