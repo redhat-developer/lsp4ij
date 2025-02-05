@@ -332,26 +332,28 @@ public final class LSPIJEditorUtils {
     public static Commenter getCommenter(@NotNull PsiFile file) {
         Commenter commenter = null;
 
+        // If it has an abstract file type, we can get comment information from it
         if (isAbstractFileTypeFile(file)) {
             AbstractFileType abstractFileType = (AbstractFileType) file.getFileType();
             commenter = abstractFileType.getCommenter();
         }
 
-        // NOTE: Unfortunately the language grammar comment information is not available for TextMate bundles
+        // NOTE: Unfortunately the comment information is not available from TextMate bundles
 
+        // Otherwise try to get it from the client features
         if (commenter == null) {
-            commenter = new LSPIJDefaultCommenter(file);
+            commenter = new ClientFeaturesBasedCommenter(file);
         }
 
         return commenter;
     }
 
-    private static class LSPIJDefaultCommenter implements Commenter {
+    private static class ClientFeaturesBasedCommenter implements Commenter {
         private final String lineCommentPrefix;
         private final String blockCommentPrefix;
         private final String blockCommentSuffix;
 
-        private LSPIJDefaultCommenter(@NotNull PsiFile file) {
+        private ClientFeaturesBasedCommenter(@NotNull PsiFile file) {
             LSPClientFeatures clientFeatures = getClientFeatures(file);
             this.lineCommentPrefix = clientFeatures != null ? clientFeatures.getLineCommentPrefix(file) : null;
             this.blockCommentPrefix = clientFeatures != null ? clientFeatures.getBlockCommentPrefix(file) : null;
