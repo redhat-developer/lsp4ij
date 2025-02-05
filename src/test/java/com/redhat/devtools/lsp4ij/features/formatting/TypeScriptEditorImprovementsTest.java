@@ -257,6 +257,34 @@ public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestC
         assertEquals(initialOffset + 1, caretModel.getOffset());
     }
 
+    public void testStatementTerminatorAfterStringLiteral() {
+        String fileBody = "var foo = 'bar'";
+        int initialOffset = fileBody.lastIndexOf("'") + 1;
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        LanguageServerItem languageServer = initializeLanguageServer();
+
+        // Configure semicolon as a statement terminator character
+        getClientConfigurationSettings(languageServer).statementTerminatorCharacters = ";";
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+
+        CaretModel caretModel = editor.getCaretModel();
+        caretModel.moveToOffset(initialOffset);
+
+        // Typing a statement terminator should insert that character and advance the caret
+        EditorTestUtil.performTypingAction(editor, ';');
+        assertEquals("var foo = 'bar';", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+
+        // Move back to just before the statement terminator and type it again; it should only advance the caret
+        caretModel.moveToOffset(initialOffset);
+        EditorTestUtil.performTypingAction(editor, ';');
+        assertEquals("var foo = 'bar';", document.getText());
+        assertEquals(initialOffset + 1, caretModel.getOffset());
+    }
+
     // Confirms the default/"broken" behavior when 'enableStatementTerminatorImprovements' is disabled
     public void testStatementTerminatorDisabled() {
         String fileBody = "console.log()";

@@ -129,7 +129,7 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
             while (stringLiteralMatcher.find()) {
                 int stringLiteralStart = stringLiteralMatcher.start();
                 int stringLiteralEnd = stringLiteralMatcher.end();
-                if ((stringLiteralStart <= offset) && (offset <= stringLiteralEnd)) {
+                if ((stringLiteralStart < offset) && (offset < stringLiteralEnd)) {
                     return fileChars.subSequence(stringLiteralStart, stringLiteralEnd).toString();
                 }
             }
