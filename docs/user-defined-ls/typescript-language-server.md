@@ -2,7 +2,7 @@
 
 You can use the [TypeScript language server](https://github.com/typescript-language-server/typescript-language-server) to benefit from `TypeScript`, `React` and `JavaScript` support:
 
-![TypeScript demo](../images/user-defined-ls/TypeScriptServerDemo.gif)
+![TypeScript demo](../images/user-defined-ls/typescript-language-server/TypeScriptServerDemo.gif)
 
 You can use it by following these instructions:
 * [Install Node.js](https://nodejs.org/en/download)
@@ -20,4 +20,4 @@ It will install:
 
 After that you can create the TypeScript Language Server with the [language server template](../UserDefinedLanguageServer.md#using-template):
 
-![TypeScript server dialog](../images/user-defined-ls/TypeScriptServerDialog.png)
+![TypeScript server dialog](../images/user-defined-ls/typescript-language-server/TypeScriptServerDialog.png)

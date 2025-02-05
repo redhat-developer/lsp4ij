@@ -9,12 +9,12 @@ To enable Swift language support in your IDE, you can integrate [SourceKit-LSP](
 3. **Select SourceKit-LSP as the template** from the available options.
    This will populate the command field with a default command `sourcekit-lsp`
 
-![SourceKit-LSP template](../images/user-defined-ls/SourceKitLSPTemplate.png)
+![SourceKit-LSP template](../images/user-defined-ls/sourcekit-lsp/SourceKitLSPTemplate.png)
 
 4. **Optional**: You may also customize the mappings section according to your preferences.
 
-   ![SourceKit-LSP template mappings](../images/user-defined-ls/SourceKitLSPTemplateMappings.png)
+   ![SourceKit-LSP template mappings](../images/user-defined-ls/sourcekit-lsp/SourceKitLSPTemplateMappings.png)
 
 5. **Click OK** to apply the changes. You should now have Swift language support enabled in your IDE.
 
-   ![SourceKit-LSP in LSP Console](../images/user-defined-ls/SourceKitLSPInLSPConsole.png)
+   ![SourceKit-LSP in LSP Console](../images/user-defined-ls/sourcekit-lsp/SourceKitLSPInLSPConsole.png)

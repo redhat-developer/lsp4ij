@@ -13,16 +13,15 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
-import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
 import java.util.Map;
+
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.createCommandLine;
 
 /**
  * {@link ProcessStreamConnectionProvider} implementation to start a language server with a
@@ -39,19 +38,6 @@ public class UserDefinedStreamConnectionProvider extends OSProcessStreamConnecti
                                                @NotNull Project project) {
         super(createCommandLine(commandLine, userEnvironmentVariables, includeSystemEnvironmentVariables));
         this.serverDefinition = serverDefinition;
-    }
-
-    @NotNull
-    private static GeneralCommandLine createCommandLine(@NotNull String commandLine,
-                                                        @NotNull Map<String, String> userEnvironmentVariables,
-                                                        boolean includeSystemEnvironmentVariables) {
-        Map<String, String> environmentVariables = new HashMap<>(userEnvironmentVariables);
-        // Add System environment variables
-        if (includeSystemEnvironmentVariables) {
-            environmentVariables.putAll(EnvironmentUtil.getEnvironmentMap());
-        }
-        return new GeneralCommandLine(CommandUtils.createCommands(commandLine))
-                .withEnvironment(environmentVariables);
     }
 
     @Override

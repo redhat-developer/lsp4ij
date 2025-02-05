@@ -43,14 +43,12 @@ public class SettingsHelperTest extends BasePlatformTestCase {
             }
             """;
 
-    private static void assertFindSettings(@NotNull String json, @NotNull String section, @Nullable String expectedJsonText) {
-        JsonObject jsonObject = JsonParser.parseReader(new StringReader(json)).getAsJsonObject();
-        JsonElement expectedJson = expectedJsonText == null ? null : JsonParser.parseReader(new StringReader(expectedJsonText));
-
-        JsonElement result = SettingsHelper.findSettings(section, jsonObject);
-
-        assertEquals(result, expectedJson);
-    }
+    // language=json
+    private final String testJuliaJson = """
+            {
+                "julia.inlayHints.static.enabled": true
+            }
+            """;
 
     public void testGetSettingsObjectValue() {
         var requestedPath = "mylsp";
@@ -128,5 +126,31 @@ public class SettingsHelperTest extends BasePlatformTestCase {
     public void testJimmerDTOClasspathFindBuilder() {
         var requestedPath = "JimmerDTO.Classpath.FindBuilder";
         assertFindSettings(testJson, requestedPath, "false");
+    }
+
+    public void testJulia() {
+        JsonObject juliaConfig = parseJsonObject(testJuliaJson);
+        assertFindSettings(testJson, "julia.inlayHints.static.enabled", "true");
+    }
+
+    private static void assertFindSettings(@NotNull String json,
+                                           @NotNull String section,
+                                           @Nullable String expectedJsonText) {
+        JsonObject jsonObject = parseJsonObject(json);
+        assertFindSettings(jsonObject,section, expectedJsonText);
+    }
+
+    private static void assertFindSettings(@NotNull JsonObject jsonObject,
+                                           @NotNull String section,
+                                           @Nullable String expectedJsonText) {
+        JsonElement expectedJson = expectedJsonText == null ? null : JsonParser.parseReader(new StringReader(expectedJsonText));
+
+        JsonElement result = SettingsHelper.findSettings(section, jsonObject);
+
+        assertEquals(result, expectedJson);
+    }
+
+    private static JsonObject parseJsonObject(@NotNull String json) {
+        return JsonParser.parseReader(new StringReader(json)).getAsJsonObject();
     }
 }

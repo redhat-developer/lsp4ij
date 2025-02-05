@@ -1,0 +1,10 @@
+{
+  "type": "julia",
+  "name": "Launch Julia file",
+  "request": "launch",
+  "program": "${file}",
+  "projectDir": "${workspaceFolder}",
+  "exitAfterTaskReturns": false,
+  "debugAutoInterpretAllModules": false,
+  "stopOnEntry": false
+}

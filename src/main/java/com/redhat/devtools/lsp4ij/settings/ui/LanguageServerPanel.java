@@ -30,7 +30,6 @@ import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPClientConfigurationJsonSchemaFileProvider;
@@ -41,6 +40,8 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
  * Language server panel which show information about language server in several tabs:
@@ -238,7 +239,7 @@ public class LanguageServerPanel implements Disposable {
             }
 
             private void updateLabel(JLabel previewCommandLabel) {
-                String preview = UserDefinedLanguageServerDefinition.resolveCommandLine(commandLine.getText(), project);
+                String preview = resolveCommandLine(commandLine.getText(), project);
                 if (preview.equals(commandLine.getText())) {
                     previewCommandLabel.setToolTipText("");
                     previewCommandLabel.setText("");

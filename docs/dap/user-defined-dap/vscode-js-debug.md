@@ -66,12 +66,12 @@ you need to select `Trace` with `verbose`.
 
 ![Set verbose traces](../images/vscode-js-debug/set_traces.png)
 
-## Configure file mappings
+~~## Configure file mappings
 
 To allows settings breakpoints to JavaScript, TypeScript, etc files, you need configure mappings in the `Mappings` tab.
 As you have selected `VSCode JS Debug` server, it will automatically populate the file mappings like this:
 
-![File mappings](../images/DAP_config_type_mappings.png)
+![File mappings](../images/DAP_config_type_mappings.png)~~
 
 ## Configure the JavaScript file to run/debug
 
