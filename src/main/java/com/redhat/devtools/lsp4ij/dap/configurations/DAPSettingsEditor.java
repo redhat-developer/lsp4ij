@@ -43,6 +43,8 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
 
     @Override
     protected void resetEditorFrom(DAPRunConfiguration runConfiguration) {
+        dapPanel.setServerId(runConfiguration.getServerId());
+
         // Sever settings
         dapPanel.setServerName(runConfiguration.getServerName());
         dapPanel.setCommandLine(runConfiguration.getCommand());
@@ -55,10 +57,6 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         dapPanel.setWorkingDirectory(runConfiguration.getWorkingDirectory());
         dapPanel.setFile(runConfiguration.getFile());
         dapPanel.setDebugMode(runConfiguration.getDebugMode());
-
-        // Update server id at the end to update
-        // - selected tab if needed
-        dapPanel.setServerId(runConfiguration.getServerId());
         dapPanel.setLaunchConfigurationId(runConfiguration.getLaunchConfigurationId());
         dapPanel.setAttachConfigurationId(runConfiguration.getAttachConfigurationId());
         dapPanel.setLaunchConfiguration(runConfiguration.getLaunchConfiguration());
@@ -66,6 +64,10 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         dapPanel.updateDebugServerWaitStrategy(runConfiguration.getDebugServerWaitStrategy(),
                 runConfiguration.getConnectTimeout(),
                 runConfiguration.getDebugServerReadyPattern());
+
+        // Update server id at the end to update
+        // - selected tab if needed
+        dapPanel.updateSelectedTab(runConfiguration.getServerId());
     }
 
     @Override
