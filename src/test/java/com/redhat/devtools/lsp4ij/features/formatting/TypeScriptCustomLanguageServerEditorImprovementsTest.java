@@ -19,9 +19,9 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.testFramework.EditorTestUtil;
 
 /**
- * These verify that editor improvements are disabled by default in non-user-defined language servers.
+ * These verify that editor improvements are disabled by default in custom (i.e., non-user-defined) language servers.
  */
-public class TypeScriptDefaultLanguageServerEditorImprovementsTest extends AbstractTypeScriptEditorImprovementsTest {
+public class TypeScriptCustomLanguageServerEditorImprovementsTest extends AbstractTypeScriptEditorImprovementsTest {
 
     // Verify LSPEditorImprovementsTypedHandler.handleNestedQuote() and LSPEditorImprovementsBackspaceHandler
 
