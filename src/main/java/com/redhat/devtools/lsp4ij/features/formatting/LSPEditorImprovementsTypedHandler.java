@@ -18,7 +18,6 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
@@ -158,16 +157,17 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
         if (document != null) {
             Commenter commenter = LSPIJEditorUtils.getCommenter(file);
 
-            // First try to see if we're in a line comment since that's much more efficient. We're in a lne
-            // comment if we find a line comment start on the same line before the current position.
+            // First try to see if we're in a line comment since that's much more efficient. We're in a line comment if
+            // we find a line comment start on the same line before the current position.
             String lineCommentPrefix = commenter.getLineCommentPrefix();
             if (StringUtil.isNotEmpty(lineCommentPrefix)) {
                 int lineNumber = document.getLineNumber(offset);
                 int lineStartOffset = document.getLineStartOffset(lineNumber);
                 int lineEndOffset = document.getLineEndOffset(lineNumber);
                 if (lineEndOffset > lineStartOffset) {
-                    String lineText = documentChars.subSequence(lineStartOffset, lineEndOffset).toString();
-                    if (StringUtil.isNotEmpty(lineText)) {
+                    CharSequence lineChars = documentChars.subSequence(lineStartOffset, lineEndOffset);
+                    if (!lineChars.isEmpty()) {
+                        String lineText = lineChars.toString();
                         int lineCommentPrefixIndex = lineText.lastIndexOf(lineCommentPrefix, offset);
                         if (lineCommentPrefixIndex > -1) {
                             int lineCommentPrefixOffset = lineStartOffset + lineCommentPrefixIndex;
@@ -179,24 +179,27 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
                 }
             }
 
-            // If not detected in a line comment, try to see if we're in a block comment. We're in a block
-            // comment if we find a block comment start before the current position without a block comment
-            // end in the interim.
+            // If not detected in a line comment, try to see if we're in a block comment. We're in a block comment if
+            // we find a block comment start before the current position without a block comment end in the interim.
             if (!inComment) {
                 String blockCommentPrefix = commenter.getBlockCommentPrefix();
                 String blockCommentSuffix = commenter.getBlockCommentSuffix();
                 if (StringUtil.isNotEmpty(blockCommentPrefix) && StringUtil.isNotEmpty(blockCommentSuffix)) {
-                    String partialDocumentText = documentChars.subSequence(0, offset).toString();
-                    int previousBlockCommentPrefixIndex = partialDocumentText.lastIndexOf(blockCommentPrefix, offset);
-                    if (previousBlockCommentPrefixIndex > -1) {
-                        // For efficiency, limit the text that has to be searched for the block comment end to
-                        // the span between the previous block comment start and the current position.  Search
-                        // forward from the block comment start assuming that in general the comment length will
-                        // be shorter than the distance between the current position and the previous block comment.
-                        String blockCommentEndSearchText = document.getText(TextRange.create(previousBlockCommentPrefixIndex, offset));
-                        int previousBlockCommentSuffixIndex = blockCommentEndSearchText.indexOf(blockCommentSuffix);
-                        if (previousBlockCommentSuffixIndex == -1) {
-                            inComment = true;
+                    CharSequence beforeOffsetChars = documentChars.subSequence(0, offset);
+                    if (!beforeOffsetChars.isEmpty()) {
+                        String beforeOffsetText = beforeOffsetChars.toString();
+                        int previousBlockCommentPrefixIndex = beforeOffsetText.lastIndexOf(blockCommentPrefix, offset);
+                        if (previousBlockCommentPrefixIndex > -1) {
+                            // For efficiency, limit the text that has to be searched for the block comment end to the span
+                            // between the previous block comment start and the current position.
+                            CharSequence betweenBlockCommentPrefixAndOffsetChars = documentChars.subSequence(previousBlockCommentPrefixIndex + blockCommentPrefix.length(), offset);
+                            if (!betweenBlockCommentPrefixAndOffsetChars.isEmpty()) {
+                                String betweenBlockCommentPrefixAndOffsetText = betweenBlockCommentPrefixAndOffsetChars.toString();
+                                int previousBlockCommentSuffixIndex = betweenBlockCommentPrefixAndOffsetText.indexOf(blockCommentSuffix);
+                                if (previousBlockCommentSuffixIndex == -1) {
+                                    inComment = true;
+                                }
+                            }
                         }
                     }
                 }
