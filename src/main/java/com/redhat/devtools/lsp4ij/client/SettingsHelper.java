@@ -43,31 +43,44 @@ public class SettingsHelper {
             return parent.get(section);
         }
 
+        // Split sections
         final var sections = section.split("[.]");
+        boolean found = false;
         JsonElement current = parent;
         for (var split : sections) {
             if (current instanceof JsonObject currentObject) {
-                current = currentObject.get(split);
+                if (currentObject.has(split)) {
+                    current = currentObject.get(split);
+                    found = true;
+                } else {
+                    found = false;
+                    break;
+                }
+            } else {
+                found = false;
+                break;
             }
         }
 
-        if (current != null) {
+        if (found) {
             return current;
         }
 
-        for (var key : Set.copyOf(parent.keySet())) {
+        // Clone the Json object parent because remove key is applied here
+        JsonObject clonedParent = parent.deepCopy();
+        for (var key : Set.copyOf(clonedParent.keySet())) {
             var keySplit = key.split("[.]");
             if (sections.length > keySplit.length) {
-                parent.remove(key);
+                clonedParent.remove(key);
                 continue;
             }
             for (int i = 0; i < sections.length; i++) {
                 if (!sections[i].equals(keySplit[i])) {
-                    parent.remove(key);
+                    clonedParent.remove(key);
                     break;
                 }
             }
         }
-        return parent.isEmpty() ? null : parent;
+        return clonedParent.isEmpty() ? null : clonedParent;
     }
 }

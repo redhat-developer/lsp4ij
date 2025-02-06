@@ -8,14 +8,14 @@ To enable Clojure language support in your IDE, you can integrate [Clojure LSP](
 
 4. **Select Clojure LSP as the template** from the available options. This will populate the command field with a default command. You need to adjust this command to point to the location of the extracted Clojure LSP asset.
 
-   ![Clojure LS template](../images/user-defined-ls/ClojureLSPTemplate.png)
+   ![Clojure LS template](../images/user-defined-ls/clojure-lsp/select_template.png)
 
 5. **Adjust the command** in the template to reference the location of the extracted Clojure LSP executable.
 
 6. **Optional**: You may also customize the mappings section according to your preferences.
 
-   ![Clojure LS template mappings](../images/user-defined-ls/ClojureLSPTemplateMappings.png)
+   ![Clojure LS template mappings](../images/user-defined-ls/clojure-lsp/configure_file_mappings.png)
 
 7. **Click OK** to apply the changes. You should now have Clojure language support enabled in your IDE, with the Clojure LSP integrated.
 
-   ![Clojure LSP in LSP Console](../images/user-defined-ls/ClojureLSPInLSPConsole.png)
+   ![Clojure LSP in LSP Console](../images/user-defined-ls/clojure-lsp/ClojureLSPInLSPConsole.png)

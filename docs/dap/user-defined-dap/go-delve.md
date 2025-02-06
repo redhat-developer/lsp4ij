@@ -117,7 +117,7 @@ Set a breakpoint in the `test.go` file:
 
 ![Set Breakpoint](../images/go-delve/set_breakpoint.png)
 
-# Debugging
+## Debugging
 
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console:
 
@@ -126,3 +126,9 @@ You can start the run configuration in either Run or Debug mode. Once started, y
 You will also see `Threads` and `Variables`:
 
 ![Debugging / Threads](../images/go-delve/debug_threads_tab.png)
+
+## Language Support
+
+If you need language support for Go (completion, validation, etc) you can [configure the Go Language Server](../../user-defined-ls/gopls.md)
+
+![Go demo](../../images/user-defined-ls/gopls/demo_ls.gif)

@@ -113,10 +113,14 @@ Set a breakpoint in the `Sources/main.swift` file:
 
 ![Set Breakpoint](../images/swift-lldb/set_breakpoint.png)
 
-# Debugging
+## Debugging
 
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console:
 
 You will also see `Threads` and `Variables`:
 
 ![Debugging / Threads](../images/swift-lldb/debug_threads_tab.png)
+
+## Language Support
+
+If you need language support for Swift (completion, validation, etc) you can [configure the SourceKit-LSP Language Server](../../user-defined-ls/sourcekit-lsp.md)
