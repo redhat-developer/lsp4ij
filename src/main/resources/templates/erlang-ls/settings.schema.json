@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/erlang/settings.schema.json",
+  "title": "LSP4IJ Erlang language server settings JSON schema",
+  "description": "JSON schema for Erlang language server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "erlang_ls.serverPath": {
+      "scope": "window",
+      "type": "string",
+      "default": "",
+      "description": "Override the default path of the erlang_ls executable with a custom one."
+    },
+    "erlang_ls.escriptPath": {
+      "scope": "window",
+      "type": "string",
+      "default": "",
+      "description": "Override the default path of the escript executable with a custom one."
+    },
+    "erlang_ls.logPath": {
+      "scope": "window",
+      "type": "string",
+      "default": "",
+      "description": "Override the default directory erlang_ls logs to."
+    },
+    "erlang_ls.logLevel": {
+      "scope": "window",
+      "enum": [
+        "none",
+        "debug",
+        "info",
+        "notice",
+        "warning",
+        "error",
+        "critical",
+        "alert",
+        "emergency"
+      ],
+      "default": "none",
+      "description": "Log level of LS server"
+    }
+  }
+}
