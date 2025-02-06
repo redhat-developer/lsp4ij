@@ -49,7 +49,9 @@ public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
             if (isVariable(textMateScope)) {
                 var textRange = new TextRange(start, end);
                 String variableName = document.getText(textRange);
-                context.addVariableRange(variableName, textRange);
+                if (!variableName.isBlank()) {
+                    context.addVariableRange(variableName.trim(), textRange);
+                }
             }
             return true;
         }
@@ -57,6 +59,8 @@ public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
     }
 
     private boolean isVariable(TextMateScope textMateScope) {
-        return textMateScope.getScopeName() != null && ((String) textMateScope.getScopeName()).contains("variable");
+        return textMateScope.getScopeName() == null /* in Julia TextMate, variable have null scope **/ ||
+                ((String) textMateScope.getScopeName()).contains("source.") /* in Julia TextMate, variable have "source.julia"" scope **/ ||
+                ((String) textMateScope.getScopeName()).contains("variable");
     }
 }

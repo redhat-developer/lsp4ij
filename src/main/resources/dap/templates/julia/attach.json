@@ -1,0 +1,6 @@
+{
+  "type": "julia",
+  "name": "Attach to process",
+  "request": "attach",
+  "port": 5858
+}

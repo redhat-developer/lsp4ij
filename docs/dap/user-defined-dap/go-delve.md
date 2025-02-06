@@ -39,11 +39,18 @@ DAP server listening at: 127.0.0.1:60732
 
    ![DAP Configuration Type](../images/DAP_config_type.png)
 
-4. In the `Server` tab, select `Go - Delve`.
+4. In the `Server` tab, click on `create a new server`:
 
-   ![DAP Configuration/Server](../images/go-delve/server_tab.png)
+   ![Create a new server](../images/DAP_server_create_link.png)
 
-This will automatically populate: 
+5. It opens a new dialog to create DAP server, select `Go - Delve` template:
+   ![Select Template](../images/go-delve/select_template.png)
+
+6. After clicking on `OK` button, it will select the new server and pre-fill configurations:
+
+![Select New server](../images/go-delve/select_new_server.png)
+
+This will automatically populate:
 
  * the server `name`
  * the `command` which starts the DAP server which should look like this:
@@ -52,7 +59,7 @@ This will automatically populate:
 dlv dap
 ```
 
- * the `Connecting to the server` is set with `after finding trace` option with:
+ * the `Connect to the server by waiting` option is set to `Log pattern before processing` with:
 
 ```
 DAP server listening at: ${address}:${port}
@@ -93,12 +100,13 @@ As you have selected `Go - Delve` server, it will automatically populate the fil
 
 ![DAP Configuration/Configuration](../images/go-delve/configuration_tab.png)
 
-2. Select `Launch` as debugging type.
+2. Select `Launch` as `Debug mode`.
 3. The DAP parameters of the launch should look like this:
 
 ```json
 {
    "type": "go",
+   "name": "Launch Go file",
    "request": "launch",
    "program": "${file}",
    "cwd": "${workspaceFolder}"
@@ -117,7 +125,7 @@ Set a breakpoint in the `test.go` file:
 
 ![Set Breakpoint](../images/go-delve/set_breakpoint.png)
 
-# Debugging
+## Debugging
 
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console:
 
@@ -126,3 +134,9 @@ You can start the run configuration in either Run or Debug mode. Once started, y
 You will also see `Threads` and `Variables`:
 
 ![Debugging / Threads](../images/go-delve/debug_threads_tab.png)
+
+## Language Support
+
+If you need language support for Go (completion, validation, etc) you can [configure the Go Language Server](../../user-defined-ls/gopls.md)
+
+![Go demo](../../images/user-defined-ls/gopls/demo_ls.gif)

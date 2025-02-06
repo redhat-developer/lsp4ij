@@ -1,6 +1,6 @@
 To enable Scala language support in your IDE, you can integrate [Scala Language Server (Metals)](https://scalameta.org/metals/) by following these steps:
 
-![Metala LS demo](../images/user-defined-ls/MetaLSDemo.gif)
+![Metals LS demo](../images/user-defined-ls/metals/demo_ls.gif)
 
 1. Install [Coursier](https://github.com/coursier/coursier) and read [How to start Metals?](https://scalameta.org/metals/docs/integrations/new-editor#starting-the-server).
 
@@ -12,14 +12,14 @@ To enable Scala language support in your IDE, you can integrate [Scala Language 
 4. **Select Scala Language Server (Metals) as the template** from the available options.
    This will populate the command field with a default command. You need to adjust this command to point to the location of the extracted generated **${BASE_DIR}/metals.bat** file.
    
-   ![Metals template](../images/user-defined-ls/MetaLSTemplate.png)
+   ![Metals template](../images/user-defined-ls/metals/select_template.png)
 
 5. **Adjust the command** in the template to reference the location of the generated metals file.
 
 6. **Optional**: You may also customize the mappings section according to your preferences.
 
-   ![Meta LS template mappings](../images/user-defined-ls/MetaLSTemplateMappings.png)
+   ![Metals template mappings](../images/user-defined-ls/metals/configure_file_mappings.png)
 
 7. **Click OK** to apply the changes. You should now have Scala language support enabled in your IDE, with the Metals integrated.
 
-   ![Meta LS in LSP Console](../images/user-defined-ls/MetaLSInLSPConsole.png)
+   ![Metals in LSP Console](../images/user-defined-ls/metals/MetaLSInLSPConsole.png)
