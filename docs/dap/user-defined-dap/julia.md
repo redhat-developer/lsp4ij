@@ -147,7 +147,7 @@ Set a breakpoint in the `test.js` file:
 
 ![Set Breakpoint](../images/julia/set_breakpoint.png)
 
-# Debugging
+## Debugging
 
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console:
 
@@ -156,3 +156,9 @@ You can start the run configuration in either Run or Debug mode. Once started, y
 You will also see `Threads` and `Variables`:
 
 ![Debugging / Threads](../images/julia/debug_threads_tab.png)
+
+## Language Support
+
+If you need language support for Julia (completion, validation, etc) you can [configure the Julia Language Server](../../user-defined-ls/julia.md)
+
+![Go demo](../../images/user-defined-ls/julia/demo_ls.gif)
