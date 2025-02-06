@@ -16,17 +16,17 @@ Here is an example with `JavaScript debugging`, which uses the [VSCode JS Debug 
 
 To configure debugging with DAP, you need to fill in:
 
-- The `Configuration` tab to specify the working directory and the file you want to run/debug:
+- The `Server` tab to specify the DAP server:
 
-  ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
+  ![DAP Configuration Type/Server](./images/DAP_config_type_server.png)
 
 - The `Mappings` tab to specify the files which can be debugged to allow adding/removing breakpoints:
 
 ![DAP Configuration Type/Mappings](./images/DAP_config_type_mappings.png)
 
-- The `Server` tab to specify the DAP server:
- 
-  ![DAP Configuration Type/Server](./images/DAP_config_type_server.png)
+- The `Configuration` tab to specify the working directory and the file you want to run/debug:
+
+  ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
 ## Inline value
 
@@ -68,11 +68,21 @@ You should edit the variable:
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
 
-# Contextual Menu
+## Contextual Menu
 
 Click on right button open existing / new DAP run configuration:
 
 ![Run/Debug menu](images/DAP_contextual_menu.png)
+
+## DAP server traces
+
+If you wish to show DAP request/response traces when you will debug:
+
+![Show DAP traces](./images/vscode-js-debug/traces_in_console.png)
+
+you need to select `Trace` with `verbose`.
+
+![Set verbose traces](./images/vscode-js-debug/set_traces.png)
 
 ## Templates
 
