@@ -187,3 +187,9 @@ Update the path with the `test.ts` file.
 TypeScript debugging should be available:
 
 ![Debugging TypeScript](../images/vscode-js-debug/debug_ts.png)
+
+## Language Support
+
+If you need language support for TypeScript/JavaScript (completion, validation, etc) you can [configure the TypeScript Language Server](../../user-defined-ls/typescript-language-server.md)
+
+![TypeScript demo](../../images/user-defined-ls/typescript-language-server/demo_ls.gif)

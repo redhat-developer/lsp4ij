@@ -3,7 +3,7 @@
 LSP4IJ provides the capability to consume any language server without developing
 an IntelliJ plugin via a `User-defined language server`.
 
-![New Language Server Dialog with TypeScript](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog.png)
+![New Language Server Dialog with TypeScript](images/user-defined-ls/typescript-language-server/select_template.png)
 
 The main idea is to: 
 
@@ -34,7 +34,7 @@ The `Server tab` requires the `server name` and `command` fields to be set.
 
 Here is a sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
-![New Language Server Dialog with TypeScript](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog.png)
+![New Language Server Dialog with TypeScript](images/user-defined-ls/typescript-language-server/select_template.png)
 
 #### Environment variables
 

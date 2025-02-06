@@ -2,9 +2,9 @@
 
 You can use [Rust Analyzer](https://rust-analyzer.github.io/) to benefit from `Rust` support:
 
-![Rust Analyzer Demo](../images/user-defined-ls/rust-analyzer/RustAnalyzerDemo.gif)
+![Rust Analyzer Demo](../images/user-defined-ls/rust-analyzer/demo_ls.gif)
 
-by following these steps:
+## Install the language server
 
 1. **Install Rust Language Server**, by following these instructions:
 
@@ -18,13 +18,13 @@ by following these steps:
     * `${BASE_DIR}/rust-analyzer.exe` for Windows OS.
     * `sh -c ${BASE_DIR}/rust-analyzer` for other OS.
 
-   ![Rust Analyzer template](../images/user-defined-ls/rust-analyzer/RustAnalyzerTemplate.png)
+   ![Rust Analyzer template](../images/user-defined-ls/rust-analyzer/select_template.png)
 
 You need to adjust this command to point to the location of the extracted Rust Analyzer LSP asset.
 
 5. **Optional**: You may also customize the mappings section:
 
-   ![Rust Analyzer template mappings](../images/user-defined-ls/rust-analyzer/RustAnalyzerTemplateMappings.png)
+   ![Rust Analyzer template mappings](../images/user-defined-ls/rust-analyzer/configure_file_mappings.png)
 
    or configuration section according to your preferences.
 

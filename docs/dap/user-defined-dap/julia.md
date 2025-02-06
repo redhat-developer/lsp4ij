@@ -1,6 +1,6 @@
-# Julia
+# Julia DAP server
 
-To debug `Julia` files, you can use the [Julia](https://github.com/julia-vscode/DebugAdapter.jl) DAP server.
+To debug [Julia](https://julialang.org/) files, you can use the [Julia](https://github.com/julia-vscode/DebugAdapter.jl) DAP server.
 
 Let’s debugging the following `test.julia` file:
 
@@ -18,7 +18,7 @@ main()
 ## Configure DAP server
 
 1. [install Julia](https://julialang.org/downloads/). After that open a terminal and type `julia`:
-   ![Install Julia DAP server](../images/julia/julia_command.png)
+   ![Julia command](../images/julia/julia_command.png)
 
 2. switch to Julia’s REPL by typing `]` to install the DAP server with the command `add DebugAdapter`
    ![Install Julia DAP server](../images/julia/julia_dap_install.png)

@@ -46,6 +46,7 @@ public class SettingsHelperTest extends BasePlatformTestCase {
     // language=json
     private final String testJuliaJson = """
             {
+            	"julia.lint.call": true,
                 "julia.inlayHints.static.enabled": true
             }
             """;
@@ -130,14 +131,15 @@ public class SettingsHelperTest extends BasePlatformTestCase {
 
     public void testJulia() {
         JsonObject juliaConfig = parseJsonObject(testJuliaJson);
-        assertFindSettings(testJson, "julia.inlayHints.static.enabled", "true");
+        assertFindSettings(juliaConfig, "julia.lint.call", "true");
+        assertFindSettings(juliaConfig, "julia.inlayHints.static.enabled", "true");
     }
 
     private static void assertFindSettings(@NotNull String json,
                                            @NotNull String section,
                                            @Nullable String expectedJsonText) {
         JsonObject jsonObject = parseJsonObject(json);
-        assertFindSettings(jsonObject,section, expectedJsonText);
+        assertFindSettings(jsonObject, section, expectedJsonText);
     }
 
     private static void assertFindSettings(@NotNull JsonObject jsonObject,

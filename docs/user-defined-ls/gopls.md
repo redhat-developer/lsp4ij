@@ -2,9 +2,9 @@
 
 You can use the [Go language server](https://pkg.go.dev/golang.org/x/tools/gopls) to benefit from `Go` support:
 
-![Go demo](../images/user-defined-ls/gopls/GoplsDemo.gif)
+![Go demo](../images/user-defined-ls/gopls/demo_ls.gif)
 
-by following these steps:
+## Install the language server
 
 1. **Install Go Language Server**, by following these instructions:
 
@@ -23,11 +23,11 @@ by following these steps:
    * `gopls -mode=stdio` for Windows OS.
    * `sh -c gopls -mode=stdio` for other OS.
 
-   ![Gopls template](../images/user-defined-ls/gopls/GoplsTemplate.png)
+   ![Gopls template](../images/user-defined-ls/gopls/select_template.png)
 
 5. **Optional**: You may also customize the mappings section:
 
-   ![Go LS template mappings](../images/user-defined-ls/gopls/GoplsTemplateMappings.png)
+   ![Go LS template mappings](../images/user-defined-ls/gopls/configure_file_mappings.png)
 
    or configuration section according to your preferences.
 
@@ -49,3 +49,9 @@ that you can configure in IntelliJ via the `Editor / TextMate Bundles` settings.
 You need to clone https://github.com/golang/vscode-go/tree/master/extension and reference this folder 
 (which contains the [package.json](https://github.com/golang/vscode-go/blob/540e146da867f42298ccdac782e4e163fec16b0d/extension/package.json#L172))
 to benefit from syntax coloration and language configuration (matching brackets, etc).
+
+## Debugging
+
+If you need to Run/Debug Go program, you can [configure the Go DAP server](../dap/user-defined-dap/go-delve.md).
+
+![Debugging / Threads](../dap/images/go-delve/debug_threads_tab.png)

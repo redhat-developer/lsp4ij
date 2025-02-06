@@ -1,25 +1,37 @@
-To enable Scala language support in your IDE, you can integrate [Scala Language Server (Metals)](https://scalameta.org/metals/) by following these steps:
+# Julia Language Server
 
-![Metala LS demo](../images/user-defined-ls/metals/MetaLSDemo.gif)
+To enable [Julia](https://julialang.org/) language support in your IDE, you can integrate [Julia Language Server](https://github.com/julia-vscode/LanguageServer.jl) by following these steps:
 
-1. Install [Coursier](https://github.com/coursier/coursier) and read [How to start Metals?](https://scalameta.org/metals/docs/integrations/new-editor#starting-the-server).
+![Julia LS demo](../images/user-defined-ls/julia/demo_ls.gif)
 
-2. Once [Coursier](https://github.com/coursier/coursier) is installed, open a terminal and execute `coursier bootstrap org.scalameta:metals_2.13:1.2.2 -o metals -f`
-   which will generate **${BASE_DIR}/metals** and **${BASE_DIR}/metals.bat** (according your OS).
+## Install the language server
+
+1. [install Julia](https://julialang.org/downloads/). After that open a terminal and type `julia`:
+   ![Julia command](../images/user-defined-ls/julia/julia_command.png)
+
+2. switch to Julia’s REPL by typing `]` to install the DAP server with the command `add LanguageServer`
+   ![Install Julia language server](../images/user-defined-ls/julia/julia_ls_install.png)
 
 3. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
-4. **Select Scala Language Server (Metals) as the template** from the available options.
-   This will populate the command field with a default command. You need to adjust this command to point to the location of the extracted generated **${BASE_DIR}/metals.bat** file.
+4. **Select Julia Language Server as the template** from the available options.
    
-   ![Metals template](../images/user-defined-ls/metals/MetaLSTemplate.png)
-
-5. **Adjust the command** in the template to reference the location of the generated metals file.
+   ![Julia template](../images/user-defined-ls/julia/select_template.png)
 
 6. **Optional**: You may also customize the mappings section according to your preferences.
 
-   ![Meta LS template mappings](../images/user-defined-ls/metals/MetaLSTemplateMappings.png)
+   ![Julia LS template mappings](../images/user-defined-ls/julia/configure_file_mappings.png)
 
-7. **Click OK** to apply the changes. You should now have Scala language support enabled in your IDE, with the Metals integrated.
+7. **Click OK** to apply the changes. You should now have [Julia](https://julialang.org/) language support enabled in your IDE:
 
-   ![Meta LS in LSP Console](../images/user-defined-ls/metals/MetaLSInLSPConsole.png)
+   ![Julia LS in LSP Console](../images/user-defined-ls/julia/ls_in_console.png)
+
+You could also configure server (you should have completion which will help you to configure server):
+
+![Julia LS configuration](../images/user-defined-ls/julia/configure_server_configuration.png)
+
+## Debugging
+
+If you need to Run/Debug Julia program, you can [configure the Julia DAP server](../dap/user-defined-dap/julia.md).
+
+![Debugging / Threads](../dap/images/julia/debug_threads_tab.png)

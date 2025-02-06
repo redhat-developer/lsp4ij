@@ -43,7 +43,6 @@ public class SettingsHelper {
             return parent.get(section);
         }
 
-
         // Split sections
         final var sections = section.split("[.]");
         boolean found = false;
@@ -83,6 +82,5 @@ public class SettingsHelper {
             }
         }
         return clonedParent.isEmpty() ? null : clonedParent;
-
     }
 }
