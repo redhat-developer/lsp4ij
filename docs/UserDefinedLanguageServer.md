@@ -122,6 +122,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Go Language Server](./user-defined-ls/gopls.md)
+* [Julia Language Server](./user-defined-ls/julia.md) 
 * [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)

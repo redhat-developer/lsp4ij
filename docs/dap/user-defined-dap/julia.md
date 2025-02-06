@@ -57,7 +57,7 @@ start_debugger()
 
    ![DAP Configuration Type](../images/DAP_config_type.png)
 
-5. Click on `create a new server`:
+5. In the `Server` tab, click on `create a new server`:
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
@@ -66,7 +66,7 @@ start_debugger()
 
 7. After clicking on `OK` button, it will select the new server and pre-fill configurations:
 
- ![Select Template](../images/julia/select_new_server.png)
+ ![Select New server](../images/julia/select_new_server.png)
 
 This will automatically populate:
 
@@ -81,7 +81,7 @@ The `${port}` argument will be replaced with a free port when the run configurat
 
 The julia `$PROJECT_DIR$` which is an Intellij macro will be replaced with your project dir.
 
-* the `Connect to the server by waiting` option is set to `Log pattern before processing`, with:
+* the `Connect to the server by waiting` option is set to `Log pattern before processing` with:
 
  ```
  Listening on port ${port}
@@ -120,7 +120,7 @@ As you have selected `Julia` server, it will automatically populate the file map
 
 ![DAP Configuration/Configuration](../images/julia/configuration_tab.png)
 
-2. Select `Launch` as debugging type.
+2. Select `Launch` as `Debug mode`.
 3. The DAP parameters of the launch should look like this:
 
 ```json
@@ -140,6 +140,7 @@ When the run configuration starts:
 
 - `${workspaceFolder}` will be replaced with the working directory you specified.
 - `${file}` will be replaced with the full path to `test.jl`.
+
 ## Set Breakpoint
 
 After applying the run configuration, you should set a breakpoint to files which matches file mappings.
@@ -161,4 +162,4 @@ You will also see `Threads` and `Variables`:
 
 If you need language support for Julia (completion, validation, etc) you can [configure the Julia Language Server](../../user-defined-ls/julia.md)
 
-![Go demo](../../images/user-defined-ls/julia/demo_ls.gif)
+![Julia demo](../../images/user-defined-ls/julia/demo_ls.gif)
