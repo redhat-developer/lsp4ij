@@ -1,0 +1,22 @@
+{
+  "id": "erlang-ls",
+  "name": "Erlang Language Server",
+  "programArgs": {
+    "default": "escript $PROJECT_DIR$/erlang_ls"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Erlang",
+        "patterns": [
+          "*.erl",
+          "*.hrl",
+          "*.src",
+          "*.escript",
+          "*.config"
+        ]
+      },
+      "languageId": "erlang"
+    }
+  ]
+}
