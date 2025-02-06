@@ -16,72 +16,19 @@ import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.project.Project;
-import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EditorTestUtil;
-import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
-import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Tests for LSPEditorImprovementsTypedHandler, LSPEditorImprovementsBackspaceHandler, and LSPEditorImprovementsEnterBetweenBracesHandler.
  */
-public class TypeScriptEditorImprovementsTest extends LSPCodeInsightFixtureTestCase {
-
-    private static final String TEST_FILE_NAME = "test.ts";
-    private static final char BACKSLASH = '\\';
-    private static final String CARET = "<caret>";
+public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorImprovementsTest {
 
     public TypeScriptEditorImprovementsTest() {
-        super("*.ts");
+        super();
         setClientConfigurable(true);
-    }
-
-    @Override
-    protected void tearDown() throws Exception {
-        // Restore the default code style
-        Editor editor = myFixture.getEditor();
-        if (editor != null) {
-            CodeStyle.getSettings(editor).getIndentOptions().USE_TAB_CHARACTER = false;
-        }
-
-        super.tearDown();
-    }
-
-    @NotNull
-    private LanguageServerItem initializeLanguageServer() {
-        List<LanguageServerItem> languageServers = new LinkedList<>();
-        try {
-            Project project = myFixture.getProject();
-            PsiFile file = myFixture.getFile();
-            ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file.getVirtualFile(), null, null)
-                    .get(5000, TimeUnit.MILLISECONDS));
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
-        LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
-        assertNotNull(languageServer);
-        return languageServer;
-    }
-
-    @NotNull
-    private ClientConfigurationSettings getClientConfigurationSettings(@NotNull LanguageServerItem languageServer) {
-        LanguageServerDefinition languageServerDefinition = languageServer.getServerDefinition();
-        assertInstanceOf(languageServerDefinition, ClientConfigurableLanguageServerDefinition.class);
-        ClientConfigurableLanguageServerDefinition configurableLanguageServerDefinition = (ClientConfigurableLanguageServerDefinition) languageServerDefinition;
-        ClientConfigurationSettings clientConfigurationSettings = configurableLanguageServerDefinition.getLanguageServerClientConfiguration();
-        assertNotNull(clientConfigurationSettings);
-        return clientConfigurationSettings;
     }
 
     // These tests exercise both LSPEditorImprovementsTypedHandler.handleNestedQuote() and LSPEditorImprovementsBackspaceHandler

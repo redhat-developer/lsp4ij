@@ -53,37 +53,37 @@ public class EditorBehaviorFeature {
     }
 
     /**
-     * Whether or not editor improvements for string literals are enabled. Defaults to true.
+     * Whether or not editor improvements for string literals are enabled. Defaults to false.
      *
      * @param file the file
      * @return true if editor improvements for string literals are enabled; otherwise false
      */
     public boolean isEnableStringLiteralImprovements(@NotNull PsiFile file) {
-        // Default to enabled
-        return true;
+        // Default to disabled
+        return false;
     }
 
     /**
-     * Whether or not editor improvements for statement terminators are enabled. Defaults to true.
+     * Whether or not editor improvements for statement terminators are enabled. Defaults to false.
      *
      * @param file the file
      * @return true if editor improvements for statement terminators are enabled; otherwise false
      */
     public boolean isEnableStatementTerminatorImprovements(@NotNull PsiFile file) {
-        // Default to enabled
-        return true;
+        // Default to disabled
+        return false;
     }
 
     /**
      * Whether or not the fix for <a href="https://youtrack.jetbrains.com/issue/IJPL-159454">IJPL-159454</a> is enabled.
-     * Defaults to true.
+     * Defaults to false.
      *
      * @param file the file
      * @return true if the fix for enter-between-braces behavior is enabled; otherwise false
      */
     public boolean isEnableEnterBetweenBracesFix(@NotNull PsiFile file) {
-        // Default to enabled
-        return true;
+        // Default to disabled
+        return false;
     }
 
     // Utility methods to check the state of these feature flags easily

@@ -38,18 +38,21 @@ public class UserDefinedEditorBehaviorFeature extends EditorBehaviorFeature {
     @Override
     public boolean isEnableStringLiteralImprovements(@NotNull PsiFile file) {
         ClientConfigurationEditorSettings editorSettings = getEditorSettings();
-        return editorSettings != null ? editorSettings.enableStringLiteralImprovements : super.isEnableStringLiteralImprovements(file);
+        // Note that this defaults to enabled for user-defined language server definitions
+        return (editorSettings == null) || editorSettings.enableStringLiteralImprovements;
     }
 
     @Override
     public boolean isEnableStatementTerminatorImprovements(@NotNull PsiFile file) {
         ClientConfigurationEditorSettings editorSettings = getEditorSettings();
-        return editorSettings != null ? editorSettings.enableStatementTerminatorImprovements : super.isEnableStatementTerminatorImprovements(file);
+        // Note that this defaults to enabled for user-defined language server definitions
+        return (editorSettings == null) || editorSettings.enableStatementTerminatorImprovements;
     }
 
     @Override
     public boolean isEnableEnterBetweenBracesFix(@NotNull PsiFile file) {
         ClientConfigurationEditorSettings editorSettings = getEditorSettings();
-        return editorSettings != null ? editorSettings.enableEnterBetweenBracesFix : super.isEnableEnterBetweenBracesFix(file);
+        // Note that this defaults to enabled for user-defined language server definitions
+        return (editorSettings == null) || editorSettings.enableEnterBetweenBracesFix;
     }
 }
