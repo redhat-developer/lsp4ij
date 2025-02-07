@@ -103,6 +103,7 @@ public class LanguageServerTemplateManagerTest {
     private UserDefinedLanguageServerDefinition createUserDefinedLanguageServerDefinition(String identifier) {
         return new UserDefinedLanguageServerDefinition(
                 identifier,
+                null,
                 identifier,
                 null,
                 "cmd",

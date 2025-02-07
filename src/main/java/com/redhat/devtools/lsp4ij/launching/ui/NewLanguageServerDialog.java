@@ -195,7 +195,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         };
     }
 
-    private void loadFromTemplate(LanguageServerTemplate template) {
+    private void loadFromTemplate(@NotNull LanguageServerTemplate template) {
         // Update name
         var serverName = this.languageServerPanel.getServerName();
         serverName.setText(template.getName() != null ? template.getName() : "");
@@ -291,6 +291,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         List<ServerMappingSettings> mappingSettings = this.languageServerPanel.getMappingsPanel().getAllMappings();
 
         // Register language server and mappings definition
+        String templateId = currentTemplate != null && currentTemplate != LanguageServerTemplate.NEW_TEMPLATE ? currentTemplate.getId() : null;
         String serverName = this.languageServerPanel.getServerName().getText();
         String commandLine = this.languageServerPanel.getCommandLine().getText();
         Map<String, String> userEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().getEnvs();
@@ -300,6 +301,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
         String clientConfiguration = this.languageServerPanel.getClientConfigurationWidget().getText();
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
+                templateId,
                 serverName,
                 "",
                 commandLine,

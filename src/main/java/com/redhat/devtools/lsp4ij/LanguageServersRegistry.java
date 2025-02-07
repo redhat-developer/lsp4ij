@@ -159,6 +159,7 @@ public class LanguageServersRegistry {
                 // Register server definition from settings
                 addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(
                                 serverId,
+                                launch.getTemplateId(),
                                 launch.getServerName(),
                                 "",
                                 launch.getCommandLine(),
@@ -370,6 +371,7 @@ public class LanguageServersRegistry {
         // Update settings
         if (serverDefinition instanceof UserDefinedLanguageServerDefinition definitionFromSettings) {
             UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = new UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings();
+            settings.setTemplateId(definitionFromSettings.getTemplateId());
             settings.setServerId(languageServerId);
             settings.setServerName(definitionFromSettings.getDisplayName());
             settings.setCommandLine(definitionFromSettings.getCommandLine());

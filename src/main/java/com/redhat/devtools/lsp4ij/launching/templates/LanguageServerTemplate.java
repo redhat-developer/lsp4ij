@@ -44,6 +44,8 @@ public class LanguageServerTemplate {
     public static final String CLIENT_SETTINGS_FILE_NAME = "clientSettings.json";
     public static final String README_FILE_NAME = "README.md";
 
+    public static final String ID_JSON_PROPERTY = "id";
+    public static final String NAME_JSON_PROPERTY = "name";
     public static final String LANGUAGE_ID_JSON_PROPERTY = "languageId";
     public static final String FILE_TYPE_JSON_PROPERTY = "fileType";
     public static final String DEFAULT_JSON_PROPERTY = "default";
@@ -52,7 +54,6 @@ public class LanguageServerTemplate {
     public static final String LANGUAGE_MAPPINGS_JSON_PROPERTY = "languageMappings";
     public static final String PATTERNS_JSON_PROPERTY = "patterns";
     public static final String FILE_TYPE_MAPPINGS_JSON_PROPERTY = "fileTypeMappings";
-    public static final String NAME_JSON_PROPERTY = "name";
 
     private static final String WINDOWS_KEY = "windows";
     private static final String MAC_KEY = "mac";
@@ -61,6 +62,7 @@ public class LanguageServerTemplate {
 
     private static final String OS_KEY = SystemInfo.isWindows ? WINDOWS_KEY : (SystemInfo.isMac ? MAC_KEY : (SystemInfo.isUnix ? UNIX_KEY : null));
 
+    private String id;
     private String name;
     private Map<String /* OS */, String /* program args */> programArgs;
 
@@ -74,6 +76,14 @@ public class LanguageServerTemplate {
     private String configurationSchema;
     private String initializationOptions;
     private String clientConfiguration;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 
     public String getName() {
         return name;
