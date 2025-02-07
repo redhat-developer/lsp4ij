@@ -42,6 +42,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     @SerializedName("displayName")
     private String name;
+    private String templateId;
     private String commandLine;
     private Map<String, String> userEnvironmentVariables;
     private boolean includeSystemEnvironmentVariables;
@@ -54,6 +55,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private ClientConfigurationSettings clientConfiguration;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
+                                               @Nullable String templateId,
                                                @NotNull String name,
                                                @Nullable String description,
                                                @NotNull String commandLine,
@@ -65,6 +67,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String clientConfigurationContent) {
         super(id, name, description, true, null, false);
         this.name = name;
+        this.templateId = templateId;
         this.commandLine = commandLine;
         this.userEnvironmentVariables = userEnvironmentVariables;
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
@@ -84,6 +87,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String configurationContent,
                                                @Nullable String initializationOptionsContent) {
         this(id,
+                null,
                 name,
                 description,
                 commandLine,
@@ -113,6 +117,16 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public @NotNull LSPClientFeatures createClientFeatures() {
         return new UserDefinedClientFeatures();
+    }
+
+    /**
+     * Returns the template id which has been used to create the language server definition and null otherwise.
+     *
+     * @return the template id which has been used to create the language server definition and null otherwise.
+     */
+    @Nullable
+    public String getTemplateId() {
+        return templateId;
     }
 
     public void setName(String name) {

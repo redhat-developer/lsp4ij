@@ -32,6 +32,7 @@ public class LanguageServerDefinitionSerializerTest {
     public void testBasicUserDefinedLsSerialization() {
         UserDefinedLanguageServerDefinition lsDef = new UserDefinedLanguageServerDefinition(
                 "id",
+                null,
                 "lsName",
                 "description",
                 "./start.sh",
@@ -56,6 +57,7 @@ public class LanguageServerDefinitionSerializerTest {
     public void testLanguageMapping() {
         UserDefinedLanguageServerDefinition lsDef = new UserDefinedLanguageServerDefinition(
                 "id",
+                null,
                 "lsName",
                 "description",
                 "./start.sh",
@@ -84,6 +86,7 @@ public class LanguageServerDefinitionSerializerTest {
     public void testFilePatternsMapping() {
         UserDefinedLanguageServerDefinition lsDef = new UserDefinedLanguageServerDefinition(
                 "id",
+                null,
                 "lsName",
                 "description",
                 "./start.sh",
@@ -119,6 +122,7 @@ public class LanguageServerDefinitionSerializerTest {
     public void testFileTypeMappings() {
         UserDefinedLanguageServerDefinition lsDef = new UserDefinedLanguageServerDefinition(
                 "id",
+                null,
                 "lsName",
                 "description",
                 "./start.sh",
