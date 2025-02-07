@@ -430,6 +430,7 @@ public class LanguageServerWrapper implements Disposable {
         if (languageClient != null) {
             languageClient.handleServerStatusChanged(serverStatus);
         }
+        getClientFeatures().handleServerStatusChanged(serverStatus);
     }
 
     private void startStopTimer() {
