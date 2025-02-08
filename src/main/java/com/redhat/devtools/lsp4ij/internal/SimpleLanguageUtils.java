@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.lang.Language;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
+import com.redhat.devtools.lsp4ij.LSPIJTextMateUtils;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -29,7 +30,7 @@ public class SimpleLanguageUtils {
         // plain/text
         languages.add(PlainTextLanguage.INSTANCE);
         // textmate
-        Language textMateLanguage = Language.findLanguageByID("textmate");
+        Language textMateLanguage = LSPIJTextMateUtils.getTextMateLanguage();
         if (textMateLanguage != null) {
             languages.add(textMateLanguage);
         }

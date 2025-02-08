@@ -15,6 +15,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.tree.IElementType;
+import com.redhat.devtools.lsp4ij.LSPIJTextMateUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateElementType;
 import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
@@ -33,7 +34,7 @@ public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
 
     @Override
     public boolean isApplicable(@NotNull VirtualFile file, @NotNull Project project) {
-        return "textmate".equals(file.getFileType().getName());
+        return LSPIJTextMateUtils.isTextMateFile(file);
     }
 
     @Override

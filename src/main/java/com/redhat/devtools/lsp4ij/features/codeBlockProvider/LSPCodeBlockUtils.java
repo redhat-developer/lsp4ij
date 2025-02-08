@@ -22,7 +22,6 @@ import com.redhat.devtools.lsp4ij.LSPIJTextMateUtils;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.plugins.textmate.psi.TextMateFile;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -109,7 +108,7 @@ public final class LSPCodeBlockUtils {
     @NotNull
     private static Map<Character, Character> getBracePairsFwd(@NotNull PsiFile file) {
         return CachedValuesManager.getCachedValue(file, () -> {
-            Map<Character, Character> bracePairs = file instanceof TextMateFile ? LSPIJTextMateUtils.getBracePairs(file) :
+            Map<Character, Character> bracePairs = LSPIJTextMateUtils.isTextMateFile(file) ? LSPIJTextMateUtils.getBracePairs(file) :
                     file.getFileType() instanceof AbstractFileType ? getAbstractFileTypeBracePairs(file) :
                             null;
             if (bracePairs == null) {
