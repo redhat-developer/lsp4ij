@@ -1,5 +1,5 @@
 {
-  "type": "undefined",
+  "type": "swift-lldb",
   "name": "Attach to process",
   "request": "attach",
   "port": 5858

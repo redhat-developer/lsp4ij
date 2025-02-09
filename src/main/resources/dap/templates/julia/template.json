@@ -1,0 +1,19 @@
+{
+  "id": "julia",
+  "name": "Julia",
+  "programArgs": {
+    "default": "julia $PROJECT_DIR$/server.jl ${port}"
+  },
+  "debugServerReadyPattern": "Listening on port ${port}",
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Julia",
+        "patterns": [
+          "*.jl"
+        ]
+      },
+      "languageId": "julia"
+    }
+  ]
+}

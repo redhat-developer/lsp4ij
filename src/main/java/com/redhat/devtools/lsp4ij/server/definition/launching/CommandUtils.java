@@ -10,10 +10,16 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.execution.util.ProgramParametersUtil;
+import com.intellij.openapi.project.Project;
+import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Command utilities.
@@ -63,6 +69,30 @@ public class CommandUtils {
         if (!arg.isEmpty()) {
             commands.add(arg);
         }
+    }
+
+    @NotNull
+    public static GeneralCommandLine createCommandLine(@NotNull String commandLine,
+                                                       @NotNull Map<String, String> userEnvironmentVariables,
+                                                       boolean includeSystemEnvironmentVariables) {
+        Map<String, String> environmentVariables = new HashMap<>(userEnvironmentVariables);
+        // Add System environment variables
+        if (includeSystemEnvironmentVariables) {
+            environmentVariables.putAll(EnvironmentUtil.getEnvironmentMap());
+        }
+        return new GeneralCommandLine(CommandUtils.createCommands(commandLine))
+                .withEnvironment(environmentVariables);
+    }
+
+    /**
+     * Returns the resolved command line with expanded macros.
+     *
+     * @param project the project.
+     * @return the resolved command line with expanded macros.
+     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
+     */
+    public static String resolveCommandLine(@NotNull String commandLine, @NotNull Project project) {
+        return ProgramParametersUtil.expandPathAndMacros(commandLine, null, project);
     }
 
 }

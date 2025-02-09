@@ -28,6 +28,8 @@ public class LanguageServerTemplateDeserializer implements JsonDeserializer<Lang
         JsonObject jsonObject = jsonElement.getAsJsonObject();
         LanguageServerTemplate languageServerTemplate = new LanguageServerTemplate();
 
+        var id = jsonObject.get(ID_JSON_PROPERTY);
+        languageServerTemplate.setId(id != null ? id.getAsString() : null);
         languageServerTemplate.setName(jsonObject.get(NAME_JSON_PROPERTY).getAsString());
         JsonObject programArgs = jsonObject.get(PROGRAM_ARGS_JSON_PROPERTY).getAsJsonObject();
         if (programArgs != null) {

@@ -104,6 +104,15 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     }
 
     /**
+     * Callback invoked when language server status changed.
+     *
+     * @param serverStatus server status
+     */
+    public void handleServerStatusChanged(@NotNull ServerStatus serverStatus) {
+        // Do nothing
+    }
+
+    /**
      * This method is invoked just before {@link LanguageServer#initialize(InitializeParams)}
      * to enable customization of the language server's initialization parameters
      * (e.g., {@link InitializeParams#getWorkDoneToken()}).
