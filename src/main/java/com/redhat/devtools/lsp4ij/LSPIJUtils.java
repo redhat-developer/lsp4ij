@@ -602,11 +602,13 @@ public class LSPIJUtils {
             // The line number is negative, it defaults to 0.
             return 0;
         }
-        // If the line number is 0 and the character is beyond the length of the first line, treat it as an offset-only
-        // position. This is technically out of spec:
+        // If the line number is 0 and the character is beyond the length of the first line in a multi-line document,
+        // treat it as an offset-only position. This is technically out of spec:
         // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position
         // but at least one language server has been observed returning Position values where [0,offset]=>offset.
-        else if ((line == 0) && (character > document.getLineEndOffset(line))) {
+        else if ((line == 0) &&
+                 (character > document.getLineEndOffset(line)) &&
+                 (document.getLineCount() > 1)) {
             return Math.max(Math.min(character, document.getTextLength()), 0);
         }
 
