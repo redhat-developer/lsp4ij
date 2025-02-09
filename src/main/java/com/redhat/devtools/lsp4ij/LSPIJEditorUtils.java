@@ -102,8 +102,8 @@ public final class LSPIJEditorUtils {
     }
 
     private static boolean isTextMateFile(@NotNull PsiFile file) {
-        // Compare languages to avoid a static reference to anything in the TextMate Bundles plugin
-        return Objects.equals(getTextMateLanguage(), file.getLanguage());
+        // Compare language IDs to avoid a static reference to anything in the TextMate Bundles plugin
+        return TEXT_MATE_LANGUAGE_ID.equals(file.getLanguage().getID());
     }
 
     /**
