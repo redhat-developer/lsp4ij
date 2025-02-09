@@ -52,7 +52,6 @@ public abstract class LSPServerSideOnTypeFormattingFixtureTestCase extends LSPCo
 
     public LSPServerSideOnTypeFormattingFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
-        setClientConfigurable(true);
     }
 
     protected void setTriggerCharacters(@NotNull String... triggerCharacters) {

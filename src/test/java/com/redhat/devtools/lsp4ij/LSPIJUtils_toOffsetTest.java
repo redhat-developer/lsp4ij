@@ -63,7 +63,7 @@ public class LSPIJUtils_toOffsetTest extends BasePlatformTestCase {
     }
 
     public void testInvalidCharacterWithTwoLines() {
-        assertOffset("foo\nbar", 0, 999999, 3, null);
+        assertOffset("foo\nbar", 0, 999999, 7, null);
         assertOffset("foo\nbar", 1, 999999, 7, null);
     }
 
@@ -73,6 +73,20 @@ public class LSPIJUtils_toOffsetTest extends BasePlatformTestCase {
 
     public void testInvalidPositionWithTwoLine() {
         assertOffset("foo\nbar", 999999, 999999, 7, null);
+    }
+
+    public void testPureOffsetPositions() {
+        String content = "foo\nbar\nbaz";
+        for (int character = 0; character < content.length(); character++) {
+            assertOffset(content, 0, character, character, content.charAt(character));
+        }
+    }
+
+    public void testInvalidPureOffsetPositions() {
+        String content = "foo\nbar\nbaz";
+        assertOffset(content, 0, -1, 0, content.charAt(0));
+        assertOffset(content, 0, content.length(), content.length(), null);
+        assertOffset(content, 0, content.length() + 1, content.length(), null);
     }
 
     public void test_vscode_EmptyContent() {

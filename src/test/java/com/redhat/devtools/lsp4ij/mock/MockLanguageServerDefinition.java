@@ -11,12 +11,10 @@
 package com.redhat.devtools.lsp4ij.mock;
 
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedClientFeatures;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,20 +25,14 @@ public class MockLanguageServerDefinition extends LanguageServerDefinition imple
 
     private static final String SERVER_ID = "mock-server-id";
 
-    private final boolean clientConfigurable;
     private final ClientConfigurationSettings clientConfigurationSettings = new ClientConfigurationSettings();
 
-    public MockLanguageServerDefinition(boolean clientConfigurable) {
-        this(SERVER_ID, clientConfigurable);
+    public MockLanguageServerDefinition() {
+        this(SERVER_ID);
     }
 
-    public MockLanguageServerDefinition(@NotNull String serverId) {
-        this(serverId, false);
-    }
-
-    private MockLanguageServerDefinition(@NotNull String serverId, boolean clientConfigurable) {
+    public MockLanguageServerDefinition(String serverId) {
         super(serverId, "name", null, true, 5, true);
-        this.clientConfigurable = clientConfigurable;
     }
 
     @Override
@@ -49,14 +41,8 @@ public class MockLanguageServerDefinition extends LanguageServerDefinition imple
     }
 
     @Override
-    @NotNull
-    public LSPClientFeatures createClientFeatures() {
-        return clientConfigurable ? new UserDefinedClientFeatures() : super.createClientFeatures();
-    }
-
-    @Override
     @Nullable
     public ClientConfigurationSettings getLanguageServerClientConfiguration() {
-        return clientConfigurable ? clientConfigurationSettings : null;
+        return clientConfigurationSettings;
     }
 }

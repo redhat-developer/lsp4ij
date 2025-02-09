@@ -155,17 +155,6 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     }
 
     /**
-     * Determines whether or not the language server reports {@link org.eclipse.lsp4j.Position} values as pure offsets.
-     *
-     * @param file the file
-     * @return true if the file's language server reports offset-only positions; otherwise false
-     */
-    public boolean serverReportsOffsetOnlyPositions(@NotNull PsiFile file) {
-        // Default to false
-        return false;
-    }
-
-    /**
      * Returns true if the server is kept alive even if all files associated with the language server are closed and false otherwise.
      *
      * @return true if the server is kept alive even if all files associated with the language server are closed and false otherwise.
@@ -1346,4 +1335,5 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             default -> null;
         };
     }
+
 }

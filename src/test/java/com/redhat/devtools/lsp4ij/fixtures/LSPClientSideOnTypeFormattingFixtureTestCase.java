@@ -53,7 +53,6 @@ public abstract class LSPClientSideOnTypeFormattingFixtureTestCase extends LSPCo
 
     public LSPClientSideOnTypeFormattingFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
-        setClientConfigurable(true);
     }
 
     /**

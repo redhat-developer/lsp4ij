@@ -25,7 +25,6 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.BaseProjectDirectories;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectLocator;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ProjectFileIndex;
@@ -603,24 +602,10 @@ public class LSPIJUtils {
             // The line number is negative, it defaults to 0.
             return 0;
         }
-        // If the line number is 0 and the character is beyond the length of the first line, see if the language server
-        // for this document should treat such a situation as an offset-only position
-        else if ((line == 0) && (character > document.getLineEndOffset(line))) {
-            VirtualFile virtualFile = LSPIJUtils.getFile(document);
-            Project project = virtualFile != null ? ProjectLocator.getInstance().guessProjectForFile(virtualFile) : null;
-            PsiFile file = project != null ? getPsiFile(virtualFile, project) : null;
-            if ((file != null) && LanguageServiceAccessor.getInstance(project).hasAny(
-                    virtualFile,
-                    ls -> ls.getClientFeatures().serverReportsOffsetOnlyPositions(file)
-            )) {
-                return Math.max(Math.min(character, document.getTextLength()), 0);
-            }
-        }
-
-        int lineOffset = document.getLineStartOffset(line);
-        int nextLineOffset = document.getLineEndOffset(line);
-        // If the character value is greater than the line length it defaults back to the line length
-        return Math.max(Math.min(lineOffset + character, nextLineOffset), lineOffset);
+        int lineStartOffset = document.getLineStartOffset(line);
+        int offset = lineStartOffset + character;
+        // Make sure we don't report an offset that can't exist.
+        return Math.max(Math.min(offset, document.getTextLength()), 0);
     }
 
     /**

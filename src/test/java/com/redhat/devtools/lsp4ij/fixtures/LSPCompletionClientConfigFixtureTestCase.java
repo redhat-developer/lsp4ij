@@ -48,7 +48,6 @@ public abstract class LSPCompletionClientConfigFixtureTestCase extends LSPCodeIn
 
     public LSPCompletionClientConfigFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
-        setClientConfigurable(true);
     }
 
     /**
