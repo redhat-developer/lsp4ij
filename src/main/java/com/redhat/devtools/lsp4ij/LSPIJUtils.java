@@ -602,10 +602,18 @@ public class LSPIJUtils {
             // The line number is negative, it defaults to 0.
             return 0;
         }
-        int lineStartOffset = document.getLineStartOffset(line);
-        int offset = lineStartOffset + character;
-        // Make sure we don't report an offset that can't exist.
-        return Math.max(Math.min(offset, document.getTextLength()), 0);
+        // If the line number is 0 and the character is beyond the length of the first line, treat it as an offset-only
+        // position. This is technically out of spec:
+        // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position
+        // but at least one language server has been observed returning Position values where [0,offset]=>offset.
+        else if ((line == 0) && (character > document.getLineEndOffset(line))) {
+            return Math.max(Math.min(character, document.getTextLength()), 0);
+        }
+
+        int lineOffset = document.getLineStartOffset(line);
+        int nextLineOffset = document.getLineEndOffset(line);
+        // If the character value is greater than the line length it defaults back to the line length
+        return Math.max(Math.min(lineOffset + character, nextLineOffset), lineOffset);
     }
 
     /**
