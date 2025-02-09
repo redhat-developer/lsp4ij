@@ -14,8 +14,10 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.tree.IElementType;
-import com.redhat.devtools.lsp4ij.LSPIJTextMateUtils;
+import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateElementType;
 import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
@@ -33,8 +35,9 @@ import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
 public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
 
     @Override
-    public boolean isApplicable(@NotNull VirtualFile file, @NotNull Project project) {
-        return LSPIJTextMateUtils.isTextMateFile(file);
+    public boolean isApplicable(@NotNull VirtualFile virtualFile, @NotNull Project project) {
+        PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
+        return (file != null) && LSPIJEditorUtils.isSupportedTextMateFile(file);
     }
 
     @Override
