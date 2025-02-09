@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -32,8 +33,15 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
     }
 
     public boolean isCaseSensitive(@NotNull PsiFile file) {
-        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getServerDefinition();
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return (clientConfiguration != null) && clientConfiguration.caseSensitive;
+        return clientConfiguration != null ? clientConfiguration.caseSensitive : super.isCaseSensitive(file);
+    }
+
+    @Override
+    public boolean serverReportsOffsetOnlyPositions(@NotNull PsiFile file) {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.serverReportsOffsetOnlyPositions : super.serverReportsOffsetOnlyPositions(file);
     }
 }

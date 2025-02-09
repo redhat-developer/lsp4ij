@@ -11,6 +11,12 @@
       "description": "Whether or not the language grammar is case-sensitive.",
       "default": false
     },
+    "serverReportsOffsetOnlyPositions": {
+      "type": "boolean",
+      "title": "Language server reports offset-only positions",
+      "description": "Whether or not the language server reports offset-only positions.",
+      "default": false
+    },
     "completion": {
       "type": "object",
       "title": "Client-side completion configuration",

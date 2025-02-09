@@ -138,6 +138,15 @@ public class ClientConfigurationSettings {
     public boolean caseSensitive = false;
 
     /**
+     * Whether or not the language server reports {@link org.eclipse.lsp4j.Position} values as pure offsets, i.e.,
+     * <code>line=0, character=offset</code>. This is technically a deviation from the
+     * <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#position">specification</a>,
+     * but the behavior has been <a href="https://github.com/forcedotcom/salesforcedx-vscode-slds/issues/141">observed</a>
+     * in at least one language server.
+     */
+    public boolean serverReportsOffsetOnlyPositions = false;
+
+    /**
      * Client-side code completion settings
      */
     public @NotNull ClientConfigurationCompletionSettings completion = new ClientConfigurationCompletionSettings();

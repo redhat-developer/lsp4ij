@@ -28,6 +28,7 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
 
     private final String[] fileNamePatterns;
     private String languageId;
+    private boolean clientConfigurable = false;
 
     protected LSPCodeInsightTestFixture myFixture;
     private MockLanguageServerDefinition serverDefinition;
@@ -63,8 +64,12 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
         this.languageId = languageId;
     }
 
+    public void setClientConfigurable(boolean clientConfigurable) {
+        this.clientConfigurable = clientConfigurable;
+    }
+
     private void registerServer() {
-        serverDefinition = new MockLanguageServerDefinition();
+        serverDefinition = new MockLanguageServerDefinition(clientConfigurable);
         List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePatterns), languageId));
         LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), serverDefinition, mappings);
     }
