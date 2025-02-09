@@ -92,34 +92,11 @@ public class DAPValue extends XNamedValue {
     public void computeSourcePosition(@NotNull XNavigatable navigatable) {
         stackFrame
                 .getSourcePositionFor(variable)
-                        .thenAccept(sourcePosition -> {
-                            if (sourcePosition != null) {
-                                navigatable.setSourcePosition(sourcePosition);
-                            }
-                        });
-
-            /*@Nullable
-            private XSourcePosition findPosition() {
-                XDebugSession debugSession = client.getSession();
-                if (debugSession == null) {
-                    return null;
-                }
-                XStackFrame stackFrame = debugSession.getCurrentStackFrame();
-                if (stackFrame == null) {
-                    return null;
-                }
-                Project project = debugSession.getProject();
-                XSourcePosition position = debugSession.getCurrentPosition();
-                Editor editor = ((FileEditorManagerImpl) FileEditorManager.getInstance(project))
-                        .getSelectedTextEditor(true);
-                if (editor == null || position == null) {
-                    return null;
-                }
-                VirtualFile virtualFile = null;
-                int offset = 0;
-                return XDebuggerUtil.getInstance().createPositionByOffset(virtualFile, resolved.getTextOffset());
-            }*/
-
+                .thenAccept(sourcePosition -> {
+                    if (sourcePosition != null) {
+                        navigatable.setSourcePosition(sourcePosition);
+                    }
+                });
     }
 
     @NotNull

@@ -27,9 +27,9 @@ import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
-import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
@@ -37,7 +37,6 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
 import com.redhat.devtools.lsp4ij.settings.ui.SchemaBackedJsonTextField;
@@ -54,6 +53,7 @@ import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory.DEFAULT_ATTACH_CONFIGURATION_ARRAY;
 import static com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory.DEFAULT_LAUNCH_CONFIGURATION_ARRAY;
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
  * UI panel to define a Debug Adapter descriptor factory.
@@ -369,7 +369,7 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
             }
 
             private void updateLabel(JLabel previewCommandLabel) {
-                String preview = UserDefinedLanguageServerDefinition.resolveCommandLine(commandLine.getText(), project);
+                String preview = resolveCommandLine(commandLine.getText(), project);
                 if (preview.equals(commandLine.getText())) {
                     previewCommandLabel.setToolTipText("");
                     previewCommandLabel.setText("");
@@ -400,8 +400,7 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     }
 
     // Server settings
-
-    public void setServerId(@Nullable String serverId) {
+    public void updateSelectedTab(@Nullable String serverId) {
         if (!initialized) {
             // If DAP server is not configured, the Server tab must be selected
             if (StringUtils.isEmpty(serverId) && getCommandLine().isEmpty()) {
@@ -411,6 +410,9 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
             }
             initialized = true;
         }
+    }
+
+    public void setServerId(@Nullable String serverId) {
         if (StringUtils.isNotBlank(serverId)) {
             DebugAdapterDescriptorFactory factory = DebugAdapterManager.getInstance().getFactoryById(serverId);
             if (factory != null) {

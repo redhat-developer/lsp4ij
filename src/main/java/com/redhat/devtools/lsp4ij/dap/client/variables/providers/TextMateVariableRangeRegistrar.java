@@ -15,6 +15,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.tree.IElementType;
+import com.redhat.devtools.lsp4ij.LSPIJTextMateUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateElementType;
 import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
@@ -33,7 +34,7 @@ public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
 
     @Override
     public boolean isApplicable(@NotNull VirtualFile file, @NotNull Project project) {
-        return "textmate".equals(file.getFileType().getName());
+        return LSPIJTextMateUtils.isTextMateFile(file);
     }
 
     @Override
@@ -49,7 +50,9 @@ public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
             if (isVariable(textMateScope)) {
                 var textRange = new TextRange(start, end);
                 String variableName = document.getText(textRange);
-                context.addVariableRange(variableName, textRange);
+                if (!variableName.isBlank()) {
+                    context.addVariableRange(variableName.trim(), textRange);
+                }
             }
             return true;
         }
@@ -57,6 +60,8 @@ public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
     }
 
     private boolean isVariable(TextMateScope textMateScope) {
-        return textMateScope.getScopeName() != null && ((String) textMateScope.getScopeName()).contains("variable");
+        return textMateScope.getScopeName() == null /* in Julia TextMate, variable have null scope **/ ||
+                ((String) textMateScope.getScopeName()).contains("source.") /* in Julia TextMate, variable have "source.julia"" scope **/ ||
+                ((String) textMateScope.getScopeName()).contains("variable");
     }
 }

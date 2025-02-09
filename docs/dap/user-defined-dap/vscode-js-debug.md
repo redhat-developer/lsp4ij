@@ -22,9 +22,16 @@ console.log(s);
 
    ![DAP Configuration Type](../images/DAP_config_type.png)
 
-4. In the `Server` tab, select `VSCode JS Debug`.
+4. In the `Server` tab, click on `create a new server`:
 
-   ![DAP Configuration/Server](../images/vscode-js-debug/server_tab.png)
+   ![Create a new server](../images/DAP_server_create_link.png)
+
+5. It opens a new dialog to create DAP server, select `VSCode JS Debug` template:
+   ![Select Template](../images/vscode-js-debug/select_template.png)
+
+6. After clicking on `OK` button, it will select the new server and pre-fill configurations:
+
+![Select New server](../images/vscode-js-debug/select_new_server.png)
 
 This will automatically populate: 
 
@@ -32,10 +39,10 @@ This will automatically populate:
  * the `command` which starts the DAP server which should look like this:
 
 ```
-node ${BASE_DIR}/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
+node <<insert base directory>>/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
 ```
 
-Replace `${BASE_DIR}` with the directory  (e.g., `/home/path/to/dap`) where you extracted the DAP server. For example:
+Replace `<<insert base directory>>` with the directory  (e.g., `/home/path/to/dap`) where you extracted the DAP server. For example:
 
 ```
 node /home/path/to/dap/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
@@ -43,7 +50,7 @@ node /home/path/to/dap/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
 
 The `${port}` argument will be replaced with a free port when the run configuration starts.
 
- * the `Connecting to the server` option is set to `after finding trace`, with:
+ * the `Connect to the server by waiting` option is set to `Log pattern before processing` with:
 
  ```
  Debug server listening at
@@ -71,7 +78,7 @@ you need to select `Trace` with `verbose`.
 To allows settings breakpoints to JavaScript, TypeScript, etc files, you need configure mappings in the `Mappings` tab.
 As you have selected `VSCode JS Debug` server, it will automatically populate the file mappings like this:
 
-![File mappings](../images/DAP_config_type_mappings.png)
+![File mappings](../images/vscode-js-debug/file_mappings_tab.png)
 
 ## Configure the JavaScript file to run/debug
 
@@ -82,12 +89,13 @@ As you have selected `VSCode JS Debug` server, it will automatically populate th
 
 ![DAP Configuration Type/Configuration](../images/vscode-js-debug/configuration_tab.png)
 
-2. Select `Launch` as debugging type.
+2. Select `Launch` as `Debug mode`.
 3. The DAP parameters of the launch should look like this:
 
 ```json
 {
    "type": "pwa-node",
+   "name": "Launch JavaScript file",
    "request": "launch",
    "program": "${file}",
    "cwd": "${workspaceFolder}"
@@ -99,14 +107,14 @@ When the run configuration starts:
 - `${workspaceFolder}` will be replaced with the working directory you specified.
 - `${file}` will be replaced with the full path to `test.js`.
 
-## Set Breakpoint
+### Set Breakpoint
 
 After applying the run configuration, you should set a breakpoint to files which matches file mappings.
 Set a breakpoint in the `test.js` file:
 
 ![Set Breakpoint](../images/vscode-js-debug/set_breakpoint.png)
 
-# Debugging
+### Debugging
 
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console:
 
@@ -159,13 +167,18 @@ Execute `tsc` command to generate source maps in the `out` folder:
  * `test.js`
  * `test.js.map`
 
-## Configure the TypeScript file to run/debug
+### Configure the TypeScript file to run/debug
 
-Update the DAP parameters like this:
+Select the `Launch TypeScript file` configuration:
+
+![Select TypeScript Launch](../images/vscode-js-debug/select_typescript_launch.png)
+
+which will update the DAP parameters like this:
 
 ```json
 {
    "type": "pwa-node",
+   "name": "Launch TypeScript file",
    "request": "launch",
    "program": "${file}",
    "cwd": "${workspaceFolder}",
@@ -187,3 +200,9 @@ Update the path with the `test.ts` file.
 TypeScript debugging should be available:
 
 ![Debugging TypeScript](../images/vscode-js-debug/debug_ts.png)
+
+## Language Support
+
+If you need language support for TypeScript/JavaScript (completion, validation, etc) you can [configure the TypeScript Language Server](../../user-defined-ls/typescript-language-server.md)
+
+![TypeScript demo](../../images/user-defined-ls/typescript-language-server/demo_ls.gif)

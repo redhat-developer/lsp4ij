@@ -2,9 +2,9 @@
 
 You can use the [Go language server](https://pkg.go.dev/golang.org/x/tools/gopls) to benefit from `Go` support:
 
-![Go demo](../images/user-defined-ls/GoplsDemo.gif)
+![Go demo](../images/user-defined-ls/gopls/demo_ls.gif)
 
-by following these steps:
+## Install the language server
 
 1. **Install Go Language Server**, by following these instructions:
 
@@ -23,20 +23,20 @@ by following these steps:
    * `gopls -mode=stdio` for Windows OS.
    * `sh -c gopls -mode=stdio` for other OS.
 
-   ![Gopls template](../images/user-defined-ls/GoplsTemplate.png)
+   ![Gopls template](../images/user-defined-ls/gopls/select_template.png)
 
 5. **Optional**: You may also customize the mappings section:
 
-   ![Go LS template mappings](../images/user-defined-ls/GoplsTemplateMappings.png)
+   ![Go LS template mappings](../images/user-defined-ls/gopls/configure_file_mappings.png)
 
    or configuration section according to your preferences.
 
-   ![Go LS template configuration](../images/user-defined-ls/GoplsTemplateConfiguration.png)
+   ![Go LS template configuration](../images/user-defined-ls/gopls/GoplsTemplateConfiguration.png)
 
 6. **Click OK** to apply the changes. You should now have Go language support enabled in your IDE, with the [Go language server](https://pkg.go.dev/golang.org/x/tools/gopls) integrated, 
    and you should see the language server in the [LSP console](../UserGuide.md#lsp-console):
 
-   ![Go LS in LSP Console](../images/user-defined-ls/GoplsInLSPConsole.png)
+   ![Go LS in LSP Console](../images/user-defined-ls/gopls/GoplsInLSPConsole.png)
 
 ## Syntax coloration
 
@@ -44,8 +44,14 @@ Today LSP4IJ doesn't support `textDocument/semanticTokens` ([please vote at issu
 uses the [Go TextMate grammar](https://github.com/golang/vscode-go/tree/master/extension/syntaxes) 
 that you can configure in IntelliJ via the `Editor / TextMate Bundles` settings.
 
-![Go TextMate Bundles](../images/user-defined-ls/GoTextMate.png)
+![Go TextMate Bundles](../images/user-defined-ls/gopls/GoTextMate.png)
 
 You need to clone https://github.com/golang/vscode-go/tree/master/extension and reference this folder 
 (which contains the [package.json](https://github.com/golang/vscode-go/blob/540e146da867f42298ccdac782e4e163fec16b0d/extension/package.json#L172))
 to benefit from syntax coloration and language configuration (matching brackets, etc).
+
+## Debugging
+
+If you need to Run/Debug Go program, you can [configure the Go DAP server](../dap/user-defined-dap/go-delve.md).
+
+![Debugging / Threads](../dap/images/go-delve/debug_threads_tab.png)

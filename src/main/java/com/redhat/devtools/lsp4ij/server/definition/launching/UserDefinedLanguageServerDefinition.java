@@ -15,7 +15,6 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.google.gson.JsonParser;
 import com.google.gson.annotations.SerializedName;
-import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
@@ -31,6 +30,8 @@ import org.slf4j.LoggerFactory;
 import java.io.StringReader;
 import java.util.Map;
 
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
+
 /**
  * {@link com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition} implementation to start a
  * language server with a process command defined by the user.
@@ -41,6 +42,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     @SerializedName("displayName")
     private String name;
+    private String templateId;
     private String commandLine;
     private Map<String, String> userEnvironmentVariables;
     private boolean includeSystemEnvironmentVariables;
@@ -53,6 +55,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private ClientConfigurationSettings clientConfiguration;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
+                                               @Nullable String templateId,
                                                @NotNull String name,
                                                @Nullable String description,
                                                @NotNull String commandLine,
@@ -64,6 +67,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String clientConfigurationContent) {
         super(id, name, description, true, null, false);
         this.name = name;
+        this.templateId = templateId;
         this.commandLine = commandLine;
         this.userEnvironmentVariables = userEnvironmentVariables;
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
@@ -83,6 +87,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String configurationContent,
                                                @Nullable String initializationOptionsContent) {
         this(id,
+                null,
                 name,
                 description,
                 commandLine,
@@ -104,17 +109,6 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 project);
     }
 
-    /**
-     * Returns the resolved command line with expanded macros.
-     *
-     * @param project the project.
-     * @return the resolved command line with expanded macros.
-     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
-     */
-    public static String resolveCommandLine(@NotNull String commandLine, @NotNull Project project) {
-        return ProgramParametersUtil.expandPathAndMacros(commandLine, null, project);
-    }
-
     @Override
     public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
         return new UserDefinedLanguageClient(this, project);
@@ -123,6 +117,16 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public @NotNull LSPClientFeatures createClientFeatures() {
         return new UserDefinedClientFeatures();
+    }
+
+    /**
+     * Returns the template id which has been used to create the language server definition and null otherwise.
+     *
+     * @return the template id which has been used to create the language server definition and null otherwise.
+     */
+    @Nullable
+    public String getTemplateId() {
+        return templateId;
     }
 
     public void setName(String name) {

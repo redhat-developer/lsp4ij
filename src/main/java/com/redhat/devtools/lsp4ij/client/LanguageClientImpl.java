@@ -301,6 +301,10 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      * </ul>
      *
      * <p>
+     *     If you need to track all status, you can do that by implementing {@link LSPClientFeatures#handleServerStatusChanged(ServerStatus)}.
+     * </p>
+     *
+     * <p>
      *     This method could be implemented to send 'workspace/didChangeConfiguration' (by calling triggerChangeConfiguration)
      *     when server is started.
      *     The implementation must be fast or execute asynchronously to avoid deteriorate startup of language server performance.
@@ -308,8 +312,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      *
      * @param serverStatus server status
      */
-    public void handleServerStatusChanged(ServerStatus serverStatus) {
-
+    public void handleServerStatusChanged(@NotNull ServerStatus serverStatus) {
+        // Do nothing
     }
 
     @Override
