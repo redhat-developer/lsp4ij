@@ -12,7 +12,10 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.ide.highlighter.custom.SyntaxTable;
+import com.intellij.ide.plugins.IdeaPluginDescriptor;
+import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.lang.Commenter;
+import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.text.StringUtil;
@@ -25,6 +28,8 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.textmate.TextMateFileType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.CancellationException;
@@ -40,6 +45,8 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  */
 @ApiStatus.Internal
 public final class LSPIJEditorUtils {
+
+    private static final Logger LOG = LoggerFactory.getLogger(LSPIJEditorUtils.class);
 
     // TODO: Unfortunately the TextMate interface changed in this commit:
     //  https://github.com/JetBrains/intellij-community/commit/8df3d04be0db4c54732a15250b789aa5d9a6de47#diff-08fc4fd41510ee4662c41d3f2a671ae2f654d1a2f6ff7608765f427c26eaeae7
@@ -100,7 +107,21 @@ public final class LSPIJEditorUtils {
     }
 
     private static boolean isTextMateFile(@NotNull PsiFile file) {
-        return file.getFileType() instanceof TextMateFileType;
+        return isTextMatePluginInstalledAndEnabled() && (file.getFileType() instanceof TextMateFileType);
+    }
+
+    private static final String TEXT_MATE_PLUGIN_ID_STRING = "org.jetbrains.plugins.textmate";
+    private static final PluginId TEXT_MATE_PLUGIN_ID = PluginId.getId(TEXT_MATE_PLUGIN_ID_STRING);
+
+    private static boolean isTextMatePluginInstalledAndEnabled() {
+        try {
+            IdeaPluginDescriptor textMatePluginDescriptor = PluginManagerCore.getPlugin(TEXT_MATE_PLUGIN_ID);
+            return (textMatePluginDescriptor != null) && textMatePluginDescriptor.isEnabled();
+        } catch (Exception e) {
+            LOG.warn("Failed to determine whether the TextMate plugin is installed and enabled.", e);
+        }
+
+        return false;
     }
 
     // Quote characters
