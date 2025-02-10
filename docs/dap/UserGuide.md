@@ -84,6 +84,12 @@ you need to select `Trace` with `verbose`.
 
 ![Set verbose traces](./images/vscode-js-debug/set_traces.png)
 
+## DAP settings
+
+You can `create/remove/update` DAP servers with `Debug Adapter Protocol` entry:
+
+![DAP settings](./images/DAP_settings.png)
+
 ## Templates
 
 LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:

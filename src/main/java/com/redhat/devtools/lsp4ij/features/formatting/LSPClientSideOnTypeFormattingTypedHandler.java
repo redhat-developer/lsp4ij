@@ -190,12 +190,14 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
             int beforeOffset = offset - 1;
             TextRange codeBlockRange = LSPCodeBlockProvider.getCodeBlockRange(editor, file, beforeOffset);
             if (codeBlockRange != null) {
-                int startOffset = codeBlockRange.getStartOffset();
-                int endOffset = codeBlockRange.getEndOffset();
-
-                // Make sure the range includes the brace pair
                 Document document = editor.getDocument();
                 CharSequence documentChars = document.getCharsSequence();
+
+                // Constrain the offsets to the valid range of the file
+                int startOffset = Math.max(codeBlockRange.getStartOffset(), 0);
+                int endOffset = Math.min(codeBlockRange.getEndOffset(), documentChars.length() - 1);
+
+                // Make sure the range includes the brace pair
                 if ((startOffset > 0) && (documentChars.charAt(startOffset) != openBraceChar)) {
                     startOffset--;
                 }
