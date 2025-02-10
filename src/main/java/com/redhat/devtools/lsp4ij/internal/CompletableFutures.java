@@ -19,6 +19,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
@@ -134,11 +135,15 @@ public class CompletableFutures {
                 // Ignore timeout
             } catch (ExecutionException | CompletionException e) {
                 Throwable cause = e.getCause();
-                if (cause instanceof CancellationException ce) {
-                    throw ce;
-                }
                 if (cause instanceof ProcessCanceledException pce) {
                     throw pce;
+                }
+                if (cause instanceof LanguageServerException) {
+                    // Server cannot be started, throws a ProcessCanceledException to ignore the error.
+                    throw new ProcessCanceledException(cause);
+                }
+                if (cause instanceof CancellationException ce) {
+                    throw ce;
                 }
                 throw e;
             } catch (InterruptedException e) {

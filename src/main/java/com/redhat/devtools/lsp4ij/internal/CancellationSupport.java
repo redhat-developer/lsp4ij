@@ -16,16 +16,21 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.actions.DisableLanguageServerErrorAction;
 import com.redhat.devtools.lsp4ij.settings.actions.OpenUrlAction;
 import com.redhat.devtools.lsp4ij.settings.actions.ReportErrorInLogAction;
+import com.redhat.devtools.lsp4ij.settings.actions.ShowErrorLogAction;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -153,7 +158,7 @@ public class CancellationSupport implements CancelChecker {
         ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
         switch (errorReportingKind) {
             case as_notification -> // Show LSP error (ResponseErrorException) in an IJ notification
-                    showNotificationError(languageServer, featureName, error);
+                    showNotificationError(languageServer.getServerDefinition(), featureName, error, languageServer.getProject());
             case in_log -> {
                 // Show LSP error in the log
                 String languageServerName = languageServer.getServerDefinition().getDisplayName();
@@ -165,19 +170,25 @@ public class CancellationSupport implements CancelChecker {
         }
     }
 
-    private static void showNotificationError(@NotNull LanguageServerItem serverWrapper, @Nullable String featureName, ResponseErrorException error) {
-        String languageServerName = serverWrapper.getServerDefinition().getDisplayName();
+    @ApiStatus.Internal
+    public static Notification showNotificationError(@NotNull LanguageServerDefinition languageServerDefinition,
+                                                     @Nullable String subtitle,
+                                                     @NotNull Exception error,
+                                                     @NotNull Project project) {
+        String languageServerName = languageServerDefinition.getDisplayName();
         String content = error.getMessage();
         Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
                 languageServerName,
                 content,
                 NotificationType.ERROR);
-        notification.setSubtitle(featureName);
-        notification.addAction(new DisableLanguageServerErrorAction(notification, serverWrapper));
-        notification.addAction(new ReportErrorInLogAction(notification, serverWrapper));
+        notification.setSubtitle(subtitle);
+        notification.addAction(new ShowErrorLogAction(languageServerDefinition, project));
+        notification.addAction(new DisableLanguageServerErrorAction(notification, languageServerDefinition, project));
+        notification.addAction(new ReportErrorInLogAction(notification, languageServerDefinition, project));
         notification.addAction(new OpenUrlAction(LSP4IJWebsiteUrlConstants.FEEDBACK_URL));
         notification.setIcon(AllIcons.General.Error);
-        Notifications.Bus.notify(notification, serverWrapper.getProject());
+        Notifications.Bus.notify(notification, project);
+        return notification;
     }
 
     /**

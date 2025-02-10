@@ -198,6 +198,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         private static final String NAME_VIEW_DETAIL = "detail";
         private static final String NAME_VIEW_CONSOLE = "console";
+        private JBTabbedPane tabbedPane;
 
         private LanguageServerView detailView;
 
@@ -219,7 +220,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 showDetail();
             } else if (key instanceof LanguageServerProcessTreeNode) {
                 // Create console Traces/Logs views
-                JBTabbedPane tabbedPane = new JBTabbedPane();
+                tabbedPane = new JBTabbedPane();
                 add(tabbedPane, NAME_VIEW_CONSOLE);
 
                 tracesConsoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
@@ -257,12 +258,11 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             return languageServerView;
         }
 
-
-        private void showConsole() {
+        public void showConsole() {
             show(NAME_VIEW_CONSOLE);
         }
 
-        private void showDetail() {
+        public void showDetail() {
             show(NAME_VIEW_DETAIL);
         }
 
@@ -291,6 +291,13 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             logsConsoleView.print(message, contentType);
         }
 
+        public void selectLogTab() {
+            // Select "Console" tab
+            showConsole();
+            // Select "Log" tab
+            tabbedPane.setSelectedIndex(1);
+        }
+
         @Override
         public void dispose() {
             for (UserDefinedLanguageServerSettingsListener settingsChangeListener : settingsChangeListeners) {
@@ -306,6 +313,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 tracesConsoleView.dispose();
             }
         }
+
     }
 
     private static ConsoleViewContentType getContentType(@Nullable MessageType type) {
@@ -472,7 +480,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         });
     }
 
-    private void showLog(MessageParams params, LanguageServerDefinition serverDefinition) {
+    private void showLog(@NotNull MessageParams params,
+                         @NotNull LanguageServerDefinition serverDefinition) {
         if (isDisposed()) {
             return;
         }
@@ -487,6 +496,56 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
         if (consoleOrErrorPanel != null) {
             consoleOrErrorPanel.showLog(params);
+        }
+    }
+
+    /**
+     * Select the "Log tab" the LSP console of the given server definition.
+     *
+     * @param serverDefinition the language server definition.
+     * @param project          the project.
+     */
+    public static void selectLogTab(@NotNull LanguageServerDefinition serverDefinition,
+                               @NotNull Project project) {
+        // Get the LSP tool window
+        var toolWindow = ToolWindowManager.getInstance(project).getToolWindow(LANGUAGE_SERVERS_TOOL_WINDOW_ID);
+        if (toolWindow == null) {
+            return;
+        }
+        invokeLaterIfNeeded(() -> {
+            // Get the panel of the LSP tool window
+            var contentManager = toolWindow.getContentManager();
+            var content = contentManager.getContent(0);
+            if (content != null && content.getComponent() instanceof LSPConsoleToolWindowPanel panel) {
+                // Show log...
+                panel.selectLogTab(serverDefinition);
+            }
+        });
+    }
+
+    /**
+     * Select "Log" tab for the given language server definition.
+     *
+     * @param serverDefinition the language server deinition.
+     */
+    private void selectLogTab(@NotNull LanguageServerDefinition serverDefinition) {
+        if (isDisposed()) {
+            return;
+        }
+        LanguageServerTreeNode serverNode = explorer.findNodeForServer(serverDefinition);
+        if (serverNode == null) {
+            return;
+        }
+        var processTreeNode = serverNode.getActiveProcessTreeNode();
+        if (processTreeNode == null) {
+            return;
+        }
+        // Select the language server process node
+        explorer.selectAndExpand(processTreeNode);
+        // Select the "Log" tab
+        var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
+        if (consoleOrErrorPanel != null) {
+            consoleOrErrorPanel.selectLogTab();
         }
     }
 

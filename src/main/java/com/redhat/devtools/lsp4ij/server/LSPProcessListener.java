@@ -19,7 +19,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 /**
  * IntelliJ process listener used to read the process of the started language server in an InputStream
@@ -30,13 +29,13 @@ class LSPProcessListener implements ProcessListener {
     private final PipedOutputStream outputStream;
     private final OutputStreamWriter outputStreamWriter;
     private final PipedInputStream inputStream;
-    private final @NotNull List<LanguageServerLogErrorHandler> errorHandlers;
+    private final @NotNull OSProcessStreamConnectionProvider provider;
 
-    public LSPProcessListener(List<LanguageServerLogErrorHandler> errorHandlers) throws IOException {
+    public LSPProcessListener(@NotNull OSProcessStreamConnectionProvider provider) throws IOException {
         this.outputStream = new PipedOutputStream();
         this.outputStreamWriter = new OutputStreamWriter(this.outputStream, StandardCharsets.UTF_8);
         this.inputStream = new PipedInputStream(this.outputStream);
-        this.errorHandlers = errorHandlers;
+        this.provider = provider;
     }
 
     @NotNull
@@ -57,7 +56,7 @@ class LSPProcessListener implements ProcessListener {
             }
         } else if (ProcessOutputType.isStderr(outputType)) {
             // Log the error in the 'Log' tab console
-            for (var handler : errorHandlers) {
+            for (var handler : provider.getHandlers()) {
                 handler.logError(removeEndLine(event.getText()));
             }
         }
@@ -65,21 +64,29 @@ class LSPProcessListener implements ProcessListener {
 
     private static String removeEndLine(String text) {
         if (text.endsWith("\r\n")) {
-            return text.substring(0, text.length() -2);
+            return text.substring(0, text.length() - 2);
         }
         if (text.endsWith("\n")) {
-            return text.substring(0, text.length() -1);
+            return text.substring(0, text.length() - 1);
         }
         return text;
     }
 
     @Override
     public void processTerminated(@NotNull ProcessEvent event) {
+        // Close the output
         try {
             outputStreamWriter.close();
             outputStream.close();
         } catch (IOException e) {
             // Do nothing
+        }
+        if (!provider.isStopped()) {
+            // The provider was not stopped by LSP4IJ (with Stop/Pause button, when all files are closed, etc)
+            // It is an unexpected error, notify it
+            for (var handler : provider.getUnexpectedServerStopHandlers()) {
+                handler.run();
+            }
         }
     }
 
