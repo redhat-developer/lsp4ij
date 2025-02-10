@@ -1107,12 +1107,15 @@ public class LSPIJUtils {
     private static void doApplyEdits(@Nullable Editor editor,
                                      @NotNull Document document,
                                      @NotNull List<TextEdit> edits) {
-        if (edits.isEmpty()) {
+        // Create an owned copy to insulate against modification of the provided list while processing it
+        List<TextEdit> ownedEdits = new ArrayList<>(edits);
+
+        if (ownedEdits.isEmpty()) {
             return;
         }
         // Convert TextEdit positions into RangeMarkers
         final var pairs = new ArrayList<Pair<TextEdit, RangeMarker>>();
-        for (var textEdit: edits) {
+        for (var textEdit : ownedEdits) {
             var range = textEdit.getRange();
             if (range != null) {
                 int start = toOffset(range.getStart(), document);
@@ -1252,14 +1255,17 @@ public class LSPIJUtils {
      */
     public static String applyEdits(@NotNull Document document,
                                     @NotNull List<? extends TextEdit> edits) {
+        // Create an owned mutable copy since we're going to modify the list
+        List<TextEdit> mutableEdits = new ArrayList<>(edits);
+
         // Sort text edits
-        if (edits.size() > 1) {
-            edits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
+        if (mutableEdits.size() > 1) {
+            mutableEdits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
         }
         String text = document.getText();
         int lastModifiedOffset = 0;
-        List<String> spans = new ArrayList<>(edits.size() + 1);
-        for (TextEdit textEdit : edits) {
+        List<String> spans = new ArrayList<>(mutableEdits.size() + 1);
+        for (TextEdit textEdit : mutableEdits) {
             int startOffset = LSPIJUtils.toOffset(textEdit.getRange().getStart(), document);
             if (startOffset < lastModifiedOffset) {
                 throw new Error("Overlapping edit");
