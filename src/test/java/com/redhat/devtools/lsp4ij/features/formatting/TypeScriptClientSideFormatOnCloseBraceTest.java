@@ -172,6 +172,77 @@ public class TypeScriptClientSideFormatOnCloseBraceTest extends LSPClientSideOnT
         );
     }
 
+    // BOUNDARY TESTS
+
+    // language=json
+    private static final String BOUNDARY_MOCK_SELECTION_RANGE_JSON = """
+            [
+              {
+                "range": {
+                  "start": {
+                    "line": 1,
+                    "character": 0
+                  },
+                  "end": {
+                    "line": 1,
+                    "character": 1
+                  }
+                },
+                "parent": {
+                  "range": {
+                    "start": {
+                      "line": 0,
+                      "character": 15
+                    },
+                    "end": {
+                      "line": 1,
+                      "character": 1
+                    }
+                  },
+                  "parent": {
+                    "range": {
+                      "start": {
+                        "line": 0,
+                        "character": 0
+                      },
+                      "end": {
+                        "line": 1,
+                        "character": 1
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+            """;
+
+    // language=json
+    private static final String BOUNDARY_MOCK_FOLDING_RANGE_JSON = "[]";
+
+    // language=json
+    private static final String BOUNDARY_MOCK_RANGE_FORMATTING_JSON = "[]";
+
+    // No language injection here because there are syntax errors
+    private static final String BOUNDARY_FILE_BODY_BEFORE = """
+            function foo() {
+            // type }"""; // NOTE: It's critical that this happen at the VERY end of the file to confirm the fix for 822
+
+    // Confirms the fix for https://github.com/redhat-developer/lsp4ij/issues/822
+    public void testCloseBraceAtEndOfFile() {
+        assertOnTypeFormatting(
+                TEST_FILE_NAME,
+                BOUNDARY_FILE_BODY_BEFORE,
+                // language=typescript
+                """
+                        function foo() {
+                        }""",
+                BOUNDARY_MOCK_SELECTION_RANGE_JSON,
+                BOUNDARY_MOCK_FOLDING_RANGE_JSON,
+                BOUNDARY_MOCK_RANGE_FORMATTING_JSON,
+                clientConfiguration -> clientConfiguration.format.onTypeFormatting.clientSide.formatOnCloseBrace = true
+        );
+    }
+
     // COMPLEX TESTS
 
     // language=json
