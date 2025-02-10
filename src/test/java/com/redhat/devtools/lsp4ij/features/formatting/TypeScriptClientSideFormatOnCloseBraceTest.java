@@ -269,8 +269,7 @@ public class TypeScriptClientSideFormatOnCloseBraceTest extends LSPClientSideOnT
             bar() {
             console.log('Hello, world.');
             }
-            // type }
-            """;
+            // type }""";
 
     public void testComplexDefaults() {
         assertOnTypeFormatting(
@@ -282,8 +281,7 @@ public class TypeScriptClientSideFormatOnCloseBraceTest extends LSPClientSideOnT
                         bar() {
                         console.log('Hello, world.');
                         }
-                        }
-                        """,
+                        }""",
                 COMPLEX_MOCK_SELECTION_RANGE_JSON,
                 COMPLEX_MOCK_FOLDING_RANGE_JSON,
                 COMPLEX_MOCK_RANGE_FORMATTING_JSON,
@@ -301,8 +299,7 @@ public class TypeScriptClientSideFormatOnCloseBraceTest extends LSPClientSideOnT
                             bar() {
                                 console.log('Hello, world.');
                             }
-                        }
-                        """,
+                        }""",
                 COMPLEX_MOCK_SELECTION_RANGE_JSON,
                 COMPLEX_MOCK_FOLDING_RANGE_JSON,
                 COMPLEX_MOCK_RANGE_FORMATTING_JSON,
@@ -320,8 +317,7 @@ public class TypeScriptClientSideFormatOnCloseBraceTest extends LSPClientSideOnT
                         bar() {
                         console.log('Hello, world.');
                         }
-                        }
-                        """,
+                        }""",
                 COMPLEX_MOCK_SELECTION_RANGE_JSON,
                 COMPLEX_MOCK_FOLDING_RANGE_JSON,
                 COMPLEX_MOCK_RANGE_FORMATTING_JSON,
