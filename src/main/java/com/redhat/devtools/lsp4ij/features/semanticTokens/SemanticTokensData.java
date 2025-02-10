@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2024 Red Hat, Inc.
+ * Copyright (c) 2024-2025 Red Hat, Inc.
  * Distributed under license by Red Hat, Inc. All rights reserved.
  * This program is made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution,
@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - Performance improvements for huge files
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
@@ -28,9 +29,6 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Consumer;
-
-import static com.intellij.codeHighlighting.RainbowHighlighter.RAINBOW_ELEMENT;
 
 /**
  * Semantic data.
@@ -63,7 +61,7 @@ public class SemanticTokensData {
     @Nullable
     public void highlight(@NotNull PsiFile file,
                           @NotNull Document document,
-                          @NotNull Consumer<HighlightInfo> addInfo) {
+                          @NotNull LazyHighlightInfo.Consumer addInfo) {
         var inspector = SemanticTokensInspectorManager.getInstance(file.getProject());
         boolean notifyInspector = inspector.hasSemanticTokensInspectorListener();
         List<SemanticTokensHighlightInfo> highlightInfos = notifyInspector ? new ArrayList<>() : null;
@@ -80,9 +78,14 @@ public class SemanticTokensData {
             int offset = 0;
             int length = 0;
             String tokenType = null;
+            int cancelCounter = 0;
             for (Integer data : dataStream) {
                 // Cancel LSP semantic tokens support as soon as possible.
-                ProgressManager.checkCanceled();
+                cancelCounter++;
+                if (cancelCounter >= 100) {
+                    cancelCounter = 0;
+                    ProgressManager.checkCanceled();
+                }
 
                 switch (idx % 5) {
                     case 0: // line
@@ -109,12 +112,7 @@ public class SemanticTokensData {
                         int end = offset + length;
                         TextAttributesKey colorKey = tokenType != null ? semanticTokensColorsProvider.getTextAttributesKey(tokenType, tokenModifiers, file) : null;
                         if (colorKey != null) {
-                            HighlightInfo highlightInfo = HighlightInfo
-                                    .newHighlightInfo(RAINBOW_ELEMENT)
-                                    .range(start, end)
-                                    .textAttributes(colorKey)
-                                    .create();
-                            addInfo.accept(highlightInfo);
+                            addInfo.accept(start, end, colorKey);
                         }
 
                         if (notifyInspector) {
