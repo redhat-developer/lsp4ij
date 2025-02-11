@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.selectionRange;
 
-import com.intellij.codeInsight.editorActions.ExtendWordSelectionHandler;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
@@ -19,8 +18,8 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import org.eclipse.lsp4j.SelectionRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,31 +33,23 @@ import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerB
 /**
  * Implementation of the IDE's extendWordSelectionHandler EP for LSP4IJ files against textDocument/selectionRange.
  */
-public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler {
+public class LSPExtendWordSelectionHandler extends AbstractLSPExtendWordSelectionHandler {
 
     @Override
     public boolean canSelect(@NotNull PsiElement element) {
-        if (!element.isValid()) {
+        if (!super.canSelect(element)) {
             return false;
         }
 
-        PsiFile psiFile = element.getContainingFile();
-        if ((psiFile == null) || !psiFile.isValid()) {
-            return false;
-        }
+        // These should all be safely non-null now
+        Project project = element.getProject();
+        PsiFile file = element.getContainingFile();
+        VirtualFile virtualFile = LSPIJUtils.getFile(element);
 
-        Project project = psiFile.getProject();
-        if (project.isDisposed()) {
-            return false;
-        }
-
-        VirtualFile file = psiFile.getVirtualFile();
-        if (file == null) {
-            return false;
-        }
         // Only if textDocument/selectionRange is supported for the file
+        //noinspection DataFlowIssue
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file, ls -> ls.getClientFeatures().getSelectionRangeFeature().isSelectionRangeSupported(psiFile));
+                .hasAny(virtualFile, ls -> ls.getClientFeatures().getSelectionRangeFeature().isSelectionRangeSupported(file));
     }
 
     @Override
@@ -68,7 +59,7 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
                                   int offset,
                                   @NotNull Editor editor) {
         PsiFile file = element.getContainingFile();
-        if (file == null || file.getVirtualFile() == null) {
+        if (file == null) {
             return null;
         }
 
@@ -89,24 +80,11 @@ public class LSPExtendWordSelectionHandler implements ExtendWordSelectionHandler
             }
         }
 
-        // Get the selection ranges
-        List<SelectionRange> selectionRanges = LSPSelectionRangeSupport.getSelectionRanges(file, document, effectiveOffset);
-        if (ContainerUtil.isEmpty(selectionRanges)) {
-            return null;
-        }
-
-        // Convert the selection ranges into text ranges
-        Set<TextRange> textRanges = new LinkedHashSet<>(selectionRanges.size());
-        for (SelectionRange selectionRange : selectionRanges) {
-            TextRange selectionTextRange = LSPSelectionRangeSupport.getTextRange(selectionRange, document);
-            textRanges.addAll(expandToWholeLinesWithBlanks(editorText, selectionTextRange));
-
-            for (SelectionRange parentSelectionRange = selectionRange.getParent();
-                 parentSelectionRange != null;
-                 parentSelectionRange = parentSelectionRange.getParent()) {
-                TextRange parentSelectionTextRange = LSPSelectionRangeSupport.getTextRange(parentSelectionRange, document);
-                textRanges.addAll(expandToWholeLinesWithBlanks(editorText, parentSelectionTextRange));
-            }
+        // Get the selection ranges and extend them to whole lines
+        Set<TextRange> textRanges = new LinkedHashSet<>();
+        List<TextRange> selectionTextRanges = LSPSelectionRangeSupport.getSelectionTextRanges(file, editor, effectiveOffset);
+        for (TextRange selectionTextRange : selectionTextRanges) {
+            ContainerUtil.addAllNotNull(textRanges, expandToWholeLinesWithBlanks(editorText, selectionTextRange));
         }
 
         // If the original offset was at line start and the effective offset was not, remove smaller text ranges

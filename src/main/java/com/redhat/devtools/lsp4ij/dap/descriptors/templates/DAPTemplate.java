@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
 import com.intellij.openapi.util.SystemInfo;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 
 import java.util.ArrayList;
@@ -38,22 +39,19 @@ public class DAPTemplate {
     };
 
     public static final String TEMPLATE_FILE_NAME = "template.json";
-    public static final String LAUNCH_FILE_NAME = "launch.json";
-    public static final String LAUNCH_SCHEMA_FILE_NAME = "launch.schema.json";
-    public static final String ATTACH_FILE_NAME = "attach.json";
-    public static final String ATTACH_SCHEMA_FILE_NAME = "attach.schema.json";
+    public static final String LAUNCH_FILE_START_NAME = "launch.";
+    public static final String ATTACH_FILE_START_NAME = "attach.";
 
     public static final String NAME_JSON_PROPERTY = "name";
     public static final String ID_JSON_PROPERTY = "id";
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
-    public static final String WAIT_FOR_TIMEOUT_JSON_PROPERTY = "waitForTimeout";
-    public static final String WAIT_FOR_TRACE_JSON_PROPERTY = "waitForTrace";
+    public static final String CONNECT_TIMEOUT_JSON_PROPERTY = "connectTimeout";
+    public static final String DEBUG_SERVER_READY_PATTERN_JSON_PROPERTY = "debugServerReadyPattern";
     public static final String LANGUAGE_JSON_PROPERTY = "language";
     public static final String LANGUAGE_MAPPINGS_JSON_PROPERTY = "languageMappings";
     public static final String PATTERNS_JSON_PROPERTY = "patterns";
     public static final String FILE_TYPE_JSON_PROPERTY = "fileType";
     public static final String FILE_TYPE_MAPPINGS_JSON_PROPERTY = "fileTypeMappings";
-
 
     private static final String WINDOWS_KEY = "windows";
     private static final String MAC_KEY = "mac";
@@ -70,14 +68,9 @@ public class DAPTemplate {
 
     private List<ServerMappingSettings> languageMappings;
 
-    private String description;
-
-    private String launchConfiguration;
-    private String launchConfigurationSchema;
-    private String attachConfiguration;
-    private String attachConfigurationSchema;
-    private String waitForTimeout;
-    private String waitForTrace;
+    private List<LaunchConfiguration> launchConfigurations;
+    private int connectTimeout;
+    private String debugServerReadyPattern;
 
     public String getId() {
         return id;
@@ -114,20 +107,20 @@ public class DAPTemplate {
         this.programArgs = programArgs;
     }
 
-    public void setWaitForTimeout(String waitForTimeout) {
-        this.waitForTimeout = waitForTimeout;
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
-    public String getWaitForTimeout() {
-        return waitForTimeout;
+    public int getConnectTimeout() {
+        return connectTimeout;
     }
 
-    public void setWaitForTrace(String waitForTrace) {
-        this.waitForTrace = waitForTrace;
+    public void setDebugServerReadyPattern(String debugServerReadyPattern) {
+        this.debugServerReadyPattern = debugServerReadyPattern;
     }
 
-    public String getWaitForTrace() {
-        return waitForTrace;
+    public String getDebugServerReadyPattern() {
+        return debugServerReadyPattern;
     }
 
     public List<ServerMappingSettings> getLanguageMappings() {
@@ -158,43 +151,11 @@ public class DAPTemplate {
         this.fileTypeMappings.add(s);
     }
 
-    public String getDescription() {
-        return description;
+    public List<LaunchConfiguration> getLaunchConfigurations() {
+        return launchConfigurations;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getLaunchConfiguration() {
-        return launchConfiguration;
-    }
-
-    public void setLaunchConfiguration(String launchConfiguration) {
-        this.launchConfiguration = launchConfiguration;
-    }
-
-    public String getLaunchConfigurationSchema() {
-        return launchConfigurationSchema;
-    }
-
-    public void setLaunchConfigurationSchema(String launchConfigurationSchema) {
-        this.launchConfigurationSchema = launchConfigurationSchema;
-    }
-
-    public String getAttachConfiguration() {
-        return attachConfiguration;
-    }
-
-    public void setAttachConfiguration(String attachConfiguration) {
-        this.attachConfiguration = attachConfiguration;
-    }
-
-    public String getAttachConfigurationSchema() {
-        return attachConfigurationSchema;
-    }
-
-    public void setAttachConfigurationSchema(String attachConfigurationSchema) {
-        this.attachConfigurationSchema = attachConfigurationSchema;
+    public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+        this.launchConfigurations = launchConfigurations;
     }
 }

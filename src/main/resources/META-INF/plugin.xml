@@ -5,6 +5,18 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.10.0</h3>
+    <ul>
+      <li><a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md" >Debug Adapter Protocol</a> support</li>
+      <li>LSP textDocument/onTypeFormatting support</li>
+      <li>On type formating client side, based on LSP selectionRanges / foldingRange</li>
+      <li>LSP Inlay Hints improvement by adopting no deprecated codeInsight.declarativeInlayProviderFactory extension point.</li>
+      <li>LSP API to customize file URI</li>
+      <li>LSP API to customize LSP progress</li>
+      <li>Fixing bugs</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/11?closed=1">changelog</a>.
+
     <h3>0.9.0</h3>
     <ul>
       <li>Support for <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md#selection-range">Selection Range</a></li>
@@ -105,7 +117,7 @@
         <ul>
           <li><a href="https://microsoft.github.io/language-server-protocol/">Language Server protocol (LSP)</a> client compatible with all flavors of IntelliJ.</li>
           <li><a href="https://microsoft.github.io/debug-adapter-protocol/" >Debug Adapter Protocol</a> support
-          with <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/DAP.md" >Debug Adapter Protocol Run/Debug configuration</a>.</li>
+          with <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md" >Debug Adapter Protocol Run/Debug configuration</a>.</li>
         </ul>
     </p>
 
@@ -255,9 +267,9 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
 
         <!-- LSP textDocument/completion request support -->
-        <typedHandler id="LSPTypedHandlerDelegate"
+        <typedHandler id="LSPCompletionTriggerTypedHandler"
                       order="last"
-                      implementation="com.redhat.devtools.lsp4ij.features.completion.LSPTypedHandlerDelegate"/>
+                      implementation="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionTriggerTypedHandler"/>
         <completion.contributor
                 id="LSPCompletionContributor"
                 language="any"
@@ -307,7 +319,16 @@
                 id="LSPCodeLensProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider"/>
 
-        <!-- LSP textDocument/inlayHint + textDocument/colorInformation requests support -->
+        <!-- LSP textDocument/inlayHint requests support -->
+        <codeInsight.declarativeInlayProviderFactory
+                id="LSPDeclarativeInlayHintProvidersFactory"
+                implementation="com.redhat.devtools.lsp4ij.features.inlayhint.LSPDeclarativeInlayHintProvidersFactory"/>
+
+        <codeInsight.inlayActionHandler
+                handlerId="LSP4IJ"
+                implementationClass="com.redhat.devtools.lsp4ij.features.inlayhint.LSPDeclarativeInlayActionHandler"/>
+
+        <!-- LSP textDocument/colorInformation requests support -->
         <codeInsight.inlayProviderFactory
                 id="LSPInlayHintProvidersFactory"
                 implementation="com.redhat.devtools.lsp4ij.features.LSPInlayHintProvidersFactory"/>
@@ -368,10 +389,21 @@
                 order="first"
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPServerSideOnTypeFormattingEnterHandler"/>
 
+        <!-- Client-side on-type formatting -->
+        <typedHandler
+                id="LSPClientSideOnTypeFormattingTypedHandler"
+                order="first, before LSPServerSideOnTypeFormattingTypedHandler"
+                implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPClientSideOnTypeFormattingTypedHandler"/>
+
         <!-- LSP textDocument/selectionRange request support -->
         <extendWordSelectionHandler
                 implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPExtendWordSelectionHandler"
+                id="LSPExtendWordSelectionHandler"
                 order="first"/>
+        <extendWordSelectionHandler
+                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPCodeBlockExtendWordSelectionHandler"
+                id="LSPCodeBlockExtendWordSelectionHandler"
+                order="first, before LSPExtendWordSelectionHandler"/>
 
         <!-- LSP textDocument/semanticTokens request support -->
         <highlightVisitor

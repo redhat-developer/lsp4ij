@@ -4,7 +4,7 @@
   "programArgs": {
     "default": "dlv dap"
   },
-  "waitForTrace": "DAP server listening at: ${address}:${port}",
+  "debugServerReadyPattern": "DAP server listening at: ${address}:${port}",
   "fileTypeMappings": [
     {
       "fileType": {

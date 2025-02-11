@@ -33,9 +33,16 @@ You should see some instructions how to start lldb-dap server.
 
    ![DAP Configuration Type](../images/DAP_config_type.png)
 
-4. In the `Server` tab, select `Swift lldb`.
+4. In the `Server` tab, click on `create a new server`:
 
-   ![DAP Configuration/Server](../images/swift-lldb/server_tab.png)
+   ![Create a new server](../images/DAP_server_create_link.png)
+
+5. It opens a new dialog to create DAP server, select `Swift lldb` template:
+   ![Select Template](../images/swift-lldb/select_template.png)
+
+6. After clicking on `OK` button, it will select the new server and pre-fill configurations:
+
+![Select New server](../images/swift-lldb/select_new_server.png)
 
 This will automatically populate:
 
@@ -46,7 +53,7 @@ This will automatically populate:
 lldb-dap
 ```
 
-This command will start the DAP server with `stdio` mode. You could starts the server in `socket` mode
+This command will start the DAP server with `stdio` mode. You could start the server in `socket` mode
 with the following command:
 
 ```
@@ -89,15 +96,16 @@ This command should generate an executable according your swift project settings
 
 ![DAP Configuration/Configuration](../images/swift-lldb/configuration_tab.png)
 
-2. Select `Launch` as debugging type.
+2. Select `Launch` as `Debug mode`.
 3. The DAP parameters of the launch should look like this:
 
 ```json
 {
-   "type": "swift-lldb",
-   "request": "launch",
-   "program": "${file}",
-   "cwd": "${workspaceFolder}"
+  "type": "swift-lldb",
+  "name": "Launch Swift executable",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}"
 }
 ```
 
@@ -113,10 +121,14 @@ Set a breakpoint in the `Sources/main.swift` file:
 
 ![Set Breakpoint](../images/swift-lldb/set_breakpoint.png)
 
-# Debugging
+## Debugging
 
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console:
 
 You will also see `Threads` and `Variables`:
 
 ![Debugging / Threads](../images/swift-lldb/debug_threads_tab.png)
+
+## Language Support
+
+If you need language support for Swift (completion, validation, etc) you can [configure the SourceKit-LSP Language Server](../../user-defined-ls/sourcekit-lsp.md)

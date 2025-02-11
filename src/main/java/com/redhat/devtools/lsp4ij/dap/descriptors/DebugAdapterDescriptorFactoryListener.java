@@ -55,10 +55,9 @@ public interface DebugAdapterDescriptorFactoryListener {
         public final boolean userEnvironmentVariablesChanged;
         public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean waitForTimeoutChanged;
-        public final boolean waitForTraceChanged;
+        public final boolean debugServerReadyPatternChanged;
         public final boolean mappingsChanged;
-        public final boolean configurationChanged;
-        public final boolean initializationOptionsContentChanged;
+        public final boolean launchConfigurationsContentChanged;
 
         public DebugAdapterDescriptorFactoryChangedEvent(@NotNull DebugAdapterDescriptorFactory descriptorFactory,
                                                          boolean nameChanged,
@@ -66,20 +65,18 @@ public interface DebugAdapterDescriptorFactoryListener {
                                                          boolean userEnvironmentVariablesChanged,
                                                          boolean includeSystemEnvironmentVariablesChanged,
                                                          boolean waitForTimeoutChanged,
-                                                         boolean waitForTraceChanged,
+                                                         boolean debugServerReadyPatternChanged,
                                                          boolean mappingsChanged,
-                                                         boolean configurationContentChanged,
-                                                         boolean initializationOptionsContentChanged) {
+                                                         boolean launchConfigurationsContentChanged) {
             this.descriptorFactory = descriptorFactory;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
             this.userEnvironmentVariablesChanged = userEnvironmentVariablesChanged;
             this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.waitForTimeoutChanged = waitForTimeoutChanged;
-            this.waitForTraceChanged = waitForTraceChanged;
+            this.debugServerReadyPatternChanged = debugServerReadyPatternChanged;
             this.mappingsChanged = mappingsChanged;
-            this.configurationChanged = configurationContentChanged;
-            this.initializationOptionsContentChanged = initializationOptionsContentChanged;
+            this.launchConfigurationsContentChanged = launchConfigurationsContentChanged;
         }
     }
 

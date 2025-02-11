@@ -2,9 +2,9 @@
   "id": "vscode-js-debug",
   "name": "VSCode JS Debug",
   "programArgs": {
-    "default": "node ${BASE_DIR}/js-debug/src/dapDebugServer.js ${port} 127.0.0.1"
+    "default": "node <<insert base directory>>/js-debug/src/dapDebugServer.js ${port} 127.0.0.1"
   },
-  "waitForTrace": "Debug server listening at ",
+  "debugServerReadyPattern": "Debug server listening at ",
   "download": {
     "page": "https://github.com/microsoft/vscode-js-debug/releases/",
     "url": "https://github.com/microsoft/vscode-js-debug/releases/download/v1.96.0/js-debug-dap-v1.96.0.tar.gz"

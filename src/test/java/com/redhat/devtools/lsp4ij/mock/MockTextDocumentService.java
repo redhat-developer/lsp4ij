@@ -172,7 +172,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends TextEdit>> rangeFormatting(DocumentRangeFormattingParams params) {
-        return CompletableFuture.completedFuture(null);
+        return CompletableFuture.completedFuture(mockFormattingTextEdits);
     }
 
     @Override
@@ -384,7 +384,27 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<SelectionRange>> selectionRange(SelectionRangeParams params) {
-        return CompletableFuture.completedFuture(mockSelectionRanges);
+        // Find the mock selection ranges that apply to the specified position. This allows us to have a single mock
+        // response that covers multiple positions that might be queried during a given test.
+        List<SelectionRange> applicableMockSelectionRanges = mockSelectionRanges
+                .stream()
+                .filter(selectionRange -> {
+                    Position startPosition = selectionRange.getRange().getStart();
+                    Position endPosition = selectionRange.getRange().getEnd();
+                    for (Position currentPosition : params.getPositions()) {
+                        if (((startPosition.getLine() < currentPosition.getLine()) ||
+                             ((startPosition.getLine() == currentPosition.getLine()) &&
+                              (startPosition.getCharacter() <= currentPosition.getCharacter()))) &&
+                            ((endPosition.getLine() > currentPosition.getLine()) ||
+                             ((endPosition.getLine() == currentPosition.getLine()) &&
+                              (endPosition.getCharacter() >= currentPosition.getCharacter())))) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })
+                .toList();
+        return CompletableFuture.completedFuture(applicableMockSelectionRanges);
     }
 
     public void setSemanticTokens(final SemanticTokens semanticTokens) {

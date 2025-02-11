@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2019 Red Hat, Inc.
+ * Copyright (c) 2019-2025 Red Hat, Inc.
  * Distributed under license by Red Hat, Inc. All rights reserved.
  * This program is made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution,
@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - Order-independent doApplyEdits
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
@@ -18,6 +19,7 @@ import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -30,6 +32,7 @@ import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.*;
 import com.intellij.psi.PsiElement;
@@ -1104,34 +1107,42 @@ public class LSPIJUtils {
     private static void doApplyEdits(@Nullable Editor editor,
                                      @NotNull Document document,
                                      @NotNull List<TextEdit> edits) {
-        if (edits.isEmpty()) {
+        // Create an owned copy to insulate against modification of the provided list while processing it
+        List<TextEdit> ownedEdits = new ArrayList<>(edits);
+
+        if (ownedEdits.isEmpty()) {
             return;
         }
-        // Sort text edits
-        if (edits.size() > 1) {
-            edits.sort(TEXT_EDITS_DESCENDING_COMPARATOR);
-        }
-        final int oldCaretOffset = editor != null ? editor.getCaretModel().getOffset() : -1;
-        int newCaretOffset = oldCaretOffset;
-        // Apply each text edit to update the given document and move the caret offset if needed
-        for (var textEdit : edits) {
-            Range range = textEdit.getRange();
+        // Convert TextEdit positions into RangeMarkers
+        final var pairs = new ArrayList<Pair<TextEdit, RangeMarker>>();
+        for (var textEdit : ownedEdits) {
+            var range = textEdit.getRange();
             if (range != null) {
-                // Text edit range exists
                 int start = toOffset(range.getStart(), document);
                 int end = toOffset(range.getEnd(), document);
+                // Range is valid, add it to the converted list
                 if (end >= start) {
-                    // Text edit range is valid, apply the text edit to the document
-                    int increment = applyEdit(start, end, textEdit.getNewText(), document, oldCaretOffset);
-                    if (newCaretOffset != -1) {
-                        // Update the caret offset
-                        newCaretOffset += increment;
-                    }
+                    var marker = document.createRangeMarker(start, end);
+                    pairs.add(Pair.create(textEdit, marker));
                 }
             }
         }
+        if (pairs.isEmpty()) {
+            return;
+        }
+        final int oldCaretOffset = editor != null ? editor.getCaretModel().getOffset() : -1;
+        int newCaretOffset = oldCaretOffset;
+        // Apply each text edit to update the given document
+        for (var pair: pairs) {
+            var edit = pair.first;
+            var marker = pair.second;
+            int increment = applyEdit(marker.getStartOffset(), marker.getEndOffset(), edit.getNewText(), document, oldCaretOffset);
+            if (newCaretOffset != -1) {
+                newCaretOffset += increment;
+            }
+            marker.dispose();
+        }
         if (newCaretOffset > -1 && oldCaretOffset != newCaretOffset) {
-            // The caret offset must be moved
             editor.getCaretModel().moveToOffset(newCaretOffset);
         }
     }
@@ -1244,14 +1255,17 @@ public class LSPIJUtils {
      */
     public static String applyEdits(@NotNull Document document,
                                     @NotNull List<? extends TextEdit> edits) {
+        // Create an owned mutable copy since we're going to modify the list
+        List<TextEdit> mutableEdits = new ArrayList<>(edits);
+
         // Sort text edits
-        if (edits.size() > 1) {
-            edits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
+        if (mutableEdits.size() > 1) {
+            mutableEdits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
         }
         String text = document.getText();
         int lastModifiedOffset = 0;
-        List<String> spans = new ArrayList<>(edits.size() + 1);
-        for (TextEdit textEdit : edits) {
+        List<String> spans = new ArrayList<>(mutableEdits.size() + 1);
+        for (TextEdit textEdit : mutableEdits) {
             int startOffset = LSPIJUtils.toOffset(textEdit.getRange().getStart(), document);
             if (startOffset < lastModifiedOffset) {
                 throw new Error("Overlapping edit");

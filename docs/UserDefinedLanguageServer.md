@@ -3,7 +3,7 @@
 LSP4IJ provides the capability to consume any language server without developing
 an IntelliJ plugin via a `User-defined language server`.
 
-![New Language Server Dialog with TypeScript](./images/user-defined-ls/TypeScriptServerDialog.png)
+![New Language Server Dialog with TypeScript](images/user-defined-ls/typescript-language-server/select_template.png)
 
 The main idea is to: 
 
@@ -34,7 +34,7 @@ The `Server tab` requires the `server name` and `command` fields to be set.
 
 Here is a sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
-![New Language Server Dialog with TypeScript](./images/user-defined-ls/TypeScriptServerDialog.png)
+![New Language Server Dialog with TypeScript](images/user-defined-ls/typescript-language-server/select_template.png)
 
 #### Environment variables
 
@@ -62,7 +62,7 @@ That command might look like this:
 
 Here is an example with Scala Language Server's `metals.bat` stored at the root of the project:
 
-![Macro syntax](./images/user-defined-ls/Macro.png)
+![Macro syntax](images/user-defined-ls/Macro.png)
 
 When commands contain macros, their resolved value is visible below the `Command` field.
 
@@ -78,11 +78,11 @@ Here are mappings samples with the [typescript-language-server](https://github.c
 
  * The existing `JavaScript` file type is used to associate the file to the language server: 
 
-![TypeScript file type](./images/user-defined-ls/TypeScriptServerDialog_FileType.png)
+![TypeScript file type](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_FileType.png)
 
 * Since IntelliJ (Community) doesn't provide file type by default `TypeScript`, `React` file name patterns are used:
 
-![TypeScript file name patterns](./images/user-defined-ls/TypeScriptServerDialog_FileNamePatterns.png)
+![TypeScript file name patterns](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_FileNamePatterns.png)
 
 NOTE: it is better to use file name pattern instead of creating custom file type for TypeScript, since by default 
 IntelliJ Community support `TypeScript syntax coloration` with `TextMate`. If you define a file type, you will
@@ -102,7 +102,7 @@ The `Configuration tab` allows to configure the language server with the expecte
 
 Here are configuration sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
-![Configuration with TypeScript](./images/user-defined-ls/TypeScriptServerDialog_Configuration.png)
+![Configuration with TypeScript](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_Configuration.png)
 
 ### Debug tab
 
@@ -121,7 +121,9 @@ pre-filled with server name, command, mappings and potential configuration.
 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
+* [Erlang Language Server](./user-defined-ls/erlang-ls.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
+* [Julia Language Server](./user-defined-ls/julia.md) 
 * [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)

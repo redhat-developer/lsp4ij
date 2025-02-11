@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.client;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
@@ -22,6 +23,8 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XValueChildrenList;
+import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
+import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.*;
@@ -30,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Debug Adapter Protocol (DAP) stack frame.
@@ -40,6 +44,7 @@ public class DAPStackFrame extends XStackFrame {
     private final @NotNull DAPClient client;
     private @Nullable XSourcePosition sourcePosition;
     private XDebuggerEvaluator evaluator;
+    private CompletableFuture<DebugVariableContext> variablesContext;
 
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame) {
@@ -72,13 +77,46 @@ public class DAPStackFrame extends XStackFrame {
             try {
                 VirtualFile file = VfsUtil.findFile(Paths.get(path), true);
                 sourcePosition = XDebuggerUtil.getInstance().createPosition(file, stackFrame.getLine() - 1);
-            }
-            catch(Exception e) {
+            } catch (Exception e) {
                 // Invalid path...
                 // ex: <node_internals>/internal/modules/cjs/loader
             }
         }
         return sourcePosition;
+    }
+
+    public CompletableFuture<XSourcePosition> getSourcePositionFor(@NotNull Variable variable) {
+        var sourcePosition = getSourcePosition();
+        if (sourcePosition == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return getVariablesContext()
+                .thenApply(context -> {
+                    return context.getSourcePositionFor(variable);
+                });
+    }
+
+    private CompletableFuture<DebugVariableContext> getVariablesContext() {
+        if (variablesContext != null) {
+            return variablesContext;
+        }
+        return getVariablesContextSync();
+    }
+
+    private synchronized CompletableFuture<DebugVariableContext> getVariablesContextSync() {
+        if (variablesContext != null) {
+            return variablesContext;
+        }
+
+        var context = new DebugVariableContext(this);
+        CompletableFuture<DebugVariableContext> future = new CompletableFuture<>();
+        ApplicationManager.getApplication().executeOnPooledThread(() ->
+                ApplicationManager.getApplication().runReadAction(() -> {
+                    context.configureContext();
+                    future.complete(context);
+                }));
+        variablesContext = future;
+        return variablesContext;
     }
 
     @Override
@@ -102,7 +140,7 @@ public class DAPStackFrame extends XStackFrame {
                         variablesArgs.setVariablesReference(parentVariablesReference);
                         server.variables(variablesArgs)
                                 .thenAccept(variablesResponse -> {
-                                    children.addBottomGroup(new DAPValueGroup(client, scope.getName(),
+                                    children.addBottomGroup(new DAPValueGroup(this, scope.getName(),
                                             Arrays.asList(variablesResponse.getVariables()),
                                             parentVariablesReference));
                                     // Add the list to the node as children.

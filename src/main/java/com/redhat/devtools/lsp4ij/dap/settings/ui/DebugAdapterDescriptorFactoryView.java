@@ -21,6 +21,7 @@ import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
@@ -88,19 +89,13 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
             if (settings == null) {
                 return true;
             }
-            if (!(isEquals(getDisplayName(), settings.getServerName())
+            return !(isEquals(getDisplayName(), settings.getServerName())
                     && isEquals(this.getCommandLine(), settings.getCommandLine())
                     && Objects.equals(this.getEnvData().getEnvs(), settings.getUserEnvironmentVariables())
                     && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
-                    && isEquals(this.getWaitForTimeout(), settings.getWaitForTimeout())
-                    && isEquals(this.getWaitForTrace(), settings.getWaitForTrace())
-                    && Objects.equals(this.getMappings(), settings.getMappings())
-                    && isEquals(this.getLaunchConfiguration(), settings.getLaunchConfiguration())
-                    && isEquals(this.getLaunchConfigurationSchema(), settings.getLaunchConfigurationSchema())
-                    && isEquals(this.getAttachConfiguration(), settings.getAttachConfiguration())
-                    && isEquals(this.getAttachConfigurationSchema(), settings.getAttachConfigurationSchema()))) {
-                return true;
-            }
+                    && this.getConnectTimeout() == settings.getConnectTimeout()
+                    && isEquals(this.getDebugServerReadyPattern(), settings.getDebugServerReadyPattern())
+                    && Objects.equals(this.getMappings(), settings.getMappings()));
         }
         return false;
     }
@@ -112,12 +107,6 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
         return Objects.equals(s1, s2);
     }
 
-    static boolean isEquals(ServerTrace st1, ServerTrace st2) {
-        // the comparison between null and default value trace should return true
-        st1 = st1 == null ? ServerTrace.getDefaultValue() : st1;
-        st2 = st2 == null ? ServerTrace.getDefaultValue() : st2;
-        return Objects.equals(st1, st2);
-    }
     /**
      * Update the UI from the registered language server definition + settings.
      */
@@ -132,7 +121,8 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                 this.setEnvData(EnvironmentVariablesData.create(
                         settings.getUserEnvironmentVariables(),
                         settings.isIncludeSystemEnvironmentVariables()));
-                this.dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().update(null,getInt(settings.getWaitForTimeout()), settings.getWaitForTrace() );
+                this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel()
+                        .update(null, settings.getConnectTimeout(), settings.getDebugServerReadyPattern());
 
                 List<ServerMappingSettings> languageMappings = settings.getMappings()
                         .stream()
@@ -151,9 +141,6 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                         .filter(mapping -> mapping.getFileNamePatterns() != null)
                         .collect(Collectors.toList());
                 this.setFileNamePatternMappings(fileNamePatternMappings);
-
-                this.setLaunchConfiguration(settings.getLaunchConfiguration());
-                this.setAttachConfiguration(settings.getLaunchConfiguration());
             }
         } else {
             // TODO : extension point
@@ -194,22 +181,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                     .collect(Collectors.toList());
             this.setFileNamePatternMappings(fileNamePatternMappings);*/
         }
-    }
-
-    public void setLaunchConfiguration(String launchConfiguration) {
-        dapDescriptorFactoryPanel.setLaunchConfiguration(launchConfiguration);
-    }
-
-    public void setAttachConfiguration(String attachConfiguration) {
-        dapDescriptorFactoryPanel.setAttachConfiguration(attachConfiguration);
-    }
-
-    private static int getInt(String text) {
-        try {
-            return Integer.parseInt(text);
-        } catch (Exception e) {
-            return 0;
-        }
+        dapDescriptorFactoryPanel.setServerId(descriptorFactoryId);
     }
 
     /**
@@ -232,14 +204,11 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                                     getEnvData().getEnvs(),
                                     getEnvData().isPassParentEnvs(),
                                     getCommandLine(),
-                                    getWaitForTimeout(),
-                                    getWaitForTrace(),
+                                    getConnectTimeout(),
+                                    getDebugServerReadyPattern(),
                                     getLanguageMappings(),
                                     getFileTypeMappings(),
-                                    getLaunchConfiguration(),
-                                    getLaunchConfigurationSchema(),
-                                    getAttachConfiguration(),
-                                    getAttachConfigurationSchema()),
+                                    getLaunchConfigurations()),
                             false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -305,7 +274,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
     public JComponent getComponent() {
         return myMainPanel;
     }
-    
+
     public String getCommandLine() {
         return dapDescriptorFactoryPanel.getCommandLine();
     }
@@ -314,12 +283,12 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
         dapDescriptorFactoryPanel.setCommandLine(commandLine);
     }
 
-    public String getWaitForTimeout() {
-        return dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getTimeout();
+    public int getConnectTimeout() {
+        return dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
     }
 
-    public String getWaitForTrace() {
-        return dapDescriptorFactoryPanel.getConnectingServerConfigurationPanel().getTrace();
+    public String getDebugServerReadyPattern() {
+        return dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getTrace();
     }
 
     public ServerTrace getServerTrace() {
@@ -329,7 +298,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
     public void setServerTrace(ServerTrace serverTrace) {
         dapDescriptorFactoryPanel.getServerTraceComboBox().setSelectedItem(serverTrace);
     }
-    
+
     public void setLanguageMappings(@NotNull List<ServerMappingSettings> mappings) {
         mappingPanel.setLanguageMappings(mappings);
     }
@@ -353,7 +322,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
 
     public List<ServerMappingSettings> getFileTypeMappings() {
         return Streams.concat(mappingPanel.getFileTypeMappings().stream(),
-                mappingPanel.getFileNamePatternMappings().stream())
+                        mappingPanel.getFileNamePatternMappings().stream())
                 .toList();
     }
 
@@ -364,19 +333,12 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                 .toList();
     }
 
-    public @Nullable String getLaunchConfiguration() {
-        return dapDescriptorFactoryPanel.getLaunchConfiguration();
+    public void refreshLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
+        dapDescriptorFactoryPanel.refreshLaunchConfigurations(launchConfigurations);
     }
 
-    public @Nullable String getLaunchConfigurationSchema() {
-        return null;
+    public @Nullable List<LaunchConfiguration> getLaunchConfigurations() {
+        return dapDescriptorFactoryPanel.getLaunchConfigurations();
     }
 
-    public @Nullable String getAttachConfiguration() {
-        return dapDescriptorFactoryPanel.getAttachConfiguration();
-    }
-
-    public @Nullable String getAttachConfigurationSchema() {
-        return null;
-    }
 }

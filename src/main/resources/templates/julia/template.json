@@ -1,0 +1,18 @@
+{
+  "id": "julia",
+  "name": "Julia Language Server",
+  "programArgs": {
+    "default": "julia -e \"using LanguageServer; runserver()\""
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Julia",
+        "patterns": [
+          "*.jl"
+        ]
+      },
+      "languageId": "julia"
+    }
+  ]
+}

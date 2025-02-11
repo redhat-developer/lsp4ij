@@ -36,6 +36,11 @@ public interface StreamConnectionProvider {
     default void addLogErrorHandler(LanguageServerLogErrorHandler handler) {
 
     }
+
+    default void addUnexpectedServerStopHandler(Runnable handler) {
+
+    }
+
     /**
      * User provided initialization options.
      */

@@ -1,0 +1,13 @@
+{
+  "type": "pwa-node",
+  "name": "Launch TypeScript file",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}",
+  "outFiles": [
+    "${workspaceFolder}/**/*.(m|c|)js",
+    "!**/node_modules/**"
+  ],
+  "sourceMaps": true,
+  "__workspaceFolder": "${workspaceFolder}"
+}

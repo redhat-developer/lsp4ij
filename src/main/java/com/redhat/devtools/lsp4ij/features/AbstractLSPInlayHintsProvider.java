@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - fixed duplicate inlay hints
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features;
 
@@ -65,47 +66,30 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         final long modificationStamp = psiFile.getModificationStamp();
         return new FactoryInlayHintsCollector(editor) {
 
-            private boolean processed;
-
             @Override
             public boolean collect(@NotNull PsiElement psiElement, @NotNull Editor editor, @NotNull InlayHintsSink inlayHintsSink) {
-                if (processed) {
-                    // Before IJ 2023-3, FactoryInlayHintsCollector#collect(PsiElement element.. is called once time with PsiFile as element.
-                    // Since IJ 2023-3, FactoryInlayHintsCollector#collect(PsiElement element.. is called several times for each token of the PsiFile
-                    // which causes the problem of codelens/inlay hint which are not displayed because there are too many call of LSP request codelens/inlayHint which are cancelled.
-                    // With IJ 2023-3 we need to collect LSP CodeLens/InlayHint just for the first call.
-                    return false;
+                if (!(psiElement instanceof PsiFile psiFile)) {
+                    return true;
                 }
-                processed = true;
                 Project project = psiFile.getProject();
                 if (project.isDisposed()) {
                     // InlayHint must not be collected
-                    return false;
+                    return true;
                 }
 
                 try {
-                    final List<CompletableFuture> pendingFutures = new ArrayList<>();
+                    final List<CompletableFuture<?>> pendingFutures = new ArrayList<>();
                     doCollect(psiFile, editor, getFactory(), inlayHintsSink, pendingFutures);
                     if (!pendingFutures.isEmpty()) {
                         // Some LSP requests:
-                        // - textDocument/inlayHint, inlayHint/resolve
                         // - textDocument/colorInformation
                         // are pending, wait for their completion and refresh the inlay hints UI to render them
-                        CompletableFuture.allOf(pendingFutures.toArray(new CompletableFuture[0]))
-                                .thenApplyAsync(_unused -> {
-                                    // Check if PsiFile was not modified
-                                    if (modificationStamp == psiFile.getModificationStamp()) {
-                                        // All pending futures are finished, refresh the inlay hints
-                                        EditorFeatureManager.getInstance(project)
-                                                        .refreshEditorFeature(psiFile.getVirtualFile(), EditorFeatureType.INLAY_HINT, false);
-                                    }
-                                    return null;
-                                });
+                        EditorFeatureManager.getInstance(project).refreshEditorFeatureWhenAllDone(pendingFutures, modificationStamp, psiFile, EditorFeatureType.INLAY_HINT);
                     }
                 } catch (CancellationException e) {
                     // Do nothing
                 }
-                return false;
+                return true;
             }
         };
     }
@@ -177,6 +161,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                                       @NotNull Editor editor,
                                       @NotNull PresentationFactory factory,
                                       @NotNull InlayHintsSink inlayHintsSink,
-                                      @NotNull List<CompletableFuture> pendingFutures);
+                                      @NotNull List<CompletableFuture<?>> pendingFutures);
 
 }

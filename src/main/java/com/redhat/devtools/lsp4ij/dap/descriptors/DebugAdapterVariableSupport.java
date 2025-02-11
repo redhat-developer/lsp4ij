@@ -11,15 +11,16 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.icons.AllIcons;
-import com.intellij.openapi.editor.DefaultLanguageHighlighterColors;
-import com.intellij.xdebugger.frame.presentation.XRegularValuePresentation;
-import com.intellij.xdebugger.frame.presentation.XStringValuePresentation;
-import com.intellij.xdebugger.frame.presentation.XValuePresentation;
+import com.intellij.xdebugger.frame.presentation.*;
+import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariablePositionProvider;
+import com.redhat.devtools.lsp4ij.dap.client.variables.providers.HighlighterDebugVariablePositionProvider;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import java.util.Collection;
+import java.util.Collections;
 
 /**
  * Debug Adapter Protocol (DAP) variable support.
@@ -41,7 +42,7 @@ public class DebugAdapterVariableSupport {
         if (StringUtils.isEmpty(type)) {
             return AllIcons.Nodes.Variable;
         }
-        if (isStringType(type) || isNumberType(type) || isBooleanType(type)) {
+        if (isStringType(type) || isNumericType(type) || isBooleanType(type)) {
             return AllIcons.Debugger.Db_primitive;
         }
         if (isObjectType(type)) {
@@ -67,33 +68,39 @@ public class DebugAdapterVariableSupport {
      * @return value representation for the given variable.
      */
     public @NotNull XValuePresentation getValuePresentation(@NotNull Variable variable) {
+        final String type = variable.getType() != null ? variable.getType() : "";
+        final String formattedValue = formatValue(variable);
+
+        // String type
+        if (isStringType(type)) {
+            return new XStringValuePresentation(formattedValue);
+        }
+
+        // Numeric type
+        if (isNumericType(type)) {
+            return new XNumericValuePresentation(formattedValue);
+        }
+
+        // Boolean type
+        if (isBooleanType(type)) {
+            return new XKeywordValuePresentation(formattedValue);
+        }
+
+        // Other type
+        return new XRegularValuePresentation(formattedValue, type);
+    }
+
+    @NotNull
+    protected String formatValue(@NotNull Variable variable) {
         final String value = variable.getValue() != null ? variable.getValue() : "";
         final String type = variable.getType() != null ? variable.getType() : "";
-
         if (isStringType(type)) {
-            String stringValue = value.replaceAll("^\"+|\"+$", "");
-            return new XStringValuePresentation(stringValue);
+            // String type (ex:value='foo' or "foo")
+            // Remove start/end simple and double quote
+            // to display only foo
+            return removeQuotes(value);
         }
-
-        if (isNumberType(type)) {
-            return new XRegularValuePresentation(value, type) {
-                @Override
-                public void renderValue(@NotNull XValueTextRenderer renderer) {
-                    renderer.renderValue(value, DefaultLanguageHighlighterColors.NUMBER);
-                }
-            };
-        }
-
-        if (isBooleanType(type)) {
-            return new XValuePresentation() {
-                @Override
-                public void renderValue(@NotNull XValueTextRenderer renderer) {
-                    renderer.renderValue(value, DefaultLanguageHighlighterColors.KEYWORD);
-                }
-            };
-        }
-
-        return new XRegularValuePresentation(value, type);
+        return value;
     }
 
     protected boolean isStringType(@NotNull String type) {
@@ -105,7 +112,7 @@ public class DebugAdapterVariableSupport {
                 "bool".equalsIgnoreCase(type);
     }
 
-    protected boolean isNumberType(@NotNull String type) {
+    protected boolean isNumericType(@NotNull String type) {
         return "number".equalsIgnoreCase(type) ||
                 "int".equalsIgnoreCase(type) ||
                 "long".equalsIgnoreCase(type) ||
@@ -137,4 +144,14 @@ public class DebugAdapterVariableSupport {
         this.serverDescriptor = serverDescriptor;
     }
 
+    public @NotNull Collection<DebugVariablePositionProvider> getDebugVariablePositionProvider() {
+        return Collections.singletonList(new HighlighterDebugVariablePositionProvider());
+    }
+
+    @NotNull
+    private static String removeQuotes(@NotNull String value) {
+        return value
+                .replaceAll("^\"+|\"+$", "")
+                .replaceAll("^\'+|\'+$", "");
+    }
 }

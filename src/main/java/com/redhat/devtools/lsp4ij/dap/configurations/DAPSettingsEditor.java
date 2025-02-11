@@ -43,12 +43,11 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
 
     @Override
     protected void resetEditorFrom(DAPRunConfiguration runConfiguration) {
+        dapPanel.setServerId(runConfiguration.getServerId());
+
         // Sever settings
         dapPanel.setServerName(runConfiguration.getServerName());
         dapPanel.setCommandLine(runConfiguration.getCommand());
-        dapPanel.updateConnectingStrategy(runConfiguration.getConnectingServerStrategy(),
-                runConfiguration.getWaitForTimeout(),
-                runConfiguration.getWaitForTrace());
         dapPanel.setServerTrace(runConfiguration.getServerTrace());
 
         // Mappings settings
@@ -57,22 +56,29 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         // Configuration settings
         dapPanel.setWorkingDirectory(runConfiguration.getWorkingDirectory());
         dapPanel.setFile(runConfiguration.getFile());
-        dapPanel.setDebuggingType(runConfiguration.getDebuggingType());
-        dapPanel.setLaunchConfiguration(runConfiguration.getLaunchParameters());
-        dapPanel.setAttachConfiguration(runConfiguration.getAttachParameters());
+        dapPanel.setDebugMode(runConfiguration.getDebugMode());
+        dapPanel.setLaunchConfigurationId(runConfiguration.getLaunchConfigurationId());
+        dapPanel.setAttachConfigurationId(runConfiguration.getAttachConfigurationId());
+        dapPanel.setLaunchConfiguration(runConfiguration.getLaunchConfiguration());
+        dapPanel.setAttachConfiguration(runConfiguration.getAttachConfiguration());
+        dapPanel.updateDebugServerWaitStrategy(runConfiguration.getDebugServerWaitStrategy(),
+                runConfiguration.getConnectTimeout(),
+                runConfiguration.getDebugServerReadyPattern());
 
-        // Update server if at and to update tabs if needed
-        dapPanel.setServerId(runConfiguration.getServerId());
+        // Update server id at the end to update
+        // - selected tab if needed
+        dapPanel.updateSelectedTab(runConfiguration.getServerId());
     }
 
     @Override
     protected void applyEditorTo(@NotNull DAPRunConfiguration runConfiguration) {
         // Sever settings
+        runConfiguration.setServerId(dapPanel.getServerId());
         runConfiguration.setServerName(dapPanel.getServerName());
         runConfiguration.setCommand(dapPanel.getCommandLine());
-        runConfiguration.setConnectingServerStrategy(dapPanel.getConnectingServerConfigurationPanel().getConnectingServerStrategy());
-        runConfiguration.setWaitForTimeout(getInt(dapPanel.getConnectingServerConfigurationPanel().getTimeout()));
-        runConfiguration.setWaitForTrace(dapPanel.getConnectingServerConfigurationPanel().getTrace());
+        runConfiguration.setDebugServerWaitStrategy(dapPanel.getDebugServerWaitStrategyPanel().getDebugServerWaitStrategy());
+        runConfiguration.setConnectTimeout(dapPanel.getDebugServerWaitStrategyPanel().getConnectTimeout());
+        runConfiguration.setDebugServerReadyPattern(dapPanel.getDebugServerWaitStrategyPanel().getTrace());
         runConfiguration.setServerTrace(dapPanel.getServerTrace());
 
         // Mappings settings
@@ -81,17 +87,11 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         // Configuration settings
         runConfiguration.setWorkingDirectory(dapPanel.getWorkingDirectory());
         runConfiguration.setFile(dapPanel.getFile());
-        runConfiguration.setDebuggingType(dapPanel.getDebuggingType());
-        runConfiguration.setLaunchParameters(dapPanel.getLaunchConfiguration());
-        runConfiguration.setAttachParameters(dapPanel.getAttachConfiguration());
-    }
-
-    private static int getInt(String text) {
-        try {
-            return Integer.parseInt(text);
-        } catch (Exception e) {
-            return 0;
-        }
+        runConfiguration.setDebugMode(dapPanel.getDebugMode());
+        runConfiguration.setLaunchConfigurationId(dapPanel.getLaunchConfigurationId());
+        runConfiguration.setLaunchConfiguration(dapPanel.getLaunchConfiguration());
+        runConfiguration.setAttachConfigurationId(dapPanel.getAttachConfigurationId());
+        runConfiguration.setAttachConfiguration(dapPanel.getAttachConfiguration());
     }
 
     @NotNull

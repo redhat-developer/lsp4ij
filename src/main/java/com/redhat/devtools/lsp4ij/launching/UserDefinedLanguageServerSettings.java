@@ -107,6 +107,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String serverId;
 
+        private String templateId;
+
         private String serverName;
 
         private String commandLine;
@@ -132,6 +134,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setServerId(String serverId) {
             this.serverId = serverId;
+        }
+
+        public String getTemplateId() {
+            return templateId;
+        }
+
+        public void setTemplateId(String templateId) {
+            this.templateId = templateId;
         }
 
         public String getServerName() {

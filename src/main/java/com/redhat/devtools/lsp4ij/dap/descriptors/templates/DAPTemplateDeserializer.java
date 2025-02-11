@@ -40,14 +40,18 @@ public class DAPTemplateDeserializer implements JsonDeserializer<DAPTemplate> {
             dapTemplate.setProgramArgs(programArgsMap);
         }
 
-        JsonElement waitForTimeout = jsonObject.get(WAIT_FOR_TIMEOUT_JSON_PROPERTY);
-        if (waitForTimeout != null) {
-            dapTemplate.setWaitForTimeout(waitForTimeout.getAsString());
+        JsonElement connectTimeout = jsonObject.get(CONNECT_TIMEOUT_JSON_PROPERTY);
+        if (connectTimeout != null) {
+            try {
+                dapTemplate.setConnectTimeout(connectTimeout.getAsInt());
+            } catch (Exception e) {
+
+            }
         }
 
-        JsonElement waitForTrace = jsonObject.get(WAIT_FOR_TRACE_JSON_PROPERTY);
-        if (waitForTrace != null) {
-            dapTemplate.setWaitForTrace(waitForTrace.getAsString());
+        JsonElement debugServerReadyPattern = jsonObject.get(DEBUG_SERVER_READY_PATTERN_JSON_PROPERTY);
+        if (debugServerReadyPattern != null) {
+            dapTemplate.setDebugServerReadyPattern(debugServerReadyPattern.getAsString());
         }
 
         JsonArray fileTypeMappings = jsonObject.getAsJsonArray(FILE_TYPE_MAPPINGS_JSON_PROPERTY);

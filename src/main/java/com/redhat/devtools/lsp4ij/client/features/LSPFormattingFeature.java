@@ -135,7 +135,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
         }
     }
 
-    // Client configuration settings
+    // Server-side on-type formatting
 
     /**
      * Whether or not server-side on-type formatting is enabled if <code>textDocument/onTypeFormatting</code> is
@@ -147,5 +147,124 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
     public boolean isOnTypeFormattingEnabled(@NotNull PsiFile file) {
         // Default to enabled
         return true;
+    }
+
+    // Client-side on-type formatting
+
+    /**
+     * Supported formatting scopes.
+     */
+    public enum FormattingScope {
+        /**
+         * The current statement if one can be identified.
+         */
+        STATEMENT,
+        /**
+         * The current code block if one can be identified.
+         */
+        CODE_BLOCK,
+        /**
+         * The current file.
+         */
+        FILE
+    }
+
+    /**
+     * Whether or not to format on close brace using client-side on-type formatting. Defaults to false.
+     *
+     * @param file the file
+     * @return true if the file should be formatted when close braces are typed; otherwise false
+     */
+    public boolean isFormatOnCloseBrace(@NotNull PsiFile file) {
+        // Default to disabled
+        return false;
+    }
+
+    /**
+     * The specific close brace characters that should trigger client-side on-type formatting.
+     *
+     * @param file the file
+     * @return the close brace characters that should trigger on-type formatting or null if the language's standard
+     * close brace characters should be used
+     */
+    @Nullable
+    public String getFormatOnCloseBraceCharacters(@NotNull PsiFile file) {
+        // Default to the language's standard close brace characters
+        return null;
+    }
+
+    /**
+     * The scope that should be formatted using client-side on-type formatting when a close brace is typed. Allowed
+     * values are {@link FormattingScope#CODE_BLOCK CODE_BLOCK} and {@link FormattingScope#FILE FILE}. Defaults to
+     * {@link FormattingScope#CODE_BLOCK CODE_BLOCK}.
+     *
+     * @param file the file
+     * @return the format scope
+     */
+    @NotNull
+    public FormattingScope getFormatOnCloseBraceScope(@NotNull PsiFile file) {
+        // Default to CODE_BLOCK
+        return FormattingScope.CODE_BLOCK;
+    }
+
+    /**
+     * Whether or not to format on statement terminator using client-side on-type formatting. Defaults to false.
+     *
+     * @param file the file
+     * @return true if the file should be formatted when statement terminators are typed; otherwise false
+     */
+    public boolean isFormatOnStatementTerminator(@NotNull PsiFile file) {
+        // Default to disabled
+        return false;
+    }
+
+    /**
+     * The specific statement terminator characters that should trigger client-side on-type formatting.
+     *
+     * @param file the file
+     * @return the statement terminator characters that should trigger on-type formatting
+     */
+    @Nullable
+    public String getFormatOnStatementTerminatorCharacters(@NotNull PsiFile file) {
+        // Default to none
+        return null;
+    }
+
+    /**
+     * The scope that should be formatted using client-side on-type formatting when a statement terminator is typed.
+     * Allowed values are {@link FormattingScope#STATEMENT STATEMENT}, {@link FormattingScope#CODE_BLOCK CODE_BLOCK},
+     * and {@link FormattingScope#FILE FILE}. Defaults to {@link FormattingScope#STATEMENT STATEMENT}.
+     *
+     * @param file the file
+     * @return the format scope
+     */
+    @NotNull
+    public FormattingScope getFormatOnStatementTerminatorScope(@NotNull PsiFile file) {
+        // Default to STATEMENT
+        return FormattingScope.STATEMENT;
+    }
+
+    /**
+     * Whether or not to format using client-side on-type formatting on completion trigger. Defaults to false.
+     *
+     * @param file the file
+     * @return true if the file should be formatted when completion triggers are typed; otherwise false
+     */
+    public boolean isFormatOnCompletionTrigger(@NotNull PsiFile file) {
+        // Default to disabled
+        return false;
+    }
+
+    /**
+     * The specific completion trigger characters that should trigger client-side on-type formatting.
+     *
+     * @param file the file
+     * @return the completion trigger characters that should trigger on-type formatting or null if the language's
+     * standard completion trigger characters should be used
+     */
+    @Nullable
+    public String getFormatOnCompletionTriggerCharacters(@NotNull PsiFile file) {
+        // Default to the language's standard completion trigger characters
+        return null;
     }
 }

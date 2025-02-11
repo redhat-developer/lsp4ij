@@ -56,6 +56,7 @@ public class DAPDebugProcess extends XDebugProcess {
     private final @NotNull DAPBreakpointHandler breakpointHandler;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
+    private final boolean isDebug;
     private @Nullable CompletableFuture<Void> connectToServerFuture;
 
     private boolean isConnected;
@@ -66,9 +67,10 @@ public class DAPDebugProcess extends XDebugProcess {
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
                            @NotNull ExecutionResult executionResult,
-                           boolean debugMode) {
+                           boolean isDebug) {
         super(session);
         this.executionResult = executionResult;
+        this.isDebug = isDebug;
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = new DAPBreakpointHandler();
         this.serverDescriptor = dapState.getServerDescriptor();
@@ -107,11 +109,11 @@ public class DAPDebugProcess extends XDebugProcess {
                         };
 
                         // 2. Connect DAP client to the DAP server by using Socket port or simple streams.
-                        DebuggingType debuggingType = dapState.getDebuggingType();
+                        DebugMode debugMode = dapState.getDebugMode();
                         ServerTrace serverTrace = dapState.getServerTrace();
                         var parameters = new HashMap<>(dapState.getDAPParameters());
-                        parameters.put("noDebug", !debugMode); // standard DAP parameter
-                        parentClient = serverDescriptor.createClient(DAPDebugProcess.this, parameters, debugMode, debuggingType, serverTrace, null);
+                        parameters.put("noDebug", !isDebug); // standard DAP parameter
+                        parentClient = serverDescriptor.createClient(DAPDebugProcess.this, parameters, isDebug, debugMode, serverTrace, null);
                         connectToServerFuture = parentClient.connectToServer(indicator);
 
                         // Wait for DAP client is connecting to the DAP server...

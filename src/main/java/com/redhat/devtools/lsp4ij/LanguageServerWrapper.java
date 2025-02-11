@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.JsonObject;
+import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
@@ -54,6 +55,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
+import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.showNotificationError;
 import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClientInfo;
 
 /**
@@ -114,6 +116,8 @@ public class LanguageServerWrapper implements Disposable {
 
     private LSPClientFeatures clientFeatures;
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
+    // error notification displayed when server start fails.
+    private @Nullable Notification errorNotification;
 
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
@@ -277,6 +281,17 @@ public class LanguageServerWrapper implements Disposable {
 
                         // Add error log
                         provider.addLogErrorHandler(error -> ServerMessageHandler.logMessage(this.getServerDefinition(), new MessageParams(MessageType.Error, error), getProject()));
+                        provider.addUnexpectedServerStopHandler(() -> {
+                            // There is an unexpected stop of the connection
+                            // 1. the process was killed outside IntelliJ
+                            // 2. the start command takes some times and fails
+                            // -->
+                            // Stop the language server
+                            stop();
+                            // Show a notification error with "The server was stopped unexpectedly." error message.
+                            serverError = new ServerWasStoppedException("The server was stopped unexpectedly.");
+                            showNotificationStartServerError();
+                        });
 
                         // Starting process...
                         updateStatus(ServerStatus.starting);
@@ -343,6 +358,12 @@ public class LanguageServerWrapper implements Disposable {
                     .thenCompose(unused -> initServer(rootURI))
                     .thenAccept(res -> {
                         serverError = null;
+                        if (errorNotification != null) {
+                            // Close the current error notification
+                            // displayed when server start fails.
+                            errorNotification.expire();
+                            errorNotification = null;
+                        }
                         serverCapabilities = res.getCapabilities();
                         getClientFeatures().setServerCapabilities(serverCapabilities);
                         this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
@@ -371,11 +392,34 @@ public class LanguageServerWrapper implements Disposable {
                         } else {
                             serverError = new CannotStartServerException("Error while starting language server '" + serverDefinition.getId() + "' (pid=" + getCurrentProcessId() + ")", e);
                         }
+                        showNotificationStartServerError();
                         initializeFuture.completeExceptionally(serverError);
                         getLanguageServerLifecycleManager().onError(this, e);
                         stop(false);
                         return null;
                     });
+        }
+    }
+
+    /**
+     * Show a notification error when server cannot be started.
+     */
+    private void showNotificationStartServerError() {
+        if (serverError == null) {
+            return;
+        }
+        // Show the notification if needed
+        boolean showNotification = errorNotification == null ||
+                errorNotification.getBalloon() == null ||
+                errorNotification.isExpired() ||
+                !errorNotification.getContent().equals(serverError.getMessage());
+        if (showNotification) {
+            // Close old error notification if needed
+            if (errorNotification != null && !errorNotification.isExpired()) {
+                errorNotification.expire();
+            }
+            // Show start server error notification.
+            errorNotification = showNotificationError(this.getServerDefinition(), "Cannot start server", serverError, this.getProject());
         }
     }
 
@@ -430,6 +474,7 @@ public class LanguageServerWrapper implements Disposable {
         if (languageClient != null) {
             languageClient.handleServerStatusChanged(serverStatus);
         }
+        getClientFeatures().handleServerStatusChanged(serverStatus);
     }
 
     private void startStopTimer() {

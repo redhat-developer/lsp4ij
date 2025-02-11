@@ -10,8 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import com.intellij.codeInsight.hints.NoSettings;
 import com.intellij.codeInsight.hints.ProviderInfo;
+import com.intellij.codeInsight.hints.declarative.InlayProviderInfo;
 import com.intellij.lang.Language;
 import com.intellij.lang.findUsages.EmptyFindUsagesProvider;
 import com.intellij.lang.findUsages.LanguageFindUsages;
@@ -23,6 +23,7 @@ import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.LightVirtualFile;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
@@ -63,6 +64,8 @@ public class LanguageServersRegistry {
             List<String> /* file extensions (ex : ts) */> languageIdFileExtensionsCache = new HashMap<>();
 
     private final Collection<LanguageServerDefinitionListener> listeners = new CopyOnWriteArrayList<>();
+
+    private final Map<String, List<InlayProviderInfo>> declarativeInlayHintsProviders = new HashMap<>();
 
     private final List<ProviderInfo<? extends Object>> inlayHintsProviders = new ArrayList<>();
 
@@ -156,6 +159,7 @@ public class LanguageServersRegistry {
                 // Register server definition from settings
                 addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(
                                 serverId,
+                                launch.getTemplateId(),
                                 launch.getServerName(),
                                 "",
                                 launch.getCommandLine(),
@@ -190,8 +194,10 @@ public class LanguageServersRegistry {
         // the language received in InlayHintProviders is plain/text, we add it to support
         // LSP inlayHint, color for a file which is not linked to a language.
         distinctLanguages.add(PlainTextLanguage.INSTANCE);
-
-        // register LSPInlayHintsProvider + LSPColorProvider automatically
+        // register LSPInlayHintsProvider automatically
+        // for all languages associated with a language server.
+        updateDeclarativeInlayHintsProviders(distinctLanguages);
+        // register LSPColorProvider automatically
         // for all languages associated with a language server.
         updateInlayHintsProviders(distinctLanguages);
         // register LSPFindUsagesProvider automatically
@@ -199,13 +205,21 @@ public class LanguageServersRegistry {
         updateFindUsagesProvider(distinctLanguages);
     }
 
-    private void updateInlayHintsProviders(Set<Language> distinctLanguages) {
+    private void updateDeclarativeInlayHintsProviders(Set<Language> distinctLanguages) {
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
+        inlayHintsProviders.clear();
+        for (Language language : distinctLanguages) {
+            List<InlayProviderInfo> hints = new ArrayList<>();
+            hints.add(new InlayProviderInfo(lspInlayHintsProvider, LSPInlayHintsProvider.PROVIDER_ID, Collections.emptySet(), true, LanguageServerBundle.message("lsp.hints.declarative.provider.name")));
+            declarativeInlayHintsProviders.put(language.getID(), hints);
+        }
+    }
+
+    private void updateInlayHintsProviders(Set<Language> distinctLanguages) {
         LSPColorProvider lspColorProvider = new LSPColorProvider();
         inlayHintsProviders.clear();
         for (Language language : distinctLanguages) {
-            inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspInlayHintsProvider));
-            inlayHintsProviders.add(new ProviderInfo<NoSettings>(language, lspColorProvider));
+            inlayHintsProviders.add(new ProviderInfo<>(language, lspColorProvider));
         }
     }
 
@@ -357,6 +371,7 @@ public class LanguageServersRegistry {
         // Update settings
         if (serverDefinition instanceof UserDefinedLanguageServerDefinition definitionFromSettings) {
             UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = new UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings();
+            settings.setTemplateId(definitionFromSettings.getTemplateId());
             settings.setServerId(languageServerId);
             settings.setServerName(definitionFromSettings.getDisplayName());
             settings.setCommandLine(definitionFromSettings.getCommandLine());
@@ -560,23 +575,40 @@ public class LanguageServersRegistry {
      * @return true if the language of the file is supported by a language server and false otherwise.
      */
     public boolean isFileSupported(@Nullable VirtualFile file, @NotNull Project project) {
-        if (file == null || !file.isInLocalFileSystem()) {
+        if (file == null) {
             return false;
         }
         Language language = LSPIJUtils.getFileLanguage(file, project);
         FileType fileType = file.getFileType();
-        return fileAssociations
+        if (fileAssociations
                 .stream()
-                .anyMatch(mapping -> mapping.match(language, fileType, file.getName()));
+                .anyMatch(mapping -> mapping.match(language, fileType, file.getName()))) {
+            if (!file.isInLocalFileSystem()) {
+                if (file instanceof LightVirtualFile) {
+                    return false;
+                }
+                PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                if (psiFile != null && !psiFile.isPhysical()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
-     * Returns the LSP codeLens / inlayHint inlay hint providers for all languages which are associated with a language server.
-     *
-     * @return the LSP codeLens / inlayHint inlay hint providers for all languages which are associated with a language server.
+     * @return the LSP codeLens / color inlay hint providers for all languages which are associated with a language server.
      */
     public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos() {
         return inlayHintsProviders;
+    }
+
+    /**
+     * @return the LSP inlayHint inlay hint providers for all languages which are associated with a language server.
+     */
+    public Map<String, List<InlayProviderInfo>> getDeclarativeInlayHintProviderInfos() {
+        return declarativeInlayHintsProviders;
     }
 
     public record UpdateServerDefinitionRequest(@NotNull Project project,

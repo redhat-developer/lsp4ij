@@ -57,9 +57,18 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         CompletableFuture<List<? extends TextEdit>> formatFuture = this.getFeatureData(params);
         try {
             waitUntilDone(formatFuture, getFile());
+        } catch (
+                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            //TODO delete block when minimum required version is 2024.2
+            handleError(formattingRequest, e);
+            return;
+        } catch (CancellationException e) {
+            // cancel the LSP requests textDocument/formatting / textDocument/rangeFormatting
+            handleError(formattingRequest, e);
+            return;
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
-            handleError(formattingRequest, cause);
+            handleError(formattingRequest, cause != null ? cause : e);
             return;
         }
         try {
@@ -71,12 +80,13 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         }
     }
 
-    private static void handleError(@NotNull AsyncFormattingRequest formattingRequest, Throwable error) {
+    private static void handleError(@NotNull AsyncFormattingRequest formattingRequest,
+                                    @NotNull Throwable error) {
         if (error instanceof ProcessCanceledException || error instanceof CancellationException) {
             // Ignore the error
             formattingRequest.onTextReady(formattingRequest.getDocumentText());
         } else {
-            formattingRequest.onError("LSP formatting error", error.getMessage());
+            formattingRequest.onError("LSP formatting error", error.getMessage() != null ? error.getMessage() :  error.getClass().getName());
         }
     }
 

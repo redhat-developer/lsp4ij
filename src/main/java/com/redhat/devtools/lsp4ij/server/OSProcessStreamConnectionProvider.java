@@ -37,6 +37,8 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
     private OSProcessHandler processHandler;
     private InputStream inputStream;
     private final List<LanguageServerLogErrorHandler> handlers;
+    private final List<Runnable> unexpectedServerStopHandlers;
+    private boolean stopped;
 
     public OSProcessStreamConnectionProvider() {
         this(null);
@@ -45,6 +47,7 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
     public OSProcessStreamConnectionProvider(@Nullable GeneralCommandLine commandLine) {
         this.commandLine = commandLine;
         this.handlers = new ArrayList<>();
+        this.unexpectedServerStopHandlers = new ArrayList<>();
     }
 
     /**
@@ -98,6 +101,11 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
     }
 
     @Override
+    public void addUnexpectedServerStopHandler(Runnable handler) {
+        unexpectedServerStopHandlers.add(handler);
+    }
+
+    @Override
     public void start() throws CannotStartProcessException {
         if (this.commandLine == null) {
             throw new CannotStartProcessException("Unable to start language server: " + this);
@@ -114,7 +122,7 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
                     return BaseOutputReader.Options.forMostlySilentProcess();
                 }
             };
-            LSPProcessListener processListener = new LSPProcessListener(handlers);
+            LSPProcessListener processListener = new LSPProcessListener(this);
             processHandler.addProcessListener(processListener);
             inputStream = processListener.getInputStream();
             processHandler.startNotify();
@@ -125,7 +133,9 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
 
     @Override
     public boolean isAlive() {
-        return processHandler != null && processHandler.isStartNotified() && !processHandler.isProcessTerminated();
+        return processHandler != null &&
+                processHandler.isStartNotified() &&
+                !processHandler.isProcessTerminated();
     }
 
     @Override
@@ -159,9 +169,30 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
 
     @Override
     public void stop() {
+        if (stopped) {
+            return;
+        }
+        this.stopped = true;
         if (processHandler != null && !processHandler.isProcessTerminated()) {
             ExecutionManagerImpl.stopProcess(processHandler);
         }
+    }
+
+    /**
+     * Returns true if the provider has been stopped with the {@link #stop()} method and false otherwise.
+     *
+     * @return true if the provider has been stopped with the {@link #stop()} method and false otherwise.
+     */
+    boolean isStopped() {
+        return stopped;
+    }
+
+    List<LanguageServerLogErrorHandler> getHandlers() {
+        return handlers;
+    }
+
+    List<Runnable> getUnexpectedServerStopHandlers() {
+        return unexpectedServerStopHandlers;
     }
 
     @Override

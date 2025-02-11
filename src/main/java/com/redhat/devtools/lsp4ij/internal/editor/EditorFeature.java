@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.internal.editor;
 
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -35,7 +36,7 @@ public interface EditorFeature {
      *
      * @param editor the editor.
      */
-    void clearEditorCache(@NotNull Editor editor);
+    void clearEditorCache(@NotNull Editor editor, @NotNull Project project);
 
     /**
      * Clear LSP data cache (ex : LSP CodeLens).

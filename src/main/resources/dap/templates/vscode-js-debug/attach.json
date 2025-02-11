@@ -1,6 +1,0 @@
-{
-  "type": "pwa-node",
-  "request": "attach",
-  "program": "${file}",
-  "cwd": "${workspaceFolder}"
-}

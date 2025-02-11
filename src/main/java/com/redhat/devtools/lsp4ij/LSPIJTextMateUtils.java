@@ -11,6 +11,8 @@
 
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.lang.Language;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -24,8 +26,41 @@ import java.util.Map;
 @ApiStatus.Internal
 public final class LSPIJTextMateUtils {
 
+    private static final String TEXTMATE_LANGUAGE_ID = "textmate";
+
     private LSPIJTextMateUtils() {
         // Pure utility class
+    }
+
+
+    /**
+     * Returns the TextMate language and null otherwise.
+     *
+     * @returnthe TextMate language and null otherwise.
+     */
+    @Nullable
+    public static Language getTextMateLanguage() {
+        return Language.findLanguageByID(TEXTMATE_LANGUAGE_ID);
+    }
+
+    /**
+     * Returns true if the given file is a TextMate file and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file is a TextMate file and false otherwise.
+     */
+    public static boolean isTextMateFile(@NotNull PsiFile file) {
+        return TEXTMATE_LANGUAGE_ID.equals(file.getLanguage().getID());
+    }
+
+    /**
+     * Returns true if the given file is a TextMate file and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file is a TextMate file and false otherwise.
+     */
+    public static boolean isTextMateFile(@NotNull VirtualFile file) {
+        return TEXTMATE_LANGUAGE_ID.equals(file.getFileType().getName());
     }
 
     /**

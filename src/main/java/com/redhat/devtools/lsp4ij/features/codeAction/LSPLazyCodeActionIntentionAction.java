@@ -62,13 +62,13 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     @Override
     public @IntentionName @NotNull String getText() {
         loadCodeActionIfNeeded();
-        return title;
+        return title != null? title : "";
     }
 
     @Override
     public @NotNull @IntentionFamilyName String getFamilyName() {
         loadCodeActionIfNeeded();
-        return familyName;
+        return familyName != null ? familyName :  LanguageServerBundle.message("lsp.intention.code.action.kind.empty");
     }
 
     @Override

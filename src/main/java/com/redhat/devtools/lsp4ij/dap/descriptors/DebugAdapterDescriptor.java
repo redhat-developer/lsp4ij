@@ -23,14 +23,13 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.net.NetUtils;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
-import com.redhat.devtools.lsp4ij.dap.DebuggingType;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.InitializeRequestArgumentsPathFormat;
@@ -40,7 +39,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.createCommandLine;
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
  * Debug Adapter Protocol (DAP) server descriptor.
@@ -109,12 +112,18 @@ public class DebugAdapterDescriptor {
                     command = userDefinedFactory.getCommandLine();
                 }
             }
-            return generateStartDAPClientCommand(command);
+            // TODO : store env configuration in the options
+            Map<String, String> userEnvironmentVariables = new HashMap<>();
+            boolean includeSystemEnvironmentVariables = true;
+            String resolvedCommandLine = resolveCommandLine(command, environment.getProject());
+            return generateStartDAPClientCommand(resolvedCommandLine, userEnvironmentVariables, includeSystemEnvironmentVariables);
         }
         return null;
     }
 
-    protected @NotNull GeneralCommandLine generateStartDAPClientCommand(@Nullable String command) throws ExecutionException {
+    protected @NotNull GeneralCommandLine generateStartDAPClientCommand(@Nullable String command,
+                                                                        @NotNull Map<String, String> userEnvironmentVariables,
+                                                                        boolean includeSystemEnvironmentVariables) throws ExecutionException {
         if (StringUtils.isBlank(command)) {
             throw new ExecutionException("DAP server command must be specified.");
         }
@@ -124,7 +133,7 @@ public class DebugAdapterDescriptor {
             port = getAvailablePort();
             command = command.replace($_PORT, String.valueOf(port));
         }
-        GeneralCommandLine commandLine = new GeneralCommandLine(CommandUtils.createCommands(command));
+        GeneralCommandLine commandLine = createCommandLine(command, userEnvironmentVariables, includeSystemEnvironmentVariables);
         if (port != null) {
             commandLine.putUserData(SERVER_PORT, port);
         }
@@ -147,12 +156,12 @@ public class DebugAdapterDescriptor {
     @NotNull
     public ServerReadyConfig getServerReadyConfig() {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            var strategy = dapOptions.getConnectingServerStrategy();
+            var strategy = dapOptions.getDebugServerWaitStrategy();
             switch (strategy) {
                 case TIMEOUT:
-                    return new ServerReadyConfig(null, dapOptions.getWaitForTimeout());
+                    return new ServerReadyConfig(null, dapOptions.getConnectTimeout());
                 case TRACE:
-                    return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor(), 0);
+                    return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor(), null);
                 default:
                     return new ServerReadyConfig(null, 0);
             }
@@ -197,11 +206,11 @@ public class DebugAdapterDescriptor {
      * @return the debugging type (launch or attach).
      */
     @NotNull
-    public DebuggingType getDebuggingType() {
+    public DebugMode getDebugMode() {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            return dapOptions.getDebuggingType();
+            return dapOptions.getDebugMode();
         }
-        return DebuggingType.LAUNCH;
+        return DebugMode.LAUNCH;
     }
 
     public @NotNull InitializeRequestArguments createInitializeRequestArguments(@NotNull Map<String, Object> dapParameters) {
@@ -283,11 +292,11 @@ public class DebugAdapterDescriptor {
     @NotNull
     public DAPClient createClient(@NotNull DAPDebugProcess debugProcess,
                                   @NotNull Map<String, Object> dapParameters,
-                                  boolean debugMode,
-                                  @NotNull DebuggingType debuggingType,
+                                  boolean isDebug,
+                                  @NotNull DebugMode debugMode,
                                   @NotNull ServerTrace serverTrace,
                                   @Nullable DAPClient parentClient) {
-        return new DAPClient(debugProcess, dapParameters, debugMode, debuggingType, serverTrace, parentClient);
+        return new DAPClient(debugProcess, dapParameters, isDebug, debugMode, serverTrace, parentClient);
     }
 
     /**
