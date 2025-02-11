@@ -37,7 +37,7 @@ public class DocumentSymbolData extends FakePsiElement {
     private final @NotNull PsiFile psiFile;
     private final DocumentSymbolData parent;
     private final @NotNull LanguageServerItem languageServer;
-    private final @NotNull TextRange textRange;
+    private TextRange textRange;
     private DocumentSymbolData[] cachedChildren;
 
     public DocumentSymbolData(@NotNull DocumentSymbol documentSymbol,
@@ -54,7 +54,6 @@ public class DocumentSymbolData extends FakePsiElement {
         this.psiFile = psiFile;
         this.languageServer = languageServer;
         this.parent = parent;
-        this.textRange = LSPIJUtils.toTextRange(documentSymbol.getRange(), LSPIJUtils.getDocument(psiFile.getVirtualFile()));
     }
 
     public @NotNull DocumentSymbol getDocumentSymbol() {
@@ -83,6 +82,9 @@ public class DocumentSymbolData extends FakePsiElement {
 
     @Override
     public TextRange getTextRange() {
+        if (textRange == null) {
+            this.textRange = LSPIJUtils.toTextRange(documentSymbol.getRange(), LSPIJUtils.getDocument(psiFile.getVirtualFile()));
+        }
         return textRange;
     }
 
