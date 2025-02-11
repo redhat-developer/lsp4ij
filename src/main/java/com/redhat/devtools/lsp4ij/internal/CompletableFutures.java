@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2023 Red Hat Inc. and others.
+ * Copyright (c) 2023-2025 Red Hat Inc. and others.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v. 2.0 which is available at
@@ -10,6 +10,7 @@
  *
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
+ *     FalsePattern - Added waitUntilDoneOrTimeout
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
@@ -99,18 +100,38 @@ public class CompletableFutures {
     }
 
     /**
-     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
-     *
-     * @param future the future to wait.
-     * @param file   the Psi file.
+     * Equivalent to {@link #waitUntilDone(CompletableFuture, PsiFile, Integer)}, but with a null timeout.
+     * Convenience function that strips the {@link TimeoutException} that never gets thrown.
      */
     public static void waitUntilDone(@Nullable CompletableFuture<?> future,
                                      @Nullable PsiFile file) throws ExecutionException, ProcessCanceledException {
+        try {
+            waitUntilDone(future, file, null);
+        } catch (TimeoutException e) {
+            // This can never happen
+            throw new AssertionError(e);
+        }
+    }
+
+    /**
+     * Waits for the given future to complete, and stops the wait if {@link ProcessCanceledException} is thrown.
+     *
+     * @param future  the future to wait.
+     * @param file    the Psi file.
+     * @param timeout the amount of time to wait in milliseconds for the future to complete, and if the timeout is
+     *                reached, this method throws {@link TimeoutException}. If null, this method waits indefinitely
+     *                without ever throwing that exception.
+     */
+    public static void waitUntilDone(@Nullable CompletableFuture<?> future,
+                                     @Nullable PsiFile file,
+                                     @Nullable Integer timeout) throws ExecutionException, ProcessCanceledException, TimeoutException {
         if (future == null) {
             return;
         }
         long start = System.currentTimeMillis();
         final long modificationStamp = file != null ? file.getModificationStamp() : -1;
+        boolean throwTimeout = timeout != null;
+        int realTimeout = timeout != null ? timeout : 25;
         while (!future.isDone()) {
             try {
                 // check progress canceled
@@ -121,9 +142,9 @@ public class CompletableFutures {
                         throw new CancellationException("Psi file has changed.");
                     }
                 }
-                // wait for 25 ms
-                future.get(25, TimeUnit.MILLISECONDS);
-            } catch (TimeoutException ignore) {
+                // wait for timeout ms
+                future.get(realTimeout, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
                 if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 && ProjectIndexingManager.isIndexingAll()){
                     // When some projects are being indexed,
                     // the language server startup can take a long time
@@ -131,6 +152,9 @@ public class CompletableFutures {
                     // waits for the language server startup.
                     // This wait can block IJ, here we stop the wait (and we could lose some LSP feature)
                     throw new CancellationException("Some projects are indexing");
+                }
+                if (throwTimeout) {
+                    throw e;
                 }
                 // Ignore timeout
             } catch (ExecutionException | CompletionException e) {
@@ -151,7 +175,6 @@ public class CompletableFutures {
             }
         }
     }
-
     /**
      * Wait in Task (which is cancellable) for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
      *

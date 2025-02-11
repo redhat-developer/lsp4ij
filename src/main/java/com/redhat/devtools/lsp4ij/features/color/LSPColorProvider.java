@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2024 Red Hat, Inc.
+ * Copyright (c) 2024-2025 Red Hat, Inc.
  * Distributed under license by Red Hat, Inc. All rights reserved.
  * This program is made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution,
@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - Non-blocking LSP request
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.color;
 
@@ -31,9 +32,11 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -50,8 +53,7 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
     protected void doCollect(@NotNull PsiFile psiFile,
                              @NotNull Editor editor,
                              @NotNull PresentationFactory factory,
-                             @NotNull InlayHintsSink inlayHintsSink,
-                             @NotNull List<CompletableFuture<?>> pendingFutures) {
+                             @NotNull InlayHintsSink inlayHintsSink) {
         // Get LSP color information from cache or create them
         LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
         var params = new DocumentColorParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
@@ -59,7 +61,7 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
 
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
+            waitUntilDone(future, psiFile, 25);
             if (isDoneNormally(future)) {
 
                 // Collect color information
@@ -80,13 +82,21 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
         } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
         } catch (CancellationException ignore) {
+        } catch (TimeoutException ignore) {
+            var pendingFutures = editor.getUserData(INLAY_HINTS_PENDING_FUTURES_KEY);
+            if (pendingFutures != null) {
+                pendingFutures.add(future);
+            }
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/color' request", e);
         } finally {
             if (!future.isDone()) {
                 // the future which collects all textDocument/colorInformation for all servers is not finished
                 // add it to the pending futures to refresh again the UI when this future will be finished.
-                pendingFutures.add(future);
+                var pendingFutures = editor.getUserData(INLAY_HINTS_PENDING_FUTURES_KEY);
+                if (pendingFutures != null) {
+                    pendingFutures.add(future);
+                }
             }
         }
     }
