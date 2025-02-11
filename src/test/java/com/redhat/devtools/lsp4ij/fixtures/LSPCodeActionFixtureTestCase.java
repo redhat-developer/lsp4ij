@@ -12,18 +12,14 @@ package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.google.gson.reflect.TypeToken;
 import com.intellij.codeInsight.intention.IntentionAction;
-import com.intellij.util.containers.ContainerUtil;
+import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
-import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
-import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCodeActionSupport;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.Command;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -78,46 +74,16 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
         var editor = myFixture.getEditor();
         var file = myFixture.getFile();
-        int offset = editor.getCaretModel().getOffset();
 
-        LSPLazyCodeActionProvider provider = new LSPIntentionCodeActionSupport(file);
-        List<Either<CodeActionData, Boolean>> targets = new LinkedList<>();
-        ContainerUtil.addAllNotNull(targets, provider.getCodeActionAt(offset));
-
-        List<String> codeActionTitles = targets.stream()
-                .filter(Either::isLeft)
-                .map(either -> either.getLeft().codeAction())
-                .map(action -> action.isRight() ? action.getRight().getTitle() : action.getLeft().getTitle())
+        List<IntentionAction> actions = CodeInsightTestFixtureImpl.getAvailableIntentions(editor, file);
+        List<String> codeActionTitles = actions.stream()
+                .map(IntentionAction::getText)
                 .filter(Objects::nonNull)
-                .toList();
+                .collect(Collectors.toList());
 
         for (String expectedAction : expectedActions) {
             assertContainsElements(codeActionTitles, expectedAction);
         }
-
-        // Approach 2
-        /*myFixture.completeBasic();
-        if (expectedActions == null || expectedActions.length == 0) {
-            assertNull("Code Actions should be null", myFixture.getLookup());
-        } else {
-            assertNotNull("Code Actions should be not null", myFixture.getLookup());
-            var actualItems = Stream.of(myFixture.getLookupElements())
-                    .map(LookupElement::getLookupString)
-                    .toList();
-            for (var expectedAction : expectedActions) {
-                assertContainsElements(actualItems, expectedAction);
-            }
-        }*/
-
-        // Approach 1
-        /*List<IntentionAction> intentionActions = myFixture.getAvailableIntentions();
-        List<String> actionTexts = intentionActions.stream()
-                .map(IntentionAction::getText)
-                .collect(Collectors.toList());
-
-        for (String expectedAction : expectedActions) {
-            assertContainsElements(actionTexts, expectedAction);
-        }*/
     }
 
     /**
