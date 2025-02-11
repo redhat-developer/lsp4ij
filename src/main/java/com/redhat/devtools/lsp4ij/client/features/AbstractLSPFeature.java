@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
  * Abstract class for any LSP feature.
  */
 @ApiStatus.Experimental
-public abstract class AbstractLSPFeature implements Disposable {
+public abstract class AbstractLSPFeature implements LSPClientFeatureAware, Disposable {
 
     private LSPClientFeatures clientFeatures;
 
@@ -88,11 +88,12 @@ public abstract class AbstractLSPFeature implements Disposable {
     }
 
     /**
-     * Set the LSP server support.
+     * Set the LSP client features.
      *
      * @param clientFeatures the LSP client features.
      */
     @ApiStatus.Internal
+    @Override
     public final void setClientFeatures(@NotNull LSPClientFeatures clientFeatures) {
         this.clientFeatures = clientFeatures;
     }

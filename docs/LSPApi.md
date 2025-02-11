@@ -27,6 +27,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP usage feature](#lsp-usage-feature)
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
 - [LSP editor behavior feature](#lsp-editor-behavior-feature)
+- [Language server installer](#language-server-installer)
 
 You can extend these default features by:
 
@@ -548,3 +549,96 @@ Unlike the features above, `LSPEditorFeature` does **not** correspond to an LSP 
 | boolean isEnableStringLiteralImprovements(PsiFile file)       | Returns `true` if editor improvements for string literals are enabled and `false` otherwise.                                    | `true` for user-defined language server definitions; otherwise `false` |
 | boolean isEnableStatementTerminatorImprovements(PsiFile file) | Returns `true` if editor improvements for statement terminators are enabled and `false` otherwise.                              | `true` for user-defined language server definitions; otherwise `false` |
 | boolean isEnableEnterBetweenBracesFix(PsiFile file)           | Returns `true` if the fix for [IJPL-159454](https://youtrack.jetbrains.com/issue/IJPL-159454) is enabled and `false` otherwise. | `true` for user-defined language server definitions; otherwise `false` |
+=======
+
+## Language server installer
+
+If you need to verify whether your language server is correctly installed, and install it if necessary, 
+you can extend the [LanguageServerInstallerBase](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/installation/LanguageServerInstallerBase.java) like this:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.redhat.devtools.lsp4ij.installation.LanguageServerInstallerBase;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * A custom implementation of the {@link LanguageServerInstallerBase} class for installing a language server.
+ * <p>
+ * This class provides the logic to check if the language server is installed and performs the actual installation process
+ * in steps, updating the progress indicator accordingly.
+ */
+public class MyLanguageServerInstaller extends LanguageServerInstallerBase {
+
+    /**
+     * Checks if the language server is installed.
+     * <p>
+     * This implementation returns {@code true} to indicate the server is installed, but you should modify it to check
+     * the actual installation state of your language server.
+     * 
+     * @return true if the server is installed, false otherwise.
+     */
+    @Override
+    protected boolean checkServerInstalled(@NotNull ProgressIndicator indicator) {
+        // check here if your language server is correctly installed
+        progress("Checking if the language server is installed...", indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+        return true;
+    }
+
+    /**
+     * Installs the language server in steps, updating the progress indicator during the process.
+     * <p>
+     * This implementation provides two installation steps. You can modify this method to match the actual installation
+     * steps for your language server.
+     * 
+     * @param indicator the {@link ProgressIndicator} to update the installation progress.
+     * @throws Exception if an error occurs during the installation process.
+     */
+    @Override
+    protected void install(@NotNull ProgressIndicator indicator) throws Exception {
+        // process installation of step 1: downloading server components
+        progress("Downloading server components...", 0.25, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+
+        // process installation of step 2: configuring server
+        progress("Configuring server...", 0.5, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+        
+        // process installation of step 3: finalizing installation
+        progress("Finalizing installation...", 0.75, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+        
+        // process installation of step 4: installation complete
+        progress("Installation complete!", 1.0, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+    }
+}
+```
+
+and register your language server installer like this:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    public @NotNull LSPClientFeatures createClientFeatures() {
+        return new LSPClientFeatures()
+                .setServerInstaller(new MyLanguageServerInstaller()); // customize language server installer         
+    }
+}
+```

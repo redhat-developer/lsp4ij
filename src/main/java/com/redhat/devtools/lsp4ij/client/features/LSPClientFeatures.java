@@ -17,6 +17,8 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.InitializeParams;
@@ -36,6 +38,8 @@ import java.net.URI;
 public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LanguageServerWrapper serverWrapper;
+
+    private ServerInstaller serverInstaller;
 
     private LSPCallHierarchyFeature callHierarchyFeature;
 
@@ -74,7 +78,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     private LSPInlayHintFeature inlayHintFeature;
 
     private LSPProgressFeature progressFeature;
-    
+
     private LSPReferencesFeature referencesFeature;
 
     private LSPRenameFeature renameFeature;
@@ -100,7 +104,52 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      * @return true if the language server is enabled for the input and false otherwise. Default to true
      */
     public boolean isEnabled(@NotNull VirtualFile file) {
+        return checkServerInstallation();
+    }
+
+    /**
+     * Checks the server installation. If the server installer is available and the installation is complete,
+     * returns {@code true} to indicate that the server is correctly installed and ready to be used. Otherwise,
+     * returns {@code false} to disable the server startup during the installation process.
+     *
+     * @return {@code true} if the server is installed, {@code false} otherwise
+     */
+    protected final boolean checkServerInstallation() {
+        var serverInstaller = getServerInstaller();
+        if (serverInstaller != null) {
+            var status = serverInstaller
+                    .checkInstallation()
+                    .getNow(null);
+            if (status != null && status == ServerInstallationStatus.INSTALLED) {
+                // The language server is correctly installed, enable it
+                return true;
+            }
+            // Disable the language server startup while installation
+            return false;
+        }
         return true;
+    }
+
+    /**
+     * Returns the server installer and null otherwise.
+     *
+     * @return the server installer and null otherwise.
+     */
+    @Nullable
+    public ServerInstaller getServerInstaller() {
+        return serverInstaller;
+    }
+
+    /**
+     * Set the server installer.
+     *
+     * @param serverInstaller server installer.
+     */
+    public void setServerInstaller(@NotNull ServerInstaller serverInstaller) {
+        this.serverInstaller = serverInstaller;
+        if (serverInstaller instanceof LSPClientFeatureAware clientFeaturesAware) {
+            clientFeaturesAware.setClientFeatures(this);
+        }
     }
 
     /**
@@ -126,7 +175,6 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      * Overrides this method if you need to generate custom URI.
      *
      * @param file the virtual file.
-     *
      * @return the file Uri and null otherwise.
      */
     @Override
