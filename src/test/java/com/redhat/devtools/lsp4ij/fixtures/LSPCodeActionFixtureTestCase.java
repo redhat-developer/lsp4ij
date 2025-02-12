@@ -11,17 +11,21 @@
 package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.google.gson.reflect.TypeToken;
+import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.intention.IntentionAction;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
-import org.eclipse.lsp4j.CodeAction;
-import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -64,17 +68,39 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                                      @NotNull List<CodeAction> codeActions,
                                      @NotNull String... expectedActions) {
         List<Either<Command, CodeAction>> wrappedCodeActions = codeActions.stream()
+                .distinct()
                 .map(Either::<Command, CodeAction>forRight)
+                .collect(Collectors.toList());
+
+        myFixture.configureByText(fileName, editorContentText);
+
+        final Editor editor = myFixture.getEditor();
+        final PsiFile file = myFixture.getFile();
+        int offset = editor.getCaretModel().getOffset();
+
+        List<Diagnostic> diagnostics = codeActions.stream()
+                .flatMap(codeAction -> Optional.ofNullable(codeAction.getDiagnostics()).stream().flatMap(List::stream))
+                .distinct()
                 .collect(Collectors.toList());
 
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
         MockLanguageServer.INSTANCE.setCodeActions(wrappedCodeActions);
+        MockLanguageServer.INSTANCE.setDiagnostics(diagnostics);
 
-        myFixture.configureByText(fileName, editorContentText);
+        /*List<String> codeActionTitles = null;
+        for (HighlightInfo info : myFixture.doHighlighting()) {
+            HighlightInfo.IntentionActionDescriptor desc = info.findRegisteredQuickFix((descriptor, range) -> descriptor);
+            final PsiElement someElement = file.findElementAt(offset);
+            assertNotNull(someElement);
+            for (IntentionAction option : desc.getOptions(someElement, editor)) {
+                codeActionTitles.add(option.getText());
+            }
+        }
+        for (String expectedAction : expectedActions) {
+            assertContainsElements(codeActionTitles, expectedAction);
+        }*/
 
-        var editor = myFixture.getEditor();
-        var file = myFixture.getFile();
-
+        CodeInsightTestFixtureImpl.instantiateAndRun(file, editor, new int[0], false);
         List<IntentionAction> actions = CodeInsightTestFixtureImpl.getAvailableIntentions(editor, file);
         List<String> codeActionTitles = actions.stream()
                 .map(IntentionAction::getText)
