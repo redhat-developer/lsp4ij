@@ -15,7 +15,9 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Adds client-side configuration features.
@@ -29,11 +31,44 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         setCompletionFeature(new UserDefinedCompletionFeature());
         setFormattingFeature(new UserDefinedFormattingFeature());
         setWorkspaceSymbolFeature(new UserDefinedWorkspaceSymbolFeature());
+        setEditorBehaviorFeature(new UserDefinedEditorBehaviorFeature(this));
     }
 
     public boolean isCaseSensitive(@NotNull PsiFile file) {
-        UserDefinedLanguageServerDefinition serverDefinition = (UserDefinedLanguageServerDefinition) getServerDefinition();
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
         ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return (clientConfiguration != null) && clientConfiguration.caseSensitive;
+        return clientConfiguration != null ? clientConfiguration.caseSensitive : super.isCaseSensitive(file);
+    }
+
+    @Override
+    @Nullable
+    public String getLineCommentPrefix(@NotNull PsiFile file) {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.lineCommentPrefix : super.getLineCommentPrefix(file);
+    }
+
+    @Override
+    @Nullable
+    public String getBlockCommentPrefix(@NotNull PsiFile file) {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.blockCommentPrefix : super.getBlockCommentPrefix(file);
+    }
+
+    @Override
+    @Nullable
+    public String getBlockCommentSuffix(@NotNull PsiFile file) {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.blockCommentSuffix : super.getBlockCommentSuffix(file);
+    }
+
+    @Override
+    @NotNull
+    public String getStatementTerminatorCharacters(@NotNull PsiFile file) {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return (clientConfiguration != null) ? clientConfiguration.statementTerminatorCharacters : super.getStatementTerminatorCharacters(file);
     }
 }

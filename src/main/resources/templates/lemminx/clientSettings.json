@@ -1,5 +1,7 @@
 {
   "caseSensitive": true,
+  "blockCommentPrefix": "<!--",
+  "blockCommentSuffix": "-->",
   "completion": {
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
