@@ -21,9 +21,9 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
         super("*.java");
     }
 
-    public void testWebFilterQuickFix() {
+    public void testWebFilterQuickFix() throws InterruptedException {
         assertCodeActions("InvalidWebFilter.java",
-                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@<caret>WebFilter()\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
+                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@Web<caret>Filter()\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
                         """                
                         [
                              {
@@ -49,7 +49,7 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
                                ],
                                "data": {
                                  "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
-                                 "documentUri": "file:///Users/dessina/Documents/Workspace/IntelliJ/liberty-tools-intellij/src/test/resources/projects/maven/jakarta-sample/src/main/java/io/openliberty/sample/jakarta/servlet/InvalidWebFilter.java",
+                                 "documentUri": "src/test/resources/templates/quick_fix_test_template/InvalidWebFilter.java",
                                  "range": {
                                    "start": {
                                      "line": 5,
@@ -92,7 +92,7 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
                                ],
                                "data": {
                                  "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
-                                 "documentUri": "file:///Users/dessina/Documents/Workspace/IntelliJ/liberty-tools-intellij/src/test/resources/projects/maven/jakarta-sample/src/main/java/io/openliberty/sample/jakarta/servlet/InvalidWebFilter.java",
+                                 "documentUri": "src/test/resources/templates/quick_fix_test_template/InvalidWebFilter.java",
                                  "range": {
                                    "start": {
                                      "line": 5,
@@ -135,7 +135,7 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
                                ],
                                "data": {
                                  "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
-                                 "documentUri": "file:///Users/dessina/Documents/Workspace/IntelliJ/liberty-tools-intellij/src/test/resources/projects/maven/jakarta-sample/src/main/java/io/openliberty/sample/jakarta/servlet/InvalidWebFilter.java",
+                                 "documentUri": "src/test/resources/templates/quick_fix_test_template/InvalidWebFilter.java",
                                  "range": {
                                    "start": {
                                      "line": 5,
@@ -160,7 +160,7 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
                 "Add the `servletNames` attribute to @WebFilter",
                 "Add the `urlPatterns` attribute to @WebFilter",
                 "Add the `value` attribute to @WebFilter");
-        // Test new editor content after applying the first quick fix
-        assertApplyCodeAction("Add the `servletNames` attribute to @WebFilter", "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(servletNames\\u003d\\\"\\\")\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n");
+
+        assertApplyCodeAction("Add the `servletNames` attribute to @WebFilter", "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(servletNames\\u003d\\\"\\\"<caret>)\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n");
     }
 }
