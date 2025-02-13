@@ -79,7 +79,7 @@ public class PostConstructAnnotationQuickFixTest extends LSPCodeActionFixtureTes
                              ],
                                  "data": {
                                  "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.annotations.PostConstructReturnTypeQuickFix",
-                                         "documentUri": "src/test/resources/templates/test_template_code_action/PostConstructAnnotation.java",
+                                         "documentUri": "file:///Users/dessina/Documents/Workspace/IntelliJ/liberty-tools-intellij/src/test/resources/projects/maven/jakarta-sample/src/main/java/io/openliberty/sample/jakarta/annotations/PostConstructAnnotation.java",
                                          "range": {
                                      "start": {
                                          "line": 15,
