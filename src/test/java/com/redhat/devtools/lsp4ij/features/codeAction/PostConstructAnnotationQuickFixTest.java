@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.features.codeAction;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeActionFixtureTestCase;
 
 /**
- * Test case for PostConstructAnnotation quick fix after LSP request cancellation.
+ * Test case for PostConstructAnnotation quick fix
  */
 public class PostConstructAnnotationQuickFixTest extends LSPCodeActionFixtureTestCase {
 

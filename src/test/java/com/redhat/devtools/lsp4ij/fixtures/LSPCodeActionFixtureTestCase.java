@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.google.gson.reflect.TypeToken;
+import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -18,10 +19,7 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -79,9 +77,9 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
         MockLanguageServer.INSTANCE.setDiagnostics(diagnostics);
 
         myFixture.configureByText(fileName, editorContentText);
-        myFixture.doHighlighting();
+        Collection<HighlightInfo> highlightInfos = myFixture.doHighlighting();
 
-        List<IntentionAction> actions = myFixture.doHighlighting().stream()
+        List<IntentionAction> actions = highlightInfos.stream()
                 .flatMap(info -> info.quickFixActionRanges != null
                         ? info.quickFixActionRanges.stream().map(pair -> pair.getFirst().getAction())
                         : Stream.empty())
@@ -91,10 +89,8 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
         List<String> codeActionTitles = new ArrayList<>();
         for (IntentionAction action : actions) {
-            try {
+            if (action.isAvailable(myFixture.getProject(), myFixture.getEditor(), myFixture.getFile())) {
                 codeActionTitles.add(action.getText());
-            } catch (IllegalStateException e) {
-                e.printStackTrace();
             }
         }
         for (String expectedAction : expectedActions) {

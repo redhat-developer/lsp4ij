@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.features.codeAction;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeActionFixtureTestCase;
 
 /**
- * Test case for InvalidWebFilter quick fix after LSP request cancellation.
+ * Test case for InvalidWebFilter quick fix
  */
 public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
 
