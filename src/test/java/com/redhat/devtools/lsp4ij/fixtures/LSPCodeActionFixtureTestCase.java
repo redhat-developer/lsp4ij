@@ -11,22 +11,19 @@
 package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.google.gson.reflect.TypeToken;
-import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.intention.IntentionAction;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
-import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Base class test case to test LSP 'textDocument/codeAction' feature.
@@ -72,12 +69,6 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                 .map(Either::<Command, CodeAction>forRight)
                 .collect(Collectors.toList());
 
-        myFixture.configureByText(fileName, editorContentText);
-
-        final Editor editor = myFixture.getEditor();
-        final PsiFile file = myFixture.getFile();
-        int offset = editor.getCaretModel().getOffset();
-
         List<Diagnostic> diagnostics = codeActions.stream()
                 .flatMap(codeAction -> Optional.ofNullable(codeAction.getDiagnostics()).stream().flatMap(List::stream))
                 .distinct()
@@ -87,26 +78,25 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
         MockLanguageServer.INSTANCE.setCodeActions(wrappedCodeActions);
         MockLanguageServer.INSTANCE.setDiagnostics(diagnostics);
 
-        /*List<String> codeActionTitles = null;
-        for (HighlightInfo info : myFixture.doHighlighting()) {
-            HighlightInfo.IntentionActionDescriptor desc = info.findRegisteredQuickFix((descriptor, range) -> descriptor);
-            final PsiElement someElement = file.findElementAt(offset);
-            assertNotNull(someElement);
-            for (IntentionAction option : desc.getOptions(someElement, editor)) {
-                codeActionTitles.add(option.getText());
-            }
-        }
-        for (String expectedAction : expectedActions) {
-            assertContainsElements(codeActionTitles, expectedAction);
-        }*/
+        myFixture.configureByText(fileName, editorContentText);
+        myFixture.doHighlighting();
 
-        CodeInsightTestFixtureImpl.instantiateAndRun(file, editor, new int[0], false);
-        List<IntentionAction> actions = CodeInsightTestFixtureImpl.getAvailableIntentions(editor, file);
-        List<String> codeActionTitles = actions.stream()
-                .map(IntentionAction::getText)
+        List<IntentionAction> actions = myFixture.doHighlighting().stream()
+                .flatMap(info -> info.quickFixActionRanges != null
+                        ? info.quickFixActionRanges.stream().map(pair -> pair.getFirst().getAction())
+                        : Stream.empty())
                 .filter(Objects::nonNull)
+                .distinct()
                 .collect(Collectors.toList());
 
+        List<String> codeActionTitles = new ArrayList<>();
+        for (IntentionAction action : actions) {
+            try {
+                codeActionTitles.add(action.getText());
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
+            }
+        }
         for (String expectedAction : expectedActions) {
             assertContainsElements(codeActionTitles, expectedAction);
         }
@@ -118,8 +108,7 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
      * @param actionText               the text of the action to be applied.
      * @param expectedEditorContentText the expected editor content text after applying the action.
      */
-    public void assertApplyCodeAction(@NotNull String actionText,
-                                      @NotNull String expectedEditorContentText) {
+    public void assertApplyCodeAction(@NotNull String actionText, @NotNull String expectedEditorContentText) {
         String expected = expectedEditorContentText;
         int expectedCaretOffset = expectedEditorContentText.indexOf("<caret>");
         if (expectedCaretOffset != -1) {
@@ -127,18 +116,24 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                     expectedEditorContentText.substring("<caret>".length() + expectedCaretOffset);
         }
 
-        IntentionAction action = myFixture.getAvailableIntentions().stream()
+        IntentionAction action = myFixture.doHighlighting().stream()
+                .flatMap(info -> {
+                    if (info.quickFixActionRanges != null) {
+                        return info.quickFixActionRanges.stream()
+                                .map(pair -> pair.getFirst().getAction())
+                                .filter(Objects::nonNull);
+                    }
+                    return Stream.empty();
+                })
                 .filter(intentionAction -> intentionAction.getText().equals(actionText))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Action with text '" + actionText + "' not found."));
 
         myFixture.launchAction(action);
-
-        var editor = myFixture.getEditor();
-        assertEquals("After applying code action, editor content should be equal", expected, editor.getDocument().getText());
+        myFixture.checkResult(expected);
 
         if (expectedCaretOffset != -1) {
-            assertEquals("After applying code action, caret offset should be equal", expectedCaretOffset, editor.getCaretModel().getOffset());
+            assertEquals("After applying code action, caret offset should be equal", expectedCaretOffset, myFixture.getEditor().getCaretModel().getOffset());
         }
     }
 }
