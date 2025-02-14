@@ -389,9 +389,9 @@
                 implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPEditorImprovementsBackspaceHandler"
                 order="first"/>
         <typedHandler
-                id="LSPImprovedTextMateTypedHandler"
+                id="LSPImprovedTextMateNestedBracesTypedHandler"
                 order="first, before LSPCompletionTriggerTypedHandler, before LSPClientSideOnTypeFormattingTypedHandler, before LSPServerSideOnTypeFormattingTypedHandler"
-                implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPImprovedTextMateTypedHandler"/>
+                implementation="com.redhat.devtools.lsp4ij.features.formatting.LSPImprovedTextMateNestedBracesTypedHandler"/>
         <!-- Workaround for https://youtrack.jetbrains.com/issue/IJPL-159454 -->
         <enterHandlerDelegate
                 id="LSPEditorImprovementsEnterBetweenBracesHandler"

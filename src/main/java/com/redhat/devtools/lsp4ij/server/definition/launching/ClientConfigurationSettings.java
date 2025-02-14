@@ -56,6 +56,12 @@ public class ClientConfigurationSettings {
          * enabled. Default to true.
          */
         public boolean enableEnterBetweenBracesFix = true;
+
+        /**
+         * Whether or not editor improvements for nested braces/brackets/parentheses in TextMate files are enabled.
+         * Defaults to true.
+         */
+        public boolean enableTextMateNestedBracesImprovements = true;
     }
 
     /**

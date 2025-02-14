@@ -16,6 +16,7 @@ import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.testFramework.EditorTestUtil;
 
 /**
@@ -165,5 +166,33 @@ public class TypeScriptCustomLanguageServerEditorImprovementsTest extends Abstra
                 """;
         assertEquals(enterBetweenBracesFileBody.replace(CARET, ""), document.getText());
         assertEquals(enterBetweenBracesFileBody.indexOf(CARET), caretModel.getOffset());
+    }
+
+    // Verify LSPImprovedTextMateNestedBracesTypedHandler
+
+    public void testImprovedTextMateNestedBracesDisabledByDefault() {
+        String fileBody = """
+                function foo() {
+                    invokePromise()
+                        .then()
+                }
+                """;
+        int initialOffset = fileBody.indexOf(".then(") + ".then(".length();
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        initializeLanguageServer();
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+
+        CaretModel caretModel = editor.getCaretModel();
+        caretModel.moveToOffset(initialOffset);
+
+        // Type four open parens and they should be inserted unpaired
+        for (int iteration = 1; iteration <= 4; iteration++) {
+            EditorTestUtil.performTypingAction(editor, '(');
+            assertEquals(fileBody.replace(".then()", ".then(" + StringUtil.repeatSymbol('(', iteration) + ")"), document.getText());
+            assertEquals(initialOffset + iteration, caretModel.getOffset());
+        }
     }
 }
