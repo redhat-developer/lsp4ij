@@ -18,6 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
+    env:
+        NO_FS_ROOTS_ACCESS_CHECK: true
     steps:
 
       # Check out current repository
@@ -38,9 +40,7 @@ jobs:
 
       # Run tests
       - name: Run Tests
-        run: |
-          export NO_FS_ROOTS_ACCESS_CHECK=true
-          ./gradlew check
+        run: ./gradlew check
 
       # Collect Tests Result
       - name: Collect Tests Result
