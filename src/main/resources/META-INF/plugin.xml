@@ -779,9 +779,22 @@ L
     </projectListeners>
 
     <!-- DAP Support -->
+
+    <extensionPoints>
+
+        <!-- Debug adapter server extension point -->
+        <extensionPoint
+                name="debugAdapterServer"
+                beanClass="com.redhat.devtools.lsp4ij.dap.definitions.extension.DebugAdapterServerExtensionPointBean">
+            <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory"/>
+        </extensionPoint>
+
+    </extensionPoints>
+
     <extensions defaultExtensionNs="com.intellij">
+
         <applicationService
-                serviceImplementation="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager"/>
+                serviceImplementation="com.redhat.devtools.lsp4ij.dap.DebugAdapterManager"/>
         <programRunner id="DAPDebugRunner"
                        implementation="com.redhat.devtools.lsp4ij.dap.DAPDebugRunner"/>
         <configurationType
@@ -801,9 +814,9 @@ L
                 bundle="messages.DAPBundle"
                 nonDefaultProject="true"
                 key="debug.adapter"
-                instance="com.redhat.devtools.lsp4ij.dap.settings.DebugAdapterDescriptorFactoryListConfigurable"/>
+                instance="com.redhat.devtools.lsp4ij.dap.settings.DebugAdapterServerListConfigurable"/>
         <applicationService id="UserDefinedDAPServerSettings"
-                            serviceImplementation="com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterDescriptorFactorySettings"/>
+                            serviceImplementation="com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings"/>
     </extensions>
 
 </idea-plugin>

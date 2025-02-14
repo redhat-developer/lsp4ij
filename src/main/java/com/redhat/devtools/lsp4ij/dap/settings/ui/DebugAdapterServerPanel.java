@@ -27,14 +27,10 @@ import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
-import com.redhat.devtools.lsp4ij.dap.DAPBundle;
-import com.redhat.devtools.lsp4ij.dap.DebugMode;
-import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
-import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
+import com.redhat.devtools.lsp4ij.dap.*;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
-import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -56,14 +52,14 @@ import static com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorF
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
- * UI panel to define a Debug Adapter descriptor factory.
+ * UI panel to define a Debug Adapter Server.
  */
-public class DebugAdapterDescriptorFactoryPanel implements Disposable {
+public class DebugAdapterServerPanel implements Disposable {
 
     private static final int COMMAND_LENGTH_MAX = 140;
 
     private final Project project;
-    private DebugAdapterDescriptorFactory currentServerFactory;
+    private DebugAdapterServerDefinition currentServer;
     private boolean initialized;
     private JBTabbedPane mainTabbedPane;
     private List<LaunchConfiguration> launchConfigurations;
@@ -75,7 +71,7 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     }
 
     // Server settings
-    private ComboBox<DebugAdapterDescriptorFactory> serverFactoryCombo;
+    private ComboBox<DebugAdapterServerDefinition> debugAdapterServerCombo;
     private JBTextField serverNameField;
     private EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
@@ -96,18 +92,18 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     private ComboBox<LaunchConfiguration> attachCombo;
     private SchemaBackedJsonTextField attachConfigurationField;
 
-    public DebugAdapterDescriptorFactoryPanel(@NotNull FormBuilder builder,
-                                              @Nullable JComponent description,
-                                              @NotNull EditionMode mode,
-                                              @NotNull Project project) {
+    public DebugAdapterServerPanel(@NotNull FormBuilder builder,
+                                   @Nullable JComponent description,
+                                   @NotNull EditionMode mode,
+                                   @NotNull Project project) {
         this(builder, description, mode, false, project);
     }
 
-    public DebugAdapterDescriptorFactoryPanel(@NotNull FormBuilder builder,
-                                              @Nullable JComponent description,
-                                              @NotNull EditionMode mode,
-                                              boolean showFactoryCombo,
-                                              @NotNull Project project) {
+    public DebugAdapterServerPanel(@NotNull FormBuilder builder,
+                                   @Nullable JComponent description,
+                                   @NotNull EditionMode mode,
+                                   boolean showFactoryCombo,
+                                   @NotNull Project project) {
         this.project = project;
         createUI(builder, description, mode, showFactoryCombo);
     }
@@ -130,33 +126,33 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
             serverTab.addComponent(description, 0);
         }
         if (showFactoryCombo) {
-            serverFactoryCombo = new ComboBox<>(new DefaultComboBoxModel<>(getServerFactories()));
-            serverFactoryCombo.setRenderer(new SimpleListCellRenderer<>() {
+            debugAdapterServerCombo = new ComboBox<>(new DefaultComboBoxModel<>(getServerDefinitions()));
+            debugAdapterServerCombo.setRenderer(new SimpleListCellRenderer<>() {
                 @Override
                 public void customize(@NotNull JList list,
-                                      @Nullable DebugAdapterDescriptorFactory serverFactory,
+                                      @Nullable DebugAdapterServerDefinition serverDefinition,
                                       int index,
                                       boolean selected,
                                       boolean hasFocus) {
-                    if (serverFactory == null) {
+                    if (serverDefinition == null) {
                         setText("");
                     } else {
-                        setText(serverFactory.getName());
+                        setText(serverDefinition.getName());
                     }
                 }
             });
             // Add Listener when server is selected, it must update Configuration / Mappings and Server tabs
-            serverFactoryCombo.addItemListener(e -> {
-                currentServerFactory = (DebugAdapterDescriptorFactory) e.getItem();
-                if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory dapFactory) {
-                    if (dapFactory != UserDefinedDebugAdapterDescriptorFactory.NONE) {
-                        loadFromDapFactory(dapFactory);
+            debugAdapterServerCombo.addItemListener(e -> {
+                currentServer = (DebugAdapterServerDefinition) e.getItem();
+                if (currentServer instanceof UserDefinedDebugAdapterServerDefinition userDefinedServer) {
+                    if (userDefinedServer != UserDefinedDebugAdapterServerDefinition.NONE) {
+                        loadFromServerDefinition(userDefinedServer);
                     }
                 }
             });
 
             JPanel serverFactoryPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            serverFactoryPanel.add(serverFactoryCombo);
+            serverFactoryPanel.add(debugAdapterServerCombo);
             serverFactoryPanel.add(new JLabel(DAPBundle.message("dap.settings.editor.server.factory.or")));
 
             var hyperLink = createHyperlinkLabel();
@@ -185,24 +181,24 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     private @NotNull HyperlinkLabel createHyperlinkLabel() {
         var hyperLink = new HyperlinkLabel(DAPBundle.message("dap.settings.editor.server.factory.create"));
         hyperLink.addHyperlinkListener(e -> {
-            var dialog = new NewDebugAdapterDescriptorFactoryDialog(project);
+            var dialog = new NewDebugAdapterServerDialog(project);
             dialog.show();
             if (dialog.isOK()) {
-                var createdFactory = dialog.getCreatedFactory();
+                var createdFactory = dialog.getCreatedServer();
                 if (createdFactory != null) {
-                    serverFactoryCombo.setModel(new DefaultComboBoxModel<>(getServerFactories()));
-                    serverFactoryCombo.setSelectedItem(createdFactory);
+                    debugAdapterServerCombo.setModel(new DefaultComboBoxModel<>(getServerDefinitions()));
+                    debugAdapterServerCombo.setSelectedItem(createdFactory);
                 }
             }
         });
         return hyperLink;
     }
 
-    private static DebugAdapterDescriptorFactory[] getServerFactories() {
-        List<DebugAdapterDescriptorFactory> factories = new ArrayList<>();
-        factories.add(DebugAdapterDescriptorFactory.NONE);
-        factories.addAll(DebugAdapterManager.getInstance().getFactories());
-        return factories.toArray(new DebugAdapterDescriptorFactory[0]);
+    private static DebugAdapterServerDefinition[] getServerDefinitions() {
+        List<DebugAdapterServerDefinition> servers = new ArrayList<>();
+        servers.add(UserDefinedDebugAdapterServerDefinition.NONE);
+        servers.addAll(DebugAdapterManager.getInstance().getDebugAdapterServers());
+        return servers.toArray(new DebugAdapterServerDefinition[0]);
     }
 
     private void addMappingsTab(JBTabbedPane tabbedPane, EditionMode mode) {
@@ -414,14 +410,14 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
 
     public void setServerId(@Nullable String serverId) {
         if (StringUtils.isNotBlank(serverId)) {
-            DebugAdapterDescriptorFactory factory = DebugAdapterManager.getInstance().getFactoryById(serverId);
-            if (factory != null) {
-                currentServerFactory = factory;
-                if (serverFactoryCombo != null) {
-                    serverFactoryCombo.setSelectedItem(factory);
+            DebugAdapterServerDefinition serverDefinition = DebugAdapterManager.getInstance().getDebugAdapterServerById(serverId);
+            if (serverDefinition != null) {
+                currentServer = serverDefinition;
+                if (debugAdapterServerCombo != null) {
+                    debugAdapterServerCombo.setSelectedItem(serverDefinition);
                 } else {
-                    if (currentServerFactory instanceof UserDefinedDebugAdapterDescriptorFactory userdefined) {
-                        loadFromDapFactory(userdefined);
+                    if (currentServer instanceof UserDefinedDebugAdapterServerDefinition userdefined) {
+                        loadFromServerDefinition(userdefined);
                     }
                 }
             }
@@ -434,35 +430,28 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
         }
     }
 
-    private void loadFromDapFactory(@NotNull UserDefinedDebugAdapterDescriptorFactory dapFactory) {
+    private void loadFromServerDefinition(@NotNull UserDefinedDebugAdapterServerDefinition serverDefinition) {
         // Update name
-        setServerName(dapFactory.getDisplayName());
+        setServerName(serverDefinition.getDisplayName());
 
         // Update wait for trace
-        updateDebugServerWaitStrategy(null, dapFactory.getConnectTimeout(),
-                dapFactory.getDebugServerReadyPattern());
+        updateDebugServerWaitStrategy(null, serverDefinition.getConnectTimeout(),
+                serverDefinition.getDebugServerReadyPattern());
 
         // Update command
-        String command = getCommandLine(dapFactory);
+        String command = getCommandLine(serverDefinition);
         this.setCommandLine(command);
 
         // Update mappings
-        mappingsPanel.refreshMappings(dapFactory.getLanguageMappings(), dapFactory.getFileTypeMappings());
+        mappingsPanel.refreshMappings(serverDefinition.getLanguageMappings(), serverDefinition.getFileTypeMappings());
 
         // Update DAP parameters
-        var launchConfigurations = dapFactory.getLaunchConfigurations();
+        var launchConfigurations = serverDefinition.getLaunchConfigurations();
         refreshLaunchConfigurations(launchConfigurations);
     }
 
-    private static int getInt(String text) {
-        try {
-            return Integer.parseInt(text);
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    private static String getCommandLine(UserDefinedDebugAdapterDescriptorFactory entry) {
+    @NotNull
+    private static String getCommandLine(@NotNull UserDefinedDebugAdapterServerDefinition entry) {
         StringBuilder command = new StringBuilder();
         if (entry.getCommandLine() != null) {
             if (!command.isEmpty()) {
@@ -480,8 +469,8 @@ public class DebugAdapterDescriptorFactoryPanel implements Disposable {
     }
 
     public String getServerId() {
-        var factory = (DebugAdapterDescriptorFactory) serverFactoryCombo.getSelectedItem();
-        return factory != null ? factory.getId() : "";
+        var serverDefinition = (DebugAdapterServerDefinition) debugAdapterServerCombo.getSelectedItem();
+        return serverDefinition != null ? serverDefinition.getId() : "";
     }
 
     public String getServerName() {

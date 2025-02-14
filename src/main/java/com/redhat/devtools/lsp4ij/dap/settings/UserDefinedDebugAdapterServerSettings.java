@@ -28,19 +28,19 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 /**
- * User defined debug adapter descriptor factory settings.
+ * User defined debug adapter server settings.
  */
 @State(
-        name = "debugAdapterDescriptorFactorySettingsState",
-        storages = @Storage("DebugAdapterDescriptorFactorySettings.xml")
+        name = "debugAdapterServerSettingsState",
+        storages = @Storage("DebugAdapterServerSettings.xml")
 )
-public class UserDefinedDebugAdapterDescriptorFactorySettings implements PersistentStateComponent<UserDefinedDebugAdapterDescriptorFactorySettings.MyState> {
+public class UserDefinedDebugAdapterServerSettings implements PersistentStateComponent<UserDefinedDebugAdapterServerSettings.MyState> {
 
     private final List<Runnable> myChangeHandlers = ContainerUtil.createConcurrentList();
     private volatile MyState myState = new MyState();
 
-    public static UserDefinedDebugAdapterDescriptorFactorySettings getInstance() {
-        return ApplicationManager.getApplication().getService(UserDefinedDebugAdapterDescriptorFactorySettings.class);
+    public static UserDefinedDebugAdapterServerSettings getInstance() {
+        return ApplicationManager.getApplication().getService(UserDefinedDebugAdapterServerSettings.class);
     }
 
     @Nullable
@@ -55,28 +55,28 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
     }
 
     /**
-     * Returns the Debug Adapter descriptor factory settings for the given factory Id and null otherwise.
+     * Returns the Debug Adapter server settings for the given server Id and null otherwise.
      *
-     * @param descriptorFactoryId the Debug Adapter descriptor factory id.
-     * @return the Debug Adapter descriptor factory settings for the given factory Id and null otherwise.
+     * @param debugAdapterServerId the Debug Adapter server id.
+     * @return the Debug Adapter server settings for the given server Id and null otherwise.
      */
     @Nullable
-    public ItemSettings getSettings(@NotNull String descriptorFactoryId) {
-        return myState.myState.get(descriptorFactoryId);
+    public ItemSettings getSettings(@NotNull String debugAdapterServerId) {
+        return myState.myState.get(debugAdapterServerId);
     }
 
     /**
      * Register the Debug Adapter descriptor factory settings for the given factory Id.
-     * @param descriptorFactoryId the Debug Adapter descriptor factory id.
+     * @param debugAdapterServerId the Debug Adapter descriptor factory id.
      * @param settings the Debug Adapter descriptor factory settings.
      */
-    public void setSettings(@NotNull String descriptorFactoryId, @NotNull ItemSettings settings) {
-        myState.myState.put(descriptorFactoryId, settings);
+    public void setSettings(@NotNull String debugAdapterServerId, @NotNull ItemSettings settings) {
+        myState.myState.put(debugAdapterServerId, settings);
         fireStateChanged();
     }
 
-    public void removeSettings(String descriptorFactoryId) {
-        myState.myState.remove(descriptorFactoryId);
+    public void removeSettings(String debugAdapterServerId) {
+        myState.myState.remove(debugAdapterServerId);
         fireStateChanged();
     }
 
@@ -111,8 +111,8 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
         }
     }
 
-    public Object updateSettings(@NotNull String descriptorFactoryId,
-                                 @NotNull UserDefinedDebugAdapterDescriptorFactorySettings.ItemSettings settings,
+    public Object updateSettings(@NotNull String debugAdapterServerId,
+                                 @NotNull UserDefinedDebugAdapterServerSettings.ItemSettings settings,
                                  boolean notify) {
 
         return null;
@@ -123,7 +123,7 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
 
     public static class ItemSettings {
 
-        private String serverId;
+        private String debugAdapterServerId;
 
         private String serverName;
 
@@ -140,11 +140,11 @@ public class UserDefinedDebugAdapterDescriptorFactorySettings implements Persist
         private List<LaunchConfiguration> launchConfigurations;
 
         public String getServerId() {
-            return serverId;
+            return debugAdapterServerId;
         }
 
-        public void setServerId(String serverId) {
-            this.serverId = serverId;
+        public void setServerId(String debugAdapterServerId) {
+            this.debugAdapterServerId = debugAdapterServerId;
         }
 
         public String getServerName() {

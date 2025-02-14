@@ -44,7 +44,8 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import static com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean.DEFAULT_DOCUMENT_MATCHER;
+import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServerMappingSettings;
+import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServerMappings;
 
 /**
  * Language servers registry.
@@ -388,66 +389,11 @@ public class LanguageServersRegistry {
         }
     }
 
-    private void updateAssociations(@NotNull LanguageServerDefinition definition, @NotNull List<ServerMapping> mappings) {
-        if (mappings != null) {
-            for (ServerMapping mapping : mappings) {
-                registerAssociation(definition, mapping);
-            }
+    private void updateAssociations(@NotNull LanguageServerDefinition definition,
+                                    @NotNull List<ServerMapping> mappings) {
+        for (ServerMapping mapping : mappings) {
+            registerAssociation(definition, mapping);
         }
-    }
-
-    @NotNull
-    private static List<ServerMappingSettings> toServerMappingSettings(@NotNull List<ServerMapping> mappings) {
-        return mappings
-                .stream()
-                .map(mapping -> {
-                    if (mapping instanceof ServerLanguageMapping languageMapping) {
-                        return ServerMappingSettings.createLanguageMappingSettings(languageMapping.getLanguage().getID(), languageMapping.getLanguageId());
-                    } else if (mapping instanceof ServerFileTypeMapping fileTypeMapping) {
-                        return ServerMappingSettings.createFileTypeMappingSettings(fileTypeMapping.getFileType().getName(), fileTypeMapping.getLanguageId());
-                    } else if (mapping instanceof ServerFileNamePatternMapping fileNamePatternMapping) {
-                        return ServerMappingSettings.createFileNamePatternsMappingSettings(fileNamePatternMapping.getFileNamePatterns(), fileNamePatternMapping.getLanguageId());
-                    }
-                    // should never occur
-                    return null;
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-    }
-
-    private static List<ServerMapping> toServerMappings(String serverId, @Nullable List<ServerMappingSettings> mappingSettings) {
-        List<ServerMapping> mappings = new ArrayList<>();
-        if (mappingSettings != null && !mappingSettings.isEmpty()) {
-            for (var mapping : mappingSettings) {
-                String languageId = mapping.getLanguageId();
-                String mappingLanguage = mapping.getLanguage();
-                if (!StringUtils.isEmpty(mappingLanguage)) {
-                    Language language = Language.findLanguageByID(mappingLanguage);
-                    if (language != null) {
-                        mappings.add(new ServerLanguageMapping(language, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
-                    }
-                } else {
-                    boolean fileTypeMappingCreated = false;
-                    String mappingFileType = mapping.getFileType();
-                    if (!StringUtils.isEmpty(mappingFileType)) {
-                        FileType fileType = FileTypeManager.getInstance().findFileTypeByName(mappingFileType);
-                        if (fileType != null) {
-                            // Register file type mapping from settings
-                            mappings.add(new ServerFileTypeMapping(fileType, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
-                            fileTypeMappingCreated = true;
-                        }
-                    }
-                    if (!fileTypeMappingCreated) {
-                        List<String> patterns = mapping.getFileNamePatterns();
-                        if (patterns != null) {
-                            // Register file name patterns mapping from settings
-                            mappings.add(new ServerFileNamePatternMapping(patterns, serverId, languageId, DEFAULT_DOCUMENT_MATCHER));
-                        }
-                    }
-                }
-            }
-        }
-        return mappings;
     }
 
     public void removeServerDefinition(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {

@@ -12,6 +12,9 @@ package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.execution.runners.ExecutionEnvironment;
+import com.intellij.ide.plugins.IdeaPluginDescriptor;
+import com.intellij.ide.plugins.PluginManagerCore;
+import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -20,15 +23,14 @@ import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPSettingsEditor;
-import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
+import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
@@ -38,8 +40,6 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
  */
 @ApiStatus.Experimental
 public abstract class DebugAdapterDescriptorFactory {
-
-    public static final DebugAdapterDescriptorFactory NONE = new UserDefinedDebugAdapterDescriptorFactory("none", "NONE", "", Collections.emptyList(), Collections.emptyList());
 
     private static final LaunchConfiguration DEFAULT_LAUNCH_CONFIGURATION = new LaunchConfiguration("default_launch", "Launch file",
             // language=json
@@ -64,26 +64,22 @@ public abstract class DebugAdapterDescriptorFactory {
                      }
                     """, DebugMode.ATTACH);
 
-    public static final LaunchConfiguration[] DEFAULT_LAUNCH_CONFIGURATION_ARRAY = new LaunchConfiguration[] {DEFAULT_LAUNCH_CONFIGURATION};
+    public static final LaunchConfiguration[] DEFAULT_LAUNCH_CONFIGURATION_ARRAY = new LaunchConfiguration[]{DEFAULT_LAUNCH_CONFIGURATION};
 
-    public static final LaunchConfiguration[] DEFAULT_ATTACH_CONFIGURATION_ARRAY = new LaunchConfiguration[] {DEFAULT_ATTACH_CONFIGURATION};
+    public static final LaunchConfiguration[] DEFAULT_ATTACH_CONFIGURATION_ARRAY = new LaunchConfiguration[]{DEFAULT_ATTACH_CONFIGURATION};
 
     public static final List<LaunchConfiguration> DEFAULT_LAUNCH_CONFIGURATIONS = Arrays.asList(
             DEFAULT_LAUNCH_CONFIGURATION,
             DEFAULT_ATTACH_CONFIGURATION
     );
 
+    private DebugAdapterServerDefinition serverDefinition;
+
     private ServerTrace serverTrace;
-
-    @NotNull
-    public abstract String getId();
-
-    @NotNull
-    public abstract String getName();
 
     public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull DAPRunConfigurationOptions options,
                                                                @NotNull ExecutionEnvironment environment) {
-        return new DebugAdapterDescriptor(options, environment, this);
+        return new DefaultDebugAdapterDescriptor(options, environment, getServerDefinition());
     }
 
     /**
@@ -106,14 +102,18 @@ public abstract class DebugAdapterDescriptorFactory {
     }
 
     /**
-     * Returns true if the given file can be debugged (to add/remove breakpoints) and false otherwise.
+     * Checks if the given file is debuggable within the specified project.
+     * A file is considered debuggable if it meets certain criteria, such as having a ".ts" extension.
+     * If the file is debuggable, breakpoints can be added or removed.
      *
-     * @param file    the file to debug.
-     * @param project the project.
-     * @return true if the given file can be debugged (to add/remove breakpoints) and false otherwise.
+     * @param file    the virtual file to check (must not be null)
+     * @param project the project context (must not be null)
+     * @return {@code true} if the file is debuggable and allows breakpoints, {@code false} otherwise
      */
-    public abstract boolean canDebug(@NotNull VirtualFile file,
-                                     @NotNull Project project);
+    public boolean isDebuggableFile(@NotNull VirtualFile file,
+                                    @NotNull Project project) {
+        return getServerDefinition().isDebuggableFile(file, project);
+    }
 
     public @NotNull SettingsEditor<? extends RunConfiguration> getConfigurationEditor(@NotNull Project project) {
         return new DAPSettingsEditor(project);
@@ -126,37 +126,45 @@ public abstract class DebugAdapterDescriptorFactory {
     public boolean prepareConfiguration(@NotNull RunConfiguration configuration,
                                         @NotNull VirtualFile file,
                                         @NotNull Project project) {
+        if (configuration instanceof FileOptionConfigurable fileOptionAware) {
+            // Configuration
+            fileOptionAware.setFile(getFilePath(file));
+        }
         if (configuration instanceof DAPRunConfiguration dapConfiguration) {
             configuration.setName(file.getName());
 
             // Configuration
-            dapConfiguration.setFile(getFilePath(file));
             dapConfiguration.setDebugMode(DebugMode.LAUNCH);
 
             // Server
-            dapConfiguration.setServerId(this.getId());
-            dapConfiguration.setServerName(this.getName());
+            dapConfiguration.setServerId(serverDefinition.getId());
+            dapConfiguration.setServerName(serverDefinition.getName());
             return true;
         }
         return false;
     }
 
-    public @NotNull String getDisplayName() {
-        return getName();
-    }
-
-    @Nullable
-    public Icon getIcon() {
-        return null;
-    }
-
-    @Nullable
-    public String getDescription() {
-        return null;
-    }
-
     @NotNull
     public List<LaunchConfiguration> getLaunchConfigurations() {
         return DEFAULT_LAUNCH_CONFIGURATIONS;
+    }
+
+    public DebugAdapterServerDefinition getServerDefinition() {
+        return serverDefinition;
+    }
+
+    @ApiStatus.Internal
+    public final void setServerDefinition(DebugAdapterServerDefinition serverDefinition) {
+        this.serverDefinition = serverDefinition;
+    }
+
+    public static Path getDebugAdapterServerPath(@NotNull String pluginId,
+                                                 @NotNull String serverPath) {
+        IdeaPluginDescriptor descriptor = PluginManagerCore.getPlugin(PluginId.getId(pluginId));
+        assert descriptor != null;
+        Path pluginPath = descriptor.getPluginPath();
+        assert pluginPath != null;
+        pluginPath = pluginPath.toAbsolutePath();
+        return pluginPath.resolve(serverPath);
     }
 }

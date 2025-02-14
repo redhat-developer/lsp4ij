@@ -1,16 +1,14 @@
 /*******************************************************************************
- * Copyright (c) 2023 Red Hat Inc. and others.
- *
- * This program and the accompanying materials are made available under the
- * terms of the Eclipse Public License v. 2.0 which is available at
- * http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
- * which is available at https://www.apache.org/licenses/LICENSE-2.0.
- *
- * SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+ * Copyright (c) 2025 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
  *
  * Contributors:
- *     Red Hat Inc. - initial API and implementation
- *******************************************************************************/
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+
 package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
 import com.google.common.collect.Streams;
@@ -21,12 +19,12 @@ import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
-import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterDescriptorFactorySettings;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -40,36 +38,36 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * UI view to define a Debug Adapter descriptor factory.
+ * UI view to define a Debug Adapter Server.
  */
-public class DebugAdapterDescriptorFactoryView implements Disposable {
+public class DebugAdapterServerView implements Disposable {
 
-    private final DebugAdapterDescriptorFactoryNameProvider descriptorFactoryNameProvider;
+    private final DebugAdapterServerNameProvider debugAdapterServerNameProvider;
     private final boolean isUserDefined;
     private final Project project;
 
-    public interface DebugAdapterDescriptorFactoryNameProvider {
+    public interface DebugAdapterServerNameProvider {
         String getDisplayName();
     }
 
     private final JPanel myMainPanel;
-    private final @NotNull DebugAdapterDescriptorFactory dapDescriptorFactory;
+    private final @NotNull DebugAdapterServerDefinition debugAdapterServer;
 
-    private DebugAdapterDescriptorFactoryPanel dapDescriptorFactoryPanel;
+    private DebugAdapterServerPanel debugAdapterServerPanel;
 
     private DAPServerMappingsPanel mappingPanel;
 
-    public DebugAdapterDescriptorFactoryView(@NotNull DebugAdapterDescriptorFactory dapDescriptorFactory,
-                                             @Nullable DebugAdapterDescriptorFactoryView.DebugAdapterDescriptorFactoryNameProvider dapDescriptorFactoryNameProvider,
-                                             @NotNull Project project) {
+    public DebugAdapterServerView(@NotNull DebugAdapterServerDefinition debugAdapterServer,
+                                  @Nullable DebugAdapterServerView.DebugAdapterServerNameProvider dapDescriptorFactoryNameProvider,
+                                  @NotNull Project project) {
         this.project = project;
-        this.dapDescriptorFactory = dapDescriptorFactory;
-        this.descriptorFactoryNameProvider = dapDescriptorFactoryNameProvider;
-        isUserDefined = dapDescriptorFactory instanceof UserDefinedDebugAdapterDescriptorFactory;
-        JComponent descriptionPanel = createDescription(dapDescriptorFactory.getDescription());
+        this.debugAdapterServer = debugAdapterServer;
+        this.debugAdapterServerNameProvider = dapDescriptorFactoryNameProvider;
+        isUserDefined = debugAdapterServer instanceof UserDefinedDebugAdapterServerDefinition;
+        JComponent descriptionPanel = createDescription(debugAdapterServer.getDescription());
         JPanel settingsPanel = createSettings(descriptionPanel, isUserDefined);
         if (!isUserDefined) {
-            TitledBorder title = IdeBorderFactory.createTitledBorder(dapDescriptorFactory.getDisplayName());
+            TitledBorder title = IdeBorderFactory.createTitledBorder(debugAdapterServer.getDisplayName());
             settingsPanel.setBorder(title);
         }
         JPanel wrapper = JBUI.Panels.simplePanel(settingsPanel);
@@ -83,9 +81,9 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
      * @return true if there are some modification in the UI fields and false otherwise.
      */
     public boolean isModified() {
-        String descriptorFactoryId = dapDescriptorFactory.getId();
+        String descriptorFactoryId = debugAdapterServer.getId();
         if (isUserDefined) {
-            UserDefinedDebugAdapterDescriptorFactorySettings.ItemSettings settings = UserDefinedDebugAdapterDescriptorFactorySettings.getInstance().getSettings(descriptorFactoryId);
+            UserDefinedDebugAdapterServerSettings.ItemSettings settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(descriptorFactoryId);
             if (settings == null) {
                 return true;
             }
@@ -111,17 +109,17 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
      * Update the UI from the registered language server definition + settings.
      */
     public void reset() {
-        String descriptorFactoryId = dapDescriptorFactory.getId();
+        String debugAdapterServerId = debugAdapterServer.getId();
 
         if (isUserDefined) {
             // User defined language server
-            UserDefinedDebugAdapterDescriptorFactorySettings.ItemSettings settings = UserDefinedDebugAdapterDescriptorFactorySettings.getInstance().getSettings(descriptorFactoryId);
+            UserDefinedDebugAdapterServerSettings.ItemSettings settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(debugAdapterServerId);
             if (settings != null) {
                 this.setCommandLine(settings.getCommandLine());
                 this.setEnvData(EnvironmentVariablesData.create(
                         settings.getUserEnvironmentVariables(),
                         settings.isIncludeSystemEnvironmentVariables()));
-                this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel()
+                this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel()
                         .update(null, settings.getConnectTimeout(), settings.getDebugServerReadyPattern());
 
                 List<ServerMappingSettings> languageMappings = settings.getMappings()
@@ -181,25 +179,25 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                     .collect(Collectors.toList());
             this.setFileNamePatternMappings(fileNamePatternMappings);*/
         }
-        dapDescriptorFactoryPanel.setServerId(descriptorFactoryId);
+        debugAdapterServerPanel.setServerId(debugAdapterServerId);
     }
 
     /**
-     * Update the proper debug adapter descriptor factory from the UI fields.
+     * Update the proper debug adapter server from the UI fields.
      */
     public void apply() {
-        String descriptorFactoryId = dapDescriptorFactory.getId();
-        UserDefinedDebugAdapterDescriptorFactorySettings.ItemSettings settings = UserDefinedDebugAdapterDescriptorFactorySettings.getInstance().getSettings(descriptorFactoryId);
-        if (dapDescriptorFactory instanceof UserDefinedDebugAdapterDescriptorFactory userDefinedFactory) {
+        String debugAdapterServerId = debugAdapterServer.getId();
+        UserDefinedDebugAdapterServerSettings.ItemSettings settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(debugAdapterServerId);
+        if (debugAdapterServer instanceof UserDefinedDebugAdapterServerDefinition userDefinedServer) {
             // Register settings and server definition without firing events
-            var settingsChangedEvent = UserDefinedDebugAdapterDescriptorFactorySettings
+            var settingsChangedEvent = UserDefinedDebugAdapterServerSettings
                     .getInstance()
-                    .updateSettings(descriptorFactoryId, settings, false);
+                    .updateSettings(debugAdapterServerId, settings, false);
             // Update user-defined language server settings
             var serverChangedEvent = DebugAdapterManager.getInstance()
-                    .updateDescriptorFactory(
-                            new DebugAdapterManager.UpdateDebugAdapterDescriptorFactoryRequest(
-                                    userDefinedFactory,
+                    .updateServerDefinition(
+                            new DebugAdapterManager.UpdateDebugAdapterServerRequest(
+                                    userDefinedServer,
                                     getDisplayName(),
                                     getEnvData().getEnvs(),
                                     getEnvData().isPassParentEnvs(),
@@ -212,7 +210,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
                             false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
-                UserDefinedDebugAdapterDescriptorFactorySettings
+                UserDefinedDebugAdapterServerSettings
                         .getInstance()
                         .handleChanged(settingsChangedEvent);
             }
@@ -224,18 +222,18 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
     }
 
     private String getDisplayName() {
-        return descriptorFactoryNameProvider != null ? descriptorFactoryNameProvider.getDisplayName() : dapDescriptorFactory.getDisplayName();
+        return debugAdapterServerNameProvider != null ? debugAdapterServerNameProvider.getDisplayName() : debugAdapterServer.getDisplayName();
     }
 
     private JPanel createSettings(JComponent description, boolean launchingServerDefinition) {
         FormBuilder builder = FormBuilder
                 .createFormBuilder()
                 .setFormLeftIndent(10);
-        this.dapDescriptorFactoryPanel = new DebugAdapterDescriptorFactoryPanel(builder,
+        this.debugAdapterServerPanel = new DebugAdapterServerPanel(builder,
                 description,
-                launchingServerDefinition ? DebugAdapterDescriptorFactoryPanel.EditionMode.EDIT_USER_DEFINED :
-                        DebugAdapterDescriptorFactoryPanel.EditionMode.EDIT_EXTENSION, project);
-        this.mappingPanel = dapDescriptorFactoryPanel.getMappingsPanel();
+                launchingServerDefinition ? DebugAdapterServerPanel.EditionMode.EDIT_USER_DEFINED :
+                        DebugAdapterServerPanel.EditionMode.EDIT_EXTENSION, project);
+        this.mappingPanel = debugAdapterServerPanel.getMappingsPanel();
         return builder.getPanel();
     }
 
@@ -263,12 +261,12 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
 
     public void setEnvData(EnvironmentVariablesData envData) {
         if (envData != null) {
-            dapDescriptorFactoryPanel.getEnvironmentVariables().setEnvData(envData);
+            debugAdapterServerPanel.getEnvironmentVariables().setEnvData(envData);
         }
     }
 
     public @NotNull EnvironmentVariablesData getEnvData() {
-        return dapDescriptorFactoryPanel.getEnvironmentVariables().getEnvData();
+        return debugAdapterServerPanel.getEnvironmentVariables().getEnvData();
     }
 
     public JComponent getComponent() {
@@ -276,27 +274,27 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
     }
 
     public String getCommandLine() {
-        return dapDescriptorFactoryPanel.getCommandLine();
+        return debugAdapterServerPanel.getCommandLine();
     }
 
     public void setCommandLine(String commandLine) {
-        dapDescriptorFactoryPanel.setCommandLine(commandLine);
+        debugAdapterServerPanel.setCommandLine(commandLine);
     }
 
     public int getConnectTimeout() {
-        return dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
+        return debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
     }
 
     public String getDebugServerReadyPattern() {
-        return dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getTrace();
+        return debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getTrace();
     }
 
     public ServerTrace getServerTrace() {
-        return (ServerTrace) dapDescriptorFactoryPanel.getServerTraceComboBox().getSelectedItem();
+        return (ServerTrace) debugAdapterServerPanel.getServerTraceComboBox().getSelectedItem();
     }
 
     public void setServerTrace(ServerTrace serverTrace) {
-        dapDescriptorFactoryPanel.getServerTraceComboBox().setSelectedItem(serverTrace);
+        debugAdapterServerPanel.getServerTraceComboBox().setSelectedItem(serverTrace);
     }
 
     public void setLanguageMappings(@NotNull List<ServerMappingSettings> mappings) {
@@ -313,7 +311,7 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
 
     @Override
     public void dispose() {
-        dapDescriptorFactoryPanel.dispose();
+        debugAdapterServerPanel.dispose();
     }
 
     public List<ServerMappingSettings> getLanguageMappings() {
@@ -334,11 +332,11 @@ public class DebugAdapterDescriptorFactoryView implements Disposable {
     }
 
     public void refreshLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
-        dapDescriptorFactoryPanel.refreshLaunchConfigurations(launchConfigurations);
+        debugAdapterServerPanel.refreshLaunchConfigurations(launchConfigurations);
     }
 
     public @Nullable List<LaunchConfiguration> getLaunchConfigurations() {
-        return dapDescriptorFactoryPanel.getLaunchConfigurations();
+        return debugAdapterServerPanel.getLaunchConfigurations();
     }
 
 }

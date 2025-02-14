@@ -18,66 +18,66 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.NamedConfigurable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugAdapterDescriptorFactoryView;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugAdapterServerView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 
 /**
- * UI settings to configure a given debug adapter descriptor factory
+ * UI settings to configure a given debug adapter server
  */
-public class DebugAdapterDescriptorFactoryConfigurable extends NamedConfigurable<DebugAdapterDescriptorFactory> implements DebugAdapterDescriptorFactoryView.DebugAdapterDescriptorFactoryNameProvider {
+public class DebugAdapterServerConfigurable extends NamedConfigurable<DebugAdapterServerDefinition> implements DebugAdapterServerView.DebugAdapterServerNameProvider {
 
-    private final DebugAdapterDescriptorFactory descriptorFactory;
+    private final DebugAdapterServerDefinition serverDefinition;
     private final @NotNull Project project;
 
-    private DebugAdapterDescriptorFactoryView myView;
+    private DebugAdapterServerView myView;
 
-    public DebugAdapterDescriptorFactoryConfigurable(@NotNull DebugAdapterDescriptorFactory descriptorFactory,
-                                                     @NotNull Runnable updater,
-                                                     @NotNull Project project) {
-        super(descriptorFactory instanceof UserDefinedDebugAdapterDescriptorFactory, updater);
+    public DebugAdapterServerConfigurable(@NotNull DebugAdapterServerDefinition serverDefinition,
+                                          @NotNull Runnable updater,
+                                          @NotNull Project project) {
+        super(serverDefinition instanceof UserDefinedDebugAdapterServerDefinition, updater);
         this.project = project;
-        this.descriptorFactory = descriptorFactory;
+        this.serverDefinition = serverDefinition;
     }
 
     @Override
     public void setDisplayName(String name) {
         // Do nothing: the descriptor name is not editable.
-        if (descriptorFactory instanceof UserDefinedDebugAdapterDescriptorFactory userDefinedFactory) {
-            userDefinedFactory.setName(name);
+        if (serverDefinition instanceof UserDefinedDebugAdapterServerDefinition userDefinedServer) {
+            userDefinedServer.setName(name);
         }
     }
 
     @Override
-    public DebugAdapterDescriptorFactory getEditableObject() {
-        return descriptorFactory;
+    public DebugAdapterServerDefinition getEditableObject() {
+        return serverDefinition;
     }
 
     @Override
     public @NlsContexts.DetailedDescription String getBannerSlogan() {
-        return descriptorFactory.getDisplayName();
+        return serverDefinition.getDisplayName();
     }
 
     @Override
     public JComponent createOptionsPanel() {
         if (myView == null) {
-            myView = new DebugAdapterDescriptorFactoryView(descriptorFactory, this, project);
+            myView = new DebugAdapterServerView(serverDefinition, this, project);
         }
         return myView.getComponent();
     }
 
     @Override
     public @NlsContexts.ConfigurableName String getDisplayName() {
-        return descriptorFactory.getDisplayName();
+        return serverDefinition.getDisplayName();
     }
 
     @Override
     public @Nullable Icon getIcon(boolean expanded) {
-        return descriptorFactory.getIcon();
+        return serverDefinition.getIcon();
     }
 
     @Override

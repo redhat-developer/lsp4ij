@@ -26,11 +26,11 @@ import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.IconUtil;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactoryListener;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
-import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.settings.ui.NewDebugAdapterDescriptorFactoryDialog;
+import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterServerListener;
+import com.redhat.devtools.lsp4ij.dap.settings.ui.NewDebugAdapterServerDialog;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,29 +43,29 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- *  Show list of Debug Adapter descriptor factories as master.
+ *  Show list of Debug Adapter Servers as master.
  */
-public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetailsComponent implements SearchableConfigurable {
+public class DebugAdapterServerListConfigurable extends MasterDetailsComponent implements SearchableConfigurable {
 
     @NonNls
     private static final String ID = "debugAdapterDescriptorFactories";
     private String displayNodeName = null;
     private final Project project;
 
-    private final DebugAdapterDescriptorFactoryListener listener = new DebugAdapterDescriptorFactoryListener() {
+    private final DebugAdapterServerListener listener = new DebugAdapterServerListener() {
 
         @Override
-        public void handleAdded(@NotNull DebugAdapterDescriptorFactoryAddedEvent event) {
+        public void handleAdded(@NotNull DebugAdapterServerListener.AddedEvent event) {
             reloadTree();
         }
 
         @Override
-        public void handleRemoved(@NotNull DebugAdapterDescriptorFactoryRemovedEvent event) {
+        public void handleRemoved(@NotNull DebugAdapterServerListener.RemovedEvent event) {
             reloadTree();
         }
 
         @Override
-        public void handleChanged(@NotNull DebugAdapterDescriptorFactoryChangedEvent event) {
+        public void handleChanged(@NotNull DebugAdapterServerListener.ChangedEvent event) {
             // Do nothing
         }
 
@@ -73,9 +73,9 @@ public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetails
 
     private boolean isTreeInitialized;
 
-    public DebugAdapterDescriptorFactoryListConfigurable(@NotNull Project project) {
+    public DebugAdapterServerListConfigurable(@NotNull Project project) {
         this.project = project;
-        DebugAdapterManager.getInstance().addDebugAdapterDescriptorFactoryListener(listener);
+        DebugAdapterManager.getInstance().addDebugAdapterServerListener(listener);
     }
 
     @Override
@@ -116,7 +116,7 @@ public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetails
         var addAction = new DumbAwareAction(DAPBundle.message("debug.adapter.action.add"), null, IconUtil.getAddIcon()) {
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
-                var dialog = new NewDebugAdapterDescriptorFactoryDialog(project);
+                var dialog = new NewDebugAdapterServerDialog(project);
                 dialog.show();
             }
 
@@ -131,8 +131,8 @@ public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetails
                 MyNode[] selectedNodes = myTree.getSelectedNodes(MyNode.class, null);
                 for (var selectedNode : selectedNodes) {
                     if (isUserDefined(selectedNode)) {
-                        var descriptorFactory = ((DebugAdapterDescriptorFactoryConfigurable) selectedNode.getConfigurable()).getEditableObject();
-                        DebugAdapterManager.getInstance().removeDebugAdapterDescriptorFactory(descriptorFactory);
+                        var serverDefinition = ((DebugAdapterServerConfigurable) selectedNode.getConfigurable()).getEditableObject();
+                        DebugAdapterManager.getInstance().removeDebugAdapterServer(serverDefinition);
                     }
                 }
             }
@@ -141,7 +141,7 @@ public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetails
             public void update(@NotNull AnActionEvent e) {
                 MyNode[] selectedNodes = myTree.getSelectedNodes(MyNode.class, null);
                 boolean enabled = selectedNodes.length > 0 && Stream.of(selectedNodes)
-                        .anyMatch(DebugAdapterDescriptorFactoryListConfigurable::isUserDefined);
+                        .anyMatch(DebugAdapterServerListConfigurable::isUserDefined);
                 e.getPresentation().setEnabled(enabled);
             }
 
@@ -155,19 +155,19 @@ public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetails
     }
 
     private static boolean isUserDefined(MyNode node) {
-        var descriptorFactory = ((DebugAdapterDescriptorFactoryConfigurable) node.getConfigurable()).getEditableObject();
-        return descriptorFactory instanceof UserDefinedDebugAdapterDescriptorFactory;
+        var serverDefinition = ((DebugAdapterServerConfigurable) node.getConfigurable()).getEditableObject();
+        return serverDefinition instanceof UserDefinedDebugAdapterServerDefinition;
     }
 
-    private void addDebugAdapterProtocolDefinitionNode(DebugAdapterDescriptorFactory descriptorFactory) {
-        MyNode node = new MyNode(new DebugAdapterDescriptorFactoryConfigurable(descriptorFactory, TREE_UPDATER, project));
+    private void addDebugAdapterProtocolDefinitionNode(DebugAdapterServerDefinition serverDefinition) {
+        MyNode node = new MyNode(new DebugAdapterServerConfigurable(serverDefinition, TREE_UPDATER, project));
         addNode(node, myRoot);
     }
 
     private void reloadTree() {
         myRoot.removeAllChildren();
-        for (var descriptorFactory : DebugAdapterManager.getInstance().getFactories()) {
-            addDebugAdapterProtocolDefinitionNode(descriptorFactory);
+        for (var serverDefinition : DebugAdapterManager.getInstance().getDebugAdapterServers()) {
+            addDebugAdapterProtocolDefinitionNode(serverDefinition);
         }
         ((DefaultTreeModel) myTree.getModel()).reload();
 
@@ -197,7 +197,7 @@ public class DebugAdapterDescriptorFactoryListConfigurable extends MasterDetails
     @Override
     public void disposeUIResources() {
         super.disposeUIResources();
-        DebugAdapterManager.getInstance().removeDebugAdapterDescriptorFactoryListener(listener);
+        DebugAdapterManager.getInstance().removeDebugAdapterServerListener(listener);
     }
 
 }

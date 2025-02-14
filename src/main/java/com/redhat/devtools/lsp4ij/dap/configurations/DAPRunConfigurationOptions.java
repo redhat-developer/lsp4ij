@@ -12,11 +12,13 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.openapi.components.StoredProperty;
-import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
+import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -27,7 +29,7 @@ import java.util.List;
 /**
  * Debug Adapter Protocol (DAP) run configuration options.
  */
-public class DAPRunConfigurationOptions extends RunConfigurationOptions {
+public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable {
 
     @Nullable
     private NetworkAddressExtractor networkAddressExtractor;
@@ -82,21 +84,25 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
 
     // Configuration settings
 
+    @Override
     @Nullable
     public String getWorkingDirectory() {
         return workingDirectory.getValue(this);
     }
 
-    public void setWorkingDirectory(String workingDirectory) {
+    @Override
+    public void setWorkingDirectory(@Nullable String workingDirectory) {
         this.workingDirectory.setValue(this, workingDirectory);
     }
 
+    @Override
     @Nullable
     public String getFile() {
         return file.getValue(this);
     }
 
-    public void setFile(String file) {
+    @Override
+    public void setFile(@Nullable String file) {
         this.file.setValue(this, file);
     }
 
@@ -270,11 +276,11 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions {
      *
      * @return the server DAP factory descriptor and null otherwise.
      */
-    public @Nullable DebugAdapterDescriptorFactory getServerFactory() {
+    public @Nullable DebugAdapterServerDefinition getDebugAdapterServer() {
         String serverId = getServerId();
         if (StringUtils.isBlank(serverId)) {
             return null;
         }
-        return DebugAdapterManager.getInstance().getFactoryById(serverId);
+        return DebugAdapterManager.getInstance().getDebugAdapterServerById(serverId);
     }
 }
