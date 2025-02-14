@@ -14,6 +14,8 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.ide.highlighter.custom.SyntaxTable;
 import com.intellij.lang.Commenter;
 import com.intellij.lang.Language;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.text.StringUtil;
@@ -25,6 +27,11 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.plugins.textmate.TextMateService;
+import org.jetbrains.plugins.textmate.editor.TextMateEditorUtils;
+import org.jetbrains.plugins.textmate.language.preferences.Preferences;
+import org.jetbrains.plugins.textmate.language.preferences.TextMateAutoClosingPair;
+import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
 
 import java.util.*;
 import java.util.concurrent.CancellationException;
@@ -42,14 +49,6 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 public final class LSPIJEditorUtils {
 
     private static final String TEXT_MATE_LANGUAGE_ID = "textmate";
-
-    // TODO: Unfortunately the TextMate interface changed in this commit:
-    //  https://github.com/JetBrains/intellij-community/commit/8df3d04be0db4c54732a15250b789aa5d9a6de47#diff-08fc4fd41510ee4662c41d3f2a671ae2f654d1a2f6ff7608765f427c26eaeae7
-    //  and would now require reflection to work in 2023.2 and later versions. Specifically it used to be
-    //  "bracePair.left/right" which returned "char", but now it's "bracePair.getLeft()/getRight()" which return
-    //  "CharSequence". I'm leaving the associated changes in but commented out and returning "null" -- existing usages
-    //  will degrade gracefully -- and then when all supported IDE versions have the same interface, this can be
-    //  restored. Perhaps this even prompts removal of support for the oldest versions that have this issue?
 
     private LSPIJEditorUtils() {
         // Pure utility class
@@ -147,27 +146,27 @@ public final class LSPIJEditorUtils {
 
     @Nullable
     private static Set<Character> getTextMateQuoteCharacters(@NotNull PsiFile file) {
-        /* TODO: See TextMate versioning comment above
-        Editor editor = isTextMateFile(file) ? LSPIJUtils.editorForElement(file) : null;
-        TextMateScope scope = editor instanceof EditorEx editorEx ? TextMateEditorUtils.getCurrentScopeSelector(editorEx) : null;
-        List<Preferences> allPreferences = scope != null ? TextMateService.getInstance().getPreferenceRegistry().getPreferences(scope) : Collections.emptyList();
-        Preferences preferences = ContainerUtil.getFirstItem(allPreferences);
-        Set<TextMateAutoClosingPair> smartTypingPairs = preferences != null ? preferences.getSmartTypingPairs() : Collections.emptySet();
-        if (!ContainerUtil.isEmpty(smartTypingPairs)) {
-            Set<Character> quoteCharacters = new LinkedHashSet<>();
-            for (TextMateAutoClosingPair smartTypingPair : smartTypingPairs) {
-                CharSequence left = smartTypingPair.getLeft();
-                CharSequence right = smartTypingPair.getRight();
-                if ((left.length() == 1) && left.equals(right)) {
-                    char quoteCharacterCandidate = left.charAt(0);
-                    if (DEFAULT_QUOTE_CHARACTERS.contains(quoteCharacterCandidate)) {
-                        quoteCharacters.add(quoteCharacterCandidate);
+        if (isTextMateFile(file)) {
+            Editor editor = LSPIJUtils.editorForElement(file);
+            TextMateScope scope = editor instanceof EditorEx editorEx ? TextMateEditorUtils.getCurrentScopeSelector(editorEx) : null;
+            List<Preferences> allPreferences = scope != null ? TextMateService.getInstance().getPreferenceRegistry().getPreferences(scope) : Collections.emptyList();
+            Preferences preferences = ContainerUtil.getFirstItem(allPreferences);
+            Set<TextMateAutoClosingPair> smartTypingPairs = preferences != null ? preferences.getSmartTypingPairs() : Collections.emptySet();
+            if (!ContainerUtil.isEmpty(smartTypingPairs)) {
+                Set<Character> quoteCharacters = new LinkedHashSet<>();
+                for (TextMateAutoClosingPair smartTypingPair : smartTypingPairs) {
+                    CharSequence left = smartTypingPair.getLeft();
+                    CharSequence right = smartTypingPair.getRight();
+                    if ((left.length() == 1) && left.equals(right)) {
+                        char quoteCharacterCandidate = left.charAt(0);
+                        if (DEFAULT_QUOTE_CHARACTERS.contains(quoteCharacterCandidate)) {
+                            quoteCharacters.add(quoteCharacterCandidate);
+                        }
                     }
                 }
+                return quoteCharacters;
             }
-            return quoteCharacters;
         }
-        */
 
         return null;
     }
