@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.completion;
 
-import com.intellij.idea.IgnoreJUnit3;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
 
 /**
@@ -248,10 +247,9 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
         assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
     }
 
-    @IgnoreJUnit3 //disabled since gradle 2.x / IC 2023.3 migration. see #843
-    public void ignoreCompletionOnPropertyValueWithValueAtEnd() {
+    public void testCompletionOnPropertyValueWithValueAtEnd() {
         // 1. Test completion items response
-        assertCompletion("bootstrap.properties",
+        assertAutoCompletion("bootstrap.properties",
                 "com.ibm.hpel.trace.bufferingEnabled=f<caret>", """                
                         [
                             {
@@ -272,9 +270,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
                                  }
                              }
                           ]"""
-                , "false");
-        // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
+                , "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
     }
 
     public void testCompletionOnPropertyValueWithValueAfterEquals() {
