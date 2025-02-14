@@ -31,8 +31,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build with Gradle
-        run: ./gradlew check -PplatformVersion=LATEST-EAP-SNAPSHOT
-
+        run: |
+          LATEST_EAP_SNAPSHOT=$(./gradlew printProductsReleases | grep 'IC-' | head -n 1 | cut -d'-' -f2)
+          ./gradlew check -PplatformVersion=LATEST-EAP-SNAPSHOT
 
       - name: Collect Tests Result
         uses: actions/upload-artifact@v4

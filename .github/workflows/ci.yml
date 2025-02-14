@@ -18,6 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
+    env:
+        NO_FS_ROOTS_ACCESS_CHECK: true
     steps:
 
       # Check out current repository

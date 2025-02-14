@@ -249,7 +249,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
 
     public void testCompletionOnPropertyValueWithValueAtEnd() {
         // 1. Test completion items response
-        assertCompletion("bootstrap.properties",
+        assertAutoCompletion("bootstrap.properties",
                 "com.ibm.hpel.trace.bufferingEnabled=f<caret>", """                
                         [
                             {
@@ -270,9 +270,7 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
                                  }
                              }
                           ]"""
-                , "false");
-        // 2. Test new editor content after applying the first completion item
-        assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
+                , "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
     }
 
     public void testCompletionOnPropertyValueWithValueAfterEquals() {

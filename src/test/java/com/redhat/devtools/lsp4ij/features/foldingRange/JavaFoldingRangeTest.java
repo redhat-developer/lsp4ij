@@ -19,7 +19,9 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPFoldingRangeFixtureTestCase;
  */
 public class JavaFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
 
-    private static final String TEST_FILE_NAME = "Hello.java";
+    // NOTE: Using an extension other than "java" here to avoid having native Java language support skew results
+    private static final String NOT_JAVA_EXTENSION = "javax";
+    private static final String TEST_FILE_NAME = "Hello." + NOT_JAVA_EXTENSION;
     private static final String TEST_FILE_BODY = """
             /*<start1>
              * File header comment.
@@ -68,7 +70,7 @@ public class JavaFoldingRangeTest extends LSPFoldingRangeFixtureTestCase {
             """;
 
     public JavaFoldingRangeTest() {
-        super("*.java");
+        super("*." + NOT_JAVA_EXTENSION);
     }
 
     public void testFoldingRanges_collapseNothing() {

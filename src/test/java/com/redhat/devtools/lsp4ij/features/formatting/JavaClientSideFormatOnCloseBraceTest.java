@@ -11,6 +11,9 @@
 
 package com.redhat.devtools.lsp4ij.features.formatting;
 
+import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
 import com.redhat.devtools.lsp4ij.fixtures.LSPClientSideOnTypeFormattingFixtureTestCase;
 
@@ -21,10 +24,32 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPClientSideOnTypeFormattingFixtureT
  */
 public class JavaClientSideFormatOnCloseBraceTest extends LSPClientSideOnTypeFormattingFixtureTestCase {
 
-    private static final String TEST_FILE_NAME = "Test.java";
+    private static final String JAVA_FILE_EXTENSION = "java";
+    private static final String JAVA_FILE_NAME_PATTERN = "*." + JAVA_FILE_EXTENSION;
+    private static final String TEST_FILE_NAME = "Test." + JAVA_FILE_EXTENSION;
+
+    private FileType javaFileType;
 
     public JavaClientSideFormatOnCloseBraceTest() {
-        super("*.java");
+        super(JAVA_FILE_NAME_PATTERN);
+    }
+
+    @Override
+    protected void setUp() throws Exception
+    {
+        super.setUp();
+        // Remove the native Java file type association so that it doesn't interfere
+        javaFileType = FileTypeManager.getInstance().getFileTypeByFileName(JAVA_FILE_EXTENSION);
+        assertNotNull(javaFileType);
+        WriteAction.run(() -> FileTypeManager.getInstance().removeAssociatedExtension(javaFileType, JAVA_FILE_EXTENSION));
+    }
+
+    @Override
+    protected void tearDown() throws Exception
+    {
+        // Restore the native Java file type association
+        WriteAction.run(() -> FileTypeManager.getInstance().associateExtension(javaFileType, JAVA_FILE_EXTENSION));
+        super.tearDown();
     }
 
     // SIMPLE TESTS

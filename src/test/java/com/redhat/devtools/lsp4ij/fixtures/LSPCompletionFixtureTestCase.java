@@ -67,6 +67,7 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
             assertNull("Completion should be null", myFixture.getLookup());
         } else {
             assertNotNull("Completion should be not null", myFixture.getLookup());
+            assertNotNull("Completion elements should be not null", myFixture.getLookupElements());
             var actualItems = Stream.of(myFixture.getLookupElements())
                     .map(LookupElement::getLookupString)
                     .toList();
@@ -89,7 +90,42 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
         if (expectedCaretOffset != -1) {
             expected = expectedEditorContentText.substring(0, expectedCaretOffset) + expectedEditorContentText.substring("<caret>".length() + expectedCaretOffset);
         }
+        assertNotNull(myFixture.getLookupElements());
         myFixture.selectItem(myFixture.getLookupElements()[selectedItemIndex]);
+        var editor = myFixture.getEditor();
+        assertEquals("After applying completion, editor content should be equal", expected, editor.getDocument().getText());
+        if (expectedCaretOffset != -1) {
+            assertEquals("After applying completion, caret offset should be equal", expectedCaretOffset, editor.getCaretModel().getOffset());
+        }
+    }
+
+    /**
+     * Test LSP apply completion.
+     *
+     * @param fileName                  the file name used to match registered language servers.
+     * @param editorContentText         the editor content text.
+     * @param jsonCompletionList        the LSP CompletionList as JSON string.
+     * @param expectedEditorContentText the expected editor content text.
+     */
+    public void assertAutoCompletion(@NotNull String fileName,
+                                     @NotNull String editorContentText,
+                                     @NotNull String jsonCompletionList,
+                                     @NotNull String expectedEditorContentText) {
+
+        if (jsonCompletionList.trim().startsWith("[")) {
+            jsonCompletionList = "{\"items\":" + jsonCompletionList + "}";
+        }
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
+        MockLanguageServer.INSTANCE.setCompletionList(JSONUtils.getLsp4jGson().fromJson(jsonCompletionList, CompletionList.class));
+        // Open editor for a given file name and content (which declares <caret> to know where the completion is triggered).
+        myFixture.configureByText(fileName, editorContentText);
+        // Process completion
+        assertNull(myFixture.completeBasic());
+        String expected = expectedEditorContentText;
+        int expectedCaretOffset = expectedEditorContentText.indexOf("<caret>");
+        if (expectedCaretOffset != -1) {
+            expected = expectedEditorContentText.substring(0, expectedCaretOffset) + expectedEditorContentText.substring("<caret>".length() + expectedCaretOffset);
+        }
         var editor = myFixture.getEditor();
         assertEquals("After applying completion, editor content should be equal", expected, editor.getDocument().getText());
         if (expectedCaretOffset != -1) {
