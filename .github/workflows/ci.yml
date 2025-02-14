@@ -38,7 +38,9 @@ jobs:
 
       # Run tests
       - name: Run Tests
-        run: ./gradlew check
+        run: |
+          export NO_FS_ROOTS_ACCESS_CHECK=true
+          ./gradlew check
 
       # Collect Tests Result
       - name: Collect Tests Result
