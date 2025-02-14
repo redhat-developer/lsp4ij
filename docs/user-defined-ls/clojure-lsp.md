@@ -1,4 +1,6 @@
-To enable Clojure language support in your IDE, you can integrate [Clojure LSP](https://clojure-lsp.io/) by following these steps:
+There is already the [clojure-lsp-intellij](https://github.com/clojure-lsp/clojure-lsp-intellij) dedicated plugin that fully integrates with lsp4ij and [Clojure LSP](https://clojure-lsp.io) providing more features, make sure to check it out first.
+
+In case you want to integrate manually, follow these steps: 
 
 1. **Download the appropriate release for your operating system** from the [Clojure LSP releases page](https://github.com/clojure-lsp/clojure-lsp/releases).
 
