@@ -17,6 +17,8 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.InitializeParams;
@@ -36,6 +38,8 @@ import java.net.URI;
 public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LanguageServerWrapper serverWrapper;
+
+    private ServerInstaller serverInstaller;
 
     private LSPCallHierarchyFeature callHierarchyFeature;
 
@@ -74,7 +78,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     private LSPInlayHintFeature inlayHintFeature;
 
     private LSPProgressFeature progressFeature;
-    
+
     private LSPReferencesFeature referencesFeature;
 
     private LSPRenameFeature renameFeature;
@@ -91,6 +95,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
+    private EditorBehaviorFeature editorBehaviorFeature;
+
     /**
      * Returns true if the language server is enabled for the given file and false otherwise. Default to true
      *
@@ -98,7 +104,52 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      * @return true if the language server is enabled for the input and false otherwise. Default to true
      */
     public boolean isEnabled(@NotNull VirtualFile file) {
+        return checkServerInstallation();
+    }
+
+    /**
+     * Checks the server installation. If the server installer is available and the installation is complete,
+     * returns {@code true} to indicate that the server is correctly installed and ready to be used. Otherwise,
+     * returns {@code false} to disable the server startup during the installation process.
+     *
+     * @return {@code true} if the server is installed, {@code false} otherwise
+     */
+    protected final boolean checkServerInstallation() {
+        var serverInstaller = getServerInstaller();
+        if (serverInstaller != null) {
+            var status = serverInstaller
+                    .checkInstallation()
+                    .getNow(null);
+            if (status != null && status == ServerInstallationStatus.INSTALLED) {
+                // The language server is correctly installed, enable it
+                return true;
+            }
+            // Disable the language server startup while installation
+            return false;
+        }
         return true;
+    }
+
+    /**
+     * Returns the server installer and null otherwise.
+     *
+     * @return the server installer and null otherwise.
+     */
+    @Nullable
+    public ServerInstaller getServerInstaller() {
+        return serverInstaller;
+    }
+
+    /**
+     * Set the server installer.
+     *
+     * @param serverInstaller server installer.
+     */
+    public void setServerInstaller(@NotNull ServerInstaller serverInstaller) {
+        this.serverInstaller = serverInstaller;
+        if (serverInstaller instanceof LSPClientFeatureAware clientFeaturesAware) {
+            clientFeaturesAware.setClientFeatures(this);
+        }
     }
 
     /**
@@ -124,7 +175,6 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      * Overrides this method if you need to generate custom URI.
      *
      * @param file the virtual file.
-     *
      * @return the file Uri and null otherwise.
      */
     @Override
@@ -152,6 +202,54 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public boolean isCaseSensitive(@NotNull PsiFile file) {
         // Default to case-insensitive
         return false;
+    }
+
+    /**
+     * Returns the language grammar-specific line comment prefix for the file.
+     *
+     * @param file the file
+     * @return the language grammar-specific line comment prefix for the file
+     */
+    @Nullable
+    public String getLineCommentPrefix(@NotNull PsiFile file) {
+        // Default to none
+        return null;
+    }
+
+    /**
+     * Returns the language grammar-specific block comment prefix for the file.
+     *
+     * @param file the file
+     * @return the language grammar-specific block comment prefix for the file
+     */
+    @Nullable
+    public String getBlockCommentPrefix(@NotNull PsiFile file) {
+        // Default to none
+        return null;
+    }
+
+    /**
+     * Returns the language grammar-specific block comment suffix for the file.
+     *
+     * @param file the file
+     * @return the language grammar-specific block comment suffix for the file
+     */
+    @Nullable
+    public String getBlockCommentSuffix(@NotNull PsiFile file) {
+        // Default to none
+        return null;
+    }
+
+    /**
+     * Returns the language grammar-specific statement terminator characters for the file.
+     *
+     * @param file the file
+     * @return the language grammar-specific statement terminator characters for the file
+     */
+    @NotNull
+    public String getStatementTerminatorCharacters(@NotNull PsiFile file) {
+        // Default to none
+        return "";
     }
 
     /**
@@ -1090,6 +1188,31 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     }
 
     /**
+     * Returns the editor behavior feature.
+     *
+     * @return the editor behavior feature.
+     */
+    @NotNull
+    public EditorBehaviorFeature getEditorBehaviorFeature() {
+        if (editorBehaviorFeature == null) {
+            editorBehaviorFeature = new EditorBehaviorFeature(this);
+        }
+        return editorBehaviorFeature;
+    }
+
+    /**
+     * Sets the editor behavior feature.
+     *
+     * @param editorBehaviorFeature the editor behavior feature
+     * @return the LSP client features
+     */
+    public LSPClientFeatures setEditorBehaviorFeature(@NotNull EditorBehaviorFeature editorBehaviorFeature) {
+        editorBehaviorFeature.setClientFeatures(this);
+        this.editorBehaviorFeature = editorBehaviorFeature;
+        return this;
+    }
+
+    /**
      * Set the language server wrapper.
      *
      * @param serverWrapper the language server wrapper.
@@ -1335,5 +1458,4 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             default -> null;
         };
     }
-
 }

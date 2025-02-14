@@ -26,6 +26,8 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP typeDefinition feature](#lsp-typeDefinition-feature)
 - [LSP usage feature](#lsp-usage-feature)
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
+- [LSP editor behavior feature](#lsp-editor-behavior-feature)
+- [Language server installer](#language-server-installer)
 
 You can extend these default features by:
 
@@ -60,6 +62,10 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 | URI getFileUri(VirtualFile file)                             | Returns the file Uri from the given virtual file and null otherwise (to use default `FileUriSupport.DEFAULT.getFileUri`).                                                                                                                                                                                                                                                                      | `null`            |
 | VirtualFile findFileByUri(String fileUri)                    | Returns the virtual file found by the given file Uri and null otherwise (to use default `FileUriSupport.DEFAULT.findFileByUri`).                                                                                                                                                                                                                                                               | `null`            |
 | boolean isCaseSensitive(PsiFile file)                        | Returns `true` if the language grammar for the given file is case-sensitive and `false` otherwise.                                                                                                                                                                                                                                                                                             | `false`           | 
+| String getLineCommentPrefix(PsiFile file)                    | Returns the language grammar line comment prefix for the file.                                                                                                                                                                                                                                                                                                                                 |                   | 
+| String getBlockCommentPrefix(PsiFile file)                   | Returns the language grammar block comment prefix for the file.                                                                                                                                                                                                                                                                                                                                |                   | 
+| String getBlockCommentSuffix(PsiFile file)                   | Returns the language grammar block comment suffix for the file.                                                                                                                                                                                                                                                                                                                                |                   | 
+| String getStatementTerminatorCharacters(PsiFile file)        | Returns the language grammar statement terminator characters for the file.                                                                                                                                                                                                                                                                                                                     |                   | 
 | boolean keepServerAlive()                                    | Returns `true` if the server is kept alive even if all files associated with the language server are closed and `false` otherwise.                                                                                                                                                                                                                                                             | `false`           |
 | boolean canStopServerByUser()                                | Returns `true` if the user can stop the language server in LSP console from the context menu and `false` otherwise.                                                                                                                                                                                                                                                                            | `true`            |
 | Project getProject()                                         | Returns the project.                                                                                                                                                                                                                                                                                                                                                                           |                   |
@@ -533,3 +539,106 @@ public class MyLSPSemanticTokensFeature extends LSPSemanticTokensFeature {
 | boolean isEnabled()         | Returns `true` if the LSP feature is enabled and `false` otherwise.                                                                                                                      | `true` when server is starting/started |
 | boolean isSupported()       | Returns `true` if the LSP feature is supported and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the LSP server capabilities. | Check the server capability            |
 | boolean supportsGotoClass() | Returns `true` if the LSP feature is efficient enough to support the IDE's Go To Class action which may be invoked frequently and `false` otherwise.                                     | `false`                                |
+
+## LSP Editor Behavior Feature
+
+Unlike the features above, `LSPEditorFeature` does **not** correspond to an LSP feature. Instead it represents IDE editor behavior features, enhancements, and fixes that, alongside the language server-provided features, help provide an optimal editor experience for LSP4IJ-integrated file types. Note that these features are _disabled by default_ for `LanguageServerDefinition` and _enabled by default_ for `UserDefinedLanguageServerDefinition`. Those implementing custom language server integrations can opt into these features if desired by overriding the respective methods listed below.
+
+| API                                                           | Description                                                                                                                     | Default Behaviour                                                      |
+|---------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| boolean isEnableStringLiteralImprovements(PsiFile file)       | Returns `true` if editor improvements for string literals are enabled and `false` otherwise.                                    | `true` for user-defined language server definitions; otherwise `false` |
+| boolean isEnableStatementTerminatorImprovements(PsiFile file) | Returns `true` if editor improvements for statement terminators are enabled and `false` otherwise.                              | `true` for user-defined language server definitions; otherwise `false` |
+| boolean isEnableEnterBetweenBracesFix(PsiFile file)           | Returns `true` if the fix for [IJPL-159454](https://youtrack.jetbrains.com/issue/IJPL-159454) is enabled and `false` otherwise. | `true` for user-defined language server definitions; otherwise `false` |
+=======
+
+## Language server installer
+
+If you need to verify whether your language server is correctly installed, and install it if necessary, 
+you can extend the [LanguageServerInstallerBase](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/installation/LanguageServerInstallerBase.java) like this:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.redhat.devtools.lsp4ij.installation.LanguageServerInstallerBase;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * A custom implementation of the {@link LanguageServerInstallerBase} class for installing a language server.
+ * <p>
+ * This class provides the logic to check if the language server is installed and performs the actual installation process
+ * in steps, updating the progress indicator accordingly.
+ */
+public class MyLanguageServerInstaller extends LanguageServerInstallerBase {
+
+    /**
+     * Checks if the language server is installed.
+     * <p>
+     * This implementation returns {@code true} to indicate the server is installed, but you should modify it to check
+     * the actual installation state of your language server.
+     * 
+     * @return true if the server is installed, false otherwise.
+     */
+    @Override
+    protected boolean checkServerInstalled(@NotNull ProgressIndicator indicator) {
+        // check here if your language server is correctly installed
+        progress("Checking if the language server is installed...", indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+        return true;
+    }
+
+    /**
+     * Installs the language server in steps, updating the progress indicator during the process.
+     * <p>
+     * This implementation provides two installation steps. You can modify this method to match the actual installation
+     * steps for your language server.
+     * 
+     * @param indicator the {@link ProgressIndicator} to update the installation progress.
+     * @throws Exception if an error occurs during the installation process.
+     */
+    @Override
+    protected void install(@NotNull ProgressIndicator indicator) throws Exception {
+        // process installation of step 1: downloading server components
+        progress("Downloading server components...", 0.25, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+
+        // process installation of step 2: configuring server
+        progress("Configuring server...", 0.5, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+        
+        // process installation of step 3: finalizing installation
+        progress("Finalizing installation...", 0.75, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+        
+        // process installation of step 4: installation complete
+        progress("Installation complete!", 1.0, indicator);
+        // Check if user has canceled the server installer task
+        ProgressManager.checkCanceled();
+    }
+}
+```
+
+and register your language server installer like this:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    public @NotNull LSPClientFeatures createClientFeatures() {
+        return new LSPClientFeatures()
+                .setServerInstaller(new MyLanguageServerInstaller()); // customize language server installer         
+    }
+}
+```
