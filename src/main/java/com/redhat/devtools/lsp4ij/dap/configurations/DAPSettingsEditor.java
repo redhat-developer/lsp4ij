@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.ui.FormBuilder;
-import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugAdapterDescriptorFactoryPanel;
+import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugAdapterServerPanel;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -26,15 +26,15 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
 
     private final JPanel myPanel;
     private final @NotNull Project project;
-    private final DebugAdapterDescriptorFactoryPanel dapPanel;
+    private final DebugAdapterServerPanel dapPanel;
 
     public DAPSettingsEditor(@NotNull Project project) {
         this.project = project;
         FormBuilder builder = FormBuilder
                 .createFormBuilder();
-        dapPanel = new DebugAdapterDescriptorFactoryPanel(builder,
+        dapPanel = new DebugAdapterServerPanel(builder,
                 null,
-                DebugAdapterDescriptorFactoryPanel.EditionMode.EDIT_USER_DEFINED,
+                DebugAdapterServerPanel.EditionMode.EDIT_USER_DEFINED,
                 true,
                 project);
         myPanel = new JPanel(new BorderLayout());

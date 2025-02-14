@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.breakpoints;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
+import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,7 +38,7 @@ public class DAPBreakpointType extends XLineBreakpointType<DAPBreakpointProperti
     public boolean canPutAt(@NotNull VirtualFile file,
                             int line,
                             @NotNull Project project) {
-        return DebugAdapterManager.getInstance().canDebug(file, project);
+        return DebugAdapterManager.getInstance().isDebuggableFile(file, project);
     }
 
 }
