@@ -23,7 +23,7 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
 
     public void testWebFilterQuickFix() {
         assertCodeActions("InvalidWebFilter.java",
-                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@Web<caret>Filter()\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
+                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(<caret>)\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
                         """                
                         [
                              {
@@ -161,6 +161,80 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
                 "Add the `urlPatterns` attribute to @WebFilter",
                 "Add the `value` attribute to @WebFilter");
 
-        assertApplyCodeAction("Add the `servletNames` attribute to @WebFilter", "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(servletNames\\u003d\\\"\\\"<caret>)\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n");
+        assertApplyCodeAction("InvalidWebFilter.java",
+                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(<caret>)\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
+                "Add the `servletNames` attribute to @WebFilter",
+                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(servletNames=\"<caret>\")\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
+                """                
+                        {
+                          "title": "Add the `servletNames` attribute to @WebFilter",
+                          "kind": "quickfix",
+                          "diagnostics": [
+                            {
+                              "range": {
+                                "start": {
+                                  "line": 5,
+                                  "character": 0
+                                },
+                                "end": {
+                                  "line": 5,
+                                  "character": 12
+                                }
+                              },
+                              "severity": 1,
+                              "code": "CompleteWebFilterAttributes",
+                              "source": "jakarta-servlet",
+                              "message": "The annotation @WebFilter must define the attribute \\u0027urlPatterns\\u0027, \\u0027servletNames\\u0027 or \\u0027value\\u0027."
+                            }
+                          ],
+                          "edit": {
+                            "changes": {},
+                            "documentChanges": [
+                              {
+                                "textDocument": {
+                                  "version": 0,
+                                  "uri": "file:///Users/dessina/Documents/Workspace/IntelliJ/liberty-tools-intellij/src/test/resources/projects/maven/jakarta-sample/src/main/java/io/openliberty/sample/jakarta/servlet/InvalidWebFilter.java"
+                                },
+                                "edits": [
+                                  {
+                                    "range": {
+                                      "start": {
+                                        "line": 0,
+                                        "character": 0
+                                      },
+                                      "end": {
+                                        "line": 11,
+                                        "character": 0
+                                      }
+                                    },
+                                    "newText": "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(servletNames\\u003d\\"\\")\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          "data": {
+                            "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
+                            "documentUri": "file:///Users/dessina/Documents/Workspace/IntelliJ/liberty-tools-intellij/src/test/resources/projects/maven/jakarta-sample/src/main/java/io/openliberty/sample/jakarta/servlet/InvalidWebFilter.java",
+                            "range": {
+                              "start": {
+                                "line": 5,
+                                "character": 0
+                              },
+                              "end": {
+                                "line": 5,
+                                "character": 12
+                              }
+                            },
+                            "extendedData": {
+                              "annotation": "jakarta.servlet.annotation.WebFilter",
+                              "attribute": "servletNames",
+                              "diagnosticCode": "CompleteWebFilterAttributes"
+                            },
+                            "resourceOperationSupported": true,
+                            "commandConfigurationUpdateSupported": false
+                          }
+                        }
+                        """);
     }
 }

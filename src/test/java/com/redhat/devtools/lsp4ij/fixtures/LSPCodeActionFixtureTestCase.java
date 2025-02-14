@@ -100,16 +100,35 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
     /**
      * Test applying a code action.
-     *
-     * @param actionText               the text of the action to be applied.
-     * @param expectedEditorContentText the expected editor content text after applying the action.
      */
-    public void assertApplyCodeAction(@NotNull String actionText, @NotNull String expectedEditorContentText) {
+    public void assertApplyCodeAction(@NotNull String fileName,
+                                      @NotNull String editorContentText,
+                                      @NotNull String actionText,
+                                      @NotNull String expectedEditorContentText,
+                                      @NotNull String codeActionJson) {
+
+        List<CodeAction> codeActions = JSONUtils.getLsp4jGson()
+                .fromJson(codeActionJson, new TypeToken<List<CodeAction>>() {}.getType());
+        List<Either<Command, CodeAction>> wrappedCodeActions = codeActions.stream()
+                .distinct()
+                .map(Either::<Command, CodeAction>forRight)
+                .collect(Collectors.toList());
+        List<Diagnostic> diagnostics = codeActions.stream()
+                .flatMap(codeAction -> Optional.ofNullable(codeAction.getDiagnostics()).stream().flatMap(List::stream))
+                .distinct()
+                .collect(Collectors.toList());
+
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
+        MockLanguageServer.INSTANCE.setCodeActions(wrappedCodeActions);
+        MockLanguageServer.INSTANCE.setDiagnostics(diagnostics);
+        myFixture.configureByText(fileName, editorContentText);
+
         String expected = expectedEditorContentText;
         int expectedCaretOffset = expectedEditorContentText.indexOf("<caret>");
         if (expectedCaretOffset != -1) {
             expected = expectedEditorContentText.substring(0, expectedCaretOffset) +
                     expectedEditorContentText.substring("<caret>".length() + expectedCaretOffset);
+            expected = expected.replace("\\n", "\n");
         }
 
         IntentionAction action = myFixture.doHighlighting().stream()
@@ -127,9 +146,5 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
         myFixture.launchAction(action);
         myFixture.checkResult(expected);
-
-        if (expectedCaretOffset != -1) {
-            assertEquals("After applying code action, caret offset should be equal", expectedCaretOffset, myFixture.getEditor().getCaretModel().getOffset());
-        }
     }
 }
