@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -173,7 +174,11 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         mappingsPanel.refreshMappings(template.getLanguageMappings(), template.getFileTypeMappings());
 
         // Update launch/attach configuration
-        debugAdapterServerPanel.refreshLaunchConfigurations(template.getLaunchConfigurations());;
+        debugAdapterServerPanel.refreshLaunchConfigurations(template.getLaunchConfigurations());
+
+        // Attach (JSON path (ex:$port))
+        debugAdapterServerPanel.setAttachAddress(StringUtils.isNotBlank(template.getAttachAddress()) ? template.getAttachAddress() : "");
+        debugAdapterServerPanel.setAttachPort(StringUtils.isNotBlank(template.getAttachPort()) ? template.getAttachPort() : "");
     }
 
     private static String getCommandLine(DAPTemplate entry) {
@@ -217,11 +222,12 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
     }
 
     private ValidationInfo validateCommand() {
-        var commandLine = this.debugAdapterServerPanel.getCommandLine();
+        // Don't validate required command when DAP server supports only "attach"
+        /*var commandLine = this.debugAdapterServerPanel.getCommandLine();
         if (commandLine.isBlank()) {
             String errorMessage = DAPBundle.message("new.debug.adapter.dialog.validation.commandLine.must.be.set");
             return new ValidationInfo(errorMessage, this.debugAdapterServerPanel.getCommandLineWidget());
-        }
+        }*/
         return null;
     }
 
@@ -245,6 +251,8 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         String trackTrace = this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getTrace();
         var launchConfigurations = this.debugAdapterServerPanel.getLaunchConfigurations();
         var mappingsPanel = debugAdapterServerPanel.getMappingsPanel();
+        String attachAddress = debugAdapterServerPanel.getAttachAddress();
+        String attachPort = debugAdapterServerPanel.getAttachPort();
         createdServer = new UserDefinedDebugAdapterServerDefinition(serverId,
                 serverName,
                 commandLine,
@@ -257,6 +265,8 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         createdServer.setConnectTimeout(connectTimeout);
         createdServer.setDebugServerReadyPattern(trackTrace);
         createdServer.setLaunchConfigurations(launchConfigurations);
+        createdServer.setAttachAddress(attachAddress);
+        createdServer.setAttachPort(attachPort);
         DebugAdapterManager.getInstance().addDebugAdapterServer(createdServer);
     }
 

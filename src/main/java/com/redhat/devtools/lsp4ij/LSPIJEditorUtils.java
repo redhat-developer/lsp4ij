@@ -101,7 +101,7 @@ public final class LSPIJEditorUtils {
         return file.getFileType() instanceof AbstractFileType;
     }
 
-    private static boolean isTextMateFile(@NotNull PsiFile file) {
+    public static boolean isTextMateFile(@NotNull PsiFile file) {
         // Compare language IDs to avoid a static reference to anything in the TextMate Bundles plugin
         return TEXT_MATE_LANGUAGE_ID.equals(file.getLanguage().getID());
     }

@@ -216,7 +216,7 @@ public abstract class DebugAdapterDescriptor {
      * @return the strategy to use to know when DAP server is started and DAP client can connect to it.
      */
     @NotNull
-    public abstract ServerReadyConfig getServerReadyConfig();
+    public abstract ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode);
 
     public abstract @Nullable FileType getFileType();
 

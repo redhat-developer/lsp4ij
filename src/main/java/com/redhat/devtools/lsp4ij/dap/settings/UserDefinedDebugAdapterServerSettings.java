@@ -138,6 +138,8 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
 
         @XCollection(elementTypes = LaunchConfiguration.class)
         private List<LaunchConfiguration> launchConfigurations;
+        private String attachAddress;
+        private String attachPort;
 
         public String getServerId() {
             return debugAdapterServerId;
@@ -232,6 +234,21 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
             this.launchConfigurations = launchConfigurations;
         }
 
+        public String getAttachAddress() {
+            return attachAddress;
+        }
+
+        public void setAttachAddress(String attachAddress) {
+            this.attachAddress = attachAddress;
+        }
+
+        public String getAttachPort() {
+            return attachPort;
+        }
+
+        public void setAttachPort(String attachPort) {
+            this.attachPort = attachPort;
+        }
     }
 
     public static class MyState {

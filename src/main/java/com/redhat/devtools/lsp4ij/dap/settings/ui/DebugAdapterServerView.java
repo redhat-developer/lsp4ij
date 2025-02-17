@@ -93,6 +93,8 @@ public class DebugAdapterServerView implements Disposable {
                     && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
                     && this.getConnectTimeout() == settings.getConnectTimeout()
                     && isEquals(this.getDebugServerReadyPattern(), settings.getDebugServerReadyPattern())
+                    && isEquals(this.getAttachAddress(), settings.getAttachAddress())
+                    && isEquals(this.getAttachPort(), settings.getAttachPort())
                     && Objects.equals(this.getMappings(), settings.getMappings()));
         }
         return false;
@@ -121,7 +123,9 @@ public class DebugAdapterServerView implements Disposable {
                         settings.isIncludeSystemEnvironmentVariables()));
                 this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel()
                         .update(null, settings.getConnectTimeout(), settings.getDebugServerReadyPattern());
-
+                this.setAttachAddress(settings.getAttachAddress());
+                this.setAttachPort(settings.getAttachPort());
+                
                 List<ServerMappingSettings> languageMappings = settings.getMappings()
                         .stream()
                         .filter(mapping -> !StringUtils.isEmpty(mapping.getLanguage()))
@@ -206,7 +210,9 @@ public class DebugAdapterServerView implements Disposable {
                                     getDebugServerReadyPattern(),
                                     getLanguageMappings(),
                                     getFileTypeMappings(),
-                                    getLaunchConfigurations()),
+                                    getLaunchConfigurations(),
+                                    getAttachAddress(),
+                                    getAttachPort()),
                             false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -280,7 +286,7 @@ public class DebugAdapterServerView implements Disposable {
     public void setCommandLine(String commandLine) {
         debugAdapterServerPanel.setCommandLine(commandLine);
     }
-
+    
     public int getConnectTimeout() {
         return debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
     }
@@ -289,6 +295,22 @@ public class DebugAdapterServerView implements Disposable {
         return debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getTrace();
     }
 
+    public String getAttachAddress() {
+        return debugAdapterServerPanel.getAttachAddress();
+    }
+
+    public void setAttachAddress(String attachAddress) {
+        debugAdapterServerPanel.setAttachAddress(attachAddress);
+    }
+
+    public String getAttachPort() {
+        return debugAdapterServerPanel.getAttachPort();
+    }
+
+    public void setAttachPort(String attachPort) {
+        debugAdapterServerPanel.setAttachPort(attachPort);
+    }
+    
     public ServerTrace getServerTrace() {
         return (ServerTrace) debugAdapterServerPanel.getServerTraceComboBox().getSelectedItem();
     }

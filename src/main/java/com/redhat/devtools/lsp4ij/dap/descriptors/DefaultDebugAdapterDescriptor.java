@@ -82,8 +82,12 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
      * @return the strategy to use to know when DAP server is started and DAP client can connect to it.
      */
     @NotNull
-    public ServerReadyConfig getServerReadyConfig() {
+    public ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            if (debugMode == DebugMode.ATTACH) {
+                int port = LaunchUtils.resolveAttachPort(dapOptions.getAttachPort(), getDapParameters());
+                return new ServerReadyConfig(dapOptions.getAttachAddress(), port);
+            }
             var strategy = dapOptions.getDebugServerWaitStrategy();
             switch (strategy) {
                 case TIMEOUT:

@@ -1,8 +1,11 @@
 {
   "id": "swift-lldb",
   "name": "Swift lldb-dap",
-  "programArgs": {
+  "launch": {
     "default": "lldb-dap"
+  },
+  "attach": {
+    "port": "$port"
   },
   "fileTypeMappings": [
     {

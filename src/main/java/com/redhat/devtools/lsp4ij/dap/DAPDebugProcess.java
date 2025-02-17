@@ -112,7 +112,9 @@ public class DAPDebugProcess extends XDebugProcess {
                         DebugMode debugMode = dapState.getDebugMode();
                         ServerTrace serverTrace = dapState.getServerTrace();
                         var parameters = new HashMap<>(dapState.getDAPParameters());
-                        parameters.put("noDebug", !isDebug); // standard DAP parameter
+                        if(debugMode == DebugMode.LAUNCH) {
+                            parameters.put("noDebug", !isDebug); // standard DAP parameter
+                        }
                         parentClient = serverDescriptor.createClient(DAPDebugProcess.this, parameters, isDebug, debugMode, serverTrace, null);
                         connectToServerFuture = parentClient.connectToServer(indicator);
 

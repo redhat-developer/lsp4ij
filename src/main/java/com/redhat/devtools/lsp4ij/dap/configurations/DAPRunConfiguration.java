@@ -126,6 +126,22 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setDebugServerReadyPattern(debugServerReadyPattern);
     }
 
+    public String getAttachAddress() {
+        return getOptions().getAttachAddress();
+    }
+
+    public void setAttachAddress(String attachAddress) {
+        getOptions().setAttachAddress(attachAddress);
+    }
+
+    public String getAttachPort() {
+        return getOptions().getAttachPort();
+    }
+
+    public void setAttachPort(String attachPort) {
+        getOptions().setAttachPort(attachPort);
+    }
+    
     public ServerTrace getServerTrace() {
         return getOptions().getServerTrace();
     }
@@ -321,6 +337,8 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         configuration.setDebugServerWaitStrategy(getDebugServerWaitStrategy());
         configuration.setConnectTimeout(getConnectTimeout());
         configuration.setDebugServerReadyPattern(getDebugServerReadyPattern());
+        configuration.setAttachAddress(getAttachAddress());
+        configuration.setAttachPort(getAttachPort());
         configuration.setServerTrace(getServerTrace());
     }
 

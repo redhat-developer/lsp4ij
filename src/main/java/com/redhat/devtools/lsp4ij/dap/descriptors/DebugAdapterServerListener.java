@@ -59,6 +59,8 @@ public interface DebugAdapterServerListener {
         public final boolean debugServerReadyPatternChanged;
         public final boolean mappingsChanged;
         public final boolean launchConfigurationsContentChanged;
+        private final boolean attachAddressChanged;
+        private final boolean attachPortChanged;
 
         public ChangedEvent(@NotNull DebugAdapterServerDefinition serverDefinition,
                             boolean nameChanged,
@@ -68,7 +70,9 @@ public interface DebugAdapterServerListener {
                             boolean waitForTimeoutChanged,
                             boolean debugServerReadyPatternChanged,
                             boolean mappingsChanged,
-                            boolean launchConfigurationsContentChanged) {
+                            boolean launchConfigurationsContentChanged,
+                            boolean attachAddressChanged,
+                            boolean attachPortChanged) {
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
@@ -78,6 +82,8 @@ public interface DebugAdapterServerListener {
             this.debugServerReadyPatternChanged = debugServerReadyPatternChanged;
             this.mappingsChanged = mappingsChanged;
             this.launchConfigurationsContentChanged = launchConfigurationsContentChanged;
+            this.attachAddressChanged = attachAddressChanged;
+            this.attachPortChanged = attachPortChanged;
         }
     }
 
