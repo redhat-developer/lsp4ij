@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2024 Red Hat, Inc.
+ * Copyright (c) 2024-2025 Red Hat, Inc.
  * Distributed under license by Red Hat, Inc. All rights reserved.
  * This program is made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution,
@@ -7,6 +7,7 @@
  *
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
+ * FalsePattern - Performance improvements for huge files
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
@@ -15,14 +16,17 @@ import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.impl.source.tree.LeafElement;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.eclipse.lsp4j.SemanticTokensParams;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +49,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 @ApiStatus.Internal
 public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
+
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPSemanticTokensHighlightVisitor.class);
     ;
 
@@ -53,22 +58,49 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         return LanguageServersRegistry.getInstance().isFileSupported(file);
     }
 
+    private HighlightInfoHolder holder;
+    private LazyHighlightInfo[] lazyInfos;
+
     @Override
     public boolean analyze(@NotNull PsiFile file, boolean updateWholeFile, @NotNull HighlightInfoHolder holder, @NotNull Runnable action) {
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             return true;
         }
-        action.run();
-        // run unconditionally, because the LSP semanticTokens API sucks and is file-level only
-        highlightSemanticTokens(file, holder);
+        try {
+            if (SimpleLanguageUtils.isSupported(file.getLanguage())) {
+                highlightSemanticTokens(file, holder);
+                this.lazyInfos = null;
+                this.holder = null;
+            } else {
+                this.lazyInfos = highlightSemanticTokens(file, null);
+                this.holder = holder;
+            }
+            action.run();
+        } finally {
+            this.holder = null;
+            this.lazyInfos = null;
+        }
         return true;
     }
 
     @Override
     public void visit(@NotNull PsiElement element) {
+        if (lazyInfos == null || !(element instanceof LeafElement))
+            return;
+        int start = element.getTextOffset();
+        if (start < 0)
+            return;
+        int end = start + element.getTextLength();
+        for (int i = start; i < end && i < lazyInfos.length; i++) {
+            var info = lazyInfos[i];
+            if (info != null) {
+                holder.add(info.resolve(i));
+                lazyInfos[i] = null;
+            }
+        }
     }
 
-    private void highlightSemanticTokens(@NotNull PsiFile file, @NotNull HighlightInfoHolder holder) {
+    private static LazyHighlightInfo[] highlightSemanticTokens(@NotNull PsiFile file, @Nullable HighlightInfoHolder holder) {
         // Consume LSP 'textDocument/semanticTokens/full' request
         LSPSemanticTokensSupport semanticTokensSupport = LSPFileSupport.getSupport(file).getSemanticTokensSupport();
         var params = new SemanticTokensParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
@@ -79,14 +111,14 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
                 ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
             semanticTokensSupport.cancel();
-            return;
+            return null;
         } catch (CancellationException e) {
             // cancel the LSP requests textDocument/semanticTokens/full
             semanticTokensSupport.cancel();
-            return;
+            return null;
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/semanticTokens/full' request", e);
-            return;
+            return null;
         }
 
         if (isDoneNormally(semanticTokensFuture)) {
@@ -95,11 +127,21 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
             if (semanticTokens != null) {
                 var document = LSPIJUtils.getDocument(file.getVirtualFile());
                 if (document == null) {
-                    return;
+                    return null;
                 }
-                semanticTokens.highlight(file, document, holder::add);
+                if (holder != null) {
+                    semanticTokens.highlight(file, document, (start, end, colorKey) ->
+                            holder.add(LazyHighlightInfo.resolve(start, end, colorKey)));
+                    return null;
+                } else {
+                    var infos = new LazyHighlightInfo[document.getTextLength()];
+                    semanticTokens.highlight(file, document, (start, end, colorKey) ->
+                            infos[start] = new LazyHighlightInfo(end, colorKey));
+                    return infos;
+                }
             }
         }
+        return null;
     }
 
     @Override
