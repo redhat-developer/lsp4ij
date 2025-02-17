@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022 Red Hat, Inc.
+ * Copyright (c) 2022-2025 Red Hat, Inc.
  * Distributed under license by Red Hat, Inc. All rights reserved.
  * This program is made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution,
@@ -11,11 +11,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features;
 
+import com.google.common.collect.Sets;
 import com.intellij.codeInsight.hints.*;
 import com.intellij.codeInsight.hints.presentation.PresentationFactory;
 import com.intellij.lang.Language;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.layout.LCFlags;
@@ -34,8 +36,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.InputEvent;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
@@ -48,6 +49,8 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         // Do nothing
         return true;
     };
+
+    public static final Key<Set<CompletableFuture<?>>> INLAY_HINTS_PENDING_FUTURES_KEY = Key.create("LSP_INLAY_HINTS_PENDING_FUTURES");
 
     private final SettingsKey<NoSettings> key = new SettingsKey<>("LSP.hints");
 
@@ -78,8 +81,10 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                 }
 
                 try {
-                    final List<CompletableFuture<?>> pendingFutures = new ArrayList<>();
-                    doCollect(psiFile, editor, getFactory(), inlayHintsSink, pendingFutures);
+                    final Set<CompletableFuture<?>> pendingFutures = Sets.newIdentityHashSet();
+                    editor.putUserData(INLAY_HINTS_PENDING_FUTURES_KEY, pendingFutures);
+                    doCollect(psiFile, editor, getFactory(), inlayHintsSink);
+                    editor.putUserData(INLAY_HINTS_PENDING_FUTURES_KEY, null);
                     if (!pendingFutures.isEmpty()) {
                         // Some LSP requests:
                         // - textDocument/colorInformation
@@ -160,7 +165,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
     protected abstract void doCollect(@NotNull PsiFile psiFile,
                                       @NotNull Editor editor,
                                       @NotNull PresentationFactory factory,
-                                      @NotNull InlayHintsSink inlayHintsSink,
-                                      @NotNull List<CompletableFuture<?>> pendingFutures);
+                                      @NotNull InlayHintsSink inlayHintsSink);
 
 }

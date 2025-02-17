@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
@@ -127,7 +128,7 @@ public class EditorFeatureManager implements Disposable {
      * @param psiFile           the file to check the timestamp of
      * @param feature           the editor feature to refresh
      */
-    public void refreshEditorFeatureWhenAllDone(@NotNull List<CompletableFuture<?>> pendingFutures,
+    public void refreshEditorFeatureWhenAllDone(@NotNull Set<CompletableFuture<?>> pendingFutures,
                                                        long modificationStamp,
                                                        @NotNull PsiFile psiFile,
                                                        @NotNull EditorFeatureType feature) {
