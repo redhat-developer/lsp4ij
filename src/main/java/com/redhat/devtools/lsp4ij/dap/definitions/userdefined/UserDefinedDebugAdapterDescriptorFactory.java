@@ -62,6 +62,8 @@ public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescri
                     }
                 }
                 dapConfiguration.setDebugServerWaitStrategy(debugServerWaitStrategy);
+                dapConfiguration.setAttachAddress(serverDefinition.getAttachAddress());
+                dapConfiguration.setAttachPort(serverDefinition.getAttachPort());
             }
             return true;
         }

@@ -111,7 +111,7 @@ public class TypeScriptDebugAdapterDescriptor extends DebugAdapterDescriptor {
     }
 
     @Override
-    public @NotNull ServerReadyConfig getServerReadyConfig() {
+    public @NotNull ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
         return new ServerReadyConfig("Debug server listening at ");
     }
 

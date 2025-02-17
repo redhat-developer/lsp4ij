@@ -40,8 +40,7 @@ You can use the [Go language server](https://pkg.go.dev/golang.org/x/tools/gopls
 
 ## Syntax coloration
 
-Today LSP4IJ doesn't support `textDocument/semanticTokens` ([please vote at issue 238](https://github.com/redhat-developer/lsp4ij/issues/238)), the demo
-uses the [Go TextMate grammar](https://github.com/golang/vscode-go/tree/master/extension/syntaxes) 
+The demo uses the [Go TextMate grammar](https://github.com/golang/vscode-go/tree/master/extension/syntaxes) 
 that you can configure in IntelliJ via the `Editor / TextMate Bundles` settings.
 
 ![Go TextMate Bundles](../images/user-defined-ls/gopls/GoTextMate.png)

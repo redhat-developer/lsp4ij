@@ -21,8 +21,13 @@ import org.jetbrains.annotations.Nullable;
  */
 public class ServerReadyConfig {
 
+    // Used by "launch" request
     private final @Nullable NetworkAddressExtractor debugServerReadyPattern;
     private final @Nullable Integer connectTimeout;
+
+    // Used by "attach" request
+    private final @Nullable String address;
+    private final @Nullable Integer port;
 
     /**
      * Creates a new ServerReadyConfig using the provided pattern.
@@ -39,7 +44,7 @@ public class ServerReadyConfig {
      * @param debugServerReadyPattern the NetworkAddressExtractor to extract the server ready message pattern.
      */
     public ServerReadyConfig(@NotNull NetworkAddressExtractor debugServerReadyPattern) {
-        this(debugServerReadyPattern, null);
+        this(debugServerReadyPattern, null, null, null);
     }
 
     /**
@@ -47,8 +52,12 @@ public class ServerReadyConfig {
      *
      * @param connectTimeout the connection timeout in milliseconds.
      */
-    public ServerReadyConfig(@Nullable Integer connectTimeout) {
-        this(null, connectTimeout);
+    public ServerReadyConfig(int connectTimeout) {
+        this(null, connectTimeout, null, null);
+    }
+
+    public ServerReadyConfig(@Nullable String address, int port) {
+        this(null, null, address, port);
     }
 
     /**
@@ -57,10 +66,14 @@ public class ServerReadyConfig {
      * @param debugServerReadyPattern the NetworkAddressExtractor to extract the server ready message pattern.
      * @param connectTimeout the connection timeout in milliseconds.
      */
-    public ServerReadyConfig(@Nullable NetworkAddressExtractor debugServerReadyPattern,
-                             @Nullable Integer connectTimeout) {
+    private ServerReadyConfig(@Nullable NetworkAddressExtractor debugServerReadyPattern,
+                             @Nullable Integer connectTimeout,
+                              @Nullable String address,
+                              @Nullable Integer port) {
         this.debugServerReadyPattern = debugServerReadyPattern;
         this.connectTimeout = connectTimeout;
+        this.address = address;
+        this.port = port;
     }
 
     /**
@@ -79,5 +92,13 @@ public class ServerReadyConfig {
      */
     public @Nullable Integer getConnectTimeout() {
         return connectTimeout;
+    }
+
+    public @Nullable String getAddress() {
+        return address;
+    }
+
+    public @Nullable Integer getPort() {
+        return port;
     }
 }

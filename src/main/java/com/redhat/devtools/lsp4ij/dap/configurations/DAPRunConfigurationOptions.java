@@ -79,6 +79,12 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     private final StoredProperty<String> debugServerReadyPattern = string("")
             .provideDelegate(this, "debugServerReadyPattern");
 
+    private final StoredProperty<String> attachAddress = string("")
+            .provideDelegate(this, "attachAddress");
+
+    private final StoredProperty<String> attachPort = string("")
+            .provideDelegate(this, "attachPort");
+
     private final StoredProperty<String> serverTrace = string(ServerTrace.getDefaultValue().name())
             .provideDelegate(this, "serverTrace");
 
@@ -251,7 +257,23 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         this.debugServerReadyPattern.setValue(this, debugServerReadyPattern);
         this.networkAddressExtractor = null;
     }
+    
+    public String getAttachAddress() {
+        return attachAddress.getValue(this);
+    }
+    
+    public void setAttachAddress(String attachAddress) {
+        this.attachAddress.setValue(this, attachAddress);
+    }
 
+    public String getAttachPort() {
+        return attachPort.getValue(this);
+    }
+
+    public void setAttachPort(String attachPort) {
+        this.attachPort.setValue(this, attachPort);
+    }
+    
     public ServerTrace getServerTrace() {
         return ServerTrace.get(serverTrace.getValue(this));
     }

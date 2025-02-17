@@ -63,7 +63,8 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
     // Configuration
     private List<LaunchConfiguration> launchConfigurations;
     private List<ServerMapping> serverMappings;
-
+    private String attachAddress;
+    private String attachPort;
     /**
      * Creates a user-defined debug adapter server definition.
      *
@@ -266,5 +267,21 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
      */
     public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
         this.launchConfigurations = launchConfigurations;
+    }
+
+    public String getAttachAddress() {
+        return attachAddress;
+    }
+
+    public void setAttachAddress(String attachAddress) {
+        this.attachAddress = attachAddress;
+    }
+
+    public String getAttachPort() {
+        return attachPort;
+    }
+
+    public void setAttachPort(String attachPort) {
+        this.attachPort = attachPort;
     }
 }

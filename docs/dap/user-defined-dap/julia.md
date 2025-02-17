@@ -144,7 +144,7 @@ When the run configuration starts:
 ## Set Breakpoint
 
 After applying the run configuration, you should set a breakpoint to files which matches file mappings.
-Set a breakpoint in the `test.js` file:
+Set a breakpoint in the `test.jl` file:
 
 ![Set Breakpoint](../images/julia/set_breakpoint.png)
 

@@ -28,6 +28,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.dap.*;
+import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
@@ -44,6 +45,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -63,6 +65,8 @@ public class DebugAdapterServerPanel implements Disposable {
     private boolean initialized;
     private JBTabbedPane mainTabbedPane;
     private List<LaunchConfiguration> launchConfigurations;
+    private AttachFieldAndPreviewLabel attachPortPreview;
+    private AttachFieldAndPreviewLabel attachAddressPreview;
 
     public enum EditionMode {
         NEW_USER_DEFINED,
@@ -73,22 +77,30 @@ public class DebugAdapterServerPanel implements Disposable {
     // Server settings
     private ComboBox<DebugAdapterServerDefinition> debugAdapterServerCombo;
     private JBTextField serverNameField;
+
+    // Server / Launch settings
     private EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private DAPDebugServerWaitStrategyPanel debugServerWaitStrategyPanel;
+
+    // Server trace
     private ComboBox<ServerTrace> serverTraceComboBox;
 
     // Mappings settings
     private DAPServerMappingsPanel mappingsPanel;
 
     // Configuration settings
-    private TextFieldWithBrowseButton workingDirectoryField;
-    private TextFieldWithBrowseButton fileField;
     private JBTabbedPane parametersTabbedPane;
     private JRadioButton launchRadioButton;
     private JRadioButton attachRadioButton;
+    // for launch
+    private TextFieldWithBrowseButton workingDirectoryField;
+    private TextFieldWithBrowseButton fileField;
     private ComboBox<LaunchConfiguration> launchCombo;
     private SchemaBackedJsonTextField launchConfigurationField;
+    // for attach
+    private JBTextField attachAddressField;
+    private JBTextField attachPortField;
     private ComboBox<LaunchConfiguration> attachCombo;
     private SchemaBackedJsonTextField attachConfigurationField;
 
@@ -151,13 +163,13 @@ public class DebugAdapterServerPanel implements Disposable {
                 }
             });
 
-            JPanel serverFactoryPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            serverFactoryPanel.add(debugAdapterServerCombo);
-            serverFactoryPanel.add(new JLabel(DAPBundle.message("dap.settings.editor.server.factory.or")));
+            JPanel serverPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            serverPanel.add(debugAdapterServerCombo);
+            serverPanel.add(new JLabel(DAPBundle.message("dap.settings.editor.server.factory.or")));
 
             var hyperLink = createHyperlinkLabel();
-            serverFactoryPanel.add(hyperLink);
-            serverTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.factory.field"), serverFactoryPanel);
+            serverPanel.add(hyperLink);
+            serverTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.factory.field"), serverPanel);
 
         }
         if (mode == EditionMode.NEW_USER_DEFINED) {
@@ -228,29 +240,13 @@ public class DebugAdapterServerPanel implements Disposable {
         radioPanel.add(attachRadioButton);
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.debug.mode"), radioPanel);
 
-        parametersTabbedPane = new JBTabbedPane();
         // Launch / Attach DAP parameters
+        parametersTabbedPane = new JBTabbedPane();
+        // Launch tab
+        createLaunchTab(parametersTabbedPane);
+        // Attach tab
+        createAttachTab(parametersTabbedPane);
         configurationTab.addComponentFillVertically(parametersTabbedPane, 0);
-
-        FormBuilder launchTab = addTab(parametersTabbedPane, DAPBundle.message("dap.settings.editor.configuration.parameters.launch.tab"));
-        launchCombo = createLaunchCombo();
-        launchCombo.addItemListener(e -> {
-            LaunchConfiguration selected = (LaunchConfiguration) e.getItem();
-            setLaunchConfiguration(selected.getContent());
-        });
-        launchTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), launchCombo);
-        launchConfigurationField = new SchemaBackedJsonTextField(project);
-        launchTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.parameters.field"), launchConfigurationField);
-
-        FormBuilder attachTab = addTab(parametersTabbedPane, DAPBundle.message("dap.settings.editor.configuration.parameters.attach.tab"));
-        attachCombo = createLaunchCombo();
-        attachCombo.addItemListener(e -> {
-            LaunchConfiguration selected = (LaunchConfiguration) e.getItem();
-            setAttachConfiguration(selected.getContent());
-        });
-        attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), attachCombo);
-        attachConfigurationField = new SchemaBackedJsonTextField(project);
-        attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.parameters.field"), attachConfigurationField);
 
         // Select by default launch debugging type.
         selectLaunchDebugMode();
@@ -262,6 +258,58 @@ public class DebugAdapterServerPanel implements Disposable {
             selectAttachDebugMode();
         });
 
+    }
+
+    private void createLaunchTab(@NotNull JBTabbedPane tabbedPane) {
+        FormBuilder launchTab = addTab(tabbedPane, DAPBundle.message("dap.settings.editor.configuration.parameters.launch.tab"));
+
+        launchCombo = createLaunchCombo();
+        launchCombo.addItemListener(e -> {
+            LaunchConfiguration selected = (LaunchConfiguration) e.getItem();
+            setLaunchConfiguration(selected.getContent());
+        });
+        launchTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), launchCombo);
+        launchConfigurationField = new SchemaBackedJsonTextField(project);
+        launchTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.parameters.field"), launchConfigurationField);
+    }
+
+    private void createAttachTab(@NotNull JBTabbedPane tabbedPane) {
+        FormBuilder attachTab = addTab(tabbedPane, DAPBundle.message("dap.settings.editor.configuration.parameters.attach.tab"));
+
+        attachAddressField = new JBTextField();
+        attachAddressPreview = new AttachFieldAndPreviewLabel(attachAddressField, field -> {
+            String address = LaunchUtils.resolveAttachAddress(field.getText(),
+                    LaunchUtils.getDapParameters(attachConfigurationField.getText(), Collections.emptyMap()));
+            return address;
+        });
+        attachTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.attach.address.field"),
+                attachAddressPreview);
+
+        attachPortField = new JBTextField();
+        attachPortPreview = new AttachFieldAndPreviewLabel(attachPortField, field -> {
+            int port = LaunchUtils.resolveAttachPort(field.getText(),
+                    LaunchUtils.getDapParameters(attachConfigurationField.getText(), Collections.emptyMap()));
+            return port != -1 ? String.valueOf(port) : "?";
+        });
+        attachTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.attach.port.field"),
+                attachPortPreview);
+
+        attachCombo = createLaunchCombo();
+        attachCombo.addItemListener(e -> {
+            LaunchConfiguration selected = (LaunchConfiguration) e.getItem();
+            setAttachConfiguration(selected.getContent());
+        });
+        attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), attachCombo);
+        attachConfigurationField = new SchemaBackedJsonTextField(project);
+        attachConfigurationField.getDocument()
+                        .addDocumentListener(new com.intellij.openapi.editor.event.DocumentListener() {
+                            @Override
+                            public void documentChanged(com.intellij.openapi.editor.event.@NotNull DocumentEvent event) {
+                                attachAddressPreview.updatePreview();
+                                attachPortPreview.updatePreview();
+                            }
+                        });
+        attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.parameters.field"), attachConfigurationField);
     }
 
     private static ComboBox<LaunchConfiguration> createLaunchCombo() {
@@ -301,6 +349,10 @@ public class DebugAdapterServerPanel implements Disposable {
             attachCombo.setModel(new DefaultComboBoxModel<LaunchConfiguration>(attaches.toArray(new LaunchConfiguration[0])));
             if (!attaches.isEmpty()) {
                 setAttachConfiguration(attaches.get(0).getContent());
+                if (launches.isEmpty()) {
+                    // The DAP server can support only "attach", select "attach" debug mode.
+                    selectAttachDebugMode();
+                }
             }
         }
     }
@@ -416,8 +468,8 @@ public class DebugAdapterServerPanel implements Disposable {
                 if (debugAdapterServerCombo != null) {
                     debugAdapterServerCombo.setSelectedItem(serverDefinition);
                 } else {
-                    if (currentServer instanceof UserDefinedDebugAdapterServerDefinition userdefined) {
-                        loadFromServerDefinition(userdefined);
+                    if (currentServer instanceof UserDefinedDebugAdapterServerDefinition userDefinedServer) {
+                        loadFromServerDefinition(userDefinedServer);
                     }
                 }
             }
@@ -448,6 +500,8 @@ public class DebugAdapterServerPanel implements Disposable {
         // Update DAP parameters
         var launchConfigurations = serverDefinition.getLaunchConfigurations();
         refreshLaunchConfigurations(launchConfigurations);
+        setAttachAddress(serverDefinition.getAttachAddress());
+        setAttachPort(serverDefinition.getAttachPort());
     }
 
     @NotNull
@@ -570,6 +624,22 @@ public class DebugAdapterServerPanel implements Disposable {
 
     public void setFile(String file) {
         this.fileField.setText(getText(file));
+    }
+
+    public String getAttachAddress() {
+        return attachAddressField.getText();
+    }
+
+    public void setAttachAddress(String attachAddress) {
+        this.attachAddressField.setText(getText(attachAddress));
+    }
+    
+    public String getAttachPort() {
+        return attachPortField.getText();
+    }
+
+    public void setAttachPort(String attachPort) {
+        this.attachPortField.setText(getText(attachPort));
     }
 
     @NotNull

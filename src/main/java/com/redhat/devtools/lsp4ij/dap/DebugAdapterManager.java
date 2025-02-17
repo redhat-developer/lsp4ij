@@ -126,6 +126,8 @@ public class DebugAdapterManager {
                     .toList();
             settings.setMappings(newMappings);
             settings.setLaunchConfigurations(definitionFromSettings.getLaunchConfigurations());
+            settings.setAttachAddress(definitionFromSettings.getAttachAddress());
+            settings.setAttachPort(definitionFromSettings.getAttachPort());
             UserDefinedDebugAdapterServerSettings.getInstance().setSettings(debugAdapterServerId, settings);
         }
     }
@@ -181,7 +183,9 @@ public class DebugAdapterManager {
             @Nullable String debugServerReadyPattern,
             @NotNull List<ServerMappingSettings> languageMappings,
             @NotNull List<ServerMappingSettings> fileTypeMappings,
-            @Nullable List<LaunchConfiguration> launchConfigurations) {
+            @Nullable List<LaunchConfiguration> launchConfigurations,
+            @Nullable String attachAddress,
+            @Nullable String attachPort) {
     }
 
     /**
@@ -218,6 +222,9 @@ public class DebugAdapterManager {
         boolean debugServerReadyPatternChanged = !Objects.equals(settings.getDebugServerReadyPattern(), request.debugServerReadyPattern());
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
         boolean launchConfigurationChanged = !Objects.equals(settings.getLaunchConfigurations(), request.launchConfigurations());
+        boolean attachAddressChanged = !Objects.equals(settings.getAttachAddress(), request.attachAddress());
+        boolean attachPortChanged = !Objects.equals(settings.getAttachAddress(), request.attachPort());
+
         // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
 
         settings.setServerName(request.name());
@@ -231,7 +238,8 @@ public class DebugAdapterManager {
 
         if (nameChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
                 commandChanged || connectTimeoutChanged || debugServerReadyPatternChanged ||
-                mappingsChanged || launchConfigurationChanged) {
+                mappingsChanged || launchConfigurationChanged ||
+        attachAddressChanged || attachPortChanged) {
             // Notifications
             DebugAdapterServerListener.ChangedEvent event = new DebugAdapterServerListener.ChangedEvent(
                     serverDefinition,
@@ -242,7 +250,9 @@ public class DebugAdapterManager {
                     connectTimeoutChanged,
                     debugServerReadyPatternChanged,
                     mappingsChanged,
-                    launchConfigurationChanged);
+                    launchConfigurationChanged,
+                    attachAddressChanged,
+                    attachPortChanged);
             if (notify) {
                 handleChangeEvent(event);
             }
@@ -448,6 +458,8 @@ public class DebugAdapterManager {
                 serverDefinition.setConnectTimeout(setting.getConnectTimeout());
                 serverDefinition.setDebugServerReadyPattern(setting.getDebugServerReadyPattern());
                 serverDefinition.setLaunchConfigurations(setting.getLaunchConfigurations());
+                serverDefinition.setAttachAddress(setting.getAttachAddress());
+                serverDefinition.setAttachPort(setting.getAttachPort());
                 addDebugAdapterServerWithoutNotification(serverDefinition);
             }
         } catch (Exception e) {
