@@ -161,10 +161,7 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
                 "Add the `urlPatterns` attribute to @WebFilter",
                 "Add the `value` attribute to @WebFilter");
 
-        assertApplyCodeAction("InvalidWebFilter.java",
-                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(<caret>)\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
-                "Add the `servletNames` attribute to @WebFilter",
-                "package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(servletNames=\"<caret>\")\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
+        assertApplyCodeAction("package io.openliberty.sample.jakarta.servlet;\\n\\nimport jakarta.servlet.Filter;\\nimport jakarta.servlet.annotation.WebFilter;\\n\\n@WebFilter(servletNames=\"<caret>\")\\npublic abstract class InvalidWebFilter implements Filter {\\n\\n}\\n\\n\\n",
                 """                
                         {
                           "title": "Add the `servletNames` attribute to @WebFilter",

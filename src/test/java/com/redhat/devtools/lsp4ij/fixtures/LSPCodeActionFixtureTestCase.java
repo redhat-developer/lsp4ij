@@ -13,6 +13,9 @@ package com.redhat.devtools.lsp4ij.fixtures;
 import com.google.gson.reflect.TypeToken;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.intention.IntentionAction;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.*;
@@ -20,8 +23,11 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static com.redhat.devtools.lsp4ij.LSPIJUtils.*;
 
 /**
  * Base class test case to test LSP 'textDocument/codeAction' feature.
@@ -98,31 +104,53 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
         }
     }
 
-    /**
-     * Test applying a code action.
-     */
-    public void assertApplyCodeAction(@NotNull String fileName,
-                                      @NotNull String editorContentText,
-                                      @NotNull String actionText,
-                                      @NotNull String expectedEditorContentText,
+    public void assertApplyCodeAction(@NotNull String expectedEditorContentText,
                                       @NotNull String codeActionJson) {
 
-        List<CodeAction> codeActions = JSONUtils.getLsp4jGson()
-                .fromJson(codeActionJson, new TypeToken<List<CodeAction>>() {}.getType());
-        List<Either<Command, CodeAction>> wrappedCodeActions = codeActions.stream()
-                .distinct()
-                .map(Either::<Command, CodeAction>forRight)
-                .collect(Collectors.toList());
-        List<Diagnostic> diagnostics = codeActions.stream()
-                .flatMap(codeAction -> Optional.ofNullable(codeAction.getDiagnostics()).stream().flatMap(List::stream))
-                .distinct()
-                .collect(Collectors.toList());
+        CodeAction resolvedCodeAction = JSONUtils.getLsp4jGson()
+                .fromJson(codeActionJson, new TypeToken<CodeAction>() {}.getType());
+        MockLanguageServer.INSTANCE.setResolvedCodeAction(resolvedCodeAction);
+        resolveCodeAction(resolvedCodeAction);
 
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
-        MockLanguageServer.INSTANCE.setCodeActions(wrappedCodeActions);
-        MockLanguageServer.INSTANCE.setDiagnostics(diagnostics);
-        myFixture.configureByText(fileName, editorContentText);
+        String expected = getExpected(expectedEditorContentText);
+        myFixture.checkResult(expected);
+    }
 
+    public void resolveCodeAction(@NotNull CodeAction action) {
+        CompletableFuture<CodeAction> resolvedActionFuture = MockLanguageServer.INSTANCE
+                .getTextDocumentService()
+                .resolveCodeAction(action);
+
+        resolvedActionFuture.thenAccept(resolvedAction -> {
+            if (resolvedAction != null && resolvedAction.getEdit() != null) {
+                WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () ->
+                                applyEdit(resolvedAction.getEdit())
+                );
+            }
+        }).exceptionally(ex -> {
+            throw new RuntimeException("Failed to resolve CodeAction", ex);
+        });
+    }
+
+    private void applyEdit(WorkspaceEdit edit) {
+        if (edit.getDocumentChanges() != null) {
+            for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
+                if (change.isLeft()) {
+                    var textDocumentEdit = change.getLeft();
+                    VirtualFile file = findResourceFor(textDocumentEdit.getTextDocument().getUri());
+                    if (file != null) {
+                        Document document = getDocument(file);
+                        if (document != null) {
+                            applyEdits(null, document, textDocumentEdit.getEdits());
+                            myFixture.getEditor().getDocument().setText(document.getText());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static @NotNull String getExpected(@NotNull String expectedEditorContentText) {
         String expected = expectedEditorContentText;
         int expectedCaretOffset = expectedEditorContentText.indexOf("<caret>");
         if (expectedCaretOffset != -1) {
@@ -130,21 +158,6 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                     expectedEditorContentText.substring("<caret>".length() + expectedCaretOffset);
             expected = expected.replace("\\n", "\n");
         }
-
-        IntentionAction action = myFixture.doHighlighting().stream()
-                .flatMap(info -> {
-                    if (info.quickFixActionRanges != null) {
-                        return info.quickFixActionRanges.stream()
-                                .map(pair -> pair.getFirst().getAction())
-                                .filter(Objects::nonNull);
-                    }
-                    return Stream.empty();
-                })
-                .filter(intentionAction -> intentionAction.getText().equals(actionText))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("Action with text '" + actionText + "' not found."));
-
-        myFixture.launchAction(action);
-        myFixture.checkResult(expected);
+        return expected;
     }
 }
