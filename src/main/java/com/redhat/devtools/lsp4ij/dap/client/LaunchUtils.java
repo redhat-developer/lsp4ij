@@ -34,21 +34,29 @@ public class LaunchUtils {
 
     public static class LaunchContext extends HashMap<String, String> {
 
+        public LaunchContext() {
+
+        }
+
+        public LaunchContext(@NotNull String file,
+                             @NotNull String workspaceFolder) {
+            set(VariableName.file, getValidPath(file))
+                    .set(VariableName.workspaceFolder, getValidPath(workspaceFolder));
+        }
+
         public LaunchContext set(VariableName name, String value) {
             super.put("${" + name.name() + "}", value);
             return this;
         }
     }
 
-    public static Map<String, Object> getDapParameters(DAPRunConfigurationOptions dapOptions) {
-        LaunchContext context = new LaunchContext()
-                .set(VariableName.file, getValidPath(dapOptions.getFile()))
-                .set(VariableName.workspaceFolder, getValidPath(dapOptions.getWorkingDirectory()));
-        return  getDapParameters(dapOptions.getDapParameters(), context);
+    public static Map<String, Object> getDapParameters(@NotNull DAPRunConfigurationOptions dapOptions) {
+        LaunchContext context = new LaunchContext(dapOptions.getFile(), dapOptions.getWorkingDirectory());
+        return getDapParameters(dapOptions.getDapParameters(), context);
     }
 
     @Nullable
-    private static String getValidPath(@Nullable String path) {
+    public static String getValidPath(@Nullable String path) {
         if (path == null) {
             return null;
         }
@@ -68,7 +76,8 @@ public class LaunchUtils {
                 launchJson = launchJson.replace(entry.getKey(), value);
             }
         }
-        Type mapType = new TypeToken<Map<String, Object>>() {}.getType();
+        Type mapType = new TypeToken<Map<String, Object>>() {
+        }.getType();
         // Conversion du JSON en Map
         return new Gson().fromJson(launchJson, mapType);
     }

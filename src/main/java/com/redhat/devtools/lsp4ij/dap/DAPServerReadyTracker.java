@@ -115,7 +115,7 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
     }
 
     private boolean waitForTimeout() {
-        Integer connectTimeout = config.connectTimeout();
+        Integer connectTimeout = config.getConnectTimeout();
         if (connectTimeout != null) {
             if (processHandler.isStartNotified()) {
                 // The process is started
@@ -136,7 +136,7 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
     private boolean debugServerReadyPattern(@Nullable String text) {
         try {
             if (!foundedTrace) {
-                NetworkAddressExtractor trackTrace = config.debugServerReadyPattern();
+                NetworkAddressExtractor trackTrace = config.getDebugServerReadyPattern();
                 if (trackTrace != null) {
                     var result = trackTrace.extract(text);
                     if (result.matches()) {

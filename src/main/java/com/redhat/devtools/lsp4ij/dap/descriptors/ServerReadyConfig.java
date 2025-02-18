@@ -11,15 +11,73 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Server ready configuration.
- *
- * @param debugServerReadyPattern
- * @param connectTimeout
+ * Configuration for server readiness.
+ * This class holds the configuration options related to server readiness,
+ * such as the pattern for matching the server ready message and the connection timeout.
  */
-public record ServerReadyConfig(@Nullable NetworkAddressExtractor debugServerReadyPattern,
-                                @Nullable Integer connectTimeout) {
+public class ServerReadyConfig {
 
+    private final @Nullable NetworkAddressExtractor debugServerReadyPattern;
+    private final @Nullable Integer connectTimeout;
+
+    /**
+     * Creates a new ServerReadyConfig using the provided pattern.
+     *
+     * @param pattern the pattern to be used for extracting the server ready message.
+     */
+    public ServerReadyConfig(@NotNull String pattern) {
+        this(new NetworkAddressExtractor(pattern));
+    }
+
+    /**
+     * Creates a new ServerReadyConfig using the provided NetworkAddressExtractor.
+     *
+     * @param debugServerReadyPattern the NetworkAddressExtractor to extract the server ready message pattern.
+     */
+    public ServerReadyConfig(@NotNull NetworkAddressExtractor debugServerReadyPattern) {
+        this(debugServerReadyPattern, null);
+    }
+
+    /**
+     * Creates a new ServerReadyConfig using the provided connection timeout.
+     *
+     * @param connectTimeout the connection timeout in milliseconds.
+     */
+    public ServerReadyConfig(@Nullable Integer connectTimeout) {
+        this(null, connectTimeout);
+    }
+
+    /**
+     * Creates a new ServerReadyConfig with both the server ready pattern and connection timeout.
+     *
+     * @param debugServerReadyPattern the NetworkAddressExtractor to extract the server ready message pattern.
+     * @param connectTimeout the connection timeout in milliseconds.
+     */
+    public ServerReadyConfig(@Nullable NetworkAddressExtractor debugServerReadyPattern,
+                             @Nullable Integer connectTimeout) {
+        this.debugServerReadyPattern = debugServerReadyPattern;
+        this.connectTimeout = connectTimeout;
+    }
+
+    /**
+     * Gets the NetworkAddressExtractor used to extract the server ready message pattern.
+     *
+     * @return the NetworkAddressExtractor, or null if not provided.
+     */
+    public @Nullable NetworkAddressExtractor getDebugServerReadyPattern() {
+        return debugServerReadyPattern;
+    }
+
+    /**
+     * Gets the connection timeout value.
+     *
+     * @return the connection timeout in milliseconds, or null if not provided.
+     */
+    public @Nullable Integer getConnectTimeout() {
+        return connectTimeout;
+    }
 }

@@ -2,12 +2,14 @@
 
 LSP4IJ provides [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) support. 
 You can read [the DAP Support overview](./DAPSupport.md), describing which DAP features are implemented, and how.
+If you need to customize the DAP support you can [register your DAP server with extension point](./DeveloperGuide.md).
 
 The DAP support is available with the `Debug Adapter Protocol` run/debug configuration type:
 
 ![DAP Configuration Type](./images/DAP_config_type.png)
 
-After configuring the [DAP configuration type](#dap-configuration-type), you can debug your file.  
+After configuring the [DAP configuration type](#dap-configuration-type), you can debug your file.
+
 Here is an example with `JavaScript debugging`, which uses the [VSCode JS Debug DAP server](./user-defined-dap/vscode-js-debug.md):
 
 ![DAP Configuration Type](./images/DAP_debugging_overview.png)
