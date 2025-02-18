@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.SpellCheckingEditorCustomizationProvider;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
@@ -128,5 +129,10 @@ public class JsonTextField extends JPanel {
 
     public void addValidationHandler(Consumer<Boolean> handler) {
         validationHandlers.add(handler);
+    }
+
+    @NotNull
+    public Document getDocument() {
+        return editorTextField.getDocument();
     }
 }

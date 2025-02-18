@@ -44,7 +44,7 @@ public class DAPTemplate {
 
     public static final String NAME_JSON_PROPERTY = "name";
     public static final String ID_JSON_PROPERTY = "id";
-    public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
+
     public static final String CONNECT_TIMEOUT_JSON_PROPERTY = "connectTimeout";
     public static final String DEBUG_SERVER_READY_PATTERN_JSON_PROPERTY = "debugServerReadyPattern";
     public static final String LANGUAGE_JSON_PROPERTY = "language";
@@ -53,12 +53,17 @@ public class DAPTemplate {
     public static final String FILE_TYPE_JSON_PROPERTY = "fileType";
     public static final String FILE_TYPE_MAPPINGS_JSON_PROPERTY = "fileTypeMappings";
 
+    public static final String LAUNCH_PROPERTY = "launch";
     private static final String WINDOWS_KEY = "windows";
     private static final String MAC_KEY = "mac";
     private static final String UNIX_KEY = "unix";
     private static final String DEFAULT_KEY = "default";
 
     private static final String OS_KEY = SystemInfo.isWindows ? WINDOWS_KEY : (SystemInfo.isMac ? MAC_KEY : (SystemInfo.isUnix ? UNIX_KEY : null));
+
+    public static final String ATTACH_PROPERTY = "attach";
+    public static final String ATTACH_ADDRESS_PROPERTY = "address";
+    public static final String ATTACH_PORT_PROPERTY = "port";
 
     private String id;
     private String name;
@@ -71,6 +76,9 @@ public class DAPTemplate {
     private List<LaunchConfiguration> launchConfigurations;
     private int connectTimeout;
     private String debugServerReadyPattern;
+
+    private String attachAddress;
+    private String attachPort;
 
     public String getId() {
         return id;
@@ -157,5 +165,21 @@ public class DAPTemplate {
 
     public void setLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
         this.launchConfigurations = launchConfigurations;
+    }
+
+    public String getAttachAddress() {
+        return attachAddress;
+    }
+
+    public void setAttachAddress(String attachAddress) {
+        this.attachAddress = attachAddress;
+    }
+
+    public String getAttachPort() {
+        return attachPort;
+    }
+
+    public void setAttachPort(String attachPort) {
+        this.attachPort = attachPort;
     }
 }

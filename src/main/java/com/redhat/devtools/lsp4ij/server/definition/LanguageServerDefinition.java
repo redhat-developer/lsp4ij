@@ -170,8 +170,6 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         this.languageIdFileNameMatcherMappings.add(Pair.create(matchers, languageId));
     }
 
-
-
     public Map<Language, String> getLanguageMappings() {
         return languageIdLanguageMappings;
     }

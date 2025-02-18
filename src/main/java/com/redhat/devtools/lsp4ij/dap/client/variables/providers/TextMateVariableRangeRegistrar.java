@@ -37,7 +37,7 @@ public class TextMateVariableRangeRegistrar implements VariableRangeRegistrar {
     @Override
     public boolean isApplicable(@NotNull VirtualFile virtualFile, @NotNull Project project) {
         PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
-        return (file != null) && LSPIJEditorUtils.isSupportedTextMateFile(file);
+        return (file != null) && LSPIJEditorUtils.isTextMateFile(file);
     }
 
     @Override

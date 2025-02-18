@@ -1,10 +1,13 @@
 {
   "id": "julia",
   "name": "Julia",
-  "programArgs": {
+  "launch": {
     "default": "julia $PROJECT_DIR$/server.jl ${port}"
   },
   "debugServerReadyPattern": "Listening on port ${port}",
+  "attach": {
+    "port": "$port"
+  },
   "fileTypeMappings": [
     {
       "fileType": {

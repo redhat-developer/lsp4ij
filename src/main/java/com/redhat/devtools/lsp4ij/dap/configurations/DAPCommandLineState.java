@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.CommandLineState;
 import com.intellij.execution.configurations.RunConfigurationOptions;
+import com.intellij.execution.process.NopProcessHandler;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
@@ -46,8 +47,17 @@ public class DAPCommandLineState extends CommandLineState {
 
     @Override
     protected @NotNull ProcessHandler startProcess() throws ExecutionException {
-        ProcessHandler processHandler = serverDescriptor.startServer();
-        new DAPServerReadyTracker(getServerReadyConfig(), processHandler);
+        var debugMode = getDebugMode();
+        var config = getServerReadyConfig(debugMode);
+        ProcessHandler processHandler;
+        if (debugMode == DebugMode.ATTACH) {
+            // attach
+            processHandler = new NopProcessHandler();
+        } else {
+            // launch
+            processHandler = serverDescriptor.startServer();
+        }
+        new DAPServerReadyTracker(config, debugMode, processHandler);
         return processHandler;
     }
 
@@ -56,8 +66,8 @@ public class DAPCommandLineState extends CommandLineState {
         return serverDescriptor.getFileType();
     }
 
-    public @NotNull ServerReadyConfig getServerReadyConfig() {
-        return serverDescriptor.getServerReadyConfig();
+    public @NotNull ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
+        return serverDescriptor.getServerReadyConfig(debugMode);
     }
 
     @NotNull
@@ -80,4 +90,5 @@ public class DAPCommandLineState extends CommandLineState {
     public String getServerName() {
         return serverDescriptor.getServerName();
     }
+
 }

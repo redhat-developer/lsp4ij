@@ -20,10 +20,11 @@ import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBInsets;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterManager;
+import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
+import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager;
-import com.redhat.devtools.lsp4ij.dap.descriptors.userdefined.UserDefinedDebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -39,17 +40,17 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * New Debug Adapter descriptor factory dialog.
+ * New Debug Adapter Server dialog.
  */
-public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
+public class NewDebugAdapterServerDialog extends DialogWrapper {
 
     private final ComboBox<DAPTemplate> templateCombo = new ComboBox<>(new DefaultComboBoxModel<>(getDAPTemplates()));
     private final Project project;
 
-    private DebugAdapterDescriptorFactoryPanel dapDescriptorFactoryPanel;
+    private DebugAdapterServerPanel debugAdapterServerPanel;
     private DAPTemplate currentTemplate = null;
     private JButton showInstructionButton = null;
-    private UserDefinedDebugAdapterDescriptorFactory createdFactory;
+    private UserDefinedDebugAdapterServerDefinition createdServer;
 
     private static DAPTemplate[] getDAPTemplates() {
         List<DAPTemplate> templates = new ArrayList<>();
@@ -58,7 +59,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
         return templates.toArray(new DAPTemplate[0]);
     }
 
-    public NewDebugAdapterDescriptorFactoryDialog(@Nullable Project project) {
+    public NewDebugAdapterServerDialog(@Nullable Project project) {
         super(project);
         this.project = project;
         super.setTitle(DAPBundle.message("new.debug.adapter.dialog.title"));
@@ -74,12 +75,12 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
         // Template combo
         createTemplateCombo(builder);
         // Create server name,  command line, mappings, configuration UI
-        this.dapDescriptorFactoryPanel = new DebugAdapterDescriptorFactoryPanel(builder, null, DebugAdapterDescriptorFactoryPanel.EditionMode.NEW_USER_DEFINED, project);
-        dapDescriptorFactoryPanel.setServerId("");
+        this.debugAdapterServerPanel = new DebugAdapterServerPanel(builder, null, DebugAdapterServerPanel.EditionMode.NEW_USER_DEFINED, project);
+        debugAdapterServerPanel.setServerId("");
 
         // Add validation
-        addValidator(this.dapDescriptorFactoryPanel.getServerNameField());
-        addValidator(this.dapDescriptorFactoryPanel.getCommandLineWidget());
+        addValidator(this.debugAdapterServerPanel.getServerNameField());
+        addValidator(this.debugAdapterServerPanel.getCommandLineWidget());
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(builder.getPanel(), BorderLayout.CENTER);
@@ -156,24 +157,28 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
 
     private void loadFromTemplate(DAPTemplate template) {
         // Update name
-        var serverName = this.dapDescriptorFactoryPanel.getServerNameField();
+        var serverName = this.debugAdapterServerPanel.getServerNameField();
         serverName.setText(template.getName() != null ? template.getName() : "");
 
         // Update command
         String command = getCommandLine(template);
-        this.dapDescriptorFactoryPanel.setCommandLine(command);
+        this.debugAdapterServerPanel.setCommandLine(command);
 
         // Update wait for trace
-        this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().update(null,
+        this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel().update(null,
                 template.getConnectTimeout(),
                 template.getDebugServerReadyPattern());
 
         // Update mappings
-        var mappingsPanel = this.dapDescriptorFactoryPanel.getMappingsPanel();
+        var mappingsPanel = this.debugAdapterServerPanel.getMappingsPanel();
         mappingsPanel.refreshMappings(template.getLanguageMappings(), template.getFileTypeMappings());
 
         // Update launch/attach configuration
-        dapDescriptorFactoryPanel.refreshLaunchConfigurations(template.getLaunchConfigurations());;
+        debugAdapterServerPanel.refreshLaunchConfigurations(template.getLaunchConfigurations());
+
+        // Attach (JSON path (ex:$port))
+        debugAdapterServerPanel.setAttachAddress(StringUtils.isNotBlank(template.getAttachAddress()) ? template.getAttachAddress() : "");
+        debugAdapterServerPanel.setAttachPort(StringUtils.isNotBlank(template.getAttachPort()) ? template.getAttachPort() : "");
     }
 
     private static String getCommandLine(DAPTemplate entry) {
@@ -189,7 +194,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
 
     @Override
     public JComponent getPreferredFocusedComponent() {
-        return this.dapDescriptorFactoryPanel.getServerNameField();
+        return this.debugAdapterServerPanel.getServerNameField();
     }
 
     @Override
@@ -208,7 +213,7 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
     }
 
     private ValidationInfo validateServerName() {
-        var serverName = this.dapDescriptorFactoryPanel.getServerNameField();
+        var serverName = this.debugAdapterServerPanel.getServerNameField();
         if (serverName.getText().isBlank()) {
             String errorMessage = DAPBundle.message("new.debug.adapter.dialog.validation.serverName.must.be.set");
             return new ValidationInfo(errorMessage, serverName);
@@ -217,11 +222,12 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
     }
 
     private ValidationInfo validateCommand() {
-        var commandLine = this.dapDescriptorFactoryPanel.getCommandLine();
+        // Don't validate required command when DAP server supports only "attach"
+        /*var commandLine = this.debugAdapterServerPanel.getCommandLine();
         if (commandLine.isBlank()) {
             String errorMessage = DAPBundle.message("new.debug.adapter.dialog.validation.commandLine.must.be.set");
-            return new ValidationInfo(errorMessage, this.dapDescriptorFactoryPanel.getCommandLineWidget());
-        }
+            return new ValidationInfo(errorMessage, this.debugAdapterServerPanel.getCommandLineWidget());
+        }*/
         return null;
     }
 
@@ -237,46 +243,50 @@ public class NewDebugAdapterDescriptorFactoryDialog extends DialogWrapper {
 
         String serverId = UUID.randomUUID().toString();
         // Register language server and mappings definition
-        String serverName = this.dapDescriptorFactoryPanel.getServerNameField().getText();
-        Map<String, String> userEnvironmentVariables = this.dapDescriptorFactoryPanel.getEnvironmentVariables().getEnvs();
-        boolean includeSystemEnvironmentVariables = this.dapDescriptorFactoryPanel.getEnvironmentVariables().isPassParentEnvs();
-        String commandLine = this.dapDescriptorFactoryPanel.getCommandLine();
-        int connectTimeout = this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
-        String trackTrace = this.dapDescriptorFactoryPanel.getDebugServerWaitStrategyPanel().getTrace();
-        var launchConfigurations = this.dapDescriptorFactoryPanel.getLaunchConfigurations();
-        var mappingsPanel = dapDescriptorFactoryPanel.getMappingsPanel();
-        createdFactory = new UserDefinedDebugAdapterDescriptorFactory(serverId,
+        String serverName = this.debugAdapterServerPanel.getServerNameField().getText();
+        Map<String, String> userEnvironmentVariables = this.debugAdapterServerPanel.getEnvironmentVariables().getEnvs();
+        boolean includeSystemEnvironmentVariables = this.debugAdapterServerPanel.getEnvironmentVariables().isPassParentEnvs();
+        String commandLine = this.debugAdapterServerPanel.getCommandLine();
+        int connectTimeout = this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
+        String trackTrace = this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getTrace();
+        var launchConfigurations = this.debugAdapterServerPanel.getLaunchConfigurations();
+        var mappingsPanel = debugAdapterServerPanel.getMappingsPanel();
+        String attachAddress = debugAdapterServerPanel.getAttachAddress();
+        String attachPort = debugAdapterServerPanel.getAttachPort();
+        createdServer = new UserDefinedDebugAdapterServerDefinition(serverId,
                 serverName,
                 commandLine,
                 mappingsPanel.getLanguageMappings(),
                 Streams.concat(mappingsPanel.getFileTypeMappings().stream(),
                                 mappingsPanel.getFileNamePatternMappings().stream())
                         .toList());
-        createdFactory.setUserEnvironmentVariables(userEnvironmentVariables);
-        createdFactory.setIncludeSystemEnvironmentVariables(includeSystemEnvironmentVariables);
-        createdFactory.setConnectTimeout(connectTimeout);
-        createdFactory.setDebugServerReadyPattern(trackTrace);
-        createdFactory.setLaunchConfigurations(launchConfigurations);
-        DebugAdapterManager.getInstance().addDebugAdapterDescriptorFactory(createdFactory);
+        createdServer.setUserEnvironmentVariables(userEnvironmentVariables);
+        createdServer.setIncludeSystemEnvironmentVariables(includeSystemEnvironmentVariables);
+        createdServer.setConnectTimeout(connectTimeout);
+        createdServer.setDebugServerReadyPattern(trackTrace);
+        createdServer.setLaunchConfigurations(launchConfigurations);
+        createdServer.setAttachAddress(attachAddress);
+        createdServer.setAttachPort(attachPort);
+        DebugAdapterManager.getInstance().addDebugAdapterServer(createdServer);
     }
 
     private void addValidator(JTextComponent textComponent) {
         textComponent.getDocument().addDocumentListener(new DocumentAdapter() {
             @Override
             protected void textChanged(@NotNull DocumentEvent e) {
-                NewDebugAdapterDescriptorFactoryDialog.super.initValidation();
+                NewDebugAdapterServerDialog.super.initValidation();
             }
         });
     }
 
     @Override
     protected void dispose() {
-        this.dapDescriptorFactoryPanel.dispose();
+        this.debugAdapterServerPanel.dispose();
         super.dispose();
     }
 
     @Nullable
-    public UserDefinedDebugAdapterDescriptorFactory getCreatedFactory() {
-        return createdFactory;
+    public UserDefinedDebugAdapterServerDefinition getCreatedServer() {
+        return createdServer;
     }
 }

@@ -34,21 +34,32 @@ public class LaunchUtils {
 
     public static class LaunchContext extends HashMap<String, String> {
 
-        public LaunchContext set(VariableName name, String value) {
-            super.put("${" + name.name() + "}", value);
+        public LaunchContext() {
+
+        }
+
+        public LaunchContext(@Nullable String file,
+                             @Nullable String workspaceFolder) {
+            set(VariableName.file, getValidPath(file))
+                    .set(VariableName.workspaceFolder, getValidPath(workspaceFolder));
+        }
+
+        public LaunchContext set(@NotNull VariableName name,
+                                 @Nullable String value) {
+            if (value != null) {
+                super.put("${" + name.name() + "}", value);
+            }
             return this;
         }
     }
 
-    public static Map<String, Object> getDapParameters(DAPRunConfigurationOptions dapOptions) {
-        LaunchContext context = new LaunchContext()
-                .set(VariableName.file, getValidPath(dapOptions.getFile()))
-                .set(VariableName.workspaceFolder, getValidPath(dapOptions.getWorkingDirectory()));
-        return  getDapParameters(dapOptions.getDapParameters(), context);
+    public static Map<String, Object> getDapParameters(@NotNull DAPRunConfigurationOptions dapOptions) {
+        LaunchContext context = new LaunchContext(dapOptions.getFile(), dapOptions.getWorkingDirectory());
+        return getDapParameters(dapOptions.getDapParameters(), context);
     }
 
     @Nullable
-    private static String getValidPath(@Nullable String path) {
+    public static String getValidPath(@Nullable String path) {
         if (path == null) {
             return null;
         }
@@ -68,8 +79,66 @@ public class LaunchUtils {
                 launchJson = launchJson.replace(entry.getKey(), value);
             }
         }
-        Type mapType = new TypeToken<Map<String, Object>>() {}.getType();
+        Type mapType = new TypeToken<Map<String, Object>>() {
+        }.getType();
         // Conversion du JSON en Map
         return new Gson().fromJson(launchJson, mapType);
+    }
+
+
+    @NotNull
+    public static String resolveAttachAddress(@Nullable  String attachAddress, @NotNull Map<String, Object> parameters) {
+        if (StringUtils.isBlank(attachAddress)) {
+            return "";
+        }
+        if (attachAddress.charAt(0) == '$') {
+            var keys = attachAddress.substring(1).split("[.]");
+            Object current = parameters;
+            for (var key : keys) {
+                if (current instanceof Map) {
+                    current = ((Map) current).get(key);
+                }
+            }
+            if (current != null) {
+                return current.toString();
+            }
+            return "?";
+        }
+        return attachAddress;
+    }
+
+    public static int resolveAttachPort(@Nullable  String attachPort, Map<String, Object> parameters) {
+        if (StringUtils.isBlank(attachPort)) {
+            return -1;
+        }
+        if (attachPort.charAt(0) == '$') {
+            var keys = attachPort.substring(1).split("[.]");
+            Object current = parameters;
+            for (var key : keys) {
+                if (current instanceof Map) {
+                    current = ((Map) current).get(key);
+                }
+            }
+            if (current instanceof Double value) {
+                return value.intValue();
+            }
+            if (current instanceof Float value) {
+                return value.intValue();
+            }
+            if (current instanceof Long value) {
+                return value.intValue();
+            }
+            if (current instanceof Integer value) {
+                return value.intValue();
+            }
+            return -1;
+        }
+        try {
+            return Integer.parseInt(attachPort);
+        }
+        catch(Exception e) {
+            // Do nothing
+        }
+        return -1;
     }
 }

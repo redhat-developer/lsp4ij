@@ -179,8 +179,8 @@ public abstract class ServerInstallerBase implements ServerInstaller {
     /**
      * Updates the progress indicator with a message and fraction value.
      *
-     * @param text the message to display.
-     * @param fraction the progress fraction (0.0 to 1.0).
+     * @param text      the message to display.
+     * @param fraction  the progress fraction (0.0 to 1.0).
      * @param indicator the progress indicator to update.
      */
     protected void progress(@NotNull String text,
@@ -193,7 +193,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
     /**
      * Updates the progress indicator with a message.
      *
-     * @param text the message to display.
+     * @param text      the message to display.
      * @param indicator the progress indicator to update.
      */
     protected void progress(@NotNull String text,
