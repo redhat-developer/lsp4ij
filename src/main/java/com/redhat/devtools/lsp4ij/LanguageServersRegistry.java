@@ -462,7 +462,7 @@ public class LanguageServersRegistry {
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
+            mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -551,19 +551,15 @@ public class LanguageServersRegistry {
      * @return true if the language of the file is supported by a language server and false otherwise.
      */
     public boolean isFileSupported(@Nullable VirtualFile virtualFile, @Nullable Language language) {
-        if (virtualFile == null) {
+        if ((virtualFile == null) || (!virtualFile.isInLocalFileSystem() && (virtualFile instanceof LightVirtualFile))) {
             return false;
         }
 
         FileType fileType = virtualFile.getFileType();
         String fileName = virtualFile.getName();
-        if (fileAssociations
+        return fileAssociations
                 .stream()
-                .anyMatch(mapping -> mapping.match(language, fileType, fileName))) {
-            return virtualFile.isInLocalFileSystem() || !(virtualFile instanceof LightVirtualFile);
-        }
-
-        return false;
+                .anyMatch(mapping -> mapping.match(language, fileType, fileName));
     }
 
     /**
