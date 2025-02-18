@@ -134,7 +134,7 @@ final class LSPSemanticToken {
             }
             // Other, e.g., string/numeric literal, comment, operator, etc.
             else {
-                return switch (tokenType) {
+                return switch (tokenType.toUpperCase()) {
                     case "COMMENT" -> LSPSemanticTokenElementType.COMMENT;
                     case "STRING" -> LSPSemanticTokenElementType.STRING;
                     case "NUMBER" -> LSPSemanticTokenElementType.NUMBER;
