@@ -135,6 +135,8 @@ public abstract class ServerInstallerBase implements ServerInstaller {
 
                     markAsInstalled(installFuture);
                 } catch (ProcessCanceledException e) {
+                    //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                    //TODO delete block when minimum required version is 2024.2
                     installFuture.cancel(true);
                 } catch (CancellationException e) {
                     installFuture.cancel(true);
