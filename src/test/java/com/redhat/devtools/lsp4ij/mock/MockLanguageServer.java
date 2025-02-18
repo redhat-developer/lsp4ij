@@ -270,6 +270,10 @@ public final class MockLanguageServer implements LanguageServer {
 		this.textDocumentService.setCodeActions(codeActions);
 	}
 
+	public void setResolvedCodeAction(CodeAction codeAction) {
+		this.textDocumentService.setResolvedCodeAction(codeAction);
+	}
+
 	public void setSignatureHelp(SignatureHelp signatureHelp) {
 		this.textDocumentService.setSignatureHelp(signatureHelp);
 	}
