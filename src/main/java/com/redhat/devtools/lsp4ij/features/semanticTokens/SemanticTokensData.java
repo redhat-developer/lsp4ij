@@ -14,15 +14,17 @@ import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensHighlightInfo;
-import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorManager;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorData;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorManager;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import org.eclipse.lsp4j.SemanticTokens;
 import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -60,10 +62,15 @@ public class SemanticTokensData {
      * @param document the document.
      * @param addInfo  callback to collect {@link HighlightInfo} created from the semantic tokens data.
      */
-    @Nullable
     public void highlight(@NotNull PsiFile file,
                           @NotNull Document document,
                           @NotNull Consumer<HighlightInfo> addInfo) {
+        // Try to populate the file's view provider with these tokens if possible
+        FileViewProvider viewProvider = file.getViewProvider();
+        LSPSemanticTokensFileViewProvider semanticTokensViewProvider = viewProvider instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider ?
+                semanticTokensFileViewProvider :
+                null;
+
         var inspector = SemanticTokensInspectorManager.getInstance(file.getProject());
         boolean notifyInspector = inspector.hasSemanticTokensInspectorListener();
         List<SemanticTokensHighlightInfo> highlightInfos = notifyInspector ? new ArrayList<>() : null;
@@ -115,6 +122,11 @@ public class SemanticTokensData {
                                     .textAttributes(colorKey)
                                     .create();
                             addInfo.accept(highlightInfo);
+                        }
+
+                        // If this file uses a view provider based on semantic tokens, add this one
+                        if (semanticTokensViewProvider != null) {
+                            semanticTokensViewProvider.addSemanticToken(TextRange.create(start, end), tokenType, tokenModifiers);
                         }
 
                         if (notifyInspector) {

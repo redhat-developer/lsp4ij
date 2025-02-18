@@ -544,6 +544,24 @@ public class LanguageServersRegistry {
     }
 
     /**
+     * Returns true if the file and optional language are supported by a language server and false otherwise.
+     *
+     * @param virtualFile the file
+     * @param language    the language
+     * @return true if the language of the file is supported by a language server and false otherwise.
+     */
+    public boolean isFileSupported(@Nullable VirtualFile virtualFile, @Nullable Language language) {
+        if ((virtualFile == null) || !virtualFile.isInLocalFileSystem()) {
+            return false;
+        }
+        FileType fileType = virtualFile.getFileType();
+        String fileName = virtualFile.getName();
+        return fileAssociations
+                .stream()
+                .anyMatch(mapping -> mapping.match(language, fileType, fileName));
+    }
+
+    /**
      * @return the LSP codeLens / color inlay hint providers for all languages which are associated with a language server.
      */
     public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos() {

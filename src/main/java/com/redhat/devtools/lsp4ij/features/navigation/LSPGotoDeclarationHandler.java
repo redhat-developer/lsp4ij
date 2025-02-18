@@ -8,6 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
+
 package com.redhat.devtools.lsp4ij.features.navigation;
 
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationHandler;
@@ -18,10 +19,14 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiReference;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,18 +47,45 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
 
     @Nullable
     @Override
-    public PsiElement[] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
+    public PsiElement[] getGotoDeclarationTargets(@Nullable PsiElement sourceElement,
+                                                  int offset,
+                                                  Editor editor) {
         Project project = editor.getProject();
         if (project == null || project.isDisposed()) {
             return PsiElement.EMPTY_ARRAY;
         }
-        PsiFile psiFile = sourceElement.getContainingFile();
+        PsiFile psiFile = sourceElement != null ? sourceElement.getContainingFile() : null;
         if (psiFile == null) {
             return PsiElement.EMPTY_ARRAY;
         }
         if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return PsiElement.EMPTY_ARRAY;
         }
+
+        // If this was called for a populated semantic tokens view provider, just get the target directly from it
+        if (psiFile.getViewProvider() instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider) {
+            if (semanticTokensFileViewProvider.isReference(offset)) {
+                PsiReference reference = semanticTokensFileViewProvider.findReferenceAt(offset);
+                PsiElement target = reference != null ? reference.resolve() : null;
+                return target != null ? new PsiElement[]{target} : PsiElement.EMPTY_ARRAY;
+            } else if (semanticTokensFileViewProvider.isDeclaration(offset)) {
+                return PsiElement.EMPTY_ARRAY;
+            }
+
+            // NOTE: It's important that we short-circuit any further processing of this potential reference if this
+            // file is backed by semantic tokens and it's not a reference or a declaration. Otherwise things that can't
+            // act as references will show up as navigatable/hyperlinked incorrectly.
+            throw new ProcessCanceledException();
+        }
+
+        // Otherwise use LSP directly
+        return getGotoDeclarationTargets(editor, sourceElement, offset);
+    }
+
+    @ApiStatus.Internal
+    public static PsiElement @NotNull [] getGotoDeclarationTargets(@NotNull Editor editor,
+                                                                   @NotNull PsiElement sourceElement,
+                                                                   int offset) {
         VirtualFile file = LSPIJUtils.getFile(sourceElement);
         if (file == null) {
             return PsiElement.EMPTY_ARRAY;
@@ -61,6 +93,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         Document document = editor.getDocument();
 
         // Consume LSP 'textDocument/definition' request
+        PsiFile psiFile = sourceElement.getContainingFile();
         LSPDefinitionSupport definitionSupport = LSPFileSupport.getSupport(psiFile).getDefinitionSupport();
         var params = new LSPDefinitionParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
@@ -80,6 +113,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
             // textDocument/definition has been collected correctly
             List<LocationData> locations = definitionsFuture.getNow(null);
             if (locations != null) {
+                Project project = psiFile.getProject();
                 return locations
                         .stream()
                         .map(location -> toPsiElement(location.location(), location.languageServer().getClientFeatures(), project))
@@ -89,5 +123,4 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         }
         return PsiElement.EMPTY_ARRAY;
     }
-
 }

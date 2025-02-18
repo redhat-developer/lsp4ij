@@ -8,13 +8,16 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
+
 package com.redhat.devtools.lsp4ij.usages;
 
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.psi.ElementDescriptionLocation;
 import com.intellij.psi.ElementDescriptionProvider;
 import com.intellij.psi.PsiElement;
+import com.intellij.usageView.UsageViewShortNameLocation;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -23,10 +26,17 @@ import org.jetbrains.annotations.Nullable;
  */
 public class LSPUsageElementDescriptionProvider implements ElementDescriptionProvider {
     @Override
-    public @Nullable @NlsSafe String getElementDescription(@NotNull PsiElement element, @NotNull ElementDescriptionLocation location) {
+    @Nullable
+    @NlsSafe
+    public String getElementDescription(@NotNull PsiElement element, @NotNull ElementDescriptionLocation location) {
         if (element instanceof LSPUsageTriggeredPsiElement) {
             return LanguageServerBundle.message("usage.description");
         }
+        // If this is for Ctrl/Cmd+Mouse hover, try to get the element description from the documentation provider
+        else if (location instanceof UsageViewShortNameLocation) {
+            return LSPSemanticTokenDocumentationProvider.getElementDescription(element, null);
+        }
+
         return null;
     }
 }
