@@ -855,12 +855,11 @@ public class LSPIJUtils {
     }
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit) {
-        applyWorkspaceEdit(edit, null, null);
+        applyWorkspaceEdit(edit, null);
     }
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
-                                          @Nullable String label,
-                                          @Nullable Editor editor) {
+                                          @Nullable String label) {
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -869,7 +868,7 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyEdits(editor, document, textDocumentEdit.getEdits());
+                            applyEdits(null, document, textDocumentEdit.getEdits());
                         }
                     }
                 } else if (change.isRight()) {
@@ -1086,7 +1085,6 @@ public class LSPIJUtils {
                                   @NotNull List<TextEdit> edits) {
         if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
             doApplyEdits(editor, document, edits);
-            editor.getDocument().setText(document.getText());
         } else {
             WriteAction.run(() -> doApplyEdits(editor, document, edits));
         }
