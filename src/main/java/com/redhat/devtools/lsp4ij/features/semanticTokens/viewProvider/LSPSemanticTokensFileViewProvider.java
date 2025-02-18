@@ -18,9 +18,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.containers.ContainerUtil;
-import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,39 +51,14 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
 
     @Override
     public boolean supportsIncrementalReparse(@NotNull Language rootLanguage) {
-        // If this file is supported by LSP, there's no possibility of incremental reparse
-        if (isSupported()) {
-            return false;
-        }
-
-        // Otherwise defer to the inherited behavior
-        return super.supportsIncrementalReparse(rootLanguage);
-    }
-
-    // File status
-
-    private boolean isSupported() {
-        return isSupported(getFile());
-    }
-
-    @Contract("null -> false")
-    private boolean isSupported(@Nullable PsiFile file) {
-        // Again, this is only ever active for TextMate files associated with a language server definition
-        return (file != null) && file.isValid() && LSPIJEditorUtils.isSupportedTextMateFile(file);
+        // LSP files do not support incremental reparse
+        return false;
     }
 
     @Nullable
     private PsiFile getFile() {
         // There should only be one PSI file
         return ContainerUtil.getFirstItem(getAllFiles());
-    }
-
-    // This is a convenience that combines the notion of both isSupported() and getFile() where a single null check
-    // is sufficient to know whether or not logic should proceed
-    @Nullable
-    private PsiFile getSupportedFile() {
-        PsiFile file = getFile();
-        return isSupported(file) ? file : null;
     }
 
     // Element and reference resolution
@@ -123,39 +96,31 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
 
     @Override
     public PsiElement findElementAt(int offset) {
-        if (isSupported()) {
-            LSPSemanticToken semanticToken = getSemanticToken(offset);
-            return semanticToken != null ? semanticToken.getElement() : super.findElementAt(offset);
-        } else {
-            return super.findElementAt(offset);
-        }
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return semanticToken != null ? semanticToken.getElement() : super.findElementAt(offset);
     }
 
     @Override
     public PsiElement findElementAt(int offset, @NotNull Class<? extends Language> lang) {
-        return isSupported() ? findElementAt(offset) : super.findElementAt(offset, lang);
+        return findElementAt(offset);
     }
 
     @Override
     public PsiElement findElementAt(int offset, @NotNull Language language) {
-        return isSupported() ? findElementAt(offset) : super.findElementAt(offset, language);
+        return findElementAt(offset);
     }
 
     @Override
     public PsiReference findReferenceAt(int offset) {
-        if (isSupported()) {
-            LSPSemanticToken semanticToken = getSemanticToken(offset);
-            LSPSemanticTokenElementType elementType = semanticToken != null ? semanticToken.getElementType() : null;
-            return elementType == LSPSemanticTokenElementType.REFERENCE ? new LSPSemanticTokenPsiReference(semanticToken) : null;
-        } else {
-            return super.findReferenceAt(offset);
-        }
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        LSPSemanticTokenElementType elementType = semanticToken != null ? semanticToken.getElementType() : null;
+        return elementType == LSPSemanticTokenElementType.REFERENCE ? new LSPSemanticTokenPsiReference(semanticToken) : null;
     }
 
     @Override
     @Nullable
     public PsiReference findReferenceAt(int offset, @NotNull Language language) {
-        return isSupported() ? findReferenceAt(offset) : super.findReferenceAt(offset, language);
+        return findReferenceAt(offset);
     }
 
     // Element description
@@ -184,19 +149,18 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
     // Store the file's semantic tokens so that we have constant-time lookup of an element for a given offset
     @Nullable
     private Map<Integer, LSPSemanticToken> getSemanticTokensByOffset() {
-        PsiFile file = getSupportedFile();
-        if (file != null) {
-            // By caching the storage on the file this way, it's automatically evicted when the file changes
-            return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
-                @Override
-                @NotNull
-                public Result<Map<Integer, LSPSemanticToken>> compute() {
-                    Map<Integer, LSPSemanticToken> semanticTokensByOffset = Collections.synchronizedMap(new HashMap<>());
-                    return Result.create(semanticTokensByOffset, file);
-                }
-            });
-        }
-        return null;
+        PsiFile file = getFile();
+        if (file == null) return null;
+
+        // By caching the storage on the file this way, it's automatically evicted when the file changes
+        return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
+            @Override
+            @NotNull
+            public Result<Map<Integer, LSPSemanticToken>> compute() {
+                Map<Integer, LSPSemanticToken> semanticTokensByOffset = Collections.synchronizedMap(new HashMap<>());
+                return Result.create(semanticTokensByOffset, file);
+            }
+        });
     }
 
     /**
@@ -210,43 +174,41 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
     public void addSemanticToken(@NotNull TextRange textRange,
                                  @Nullable String tokenType,
                                  @Nullable List<String> tokenModifiers) {
-        PsiFile file = getSupportedFile();
-        if (file != null) {
-            Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
-            if (semanticTokensByOffset != null) {
-                LSPSemanticToken semanticToken = new LSPSemanticToken(file, textRange, tokenType, tokenModifiers);
+        PsiFile file = getFile();
+        if (file == null) return;
 
-                // Index the token for its text range
-                for (int offset = textRange.getStartOffset(); offset <= textRange.getEndOffset(); offset++) {
-                    semanticTokensByOffset.put(offset, semanticToken);
-                }
+        Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
+        if (semanticTokensByOffset != null) {
+            LSPSemanticToken semanticToken = new LSPSemanticToken(file, textRange, tokenType, tokenModifiers);
+
+            // Index the token for its text range
+            for (int offset = textRange.getStartOffset(); offset <= textRange.getEndOffset(); offset++) {
+                semanticTokensByOffset.put(offset, semanticToken);
             }
         }
     }
 
     @Nullable
     private LSPSemanticToken getSemanticToken(int offset) {
-        PsiFile file = getSupportedFile();
-        if (file != null) {
-            // If this file has semantic tokens, use them
-            Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
-            if (!ContainerUtil.isEmpty(semanticTokensByOffset)) {
-                return semanticTokensByOffset.get(offset);
-            }
-            // Otherwise stub a semantic token for the entire file so that it won't highlight as a link on mouse hover
-            else {
-                // By caching the stub on the file this way, it's automatically evicted when the file changes
-                return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
-                    @Override
-                    @NotNull
-                    public Result<LSPSemanticToken> compute() {
-                        LSPSemanticToken stubSemanticToken = new LSPSemanticToken(file, file.getTextRange(), null, null);
-                        return Result.create(stubSemanticToken, file);
-                    }
-                });
-            }
-        }
+        PsiFile file = getFile();
+        if (file == null) return null;
 
-        return null;
+        // If this file has semantic tokens, use them
+        Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
+        if (!ContainerUtil.isEmpty(semanticTokensByOffset)) {
+            return semanticTokensByOffset.get(offset);
+        }
+        // Otherwise stub a semantic token for the entire file so that it won't highlight as a link on mouse hover
+        else {
+            // By caching the stub on the file this way, it's automatically evicted when the file changes
+            return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
+                @Override
+                @NotNull
+                public Result<LSPSemanticToken> compute() {
+                    LSPSemanticToken stubSemanticToken = new LSPSemanticToken(file, file.getTextRange(), null, null);
+                    return Result.create(stubSemanticToken, file);
+                }
+            });
+        }
     }
 }
