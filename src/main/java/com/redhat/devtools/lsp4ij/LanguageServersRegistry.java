@@ -551,14 +551,19 @@ public class LanguageServersRegistry {
      * @return true if the language of the file is supported by a language server and false otherwise.
      */
     public boolean isFileSupported(@Nullable VirtualFile virtualFile, @Nullable Language language) {
-        if ((virtualFile == null) || !virtualFile.isInLocalFileSystem()) {
+        if (virtualFile == null) {
             return false;
         }
+
         FileType fileType = virtualFile.getFileType();
         String fileName = virtualFile.getName();
-        return fileAssociations
+        if (fileAssociations
                 .stream()
-                .anyMatch(mapping -> mapping.match(language, fileType, fileName));
+                .anyMatch(mapping -> mapping.match(language, fileType, fileName))) {
+            return virtualFile.isInLocalFileSystem() || !(virtualFile instanceof LightVirtualFile);
+        }
+
+        return false;
     }
 
     /**
