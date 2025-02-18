@@ -134,7 +134,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                     install(indicator);
 
                     markAsInstalled(installFuture);
-                } catch (CancellationException | ProcessCanceledException e) {
+                } catch (CancellationException e) {
                     installFuture.cancel(true);
                 } catch (Throwable e) {
                     status = ServerInstallationStatus.NOT_INSTALLED;
