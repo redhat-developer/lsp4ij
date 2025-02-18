@@ -134,12 +134,12 @@ final class LSPSemanticToken {
             }
             // Other, e.g., string/numeric literal, comment, operator, etc.
             else {
-                return switch (tokenType.toUpperCase()) {
-                    case "COMMENT" -> LSPSemanticTokenElementType.COMMENT;
-                    case "STRING" -> LSPSemanticTokenElementType.STRING;
-                    case "NUMBER" -> LSPSemanticTokenElementType.NUMBER;
-                    case "REGEXP" -> LSPSemanticTokenElementType.REGEXP;
-                    case "OPERATOR" -> LSPSemanticTokenElementType.OPERATOR;
+                return switch (tokenType) {
+                    case SemanticTokenTypes.Comment -> LSPSemanticTokenElementType.COMMENT;
+                    case SemanticTokenTypes.String -> LSPSemanticTokenElementType.STRING;
+                    case SemanticTokenTypes.Number -> LSPSemanticTokenElementType.NUMBER;
+                    case SemanticTokenTypes.Regexp -> LSPSemanticTokenElementType.REGEXP;
+                    case SemanticTokenTypes.Operator -> LSPSemanticTokenElementType.OPERATOR;
                     default -> LSPSemanticTokenElementType.UNKNOWN;
                 };
             }
