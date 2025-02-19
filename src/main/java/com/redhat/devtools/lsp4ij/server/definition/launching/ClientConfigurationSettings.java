@@ -53,7 +53,7 @@ public class ClientConfigurationSettings {
 
         /**
          * Whether or not the fix for <a href="https://youtrack.jetbrains.com/issue/IJPL-159454">IJPL-159454</a> is
-         * enabled. Default to true.
+         * enabled. Defaults to true.
          */
         public boolean enableEnterBetweenBracesFix = true;
 
@@ -62,6 +62,11 @@ public class ClientConfigurationSettings {
          * Defaults to true.
          */
         public boolean enableTextMateNestedBracesImprovements = true;
+
+        /**
+         * Whether or not the custom file view provider for TextMate files is enabled. Defaults to true.
+         */
+        public boolean enableTextMateFileViewProvider = true;
     }
 
     /**

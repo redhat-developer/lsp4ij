@@ -18,6 +18,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -49,16 +50,41 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
         super(psiManager, virtualFile, eventSystemEnabled, language);
     }
 
-    @Override
-    public boolean supportsIncrementalReparse(@NotNull Language rootLanguage) {
-        // LSP files do not support incremental reparse
-        return false;
+    /**
+     * Returns the semantic tokens file view provider for the provided PSI file if assignable and enabled.
+     *
+     * @param file the PSI file
+     * @return the semantic tokens file view provider if assignable and enabled; otherwise false
+     */
+    @ApiStatus.Internal
+    public static LSPSemanticTokensFileViewProvider getInstance(@Nullable PsiFile file) {
+        FileViewProvider fileViewProvider = file != null ? file.getViewProvider() : null;
+        return ((fileViewProvider instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider) &&
+                semanticTokensFileViewProvider.isEnabled()) ?
+                semanticTokensFileViewProvider :
+                null;
+    }
+
+    // Only override standard behavior when enabled to do so
+    private boolean isEnabled() {
+        return getFile() != null;
     }
 
     @Nullable
     private PsiFile getFile() {
         // There should only be one PSI file
-        return ContainerUtil.getFirstItem(getAllFiles());
+        List<PsiFile> allFiles = getAllFiles();
+        PsiFile file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
+        return (file != null) && EditorBehaviorFeature.enableTextMateFileViewProvider(file) ? file : null;
+    }
+
+    @Override
+    public boolean supportsIncrementalReparse(@NotNull Language rootLanguage) {
+        // LSP files do not support incremental reparse
+        if (isEnabled()) {
+            return false;
+        }
+        return super.supportsIncrementalReparse(rootLanguage);
     }
 
     // Element and reference resolution
@@ -96,31 +122,37 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
 
     @Override
     public PsiElement findElementAt(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return semanticToken != null ? semanticToken.getElement() : super.findElementAt(offset);
+        if (isEnabled()) {
+            LSPSemanticToken semanticToken = getSemanticToken(offset);
+            return semanticToken != null ? semanticToken.getElement() : super.findElementAt(offset);
+        }
+        return super.findElementAt(offset);
     }
 
     @Override
     public PsiElement findElementAt(int offset, @NotNull Class<? extends Language> lang) {
-        return findElementAt(offset);
+        return isEnabled() ? findElementAt(offset) : super.findElementAt(offset, lang);
     }
 
     @Override
     public PsiElement findElementAt(int offset, @NotNull Language language) {
-        return findElementAt(offset);
+        return isEnabled() ? findElementAt(offset) : super.findElementAt(offset, language);
     }
 
     @Override
     public PsiReference findReferenceAt(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        LSPSemanticTokenElementType elementType = semanticToken != null ? semanticToken.getElementType() : null;
-        return elementType == LSPSemanticTokenElementType.REFERENCE ? new LSPSemanticTokenPsiReference(semanticToken) : null;
+        if (isEnabled()) {
+            LSPSemanticToken semanticToken = getSemanticToken(offset);
+            LSPSemanticTokenElementType elementType = semanticToken != null ? semanticToken.getElementType() : null;
+            return elementType == LSPSemanticTokenElementType.REFERENCE ? new LSPSemanticTokenPsiReference(semanticToken) : null;
+        }
+        return super.findReferenceAt(offset);
     }
 
     @Override
     @Nullable
     public PsiReference findReferenceAt(int offset, @NotNull Language language) {
-        return findReferenceAt(offset);
+        return isEnabled() ? findReferenceAt(offset) : super.findReferenceAt(offset, language);
     }
 
     // Element description

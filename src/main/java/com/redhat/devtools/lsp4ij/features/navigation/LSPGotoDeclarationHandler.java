@@ -63,7 +63,8 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         }
 
         // If this was called for a populated semantic tokens view provider, just get the target directly from it
-        if (psiFile.getViewProvider() instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider) {
+        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(psiFile);
+        if (semanticTokensFileViewProvider != null) {
             if (semanticTokensFileViewProvider.isReference(offset)) {
                 PsiReference reference = semanticTokensFileViewProvider.findReferenceAt(offset);
                 PsiElement target = reference != null ? reference.resolve() : null;

@@ -99,6 +99,17 @@ public class EditorBehaviorFeature {
         return false;
     }
 
+    /**
+     * Whether or not the custom file view provider for TextMate files is enabled.
+     *
+     * @param file the file
+     * @return true if the custom file view provider for TextMate files is enabled; otherwise false
+     */
+    public boolean isEnableTextMateFileViewProvider(@NotNull PsiFile file) {
+        // Default to disabled
+        return false;
+    }
+
     // Utility methods to check the state of these feature flags easily
 
     /**
@@ -155,6 +166,19 @@ public class EditorBehaviorFeature {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
                 file.getVirtualFile(),
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateNestedBracesImprovements(file)
+        );
+    }
+
+    /**
+     * Whether or not the custom file view provider for TextMate files is enabled.
+     *
+     * @param file the PSI file
+     * @return true if the custom file view provider for TextMate files is enabled; otherwise false
+     */
+    public static boolean enableTextMateFileViewProvider(@NotNull PsiFile file) {
+        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
+                file.getVirtualFile(),
+                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateFileViewProvider(file)
         );
     }
 }

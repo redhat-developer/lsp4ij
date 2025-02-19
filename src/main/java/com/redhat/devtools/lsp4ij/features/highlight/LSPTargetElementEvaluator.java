@@ -14,7 +14,6 @@ package com.redhat.devtools.lsp4ij.features.highlight;
 import com.intellij.codeInsight.TargetElementEvaluatorEx2;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -45,9 +44,9 @@ public class LSPTargetElementEvaluator extends TargetElementEvaluatorEx2 {
         }
 
         // See if the view provider can provide an element
-        FileViewProvider viewProvider = file.getViewProvider();
-        if (viewProvider instanceof LSPSemanticTokensFileViewProvider) {
-            return viewProvider.findElementAt(offset);
+        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
+        if (semanticTokensFileViewProvider != null) {
+            return semanticTokensFileViewProvider.findElementAt(offset);
         }
 
         // Nope. Try to find the word at the caret and return a fake PSI element for it

@@ -44,7 +44,8 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
             PsiFile targetFile = targetElement.getContainingFile();
 
             // Try to get an element description for the semantic token if present
-            if (targetFile.getViewProvider() instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider) {
+            LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(targetFile);
+            if (semanticTokensFileViewProvider != null) {
                 String elementDescription = semanticTokensFileViewProvider.getElementDescription(targetElement, sourceElement);
                 if (StringUtil.isNotEmpty(elementDescription)) {
                     return elementDescription;

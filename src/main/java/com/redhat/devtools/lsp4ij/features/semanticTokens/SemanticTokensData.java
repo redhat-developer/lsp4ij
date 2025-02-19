@@ -15,7 +15,6 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensHighlightInfo;
@@ -66,10 +65,7 @@ public class SemanticTokensData {
                           @NotNull Document document,
                           @NotNull Consumer<HighlightInfo> addInfo) {
         // Try to populate the file's view provider with these tokens if possible
-        FileViewProvider viewProvider = file.getViewProvider();
-        LSPSemanticTokensFileViewProvider semanticTokensViewProvider = viewProvider instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider ?
-                semanticTokensFileViewProvider :
-                null;
+        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
 
         var inspector = SemanticTokensInspectorManager.getInstance(file.getProject());
         boolean notifyInspector = inspector.hasSemanticTokensInspectorListener();
@@ -125,8 +121,8 @@ public class SemanticTokensData {
                         }
 
                         // If this file uses a view provider based on semantic tokens, add this one
-                        if (semanticTokensViewProvider != null) {
-                            semanticTokensViewProvider.addSemanticToken(TextRange.create(start, end), tokenType, tokenModifiers);
+                        if (semanticTokensFileViewProvider != null) {
+                            semanticTokensFileViewProvider.addSemanticToken(TextRange.create(start, end), tokenType, tokenModifiers);
                         }
 
                         if (notifyInspector) {
