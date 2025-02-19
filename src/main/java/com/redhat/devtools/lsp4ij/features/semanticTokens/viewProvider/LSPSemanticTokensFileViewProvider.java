@@ -113,6 +113,43 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
         return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.REFERENCE);
     }
 
+    /**
+     * Returns whether or not the semantic token/element at the offset is for a string literal.
+     *
+     * @param offset the offset
+     * @return whether or not the semantic token/element at the offset is for a string literal
+     */
+    @ApiStatus.Internal
+    public boolean isStringLiteral(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.STRING);
+    }
+
+    /**
+     * Returns whether or not the semantic token/element at the offset is for a comment.
+     *
+     * @param offset the offset
+     * @return whether or not the semantic token/element at the offset is for a comment
+     */
+    @ApiStatus.Internal
+    public boolean isComment(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.STRING);
+    }
+
+    /**
+     * Returns the text range of the semantic token/element at the offset.
+     *
+     * @param offset the offset
+     * @return the text range of the semantic token/element at the offset, or null if none exists
+     */
+    @Nullable
+    @ApiStatus.Internal
+    public TextRange getSemanticTokenTextRange(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return semanticToken != null ? semanticToken.getTextRange() : null;
+    }
+
     // NOTE: These are really the core of what makes this all work. Basically when any external caller needs to
     // find an element or reference for a given offset in the file, we use the semantic token information that
     // was populated the last time that semantic tokens were returned by the language server to return an element
