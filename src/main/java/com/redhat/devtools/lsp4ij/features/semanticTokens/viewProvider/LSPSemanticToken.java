@@ -68,7 +68,7 @@ final class LSPSemanticToken {
     private final List<String> tokenModifiers;
 
     private final LSPSemanticTokenElementType elementType;
-    private final LSPSemanticTokenPsiElement element;
+    private volatile LSPSemanticTokenPsiElement element = null;
 
     /**
      * Creates a new semantic token.
@@ -88,9 +88,7 @@ final class LSPSemanticToken {
         this.textRange = textRange;
         this.tokenType = tokenType;
         this.tokenModifiers = tokenModifiers != null ? tokenModifiers : Collections.emptyList();
-
         this.elementType = getElementType(this.tokenType, this.tokenModifiers);
-        this.element = new LSPSemanticTokenPsiElement(this);
     }
 
     @NotNull
@@ -151,6 +149,14 @@ final class LSPSemanticToken {
 
     @NotNull
     LSPSemanticTokenPsiElement getElement() {
+        // Create the element lazily so that, if it's never needed, it's never created
+        if (element == null) {
+            synchronized (this) {
+                if (element == null) {
+                    element = new LSPSemanticTokenPsiElement(this);
+                }
+            }
+        }
         return element;
     }
 }
