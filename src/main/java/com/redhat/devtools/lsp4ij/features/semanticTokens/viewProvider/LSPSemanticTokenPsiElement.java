@@ -95,7 +95,12 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
                     if (textRange != null) {
                         Document document = LSPIJUtils.getDocument(this);
                         CharSequence documentChars = document != null ? document.getCharsSequence() : null;
-                        CharSequence textChars = documentChars != null ? documentChars.subSequence(textRange.getStartOffset(), textRange.getEndOffset()) : null;
+                        CharSequence textChars = documentChars != null ?
+                                documentChars.subSequence(
+                                        Math.max(textRange.getStartOffset(), 0),
+                                        Math.min(textRange.getEndOffset(), semanticToken.getFile().getTextLength())
+                                ) :
+                                null;
                         if (textChars != null) {
                             workingText = textChars.toString();
                         }
