@@ -76,6 +76,12 @@
           "title": "Enable enter-between-braces fix",
           "description": "Whether or not the fix for enter-between-braces behavior in TextMate and abstract file type files is enabled.",
           "default": true
+        },
+        "enableTextMateNestedBracesImprovements": {
+          "type": "boolean",
+          "title": "Enable TextMate nested braces fix",
+          "description": "Whether or not editor improvements for nested braces/brackets/parentheses in TextMate files are enabled.",
+          "default": true
         }
       }
     },

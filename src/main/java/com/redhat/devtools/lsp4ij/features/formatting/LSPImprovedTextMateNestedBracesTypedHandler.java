@@ -11,16 +11,24 @@
 
 package com.redhat.devtools.lsp4ij.features.formatting;
 
+import com.intellij.codeInsight.CodeInsightSettings;
 import com.intellij.codeInsight.editorActions.TypedHandlerDelegate;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedEditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.plugins.textmate.editor.TextMateEditorUtils;
+import org.jetbrains.plugins.textmate.editor.TextMateTypedHandler;
+import org.jetbrains.plugins.textmate.language.preferences.TextMateAutoClosingPair;
+import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
 
 /**
  * Improves on-type handling of unbalanced nested brace/bracket/paren pairs in TextMate files.
  */
-public class LSPImprovedTextMateTypedHandler extends TypedHandlerDelegate {
+public class LSPImprovedTextMateNestedBracesTypedHandler extends TypedHandlerDelegate {
 
     @Override
     @NotNull
@@ -28,9 +36,9 @@ public class LSPImprovedTextMateTypedHandler extends TypedHandlerDelegate {
                             @NotNull Project project,
                             @NotNull Editor editor,
                             @NotNull PsiFile file) {
-        /* TODO: Uncomment once LSP4IJ no longer supports 2023.2
         if (LSPIJEditorUtils.isSupportedTextMateFile(file) &&
-            CodeInsightSettings.getInstance().AUTOINSERT_PAIR_BRACKET) {
+            CodeInsightSettings.getInstance().AUTOINSERT_PAIR_BRACKET &&
+            UserDefinedEditorBehaviorFeature.enableTextMateNestedBracesImprovements(file)) {
             int offset = editor.getCaretModel().getOffset();
             if (offset > 1) {
                 TextMateScope scopeSelector = TextMateEditorUtils.getCurrentScopeSelector((EditorEx) editor);
@@ -77,7 +85,6 @@ public class LSPImprovedTextMateTypedHandler extends TypedHandlerDelegate {
                 }
             }
         }
-        */
 
         return super.charTyped(charTyped, project, editor, file);
     }
