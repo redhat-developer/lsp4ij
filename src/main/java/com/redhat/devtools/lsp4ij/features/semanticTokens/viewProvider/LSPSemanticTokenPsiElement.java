@@ -44,11 +44,6 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
         this.semanticToken = semanticToken;
     }
 
-    @NotNull
-    LSPSemanticToken getSemanticToken() {
-        return semanticToken;
-    }
-
     @Override
     public boolean isPhysical() {
         // These do represent real text ranges in physical files
@@ -71,7 +66,7 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
     @Nullable
     public PsiElement getNameIdentifier() {
         // If this is a declaration, return this element as the name identifier
-        return getSemanticToken().getElementType() == LSPSemanticTokenElementType.DECLARATION ? this : null;
+        return semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION ? this : null;
     }
 
     @Override
