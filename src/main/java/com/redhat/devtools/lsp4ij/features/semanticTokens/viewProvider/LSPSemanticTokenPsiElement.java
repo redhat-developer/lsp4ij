@@ -56,6 +56,12 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
     }
 
     @Override
+    public boolean isValid() {
+        // Tie the validity of this element to that of its containing file
+        return semanticToken.getFile().isValid();
+    }
+
+    @Override
     public boolean canNavigate() {
         // References can be navigated
         return semanticToken.getElementType() == LSPSemanticTokenElementType.REFERENCE;
