@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -149,7 +150,7 @@ final class LSPSemanticToken {
 
     @NotNull
     LSPSemanticTokenPsiElement getElement() {
-        // Create the element lazily so that, if it's never needed, it's never created
+        // Create the element lazily so that if it's never needed, it's never created
         if (element == null) {
             synchronized (this) {
                 if (element == null) {
@@ -158,5 +159,25 @@ final class LSPSemanticToken {
             }
         }
         return element;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if ((o == null) || (getClass() != o.getClass())) return false;
+        LSPSemanticToken that = (LSPSemanticToken) o;
+        return Objects.equals(file, that.file) &&
+               Objects.equals(textRange, that.textRange) &&
+               Objects.equals(tokenType, that.tokenType) &&
+               Objects.equals(tokenModifiers, that.tokenModifiers);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                file,
+                textRange,
+                tokenType,
+                tokenModifiers
+        );
     }
 }

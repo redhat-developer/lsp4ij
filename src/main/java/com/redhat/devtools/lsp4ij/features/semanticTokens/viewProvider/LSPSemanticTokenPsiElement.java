@@ -124,4 +124,16 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
 
         return null;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if ((o == null) || (getClass() != o.getClass())) return false;
+        LSPSemanticTokenPsiElement that = (LSPSemanticTokenPsiElement) o;
+        return Objects.equals(semanticToken, that.semanticToken);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(semanticToken);
+    }
 }

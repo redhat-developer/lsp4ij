@@ -83,7 +83,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         }
 
         // Use LSP to find targets
-        PsiElement[] targets = getGotoDeclarationTargets(editor, sourceElement, offset);
+        PsiElement[] targets = getGotoDeclarationTargets(sourceElement, offset);
 
         // If this is a semantic token-backed file and there were targets but this wasn't represented in semantic tokens
         // as a reference, stub a reference for the word at the current offset
@@ -109,15 +109,25 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         return targets;
     }
 
+    /**
+     * Uses LSP to resolve the target elements for the reference at the specified offset in the file containing the
+     * provided source element.
+     *
+     * @param sourceElement the source element
+     * @param offset        the offset
+     * @return the resolved reference
+     */
     @ApiStatus.Internal
-    public static PsiElement @NotNull [] getGotoDeclarationTargets(@NotNull Editor editor,
-                                                                   @NotNull PsiElement sourceElement,
-                                                                   int offset) {
+    public static PsiElement @NotNull [] getGotoDeclarationTargets(@NotNull PsiElement sourceElement, int offset) {
         VirtualFile file = LSPIJUtils.getFile(sourceElement);
         if (file == null) {
             return PsiElement.EMPTY_ARRAY;
         }
-        Document document = editor.getDocument();
+
+        Document document = LSPIJUtils.getDocument(file);
+        if (document == null) {
+            return PsiElement.EMPTY_ARRAY;
+        }
 
         // Consume LSP 'textDocument/definition' request
         PsiFile psiFile = sourceElement.getContainingFile();

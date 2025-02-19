@@ -26,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -59,7 +60,7 @@ class LSPSemanticTokenPsiReference extends PsiReferenceBase<LSPSemanticTokenPsiE
                     @Override
                     @NotNull
                     public Result<PsiElement> compute() {
-                        PsiElement[] targets = LSPGotoDeclarationHandler.getGotoDeclarationTargets(editor, element, element.getTextOffset());
+                        PsiElement[] targets = LSPGotoDeclarationHandler.getGotoDeclarationTargets(element, element.getTextOffset());
 
                         // Add both source and target files as cache dependencies
                         Set<PsiElement> dependencies = new HashSet<>();
@@ -92,5 +93,17 @@ class LSPSemanticTokenPsiReference extends PsiReferenceBase<LSPSemanticTokenPsiE
     public Object @NotNull [] getVariants() {
         // We don't have enough information to return variants here
         return EMPTY_ARRAY;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if ((o == null) || (getClass() != o.getClass())) return false;
+        LSPSemanticTokenPsiReference that = (LSPSemanticTokenPsiReference) o;
+        return Objects.equals(semanticToken, that.semanticToken);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(semanticToken);
     }
 }
