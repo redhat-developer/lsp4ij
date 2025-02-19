@@ -30,7 +30,7 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFileName;
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
 
 /**
- *  Debug Adapter Protocol (DAP) breakpoint handler.
+ * Debug Adapter Protocol (DAP) breakpoint handler.
  */
 public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAPBreakpointProperties>> {
 
@@ -78,6 +78,10 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
     }
 
     private CompletableFuture<@Nullable Void> sendBreakpoints() {
+        return sendBreakpoints(null);
+    }
+
+    private CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable XSourcePosition temporaryBreakpoint) {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
         }
@@ -86,18 +90,11 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
         Map<Source, List<SourceBreakpoint>> targetBreakpoints = new HashMap<>();
         for (XBreakpoint breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
+            addSourceBreakpoint(sourcePosition, targetBreakpoints);
+        }
 
-            Source source = new Source();
-            source.setPath(getFilePath(sourcePosition.getFile()));
-            source.setName(getFileName(sourcePosition.getFile()));
-
-            List<SourceBreakpoint> sourceBreakpoints = targetBreakpoints
-                    .computeIfAbsent(source, s -> new ArrayList<>());
-
-            int lineNumber = getLineNumber(sourcePosition);
-            SourceBreakpoint sourceBreakpoint = new SourceBreakpoint();
-            sourceBreakpoint.setLine(lineNumber);
-            sourceBreakpoints.add(sourceBreakpoint);
+        if (temporaryBreakpoint != null) {
+            addSourceBreakpoint(temporaryBreakpoint, targetBreakpoints);
         }
 
         final var setBreakpointsFutures = new ArrayList<CompletableFuture<Void>>();
@@ -128,6 +125,28 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
             }
         }
         return CompletableFuture.allOf(setBreakpointsFutures.toArray(new CompletableFuture[setBreakpointsFutures.size()]));
+    }
+
+    private static void addSourceBreakpoint(XSourcePosition sourcePosition, Map<Source, List<SourceBreakpoint>> targetBreakpoints) {
+        Source source = toDAPSource(sourcePosition);
+        List<SourceBreakpoint> sourceBreakpoints = targetBreakpoints
+                .computeIfAbsent(source, s -> new ArrayList<>());
+
+        int lineNumber = getLineNumber(sourcePosition);
+        SourceBreakpoint sourceBreakpoint = new SourceBreakpoint();
+        sourceBreakpoint.setLine(lineNumber);
+        sourceBreakpoints.add(sourceBreakpoint);
+    }
+
+    private static @NotNull Source toDAPSource(XSourcePosition sourcePosition) {
+        Source source = new Source();
+        source.setPath(getFilePath(sourcePosition.getFile()));
+        source.setName(getFileName(sourcePosition.getFile()));
+        return source;
+    }
+
+    public CompletableFuture<@Nullable Void> sendTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
+        return sendBreakpoints(sourcePosition);
     }
 
     /**
