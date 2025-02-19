@@ -35,6 +35,7 @@ import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.usages.LSPFindUsagesProvider;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -544,22 +545,30 @@ public class LanguageServersRegistry {
     }
 
     /**
-     * Returns true if the file and optional language are supported by a language server and false otherwise.
+     * Returns true if the virtual file and optional language are supported by a language server and false otherwise.
+     * This signature should be used only when it is not yet possible yet to check the PSI file because it is in the
+     * process of being created via a file view provider factory. If a PSI file is available, one of the other
+     * signatures of {@link #isFileSupported} should be used instead.
      *
-     * @param virtualFile the file
+     * @param virtualFile the virtual file
      * @param language    the language
-     * @return true if the language of the file is supported by a language server and false otherwise.
+     * @return true if the virtual file is supported by a configured language server and false otherwise.
      */
+    @ApiStatus.Internal
     public boolean isFileSupported(@Nullable VirtualFile virtualFile, @Nullable Language language) {
-        if ((virtualFile == null) || (!virtualFile.isInLocalFileSystem() && (virtualFile instanceof LightVirtualFile))) {
+        if (virtualFile == null) {
             return false;
         }
 
         FileType fileType = virtualFile.getFileType();
         String fileName = virtualFile.getName();
-        return fileAssociations
+        if (fileAssociations
                 .stream()
-                .anyMatch(mapping -> mapping.match(language, fileType, fileName));
+                .anyMatch(mapping -> mapping.match(language, fileType, fileName))) {
+            return virtualFile.isInLocalFileSystem() || !(virtualFile instanceof LightVirtualFile);
+        }
+
+        return false;
     }
 
     /**
