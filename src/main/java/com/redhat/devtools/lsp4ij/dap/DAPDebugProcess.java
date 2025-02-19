@@ -22,6 +22,7 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
@@ -293,5 +294,16 @@ public class DAPDebugProcess extends XDebugProcess {
             return dapStackFrame;
         }
         return null;
+    }
+
+    @Override
+    public void runToPosition(@NotNull XSourcePosition position,
+                              @Nullable XSuspendContext context) {
+        getBreakpointHandler()
+                .sendTemporaryBreakpoint(position)// Send a temporary breakpoint with the proper position to the DAP server
+                .thenApply(unused -> {
+                    resume(context); // and resume the debugger
+                    return null;
+                });
     }
 }

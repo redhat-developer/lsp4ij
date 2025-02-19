@@ -16,6 +16,7 @@ import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.testFramework.EditorTestUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
@@ -544,5 +545,71 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
     @NotNull
     private static String adjustIndent(@NotNull String fileBody, boolean useTabCharacter) {
         return useTabCharacter ? fileBody.replace("    ", "\t") : fileBody;
+    }
+
+    // These tests exercise the behavior of LSPImprovedTextMateNestedBracesTypedHandler
+
+    public void testImprovedTextMateNestedBraces() {
+        String fileBody = """
+                function foo() {
+                    invokePromise()
+                        .then()
+                }
+                """;
+        int initialOffset = fileBody.indexOf(".then(") + ".then(".length();
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        initializeLanguageServer();
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+
+        CaretModel caretModel = editor.getCaretModel();
+        caretModel.moveToOffset(initialOffset);
+
+        // Type four open parens and we should end up five balanced parens
+        for (int iteration = 1; iteration <= 4; iteration++) {
+            EditorTestUtil.performTypingAction(editor, '(');
+            assertEquals(fileBody.replace(".then()", ".then(" + StringUtil.repeatSymbol('(', iteration) + StringUtil.repeatSymbol(')', iteration) + ")"), document.getText());
+            assertEquals(initialOffset + iteration, caretModel.getOffset());
+        }
+
+        // Type five close parens and nothing should be inserted but the caret should be advanced each time
+        String fiveBalancedParens = fileBody.replace(".then()", ".then" + StringUtil.repeatSymbol('(', 5) + StringUtil.repeatSymbol(')', 5));
+        initialOffset = caretModel.getOffset();
+        for (int iteration = 1; iteration <= 5; iteration++) {
+            EditorTestUtil.performTypingAction(editor, ')');
+            assertEquals(fiveBalancedParens, document.getText());
+            assertEquals(initialOffset + iteration, caretModel.getOffset());
+        }
+    }
+
+    public void testImprovedTextMateNestedBracesDisabled() {
+        String fileBody = """
+                function foo() {
+                    invokePromise()
+                        .then()
+                }
+                """;
+        int initialOffset = fileBody.indexOf(".then(") + ".then(".length();
+
+        myFixture.configureByText(TEST_FILE_NAME, fileBody);
+        LanguageServerItem languageServer = initializeLanguageServer();
+
+        // Disable TextMate Bundles file improvements
+        getClientConfigurationSettings(languageServer).editor.enableTextMateNestedBracesImprovements = false;
+
+        Editor editor = myFixture.getEditor();
+        Document document = editor.getDocument();
+
+        CaretModel caretModel = editor.getCaretModel();
+        caretModel.moveToOffset(initialOffset);
+
+        // Type four open parens and they should be inserted unpaired
+        for (int iteration = 1; iteration <= 4; iteration++) {
+            EditorTestUtil.performTypingAction(editor, '(');
+            assertEquals(fileBody.replace(".then()", ".then(" + StringUtil.repeatSymbol('(', iteration) + ")"), document.getText());
+            assertEquals(initialOffset + iteration, caretModel.getOffset());
+        }
     }
 }
