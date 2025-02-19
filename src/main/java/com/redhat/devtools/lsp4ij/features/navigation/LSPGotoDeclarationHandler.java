@@ -11,20 +11,25 @@
 
 package com.redhat.devtools.lsp4ij.features.navigation;
 
+import com.intellij.codeInsight.navigation.CtrlMouseHandler2;
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationHandler;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiReference;
+import com.intellij.util.ArrayUtil;
+import com.intellij.util.ExceptionUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
+import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -62,25 +67,46 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
             return PsiElement.EMPTY_ARRAY;
         }
 
-        // If this was called for a populated semantic tokens view provider, just get the target directly from it
+        // If this was called for a populated semantic tokens view provider, try to get the target directly from it
         LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(psiFile);
         if (semanticTokensFileViewProvider != null) {
+            // If this is definitely a reference, resolve it
             if (semanticTokensFileViewProvider.isReference(offset)) {
                 PsiReference reference = semanticTokensFileViewProvider.findReferenceAt(offset);
                 PsiElement target = reference != null ? reference.resolve() : null;
                 return target != null ? new PsiElement[]{target} : PsiElement.EMPTY_ARRAY;
-            } else if (semanticTokensFileViewProvider.isDeclaration(offset)) {
+            }
+            // If it's definitely a declaration, just return an empty set of targets
+            else if (semanticTokensFileViewProvider.isDeclaration(offset)) {
                 return PsiElement.EMPTY_ARRAY;
             }
-
-            // NOTE: It's important that we short-circuit any further processing of this potential reference if this
-            // file is backed by semantic tokens and it's not a reference or a declaration. Otherwise things that can't
-            // act as references will show up as navigatable/hyperlinked incorrectly.
-            throw new ProcessCanceledException();
         }
 
-        // Otherwise use LSP directly
-        return getGotoDeclarationTargets(editor, sourceElement, offset);
+        // Use LSP to find targets
+        PsiElement[] targets = getGotoDeclarationTargets(editor, sourceElement, offset);
+
+        // If this is a semantic token-backed file and there were targets but this wasn't represented in semantic tokens
+        // as a reference, stub a reference for the word at the current offset
+        if (semanticTokensFileViewProvider != null) {
+            if (!ArrayUtil.isEmpty(targets)) {
+                TextRange wordRange = LSPIJUtils.getWordRangeAt(editor.getDocument(), psiFile, offset);
+                if (wordRange != null) {
+                    // This will ensure it's stubbed as a generic reference
+                    semanticTokensFileViewProvider.addSemanticToken(wordRange, SemanticTokenTypes.Type, null);
+                }
+            }
+
+            // NOTE: When invoked during Ctrl/Cmd+Mouseover, it's CRITICAL that we short-circuit any further Goto
+            // Declaration Handler processing if this file is backed by semantic tokens and it's not a reference or a
+            // declaration. Otherwise things that can't act as references will show up as hyperlinked incorrectly.
+            // Unfortunately there's no symbolic state available as to whether or not this was invoked that way, so
+            // we have to check the stack trace for the known caller.
+            if (ExceptionUtil.currentStackTrace().contains(CtrlMouseHandler2.class.getName())) {
+                throw new ProcessCanceledException();
+            }
+        }
+
+        return targets;
     }
 
     @ApiStatus.Internal
