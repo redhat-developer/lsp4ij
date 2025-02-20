@@ -31,9 +31,11 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -51,15 +53,15 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                              @NotNull Editor editor,
                              @NotNull PresentationFactory factory,
                              @NotNull InlayHintsSink inlayHintsSink,
-                             @NotNull List<CompletableFuture<?>> pendingFutures) {
+                             @NotNull Set<CompletableFuture<?>> pendingFutures) {
         // Get LSP color information from cache or create them
         LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
         var params = new DocumentColorParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
         CompletableFuture<List<ColorData>> future = colorSupport.getColors(params);
 
         try {
-            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
+            // Wait until the future while 200ms and stop the wait if there are some ProcessCanceledException.
+            waitUntilDone(future, psiFile, 200);
             if (isDoneNormally(future)) {
 
                 // Collect color information
@@ -77,17 +79,15 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                                         toPresentation(list, factory))
                         );
             }
+        } catch (TimeoutException ignore) {
+            // the future which collects all textDocument/documentColor for all servers is not finished
+            // add it to the pending futures to refresh again the UI when this future will be finished.
+            pendingFutures.add(future);
         } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/color' request", e);
-        } finally {
-            if (!future.isDone()) {
-                // the future which collects all textDocument/colorInformation for all servers is not finished
-                // add it to the pending futures to refresh again the UI when this future will be finished.
-                pendingFutures.add(future);
-            }
+            LOGGER.error("Error while consuming LSP 'textDocument/documentColor' request", e);
         }
     }
 

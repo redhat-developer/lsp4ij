@@ -8,11 +8,12 @@
  * Contributors:
  * FalsePattern - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.inlayhint;
+package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.codeInsight.hints.declarative.*;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
@@ -27,14 +28,18 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.awt.event.InputEvent;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+
+import static com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager.getPendingFutures;
 
 /*
  * Abstract class used to display IntelliJ inlay hints.
  */
 public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayHintsProvider {
+
+    private static final Key<Set<CompletableFuture<?>>> DECLARATIVE_INLAY_HINTS_PENDING_FUTURES_KEY =
+            Key.create("lsp.declarative.inlay.hints.pending.futures");
 
     private static final SharedBypassCollector EMPTY_INLAY_HINTS_COLLECTOR = (psiElement, inlayHintsSink) -> {
         // Do nothing
@@ -67,7 +72,7 @@ public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayH
     protected abstract void doCollect(@NotNull PsiFile psiFile,
                                       @NotNull Editor editor,
                                       @NotNull InlayTreeSink inlayHintsSink,
-                                      @NotNull List<CompletableFuture<?>> pendingFutures);
+                                      @NotNull Set<CompletableFuture<?>> pendingFutures);
 
 
     private class Collector implements OwnBypassCollector {
@@ -87,7 +92,7 @@ public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayH
                 return;
             }
 
-            final List<CompletableFuture<?>> pendingFutures = new ArrayList<>();
+            final Set<CompletableFuture<?>> pendingFutures = getPendingFutures(editor, DECLARATIVE_INLAY_HINTS_PENDING_FUTURES_KEY);
             doCollect(psiFile, editor, inlayTreeSink, pendingFutures);
             if (!pendingFutures.isEmpty()) {
                 // Some LSP requests:
