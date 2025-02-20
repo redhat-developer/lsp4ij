@@ -22,7 +22,6 @@ import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.ServerCapabilities;
-import org.eclipse.lsp4j.SymbolKind;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -97,8 +96,7 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Finds the text offset of the symbol as the start of its selection range. Only types and methods/functions are
-     * reported as having a text offset.
+     * Finds the text offset of the symbol as the start of its selection range if available and range if not.
      *
      * @param documentSymbol the document symbol
      * @param psiFile        the file
@@ -106,20 +104,13 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
      */
     public int getTextOffset(@NotNull DocumentSymbol documentSymbol,
                              @NotNull PsiFile psiFile) {
-        SymbolKind symbolKind = documentSymbol.getKind();
-        // TODO: This works quite well without having to implement MethodNavigationOffsetProvider
-        if ((symbolKind == SymbolKind.Class) ||
-                (symbolKind == SymbolKind.Interface) ||
-                (symbolKind == SymbolKind.Enum) ||
-                (symbolKind == SymbolKind.Struct) ||
-                (symbolKind == SymbolKind.Method) ||
-                (symbolKind == SymbolKind.Function)) {
-            Range selectionRange = documentSymbol.getSelectionRange();
-            Position startPosition = selectionRange != null ? selectionRange.getStart() : null;
-            Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
-            if ((startPosition != null) && (document != null)) {
-                return LSPIJUtils.toOffset(startPosition, document);
-            }
+        // NOTE: This works quite well without having to implement MethodNavigationOffsetProvider
+        Range selectionRange = documentSymbol.getSelectionRange();
+        Range range = documentSymbol.getRange();
+        Position startPosition = selectionRange != null ? selectionRange.getStart() : range.getStart();
+        Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
+        if ((startPosition != null) && (document != null)) {
+            return LSPIJUtils.toOffset(startPosition, document);
         }
         return 0;
     }
