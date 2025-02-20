@@ -106,6 +106,24 @@ public class CompletableFutures {
      */
     public static void waitUntilDone(@Nullable CompletableFuture<?> future,
                                      @Nullable PsiFile file) throws ExecutionException, ProcessCanceledException {
+        try {
+            waitUntilDone(future, file, null);
+        } catch (TimeoutException e) {
+            // Should never occur since timeout is null
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
+     *
+     * @param future  the future to wait.
+     * @param file    the Psi file.
+     * @param timeout wait for the given timeout and null otherwise.
+     */
+    public static void waitUntilDone(@Nullable CompletableFuture<?> future,
+                                     @Nullable PsiFile file,
+                                     @Nullable Integer timeout) throws ExecutionException, ProcessCanceledException, TimeoutException {
         if (future == null) {
             return;
         }
@@ -124,7 +142,11 @@ public class CompletableFutures {
                 // wait for 25 ms
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
-                if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 && ProjectIndexingManager.isIndexingAll()){
+                long time = System.currentTimeMillis() - start;
+                if (timeout != null  && time > timeout) {
+                    throw ignore;
+                }
+                if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 && ProjectIndexingManager.isIndexingAll()) {
                     // When some projects are being indexed,
                     // the language server startup can take a long time
                     // and the LSP feature (ex: codeLens)
@@ -171,7 +193,8 @@ public class CompletableFutures {
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
                     waitUntilDone(future, file);
-                } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                } catch (
+                        ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                     //TODO delete block when minimum required version is 2024.2
                     if (!future.isCancelled()) {
                         // Case when user click on cancel of progress Task.

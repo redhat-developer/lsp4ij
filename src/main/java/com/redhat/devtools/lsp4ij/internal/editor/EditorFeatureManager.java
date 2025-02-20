@@ -11,12 +11,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal.editor;
 
+import com.google.common.collect.Sets;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -24,10 +26,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
@@ -45,7 +44,8 @@ import java.util.concurrent.CompletableFuture;
 @ApiStatus.Internal
 public class EditorFeatureManager implements Disposable {
 
-    record RefreshEditorFeatureContext(@NotNull PsiFile file, @NotNull List<Runnable> runnables) {}
+    record RefreshEditorFeatureContext(@NotNull PsiFile file, @NotNull List<Runnable> runnables) {
+    }
 
     private final @NotNull Project project;
 
@@ -121,16 +121,17 @@ public class EditorFeatureManager implements Disposable {
 
     /**
      * Waits for all futures in the provided list to finish, then refreshes the given editor feature if the file has not
-     *  been modified since.
+     * been modified since.
+     *
      * @param pendingFutures    a list of futures to wait for
      * @param modificationStamp the initial file modification timestamp
      * @param psiFile           the file to check the timestamp of
      * @param feature           the editor feature to refresh
      */
-    public void refreshEditorFeatureWhenAllDone(@NotNull List<CompletableFuture<?>> pendingFutures,
-                                                       long modificationStamp,
-                                                       @NotNull PsiFile psiFile,
-                                                       @NotNull EditorFeatureType feature) {
+    public void refreshEditorFeatureWhenAllDone(@NotNull Set<CompletableFuture<?>> pendingFutures,
+                                                long modificationStamp,
+                                                @NotNull PsiFile psiFile,
+                                                @NotNull EditorFeatureType feature) {
         CompletableFuture.allOf(pendingFutures.toArray(new CompletableFuture[0]))
                 .thenApplyAsync(_unused -> {
                     // Check if PsiFile was not modified
@@ -172,6 +173,29 @@ public class EditorFeatureManager implements Disposable {
 
     private EditorFeature getEditorFeature(@NotNull EditorFeatureType featureType) {
         return editorFeatures.get(featureType);
+    }
+
+    @NotNull
+    public static Set<CompletableFuture<?>> getPendingFutures(@NotNull Editor editor,
+                                                              @NotNull Key<Set<CompletableFuture<?>>> key) {
+        var futures = editor.getUserData(key);
+        if (futures != null) {
+            return futures;
+        }
+
+        return getPendingFuturesSync(editor, key);
+    }
+
+    @NotNull
+    private static synchronized Set<CompletableFuture<?>> getPendingFuturesSync(@NotNull Editor editor,
+                                                                                @NotNull Key<Set<CompletableFuture<?>>> key) {
+        var futures = editor.getUserData(key);
+        if (futures != null) {
+            return futures;
+        }
+        futures = Sets.newIdentityHashSet();
+        editor.putUserData(key, futures);
+        return futures;
     }
 
     @Override

@@ -20,6 +20,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDeclarativeInlayHintsProvider;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -30,9 +31,11 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -52,7 +55,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     protected void doCollect(@NotNull PsiFile psiFile,
                              @NotNull Editor editor,
                              @NotNull InlayTreeSink inlayHintsSink,
-                             @NotNull List<CompletableFuture<?>> pendingFutures) {
+                             @NotNull Set<CompletableFuture<?>> pendingFutures) {
         // Get LSP inlay hints from cache or create them
         LSPInlayHintsSupport inlayHintSupport = LSPFileSupport.getSupport(psiFile).getInlayHintsSupport();
         Range viewPortRange = getViewPortRange(editor);
@@ -60,8 +63,8 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         CompletableFuture<List<InlayHintData>> future = inlayHintSupport.getInlayHints(params);
 
         try {
-            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
+            // Wait until the future while 200ms and stop the wait if there are some ProcessCanceledException.
+            waitUntilDone(future, psiFile, 200);
             if (isDoneNormally(future)) {
 
                 // Collect inlay hints
@@ -78,17 +81,15 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
                         });
             }
             return;
+        } catch (TimeoutException ignore) {
+            // the future which collects all textDocument/inlayHint for all servers is not finished
+            // add it to the pending futures to refresh again the UI when this future will be finished.
+            pendingFutures.add(future);
         } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/inlayHint' request", e);
-        } finally {
-            if (!future.isDone()) {
-                // the future which collects all textDocument/inlayHint for all servers is not finished
-                // add it to the pending futures to refresh again the UI when this future will be finished.
-                pendingFutures.add(future);
-            }
         }
     }
 
