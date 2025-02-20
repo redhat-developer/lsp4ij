@@ -31,6 +31,7 @@ import java.util.Objects;
  */
 public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiNameIdentifierOwner {
     private final LSPSemanticToken semanticToken;
+    private final boolean isFile;
     private volatile LeafPsiElement node = null;
     private volatile String text = null;
 
@@ -41,6 +42,7 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
      */
     LSPSemanticTokenPsiElement(@NotNull LSPSemanticToken semanticToken) {
         super(semanticToken.getFile(), semanticToken.getTextRange());
+        this.isFile = Objects.equals(semanticToken.getFile().getTextRange(), semanticToken.getTextRange());
         this.semanticToken = semanticToken;
     }
 
@@ -87,6 +89,9 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
     @Override
     @NotNull
     public String getText() {
+        // Optimization for full-file elements to avoid copying the full file text
+        if (isFile) return getContainingFile().getText();
+
         // This is lazy-initialized because to avoid having to derive it until/unless needed
         if (text == null) {
             synchronized (this) {
