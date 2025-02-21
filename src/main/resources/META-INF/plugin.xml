@@ -431,6 +431,21 @@
         <colorSettingsPage
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
 
+        <!-- File view provider based on textDocument/semanticTokens -->
+        <!--
+         NOTE: This can only be registered for TextMate files because abstract file type plain text files have no
+         language and a variable file type.
+         -->
+        <lang.fileViewProviderFactory
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProviderFactory"/>
+        <lang.elementManipulator
+                forClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElementManipulator"/>
+        <lang.documentationProvider
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider"/>
+
         <!-- LSP textDocument/prepareTypeHierarchy request support -->
         <typeHierarchyProvider
                 language="TEXT"

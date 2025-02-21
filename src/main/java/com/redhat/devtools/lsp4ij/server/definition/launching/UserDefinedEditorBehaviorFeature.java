@@ -62,4 +62,11 @@ public class UserDefinedEditorBehaviorFeature extends EditorBehaviorFeature {
         // Note that this defaults to enabled for user-defined language server definitions
         return (editorSettings == null) || editorSettings.enableTextMateNestedBracesImprovements;
     }
+
+    @Override
+    public boolean isEnableTextMateFileViewProvider(@NotNull PsiFile file) {
+        ClientConfigurationEditorSettings editorSettings = getEditorSettings();
+        // Note that this defaults to enabled for user-defined language server definitions
+        return (editorSettings == null) || editorSettings.enableTextMateFileViewProvider;
+    }
 }
