@@ -125,7 +125,9 @@ public final class MockLanguageServer implements LanguageServer {
 		capabilities.setReferencesProvider(true);
 		capabilities.setDocumentFormattingProvider(true);
 		capabilities.setSelectionRangeProvider(true);
-		capabilities.setCodeActionProvider(Boolean.TRUE);
+		var codeActionOptions = new CodeActionOptions();
+		codeActionOptions.setResolveProvider(Boolean.TRUE);
+		capabilities.setCodeActionProvider(codeActionOptions);
 		capabilities.setCodeLensProvider(new CodeLensOptions(true));
 		capabilities.setDocumentLinkProvider(new DocumentLinkOptions());
 		capabilities.setSignatureHelpProvider(new SignatureHelpOptions());
@@ -268,6 +270,10 @@ public final class MockLanguageServer implements LanguageServer {
 
 	public void setCodeActions(List<Either<Command, CodeAction>> codeActions) {
 		this.textDocumentService.setCodeActions(codeActions);
+	}
+
+	public void setResolvedCodeAction(CodeAction codeAction) {
+		this.textDocumentService.setResolvedCodeAction(codeAction);
 	}
 
 	public void setSignatureHelp(SignatureHelp signatureHelp) {
