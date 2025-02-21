@@ -23,6 +23,7 @@ import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPSettingsEditor;
+import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -39,7 +40,7 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
  * Debug Adapter Protocol (DAP) server descriptor factory.
  */
 @ApiStatus.Experimental
-public abstract class DebugAdapterDescriptorFactory {
+public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
 
     private static final LaunchConfiguration DEFAULT_LAUNCH_CONFIGURATION = new LaunchConfiguration("default_launch", "Launch file",
             // language=json
@@ -101,15 +102,7 @@ public abstract class DebugAdapterDescriptorFactory {
         return serverTrace != null ? serverTrace : ServerTrace.off;
     }
 
-    /**
-     * Checks if the given file is debuggable within the specified project.
-     * A file is considered debuggable if it meets certain criteria, such as having a ".ts" extension.
-     * If the file is debuggable, breakpoints can be added or removed.
-     *
-     * @param file    the virtual file to check (must not be null)
-     * @param project the project context (must not be null)
-     * @return {@code true} if the file is debuggable and allows breakpoints, {@code false} otherwise
-     */
+    @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file,
                                     @NotNull Project project) {
         return getServerDefinition().isDebuggableFile(file, project);

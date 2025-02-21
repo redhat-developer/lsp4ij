@@ -19,11 +19,14 @@ import com.intellij.execution.process.ProcessHandlerFactory;
 import com.intellij.execution.process.ProcessTerminatedListener;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.net.NetUtils;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
+import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -39,7 +42,7 @@ import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.createCommandLine;
 
-public abstract class DebugAdapterDescriptor {
+public abstract class DebugAdapterDescriptor implements DebuggableFile {
 
     protected static final String $_PORT = "${port}";
 
@@ -51,8 +54,8 @@ public abstract class DebugAdapterDescriptor {
     private @NotNull DebugAdapterVariableSupport variableSupport;
 
     public DebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
-                                         @NotNull ExecutionEnvironment environment,
-                                         @Nullable DebugAdapterServerDefinition serverDefinition) {
+                                  @NotNull ExecutionEnvironment environment,
+                                  @Nullable DebugAdapterServerDefinition serverDefinition) {
         this.options = options;
         this.environment = environment;
         this.serverDefinition = serverDefinition;
@@ -234,4 +237,8 @@ public abstract class DebugAdapterDescriptor {
         return serverDefinition;
     }
 
+    @Override
+    public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
+        return serverDefinition != null && serverDefinition.isDebuggableFile(file, project);
+    }
 }

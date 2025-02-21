@@ -15,6 +15,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
 import com.redhat.devtools.lsp4ij.server.definition.ServerFileTypeMapping;
@@ -45,7 +46,7 @@ import java.util.List;
  * @see DebugAdapterDescriptorFactory
  * @see ServerMapping
  */
-public abstract class DebugAdapterServerDefinition {
+public abstract class DebugAdapterServerDefinition implements DebuggableFile {
 
     private final @NotNull String id;
     private @NotNull String name;
@@ -119,18 +120,7 @@ public abstract class DebugAdapterServerDefinition {
         return AllIcons.Webreferences.Server;
     }
 
-    /**
-     * Checks if the given file is debuggable within the specified project.
-     *
-     * <p>A file is considered debuggable if it matches a valid file mapping
-     * defined for the server. Mappings can be based on file type, filename pattern, or language.</p>
-     *
-     * <p>If the file is debuggable, breakpoints can be added or removed.</p>
-     *
-     * @param file    the virtual file to check (must not be null)
-     * @param project the project context (must not be null)
-     * @return {@code true} if the file is debuggable and allows breakpoints, {@code false} otherwise
-     */
+    @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file,
                                     @NotNull Project project) {
         Language language = null;
