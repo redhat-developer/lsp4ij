@@ -58,7 +58,7 @@ class LSPSemanticTokenPsiReference extends PsiReferenceBase<LSPSemanticTokenPsiE
                 // Cache the resolved reference so that it only has to happen once until/unless the source/target file(s) change
                 return CachedValuesManager.getCachedValue(element, new CachedValueProvider<>() {
                     @Override
-                    @NotNull
+                    @Nullable
                     public Result<PsiElement> compute() {
                         PsiElement[] targets = LSPGotoDeclarationHandler.getGotoDeclarationTargets(element, element.getTextOffset());
 
@@ -73,7 +73,7 @@ class LSPSemanticTokenPsiReference extends PsiReferenceBase<LSPSemanticTokenPsiE
                         }
 
                         PsiElement target = ArrayUtil.getFirstElement(targets);
-                        return Result.create(target, dependencies.toArray());
+                        return target != null ? Result.create(target, dependencies.toArray()) : null;
                     }
                 });
             }
