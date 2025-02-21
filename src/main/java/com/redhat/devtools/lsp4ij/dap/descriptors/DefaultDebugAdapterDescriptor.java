@@ -87,8 +87,9 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     public ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             if (debugMode == DebugMode.ATTACH) {
+                String address = LaunchUtils.resolveAttachAddress(dapOptions.getAttachAddress(), getDapParameters());
                 int port = LaunchUtils.resolveAttachPort(dapOptions.getAttachPort(), getDapParameters());
-                return new ServerReadyConfig(dapOptions.getAttachAddress(), port);
+                return new ServerReadyConfig(address, port);
             }
             var strategy = dapOptions.getDebugServerWaitStrategy();
             switch (strategy) {

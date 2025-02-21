@@ -142,6 +142,7 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
         return DEFAULT_LAUNCH_CONFIGURATIONS;
     }
 
+    @NotNull
     public DebugAdapterServerDefinition getServerDefinition() {
         return serverDefinition;
     }

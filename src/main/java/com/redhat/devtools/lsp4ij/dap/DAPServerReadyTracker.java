@@ -37,6 +37,7 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
     private final @NotNull ServerReadyConfig config;
     private final @NotNull ProcessHandler processHandler;
     private final @NotNull DebugMode debugMode;
+    private @Nullable String address;
     private @Nullable Integer port;
     private boolean foundedTrace;
 
@@ -47,13 +48,19 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
         this.debugMode = debugMode;
         this.processHandler = processHandler;
         this.port = config.getPort() != null ? config.getPort() : DebugAdapterDescriptor.getServerPort(processHandler);
+        this.address = config.getAddress();
         processHandler.addProcessListener(this);
         processHandler.putUserData(SERVER_READY_TRACKER_KEY, this);
     }
 
-
-    public @Nullable Integer getPort() {
+    @Nullable
+    public Integer getPort() {
         return port;
+    }
+
+    @Nullable
+    public String getAddress() {
+        return address;
     }
 
     public CompletableFuture<Void> track() {
@@ -78,7 +85,8 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
             while (!DAPServerReadyTracker.this.isDone()) {
                 // The tracker future has not been cancelled
                 // Check if socket is available for the given port
-                if (isSocketAvailable(InetAddress.getLoopbackAddress().getHostAddress(), port)) {
+                if (isSocketAvailable(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(),
+                        port)) {
                     // The socket is available, notify onServerReady
                     break;
                 }
@@ -159,6 +167,9 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
                                 port = Integer.valueOf(extractedPort);
                             }
                         }
+                        if (address == null) {
+                            address = result.address();
+                        }
                         foundedTrace = true;
                     }
                 }
@@ -171,5 +182,6 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
         }
         return false;
     }
+
 
 }
