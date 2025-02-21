@@ -140,7 +140,7 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
         super("*.ts");
     }
 
-    public void testSemanticTokens() {
+    public void testEnabled() {
         assertViewProviderEnabled(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY,
@@ -163,17 +163,8 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
         );
     }
 
-    public void testSemanticTokensDisabled() {
-        assertViewProviderDisabled(
-                TEST_FILE_NAME,
-                TEST_FILE_BODY,
-                MOCK_SEMANTIC_TOKENS_PROVIDER_JSON,
-                MOCK_SEMANTIC_TOKENS_JSON
-        );
-    }
-
     // Confirms the behavior for a language server that doesn't support semantic tokens or when they're not yet present
-    public void testNoSemanticTokens() {
+    public void testEnabledNoSemanticTokens() {
         assertViewProviderEnabled(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY,
@@ -185,6 +176,15 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
                         Map.entry(fileBody -> TEST_FILE_BODY.length() / 2, LSPSemanticTokenElementType.UNKNOWN),
                         Map.entry(fileBody -> TEST_FILE_BODY.length() - 1, LSPSemanticTokenElementType.UNKNOWN)
                 )
+        );
+    }
+
+    public void testDisabled() {
+        assertViewProviderDisabled(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY,
+                MOCK_SEMANTIC_TOKENS_PROVIDER_JSON,
+                MOCK_SEMANTIC_TOKENS_JSON
         );
     }
 }

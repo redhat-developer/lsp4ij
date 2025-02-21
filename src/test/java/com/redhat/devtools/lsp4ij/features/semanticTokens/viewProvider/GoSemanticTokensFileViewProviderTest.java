@@ -169,7 +169,7 @@ public class GoSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileV
         super("*.go");
     }
 
-    public void testSemanticTokens() {
+    public void testEnabled() {
         assertViewProviderEnabled(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY,
@@ -192,7 +192,7 @@ public class GoSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileV
         );
     }
 
-    public void testSemanticTokensDisabled() {
+    public void testDisabled() {
         assertViewProviderDisabled(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY,
