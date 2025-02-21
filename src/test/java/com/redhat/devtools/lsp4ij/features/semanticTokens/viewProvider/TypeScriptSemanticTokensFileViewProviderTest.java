@@ -24,7 +24,7 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
 
     public void testSemanticTokens() {
         assertViewProvider(
-                "demo.ts",
+                "test.ts",
                 // language=typescript
                 """
                         /** Doc comment. */
