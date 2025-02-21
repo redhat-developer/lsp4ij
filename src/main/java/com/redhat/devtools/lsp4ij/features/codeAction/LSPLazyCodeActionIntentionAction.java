@@ -74,12 +74,15 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
     @Override
     public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile file) {
         loadCodeActionIfNeeded();
-        return isValidCodeAction();
+        return isValidCodeAction(this.action);
     }
 
     @Override
     public void invoke(@NotNull Project project, Editor editor, PsiFile file) throws IncorrectOperationException {
-        var languageServer = getLanguageServer();
+        var languageServer = getLanguageServer(this.action);
+        if (languageServer == null) {
+            return;
+        }
         if (codeAction != null) {
             if (codeAction.getEdit() == null && codeAction.getCommand() == null
                     && languageServer.getClientFeatures().getCodeActionFeature().isResolveCodeActionSupported(file)) {
@@ -127,10 +130,6 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         CommandExecutor.executeCommand(new LSPCommandContext(command, file, LSPCommandContext.ExecutedBy.CODE_ACTION, editor, languageServer));
     }
 
-    private LanguageServerItem getLanguageServer() {
-        return action.getLeft().languageServer();
-    }
-
     @Override
     public boolean startInWriteAction() {
         return true;
@@ -145,10 +144,10 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
             return;
         }
         // Try to get the LSP code action from the given index
-        this.action = lazyCodeActions.getCodeActionAt(index);
-        if (isValidCodeAction()) {
-            var codeActionFeature = getLanguageServer().getClientFeatures().getCodeActionFeature();
-            var action = this.action.getLeft().codeAction();
+        var currentAction = this.action = lazyCodeActions.getCodeActionAt(index);
+        if (isValidCodeAction(currentAction)) {
+            var codeActionFeature = getLanguageServer(currentAction).getClientFeatures().getCodeActionFeature();
+            var action = currentAction.getLeft().codeAction();
             if (action.isRight()) {
                 codeAction = action.getRight();
                 title = codeActionFeature.getText(codeAction);
@@ -169,8 +168,13 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         }
     }
 
-    private boolean isValidCodeAction() {
-        var action = this.action;
+
+    @Nullable
+    private static LanguageServerItem getLanguageServer(@Nullable Either<CodeActionData, Boolean> action) {
+        return action != null && action.isLeft() ? action.getLeft().languageServer() : null;
+    }
+    
+    private static boolean isValidCodeAction(@Nullable Either<CodeActionData, Boolean> action) {
         return action != null && action.isLeft();
     }
 
