@@ -58,6 +58,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private Location[] mockReferences = new Location[0];
     private List<Diagnostic> diagnostics;
     private List<Either<Command, CodeAction>> mockCodeActions;
+    private CodeAction mockResolvedCodeAction;
     private List<ColorInformation> mockDocumentColors;
     private Function<PrepareRenameParams, Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>> prepareRenameProcessor;
     private Function<RenameParams, WorkspaceEdit> renameProcessor;
@@ -144,7 +145,28 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
         codeActionRequests++;
-        return futureFactory(this.mockCodeActions);
+        // Filter code actions by using params.getContext().getOnly()
+        var only = (params.getContext() != null && params.getContext().getOnly() != null && !params.getContext().getOnly().isEmpty()) ?
+                params.getContext().getOnly() : null;
+        var filteredCodeActions = mockCodeActions;
+        if (only != null) {
+            filteredCodeActions = mockCodeActions
+                    .stream()
+                    .filter(ca -> {
+                        if (ca.isLeft()) {
+                            return true;
+                        }
+                        var codeAction = ca.getRight();
+                        for (var kind : only) {
+                            if (Objects.equals(kind, codeAction.getKind())) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
+                    .toList();
+        }
+        return futureFactory(filteredCodeActions);
     }
 
     @Override
@@ -262,7 +284,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<CodeAction> resolveCodeAction(CodeAction unresolved) {
-        return CompletableFuture.completedFuture(unresolved);
+        return CompletableFuture.completedFuture(mockResolvedCodeAction);
     }
 
     public void setMockCompletionList(CompletionList completionList) {
@@ -323,6 +345,7 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockReferences = null;
         this.remoteProxies = new ArrayList<>();
         this.mockCodeActions = new ArrayList<>();
+        this.mockResolvedCodeAction = new CodeAction();
         this.renameProcessor = null;
         this.prepareRenameProcessor = null;
         this.documentSymbols = Collections.emptyList();
@@ -340,6 +363,10 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void setCodeActions(List<Either<Command, CodeAction>> codeActions) {
         this.mockCodeActions = codeActions;
+    }
+
+    public void setResolvedCodeAction(CodeAction resolvedCodeAction) {
+        this.mockResolvedCodeAction = resolvedCodeAction;
     }
 
     public void setSignatureHelp(SignatureHelp signatureHelp) {
@@ -393,11 +420,11 @@ public class MockTextDocumentService implements TextDocumentService {
                     Position endPosition = selectionRange.getRange().getEnd();
                     for (Position currentPosition : params.getPositions()) {
                         if (((startPosition.getLine() < currentPosition.getLine()) ||
-                             ((startPosition.getLine() == currentPosition.getLine()) &&
-                              (startPosition.getCharacter() <= currentPosition.getCharacter()))) &&
-                            ((endPosition.getLine() > currentPosition.getLine()) ||
-                             ((endPosition.getLine() == currentPosition.getLine()) &&
-                              (endPosition.getCharacter() >= currentPosition.getCharacter())))) {
+                                ((startPosition.getLine() == currentPosition.getLine()) &&
+                                        (startPosition.getCharacter() <= currentPosition.getCharacter()))) &&
+                                ((endPosition.getLine() > currentPosition.getLine()) ||
+                                        ((endPosition.getLine() == currentPosition.getLine()) &&
+                                                (endPosition.getCharacter() >= currentPosition.getCharacter())))) {
                             return true;
                         }
                     }

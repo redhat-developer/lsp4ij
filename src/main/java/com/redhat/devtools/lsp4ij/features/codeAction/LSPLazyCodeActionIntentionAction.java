@@ -33,6 +33,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * The lazy IJ Quick fix / Intention.
  */
@@ -87,18 +89,36 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
             if (codeAction.getEdit() == null && codeAction.getCommand() == null
                     && languageServer.getClientFeatures().getCodeActionFeature().isResolveCodeActionSupported(file)) {
                 // Unresolved code action "edit" property. Resolve it.
-                languageServer
-                        .getInitializedServer()
-                        .thenApply(ls ->
-                                ls.getTextDocumentService().resolveCodeAction(codeAction)
-                                        .thenAccept(resolved -> {
-                                            ApplicationManager.getApplication().invokeLater(() -> {
-                                                DocumentUtil.writeInRunUndoTransparentAction(() -> {
-                                                    apply(resolved != null ? resolved : codeAction, file, editor, languageServer);
+                if (ApplicationManager.getApplication().isUnitTestMode()) {
+                    // In Test mode, collect the resolve code actions synchronously, otherwise tests will fail
+                    try {
+                        var resolved = languageServer.getServer().getTextDocumentService().resolveCodeAction(codeAction)
+                                .get(10000, TimeUnit.MILLISECONDS);
+                        ApplicationManager.getApplication().invokeLater(() -> {
+                            DocumentUtil.writeInRunUndoTransparentAction(() -> {
+                                apply(resolved != null ? resolved : codeAction, file, editor, languageServer);
+                            });
+                        });
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    // In runtime mode, collect the resolve code action asynchronously to avoid freezing the IDE.
+                    languageServer
+                            .getInitializedServer()
+                            .thenApply(ls ->
+                                    ls.getTextDocumentService().resolveCodeAction(codeAction)
+                                            .thenAccept(resolved -> {
+                                                ApplicationManager.getApplication().invokeLater(() -> {
+                                                    DocumentUtil.writeInRunUndoTransparentAction(() -> {
+                                                        apply(resolved != null ? resolved : codeAction, file, editor, languageServer);
+                                                    });
                                                 });
-                                            });
-                                        })
-                        );
+                                            })
+                            );
+                }
             } else {
                 apply(codeAction, file, editor, languageServer);
             }
