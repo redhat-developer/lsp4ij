@@ -11,7 +11,11 @@
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.execution.configurations.RunConfigurationOptions;
+import com.intellij.lang.Language;
 import com.intellij.openapi.components.StoredProperty;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
@@ -22,14 +26,16 @@ import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
 
 import java.util.List;
 
 /**
  * Debug Adapter Protocol (DAP) run configuration options.
  */
-public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable {
+public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile {
 
     @Nullable
     private NetworkAddressExtractor networkAddressExtractor;
@@ -304,5 +310,37 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
             return null;
         }
         return DebugAdapterManager.getInstance().getDebugAdapterServerById(serverId);
+    }
+
+    @Override
+    public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
+        // Match mappings?
+        for (var mapping : getServerMappings()) {
+            // Match file type?
+            String fileType = mapping.getFileType();
+            if (StringUtils.isNotBlank(fileType)) {
+                if (fileType.equals(file.getFileType().getName())) {
+                    return true;
+                }
+            }
+            // Match file name patterns?
+            if (mapping.getFileNamePatterns() != null) {
+                for (var pattern : mapping.getFileNamePatterns()) {
+                    var p = FileNameMatcherFactory.getInstance().createMatcher(pattern);
+                    if (p.acceptsCharSequence(file.getName())) {
+                        return true;
+                    }
+                }
+            }
+            // Match language?
+            String language = mapping.getLanguage();
+            if (StringUtils.isNotBlank(language)) {
+                Language fileLanguage = LSPIJUtils.getFileLanguage(file, project);
+                if (fileLanguage != null && language.equals(fileLanguage.getID())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

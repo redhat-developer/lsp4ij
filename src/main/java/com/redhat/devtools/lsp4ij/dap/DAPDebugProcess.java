@@ -70,18 +70,19 @@ public class DAPDebugProcess extends XDebugProcess {
                            @NotNull ExecutionResult executionResult,
                            boolean isDebug) {
         super(session);
+        var project = getSession().getProject();
         this.executionResult = executionResult;
         this.isDebug = isDebug;
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
-        this.breakpointHandler = new DAPBreakpointHandler();
         this.serverDescriptor = dapState.getServerDescriptor();
+        this.breakpointHandler = new DAPBreakpointHandler(serverDescriptor, project);
         this.isConnected = true;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
         serverReadyFuture = DAPServerReadyTracker.getServerReadyTracker(getProcessHandler());
         Integer port = serverReadyFuture.getPort();
-        ProgressManager.getInstance().run(new Task.Backgroundable(getSession().getProject(),
-                getConnectingTitle(dapState.getServerName(), port), true) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(project,
+                getStartingServerTaskTitle(dapState.getFile(), dapState.getServerName(), port, dapState.getDebugMode()), true) {
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
@@ -113,7 +114,7 @@ public class DAPDebugProcess extends XDebugProcess {
                         DebugMode debugMode = dapState.getDebugMode();
                         ServerTrace serverTrace = dapState.getServerTrace();
                         var parameters = new HashMap<>(dapState.getDAPParameters());
-                        if(debugMode == DebugMode.LAUNCH) {
+                        if (debugMode == DebugMode.LAUNCH) {
                             parameters.put("noDebug", !isDebug); // standard DAP parameter
                         }
                         parentClient = serverDescriptor.createClient(DAPDebugProcess.this, parameters, isDebug, debugMode, serverTrace, null);
@@ -139,16 +140,41 @@ public class DAPDebugProcess extends XDebugProcess {
         });
     }
 
-    private @NlsContexts.ProgressTitle @NotNull String getConnectingTitle(@Nullable String serverName,
-                                                                          @Nullable Integer port) {
-        if (serverName == null) {
-            serverName = "DAP server";
-        } else {
-            serverName = "'" + serverName + "' server";
+    private static @NlsContexts.ProgressTitle @NotNull String getStartingServerTaskTitle(@Nullable String file,
+                                                                                         @Nullable String serverName,
+                                                                                         @Nullable Integer port,
+                                                                                         @NotNull DebugMode debugMode) {
+        // Ex :
+        // Launching 'test.ts' with 'VSCode JS Debug' at 9999 port...
+        // Attaching 'test.ts' with 'VSCode JS Debug' at 9999 port...
+        StringBuilder title = new StringBuilder(debugMode == DebugMode.ATTACH ? "Attaching" : "Launching");
+
+        // Add file info
+        if (file != null) {
+            int index = file.lastIndexOf('/');
+            if (index == -1) {
+                index = file.lastIndexOf('\\');
+            }
+            title.append(" '");
+            title.append(index != -1 ? file.substring(index + 1) : file);
+            title.append("'");
         }
-        return port != null ?
-                DAPBundle.message("dap.client.connecting.at.port.title", serverName, String.valueOf(port)) :
-                DAPBundle.message("dap.client.connecting.no.port.title", serverName);
+
+        // Add server info
+        title.append(" ");
+        if (file != null) {
+            title.append("with ");
+        }
+        title.append("'");
+        title.append(serverName == null ? "DAP server" : serverName);
+        title.append("'");
+
+        // Add port info
+        if (port != null) {
+            title.append(" at ");
+            title.append(port);
+        }
+        return title.toString();
     }
 
     @Override

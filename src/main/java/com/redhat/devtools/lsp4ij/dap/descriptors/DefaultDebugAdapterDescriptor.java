@@ -17,6 +17,8 @@ import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
@@ -159,5 +161,16 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         return serverName;
     }
 
+    @Override
+    public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
+        if(getServerDefinition() != null &&
+                super.isDebuggableFile(file, project)) {
+            return true;
+        }
+        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            return dapOptions.isDebuggableFile(file, project);
+        }
+        return false;
+    }
 }
 

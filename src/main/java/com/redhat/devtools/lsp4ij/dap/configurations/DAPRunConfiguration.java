@@ -13,11 +13,9 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 import com.intellij.execution.Executor;
 import com.intellij.execution.configurations.*;
 import com.intellij.execution.runners.ExecutionEnvironment;
-import com.intellij.lang.Language;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
@@ -31,14 +29,13 @@ import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
 
 import java.util.List;
 
 /**
  * Debug Adapter Protocol (DAP) run configuration.
  */
-public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfigurationOptions> implements FileOptionConfigurable, WorkingDirectoryConfigurable {
+public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfigurationOptions> implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile {
 
     public static final String DEBUG_ADAPTER_CONFIGURATION = "Debug Adapter Configuration";
 
@@ -243,41 +240,9 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         return new DAPCommandLineState(serverDescriptor, getOptions(), environment);
     }
 
-    /**
-     * Returns true if the given file can be debugged (to add/remove breakpoints) and false otherwise.
-     *
-     * @param file the file to debug.
-     * @return true if the given file can be debugged (to add/remove breakpoints) and false otherwise.
-     */
-    public boolean canDebug(@NotNull VirtualFile file) {
-        // Match mappings?
-        for (var mapping : getServerMappings()) {
-            // Match file type?
-            String fileType = mapping.getFileType();
-            if (StringUtils.isNotBlank(fileType)) {
-                if (fileType.equals(file.getFileType().getName())) {
-                    return true;
-                }
-            }
-            // Match file name patterns?
-            if (mapping.getFileNamePatterns() != null) {
-                for (var pattern : mapping.getFileNamePatterns()) {
-                    var p = FileNameMatcherFactory.getInstance().createMatcher(pattern);
-                    if (p.acceptsCharSequence(file.getName())) {
-                        return true;
-                    }
-                }
-            }
-            // Match language?
-            String language = mapping.getLanguage();
-            if (StringUtils.isNotBlank(language)) {
-                Language fileLanguage = LSPIJUtils.getFileLanguage(file, getProject());
-                if (fileLanguage != null && language.equals(fileLanguage.getID())) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    @Override
+    public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
+        return getOptions().isDebuggableFile(file, project);
     }
 
     /**

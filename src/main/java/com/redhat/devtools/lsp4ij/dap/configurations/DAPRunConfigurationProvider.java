@@ -58,6 +58,6 @@ public class DAPRunConfigurationProvider extends LazyRunConfigurationProducer<DA
         if (file == null) {
             return false;
         }
-        return configuration.canDebug(file);
+        return configuration.isDebuggableFile(file, configuration.getProject());
     }
 }

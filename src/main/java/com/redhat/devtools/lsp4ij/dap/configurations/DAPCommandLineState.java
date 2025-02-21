@@ -19,6 +19,7 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
 import com.redhat.devtools.lsp4ij.dap.DAPServerReadyTracker;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.console.DAPTextConsoleBuilderImpl;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.ServerReadyConfig;
@@ -91,4 +92,11 @@ public class DAPCommandLineState extends CommandLineState {
         return serverDescriptor.getServerName();
     }
 
+    @Nullable
+    public String getFile() {
+        if (options instanceof FileOptionConfigurable fileOptions) {
+            return fileOptions.getFile();
+        }
+        return null;
+    }
 }
