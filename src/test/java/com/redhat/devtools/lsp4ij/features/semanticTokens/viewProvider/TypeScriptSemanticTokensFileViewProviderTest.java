@@ -138,18 +138,20 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
                           ]
                         }
                         """,
-                Map.entry(fileBody -> fileBody.indexOf("Foo"), LSPSemanticTokenElementType.DECLARATION),
-                Map.entry(fileBody -> fileBody.indexOf("field"), LSPSemanticTokenElementType.DECLARATION),
-                Map.entry(fileBody -> fileBody.indexOf("property"), LSPSemanticTokenElementType.DECLARATION),
-                Map.entry(fileBody -> fileBody.indexOf("bar()"), LSPSemanticTokenElementType.DECLARATION),
-                Map.entry(fileBody -> fileBody.indexOf("console.log('"), LSPSemanticTokenElementType.REFERENCE),
-                Map.entry(fileBody -> fileBody.indexOf("log('"), LSPSemanticTokenElementType.REFERENCE),
-                Map.entry(fileBody -> fileBody.indexOf("declaration"), LSPSemanticTokenElementType.DECLARATION),
-                Map.entry(fileBody -> fileBody.indexOf("Math"), LSPSemanticTokenElementType.REFERENCE),
-                Map.entry(fileBody -> fileBody.indexOf("PI"), LSPSemanticTokenElementType.REFERENCE),
-                Map.entry(fileBody -> fileBody.indexOf("console.log(d"), LSPSemanticTokenElementType.REFERENCE),
-                Map.entry(fileBody -> fileBody.indexOf("log(d"), LSPSemanticTokenElementType.REFERENCE),
-                Map.entry(fileBody -> fileBody.indexOf("declaration)"), LSPSemanticTokenElementType.REFERENCE)
+                Map.ofEntries(
+                        Map.entry(fileBody -> fileBody.indexOf("Foo"), LSPSemanticTokenElementType.DECLARATION),
+                        Map.entry(fileBody -> fileBody.indexOf("field"), LSPSemanticTokenElementType.DECLARATION),
+                        Map.entry(fileBody -> fileBody.indexOf("property"), LSPSemanticTokenElementType.DECLARATION),
+                        Map.entry(fileBody -> fileBody.indexOf("bar()"), LSPSemanticTokenElementType.DECLARATION),
+                        Map.entry(fileBody -> fileBody.indexOf("console.log('"), LSPSemanticTokenElementType.REFERENCE),
+                        Map.entry(fileBody -> fileBody.indexOf("log('"), LSPSemanticTokenElementType.REFERENCE),
+                        Map.entry(fileBody -> fileBody.indexOf("declaration"), LSPSemanticTokenElementType.DECLARATION),
+                        Map.entry(fileBody -> fileBody.indexOf("Math"), LSPSemanticTokenElementType.REFERENCE),
+                        Map.entry(fileBody -> fileBody.indexOf("PI"), LSPSemanticTokenElementType.REFERENCE),
+                        Map.entry(fileBody -> fileBody.indexOf("console.log(d"), LSPSemanticTokenElementType.REFERENCE),
+                        Map.entry(fileBody -> fileBody.indexOf("log(d"), LSPSemanticTokenElementType.REFERENCE),
+                        Map.entry(fileBody -> fileBody.indexOf("declaration)"), LSPSemanticTokenElementType.REFERENCE)
+                )
         );
     }
 }

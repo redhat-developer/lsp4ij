@@ -44,7 +44,7 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
                                       @NotNull String fileBody,
                                       @NotNull String mockSemanticTokensProviderJson,
                                       @NotNull String mockSemanticTokensJson,
-                                      @NotNull Map.Entry<Function<String, Integer>, LSPSemanticTokenElementType>... tokenVerifiers) {
+                                      @NotNull Map<Function<String, Integer>, IElementType> tokenVerifiers) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
         Gson gson = JSONUtils.getLsp4jGson();
 
@@ -71,9 +71,9 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
         myFixture.doHighlighting();
 
         // Confirm the token element types
-        for (Map.Entry<Function<String, Integer>, LSPSemanticTokenElementType> tokenVerifier : tokenVerifiers) {
+        for (Map.Entry<Function<String, Integer>, IElementType> tokenVerifier : tokenVerifiers.entrySet()) {
             Function<String, Integer> tokenSearchFunction = tokenVerifier.getKey();
-            LSPSemanticTokenElementType tokenElementType = tokenVerifier.getValue();
+            IElementType tokenElementType = tokenVerifier.getValue();
 
             Integer tokenOffset = tokenSearchFunction.apply(fileBody);
             assertNotNull(tokenOffset);
@@ -94,7 +94,7 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
     }
 
     private static void assertSemanticTokenElement(@NotNull PsiFile file,
-                                                   @NotNull LSPSemanticTokenElementType expectedTokenElementType,
+                                                   @NotNull IElementType expectedTokenElementType,
                                                    int offset) {
         PsiElement element = file.findElementAt(offset);
         assertInstanceOf(element, LSPSemanticTokenPsiElement.class);
@@ -108,12 +108,12 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
 
     private static void assertSemanticTokenElement(@NotNull PsiFile file,
                                                    @NotNull LSPSemanticTokenPsiElement semanticTokenElement,
-                                                   @Nullable LSPSemanticTokenElementType expectedTokenElementType) {
+                                                   @Nullable IElementType expectedTokenElementType) {
         // Verify the element type if appropriate
         ASTNode semanticTokenNode = semanticTokenElement.getNode();
         assertNotNull(semanticTokenNode);
         IElementType tokenElementType = semanticTokenNode.getElementType();
-        assertInstanceOf(tokenElementType, LSPSemanticTokenElementType.class);
+        assertInstanceOf(tokenElementType, IElementType.class);
         if (expectedTokenElementType != null) {
             assertEquals(expectedTokenElementType, tokenElementType);
         }
