@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
-import com.google.gson.Gson;
 import com.intellij.lang.ASTNode;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -42,18 +41,24 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
 
     protected void assertViewProvider(@NotNull String fileName,
                                       @NotNull String fileBody,
-                                      @NotNull String mockSemanticTokensProviderJson,
-                                      @NotNull String mockSemanticTokensJson,
+                                      @Nullable String mockSemanticTokensProviderJson,
+                                      @Nullable String mockSemanticTokensJson,
                                       @NotNull Map<Function<String, Integer>, IElementType> tokenVerifiers) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
-        Gson gson = JSONUtils.getLsp4jGson();
+
+        // Must both be non-null or null together
+        assertEquals(mockSemanticTokensProviderJson != null, mockSemanticTokensJson != null);
 
         ServerCapabilities serverCapabilities = MockLanguageServer.defaultServerCapabilities();
-        SemanticTokensWithRegistrationOptions mockSemanticTokensProvider = gson.fromJson(mockSemanticTokensProviderJson, SemanticTokensWithRegistrationOptions.class);
+        SemanticTokensWithRegistrationOptions mockSemanticTokensProvider = mockSemanticTokensProviderJson != null ?
+                JSONUtils.getLsp4jGson().fromJson(mockSemanticTokensProviderJson, SemanticTokensWithRegistrationOptions.class) :
+                null;
         serverCapabilities.setSemanticTokensProvider(mockSemanticTokensProvider);
         MockLanguageServer.reset(() -> serverCapabilities);
 
-        SemanticTokens mockSemanticTokens = gson.fromJson(mockSemanticTokensJson, SemanticTokens.class);
+        SemanticTokens mockSemanticTokens = mockSemanticTokensJson != null ?
+                JSONUtils.getLsp4jGson().fromJson(mockSemanticTokensJson, SemanticTokens.class) :
+                null;
         MockLanguageServer.INSTANCE.setSemanticTokens(mockSemanticTokens);
 
         PsiFile file = myFixture.configureByText(fileName, fileBody);

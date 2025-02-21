@@ -18,28 +18,32 @@ import java.util.Map;
  */
 public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileViewProviderFixtureTestCase {
 
+    private static final String TEST_FILE_NAME = "test.ts";
+
+    // language=typescript
+    private static final String TEST_FILE_BODY = """
+            /** Doc comment. */
+            export class Foo {
+                field: number;
+                get property() { return ''; };
+            
+                // Line comment
+                static bar() {
+                    console.log('Hello, world.');
+                    const declaration = Math.PI;
+                    console.log(declaration);
+                }
+            }
+            """;
+
     public TypeScriptSemanticTokensFileViewProviderTest() {
         super("*.ts");
     }
 
     public void testSemanticTokens() {
         assertViewProvider(
-                "test.ts",
-                // language=typescript
-                """
-                        /** Doc comment. */
-                        export class Foo {
-                            field: number;
-                            get property() { return ''; };
-                        
-                            // Line comment
-                            static bar() {
-                                console.log('Hello, world.');
-                                const declaration = Math.PI;
-                                console.log(declaration);
-                            }
-                        }
-                        """,
+                TEST_FILE_NAME,
+                TEST_FILE_BODY,
                 // language=json
                 """
                         {
@@ -151,6 +155,22 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
                         Map.entry(fileBody -> fileBody.indexOf("console.log(d"), LSPSemanticTokenElementType.REFERENCE),
                         Map.entry(fileBody -> fileBody.indexOf("log(d"), LSPSemanticTokenElementType.REFERENCE),
                         Map.entry(fileBody -> fileBody.indexOf("declaration)"), LSPSemanticTokenElementType.REFERENCE)
+                )
+        );
+    }
+
+    // Confirms the behavior for a language server that doesn't support semantic tokens or when they're not yet present
+    public void testNoSemanticTokens() {
+        assertViewProvider(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY,
+                null,
+                null,
+                // Should only be one file-level token/element of unknown type; check the start/middle/end
+                Map.ofEntries(
+                        Map.entry(fileBody -> 0, LSPSemanticTokenElementType.UNKNOWN),
+                        Map.entry(fileBody -> TEST_FILE_BODY.length() / 2, LSPSemanticTokenElementType.UNKNOWN),
+                        Map.entry(fileBody -> TEST_FILE_BODY.length() - 1, LSPSemanticTokenElementType.UNKNOWN)
                 )
         );
     }
