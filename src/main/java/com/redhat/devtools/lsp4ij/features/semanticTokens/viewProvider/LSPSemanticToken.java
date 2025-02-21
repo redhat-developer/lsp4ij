@@ -27,7 +27,7 @@ import java.util.Set;
 /**
  * Represents a concrete semantic token in a file.
  */
-final class LSPSemanticToken {
+class LSPSemanticToken {
     // Semantic token types that should be interpreted as representing identifier names
     private static final Set<String> IDENTIFIER_NAME_TOKEN_TYPES = Set.of(
             SemanticTokenTypes.Namespace,
@@ -68,6 +68,7 @@ final class LSPSemanticToken {
     private final String tokenType;
     private final List<String> tokenModifiers;
 
+    private final boolean isFileLevel;
     private final LSPSemanticTokenElementType elementType;
     private volatile LSPSemanticTokenPsiElement element = null;
 
@@ -89,6 +90,7 @@ final class LSPSemanticToken {
         this.textRange = textRange;
         this.tokenType = tokenType;
         this.tokenModifiers = tokenModifiers != null ? tokenModifiers : Collections.emptyList();
+        this.isFileLevel = Objects.equals(file.getTextRange(), textRange);
         this.elementType = getElementType(this.tokenType, this.tokenModifiers);
     }
 
@@ -110,6 +112,10 @@ final class LSPSemanticToken {
     @NotNull
     List<String> getTokenModifiers() {
         return tokenModifiers;
+    }
+
+    boolean isFileLevel() {
+        return isFileLevel;
     }
 
     @NotNull

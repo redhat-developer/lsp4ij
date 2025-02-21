@@ -51,13 +51,14 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
     }
 
     /**
-     * Returns the semantic tokens file view provider for the provided PSI file if assignable and enabled.
+     * Returns the semantic tokens file view provider for the provided element if assignable and enabled.
      *
-     * @param file the PSI file
+     * @param element the PSI element
      * @return the semantic tokens file view provider if assignable and enabled; otherwise false
      */
     @ApiStatus.Internal
-    public static LSPSemanticTokensFileViewProvider getInstance(@Nullable PsiFile file) {
+    public static LSPSemanticTokensFileViewProvider getInstance(@Nullable PsiElement element) {
+        PsiFile file = element != null ? element.getContainingFile() : null;
         FileViewProvider fileViewProvider = file != null ? file.getViewProvider() : null;
         return ((fileViewProvider instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider) &&
                 semanticTokensFileViewProvider.isEnabled()) ?
@@ -75,7 +76,7 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
         // There should only be one PSI file
         List<PsiFile> allFiles = getAllFiles();
         PsiFile file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
-        return (file != null) && EditorBehaviorFeature.enableTextMateFileViewProvider(file) ? file : null;
+        return (file != null) && file.isValid() && EditorBehaviorFeature.enableTextMateFileViewProvider(file) ? file : null;
     }
 
     @Override
