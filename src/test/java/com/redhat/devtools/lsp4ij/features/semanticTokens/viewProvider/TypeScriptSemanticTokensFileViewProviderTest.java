@@ -36,112 +36,116 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
             }
             """;
 
+    // language=json
+    private static final String MOCK_SEMANTIC_TOKENS_PROVIDER_JSON = """
+            {
+              "legend": {
+                "tokenTypes": [
+                  "class",
+                  "enum",
+                  "interface",
+                  "namespace",
+                  "typeParameter",
+                  "type",
+                  "parameter",
+                  "variable",
+                  "enumMember",
+                  "property",
+                  "function",
+                  "member"
+                ],
+                "tokenModifiers": [
+                  "declaration",
+                  "static",
+                  "async",
+                  "readonly",
+                  "defaultLibrary",
+                  "local"
+                ]
+              },
+              "range": true,
+              "full": true
+            }
+            """;
+
+    // language=json
+    private static final String MOCK_SEMANTIC_TOKENS_JSON = """
+            {
+              "data": [
+                1,
+                13,
+                3,
+                0,
+                1,
+                1,
+                4,
+                5,
+                9,
+                1,
+                1,
+                8,
+                8,
+                9,
+                1,
+                3,
+                11,
+                3,
+                11,
+                3,
+                1,
+                8,
+                7,
+                7,
+                16,
+                0,
+                8,
+                3,
+                11,
+                16,
+                1,
+                14,
+                11,
+                7,
+                41,
+                0,
+                14,
+                4,
+                7,
+                16,
+                0,
+                5,
+                2,
+                9,
+                24,
+                1,
+                8,
+                7,
+                7,
+                16,
+                0,
+                8,
+                3,
+                11,
+                16,
+                0,
+                4,
+                11,
+                7,
+                40
+              ]
+            }
+            """;
+
     public TypeScriptSemanticTokensFileViewProviderTest() {
         super("*.ts");
     }
 
     public void testSemanticTokens() {
-        assertViewProvider(
+        assertViewProviderEnabled(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY,
-                // language=json
-                """
-                        {
-                          "legend": {
-                            "tokenTypes": [
-                              "class",
-                              "enum",
-                              "interface",
-                              "namespace",
-                              "typeParameter",
-                              "type",
-                              "parameter",
-                              "variable",
-                              "enumMember",
-                              "property",
-                              "function",
-                              "member"
-                            ],
-                            "tokenModifiers": [
-                              "declaration",
-                              "static",
-                              "async",
-                              "readonly",
-                              "defaultLibrary",
-                              "local"
-                            ]
-                          },
-                          "range": true,
-                          "full": true
-                        }
-                        """,
-                // language=json
-                """
-                        {
-                          "data": [
-                            1,
-                            13,
-                            3,
-                            0,
-                            1,
-                            1,
-                            4,
-                            5,
-                            9,
-                            1,
-                            1,
-                            8,
-                            8,
-                            9,
-                            1,
-                            3,
-                            11,
-                            3,
-                            11,
-                            3,
-                            1,
-                            8,
-                            7,
-                            7,
-                            16,
-                            0,
-                            8,
-                            3,
-                            11,
-                            16,
-                            1,
-                            14,
-                            11,
-                            7,
-                            41,
-                            0,
-                            14,
-                            4,
-                            7,
-                            16,
-                            0,
-                            5,
-                            2,
-                            9,
-                            24,
-                            1,
-                            8,
-                            7,
-                            7,
-                            16,
-                            0,
-                            8,
-                            3,
-                            11,
-                            16,
-                            0,
-                            4,
-                            11,
-                            7,
-                            40
-                          ]
-                        }
-                        """,
+                MOCK_SEMANTIC_TOKENS_PROVIDER_JSON,
+                MOCK_SEMANTIC_TOKENS_JSON,
                 Map.ofEntries(
                         Map.entry(fileBody -> fileBody.indexOf("Foo"), LSPSemanticTokenElementType.DECLARATION),
                         Map.entry(fileBody -> fileBody.indexOf("field"), LSPSemanticTokenElementType.DECLARATION),
@@ -159,9 +163,18 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
         );
     }
 
+    public void testSemanticTokensDisabled() {
+        assertViewProviderDisabled(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY,
+                MOCK_SEMANTIC_TOKENS_PROVIDER_JSON,
+                MOCK_SEMANTIC_TOKENS_JSON
+        );
+    }
+
     // Confirms the behavior for a language server that doesn't support semantic tokens or when they're not yet present
     public void testNoSemanticTokens() {
-        assertViewProvider(
+        assertViewProviderEnabled(
                 TEST_FILE_NAME,
                 TEST_FILE_BODY,
                 null,
