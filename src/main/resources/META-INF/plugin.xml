@@ -279,7 +279,8 @@
         <!-- LSP textDocument/definition request support -->
         <gotoDeclarationHandler
                 id="LSPGotoDeclarationHandler"
-                implementation="com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler"/>
+                implementation="com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler"
+                order="first"/>
 
         <!-- LSP textDocument/documentLink request support -->
         <externalAnnotator
