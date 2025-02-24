@@ -64,9 +64,9 @@ public class ClientConfigurationSettings {
         public boolean enableTextMateNestedBracesImprovements = true;
 
         /**
-         * Whether or not the custom file view provider for TextMate files is enabled. Defaults to true.
+         * Whether or not the semantic tokens-based file view provider is enabled. Defaults to true.
          */
-        public boolean enableTextMateFileViewProvider = true;
+        public boolean enableSemanticTokensFileViewProvider = true;
     }
 
     /**

@@ -64,9 +64,9 @@ public class UserDefinedEditorBehaviorFeature extends EditorBehaviorFeature {
     }
 
     @Override
-    public boolean isEnableTextMateFileViewProvider(@NotNull PsiFile file) {
+    public boolean isEnableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
         ClientConfigurationEditorSettings editorSettings = getEditorSettings();
         // Note that this defaults to enabled for user-defined language server definitions
-        return (editorSettings == null) || editorSettings.enableTextMateFileViewProvider;
+        return (editorSettings == null) || editorSettings.enableSemanticTokensFileViewProvider;
     }
 }

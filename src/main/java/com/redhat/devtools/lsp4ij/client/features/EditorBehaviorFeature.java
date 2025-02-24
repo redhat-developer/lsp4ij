@@ -100,12 +100,12 @@ public class EditorBehaviorFeature {
     }
 
     /**
-     * Whether or not the custom file view provider for TextMate files is enabled.
+     * Whether or not the semantic tokens-based file view provider is enabled.
      *
      * @param file the file
-     * @return true if the custom file view provider for TextMate files is enabled; otherwise false
+     * @return true if the semantic tokens-based file view provider is enabled; otherwise false
      */
-    public boolean isEnableTextMateFileViewProvider(@NotNull PsiFile file) {
+    public boolean isEnableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
         // Default to disabled
         return false;
     }
@@ -170,15 +170,15 @@ public class EditorBehaviorFeature {
     }
 
     /**
-     * Whether or not the custom file view provider for TextMate files is enabled.
+     * Whether or not the semantic tokens-based file view provider is enabled.
      *
      * @param file the PSI file
-     * @return true if the custom file view provider for TextMate files is enabled; otherwise false
+     * @return true if the semantic tokens-based file view provider is enabled; otherwise false
      */
-    public static boolean enableTextMateFileViewProvider(@NotNull PsiFile file) {
+    public static boolean enableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
                 file.getVirtualFile(),
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateFileViewProvider(file)
+                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
         );
     }
 }

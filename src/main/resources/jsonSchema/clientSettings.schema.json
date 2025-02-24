@@ -83,10 +83,10 @@
           "description": "Whether or not editor improvements for nested braces/brackets/parentheses in TextMate files are enabled.",
           "default": true
         },
-        "enableTextMateFileViewProvider": {
+        "enableSemanticTokensFileViewProvider": {
           "type": "boolean",
-          "title": "Enable TextMate file view provider",
-          "description": "Whether or not the custom file view provider for TextMate files is enabled.",
+          "title": "Enable semantic tokens-based file view provider",
+          "description": "Whether or not the semantic tokens-based file view provider is enabled.",
           "default": true
         }
       }

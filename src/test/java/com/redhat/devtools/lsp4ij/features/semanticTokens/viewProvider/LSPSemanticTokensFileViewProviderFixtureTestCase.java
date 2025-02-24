@@ -93,7 +93,7 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
         ClientConfigurableLanguageServerDefinition configurableLanguageServerDefinition = (ClientConfigurableLanguageServerDefinition) languageServerDefinition;
         ClientConfigurationSettings clientConfiguration = configurableLanguageServerDefinition.getLanguageServerClientConfiguration();
         assertNotNull(clientConfiguration);
-        clientConfiguration.editor.enableTextMateFileViewProvider = enabled;
+        clientConfiguration.editor.enableSemanticTokensFileViewProvider = enabled;
 
         // Force a highlighting pass to populate the view provider's semantic tokens
         myFixture.doHighlighting();

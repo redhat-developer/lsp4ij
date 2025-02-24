@@ -88,7 +88,7 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
         // There should only be one PSI file
         List<PsiFile> allFiles = getAllFiles();
         PsiFile file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
-        return (file != null) && file.isValid() && EditorBehaviorFeature.enableTextMateFileViewProvider(file) ? file : null;
+        return (file != null) && file.isValid() && EditorBehaviorFeature.enableSemanticTokensFileViewProvider(file) ? file : null;
     }
 
     @Override
