@@ -453,11 +453,10 @@
 
     <!-- Register the semantic tokens file view provider for the CSS/JS abstract file types in Community Edition -->
     <!--suppress PluginXmlValidity -->
-    <depends optional="true" config-file="plugin-file-view-provider-ce.xml">com.intellij.modules.idea.community
-    </depends>
+    <depends optional="true" config-file="plugin-file-view-provider-ce.xml">com.intellij.modules.idea.community</depends>
     <!--suppress PluginXmlValidity -->
-    <depends optional="true" config-file="plugin-file-view-provider-ce.xml">com.intellij.modules.pycharm.community
-    </depends>
+    <!-- TODO: Disabling until https://platform.jetbrains.com/t/686 is resolved -->
+    <!--<depends optional="true" config-file="plugin-file-view-provider-ce.xml">com.intellij.modules.pycharm.community</depends>-->
 
     <extensions defaultExtensionNs="com.intellij">
         <!-- LSP textDocument/prepareTypeHierarchy request support -->
