@@ -14,17 +14,17 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 import java.util.Map;
 
 /**
- * Tests the semantic tokens-based file view provider for TypeScript, a TextMate file type.
+ * Tests the semantic tokens-based file view provider for JavaScript, a plain text/abstract file type.
  */
-public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileViewProviderFixtureTestCase {
+public class JavaScriptSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileViewProviderFixtureTestCase {
 
-    private static final String TEST_FILE_NAME = "test.ts";
+    private static final String TEST_FILE_NAME = "test.js";
 
-    // language=typescript
+    // language=javascript
     private static final String TEST_FILE_BODY = """
             /** Doc comment. */
             export class Foo {
-                field: number;
+                field;
                 get property() { return ''; };
             
                 // Line comment
@@ -136,8 +136,8 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
             }
             """;
 
-    public TypeScriptSemanticTokensFileViewProviderTest() {
-        super("*.ts");
+    public JavaScriptSemanticTokensFileViewProviderTest() {
+        super("*.js");
     }
 
     public void testEnabled() {

@@ -21,8 +21,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A {@link FileViewProviderFactory} for LSP-backed TextMate files where elements are derived dynamically from reported
- * semantic tokens.
+ * A {@link FileViewProviderFactory} for LSP-backed files where elements are derived dynamically from semantic tokens.
  */
 public class LSPSemanticTokensFileViewProviderFactory implements FileViewProviderFactory {
 
@@ -33,8 +32,13 @@ public class LSPSemanticTokensFileViewProviderFactory implements FileViewProvide
                                                    @NotNull PsiManager psiManager,
                                                    boolean eventSystemEnabled) {
         // Only create a semantic tokens-based view provider for files supported by a configured language server
-        return LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language) ?
-                new LSPSemanticTokensFileViewProvider(psiManager, virtualFile, eventSystemEnabled, language) :
-                new SingleRootFileViewProvider(psiManager, virtualFile, eventSystemEnabled);
+        if ((language != null) && LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language)) {
+            return new LSPSemanticTokensFileViewProvider(psiManager, virtualFile, eventSystemEnabled, language);
+        } else if (LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language)) {
+            return new LSPSemanticTokensFileViewProvider(psiManager, virtualFile, eventSystemEnabled);
+        }
+
+        // If not supported, use the standard file view provider for simple source files
+        return new SingleRootFileViewProvider(psiManager, virtualFile, eventSystemEnabled);
     }
 }
