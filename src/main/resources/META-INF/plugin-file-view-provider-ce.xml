@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Register the semantic tokens file view provider for the CSS/JS abstract file types in Community Edition -->
+        <fileType.fileViewProviderFactory
+                filetype="CSS"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProviderFactory"/>
+        <fileType.fileViewProviderFactory
+                filetype="JavaScript"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProviderFactory"/>
+    </extensions>
+</idea-plugin>
