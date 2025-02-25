@@ -63,6 +63,11 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
     }
 
     @Override
+    public String getName() {
+        return semanticToken.isFileLevel() ? getContainingFile().getName() : super.getName();
+    }
+
+    @Override
     @Nullable
     public PsiElement getNameIdentifier() {
         // If this is a declaration, return this element as the name identifier
