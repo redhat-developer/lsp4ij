@@ -20,6 +20,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.NlsContexts;
+import com.intellij.ui.AppUIUtil;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
@@ -52,6 +53,14 @@ import java.util.function.Supplier;
  */
 public class DAPDebugProcess extends XDebugProcess {
 
+    private enum Status {
+        NONE,
+        STARTING,
+        STARTED,
+        STOPPING,
+        STOPPED
+    }
+
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
     private final @NotNull DAPBreakpointHandler breakpointHandler;
@@ -60,7 +69,7 @@ public class DAPDebugProcess extends XDebugProcess {
     private final boolean isDebug;
     private @Nullable CompletableFuture<Void> connectToServerFuture;
 
-    private boolean isConnected;
+    private Status status;
 
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
@@ -70,22 +79,29 @@ public class DAPDebugProcess extends XDebugProcess {
                            @NotNull ExecutionResult executionResult,
                            boolean isDebug) {
         super(session);
+        var project = getSession().getProject();
         this.executionResult = executionResult;
         this.isDebug = isDebug;
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
-        this.breakpointHandler = new DAPBreakpointHandler();
         this.serverDescriptor = dapState.getServerDescriptor();
-        this.isConnected = true;
+        this.breakpointHandler = new DAPBreakpointHandler(serverDescriptor, project);
+        this.status = Status.NONE;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
         serverReadyFuture = DAPServerReadyTracker.getServerReadyTracker(getProcessHandler());
         Integer port = serverReadyFuture.getPort();
-        ProgressManager.getInstance().run(new Task.Backgroundable(getSession().getProject(),
-                getConnectingTitle(dapState.getServerName(), port), true) {
+        String address = serverReadyFuture.getAddress();
+        String taskTitle = getStartingServerTaskTitle(dapState.getFile(), dapState.getServerName(), address, port, dapState.getDebugMode());
+
+        ProgressManager.getInstance().run(new Task.Backgroundable(project,taskTitle, true) {
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
 
+                DAPDebugProcess.this.status = Status.STARTING;
+                if (dapState.getDebugMode()== DebugMode.ATTACH) {
+                    print(taskTitle, ConsoleViewContentType.SYSTEM_OUTPUT);
+                }
                 // The Debug server is launched, create a DAP client and connect to the server when it is ready:
                 // - wait for socket port
                 // - or wait for some ms
@@ -103,7 +119,7 @@ public class DAPDebugProcess extends XDebugProcess {
                                 // Call again serverReadyFuture.getPort() because the trace tracker could extract it.
                                 // ex: with Go DAP server, the server start command doesn't define some port, but the DAP server generates
                                 // the following trace "DAP server listening at: 127.0.0.1:51694"
-                                return getTransportStreams(executionResult, serverReadyFuture.getPort());
+                                return getTransportStreams(executionResult, serverReadyFuture.getAddress(), serverReadyFuture.getPort());
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
@@ -113,7 +129,7 @@ public class DAPDebugProcess extends XDebugProcess {
                         DebugMode debugMode = dapState.getDebugMode();
                         ServerTrace serverTrace = dapState.getServerTrace();
                         var parameters = new HashMap<>(dapState.getDAPParameters());
-                        if(debugMode == DebugMode.LAUNCH) {
+                        if (debugMode == DebugMode.LAUNCH) {
                             parameters.put("noDebug", !isDebug); // standard DAP parameter
                         }
                         parentClient = serverDescriptor.createClient(DAPDebugProcess.this, parameters, isDebug, debugMode, serverTrace, null);
@@ -121,6 +137,7 @@ public class DAPDebugProcess extends XDebugProcess {
 
                         // Wait for DAP client is connecting to the DAP server...
                         CompletableFutures.waitUntilDone(connectToServerFuture);
+                        DAPDebugProcess.this.status = Status.STARTED;
                     }
                 } catch (ProcessCanceledException e) {
                     // Ignore error
@@ -139,16 +156,51 @@ public class DAPDebugProcess extends XDebugProcess {
         });
     }
 
-    private @NlsContexts.ProgressTitle @NotNull String getConnectingTitle(@Nullable String serverName,
-                                                                          @Nullable Integer port) {
-        if (serverName == null) {
-            serverName = "DAP server";
-        } else {
-            serverName = "'" + serverName + "' server";
+    private static @NlsContexts.ProgressTitle @NotNull String getStartingServerTaskTitle(@Nullable String file,
+                                                                                         @Nullable String serverName,
+                                                                                         @Nullable String address,
+                                                                                         @Nullable Integer port,
+                                                                                         @NotNull DebugMode debugMode) {
+        // Ex :
+        // Launching 'test.ts' with 'VSCode JS Debug' at 9999 port...
+        // Attaching 'test.ts' with 'VSCode JS Debug' at 9999 port...
+        StringBuilder title = new StringBuilder(debugMode == DebugMode.ATTACH ? "Attaching" : "Launching");
+
+        // Add file info
+        if (file != null) {
+            int index = file.lastIndexOf('/');
+            if (index == -1) {
+                index = file.lastIndexOf('\\');
+            }
+            title.append(" '");
+            title.append(index != -1 ? file.substring(index + 1) : file);
+            title.append("'");
         }
-        return port != null ?
-                DAPBundle.message("dap.client.connecting.at.port.title", serverName, String.valueOf(port)) :
-                DAPBundle.message("dap.client.connecting.no.port.title", serverName);
+
+        // Add server info
+        title.append(" ");
+        if (file != null) {
+            title.append("with ");
+        }
+        title.append("'");
+        title.append(serverName == null ? "DAP server" : serverName);
+        title.append("'");
+
+        // Add port info
+        if (address != null || port != null) {
+            title.append(" at ");
+            if(address != null) {
+                title.append(address);
+                if (port != null) {
+                    title.append(":");
+                }
+            }
+            if (port != null) {
+                title.append(port);
+            }
+        }
+
+        return title.toString();
     }
 
     @Override
@@ -171,10 +223,11 @@ public class DAPDebugProcess extends XDebugProcess {
 
     @Override
     public void stop() {
-        if (isConnected) {
+        if (status !=Status.STOPPED && status != Status.STOPPING) {
             ApplicationManager.getApplication()
                     .executeOnPooledThread(() -> {
                         try {
+                            status = Status.STOPPING;
                             if (serverReadyFuture != null && !CompletableFutures.isDoneNormally(serverReadyFuture)) {
                                 serverReadyFuture.cancel(true);
                             }
@@ -194,7 +247,7 @@ public class DAPDebugProcess extends XDebugProcess {
                             if (session != null) {
                                 session.stop();
                             }
-                            isConnected = false;
+                            status = Status.STOPPED;
                         }
                     });
         }
@@ -245,9 +298,10 @@ public class DAPDebugProcess extends XDebugProcess {
     }
 
     private static TransportStreams getTransportStreams(@NotNull ExecutionResult executionResult,
+                                                        @Nullable String address,
                                                         @Nullable Integer port) throws IOException {
         if (port != null) {
-            return new TransportStreams.SocketTransportStreams(InetAddress.getLoopbackAddress().getHostAddress(), port);
+            return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
         }
         var processHandler = executionResult.getProcessHandler();
         DAPProcessListener processListener = new DAPProcessListener();
@@ -266,12 +320,15 @@ public class DAPDebugProcess extends XDebugProcess {
         if (message.charAt(message.length() - 1) != '\n') {
             message += "\n";
         }
-        var consoleView = getSession().getConsoleView();
-        if (consoleView == null) {
-            return;
+        final String text = message;
+        AppUIUtil.invokeOnEdt(() -> {
+            var consoleView = getSession().getConsoleView();
+            if (consoleView == null) {
+                return;
 
-        }
-        consoleView.print(message, type);
+            }
+            consoleView.print(text, type);
+        });
     }
 
     @Override

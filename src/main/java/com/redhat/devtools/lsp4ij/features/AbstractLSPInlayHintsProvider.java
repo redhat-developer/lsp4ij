@@ -16,6 +16,7 @@ import com.intellij.codeInsight.hints.presentation.PresentationFactory;
 import com.intellij.lang.Language;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.layout.LCFlags;
@@ -34,15 +35,19 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.InputEvent;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+
+import static com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager.getPendingFutures;
 
 /*
  * Abstract class used to display IntelliJ inlay hints.
  */
 public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvider<NoSettings> {
+
+    private static final Key<Set<CompletableFuture<?>>> INLAY_HINTS_PENDING_FUTURES_KEY =
+            Key.create("lsp.inlay.hints.pending.futures");
 
     private static final InlayHintsCollector EMPTY_INLAY_HINTS_COLLECTOR = (psiElement, editor, inlayHintsSink) -> {
         // Do nothing
@@ -78,7 +83,7 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                 }
 
                 try {
-                    final List<CompletableFuture<?>> pendingFutures = new ArrayList<>();
+                    final Set<CompletableFuture<?>> pendingFutures = getPendingFutures(editor, INLAY_HINTS_PENDING_FUTURES_KEY);
                     doCollect(psiFile, editor, getFactory(), inlayHintsSink, pendingFutures);
                     if (!pendingFutures.isEmpty()) {
                         // Some LSP requests:
@@ -161,6 +166,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                                       @NotNull Editor editor,
                                       @NotNull PresentationFactory factory,
                                       @NotNull InlayHintsSink inlayHintsSink,
-                                      @NotNull List<CompletableFuture<?>> pendingFutures);
+                                      @NotNull Set<CompletableFuture<?>> pendingFutures);
 
 }

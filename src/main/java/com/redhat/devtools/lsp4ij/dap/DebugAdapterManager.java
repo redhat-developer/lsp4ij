@@ -19,6 +19,7 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
+import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.extension.DebugAdapterServerExtensionPointBean;
 import com.redhat.devtools.lsp4ij.dap.definitions.extension.ExtensionDebugAdapterServerDefinition;
@@ -51,7 +52,7 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
  * within a specific project. It also supports notifications for listeners when servers are added or removed.
  */
 
-public class DebugAdapterManager {
+public class DebugAdapterManager implements DebuggableFile {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DebugAdapterManager.class);
 
@@ -271,15 +272,7 @@ public class DebugAdapterManager {
         }
     }
 
-    /**
-     * Checks if the given file is debuggable within the specified project.
-     * A file is considered debuggable if it meets certain criteria, such as having a ".ts" extension.
-     * If the file is debuggable, breakpoints can be added or removed.
-     *
-     * @param file    the virtual file to check (must not be null)
-     * @param project the project context (must not be null)
-     * @return {@code true} if the file is debuggable and allows breakpoints, {@code false} otherwise
-     */
+    @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file,
                                     @NotNull Project project) {
         // Search canDebug inside the factories
@@ -304,7 +297,7 @@ public class DebugAdapterManager {
         List<RunConfiguration> all = RunManager.getInstance(project).getAllConfigurationsList();
         for (var runConfiguration : all) {
             if (runConfiguration instanceof DAPRunConfiguration dapConfig) {
-                if (dapConfig.canDebug(file)) {
+                if (dapConfig.isDebuggableFile(file, project)) {
                     if (checkFile) {
                         String existingFile = ((DAPRunConfiguration) runConfiguration).getFile();
                         if (!getFilePath(file).equals(existingFile)) {

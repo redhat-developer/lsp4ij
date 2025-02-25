@@ -5,6 +5,18 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.11.0</h3>
+    <ul>
+      <li>Performance improvements for LSP inlay hints</li>
+      <li>Performance improvements for LSP semantic tokens</li>
+      <li>Enhanced TextMate editing experience</li>
+      <li><a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md#language-server-installer">Language Server Installer API</a> introduced</li>
+      <li>Improved Debug DAP support, now with "attach" functionality for supporting <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/user-defined-dap/python-debugpy.md">Python - Debugpy</a></li>
+      <li>New (experimental) <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/DeveloperGuide.md>extension point to register a DAP server</a> introduced</li>
+      <li>Fixing bugs</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/12?closed=1">changelog</a>.
+
     <h3>0.10.0</h3>
     <ul>
       <li><a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md" >Debug Adapter Protocol</a> support</li>

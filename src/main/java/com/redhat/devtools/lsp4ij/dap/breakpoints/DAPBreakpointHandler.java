@@ -10,12 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
@@ -34,26 +37,23 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
  */
 public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAPBreakpointProperties>> {
 
+    private final @NotNull DebugAdapterDescriptor adapterDescriptor;
+    private final @NotNull Project project;
     private IDebugProtocolServer debugProtocolServer;
     private @Nullable Capabilities capabilities;
     private final List<XBreakpoint> breakpoints = ContainerUtil.createConcurrentList();
 
-    public DAPBreakpointHandler() {
+    public DAPBreakpointHandler(@NotNull DebugAdapterDescriptor adapterDescriptor,
+                                @NotNull Project project) {
         super(DAPBreakpointType.class);
+        this.adapterDescriptor = adapterDescriptor;
+        this.project = project;
     }
 
     @Override
     public void registerBreakpoint(@NotNull XLineBreakpoint<DAPBreakpointProperties> breakpoint) {
-        if (!supportsBreakpoint(breakpoint)) {
-            return;
-        }
-
-        if (!breakpoint.isEnabled()) {
-            return;
-        }
-
-        XSourcePosition sourcePosition = breakpoint.getSourcePosition();
-        if (sourcePosition == null) {
+        if (!(breakpoint.isEnabled() &&
+                supportsBreakpoint(breakpoint))) {
             return;
         }
 
@@ -156,7 +156,15 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
      * @return whether this target can install the given breakpoint
      */
     public boolean supportsBreakpoint(XBreakpoint breakpoint) {
-        return breakpoint.getType() instanceof DAPBreakpointType;
+        if (!(breakpoint.getType() instanceof DAPBreakpointType)) {
+            return false;
+        }
+
+        XSourcePosition sourcePosition = breakpoint.getSourcePosition();
+        if (sourcePosition == null) {
+            return false;
+        }
+        return adapterDescriptor.isDebuggableFile(sourcePosition.getFile(), project);
     }
 
     private static int getLineNumber(@NotNull XSourcePosition sourcePosition) {
@@ -165,7 +173,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
 
 
     @Nullable
-    public XBreakpoint<DAPBreakpointProperties> findBreakPoint(@NotNull StackFrame stackFrame) {
+    public XBreakpoint<DAPBreakpointProperties> findBreakpoint(@NotNull StackFrame stackFrame) {
         Path filePath = Paths.get(stackFrame.getSource().getPath().trim());
         if (filePath == null) {
             return null;
