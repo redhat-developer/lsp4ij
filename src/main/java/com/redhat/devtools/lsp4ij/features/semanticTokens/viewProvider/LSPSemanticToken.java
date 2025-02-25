@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
 import org.eclipse.lsp4j.SemanticTokenModifiers;
 import org.eclipse.lsp4j.SemanticTokenTypes;
@@ -20,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -28,8 +30,8 @@ import java.util.Set;
  * Represents a concrete semantic token in a file.
  */
 class LSPSemanticToken {
-    // Semantic token types that should be interpreted as representing identifier names
-    private static final Set<String> IDENTIFIER_NAME_TOKEN_TYPES = Set.of(
+    // Semantic token types that should be interpreted as representing identifiers
+    private static final Set<String> IDENTIFIER_TOKEN_TYPES = Set.of(
             SemanticTokenTypes.Namespace,
             SemanticTokenTypes.Type,
             SemanticTokenTypes.Class,
@@ -51,11 +53,24 @@ class LSPSemanticToken {
             "member" // JavaScript/TypeScript-specific
     );
 
-    // Semantic token modifiers that should be interpreted as representing identifier declarations
-    private static final Set<String> IDENTIFIER_DECLARATION_TOKEN_MODIFIERS = Set.of(
+    // Semantic token modifiers that should be interpreted as representing declarations
+    private static final Set<String> DECLARATION_TOKEN_MODIFIERS = Set.of(
             SemanticTokenModifiers.Declaration,
             SemanticTokenModifiers.Definition
     );
+
+    // Semantic token types that should be interpreted as representing types
+    private static final Set<String> TYPE_TOKEN_TYPES = Set.of(
+            SemanticTokenTypes.Namespace,
+            SemanticTokenTypes.Type,
+            SemanticTokenTypes.Class,
+            SemanticTokenTypes.Enum,
+            SemanticTokenTypes.Interface,
+            SemanticTokenTypes.Struct
+    );
+
+    // Semantic token types that should NOT be interpreted as representing types
+    private static final Set<String> NON_TYPE_TOKEN_TYPES = new LinkedHashSet<>(ContainerUtil.subtract(IDENTIFIER_TOKEN_TYPES, TYPE_TOKEN_TYPES));
 
     // Semantic token types that should be interpreted as representing keywords/reserved words in the language
     private static final Set<String> KEYWORD_TOKEN_TYPES = Set.of(
@@ -110,6 +125,18 @@ class LSPSemanticToken {
     }
 
     @NotNull
+    ThreeState isType() {
+        if (tokenType != null) {
+            if (TYPE_TOKEN_TYPES.contains(tokenType)) {
+                return ThreeState.YES;
+            } else if (NON_TYPE_TOKEN_TYPES.contains(tokenType)) {
+                return ThreeState.NO;
+            }
+        }
+        return ThreeState.UNSURE;
+    }
+
+    @NotNull
     List<String> getTokenModifiers() {
         return tokenModifiers;
     }
@@ -127,9 +154,9 @@ class LSPSemanticToken {
     private static LSPSemanticTokenElementType getElementType(@Nullable String tokenType,
                                                               @NotNull List<String> tokenModifiers) {
         if (tokenType != null) {
-            // If this is an identifier name token, see if it's a declaration or a reference
-            if (IDENTIFIER_NAME_TOKEN_TYPES.contains(tokenType)) {
-                return ContainerUtil.intersects(IDENTIFIER_DECLARATION_TOKEN_MODIFIERS, tokenModifiers) ?
+            // If this is an identifier token, see if it's a declaration or a reference
+            if (IDENTIFIER_TOKEN_TYPES.contains(tokenType)) {
+                return ContainerUtil.intersects(DECLARATION_TOKEN_MODIFIERS, tokenModifiers) ?
                         LSPSemanticTokenElementType.DECLARATION :
                         LSPSemanticTokenElementType.REFERENCE;
             }

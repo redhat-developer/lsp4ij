@@ -16,6 +16,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -23,6 +24,7 @@ import com.intellij.usageView.UsageInfo;
 import com.intellij.usages.Usage;
 import com.intellij.usages.UsageInfo2UsageAdapter;
 import com.intellij.util.Processor;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.eclipse.lsp4j.Position;
@@ -31,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -103,7 +106,19 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                     // Show response of textDocument/definition, textDocument/references, etc as usage info.
                     List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
                     if (usages != null) {
-                        for (LSPUsagePsiElement usage : usages) {
+                        // Remove any usages that fully contain other usages, e.g., definitions when what's really
+                        // wanted is the contained declaration/name identifier
+                        List<LSPUsagePsiElement> filteredUsages = new ArrayList<>(usages);
+                        filteredUsages.removeIf(usage -> ContainerUtil.exists(usages, otherUsage -> {
+                            if (usage != otherUsage) {
+                                TextRange textRange = usage.getTextRange();
+                                TextRange otherTextRange = otherUsage.getTextRange();
+                                return (textRange != null) && (otherTextRange != null) && textRange.contains(otherTextRange) && !textRange.equals(otherTextRange);
+                            }
+                            return false;
+                        }));
+
+                        for (LSPUsagePsiElement usage : filteredUsages) {
                             processor.process(new UsageInfo2UsageAdapter(new UsageInfo(usage)));
                         }
                     }

@@ -10,13 +10,16 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.usages;
 
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.ThreeState;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.*;
@@ -70,16 +73,39 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         return CompletableFuture.completedFuture(null);
                     }
 
-                    DeclarationParams declarationParams = new DeclarationParams(textDocumentIdentifier, params.position());
-                    DefinitionParams definitionParams = new DefinitionParams(textDocumentIdentifier, params.position());
-                    TypeDefinitionParams typeDefinitionParams = new TypeDefinitionParams(textDocumentIdentifier, params.position());
-                    ReferenceParams referenceParams = createReferenceParams(textDocumentIdentifier, params.position(), project);
-                    ImplementationParams implementationParams = new ImplementationParams(textDocumentIdentifier, params.position());
+                    // Assume we need to collect everything
+                    boolean collectDefinitions = true;
+                    boolean collectTypeDefinitions = true;
+
+                    // If we can determine the type of element being searched, see if we can/should search for less
+                    Position position = params.position();
+                    Document document = LSPIJUtils.getDocument(file);
+                    int offset = document != null ? LSPIJUtils.toOffset(position, document) : -1;
+                    if (offset > -1) {
+                        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
+                        if (semanticTokensFileViewProvider != null) {
+                            // Don't collect non-type definitions for type elements
+                            ThreeState isType = semanticTokensFileViewProvider.isType(offset);
+                            if (isType == ThreeState.YES) {
+                                collectDefinitions = false;
+                            }
+                            // Don't collect type definitions for non-type elements
+                            else if (isType == ThreeState.NO) {
+                                collectTypeDefinitions = false;
+                            }
+                        }
+                    }
+
+                    DeclarationParams declarationParams = new DeclarationParams(textDocumentIdentifier, position);
+                    DefinitionParams definitionParams = new DefinitionParams(textDocumentIdentifier, position);
+                    TypeDefinitionParams typeDefinitionParams = new TypeDefinitionParams(textDocumentIdentifier, position);
+                    ReferenceParams referenceParams = createReferenceParams(textDocumentIdentifier, position, project);
+                    ImplementationParams implementationParams = new ImplementationParams(textDocumentIdentifier, position);
 
                     List<CompletableFuture<List<LSPUsagePsiElement>>> allFutures = new ArrayList<>();
                     for (var ls : languageServers) {
-
                         var clientFeature = ls.getClientFeatures();
+
                         // Collect declarations
                         if (clientFeature.getDeclarationFeature().isDeclarationSupported(file)) {
                             updateTextDocumentUri(declarationParams.getTextDocument(), file, ls);
@@ -93,7 +119,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect definitions
-                        if (clientFeature.getDefinitionFeature().isDefinitionSupported(file)) {
+                        if (collectDefinitions && clientFeature.getDefinitionFeature().isDefinitionSupported(file)) {
                             updateTextDocumentUri(definitionParams.getTextDocument(), file, ls);
                             allFutures.add(
                                     cancellationSupport.execute(ls
@@ -104,7 +130,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect type definitions
-                        if (clientFeature.getTypeDefinitionFeature().isTypeDefinitionSupported(file)) {
+                        if (collectTypeDefinitions && clientFeature.getTypeDefinitionFeature().isTypeDefinitionSupported(file)) {
                             updateTextDocumentUri(typeDefinitionParams.getTextDocument(), file, ls);
                             allFutures.add(
                                     cancellationSupport.execute(ls
@@ -125,7 +151,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                             );
                         }
 
-                        // Collect implementation
+                        // Collect implementations
                         if (clientFeature.getImplementationFeature().isImplementationSupported(file)) {
                             updateTextDocumentUri(implementationParams.getTextDocument(), file, ls);
                             allFutures.add(

@@ -14,9 +14,15 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 import com.intellij.lang.Language;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.*;
+import com.intellij.psi.FileViewProvider;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
+import com.intellij.psi.PsiReference;
+import com.intellij.psi.SingleRootFileViewProvider;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
+import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import org.jetbrains.annotations.ApiStatus;
@@ -68,6 +74,7 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
      * @param element the PSI element
      * @return the semantic tokens file view provider if assignable and enabled; otherwise false
      */
+    @Nullable
     @ApiStatus.Internal
     public static LSPSemanticTokensFileViewProvider getInstance(@Nullable PsiElement element) {
         PsiFile file = element != null ? element.getContainingFile() : null;
@@ -112,6 +119,21 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
     public boolean isDeclaration(int offset) {
         LSPSemanticToken semanticToken = getSemanticToken(offset);
         return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION);
+    }
+
+    /**
+     * Returns whether or not the semantic token/element at the offset is for a type.
+     *
+     * @param offset the offset
+     * @return {@link ThreeState#YES} if the semantic token/element at the offset is definitely for a type,
+     * {@link ThreeState#NO} if it's definitely <b>not</b> for a type, and {@link ThreeState#UNSURE} if it
+     * cannot be definitively determined
+     */
+    @NotNull
+    @ApiStatus.Internal
+    public ThreeState isType(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) ? semanticToken.isType() : ThreeState.UNSURE;
     }
 
     /**
