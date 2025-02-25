@@ -84,6 +84,16 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
         return node;
     }
 
+    /**
+     * Returns the element's semantic token type.
+     *
+     * @return the element's semantic token type, or null if the element doesn't have a token type
+     */
+    @Nullable
+    public String getType() {
+        return semanticToken.getTokenType();
+    }
+
     @Override
     @NotNull
     public String getText() {
