@@ -431,10 +431,7 @@
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensHighlightVisitor"/>
         <colorSettingsPage
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
-    </extensions>
 
-    <!-- Semantic tokens-based file view provider -->
-    <extensions defaultExtensionNs="com.intellij">
         <!-- File view provider based on textDocument/semanticTokens -->
         <!--
          NOTE: This can only be registered for TextMate files because abstract file type plain text files have no
@@ -449,16 +446,7 @@
         <lang.documentationProvider
                 language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider"/>
-    </extensions>
 
-    <!-- Register the semantic tokens file view provider for the CSS/JS abstract file types in Community Edition -->
-    <!--suppress PluginXmlValidity -->
-    <depends optional="true" config-file="plugin-file-view-provider-ce.xml">com.intellij.modules.idea.community</depends>
-    <!--suppress PluginXmlValidity -->
-    <!-- TODO: Disabling until https://platform.jetbrains.com/t/686 is resolved -->
-    <!--<depends optional="true" config-file="plugin-file-view-provider-ce.xml">com.intellij.modules.pycharm.community</depends>-->
-
-    <extensions defaultExtensionNs="com.intellij">
         <!-- LSP textDocument/prepareTypeHierarchy request support -->
         <typeHierarchyProvider
                 language="TEXT"

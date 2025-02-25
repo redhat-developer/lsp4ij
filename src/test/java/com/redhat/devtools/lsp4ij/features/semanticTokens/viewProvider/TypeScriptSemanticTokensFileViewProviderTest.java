@@ -14,7 +14,7 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 import java.util.Map;
 
 /**
- * Tests the semantic tokens-based file view provider for TypeScript, a TextMate file type.
+ * Tests the semantic tokens-based file view provider for TypeScript.
  */
 public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileViewProviderFixtureTestCase {
 
@@ -159,6 +159,22 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
                         Map.entry(fileBody -> fileBody.indexOf("console.log(d"), LSPSemanticTokenElementType.REFERENCE),
                         Map.entry(fileBody -> fileBody.indexOf("log(d"), LSPSemanticTokenElementType.REFERENCE),
                         Map.entry(fileBody -> fileBody.indexOf("declaration)"), LSPSemanticTokenElementType.REFERENCE)
+                )
+        );
+    }
+
+    // Confirms the behavior for a language server that doesn't support semantic tokens or when they're not yet present
+    public void testEnabledNoSemanticTokens() {
+        assertViewProviderEnabled(
+                TEST_FILE_NAME,
+                TEST_FILE_BODY,
+                null,
+                null,
+                // Should only be one file-level token/element of unknown type; check the start/middle/end
+                Map.ofEntries(
+                        Map.entry(fileBody -> 0, LSPSemanticTokenElementType.UNKNOWN),
+                        Map.entry(fileBody -> TEST_FILE_BODY.length() / 2, LSPSemanticTokenElementType.UNKNOWN),
+                        Map.entry(fileBody -> TEST_FILE_BODY.length() - 1, LSPSemanticTokenElementType.UNKNOWN)
                 )
         );
     }
