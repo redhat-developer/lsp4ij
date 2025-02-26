@@ -530,9 +530,8 @@ factory should be registered in `plugin.xml` as `language.fileViewProviderFactor
 
 #### LSPSemanticTokensFileViewProvider
 
-Most files use a `SingleRootFileViewProvider`, and those that do can subclass 
-`LSPSemanticTokensSingleRootFileViewProvider` with either the language-based constructor of the file type-based
-constructor as appropriate and generally nothing else required.
+Most files use a `SingleRootFileViewProvider`, and those that do can use `LSPSemanticTokensSingleRootFileViewProvider`.
+If specialized behavior is needed, it can also be subclassed.
 
 Files that use a more complex file view provider should subclass that view provider, implement the
 `LSPSemanticTokensFileViewProvider` interface, create a `LSPSemanticTokensFileViewProviderHelper` member variable,

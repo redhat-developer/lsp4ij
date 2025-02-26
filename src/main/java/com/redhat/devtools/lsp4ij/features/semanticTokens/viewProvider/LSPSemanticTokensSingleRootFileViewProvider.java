@@ -24,10 +24,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Abstract base class for custom implementations of {@link LSPSemanticTokensFileViewProvider} where PSI files are
- * generally based on {@link SingleRootFileViewProvider}.
+ * Implementation of {@link LSPSemanticTokensFileViewProvider} where PSI files are based on {@link SingleRootFileViewProvider}.
  */
-public abstract class LSPSemanticTokensSingleRootFileViewProvider
+public class LSPSemanticTokensSingleRootFileViewProvider
         extends SingleRootFileViewProvider
         implements LSPSemanticTokensFileViewProvider {
 
