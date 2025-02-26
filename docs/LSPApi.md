@@ -521,9 +521,8 @@ structure, and it provides a simple way for other file types to gain access to t
 
 #### LSPSemanticTokensFileViewProviderFactory
 
-Most files use a `SingleRootFileViewProvider`, and those that do can use `LSPSemanticTokensSingleRootFileViewProviderFactory`.
-If specialized behavior is needed, it can also be subclassed and the appropriate `LSPSemanticTokensFileViewProvider`
-returned as documented below.
+Most files use a `SingleRootFileViewProvider`, and those that do can use `LSPSemanticTokensFileViewProviderFactory`.
+If specialized behavior is needed, `LSPSemanticTokensFileViewProviderFactory` subclassed and and implemented.
 
 If the custom LSP integration's files are based on a specific language ID, the factory should be registered in 
 `plugin.xml` using `language.fileViewProviderFactory`. It its files are not based on specific language ID, it should be
