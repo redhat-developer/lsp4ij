@@ -54,38 +54,40 @@ final class LSPSemanticTokensStructurelessFileViewProvider extends LSPSemanticTo
     // don't know for a fact that we can/should respond ourselves. This ensures that non-LSP4IJ TextMate files
     // see no change in behavior.
 
+    @Nullable
+    private PsiElement getSemanticTokenElement(int offset) {
+        LSPSemanticToken semanticToken = isEnabled() ? getSemanticToken(offset) : null;
+        return semanticToken != null ? semanticToken.getElement() : null;
+    }
+
     @Override
     public PsiElement findElementAt(int offset) {
-        if (isEnabled()) {
-            LSPSemanticToken semanticToken = getSemanticToken(offset);
-            return semanticToken != null ? semanticToken.getElement() : super.findElementAt(offset);
-        }
-        return super.findElementAt(offset);
+        PsiElement element = getSemanticTokenElement(offset);
+        return element != null ? element : super.findElementAt(offset);
     }
 
     @Override
     public PsiElement findElementAt(int offset, @NotNull Class<? extends Language> lang) {
-        return isEnabled() ? findElementAt(offset) : super.findElementAt(offset, lang);
+        PsiElement element = getSemanticTokenElement(offset);
+        return element != null ? element : super.findElementAt(offset, lang);
     }
 
     @Override
     public PsiElement findElementAt(int offset, @NotNull Language language) {
-        return isEnabled() ? findElementAt(offset) : super.findElementAt(offset, language);
+        PsiElement element = getSemanticTokenElement(offset);
+        return element != null ? element : super.findElementAt(offset, language);
     }
 
     @Override
     public PsiReference findReferenceAt(int offset) {
-        if (isEnabled()) {
-            LSPSemanticToken semanticToken = getSemanticToken(offset);
-            LSPSemanticTokenElementType elementType = semanticToken != null ? semanticToken.getElementType() : null;
-            return elementType == LSPSemanticTokenElementType.REFERENCE ? new LSPSemanticTokenPsiReference(semanticToken) : null;
-        }
-        return super.findReferenceAt(offset);
+        PsiReference reference = getSemanticTokenReference(offset);
+        return reference != null ? reference : super.findReferenceAt(offset);
     }
 
     @Override
     @Nullable
     public PsiReference findReferenceAt(int offset, @NotNull Language language) {
-        return isEnabled() ? findReferenceAt(offset) : super.findReferenceAt(offset, language);
+        PsiReference reference = getSemanticTokenReference(offset);
+        return reference != null ? reference : super.findReferenceAt(offset, language);
     }
 }

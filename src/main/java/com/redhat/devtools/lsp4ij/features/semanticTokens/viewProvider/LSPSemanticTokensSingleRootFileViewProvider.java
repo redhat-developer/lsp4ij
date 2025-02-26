@@ -16,12 +16,17 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiManager;
+import com.intellij.psi.PsiReference;
 import com.intellij.psi.SingleRootFileViewProvider;
+import com.intellij.psi.impl.source.resolve.reference.impl.PsiMultiReference;
 import com.intellij.util.ThreeState;
+import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Implementation of {@link LSPSemanticTokensFileViewProvider} where PSI files are based on {@link SingleRootFileViewProvider}.
@@ -141,5 +146,39 @@ public class LSPSemanticTokensSingleRootFileViewProvider
     @Nullable
     LSPSemanticToken getSemanticToken(int offset) {
         return helper.getSemanticToken(offset);
+    }
+
+    @Nullable
+    protected PsiReference getSemanticTokenReference(int offset) {
+        LSPSemanticToken semanticToken = isEnabled() ? getSemanticToken(offset) : null;
+        LSPSemanticTokenElementType elementType = semanticToken != null ? semanticToken.getElementType() : null;
+        return elementType == LSPSemanticTokenElementType.REFERENCE ? new LSPSemanticTokenPsiReference(semanticToken) : null;
+    }
+
+    @Override
+    public PsiReference findReferenceAt(int offset) {
+        Set<PsiReference> references = new LinkedHashSet<>();
+        ContainerUtil.addIfNotNull(references, super.findReferenceAt(offset));
+        ContainerUtil.addIfNotNull(references, getSemanticTokenReference(offset));
+
+        if (references.isEmpty()) return null;
+        if (references.size() == 1) return ContainerUtil.getFirstItem(references);
+
+        PsiElement element = findElementAt(offset);
+        return element != null ? new PsiMultiReference(references.toArray(PsiReference.EMPTY_ARRAY), element) : null;
+    }
+
+    @Override
+    @Nullable
+    public PsiReference findReferenceAt(int offset, @NotNull Language language) {
+        Set<PsiReference> references = new LinkedHashSet<>();
+        ContainerUtil.addIfNotNull(references, super.findReferenceAt(offset, language));
+        ContainerUtil.addIfNotNull(references, getSemanticTokenReference(offset));
+
+        if (references.isEmpty()) return null;
+        if (references.size() == 1) return ContainerUtil.getFirstItem(references);
+
+        PsiElement element = findElementAt(offset, language);
+        return element != null ? new PsiMultiReference(references.toArray(PsiReference.EMPTY_ARRAY), element) : null;
     }
 }
