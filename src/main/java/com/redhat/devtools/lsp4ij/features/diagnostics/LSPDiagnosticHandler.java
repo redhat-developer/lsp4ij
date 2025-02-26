@@ -91,10 +91,12 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
             synchronized (data) {
                 data.updateDiagnostics(params.getDiagnostics());
             }
-            // Trigger Intellij validation to execute
-            // {@link LSPDiagnosticAnnotator}.
-            // which translates LSP Diagnostics into Intellij Annotation
-            DaemonCodeAnalyzer.getInstance(project).restart(psiFile);
+            if (!ApplicationManager.getApplication().isUnitTestMode()) {
+                // Trigger Intellij validation to execute
+                // {@link LSPDiagnosticAnnotator}.
+                // which translates LSP Diagnostics into Intellij Annotation
+                DaemonCodeAnalyzer.getInstance(project).restart(psiFile);
+            }
         }
     }
 }
