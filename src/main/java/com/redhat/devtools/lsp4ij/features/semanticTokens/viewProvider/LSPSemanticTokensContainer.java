@@ -22,7 +22,7 @@ import java.util.List;
 /**
  * Common interface for semantic tokens containers.
  */
-public interface LSPSemanticTokensBasedElementContainer {
+interface LSPSemanticTokensContainer {
     /**
      * Whether or not the file view provider is enabled for semantic tokens.
      *
@@ -39,15 +39,20 @@ public interface LSPSemanticTokensBasedElementContainer {
     boolean isDeclaration(int offset);
 
     /**
-     * Whether or not the semantic token at the offset is for a type declaration, definition, or reference.
+     * Whether or not the semantic token at the offset is for a keyword.
      *
      * @param offset the offset
-     * @return {@link ThreeState#YES} if the semantic token at the offset is conclusively for a type;
-     * {@link ThreeState#NO} if the semantic token at the offset is conclusively <b>not</b> for a type;
-     * otherwise {@link ThreeState#UNSURE}
+     * @return true if the semantic token at the offset is for a keyword; otherwise false
      */
-    @NotNull
-    ThreeState isType(int offset);
+    boolean isKeyword(int offset);
+
+    /**
+     * Whether or not the semantic token at the offset is for a operator.
+     *
+     * @param offset the offset
+     * @return true if the semantic token at the offset is for a operator; otherwise false
+     */
+    boolean isOperator(int offset);
 
     /**
      * Whether or not the semantic token at the offset is for a reference.
@@ -66,12 +71,39 @@ public interface LSPSemanticTokensBasedElementContainer {
     boolean isStringLiteral(int offset);
 
     /**
+     * Whether or not the semantic token at the offset is for a numeric literal.
+     *
+     * @param offset the offset
+     * @return true if the semantic token at the offset is for a numeric literal; otherwise false
+     */
+    boolean isNumericLiteral(int offset);
+
+    /**
+     * Whether or not the semantic token at the offset is for a regular expression.
+     *
+     * @param offset the offset
+     * @return true if the semantic token at the offset is for a regular expression; otherwise false
+     */
+    boolean isRegularExpression(int offset);
+
+    /**
      * Whether or not the semantic token at the offset is for a comment.
      *
      * @param offset the offset
      * @return true if the semantic token at the offset is for a comment; otherwise false
      */
     boolean isComment(int offset);
+
+    /**
+     * Whether or not the semantic token at the offset is for a type declaration, definition, or reference.
+     *
+     * @param offset the offset
+     * @return {@link ThreeState#YES} if the semantic token at the offset is conclusively for a type;
+     * {@link ThreeState#NO} if the semantic token at the offset is conclusively <b>not</b> for a type;
+     * otherwise {@link ThreeState#UNSURE}
+     */
+    @NotNull
+    ThreeState isType(int offset);
 
     /**
      * Returns the description for the specified element, optionally formatted as appropriate from the perspective of

@@ -30,7 +30,7 @@ import java.util.Map;
 /**
  * Helper class for {@link LSPSemanticTokensFileViewProvider} implementations to help fulfill its interface.
  */
-public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticTokensBasedElementContainer {
+public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticTokensContainer {
 
     private final LSPSemanticTokensFileViewProvider fileViewProvider;
 
@@ -57,16 +57,21 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
     }
 
     @Override
-    public boolean isDeclaration(int offset) {
+    public boolean isKeyword(int offset) {
         LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.KEYWORD);
     }
 
     @Override
-    @NotNull
-    public ThreeState isType(int offset) {
+    public boolean isOperator(int offset) {
         LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) ? semanticToken.isType() : ThreeState.UNSURE;
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.OPERATOR);
+    }
+
+    @Override
+    public boolean isDeclaration(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION);
     }
 
     @Override
@@ -82,9 +87,28 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
     }
 
     @Override
+    public boolean isNumericLiteral(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.NUMBER);
+    }
+
+    @Override
+    public boolean isRegularExpression(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.REGEXP);
+    }
+
+    @Override
     public boolean isComment(int offset) {
         LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.STRING);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.COMMENT);
+    }
+
+    @Override
+    @NotNull
+    public ThreeState isType(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) ? semanticToken.isType() : ThreeState.UNSURE;
     }
 
     @Nullable

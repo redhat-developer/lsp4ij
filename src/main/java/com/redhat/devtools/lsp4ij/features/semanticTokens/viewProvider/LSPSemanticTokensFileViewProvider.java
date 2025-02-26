@@ -23,7 +23,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>
  * Most custom implementations should be able to subclass {@link LSPSemanticTokensSingleRootFileViewProvider}.
  */
-public interface LSPSemanticTokensFileViewProvider extends FileViewProvider, LSPSemanticTokensBasedElementContainer {
+public interface LSPSemanticTokensFileViewProvider extends FileViewProvider, LSPSemanticTokensContainer {
     /**
      * Returns the semantic tokens file view provider for the provided element if assignable and enabled.
      *

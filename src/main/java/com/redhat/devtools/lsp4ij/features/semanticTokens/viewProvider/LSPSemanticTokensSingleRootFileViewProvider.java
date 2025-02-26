@@ -68,14 +68,18 @@ public abstract class LSPSemanticTokensSingleRootFileViewProvider
     }
 
     @Override
-    public boolean isDeclaration(int offset) {
-        return helper.isDeclaration(offset);
+    public boolean isKeyword(int offset) {
+        return helper.isKeyword(offset);
     }
 
     @Override
-    @NotNull
-    public ThreeState isType(int offset) {
-        return helper.isType(offset);
+    public boolean isOperator(int offset) {
+        return helper.isOperator(offset);
+    }
+
+    @Override
+    public boolean isDeclaration(int offset) {
+        return helper.isDeclaration(offset);
     }
 
     @Override
@@ -89,8 +93,24 @@ public abstract class LSPSemanticTokensSingleRootFileViewProvider
     }
 
     @Override
+    public boolean isNumericLiteral(int offset) {
+        return helper.isNumericLiteral(offset);
+    }
+
+    @Override
+    public boolean isRegularExpression(int offset) {
+        return helper.isRegularExpression(offset);
+    }
+
+    @Override
     public boolean isComment(int offset) {
         return helper.isComment(offset);
+    }
+
+    @Override
+    @NotNull
+    public ThreeState isType(int offset) {
+        return helper.isType(offset);
     }
 
     @Override
