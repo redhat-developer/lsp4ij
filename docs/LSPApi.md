@@ -521,12 +521,13 @@ structure, and it provides a simple way for other file types to gain access to t
 
 #### LSPSemanticTokensFileViewProviderFactory
 
-Custom LSP implementations should create a subclass of `LSPSemanticTokensFileViewProviderFactory` and implement either
-`createFileViewProviderForLanguage()` if files are based on a specific language ID or 
-`createFileViewProviderForFileType()` if files are based on a specific file type name. It's fine to implement both, of
-course. The implemented methods should return concrete implementations of `LSPSemanticTokensFileViewProvider`. The
-factory should be registered in `plugin.xml` as `language.fileViewProviderFactory` and/or 
-`fileType.fileViewProviderFactory` as appropriate.
+Most files use a `SingleRootFileViewProvider`, and those that do can use `LSPSemanticTokensSingleRootFileViewProviderFactory`.
+If specialized behavior is needed, it can also be subclassed and the appropriate `LSPSemanticTokensFileViewProvider`
+returned as documented below.
+
+If the custom LSP integration's files are based on a specific language ID, the factory should be registered in 
+`plugin.xml` using `language.fileViewProviderFactory`. It its files are not based on specific language ID, it should be
+registered using `fileType.fileViewProviderFactory`.
 
 #### LSPSemanticTokensFileViewProvider
 

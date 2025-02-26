@@ -24,7 +24,7 @@ import org.jetbrains.annotations.NotNull;
  * A {@link FileViewProviderFactory} for LSP-backed files where information about elements can be derived from reported
  * semantic tokens.
  */
-public abstract class LSPSemanticTokensFileViewProviderFactory implements FileViewProviderFactory {
+public class LSPSemanticTokensFileViewProviderFactory implements FileViewProviderFactory {
 
     @Override
     @NotNull
@@ -53,10 +53,12 @@ public abstract class LSPSemanticTokensFileViewProviderFactory implements FileVi
      * @return the semantic tokens-based file view provider for the file and language
      */
     @NotNull
-    protected abstract LSPSemanticTokensFileViewProvider createFileViewProviderForLanguage(@NotNull PsiManager psiManager,
+    protected LSPSemanticTokensFileViewProvider createFileViewProviderForLanguage(@NotNull PsiManager psiManager,
                                                                                            @NotNull VirtualFile virtualFile,
                                                                                            boolean eventSystemEnabled,
-                                                                                           @NotNull Language language);
+                                                                                  @NotNull Language language) {
+        return new LSPSemanticTokensSingleRootFileViewProvider(psiManager, virtualFile, eventSystemEnabled, language);
+    }
 
     /**
      * Creates a semantic tokens-based file view provider for a file without a specific language.
@@ -67,7 +69,9 @@ public abstract class LSPSemanticTokensFileViewProviderFactory implements FileVi
      * @return the semantic tokens-based file view provider for the file
      */
     @NotNull
-    protected abstract LSPSemanticTokensFileViewProvider createFileViewProviderForFileType(@NotNull PsiManager psiManager,
+    protected LSPSemanticTokensFileViewProvider createFileViewProviderForFileType(@NotNull PsiManager psiManager,
                                                                                            @NotNull VirtualFile virtualFile,
-                                                                                           boolean eventSystemEnabled);
+                                                                                  boolean eventSystemEnabled) {
+        return new LSPSemanticTokensSingleRootFileViewProvider(psiManager, virtualFile, eventSystemEnabled);
+    }
 }
