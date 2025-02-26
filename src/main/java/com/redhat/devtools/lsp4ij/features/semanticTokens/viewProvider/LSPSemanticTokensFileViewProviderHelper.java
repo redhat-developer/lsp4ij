@@ -1,0 +1,170 @@
+/*******************************************************************************
+ * Copyright (c) 2025 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at http://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+
+package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
+
+import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
+import com.intellij.util.ThreeState;
+import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Helper class for {@link LSPSemanticTokensFileViewProvider} implementations to help fulfill its interface.
+ */
+public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticTokensBasedElementContainer {
+
+    private final LSPSemanticTokensFileViewProvider fileViewProvider;
+
+    /**
+     * Creates a helper for the provided semantic tokens file view provider.
+     *
+     * @param fileViewProvider the semantic tokens file view provider
+     */
+    public LSPSemanticTokensFileViewProviderHelper(@NotNull LSPSemanticTokensFileViewProvider fileViewProvider) {
+        this.fileViewProvider = fileViewProvider;
+    }
+
+    @Nullable
+    private PsiFile getFile() {
+        // There should only be one PSI file
+        List<PsiFile> allFiles = fileViewProvider.getAllFiles();
+        PsiFile file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
+        return (file != null) && file.isValid() && EditorBehaviorFeature.enableSemanticTokensFileViewProvider(file) ? file : null;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return getFile() != null;
+    }
+
+    @Override
+    public boolean isDeclaration(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION);
+    }
+
+    @Override
+    @NotNull
+    public ThreeState isType(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) ? semanticToken.isType() : ThreeState.UNSURE;
+    }
+
+    @Override
+    public boolean isReference(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.REFERENCE);
+    }
+
+    @Override
+    public boolean isStringLiteral(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.STRING);
+    }
+
+    @Override
+    public boolean isComment(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.STRING);
+    }
+
+    @Nullable
+    @Override
+    public String getElementDescription(@NotNull PsiElement element, @Nullable PsiElement referenceElement) {
+        if (fileViewProvider.findElementAt(element.getTextOffset()) instanceof LSPSemanticTokenPsiElement semanticTokenElement) {
+            return semanticTokenElement.getDescription(referenceElement);
+        }
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public TextRange getSemanticTokenTextRange(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return semanticToken != null ? semanticToken.getTextRange() : null;
+    }
+
+    // Store the file's semantic tokens so that we have constant-time lookup of an element for a given offset
+    @Nullable
+    private Map<Integer, LSPSemanticToken> getSemanticTokensByOffset() {
+        PsiFile file = getFile();
+        if (file == null) return null;
+
+        // By caching the storage on the file this way, it's automatically evicted when the file changes
+        return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
+            @Override
+            @NotNull
+            public Result<Map<Integer, LSPSemanticToken>> compute() {
+                Map<Integer, LSPSemanticToken> semanticTokensByOffset = Collections.synchronizedMap(new HashMap<>());
+                return Result.create(semanticTokensByOffset, file);
+            }
+        });
+    }
+
+    @Override
+    public void addSemanticToken(@NotNull TextRange textRange,
+                                 @Nullable String tokenType,
+                                 @Nullable List<String> tokenModifiers) {
+        PsiFile file = getFile();
+        if (file == null) return;
+
+        Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
+        if (semanticTokensByOffset != null) {
+            LSPSemanticToken semanticToken = new LSPSemanticToken(file, textRange, tokenType, tokenModifiers);
+
+            // Index the token for its text range
+            for (int offset = textRange.getStartOffset(); offset <= textRange.getEndOffset(); offset++) {
+                semanticTokensByOffset.put(offset, semanticToken);
+            }
+        }
+    }
+
+    /**
+     * Returns the semantic token for the offset.
+     *
+     * @param offset the offset
+     * @return the semantic token or null if no semantic token exists at the offset
+     */
+    @Nullable
+    LSPSemanticToken getSemanticToken(int offset) {
+        PsiFile file = getFile();
+        if (file == null) return null;
+
+        // If this file has semantic tokens, use them
+        Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
+        if (!ContainerUtil.isEmpty(semanticTokensByOffset)) {
+            return semanticTokensByOffset.get(offset);
+        }
+        // Otherwise stub a semantic token for the entire file so that it won't highlight as a link on mouse hover
+        else {
+            // By caching the stub on the file this way, it's automatically evicted when the file changes
+            return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
+                @Override
+                @NotNull
+                public Result<LSPSemanticToken> compute() {
+                    LSPSemanticToken stubSemanticToken = new LSPSemanticToken(file, file.getTextRange(), null, null);
+                    return Result.create(stubSemanticToken, file);
+                }
+            });
+        }
+    }
+}

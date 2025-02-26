@@ -11,63 +11,19 @@
 
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
-import com.intellij.lang.Language;
-import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
-import com.intellij.psi.PsiReference;
-import com.intellij.psi.SingleRootFileViewProvider;
-import com.intellij.psi.util.CachedValueProvider;
-import com.intellij.psi.util.CachedValuesManager;
-import com.intellij.util.ThreeState;
-import com.intellij.util.containers.ContainerUtil;
-import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
-import org.jetbrains.annotations.ApiStatus;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 /**
- * A {@link FileViewProvider} for an LSP-backed file where elements are derived dynamically from reported semantic tokens.
+ * A {@link FileViewProvider} for LSP-backed files where information about elements can be derived from reported
+ * semantic tokens. The implementation can be whatever is appropriate for the file, but this provides a common
+ * interface by which the file view provider can be populated with and queried for semantic token information.
+ * <p>
+ * Most custom implementations should be able to subclass {@link LSPSemanticTokensSingleRootFileViewProvider}.
  */
-@ApiStatus.Internal
-public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvider {
-
-    /**
-     * Creates a new file view provider based on language.
-     *
-     * @param psiManager         the PSI manager
-     * @param virtualFile        the virtual file
-     * @param eventSystemEnabled whether or not the event system is enabled
-     * @param language           the language which should always be TextMate
-     */
-    LSPSemanticTokensFileViewProvider(@NotNull PsiManager psiManager,
-                                      @NotNull VirtualFile virtualFile,
-                                      boolean eventSystemEnabled,
-                                      @NotNull Language language) {
-        super(psiManager, virtualFile, eventSystemEnabled, language);
-    }
-
-    /**
-     * Creates a new file view provider based on file type.
-     *
-     * @param psiManager         the PSI manager
-     * @param virtualFile        the virtual file
-     * @param eventSystemEnabled whether or not the event system is enabled
-     */
-    LSPSemanticTokensFileViewProvider(@NotNull PsiManager psiManager,
-                                      @NotNull VirtualFile virtualFile,
-                                      boolean eventSystemEnabled) {
-        super(psiManager, virtualFile, eventSystemEnabled);
-    }
-
+public interface LSPSemanticTokensFileViewProvider extends FileViewProvider, LSPSemanticTokensBasedElementContainer {
     /**
      * Returns the semantic tokens file view provider for the provided element if assignable and enabled.
      *
@@ -75,244 +31,12 @@ public class LSPSemanticTokensFileViewProvider extends SingleRootFileViewProvide
      * @return the semantic tokens file view provider if assignable and enabled; otherwise false
      */
     @Nullable
-    @ApiStatus.Internal
-    public static LSPSemanticTokensFileViewProvider getInstance(@Nullable PsiElement element) {
+    static LSPSemanticTokensFileViewProvider getInstance(@Nullable PsiElement element) {
         PsiFile file = element != null ? element.getContainingFile() : null;
         FileViewProvider fileViewProvider = file != null ? file.getViewProvider() : null;
         return ((fileViewProvider instanceof LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider) &&
                 semanticTokensFileViewProvider.isEnabled()) ?
                 semanticTokensFileViewProvider :
                 null;
-    }
-
-    // Only override standard behavior when enabled to do so
-    private boolean isEnabled() {
-        return getFile() != null;
-    }
-
-    @Nullable
-    private PsiFile getFile() {
-        // There should only be one PSI file
-        List<PsiFile> allFiles = getAllFiles();
-        PsiFile file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
-        return (file != null) && file.isValid() && EditorBehaviorFeature.enableSemanticTokensFileViewProvider(file) ? file : null;
-    }
-
-    @Override
-    public boolean supportsIncrementalReparse(@NotNull Language rootLanguage) {
-        // LSP files do not support incremental reparse
-        if (isEnabled()) {
-            return false;
-        }
-        return super.supportsIncrementalReparse(rootLanguage);
-    }
-
-    // Element and reference resolution
-
-    /**
-     * Returns whether or not the semantic token/element at the offset is for a declaration.
-     *
-     * @param offset the offset
-     * @return whether or not the semantic token/element at the offset is for a declaration
-     */
-    @ApiStatus.Internal
-    public boolean isDeclaration(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION);
-    }
-
-    /**
-     * Returns whether or not the semantic token/element at the offset is for a type.
-     *
-     * @param offset the offset
-     * @return {@link ThreeState#YES} if the semantic token/element at the offset is definitely for a type,
-     * {@link ThreeState#NO} if it's definitely <b>not</b> for a type, and {@link ThreeState#UNSURE} if it
-     * cannot be definitively determined
-     */
-    @NotNull
-    @ApiStatus.Internal
-    public ThreeState isType(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) ? semanticToken.isType() : ThreeState.UNSURE;
-    }
-
-    /**
-     * Returns whether or not the semantic token/element at the offset is for a reference.
-     *
-     * @param offset the offset
-     * @return whether or not the semantic token/element at the offset is for a reference
-     */
-    @ApiStatus.Internal
-    public boolean isReference(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.REFERENCE);
-    }
-
-    /**
-     * Returns whether or not the semantic token/element at the offset is for a string literal.
-     *
-     * @param offset the offset
-     * @return whether or not the semantic token/element at the offset is for a string literal
-     */
-    @ApiStatus.Internal
-    public boolean isStringLiteral(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.STRING);
-    }
-
-    /**
-     * Returns whether or not the semantic token/element at the offset is for a comment.
-     *
-     * @param offset the offset
-     * @return whether or not the semantic token/element at the offset is for a comment
-     */
-    @ApiStatus.Internal
-    public boolean isComment(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.STRING);
-    }
-
-    /**
-     * Returns the text range of the semantic token/element at the offset.
-     *
-     * @param offset the offset
-     * @return the text range of the semantic token/element at the offset, or null if none exists
-     */
-    @Nullable
-    @ApiStatus.Internal
-    public TextRange getSemanticTokenTextRange(int offset) {
-        LSPSemanticToken semanticToken = getSemanticToken(offset);
-        return semanticToken != null ? semanticToken.getTextRange() : null;
-    }
-
-    // NOTE: These are really the core of what makes this all work. Basically when any external caller needs to
-    // find an element or reference for a given offset in the file, we use the semantic token information that
-    // was populated the last time that semantic tokens were returned by the language server to return an element
-    // at that offset (or not). In all cases, we take great care to delegate to the inherited behavior if we
-    // don't know for a fact that we can/should respond ourselves. This ensures that non-LSP4IJ TextMate files
-    // see no change in behavior.
-
-    @Override
-    public PsiElement findElementAt(int offset) {
-        if (isEnabled()) {
-            LSPSemanticToken semanticToken = getSemanticToken(offset);
-            return semanticToken != null ? semanticToken.getElement() : super.findElementAt(offset);
-        }
-        return super.findElementAt(offset);
-    }
-
-    @Override
-    public PsiElement findElementAt(int offset, @NotNull Class<? extends Language> lang) {
-        return isEnabled() ? findElementAt(offset) : super.findElementAt(offset, lang);
-    }
-
-    @Override
-    public PsiElement findElementAt(int offset, @NotNull Language language) {
-        return isEnabled() ? findElementAt(offset) : super.findElementAt(offset, language);
-    }
-
-    @Override
-    public PsiReference findReferenceAt(int offset) {
-        if (isEnabled()) {
-            LSPSemanticToken semanticToken = getSemanticToken(offset);
-            LSPSemanticTokenElementType elementType = semanticToken != null ? semanticToken.getElementType() : null;
-            return elementType == LSPSemanticTokenElementType.REFERENCE ? new LSPSemanticTokenPsiReference(semanticToken) : null;
-        }
-        return super.findReferenceAt(offset);
-    }
-
-    @Override
-    @Nullable
-    public PsiReference findReferenceAt(int offset, @NotNull Language language) {
-        return isEnabled() ? findReferenceAt(offset) : super.findReferenceAt(offset, language);
-    }
-
-    // Element description
-
-    /**
-     * Returns the description for the specified element, optionally formatted as appropriate from the perspective of
-     * the provided reference element. For example, if both are elements are in the same file, there's no reason to
-     * include the target element's file name in the description, but if they're in different files, it's useful to
-     * know where the target element resides.
-     *
-     * @param element          the element for which a description should be returned
-     * @param referenceElement the reference element from which the description is being requested
-     * @return the element description
-     */
-    @Nullable
-    @ApiStatus.Internal
-    public String getElementDescription(@NotNull PsiElement element, @Nullable PsiElement referenceElement) {
-        if (findElementAt(element.getTextOffset()) instanceof LSPSemanticTokenPsiElement semanticTokenElement) {
-            return semanticTokenElement.getDescription(referenceElement);
-        }
-        return null;
-    }
-
-    // Semantic tokens management
-
-    // Store the file's semantic tokens so that we have constant-time lookup of an element for a given offset
-    @Nullable
-    private Map<Integer, LSPSemanticToken> getSemanticTokensByOffset() {
-        PsiFile file = getFile();
-        if (file == null) return null;
-
-        // By caching the storage on the file this way, it's automatically evicted when the file changes
-        return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
-            @Override
-            @NotNull
-            public Result<Map<Integer, LSPSemanticToken>> compute() {
-                Map<Integer, LSPSemanticToken> semanticTokensByOffset = Collections.synchronizedMap(new HashMap<>());
-                return Result.create(semanticTokensByOffset, file);
-            }
-        });
-    }
-
-    /**
-     * Adds a semantic token for the file.
-     *
-     * @param textRange      the token's text range in the file
-     * @param tokenType      the token type
-     * @param tokenModifiers the token modifiers
-     */
-    @ApiStatus.Internal
-    public void addSemanticToken(@NotNull TextRange textRange,
-                                 @Nullable String tokenType,
-                                 @Nullable List<String> tokenModifiers) {
-        PsiFile file = getFile();
-        if (file == null) return;
-
-        Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
-        if (semanticTokensByOffset != null) {
-            LSPSemanticToken semanticToken = new LSPSemanticToken(file, textRange, tokenType, tokenModifiers);
-
-            // Index the token for its text range
-            for (int offset = textRange.getStartOffset(); offset <= textRange.getEndOffset(); offset++) {
-                semanticTokensByOffset.put(offset, semanticToken);
-            }
-        }
-    }
-
-    @Nullable
-    private LSPSemanticToken getSemanticToken(int offset) {
-        PsiFile file = getFile();
-        if (file == null) return null;
-
-        // If this file has semantic tokens, use them
-        Map<Integer, LSPSemanticToken> semanticTokensByOffset = getSemanticTokensByOffset();
-        if (!ContainerUtil.isEmpty(semanticTokensByOffset)) {
-            return semanticTokensByOffset.get(offset);
-        }
-        // Otherwise stub a semantic token for the entire file so that it won't highlight as a link on mouse hover
-        else {
-            // By caching the stub on the file this way, it's automatically evicted when the file changes
-            return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
-                @Override
-                @NotNull
-                public Result<LSPSemanticToken> compute() {
-                    LSPSemanticToken stubSemanticToken = new LSPSemanticToken(file, file.getTextRange(), null, null);
-                    return Result.create(stubSemanticToken, file);
-                }
-            });
-        }
     }
 }

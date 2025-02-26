@@ -21,24 +21,53 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A {@link FileViewProviderFactory} for LSP-backed files where elements are derived dynamically from semantic tokens.
+ * A {@link FileViewProviderFactory} for LSP-backed files where information about elements can be derived from reported
+ * semantic tokens.
  */
-public class LSPSemanticTokensFileViewProviderFactory implements FileViewProviderFactory {
+public abstract class LSPSemanticTokensFileViewProviderFactory implements FileViewProviderFactory {
 
     @Override
     @NotNull
-    public FileViewProvider createFileViewProvider(@NotNull VirtualFile virtualFile,
-                                                   Language language,
-                                                   @NotNull PsiManager psiManager,
-                                                   boolean eventSystemEnabled) {
+    public final FileViewProvider createFileViewProvider(@NotNull VirtualFile virtualFile,
+                                                         Language language,
+                                                         @NotNull PsiManager psiManager,
+                                                         boolean eventSystemEnabled) {
         // Only create a semantic tokens-based view provider for files supported by a configured language server
         if ((language != null) && LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language)) {
-            return new LSPSemanticTokensFileViewProvider(psiManager, virtualFile, eventSystemEnabled, language);
+            return createFileViewProviderForLanguage(psiManager, virtualFile, eventSystemEnabled, language);
         } else if (LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language)) {
-            return new LSPSemanticTokensFileViewProvider(psiManager, virtualFile, eventSystemEnabled);
+            return createFileViewProviderForFileType(psiManager, virtualFile, eventSystemEnabled);
         }
 
         // If not supported, use the standard file view provider for simple source files
         return new SingleRootFileViewProvider(psiManager, virtualFile, eventSystemEnabled);
     }
+
+    /**
+     * Creates a semantic tokens-based file view provider for a file with a specific language.
+     *
+     * @param psiManager         the PSI manager
+     * @param virtualFile        the virtual file
+     * @param eventSystemEnabled whether or not the event system is enabled
+     * @param language           the file's language
+     * @return the semantic tokens-based file view provider for the file and language
+     */
+    @NotNull
+    protected abstract LSPSemanticTokensFileViewProvider createFileViewProviderForLanguage(@NotNull PsiManager psiManager,
+                                                                                           @NotNull VirtualFile virtualFile,
+                                                                                           boolean eventSystemEnabled,
+                                                                                           @NotNull Language language);
+
+    /**
+     * Creates a semantic tokens-based file view provider for a file without a specific language.
+     *
+     * @param psiManager         the PSI manager
+     * @param virtualFile        the virtual file
+     * @param eventSystemEnabled whether or not the event system is enabled
+     * @return the semantic tokens-based file view provider for the file
+     */
+    @NotNull
+    protected abstract LSPSemanticTokensFileViewProvider createFileViewProviderForFileType(@NotNull PsiManager psiManager,
+                                                                                           @NotNull VirtualFile virtualFile,
+                                                                                           boolean eventSystemEnabled);
 }
