@@ -78,16 +78,6 @@ public class LSPSemanticTokensSingleRootFileViewProvider
     }
 
     @Override
-    public boolean isDeclaration(int offset) {
-        return helper.isDeclaration(offset);
-    }
-
-    @Override
-    public boolean isReference(int offset) {
-        return helper.isReference(offset);
-    }
-
-    @Override
     public boolean isStringLiteral(int offset) {
         return helper.isStringLiteral(offset);
     }
@@ -105,6 +95,16 @@ public class LSPSemanticTokensSingleRootFileViewProvider
     @Override
     public boolean isComment(int offset) {
         return helper.isComment(offset);
+    }
+
+    @Override
+    public boolean isDeclaration(int offset) {
+        return helper.isDeclaration(offset);
+    }
+
+    @Override
+    public boolean isReference(int offset) {
+        return helper.isReference(offset);
     }
 
     @Override

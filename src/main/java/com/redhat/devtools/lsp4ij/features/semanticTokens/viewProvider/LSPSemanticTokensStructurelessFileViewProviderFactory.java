@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
  * A {@link FileViewProviderFactory} for files with no inherent PSI tree where PSI element should correspond exactly to
  * semantic tokens, e.g., plain text and TextMate files.
  */
-public class LSPSemanticTokensStructurelessFileViewProviderFactory extends LSPSemanticTokensFileViewProviderFactory {
+public final class LSPSemanticTokensStructurelessFileViewProviderFactory extends LSPSemanticTokensFileViewProviderFactory {
 
     @Override
     @NotNull

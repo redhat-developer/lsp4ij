@@ -14,6 +14,7 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 import com.intellij.psi.FileViewProvider;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -29,6 +30,7 @@ public interface LSPSemanticTokensFileViewProvider extends FileViewProvider, LSP
      * @return the semantic tokens file view provider if assignable and enabled; otherwise false
      */
     @Nullable
+    @Contract("null -> null")
     static LSPSemanticTokensFileViewProvider getInstance(@Nullable PsiElement element) {
         PsiFile file = element != null ? element.getContainingFile() : null;
         FileViewProvider fileViewProvider = file != null ? file.getViewProvider() : null;

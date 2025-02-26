@@ -31,14 +31,6 @@ interface LSPSemanticTokensContainer {
     boolean isEnabled();
 
     /**
-     * Whether or not the semantic token at the offset is for a declaration or definition.
-     *
-     * @param offset the offset
-     * @return true if the semantic token at the offset is for a declaration or definition; otherwise false
-     */
-    boolean isDeclaration(int offset);
-
-    /**
      * Whether or not the semantic token at the offset is for a keyword.
      *
      * @param offset the offset
@@ -53,14 +45,6 @@ interface LSPSemanticTokensContainer {
      * @return true if the semantic token at the offset is for a operator; otherwise false
      */
     boolean isOperator(int offset);
-
-    /**
-     * Whether or not the semantic token at the offset is for a reference.
-     *
-     * @param offset the offset
-     * @return true if the semantic token at the offset is for a reference; otherwise false
-     */
-    boolean isReference(int offset);
 
     /**
      * Whether or not the semantic token at the offset is for a string literal.
@@ -93,6 +77,22 @@ interface LSPSemanticTokensContainer {
      * @return true if the semantic token at the offset is for a comment; otherwise false
      */
     boolean isComment(int offset);
+
+    /**
+     * Whether or not the semantic token at the offset is for a declaration or definition.
+     *
+     * @param offset the offset
+     * @return true if the semantic token at the offset is for a declaration or definition; otherwise false
+     */
+    boolean isDeclaration(int offset);
+
+    /**
+     * Whether or not the semantic token at the offset is for a reference.
+     *
+     * @param offset the offset
+     * @return true if the semantic token at the offset is for a reference; otherwise false
+     */
+    boolean isReference(int offset);
 
     /**
      * Whether or not the semantic token at the offset is for a type declaration, definition, or reference.
