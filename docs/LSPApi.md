@@ -554,21 +554,21 @@ provider implementation, implement the `LSPSemanticTokensFileViewProvider` inter
 `LSPSemanticTokensFileViewProvider` interface to the helper, e.g.:
 
 ```java
-public class LSPSemanticTokensSingleRootFileViewProvider extends ComplexFileViewProvider implements LSPSemanticTokensFileViewProvider {
+public class MyCustomSemanticTokensFileViewProvider extends ComplexFileViewProvider implements LSPSemanticTokensFileViewProvider {
 
     private final LSPSemanticTokensFileViewProviderHelper helper;
 
-    public LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
-                                                       @NotNull VirtualFile virtualFile,
-                                                       boolean eventSystemEnabled,
-                                                       @NotNull Language language) {
+    public MyCustomSemanticTokensFileViewProvider(@NotNull PsiManager manager,
+                                                  @NotNull VirtualFile virtualFile,
+                                                  boolean eventSystemEnabled,
+                                                  @NotNull Language language) {
         super(manager, virtualFile, eventSystemEnabled, language);
         this.helper = new LSPSemanticTokensFileViewProviderHelper(this);
     }
 
-    public LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
-                                                       @NotNull VirtualFile virtualFile,
-                                                       boolean eventSystemEnabled) {
+    public MyCustomSemanticTokensFileViewProvider(@NotNull PsiManager manager,
+                                                  @NotNull VirtualFile virtualFile,
+                                                  boolean eventSystemEnabled) {
         super(manager, virtualFile, eventSystemEnabled);
         this.helper = new LSPSemanticTokensFileViewProviderHelper(this);
     }
