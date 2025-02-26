@@ -522,20 +522,19 @@ structure, and it provides a simple way for other file types to gain access to t
 #### LSPSemanticTokensFileViewProviderFactory
 
 Most files use a `SingleRootFileViewProvider`, and those that do can use `LSPSemanticTokensFileViewProviderFactory`.
-If specialized behavior is needed, `LSPSemanticTokensFileViewProviderFactory` subclassed and and implemented.
+If specialized behavior is needed, `LSPSemanticTokensFileViewProviderFactory` can be subclassed and implemented to
+return more complex `LSPSemanticTokensFileViewProvider` implementations as described below.
 
 If the custom LSP integration's files are based on a specific language ID, the factory should be registered in 
-`plugin.xml` using `language.fileViewProviderFactory`. It its files are not based on specific language ID, it should be
+`plugin.xml` using `language.fileViewProviderFactory`. If its files are not based on specific language ID, it should be
 registered using `fileType.fileViewProviderFactory`.
 
 #### LSPSemanticTokensFileViewProvider
 
-Most files use a `SingleRootFileViewProvider`, and those that do can use `LSPSemanticTokensSingleRootFileViewProvider`.
-If specialized behavior is needed, it can also be subclassed.
-
-Files that use a more complex file view provider should subclass that view provider, implement the
-`LSPSemanticTokensFileViewProvider` interface, create a `LSPSemanticTokensFileViewProviderHelper` member variable,
-and delegate the methods in the `LSPSemanticTokensFileViewProvider` interface to the helper.
+Files that require something more complex than `SingleRootFileViewProvider` should subclass the required file view
+provider implementation, implement the `LSPSemanticTokensFileViewProvider` interface, create a
+`LSPSemanticTokensFileViewProviderHelper` member variable in the constructor(s), and delegate the method
+`LSPSemanticTokensFileViewProvider` interface to the helper.
 
 #### Declaration Elements
 

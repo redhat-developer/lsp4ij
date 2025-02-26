@@ -20,8 +20,6 @@ import org.jetbrains.annotations.Nullable;
  * A {@link FileViewProvider} for LSP-backed files where information about elements can be derived from reported
  * semantic tokens. The implementation can be whatever is appropriate for the file, but this provides a common
  * interface by which the file view provider can be populated with and queried for semantic token information.
- * <p>
- * Most custom implementations should be able to subclass {@link LSPSemanticTokensSingleRootFileViewProvider}.
  */
 public interface LSPSemanticTokensFileViewProvider extends FileViewProvider, LSPSemanticTokensContainer {
     /**
