@@ -555,17 +555,17 @@ public class LSPSemanticTokensSingleRootFileViewProvider extends ComplexFileView
 
     private final LSPSemanticTokensFileViewProviderHelper helper;
 
-    protected LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
-                                                          @NotNull VirtualFile virtualFile,
-                                                          boolean eventSystemEnabled,
-                                                          @NotNull Language language) {
+    public LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
+                                                       @NotNull VirtualFile virtualFile,
+                                                       boolean eventSystemEnabled,
+                                                       @NotNull Language language) {
         super(manager, virtualFile, eventSystemEnabled, language);
         this.helper = new LSPSemanticTokensFileViewProviderHelper(this);
     }
 
-    protected LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
-                                                          @NotNull VirtualFile virtualFile,
-                                                          boolean eventSystemEnabled) {
+    public LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
+                                                       @NotNull VirtualFile virtualFile,
+                                                       boolean eventSystemEnabled) {
         super(manager, virtualFile, eventSystemEnabled);
         this.helper = new LSPSemanticTokensFileViewProviderHelper(this);
     }
