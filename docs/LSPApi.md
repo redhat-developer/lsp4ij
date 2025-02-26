@@ -605,8 +605,23 @@ LSPSemanticTokensFileViewProvider fileViewProvider = LSPSemanticTokensFileViewPr
 boolean isDeclaration = (fileViewProvider != null) && fileViewProvider.isDeclaration(element.getTextOffset());
 ```
 
-When an element is determined to be for a declaration, `getNameIdentifier()` should return either that entire element
-or, if appropriate, its child/descendant element that represents the declaration's name identifier.
+When an element is determined to be for a declaration, `getNameIdentifier()` should return either that entire element, e.g.:
+
+```java
+public class MyPsiElement extends PsiElementBase implements PsiNameIdentifierOwner {
+    // Existing implementation...
+
+    @Override
+    @Nullable
+    public PsiElement getNameIdentifier() {
+        LSPSemanticTokensFileViewProvider fileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(this);
+        return (fileViewProvider != null) && fileViewProvider.isDeclaration(getTextOffset()) ? this : null;
+    }
+}
+```
+
+If appropriate, the implementation should instead return the child/descendant element that represents the declaration's
+name identifier
 
 ## LSP SignatureHelp Feature
 
