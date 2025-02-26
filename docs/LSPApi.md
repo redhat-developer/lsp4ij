@@ -587,7 +587,7 @@ public class LSPSemanticTokensSingleRootFileViewProvider extends ComplexFileView
 #### Declaration Elements
 
 If the JetBrains IDE can determine that an element is a _declaration_, it provides certain standard features, e.g.,
-the **Go To Declarations or Usages** action automatically shows usages of the declaration. It is therefore important
+the **Navigate | Declaration or Usages** action automatically shows usages of the declaration. It is therefore important
 that custom LSP integrations help the IDE determine which elements are declarations. The IDE uses the interface
 `PsiNameIdentifierOwner` and its method `getNameIdentifier()` to determine this. As a result, custom LSP integrations
 with PSI element hierarchies should ensure that the PSI element type that is used for declarations -- even if it's also
