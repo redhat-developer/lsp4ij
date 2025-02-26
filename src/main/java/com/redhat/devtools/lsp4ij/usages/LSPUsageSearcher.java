@@ -20,6 +20,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.search.SearchScope;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.usages.Usage;
 import com.intellij.usages.UsageInfo2UsageAdapter;
@@ -77,13 +78,19 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                 return;
             }
 
+            // Make sure that the search scope is respected when adding usages
+            SearchScope searchScope = options.searchScope;
+
             if (element instanceof LSPUsageTriggeredPsiElement elt) {
                 if (elt.getLSPReferences() != null) {
                     elt.getLSPReferences()
                             .forEach(ref -> {
                                 var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, project);
                                 if (psiElement != null) {
-                                    processor.process(new UsageInfo2UsageAdapter(new UsageInfo(psiElement)));
+                                    VirtualFile psiElementFile = LSPIJUtils.getFile(psiElement);
+                                    if ((psiElementFile != null) && searchScope.contains(psiElementFile)) {
+                                        processor.process(new UsageInfo2UsageAdapter(new UsageInfo(psiElement)));
+                                    }
                                 }
                             });
                     return;
@@ -106,15 +113,25 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                     // Show response of textDocument/definition, textDocument/references, etc as usage info.
                     List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
                     if (usages != null) {
-                        // Remove any usages that fully contain other usages, e.g., definitions when what's really
-                        // wanted is the contained declaration/name identifier
                         List<LSPUsagePsiElement> filteredUsages = new ArrayList<>(usages);
                         filteredUsages.removeIf(usage -> ContainerUtil.exists(usages, otherUsage -> {
+                            // Remove any usages that aren't included in the search scope
+                            VirtualFile usageFile = LSPIJUtils.getFile(usage);
+                            if ((usageFile == null) || !searchScope.contains(usageFile)) {
+                                return true;
+                            }
+
+                            // Remove any usages that fully contain other usages, e.g., definitions when what's really
+                            // wanted is the contained declaration/name identifier
                             if (usage != otherUsage) {
                                 TextRange textRange = usage.getTextRange();
                                 TextRange otherTextRange = otherUsage.getTextRange();
-                                return (textRange != null) && (otherTextRange != null) && textRange.contains(otherTextRange) && !textRange.equals(otherTextRange);
+                                return (textRange != null) &&
+                                       (otherTextRange != null) &&
+                                       textRange.contains(otherTextRange) &&
+                                       !textRange.equals(otherTextRange);
                             }
+
                             return false;
                         }));
 
@@ -133,7 +150,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             LSPExternalReferencesFinder.processExternalReferences(
                     file,
                     element.getTextOffset(),
-                    options.searchScope,
+                    searchScope,
                     reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
             );
         });
