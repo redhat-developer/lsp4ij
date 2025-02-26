@@ -543,6 +543,9 @@ If its files are not based on specific language ID, it should be registered usin
         implementationClass="com.myProduct.semanticTokens.viewProvider.MyCustomSemanticTokensFileViewProviderFactory"/>
 ```
 
+Custom LSP integrations will also need to enable the feature flag for semantic tokens file view providers by overriding
+`EditorBehaviorFeature#isEnableSemanticTokensFileViewProvider()` to return `true`.
+
 #### LSPSemanticTokensFileViewProvider
 
 Files that require something more complex than `SingleRootFileViewProvider` should subclass the required file view
