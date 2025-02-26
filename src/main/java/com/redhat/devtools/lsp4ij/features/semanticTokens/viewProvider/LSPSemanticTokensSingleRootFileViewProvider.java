@@ -62,6 +62,7 @@ public class LSPSemanticTokensSingleRootFileViewProvider
         this.helper = new LSPSemanticTokensFileViewProviderHelper(this);
     }
 
+    @Override
     public boolean isEnabled() {
         return helper.isEnabled();
     }

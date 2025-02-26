@@ -526,15 +526,63 @@ If specialized behavior is needed, `LSPSemanticTokensFileViewProviderFactory` ca
 return more complex `LSPSemanticTokensFileViewProvider` implementations as described below.
 
 If the custom LSP integration's files are based on a specific language ID, the factory should be registered in 
-`plugin.xml` using `language.fileViewProviderFactory`. If its files are not based on specific language ID, it should be
-registered using `fileType.fileViewProviderFactory`.
+`plugin.xml` using `lang.fileViewProviderFactory` (using the simple factory):
+
+```xml
+<lang.fileViewProviderFactory
+        language="myLanguageId"
+        implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProviderFactory"/>
+```
+
+If its files are not based on specific language ID, it should be registered using `fileType.fileViewProviderFactory`
+(using a custom factory):
+
+```xml
+<fileType.fileViewProviderFactory
+        fileType="myFileTypeName"
+        implementationClass="com.myProduct.semanticTokens.viewProvider.MyCustomSemanticTokensFileViewProviderFactory"/>
+```
 
 #### LSPSemanticTokensFileViewProvider
 
 Files that require something more complex than `SingleRootFileViewProvider` should subclass the required file view
 provider implementation, implement the `LSPSemanticTokensFileViewProvider` interface, create a
-`LSPSemanticTokensFileViewProviderHelper` member variable in the constructor(s), and delegate the method
-`LSPSemanticTokensFileViewProvider` interface to the helper.
+`LSPSemanticTokensFileViewProviderHelper` member variable in the constructor(s), and delegate the
+`LSPSemanticTokensFileViewProvider` interface to the helper, e.g.:
+
+```java
+public class LSPSemanticTokensSingleRootFileViewProvider extends ComplexFileViewProvider implements LSPSemanticTokensFileViewProvider {
+
+    private final LSPSemanticTokensFileViewProviderHelper helper;
+
+    protected LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
+                                                          @NotNull VirtualFile virtualFile,
+                                                          boolean eventSystemEnabled,
+                                                          @NotNull Language language) {
+        super(manager, virtualFile, eventSystemEnabled, language);
+        this.helper = new LSPSemanticTokensFileViewProviderHelper(this);
+    }
+
+    protected LSPSemanticTokensSingleRootFileViewProvider(@NotNull PsiManager manager,
+                                                          @NotNull VirtualFile virtualFile,
+                                                          boolean eventSystemEnabled) {
+        super(manager, virtualFile, eventSystemEnabled);
+        this.helper = new LSPSemanticTokensFileViewProviderHelper(this);
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return helper.isEnabled();
+    }
+
+    @Override
+    public boolean isKeyword(int offset) {
+        return helper.isKeyword(offset);
+    }
+
+    // Delegate the rest of the required interface...
+}
+```
 
 #### Declaration Elements
 
