@@ -620,8 +620,7 @@ public class MyPsiElement extends PsiElementBase implements PsiNameIdentifierOwn
 }
 ```
 
-If appropriate, the implementation should instead return the child/descendant element that represents the declaration's
-name identifier
+or, if appropriate, the the child/descendant element that represents the declaration's name identifier.
 
 ## LSP SignatureHelp Feature
 
