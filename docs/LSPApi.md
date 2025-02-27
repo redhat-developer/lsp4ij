@@ -543,9 +543,6 @@ If its files are not based on specific language ID, it should be registered usin
         implementationClass="com.myProduct.semanticTokens.viewProvider.MyCustomSemanticTokensFileViewProviderFactory"/>
 ```
 
-Custom LSP integrations will also need to enable the feature flag for semantic tokens file view providers by overriding
-`EditorBehaviorFeature#isEnableSemanticTokensFileViewProvider()` to return `true`.
-
 #### LSPSemanticTokensFileViewProvider
 
 Files that require something more complex than `SingleRootFileViewProvider` should subclass the required file view
@@ -655,13 +652,13 @@ or, if appropriate, the the child/descendant element that represents the declara
 
 Unlike the features above, `LSPEditorFeature` does **not** correspond to an LSP feature. Instead it represents IDE editor behavior features, enhancements, and fixes that, alongside the language server-provided features, help provide an optimal editor experience for LSP4IJ-integrated file types. Note that these features are _disabled by default_ for `LanguageServerDefinition` and _enabled by default_ for `UserDefinedLanguageServerDefinition`. Those implementing custom language server integrations can opt into these features if desired by overriding the respective methods listed below.
 
-| API                                                            | Description                                                                                                                       | Default Behaviour                                                      |
-|----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| boolean isEnableStringLiteralImprovements(PsiFile file)        | Returns `true` if editor improvements for string literals are enabled and `false` otherwise.                                      | `true` for user-defined language server definitions; otherwise `false` |
-| boolean isEnableStatementTerminatorImprovements(PsiFile file)  | Returns `true` if editor improvements for statement terminators are enabled and `false` otherwise.                                | `true` for user-defined language server definitions; otherwise `false` |
-| boolean isEnableEnterBetweenBracesFix(PsiFile file)            | Returns `true` if the fix for [IJPL-159454](https://youtrack.jetbrains.com/issue/IJPL-159454) is enabled and `false` otherwise.   | `true` for user-defined language server definitions; otherwise `false` |
-| boolean isEnableTextMateNestedBracesImprovements(PsiFile file) | Returns `true` if editor improvements for nested braces/brackets/parentheses in TextMate files are enabled and `false` otherwise. | `true` for user-defined language server definitions; otherwise `false` |
-| boolean isEnableSemanticTokensFileViewProvider(PsiFile file)   | Returns `true` if the semantic tokens-based file view provider is enabled and `false` otherwise.                                  | `true` for user-defined language server definitions; otherwise `false` |
+| API                                                            | Description                                                                                                                       | Default Behaviour                                                                                    |
+|----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| boolean isEnableStringLiteralImprovements(PsiFile file)        | Returns `true` if editor improvements for string literals are enabled and `false` otherwise.                                      | `true` for user-defined language server definitions; otherwise `false`                               |
+| boolean isEnableStatementTerminatorImprovements(PsiFile file)  | Returns `true` if editor improvements for statement terminators are enabled and `false` otherwise.                                | `true` for user-defined language server definitions; otherwise `false`                               |
+| boolean isEnableEnterBetweenBracesFix(PsiFile file)            | Returns `true` if the fix for [IJPL-159454](https://youtrack.jetbrains.com/issue/IJPL-159454) is enabled and `false` otherwise.   | `true` for user-defined language server definitions; otherwise `false`                               |
+| boolean isEnableTextMateNestedBracesImprovements(PsiFile file) | Returns `true` if editor improvements for nested braces/brackets/parentheses in TextMate files are enabled and `false` otherwise. | `true` for user-defined language server definitions; otherwise `false`                               |
+| boolean isEnableSemanticTokensFileViewProvider(PsiFile file)   | Returns `true` if the semantic tokens-based file view provider is enabled and `false` otherwise.                                  | `true`, but a file view provider must be registered for non-user-defined language server definitions |
 =======
 
 ## Language server installer

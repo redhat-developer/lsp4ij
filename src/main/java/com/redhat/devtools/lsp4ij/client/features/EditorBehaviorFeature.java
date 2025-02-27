@@ -106,8 +106,8 @@ public class EditorBehaviorFeature {
      * @return true if the semantic tokens-based file view provider is enabled; otherwise false
      */
     public boolean isEnableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
-        // Default to disabled
-        return false;
+        // Default to enabled, but a file view provider must be registered for the provided file to be truly enabled
+        return true;
     }
 
     // Utility methods to check the state of these feature flags easily
