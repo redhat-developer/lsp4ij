@@ -47,12 +47,11 @@ final class LSPSemanticTokensStructurelessFileViewProvider extends LSPSemanticTo
         return super.supportsIncrementalReparse(rootLanguage);
     }
 
-    // NOTE: These are really the core of what makes this all work. Basically when any external caller needs to
-    // find an element or reference for a given offset in the file, we use the semantic token information that
-    // was populated the last time that semantic tokens were returned by the language server to return an element
-    // at that offset (or not). In all cases, we take great care to delegate to the inherited behavior if we
-    // don't know for a fact that we can/should respond ourselves. This ensures that non-LSP4IJ TextMate files
-    // see no change in behavior.
+    // NOTE: These are really the core of what makes this all work. Basically when any external caller needs to find an
+    // element or reference for a given offset in the file, we use the semantic token information that was populated the
+    // last time that semantic tokens were returned by the language server to return an element at that offset (or not).
+    // In all cases, we take great care to delegate to the inherited behavior if we don't know for a fact that we
+    // can/should respond ourselves. This ensures that non-LSP4IJ files see no change in behavior.
 
     @Nullable
     private PsiElement getSemanticTokenElement(int offset) {

@@ -14,7 +14,7 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 import java.util.Map;
 
 /**
- * Tests the semantic tokens-based file view provider for Go.
+ * Tests the semantic tokens-based file view provider for Go, a TextMate file type.
  */
 public class GoSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileViewProviderFixtureTestCase {
 

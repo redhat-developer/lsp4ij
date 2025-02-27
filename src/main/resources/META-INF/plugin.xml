@@ -445,13 +445,13 @@
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
 
         <!-- File view provider based on textDocument/semanticTokens -->
-        <!--
-         NOTE: This can only be registered for TextMate files because abstract file type plain text files have no
-         language and a variable file type.
-         -->
+        <!-- We can register a view provider factory for TextMate files based on the language -->
         <lang.fileViewProviderFactory
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
+        <!-- We cannot register one for plain text abstract file types, so we have to do that dynamically -->
+        <postStartupActivity
+                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar"/>
         <lang.elementManipulator
                 forClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement"
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElementManipulator"/>

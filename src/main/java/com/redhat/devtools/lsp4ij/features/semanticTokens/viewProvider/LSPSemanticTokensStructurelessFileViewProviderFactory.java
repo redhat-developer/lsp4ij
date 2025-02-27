@@ -23,6 +23,8 @@ import org.jetbrains.annotations.NotNull;
  */
 public final class LSPSemanticTokensStructurelessFileViewProviderFactory extends LSPSemanticTokensFileViewProviderFactory {
 
+    static final LSPSemanticTokensStructurelessFileViewProviderFactory INSTANCE = new LSPSemanticTokensStructurelessFileViewProviderFactory();
+
     @Override
     @NotNull
     protected LSPSemanticTokensFileViewProvider createFileViewProviderForLanguage(@NotNull PsiManager psiManager,

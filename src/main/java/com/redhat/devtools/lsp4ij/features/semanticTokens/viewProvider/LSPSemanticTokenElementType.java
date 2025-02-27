@@ -12,7 +12,6 @@
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
 import com.intellij.psi.tree.IElementType;
-import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 
@@ -32,7 +31,6 @@ class LSPSemanticTokenElementType extends IElementType {
     static final LSPSemanticTokenElementType UNKNOWN = new LSPSemanticTokenElementType("UNKNOWN");
 
     LSPSemanticTokenElementType(@NonNls @NotNull String debugName) {
-        // Note that this all only works for the TextMate language, so we can safely specify that here
-        super(debugName, LSPIJEditorUtils.getTextMateLanguage());
+        super(debugName, LSPSemanticTokenLanguage.INSTANCE);
     }
 }

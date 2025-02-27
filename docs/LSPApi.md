@@ -516,8 +516,9 @@ public class MyLSPSemanticTokensFeature extends LSPSemanticTokensFeature {
 LSP4IJ can help incorporate a file's semantic tokens information so that it's readily available and can be used to
 implement specific behavior based on whether an element is a declaration or reference, string or numeric literal,
 comment, etc., based on the reported semantic tokens. This is implemented via a custom `FileViewProviderFactory` and
-`FileViewProvider`. LSP4IJ includes default implementations of these for TextMate files which otherwise lack PSI element
-structure, and it provides a simple way for other file types to gain access to the same features.
+`FileViewProvider`. LSP4IJ includes default implementations of these for TextMate files and plain text files associated
+with abstract files types which otherwise lack PSI element structure, and it provides a simple way for other file types
+to gain access to the same features.
 
 #### LSPSemanticTokensFileViewProviderFactory
 
