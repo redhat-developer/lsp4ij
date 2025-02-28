@@ -137,7 +137,7 @@ public class TypeScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
             """;
 
     public TypeScriptSemanticTokensFileViewProviderTest() {
-        super("*.ts");
+        super("*.ts", "typescript");
     }
 
     public void testEnabled() {

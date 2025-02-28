@@ -29,7 +29,7 @@ public class CssSemanticTokensFileViewProviderTest extends LSPSemanticTokensFile
             """;
 
     public CssSemanticTokensFileViewProviderTest() {
-        super("*.css");
+        super("*.css", "css");
     }
 
     public void testEnabled() {

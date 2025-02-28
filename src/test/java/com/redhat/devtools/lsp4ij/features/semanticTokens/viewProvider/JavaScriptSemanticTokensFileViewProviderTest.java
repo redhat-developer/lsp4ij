@@ -137,7 +137,7 @@ public class JavaScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
             """;
 
     public JavaScriptSemanticTokensFileViewProviderTest() {
-        super("*.js");
+        super("*.js", "javascript");
     }
 
     public void testEnabled() {

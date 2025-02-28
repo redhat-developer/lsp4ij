@@ -31,8 +31,19 @@ import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.server.definition.*;
-import com.redhat.devtools.lsp4ij.server.definition.extension.*;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileTypeMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
+import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.usages.LSPFindUsagesProvider;
 import org.jetbrains.annotations.ApiStatus;
@@ -424,6 +435,7 @@ public class LanguageServersRegistry {
                 .filter(mapping -> definition.equals(mapping.getServerDefinition()))
                 .toList();
         fileAssociations.removeAll(mappingsToRemove);
+        definition.removeAssociations();
     }
 
     public LanguageServerDefinitionListener.@Nullable LanguageServerChangedEvent updateServerDefinition(@NotNull UpdateServerDefinitionRequest request,

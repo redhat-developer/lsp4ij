@@ -166,7 +166,7 @@ public class GoSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileV
             """;
 
     public GoSemanticTokensFileViewProviderTest() {
-        super("*.go");
+        super("*.go", "go");
     }
 
     public void testEnabled() {

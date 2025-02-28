@@ -449,9 +449,6 @@
         <lang.fileViewProviderFactory
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
-        <!-- We cannot register one for plain text abstract file types, so we have to do that dynamically -->
-        <postStartupActivity
-                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar"/>
         <lang.elementManipulator
                 forClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement"
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElementManipulator"/>
@@ -459,6 +456,19 @@
                 language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider"/>
 
+        <!-- We cannot register one for plain text abstract file types, so we have to do that dynamically. Do so when a project is opened. -->
+        <postStartupActivity
+                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar$ProjectOpenedListener"/>
+    </extensions>
+
+    <applicationListeners>
+        <!-- Also do so when file type associations change -->
+        <listener
+                class="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar$FileTypesChangedListener"
+                topic="com.intellij.openapi.fileTypes.FileTypeListener"/>
+    </applicationListeners>
+
+    <extensions defaultExtensionNs="com.intellij">
         <!-- LSP textDocument/prepareTypeHierarchy request support -->
         <typeHierarchyProvider
                 language="TEXT"

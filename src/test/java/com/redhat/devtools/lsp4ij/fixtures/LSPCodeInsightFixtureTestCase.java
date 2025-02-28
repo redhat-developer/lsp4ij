@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -35,6 +36,11 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
 
     public LSPCodeInsightFixtureTestCase(String... fileNamePatterns) {
         this.fileNamePatterns = fileNamePatterns;
+    }
+
+    protected LSPCodeInsightFixtureTestCase(@NotNull String fileNamePattern, @NotNull String languageId) {
+        this(fileNamePattern);
+        setLanguageId(languageId);
     }
 
     @Override

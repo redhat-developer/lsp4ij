@@ -44,8 +44,9 @@ import java.util.function.Function;
  */
 public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
-    protected LSPSemanticTokensFileViewProviderFixtureTestCase(String... fileNamePatterns) {
-        super(fileNamePatterns);
+    protected LSPSemanticTokensFileViewProviderFixtureTestCase(@NotNull String fileNamePattern,
+                                                               @NotNull String languageId) {
+        super(fileNamePattern, languageId);
         setClientConfigurable(true);
     }
 
