@@ -114,14 +114,19 @@ public class LSPSemanticTokensSingleRootFileViewProvider
 
     @Override
     @NotNull
+    public ThreeState isIdentifier(int offset) {
+        return helper.isIdentifier(offset);
+    }
+
+    @Override
+    @NotNull
     public ThreeState isType(int offset) {
         return helper.isType(offset);
     }
 
     @Override
-    @Nullable
-    public String getElementDescription(@NotNull PsiElement element, @Nullable PsiElement referenceElement) {
-        return helper.getElementDescription(element, referenceElement);
+    public boolean isWhitespace(int offset) {
+        return helper.isWhitespace(offset);
     }
 
     @Override

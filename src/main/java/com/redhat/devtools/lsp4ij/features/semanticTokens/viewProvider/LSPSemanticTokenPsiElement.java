@@ -14,9 +14,7 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 import com.intellij.lang.ASTNode;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiNameIdentifierOwner;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -132,23 +130,6 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
         }
 
         return text;
-    }
-
-    @Nullable
-    public String getDescription(@Nullable PsiElement referenceElement) {
-        // Only declaration elements have description text
-        if (semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION) {
-            String tokenType = semanticToken.getTokenType();
-            PsiFile file = getContainingFile();
-            return "<html>" +
-                    (StringUtil.isNotEmpty(tokenType) ? StringUtil.capitalize(tokenType) + " " : "") +
-                    "<code>" + StringUtil.escapeXmlEntities(getText()) + "</code>" +
-                    // If the reference is in another file, include this element's file name in the description
-                    ((referenceElement != null) && !Objects.equals(file, referenceElement.getContainingFile()) ? " in <code>" + file.getName() + "</code>" : "") +
-                    "</html>";
-        }
-
-        return null;
     }
 
     @Override

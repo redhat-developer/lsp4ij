@@ -12,7 +12,6 @@
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
 import com.intellij.openapi.util.TextRange;
-import com.intellij.psi.PsiElement;
 import com.intellij.util.ThreeState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -95,6 +94,17 @@ interface LSPSemanticTokensContainer {
     boolean isReference(int offset);
 
     /**
+     * Whether or not the semantic token at the offset is for an identifier.
+     *
+     * @param offset the offset
+     * @return {@link ThreeState#YES} if the semantic token at the offset is conclusively for an identifier;
+     * {@link ThreeState#NO} if the semantic token at the offset is conclusively <b>not</b> for an identifier;
+     * otherwise {@link ThreeState#UNSURE}
+     */
+    @NotNull
+    ThreeState isIdentifier(int offset);
+
+    /**
      * Whether or not the semantic token at the offset is for a type declaration, definition, or reference.
      *
      * @param offset the offset
@@ -106,17 +116,12 @@ interface LSPSemanticTokensContainer {
     ThreeState isType(int offset);
 
     /**
-     * Returns the description for the specified element, optionally formatted as appropriate from the perspective of
-     * the provided reference element. For example, if both are elements are in the same file, there's no reason to
-     * include the target element's file name in the description, but if they're in different files, it's useful to
-     * know where the target element resides.
+     * Whether or not the offset is for whitespace.
      *
-     * @param element          the element for which a description should be returned
-     * @param referenceElement the reference element from which the description is being requested
-     * @return the element description
+     * @param offset the offset
+     * @return true if the offset is for whitespace; otherwise false
      */
-    @Nullable
-    String getElementDescription(@NotNull PsiElement element, @Nullable PsiElement referenceElement);
+    boolean isWhitespace(int offset);
 
     /**
      * Returns the text range of the semantic token at the offset.

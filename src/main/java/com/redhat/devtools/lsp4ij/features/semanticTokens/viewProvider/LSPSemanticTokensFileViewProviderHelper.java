@@ -11,13 +11,14 @@
 
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -104,6 +105,14 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
         return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.REFERENCE);
     }
 
+    @NotNull
+    public ThreeState isIdentifier(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) ? semanticToken.isIdentifier() :
+                isWhitespace(offset) ? ThreeState.NO :
+                        ThreeState.UNSURE;
+    }
+
     @Override
     @NotNull
     public ThreeState isType(int offset) {
@@ -111,13 +120,11 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
         return (semanticToken != null) ? semanticToken.isType() : ThreeState.UNSURE;
     }
 
-    @Nullable
     @Override
-    public String getElementDescription(@NotNull PsiElement element, @Nullable PsiElement referenceElement) {
-        if (fileViewProvider.findElementAt(element.getTextOffset()) instanceof LSPSemanticTokenPsiElement semanticTokenElement) {
-            return semanticTokenElement.getDescription(referenceElement);
-        }
-        return null;
+    public boolean isWhitespace(int offset) {
+        PsiFile file = getFile();
+        Document document = (file != null) && (offset >= 0) && (offset < file.getTextLength()) ? LSPIJUtils.getDocument(file) : null;
+        return (document != null) && Character.isWhitespace(document.getCharsSequence().charAt(offset));
     }
 
     @Nullable

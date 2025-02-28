@@ -30,6 +30,37 @@ import java.util.Set;
  * Represents a concrete semantic token in a file.
  */
 class LSPSemanticToken {
+    // TODO: Need a mechanism for language server definitions to register token types and token modifiers including how
+    //  they should be interpreted for syntax highlighting and categorization
+    private static final String MEMBER_TOKEN_TYPE = "member"; // JavaScript/TypeScript-specific
+
+    // All semantic token types
+    private static final Set<String> ALL_TOKEN_TYPES = Set.of(
+            SemanticTokenTypes.Namespace,
+            SemanticTokenTypes.Type,
+            SemanticTokenTypes.Class,
+            SemanticTokenTypes.Enum,
+            SemanticTokenTypes.Interface,
+            SemanticTokenTypes.Struct,
+            SemanticTokenTypes.TypeParameter,
+            SemanticTokenTypes.Parameter,
+            SemanticTokenTypes.Variable,
+            SemanticTokenTypes.Property,
+            SemanticTokenTypes.EnumMember,
+            SemanticTokenTypes.Event,
+            SemanticTokenTypes.Function,
+            SemanticTokenTypes.Method,
+            SemanticTokenTypes.Macro,
+            SemanticTokenTypes.Modifier,
+            SemanticTokenTypes.Comment,
+            SemanticTokenTypes.String,
+            SemanticTokenTypes.Number,
+            SemanticTokenTypes.Regexp,
+            SemanticTokenTypes.Operator,
+            SemanticTokenTypes.Decorator,
+            MEMBER_TOKEN_TYPE
+    );
+
     // Semantic token types that should be interpreted as representing identifiers
     private static final Set<String> IDENTIFIER_TOKEN_TYPES = Set.of(
             SemanticTokenTypes.Namespace,
@@ -48,16 +79,11 @@ class LSPSemanticToken {
             SemanticTokenTypes.Method,
             SemanticTokenTypes.Macro,
             SemanticTokenTypes.Decorator,
-            // TODO: Need a mechanism for language server definitions to register token types and token modifiers
-            //  including how they should be interpreted for syntax highlighting and categorization
-            "member" // JavaScript/TypeScript-specific
+            MEMBER_TOKEN_TYPE
     );
 
-    // Semantic token modifiers that should be interpreted as representing declarations
-    private static final Set<String> DECLARATION_TOKEN_MODIFIERS = Set.of(
-            SemanticTokenModifiers.Declaration,
-            SemanticTokenModifiers.Definition
-    );
+    // Semantic token types that should NOT be interpreted as representing identifiers
+    private static final Set<String> NON_IDENTIFIER_TOKEN_TYPES = new LinkedHashSet<>(ContainerUtil.subtract(ALL_TOKEN_TYPES, IDENTIFIER_TOKEN_TYPES));
 
     // Semantic token types that should be interpreted as representing types
     private static final Set<String> TYPE_TOKEN_TYPES = Set.of(
@@ -76,6 +102,12 @@ class LSPSemanticToken {
     private static final Set<String> KEYWORD_TOKEN_TYPES = Set.of(
             SemanticTokenTypes.Keyword,
             SemanticTokenTypes.Modifier
+    );
+
+    // Semantic token modifiers that should be interpreted as representing declarations
+    private static final Set<String> DECLARATION_TOKEN_MODIFIERS = Set.of(
+            SemanticTokenModifiers.Declaration,
+            SemanticTokenModifiers.Definition
     );
 
     private final PsiFile file;
@@ -122,6 +154,18 @@ class LSPSemanticToken {
     @Nullable
     String getTokenType() {
         return tokenType;
+    }
+
+    @NotNull
+    ThreeState isIdentifier() {
+        if (tokenType != null) {
+            if (IDENTIFIER_TOKEN_TYPES.contains(tokenType)) {
+                return ThreeState.YES;
+            } else if (NON_IDENTIFIER_TOKEN_TYPES.contains(tokenType)) {
+                return ThreeState.NO;
+            }
+        }
+        return ThreeState.UNSURE;
     }
 
     @NotNull

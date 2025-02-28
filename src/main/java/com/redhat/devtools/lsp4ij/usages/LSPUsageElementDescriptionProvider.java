@@ -81,9 +81,9 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
             return LanguageServerBundle.message("usage.description");
         }
 
-        // If this is for Ctrl/Cmd+Mouse hover, try to get the element description from the documentation provider
+        // If this is for Ctrl/Cmd+Mouse hover, try to get the element documentation from the documentation provider
         else if (location instanceof UsageViewShortNameLocation) {
-            return LSPSemanticTokenDocumentationProvider.getElementDescription(element, null);
+            return LSPSemanticTokenDocumentationProvider.getDocumentation(element);
         }
 
         return null;
