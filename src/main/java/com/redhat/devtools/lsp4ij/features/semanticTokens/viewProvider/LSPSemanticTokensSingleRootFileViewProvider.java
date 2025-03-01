@@ -113,6 +113,11 @@ public class LSPSemanticTokensSingleRootFileViewProvider
     }
 
     @Override
+    public boolean isUnknown(int offset) {
+        return helper.isUnknown(offset);
+    }
+
+    @Override
     @NotNull
     public ThreeState isIdentifier(int offset) {
         return helper.isIdentifier(offset);

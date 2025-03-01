@@ -9,7 +9,7 @@
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
 
-package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
+package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.intellij.lang.ASTNode;
 import com.intellij.openapi.project.Project;
@@ -18,11 +18,13 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.tree.IElementType;
+import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -37,12 +39,114 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
  * Base test fixture for the semantic tokens-based file view provider.
  */
+@SuppressWarnings("unused")
 public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends LSPCodeInsightFixtureTestCase {
+
+    // Token type verifiers
+    protected static final Consumer<LSPSemanticTokenPsiElement> isKeyword = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isKeyword(offset),
+            false,
+            ThreeState.NO,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isOperator = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isOperator(offset),
+            false,
+            ThreeState.NO,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isStringLiteral = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isStringLiteral(offset),
+            false,
+            ThreeState.NO,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isNumericLiteral = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isNumericLiteral(offset),
+            false,
+            ThreeState.NO,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isRegularExpression = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isRegularExpression(offset),
+            false,
+            ThreeState.NO,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isComment = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isComment(offset),
+            false,
+            ThreeState.NO,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isTypeDeclaration = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isDeclaration(offset),
+            true,
+            ThreeState.YES,
+            ThreeState.YES
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isNonTypeDeclaration = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isDeclaration(offset),
+            true,
+            ThreeState.YES,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isTypeReference = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isReference(offset),
+            false,
+            ThreeState.YES,
+            ThreeState.YES
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isNonTypeReference = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isReference(offset),
+            false,
+            ThreeState.YES,
+            ThreeState.NO
+    );
+    protected static final Consumer<LSPSemanticTokenPsiElement> isUnknown = element -> assertSemanticToken(
+            element,
+            (fileViewProvider, offset) -> fileViewProvider.isUnknown(offset),
+            false,
+            ThreeState.UNSURE,
+            ThreeState.UNSURE
+    );
+
+    private interface TokenTypeVerifier {
+        boolean test(@NotNull LSPSemanticTokensFileViewProvider fileViewProvider, @NotNull Integer offset);
+    }
+
+    private static void assertSemanticToken(
+            @NotNull LSPSemanticTokenPsiElement element,
+            @NotNull TokenTypeVerifier tokenTypeVerifier,
+            boolean isNameIdentifier,
+            @NotNull ThreeState isIdentifier,
+            @NotNull ThreeState isType
+    ) {
+        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(element);
+        assertNotNull(semanticTokensFileViewProvider);
+        assertTrue(tokenTypeVerifier.test(semanticTokensFileViewProvider, element.getTextOffset()));
+        int offset = element.getTextOffset();
+        assertEquals(isNameIdentifier, element.getNameIdentifier() != null);
+        assertEquals(isIdentifier, semanticTokensFileViewProvider.isIdentifier(offset));
+        assertEquals(isType, semanticTokensFileViewProvider.isType(offset));
+        assertFalse(semanticTokensFileViewProvider.isWhitespace(offset));
+    }
 
     protected LSPSemanticTokensFileViewProviderFixtureTestCase(@NotNull String fileNamePattern,
                                                                @NotNull String languageId) {
@@ -106,17 +210,17 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
                                              @NotNull String fileBody,
                                              @Nullable String mockSemanticTokensProviderJson,
                                              @Nullable String mockSemanticTokensJson,
-                                             @NotNull Map<Function<String, Integer>, IElementType> tokenVerifiers) {
+                                             @NotNull Map<Function<String, Integer>, Consumer<LSPSemanticTokenPsiElement>> tokenVerifiers) {
         PsiFile file = initialize(fileName, fileBody, mockSemanticTokensProviderJson, mockSemanticTokensJson, true);
 
         // Confirm the token element types
-        for (Map.Entry<Function<String, Integer>, IElementType> tokenVerifier : tokenVerifiers.entrySet()) {
+        for (Map.Entry<Function<String, Integer>, Consumer<LSPSemanticTokenPsiElement>> tokenVerifier : tokenVerifiers.entrySet()) {
             Function<String, Integer> tokenSearchFunction = tokenVerifier.getKey();
-            IElementType tokenElementType = tokenVerifier.getValue();
+            Consumer<LSPSemanticTokenPsiElement> tokenElementVerifier = tokenVerifier.getValue();
 
             Integer tokenOffset = tokenSearchFunction.apply(fileBody);
             assertNotNull(tokenOffset);
-            assertSemanticTokenElement(file, tokenElementType, tokenOffset);
+            assertSemanticTokenElement(file, tokenElementVerifier, tokenOffset);
         }
 
         // Verify all tokens including those that weren't explicitly specified via verifiers
@@ -147,11 +251,11 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
     }
 
     private static void assertSemanticTokenElement(@NotNull PsiFile file,
-                                                   @NotNull IElementType expectedTokenElementType,
+                                                   @NotNull Consumer<LSPSemanticTokenPsiElement> tokenElementVerifier,
                                                    int offset) {
         PsiElement element = file.findElementAt(offset);
         assertInstanceOf(element, LSPSemanticTokenPsiElement.class);
-        assertSemanticTokenElement(file, (LSPSemanticTokenPsiElement) element, expectedTokenElementType);
+        assertSemanticTokenElement(file, (LSPSemanticTokenPsiElement) element, tokenElementVerifier);
     }
 
     private static void assertSemanticTokenElement(@NotNull PsiFile file,
@@ -161,20 +265,22 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
 
     private static void assertSemanticTokenElement(@NotNull PsiFile file,
                                                    @NotNull LSPSemanticTokenPsiElement semanticTokenElement,
-                                                   @Nullable IElementType expectedTokenElementType) {
+                                                   @Nullable Consumer<LSPSemanticTokenPsiElement> tokenElementVerifier) {
         // Verify the element type if appropriate
         ASTNode semanticTokenNode = semanticTokenElement.getNode();
         assertNotNull(semanticTokenNode);
         IElementType tokenElementType = semanticTokenNode.getElementType();
         assertInstanceOf(tokenElementType, IElementType.class);
-        if (expectedTokenElementType != null) {
-            assertEquals(expectedTokenElementType, tokenElementType);
+        if (tokenElementVerifier != null) {
+            tokenElementVerifier.accept(semanticTokenElement);
         }
 
         // Verify references are only present for reference elements
         PsiReference reference = file.findReferenceAt(semanticTokenElement.getTextOffset());
-        if (tokenElementType == LSPSemanticTokenElementType.REFERENCE) {
-            assertInstanceOf(reference, LSPSemanticTokenPsiReference.class);
+        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(semanticTokenElement);
+        assertNotNull(semanticTokensFileViewProvider);
+        if (semanticTokensFileViewProvider.isReference(semanticTokenElement.getTextOffset())) {
+            assertNotNull(reference);
         } else {
             assertNull(reference);
         }

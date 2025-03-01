@@ -105,6 +105,12 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
         return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.REFERENCE);
     }
 
+    @Override
+    public boolean isUnknown(int offset) {
+        LSPSemanticToken semanticToken = getSemanticToken(offset);
+        return (semanticToken != null) && (semanticToken.getElementType() == LSPSemanticTokenElementType.UNKNOWN);
+    }
+
     @NotNull
     public ThreeState isIdentifier(int offset) {
         LSPSemanticToken semanticToken = getSemanticToken(offset);

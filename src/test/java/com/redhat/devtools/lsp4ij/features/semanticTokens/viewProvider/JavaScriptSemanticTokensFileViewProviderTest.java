@@ -11,6 +11,8 @@
 
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
+import com.redhat.devtools.lsp4ij.fixtures.LSPSemanticTokensFileViewProviderFixtureTestCase;
+
 import java.util.Map;
 
 /**
@@ -147,18 +149,19 @@ public class JavaScriptSemanticTokensFileViewProviderTest extends LSPSemanticTok
                 MOCK_SEMANTIC_TOKENS_PROVIDER_JSON,
                 MOCK_SEMANTIC_TOKENS_JSON,
                 Map.ofEntries(
-                        Map.entry(fileBody -> fileBody.indexOf("Foo"), LSPSemanticTokenElementType.DECLARATION),
-                        Map.entry(fileBody -> fileBody.indexOf("field"), LSPSemanticTokenElementType.DECLARATION),
-                        Map.entry(fileBody -> fileBody.indexOf("property"), LSPSemanticTokenElementType.DECLARATION),
-                        Map.entry(fileBody -> fileBody.indexOf("bar()"), LSPSemanticTokenElementType.DECLARATION),
-                        Map.entry(fileBody -> fileBody.indexOf("console.log('"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("log('"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("declaration"), LSPSemanticTokenElementType.DECLARATION),
-                        Map.entry(fileBody -> fileBody.indexOf("Math"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("PI"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("console.log(d"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("log(d"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("declaration)"), LSPSemanticTokenElementType.REFERENCE)
+                        Map.entry(fileBody -> fileBody.indexOf("Foo"), isTypeDeclaration),
+                        Map.entry(fileBody -> fileBody.indexOf("field"), isNonTypeDeclaration),
+                        Map.entry(fileBody -> fileBody.indexOf("property"), isNonTypeDeclaration),
+                        Map.entry(fileBody -> fileBody.indexOf("bar()"), isNonTypeDeclaration),
+                        Map.entry(fileBody -> fileBody.indexOf("console.log('"), isNonTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("log('"), isNonTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("declaration"), isNonTypeDeclaration),
+                        // "Math" is declared as a variable and not a type
+                        Map.entry(fileBody -> fileBody.indexOf("Math"), isNonTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("PI"), isNonTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("console.log(d"), isNonTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("log(d"), isNonTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("declaration)"), isNonTypeReference)
                 )
         );
     }

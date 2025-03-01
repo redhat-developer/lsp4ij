@@ -96,7 +96,7 @@ class LSPSemanticToken {
     );
 
     // Semantic token types that should NOT be interpreted as representing types
-    private static final Set<String> NON_TYPE_TOKEN_TYPES = new LinkedHashSet<>(ContainerUtil.subtract(IDENTIFIER_TOKEN_TYPES, TYPE_TOKEN_TYPES));
+    private static final Set<String> NON_TYPE_TOKEN_TYPES = new LinkedHashSet<>(ContainerUtil.subtract(ALL_TOKEN_TYPES, TYPE_TOKEN_TYPES));
 
     // Semantic token types that should be interpreted as representing keywords/reserved words in the language
     private static final Set<String> KEYWORD_TOKEN_TYPES = Set.of(

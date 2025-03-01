@@ -11,6 +11,8 @@
 
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
+import com.redhat.devtools.lsp4ij.fixtures.LSPSemanticTokensFileViewProviderFixtureTestCase;
+
 import java.util.Map;
 
 /**
@@ -177,17 +179,17 @@ public class GoSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileV
                 MOCK_SEMANTIC_TOKENS_JSON,
                 Map.ofEntries(
                         // NOTE: This namespace token seems like it should be a declaration, but it doesn't include any modifiers
-                        Map.entry(fileBody -> fileBody.indexOf("test"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("fmt"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("/*"), LSPSemanticTokenElementType.COMMENT),
-                        Map.entry(fileBody -> fileBody.indexOf("main"), LSPSemanticTokenElementType.DECLARATION),
-                        Map.entry(fileBody -> fileBody.indexOf("//"), LSPSemanticTokenElementType.COMMENT),
-                        Map.entry(fileBody -> fileBody.indexOf("num"), LSPSemanticTokenElementType.DECLARATION),
-                        Map.entry(fileBody -> fileBody.indexOf("10"), LSPSemanticTokenElementType.NUMBER),
-                        Map.entry(fileBody -> fileBody.indexOf("fmt."), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("Println"), LSPSemanticTokenElementType.REFERENCE),
-                        Map.entry(fileBody -> fileBody.indexOf("\"num"), LSPSemanticTokenElementType.STRING),
-                        Map.entry(fileBody -> fileBody.indexOf("10)"), LSPSemanticTokenElementType.NUMBER)
+                        Map.entry(fileBody -> fileBody.indexOf("test"), isTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("fmt"), isTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("/*"), isComment),
+                        Map.entry(fileBody -> fileBody.indexOf("main"), isNonTypeDeclaration),
+                        Map.entry(fileBody -> fileBody.indexOf("//"), isComment),
+                        Map.entry(fileBody -> fileBody.indexOf("num"), isNonTypeDeclaration),
+                        Map.entry(fileBody -> fileBody.indexOf("10"), isNumericLiteral),
+                        Map.entry(fileBody -> fileBody.indexOf("fmt."), isTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("Println"), isNonTypeReference),
+                        Map.entry(fileBody -> fileBody.indexOf("\"num"), isStringLiteral),
+                        Map.entry(fileBody -> fileBody.indexOf("10)"), isNumericLiteral)
                 )
         );
     }

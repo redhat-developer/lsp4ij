@@ -11,6 +11,8 @@
 
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
+import com.redhat.devtools.lsp4ij.fixtures.LSPSemanticTokensFileViewProviderFixtureTestCase;
+
 import java.util.Map;
 
 /**
@@ -41,9 +43,9 @@ public class CssSemanticTokensFileViewProviderTest extends LSPSemanticTokensFile
                 null,
                 // Should only be one file-level token/element of unknown type; check the start/middle/end
                 Map.ofEntries(
-                        Map.entry(fileBody -> 0, LSPSemanticTokenElementType.UNKNOWN),
-                        Map.entry(fileBody -> TEST_FILE_BODY.length() / 2, LSPSemanticTokenElementType.UNKNOWN),
-                        Map.entry(fileBody -> TEST_FILE_BODY.length() - 1, LSPSemanticTokenElementType.UNKNOWN)
+                        Map.entry(fileBody -> 0, isUnknown),
+                        Map.entry(fileBody -> TEST_FILE_BODY.length() / 2, isUnknown),
+                        Map.entry(fileBody -> TEST_FILE_BODY.length() - 1, isUnknown)
                 )
         );
     }

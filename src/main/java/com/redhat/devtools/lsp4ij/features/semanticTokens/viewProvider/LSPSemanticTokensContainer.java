@@ -94,6 +94,14 @@ interface LSPSemanticTokensContainer {
     boolean isReference(int offset);
 
     /**
+     * Whether or not the semantic token at the offset is of an unknown type.
+     *
+     * @param offset the offset
+     * @return true if the semantic token at the offset is of an unknown type; otherwise false
+     */
+    boolean isUnknown(int offset);
+
+    /**
      * Whether or not the semantic token at the offset is for an identifier.
      *
      * @param offset the offset
