@@ -99,6 +99,17 @@ public class EditorBehaviorFeature {
         return false;
     }
 
+    /**
+     * Whether or not the semantic tokens-based file view provider is enabled.
+     *
+     * @param file the file
+     * @return true if the semantic tokens-based file view provider is enabled; otherwise false
+     */
+    public boolean isEnableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
+        // Default to enabled, but a file view provider must be registered for the provided file to be truly enabled
+        return true;
+    }
+
     // Utility methods to check the state of these feature flags easily
 
     /**
@@ -155,6 +166,19 @@ public class EditorBehaviorFeature {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
                 file.getVirtualFile(),
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateNestedBracesImprovements(file)
+        );
+    }
+
+    /**
+     * Whether or not the semantic tokens-based file view provider is enabled.
+     *
+     * @param file the PSI file
+     * @return true if the semantic tokens-based file view provider is enabled; otherwise false
+     */
+    public static boolean enableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
+        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
+                file.getVirtualFile(),
+                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
         );
     }
 }

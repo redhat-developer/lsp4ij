@@ -17,6 +17,7 @@ import com.intellij.platform.backend.presentation.TargetPresentation;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.MarkupContent;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -55,7 +56,13 @@ public class LSPDocumentationTarget implements DocumentationTarget {
     @Nullable
     @Override
     public DocumentationResult computeDocumentation() {
-        return DocumentationResult.documentation(convertToHtml(contents, languageServer, file));
+        return DocumentationResult.documentation(getHtml());
+    }
+
+    @NotNull
+    @ApiStatus.Internal
+    public String getHtml() {
+        return convertToHtml(contents, languageServer, file);
     }
 
     @NotNull
