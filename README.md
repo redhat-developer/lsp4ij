@@ -78,6 +78,7 @@ Here are some projects that use LSP4IJ:
  * [Qt Tools for Android Studio](https://code.qt.io/cgit/qt-labs/android-studio-tools.git/)
  * [Clojure LSP Intellij](https://github.com/clojure-lsp/clojure-lsp-intellij)
  * [GroovyScript for IntelliJ](https://github.com/IntegerLimit/GroovyScriptPlugin)
+ * [Redscript Intellij](https://github.com/pawrequest/redscript-intellij)
 
 ## Requirements
 
