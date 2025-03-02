@@ -79,6 +79,7 @@ Here are some projects that use LSP4IJ:
  * [Clojure LSP Intellij](https://github.com/clojure-lsp/clojure-lsp-intellij)
  * [GroovyScript for IntelliJ](https://github.com/IntegerLimit/GroovyScriptPlugin)
  * [Redscript Intellij](https://github.com/pawrequest/redscript-intellij)
+ * [AngelScript Language Server for IntelliJ](https://github.com/pawrequest/redscript-intellij)
 
 ## Requirements
 
