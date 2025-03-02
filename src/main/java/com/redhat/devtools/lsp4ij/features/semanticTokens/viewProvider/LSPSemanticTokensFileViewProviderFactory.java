@@ -33,10 +33,12 @@ public class LSPSemanticTokensFileViewProviderFactory implements FileViewProvide
                                                          @NotNull PsiManager psiManager,
                                                          boolean eventSystemEnabled) {
         // Only create a semantic tokens-based view provider for files supported by a configured language server
-        if ((language != null) && LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language)) {
-            return createFileViewProviderForLanguage(psiManager, virtualFile, eventSystemEnabled, language);
-        } else if (LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language)) {
-            return createFileViewProviderForFileType(psiManager, virtualFile, eventSystemEnabled);
+        if (LanguageServersRegistry.getInstance().isFileSupported(virtualFile, language)) {
+            return language != null ?
+                    // If there's a language, create a file view provider for it
+                    createFileViewProviderForLanguage(psiManager, virtualFile, eventSystemEnabled, language) :
+                    // Otherwise create one for the file type
+                    createFileViewProviderForFileType(psiManager, virtualFile, eventSystemEnabled);
         }
 
         // If not supported, use the standard file view provider for simple source files

@@ -150,7 +150,8 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
 
     protected LSPSemanticTokensFileViewProviderFixtureTestCase(@NotNull String fileNamePattern,
                                                                @NotNull String languageId) {
-        super(fileNamePattern, languageId);
+        super(fileNamePattern);
+        setLanguageId(languageId);
         setClientConfigurable(true);
     }
 
