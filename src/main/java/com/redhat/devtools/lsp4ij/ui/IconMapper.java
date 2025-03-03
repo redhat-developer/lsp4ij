@@ -22,13 +22,14 @@ import com.intellij.util.ui.ColorIcon;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.SymbolKind;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.Icon;
+import java.awt.Color;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -240,6 +241,41 @@ public class IconMapper {
             default:
                 return AllIcons.Nodes.EmptyNode;
         }
+    }
+
+    /**
+     * Returns the icon for the provided {@link SemanticTokenTypes} value if possible.
+     *
+     * @param tokenType the icon name as semantic token type value
+     * @return the corresponding icon, or null if no icon could be found
+     */
+    @Nullable
+    public static Icon getIcon(@Nullable String tokenType) {
+        if (tokenType != null) {
+            return switch (tokenType) {
+                case SemanticTokenTypes.Namespace -> AllIcons.Nodes.Package;
+                case SemanticTokenTypes.Class -> AllIcons.Nodes.Class;
+                case SemanticTokenTypes.Enum -> AllIcons.Nodes.Enum;
+                case SemanticTokenTypes.Interface -> AllIcons.Nodes.Interface;
+                case SemanticTokenTypes.TypeParameter -> AllIcons.Nodes.Parameter;
+                case SemanticTokenTypes.Parameter -> AllIcons.Nodes.Parameter;
+                case SemanticTokenTypes.Variable -> AllIcons.Nodes.Variable;
+                case SemanticTokenTypes.Property -> AllIcons.Nodes.Property;
+                case SemanticTokenTypes.EnumMember -> AllIcons.Nodes.Field;
+                case SemanticTokenTypes.Function -> AllIcons.Nodes.Function;
+                case SemanticTokenTypes.Macro -> AllIcons.Nodes.Function;
+                case SemanticTokenTypes.Method -> AllIcons.Nodes.Method;
+                // Decorators are just annotations
+                case SemanticTokenTypes.Decorator -> AllIcons.Nodes.Annotationtype;
+                // Following the same convention as above for these two
+                case SemanticTokenTypes.Type -> AllIcons.Json.Object;
+                case SemanticTokenTypes.Struct -> AllIcons.Json.Object;
+                // TODO: SemanticTokenTypes.Event
+                // TODO: "member" from the TypeScript language server
+                default -> null;
+            };
+        }
+        return null;
     }
 
     private static @NotNull Icon load(String iconPath) {

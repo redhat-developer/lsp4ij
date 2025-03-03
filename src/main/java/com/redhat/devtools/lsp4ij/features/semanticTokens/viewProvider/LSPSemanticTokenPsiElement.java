@@ -19,9 +19,11 @@ import com.intellij.psi.PsiNameIdentifierOwner;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
+import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.Icon;
 import java.util.Objects;
 
 /**
@@ -29,6 +31,7 @@ import java.util.Objects;
  */
 public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiNameIdentifierOwner {
     private final LSPSemanticToken semanticToken;
+    private final Icon icon;
     private volatile LeafPsiElement node = null;
     private volatile String text = null;
 
@@ -40,6 +43,11 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
     LSPSemanticTokenPsiElement(@NotNull LSPSemanticToken semanticToken) {
         super(semanticToken.getFile(), semanticToken.getTextRange());
         this.semanticToken = semanticToken;
+        // If this is a declaration or reference, try to use an appropriate icon
+        LSPSemanticTokenElementType elementType = semanticToken.getElementType();
+        this.icon = (elementType == LSPSemanticTokenElementType.DECLARATION) || (elementType == LSPSemanticTokenElementType.REFERENCE) ?
+                IconMapper.getIcon(semanticToken.getTokenType()) :
+                null;
     }
 
     @Override
@@ -70,6 +78,12 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
     public PsiElement getNameIdentifier() {
         // If this is a declaration, return this element as the name identifier
         return semanticToken.getElementType() == LSPSemanticTokenElementType.DECLARATION ? this : null;
+    }
+
+    @Override
+    @Nullable
+    public Icon getIcon(boolean open) {
+        return icon != null ? icon : super.getIcon(open);
     }
 
     @Override
