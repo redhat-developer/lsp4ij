@@ -23,6 +23,7 @@ import com.intellij.psi.codeStyle.NameUtil;
 import com.intellij.usageView.UsageViewLongNameLocation;
 import com.intellij.usageView.UsageViewShortNameLocation;
 import com.intellij.usageView.UsageViewTypeLocation;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider;
@@ -38,6 +39,12 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
     @Nullable
     @NlsSafe
     public String getElementDescription(@NotNull PsiElement element, @NotNull ElementDescriptionLocation location) {
+        // Only for LSP4IJ-supported files
+        PsiFile file = element.getContainingFile();
+        if (!LSPFileSupport.hasSupport(file)) {
+            return null;
+        }
+
         // Try to use the real element if possible
         if (element instanceof LSPUsageTriggeredPsiElement usageTriggeredPsiElement) {
             PsiElement realElement = usageTriggeredPsiElement.getRealElement();
@@ -68,11 +75,8 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
             }
 
             // Otherwise try to get the current word
-            PsiFile file = element.getContainingFile();
             Document document = LSPIJUtils.getDocument(element);
-            TextRange wordRange = (file != null) && (document != null) ?
-                    LSPIJUtils.getWordRangeAt(document, file, element.getTextOffset()) :
-                    null;
+            TextRange wordRange = document != null ? LSPIJUtils.getWordRangeAt(document, file, element.getTextOffset()) : null;
             if (wordRange != null) {
                 return document.getText(wordRange);
             }
