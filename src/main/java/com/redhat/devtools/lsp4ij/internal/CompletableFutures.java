@@ -94,7 +94,7 @@ public class CompletableFutures {
         return future != null && future.isDone() && !future.isCancelled() && !future.isCompletedExceptionally();
     }
 
-    public static void waitUntilDone(@NotNull CompletableFuture<?> future) throws ExecutionException, ProcessCanceledException {
+    public static void waitUntilDone(@Nullable CompletableFuture<?> future) throws ExecutionException, ProcessCanceledException {
         waitUntilDone(future, null);
     }
 
