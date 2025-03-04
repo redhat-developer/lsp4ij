@@ -15,6 +15,7 @@ import com.intellij.usages.UsageTarget;
 import com.intellij.usages.impl.rules.UsageType;
 import com.intellij.usages.impl.rules.UsageTypeProviderEx;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -46,18 +47,17 @@ public class LSPUsageTypeProvider implements UsageTypeProviderEx {
     @Override
     public UsageType getUsageType(PsiElement element, UsageTarget @NotNull [] targets) {
         if (element instanceof LSPUsagePsiElement usageElement) {
-            switch (usageElement.getKind()) {
-                case declarations:
-                    return DECLARATIONS_USAGE_TYPE;
-                case definitions:
-                    return DEFINITIONS_USAGE_TYPE;
-                case typeDefinitions:
-                    return TYPE_DEFINITIONS_USAGE_TYPE;
-                case references:
-                    return REFERENCES_USAGE_TYPE;
-                case implementations:
-                    return IMPLEMENTATIONS_USAGE_TYPE;
-            }
+            return switch (usageElement.getKind()) {
+                case declarations -> DECLARATIONS_USAGE_TYPE;
+                case definitions -> DEFINITIONS_USAGE_TYPE;
+                case typeDefinitions -> TYPE_DEFINITIONS_USAGE_TYPE;
+                case references -> REFERENCES_USAGE_TYPE;
+                case implementations -> IMPLEMENTATIONS_USAGE_TYPE;
+            };
+        }
+        // We can also have local usages to semantic token elements which are references
+        else if (element instanceof LSPSemanticTokenPsiElement) {
+            return REFERENCES_USAGE_TYPE;
         }
         return null;
     }

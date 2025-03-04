@@ -31,10 +31,22 @@ import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.server.definition.*;
-import com.redhat.devtools.lsp4ij.server.definition.extension.*;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileTypeMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
+import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.usages.LSPFindUsagesProvider;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -423,6 +435,7 @@ public class LanguageServersRegistry {
                 .filter(mapping -> definition.equals(mapping.getServerDefinition()))
                 .toList();
         fileAssociations.removeAll(mappingsToRemove);
+        definition.removeAssociations();
     }
 
     public LanguageServerDefinitionListener.@Nullable LanguageServerChangedEvent updateServerDefinition(@NotNull UpdateServerDefinitionRequest request,
@@ -462,7 +475,7 @@ public class LanguageServersRegistry {
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
+            mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -540,6 +553,33 @@ public class LanguageServersRegistry {
             }
             return true;
         }
+        return false;
+    }
+
+    /**
+     * Returns true if the virtual file and optional language are supported by a language server and false otherwise.
+     * This signature should be used only when it is not yet possible yet to check the PSI file because it is in the
+     * process of being created via a file view provider factory. If a PSI file is available, one of the other
+     * signatures of {@link #isFileSupported} should be used instead.
+     *
+     * @param virtualFile the virtual file
+     * @param language    the language
+     * @return true if the virtual file is supported by a configured language server and false otherwise.
+     */
+    @ApiStatus.Internal
+    public boolean isFileSupported(@Nullable VirtualFile virtualFile, @Nullable Language language) {
+        if (virtualFile == null) {
+            return false;
+        }
+
+        FileType fileType = virtualFile.getFileType();
+        String fileName = virtualFile.getName();
+        if (fileAssociations
+                .stream()
+                .anyMatch(mapping -> mapping.match(language, fileType, fileName))) {
+            return virtualFile.isInLocalFileSystem() || !(virtualFile instanceof LightVirtualFile);
+        }
+
         return false;
     }
 

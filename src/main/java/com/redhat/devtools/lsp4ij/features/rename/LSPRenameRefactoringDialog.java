@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.features.rename;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.FileTypes;
@@ -239,10 +240,10 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                 @Override
                 public void run(@NotNull ProgressIndicator progressIndicator) {
                     progressIndicator.setIndeterminate(true);
-                    LSPExternalReferencesFinder.processExternalReferences(file, offset, reference -> {
+                    ReadAction.run(() -> LSPExternalReferencesFinder.processExternalReferences(file, offset, reference -> {
                         externalReferences.add(reference);
                         return true;
-                    });
+                    }));
                 }
             });
         }

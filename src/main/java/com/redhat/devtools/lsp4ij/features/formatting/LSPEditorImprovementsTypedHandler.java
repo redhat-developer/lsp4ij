@@ -18,6 +18,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
@@ -25,6 +26,7 @@ import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -73,9 +75,10 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
         String stringLiteral = getStringLiteral(file, documentChars, offset);
         if (StringUtil.isNotEmpty(stringLiteral)) {
             char stringLiteralQuote = stringLiteral.charAt(0);
-            // Single quote within double-quoted string or vice-versa
-            // Escaped single quote within single-quoted string or vice-versa
-            if ((stringLiteralQuote != quote) || ((offset > 0) && (documentChars.charAt(offset - 1) == '\\'))) {
+            // Quote character within a string bounded by another quote character
+            if ((stringLiteralQuote != quote) ||
+                // Escaped quote character within string bounded by the same quote character
+                ((offset > 0) && (documentChars.charAt(offset - 1) == '\\'))) {
                 document.insertString(offset, String.valueOf(quote));
                 editor.getCaretModel().moveToOffset(offset + 1);
                 return true;
@@ -126,6 +129,20 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
                                            int offset) {
         Set<Character> quoteCharacters = LSPIJEditorUtils.getQuoteCharacters(file);
         if (!ContainerUtil.isEmpty(quoteCharacters)) {
+            // Try to determine this using semantic tokens
+            LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
+            if ((semanticTokensFileViewProvider != null) && semanticTokensFileViewProvider.isStringLiteral(offset)) {
+                TextRange textRange = semanticTokensFileViewProvider.getSemanticTokenTextRange(offset);
+                if (textRange != null) {
+                    String stringLiteral = fileChars.subSequence(textRange.getStartOffset(), textRange.getEndOffset()).toString();
+                    if (StringUtil.isNotEmpty(stringLiteral) &&
+                        quoteCharacters.contains(stringLiteral.charAt(0)) &&
+                        quoteCharacters.contains(stringLiteral.charAt(stringLiteral.length() - 1))) {
+                        return stringLiteral;
+                    }
+                }
+            }
+
             // This pattern is basically from any quote character to the same character with no unescaped same quote
             // character or line break in between
             Pattern stringLiteralPattern = Pattern.compile("([" + StringUtil.join(quoteCharacters, "") + "])([^$1\\r\\n]|\\\\\\.)*\\1");
@@ -151,14 +168,18 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
     private static boolean inComment(@NotNull PsiFile file,
                                      @NotNull CharSequence documentChars,
                                      int offset) {
-        boolean inComment = false;
+        // Try to determine this using semantic tokens
+        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
+        if ((semanticTokensFileViewProvider != null) && semanticTokensFileViewProvider.isComment(offset)) {
+            return true;
+        }
 
         Document document = LSPIJUtils.getDocument(file);
         if (document != null) {
             Commenter commenter = LSPIJEditorUtils.getCommenter(file);
 
-            // First try to see if we're in a line comment since that's much more efficient. We're in a line comment if
-            // we find a line comment start on the same line before the current position.
+            // Try to see if we're in a line comment since that's much more efficient. We're in a line comment if we
+            // find a line comment start on the same line before the current position.
             String lineCommentPrefix = commenter.getLineCommentPrefix();
             if (StringUtil.isNotEmpty(lineCommentPrefix)) {
                 int lineNumber = document.getLineNumber(offset);
@@ -172,7 +193,7 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
                         if (lineCommentPrefixIndex > -1) {
                             int lineCommentPrefixOffset = lineStartOffset + lineCommentPrefixIndex;
                             if (lineCommentPrefixOffset < offset) {
-                                inComment = true;
+                                return true;
                             }
                         }
                     }
@@ -181,24 +202,22 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
 
             // If not detected in a line comment, try to see if we're in a block comment. We're in a block comment if
             // we find a block comment start before the current position without a block comment end in the interim.
-            if (!inComment) {
-                String blockCommentPrefix = commenter.getBlockCommentPrefix();
-                String blockCommentSuffix = commenter.getBlockCommentSuffix();
-                if (StringUtil.isNotEmpty(blockCommentPrefix) && StringUtil.isNotEmpty(blockCommentSuffix)) {
-                    CharSequence beforeOffsetChars = documentChars.subSequence(0, offset);
-                    if (!beforeOffsetChars.isEmpty()) {
-                        String beforeOffsetText = beforeOffsetChars.toString();
-                        int previousBlockCommentPrefixIndex = beforeOffsetText.lastIndexOf(blockCommentPrefix, offset);
-                        if (previousBlockCommentPrefixIndex > -1) {
-                            // For efficiency, limit the text that has to be searched for the block comment end to the span
-                            // between the previous block comment start and the current position.
-                            CharSequence betweenBlockCommentPrefixAndOffsetChars = documentChars.subSequence(previousBlockCommentPrefixIndex + blockCommentPrefix.length(), offset);
-                            if (!betweenBlockCommentPrefixAndOffsetChars.isEmpty()) {
-                                String betweenBlockCommentPrefixAndOffsetText = betweenBlockCommentPrefixAndOffsetChars.toString();
-                                int previousBlockCommentSuffixIndex = betweenBlockCommentPrefixAndOffsetText.indexOf(blockCommentSuffix);
-                                if (previousBlockCommentSuffixIndex == -1) {
-                                    inComment = true;
-                                }
+            String blockCommentPrefix = commenter.getBlockCommentPrefix();
+            String blockCommentSuffix = commenter.getBlockCommentSuffix();
+            if (StringUtil.isNotEmpty(blockCommentPrefix) && StringUtil.isNotEmpty(blockCommentSuffix)) {
+                CharSequence beforeOffsetChars = documentChars.subSequence(0, offset);
+                if (!beforeOffsetChars.isEmpty()) {
+                    String beforeOffsetText = beforeOffsetChars.toString();
+                    int previousBlockCommentPrefixIndex = beforeOffsetText.lastIndexOf(blockCommentPrefix, offset);
+                    if (previousBlockCommentPrefixIndex > -1) {
+                        // For efficiency, limit the text that has to be searched for the block comment end to the span
+                        // between the previous block comment start and the current position.
+                        CharSequence betweenBlockCommentPrefixAndOffsetChars = documentChars.subSequence(previousBlockCommentPrefixIndex + blockCommentPrefix.length(), offset);
+                        if (!betweenBlockCommentPrefixAndOffsetChars.isEmpty()) {
+                            String betweenBlockCommentPrefixAndOffsetText = betweenBlockCommentPrefixAndOffsetChars.toString();
+                            int previousBlockCommentSuffixIndex = betweenBlockCommentPrefixAndOffsetText.indexOf(blockCommentSuffix);
+                            if (previousBlockCommentSuffixIndex == -1) {
+                                return true;
                             }
                         }
                     }
@@ -206,6 +225,6 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
             }
         }
 
-        return inComment;
+        return false;
     }
 }
