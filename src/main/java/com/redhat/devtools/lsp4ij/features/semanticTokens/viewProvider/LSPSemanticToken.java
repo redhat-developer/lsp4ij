@@ -15,93 +15,114 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenTypes;
 import org.eclipse.lsp4j.SemanticTokenModifiers;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Represents a concrete semantic token in a file.
  */
 class LSPSemanticToken {
-    // TODO: Need a mechanism for language server definitions to register token types and token modifiers including how
-    //  they should be interpreted for syntax highlighting and categorization
-    private static final String MEMBER_TOKEN_TYPE = "member"; // JavaScript/TypeScript-specific
 
     // All semantic token types
-    private static final Set<String> ALL_TOKEN_TYPES = Set.of(
-            SemanticTokenTypes.Namespace,
-            SemanticTokenTypes.Type,
-            SemanticTokenTypes.Class,
-            SemanticTokenTypes.Enum,
-            SemanticTokenTypes.Interface,
-            SemanticTokenTypes.Struct,
-            SemanticTokenTypes.TypeParameter,
-            SemanticTokenTypes.Parameter,
-            SemanticTokenTypes.Variable,
-            SemanticTokenTypes.Property,
-            SemanticTokenTypes.EnumMember,
-            SemanticTokenTypes.Event,
-            SemanticTokenTypes.Function,
-            SemanticTokenTypes.Method,
-            SemanticTokenTypes.Macro,
-            SemanticTokenTypes.Modifier,
-            SemanticTokenTypes.Comment,
-            SemanticTokenTypes.String,
-            SemanticTokenTypes.Number,
-            SemanticTokenTypes.Regexp,
-            SemanticTokenTypes.Operator,
-            SemanticTokenTypes.Decorator,
-            MEMBER_TOKEN_TYPE
+    private static final Set<String> ALL_TOKEN_TYPES = ContainerUtil.union(
+            Set.of(
+                    SemanticTokenTypes.Namespace,
+                    SemanticTokenTypes.Type,
+                    SemanticTokenTypes.Class,
+                    SemanticTokenTypes.Enum,
+                    SemanticTokenTypes.Interface,
+                    SemanticTokenTypes.Struct,
+                    SemanticTokenTypes.TypeParameter,
+                    SemanticTokenTypes.Parameter,
+                    SemanticTokenTypes.Variable,
+                    SemanticTokenTypes.Property,
+                    SemanticTokenTypes.EnumMember,
+                    SemanticTokenTypes.Event,
+                    SemanticTokenTypes.Function,
+                    SemanticTokenTypes.Method,
+                    SemanticTokenTypes.Macro,
+                    SemanticTokenTypes.Modifier,
+                    SemanticTokenTypes.Comment,
+                    SemanticTokenTypes.String,
+                    SemanticTokenTypes.Number,
+                    SemanticTokenTypes.Regexp,
+                    SemanticTokenTypes.Operator,
+                    SemanticTokenTypes.Decorator
+            ),
+            Arrays.stream(LSPSemanticTokenTypes.values())
+                    .map(t -> t.name)
+                    .collect(Collectors.toSet())
     );
 
     // Semantic token types that should be interpreted as representing identifiers
-    private static final Set<String> IDENTIFIER_TOKEN_TYPES = Set.of(
-            SemanticTokenTypes.Namespace,
-            SemanticTokenTypes.Type,
-            SemanticTokenTypes.Class,
-            SemanticTokenTypes.Enum,
-            SemanticTokenTypes.Interface,
-            SemanticTokenTypes.Struct,
-            SemanticTokenTypes.TypeParameter,
-            SemanticTokenTypes.Parameter,
-            SemanticTokenTypes.Variable,
-            SemanticTokenTypes.Property,
-            SemanticTokenTypes.EnumMember,
-            SemanticTokenTypes.Event,
-            SemanticTokenTypes.Function,
-            SemanticTokenTypes.Method,
-            SemanticTokenTypes.Macro,
-            SemanticTokenTypes.Decorator,
-            MEMBER_TOKEN_TYPE
+    private static final Set<String> IDENTIFIER_TOKEN_TYPES = ContainerUtil.union(
+            Set.of(
+                    SemanticTokenTypes.Namespace,
+                    SemanticTokenTypes.Type,
+                    SemanticTokenTypes.Class,
+                    SemanticTokenTypes.Enum,
+                    SemanticTokenTypes.Interface,
+                    SemanticTokenTypes.Struct,
+                    SemanticTokenTypes.TypeParameter,
+                    SemanticTokenTypes.Parameter,
+                    SemanticTokenTypes.Variable,
+                    SemanticTokenTypes.Property,
+                    SemanticTokenTypes.EnumMember,
+                    SemanticTokenTypes.Event,
+                    SemanticTokenTypes.Function,
+                    SemanticTokenTypes.Method,
+                    SemanticTokenTypes.Macro,
+                    SemanticTokenTypes.Decorator
+            ),
+            Arrays.stream(LSPSemanticTokenTypes.values())
+                    .filter(t -> t.identifier)
+                    .map(t -> t.name)
+                    .collect(Collectors.toSet())
     );
 
     // Semantic token types that should NOT be interpreted as representing identifiers
     private static final Set<String> NON_IDENTIFIER_TOKEN_TYPES = new LinkedHashSet<>(ContainerUtil.subtract(ALL_TOKEN_TYPES, IDENTIFIER_TOKEN_TYPES));
 
     // Semantic token types that should be interpreted as representing types
-    private static final Set<String> TYPE_TOKEN_TYPES = Set.of(
-            SemanticTokenTypes.Namespace,
-            SemanticTokenTypes.Type,
-            SemanticTokenTypes.Class,
-            SemanticTokenTypes.Enum,
-            SemanticTokenTypes.Interface,
-            SemanticTokenTypes.Struct
+    private static final Set<String> TYPE_TOKEN_TYPES = ContainerUtil.union(
+            Set.of(
+                    SemanticTokenTypes.Namespace,
+                    SemanticTokenTypes.Type,
+                    SemanticTokenTypes.Class,
+                    SemanticTokenTypes.Enum,
+                    SemanticTokenTypes.Interface,
+                    SemanticTokenTypes.Struct
+            ),
+            Arrays.stream(LSPSemanticTokenTypes.values())
+                    .filter(t -> t.type)
+                    .map(t -> t.name)
+                    .collect(Collectors.toSet())
     );
 
     // Semantic token types that should NOT be interpreted as representing types
     private static final Set<String> NON_TYPE_TOKEN_TYPES = new LinkedHashSet<>(ContainerUtil.subtract(ALL_TOKEN_TYPES, TYPE_TOKEN_TYPES));
 
     // Semantic token types that should be interpreted as representing keywords/reserved words in the language
-    private static final Set<String> KEYWORD_TOKEN_TYPES = Set.of(
-            SemanticTokenTypes.Keyword,
-            SemanticTokenTypes.Modifier
+    private static final Set<String> KEYWORD_TOKEN_TYPES = ContainerUtil.union(
+            Set.of(
+                    SemanticTokenTypes.Keyword,
+                    SemanticTokenTypes.Modifier
+            ),
+            Arrays.stream(LSPSemanticTokenTypes.values())
+                    .filter(t -> t.keyword)
+                    .map(t -> t.name)
+                    .collect(Collectors.toSet())
     );
 
     // Semantic token modifiers that should be interpreted as representing declarations

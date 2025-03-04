@@ -19,6 +19,8 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.util.ui.ColorIcon;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenType;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenTypes;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionItemKind;
 import org.eclipse.lsp4j.MarkupContent;
@@ -252,28 +254,47 @@ public class IconMapper {
     @Nullable
     public static Icon getIcon(@Nullable String tokenType) {
         if (tokenType != null) {
-            return switch (tokenType) {
-                case SemanticTokenTypes.Namespace -> AllIcons.Nodes.Package;
-                case SemanticTokenTypes.Class -> AllIcons.Nodes.Class;
-                case SemanticTokenTypes.Enum -> AllIcons.Nodes.Enum;
-                case SemanticTokenTypes.Interface -> AllIcons.Nodes.Interface;
-                case SemanticTokenTypes.TypeParameter -> AllIcons.Nodes.Parameter;
-                case SemanticTokenTypes.Parameter -> AllIcons.Nodes.Parameter;
-                case SemanticTokenTypes.Variable -> AllIcons.Nodes.Variable;
-                case SemanticTokenTypes.Property -> AllIcons.Nodes.Property;
-                case SemanticTokenTypes.EnumMember -> AllIcons.Nodes.Field;
-                case SemanticTokenTypes.Function -> AllIcons.Nodes.Function;
-                case SemanticTokenTypes.Macro -> AllIcons.Nodes.Function;
-                case SemanticTokenTypes.Method -> AllIcons.Nodes.Method;
+            // If this is for a custom semantic token type that expresses an inheritance relationship, swap it out now
+            LSPSemanticTokenType lspSemanticTokenType = LSPSemanticTokenTypes.valueOf(tokenType);
+            if ((lspSemanticTokenType != null) && (lspSemanticTokenType.inheritFrom != null)) {
+                tokenType = lspSemanticTokenType.inheritFrom;
+            }
+
+            switch (tokenType) {
+                case SemanticTokenTypes.Namespace:
+                    return AllIcons.Nodes.Package;
+                case SemanticTokenTypes.Class:
+                    return AllIcons.Nodes.Class;
+                case SemanticTokenTypes.Enum:
+                    return AllIcons.Nodes.Enum;
+                case SemanticTokenTypes.Interface:
+                    return AllIcons.Nodes.Interface;
+                case SemanticTokenTypes.TypeParameter:
+                    return AllIcons.Nodes.Parameter;
+                case SemanticTokenTypes.Parameter:
+                    return AllIcons.Nodes.Parameter;
+                case SemanticTokenTypes.Variable:
+                    return AllIcons.Nodes.Variable;
+                case SemanticTokenTypes.Property:
+                    return AllIcons.Nodes.Property;
+                case SemanticTokenTypes.EnumMember:
+                    return AllIcons.Nodes.Field;
+                case SemanticTokenTypes.Function:
+                    return AllIcons.Nodes.Function;
+                case SemanticTokenTypes.Macro:
+                    return AllIcons.Nodes.Function;
+                case SemanticTokenTypes.Method:
+                    return AllIcons.Nodes.Method;
                 // Decorators are just annotations
-                case SemanticTokenTypes.Decorator -> AllIcons.Nodes.Annotationtype;
+                case SemanticTokenTypes.Decorator:
+                    return AllIcons.Nodes.Annotationtype;
                 // Following the same convention as above for these two
-                case SemanticTokenTypes.Type -> AllIcons.Json.Object;
-                case SemanticTokenTypes.Struct -> AllIcons.Json.Object;
+                case SemanticTokenTypes.Type:
+                    return AllIcons.Json.Object;
+                case SemanticTokenTypes.Struct:
+                    return AllIcons.Json.Object;
                 // TODO: SemanticTokenTypes.Event
-                // TODO: "member" from the TypeScript language server
-                default -> null;
-            };
+            }
         }
         return null;
     }
