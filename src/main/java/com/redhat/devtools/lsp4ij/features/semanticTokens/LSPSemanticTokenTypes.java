@@ -25,6 +25,16 @@ import java.util.Map;
 @ApiStatus.Internal
 public class LSPSemanticTokenTypes {
 
+    // https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#standard-token-types-and-modifiers
+    private static final LSPSemanticTokenType Label = new LSPSemanticTokenType(
+            "label",
+            true,
+            false,
+            false,
+            null,
+            SemanticTokensHighlightingColors.LABEL.getExternalName()
+    );
+
     // TypeScript "member"
     private static final LSPSemanticTokenType Member = new LSPSemanticTokenType(
             "member",
@@ -37,6 +47,7 @@ public class LSPSemanticTokenTypes {
 
     // All custom semantic token types
     private static final LSPSemanticTokenType[] values = new LSPSemanticTokenType[]{
+            Label,
             Member
     };
 

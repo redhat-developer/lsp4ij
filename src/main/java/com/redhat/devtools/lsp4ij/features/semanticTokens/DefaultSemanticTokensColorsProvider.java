@@ -172,12 +172,6 @@ public class DefaultSemanticTokensColorsProvider implements SemanticTokensColors
             case SemanticTokenTypes.Macro:
                 return SemanticTokensHighlightingColors.MACRO;
 
-            // label: for identifiers that declare a label.
-            case "label":
-                // LSP doesn't define "label", but vscode defines it
-                // See https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#standard-token-types-and-modifiers
-                return SemanticTokensHighlightingColors.LABEL;
-
             // comment: for tokens that represent a comment.
             case SemanticTokenTypes.Comment:
                 return SemanticTokensHighlightingColors.COMMENT;
