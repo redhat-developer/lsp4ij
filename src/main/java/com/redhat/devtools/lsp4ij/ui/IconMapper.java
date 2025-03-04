@@ -160,6 +160,7 @@ public class IconMapper {
             case Variable:
                 return AllIcons.Nodes.Variable;
             case Struct:
+                // TODO: Should this be AllIcons.Nodes.Types?
                 return AllIcons.Json.Object;
             case Class:
                 return AllIcons.Nodes.Class;
@@ -213,6 +214,7 @@ public class IconMapper {
                 return AllIcons.Nodes.Variable;
             case Object:
             case Struct:
+                // TODO: Should this be AllIcons.Nodes.Types?
                 return AllIcons.Json.Object;
             case Array:
                 return AllIcons.Json.Array;
@@ -263,12 +265,16 @@ public class IconMapper {
             switch (tokenType) {
                 case SemanticTokenTypes.Namespace:
                     return AllIcons.Nodes.Package;
+                case SemanticTokenTypes.Type:
+                    return AllIcons.Nodes.Type;
                 case SemanticTokenTypes.Class:
                     return AllIcons.Nodes.Class;
                 case SemanticTokenTypes.Enum:
                     return AllIcons.Nodes.Enum;
                 case SemanticTokenTypes.Interface:
                     return AllIcons.Nodes.Interface;
+                case SemanticTokenTypes.Struct:
+                    return AllIcons.Nodes.Type;
                 case SemanticTokenTypes.TypeParameter:
                     return AllIcons.Nodes.Parameter;
                 case SemanticTokenTypes.Parameter:
@@ -288,11 +294,6 @@ public class IconMapper {
                 // Decorators are just annotations
                 case SemanticTokenTypes.Decorator:
                     return AllIcons.Nodes.Annotationtype;
-                // Following the same convention as above for these two
-                case SemanticTokenTypes.Type:
-                    return AllIcons.Json.Object;
-                case SemanticTokenTypes.Struct:
-                    return AllIcons.Json.Object;
                 // TODO: SemanticTokenTypes.Event
             }
         }
