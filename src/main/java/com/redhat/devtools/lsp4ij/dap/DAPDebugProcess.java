@@ -99,9 +99,8 @@ public class DAPDebugProcess extends XDebugProcess {
             public void run(@NotNull ProgressIndicator indicator) {
 
                 DAPDebugProcess.this.status = Status.STARTING;
-                if (dapState.getDebugMode()== DebugMode.ATTACH) {
-                    print(taskTitle, ConsoleViewContentType.SYSTEM_OUTPUT);
-                }
+                print(taskTitle, ConsoleViewContentType.SYSTEM_OUTPUT);
+
                 // The Debug server is launched, create a DAP client and connect to the server when it is ready:
                 // - wait for socket port
                 // - or wait for some ms
