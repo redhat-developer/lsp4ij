@@ -1,6 +1,6 @@
 {
   "id": "python-debugpy",
-  "name": "Python- Debugpy",
+  "name": "Python - Debugpy",
   "attach": {
     "address": "$connect.host",
     "port": "$connect.port"
