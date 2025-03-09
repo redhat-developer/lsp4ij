@@ -11,20 +11,25 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -35,6 +40,9 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
     private static final long WAIT_AFTER_SENDING_DID_OPEN = 500L;
 
+    private record DocumentText(@NotNull String text, @NotNull LanguageServer languageServer) {
+    }
+
     private final @NotNull LanguageServerWrapper languageServerWrapper;
     private final @NotNull Document document;
     private final @NotNull String fileUri;
@@ -42,7 +50,8 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
     private int version = 0;
     private final List<TextDocumentContentChangeEvent> changeEvents;
-    @NotNull final CompletableFuture<Void> didOpenFuture;
+    @NotNull
+    final CompletableFuture<Void> didOpenFuture;
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull String fileUri,
@@ -54,18 +63,12 @@ public class DocumentContentSynchronizer implements DocumentListener {
         this.syncKind = syncKind != null ? syncKind : TextDocumentSyncKind.Full;
 
         this.document = document;
-        // add a document buffer
-        TextDocumentItem textDocument = new TextDocumentItem();
-        textDocument.setUri(this.fileUri);
-        textDocument.setText(document.getText());
 
-        @NotNull String languageId = languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
-        textDocument.setLanguageId(languageId);
-        textDocument.setVersion(++version);
         didOpenFuture = languageServerWrapper
                 .getInitializedServer()
-                .thenAcceptAsync(ls -> ls.getTextDocumentService()
-                        .didOpen(new DidOpenTextDocumentParams(textDocument)))
+                .thenComposeAsync(ls -> getDocumentText(ls))
+                .thenAcceptAsync(data -> data.languageServer().getTextDocumentService()
+                        .didOpen(new DidOpenTextDocumentParams(createTextDocumentItem(data.text(), file))))
                 .thenCompose(result ->
                         CompletableFuture.runAsync(() -> {
                             if (ApplicationManager.getApplication().isUnitTestMode()) {
@@ -84,6 +87,31 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
         // Initialize LSP change events
         changeEvents = new ArrayList<>();
+    }
+
+    private CompletionStage<DocumentText> getDocumentText(@NotNull LanguageServer ls) {
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            DocumentText text = new DocumentText(document.getText(), ls);
+            return CompletableFuture.completedFuture(text);
+        }
+        CompletableFuture<DocumentText> textFuture = new CompletableFuture<>();
+        ReadAction.nonBlocking((Callable<Void>) () -> {
+            DocumentText text = new DocumentText(document.getText(), ls);
+            textFuture.complete(text);
+            return null;
+        }).submit(AppExecutorUtil.getAppExecutorService());
+        return textFuture;
+    }
+
+    @NotNull
+    private TextDocumentItem createTextDocumentItem(@NotNull String text, @NotNull VirtualFile file) {
+        TextDocumentItem textDocument = new TextDocumentItem();
+        textDocument.setUri(this.fileUri);
+        @NotNull String languageId = languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
+        textDocument.setLanguageId(languageId);
+        textDocument.setVersion(++version);
+        textDocument.setText(text);
+        return textDocument;
     }
 
     @Override
