@@ -41,7 +41,7 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
     public String getElementDescription(@NotNull PsiElement element, @NotNull ElementDescriptionLocation location) {
         // Only for LSP4IJ-supported files
         PsiFile file = element.getContainingFile();
-        if (!LSPFileSupport.hasSupport(file)) {
+        if ((file == null) || !file.isValid() || !LSPFileSupport.hasSupport(file)) {
             return null;
         }
 
