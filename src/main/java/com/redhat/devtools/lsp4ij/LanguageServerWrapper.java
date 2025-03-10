@@ -67,6 +67,8 @@ public class LanguageServerWrapper implements Disposable {
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
+    record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText, @Nullable String languageId, boolean waitForDidOpen) {}
+
     private MessageBusConnection messageBusConnection;
 
     @NotNull
@@ -370,7 +372,7 @@ public class LanguageServerWrapper implements Disposable {
                     }).thenRun(() -> this.languageServer.initialized(new InitializedParams())).thenRun(() -> {
                         initializeFuture.thenRunAsync(() -> {
                             for (VirtualFile fileToReconnect : filesToReconnect) {
-                                connect(fileToReconnect, null);
+                                connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null,true));
                             }
                         });
 
@@ -680,12 +682,12 @@ public class LanguageServerWrapper implements Disposable {
      * </p>
      *
      * @param file             the file to connect to the language server
-     * @param optionalDocument the document of the file and null otherwise. In the null case, the document will be retrieved from the file
+     * @param fileConnectionInfo the document of the file and null otherwise. In the null case, the document will be retrieved from the file
      *                         by using a blocking read action.
      * @return the completable future with the language server instance or null.
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
-                                                        @Nullable Document optionalDocument) {
+                                                        @NotNull LanguageServerWrapper.LSPFileConnectionInfo fileConnectionInfo) {
         removeStopTimer(false);
 
         URI fileUri = toUri(file);
@@ -694,7 +696,8 @@ public class LanguageServerWrapper implements Disposable {
             return CompletableFuture.completedFuture(null);
         }
 
-        var ls = getLanguageServerWhenDidOpen(fileUri);
+        boolean waitForDidOpen = fileConnectionInfo.waitForDidOpen();
+        var ls = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
         if (ls != null) {
             return ls;
         }
@@ -711,42 +714,49 @@ public class LanguageServerWrapper implements Disposable {
             // Here, the "initialize" future is initialized
 
             // Check if file is already opened (without synchronized block)
-            var ls2 = getLanguageServerWhenDidOpen(fileUri);
+            var ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
             if (ls2 != null) {
                 return ls2;
             }
 
             // Here the file is not already connected
             // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
+            Document optionalDocument = fileConnectionInfo.document();
             Document document = optionalDocument != null ? optionalDocument : LSPIJUtils.getDocument(file);
 
             synchronized (connectedDocuments) {
                 // Check again if file is already opened (within synchronized block)
-                ls2 = getLanguageServerWhenDidOpen(fileUri);
+                ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
                 if (ls2 != null) {
                     return ls2;
                 }
 
-                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(fileUri.toASCIIString(), file, document);
+                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(fileUri.toASCIIString(), file, document, fileConnectionInfo.documentText(), fileConnectionInfo.languageId());
                 document.addDocumentListener(synchronizer);
                 LSPVirtualFileData data = new LSPVirtualFileData(new LanguageServerItem(languageServer, this), file, synchronizer);
                 LanguageServerWrapper.this.connectedDocuments.put(fileUri, data);
 
-                return getLanguageServerWhenDidOpen(synchronizer.didOpenFuture);
+                if (waitForDidOpen) {
+                    return getLanguageServerWhenDidOpen(synchronizer.getDidOpenFuture());
+                }
+                return CompletableFuture.completedFuture(languageServer);
             }
         });
     }
 
     @Nullable
-    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@Nullable URI fileUri) {
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@Nullable URI fileUri, boolean waitForDidOpen) {
         if (fileUri == null) {
             return null;
         }
         var existingData = connectedDocuments.get(fileUri);
         if (existingData != null) {
+            if (!waitForDidOpen) {
+                return CompletableFuture.completedFuture(languageServer);
+            }
             // The file is already connected.
             // returns the language server instance when didOpen happened
-            var didOpenFuture = existingData.getSynchronizer().didOpenFuture;
+            var didOpenFuture = existingData.getSynchronizer().getDidOpenFuture();
             return getLanguageServerWhenDidOpen(didOpenFuture);
         }
         return null;
@@ -767,7 +777,9 @@ public class LanguageServerWrapper implements Disposable {
     @NotNull
     private DocumentContentSynchronizer createDocumentContentSynchronizer(@NotNull String fileUri,
                                                                           @NotNull VirtualFile file,
-                                                                          @NotNull Document document) {
+                                                                          @NotNull Document document,
+                                                                          @Nullable String documentText,
+                                                                          @Nullable String languageId) {
         Either<TextDocumentSyncKind, TextDocumentSyncOptions> syncOptions = initializeFuture == null ? null
                 : this.serverCapabilities.getTextDocumentSync();
         TextDocumentSyncKind syncKind = null;
@@ -778,7 +790,7 @@ public class LanguageServerWrapper implements Disposable {
                 syncKind = syncOptions.getLeft();
             }
         }
-        return new DocumentContentSynchronizer(this, fileUri, file, document, syncKind);
+        return new DocumentContentSynchronizer(this, fileUri, file, document, documentText, languageId, syncKind);
     }
 
     void disconnect(@NotNull VirtualFile file, boolean stopIfNoOpenedFiles) {

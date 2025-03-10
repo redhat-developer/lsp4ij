@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -146,7 +147,8 @@ public class CompletableFutures {
                 if (timeout != null  && time > timeout) {
                     throw ignore;
                 }
-                if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 && ProjectIndexingManager.isIndexingAll()) {
+                if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 &&
+                        (ProjectIndexingManager.isIndexingAll() || ApplicationManager.getApplication().isDispatchThread())) {
                     // When some projects are being indexed,
                     // the language server startup can take a long time
                     // and the LSP feature (ex: codeLens)
