@@ -39,27 +39,51 @@ public class DocumentContentSynchronizer implements DocumentListener {
     private final @NotNull Document document;
     private final @NotNull String fileUri;
     private final TextDocumentSyncKind syncKind;
+    private final @NotNull VirtualFile file;
+    private final @Nullable String documentText;
+    private final @Nullable String languageId;
 
     private int version = 0;
     private final List<TextDocumentContentChangeEvent> changeEvents;
-    @NotNull final CompletableFuture<Void> didOpenFuture;
+    @NotNull private CompletableFuture<Void> didOpenFuture;
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull String fileUri,
                                        @NotNull VirtualFile file,
                                        @NotNull Document document,
+                                       @Nullable String documentText,
+                                       @Nullable String languageId,
                                        @Nullable TextDocumentSyncKind syncKind) {
         this.languageServerWrapper = languageServerWrapper;
+        this.file = file;
         this.fileUri = fileUri;
         this.syncKind = syncKind != null ? syncKind : TextDocumentSyncKind.Full;
-
         this.document = document;
+        this.documentText = documentText;
+        this.languageId = languageId;
+
+        // Initialize LSP change events
+        changeEvents = new ArrayList<>();
+    }
+
+    public @NotNull CompletableFuture<Void> getDidOpenFuture() {
+        if (didOpenFuture != null) {
+            return didOpenFuture;
+        }
+        return getDidOpenFutureSync();
+    }
+
+    private synchronized @NotNull CompletableFuture<Void> getDidOpenFutureSync() {
+        if (didOpenFuture != null) {
+            return didOpenFuture;
+        }
         // add a document buffer
         TextDocumentItem textDocument = new TextDocumentItem();
         textDocument.setUri(this.fileUri);
-        textDocument.setText(document.getText());
+        textDocument.setText(documentText != null ? documentText : document.getText());
 
-        @NotNull String languageId = languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
+        @NotNull String languageId = this.languageId != null ? this.languageId :
+                languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
         textDocument.setLanguageId(languageId);
         textDocument.setVersion(++version);
         didOpenFuture = languageServerWrapper
@@ -81,9 +105,7 @@ public class DocumentContentSynchronizer implements DocumentListener {
                             }
                         })
                 );
-
-        // Initialize LSP change events
-        changeEvents = new ArrayList<>();
+        return didOpenFuture;
     }
 
     @Override
