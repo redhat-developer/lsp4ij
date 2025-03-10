@@ -178,7 +178,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
             // 2. Send a textDocument/didOpen for the new file name
             URI newUri = languageServerWrapper.toUri(virtualNewFile);
             if (!languageServerWrapper.isConnectedTo(newUri)) {
-                languageServerWrapper.connect(virtualNewFile, null);
+                languageServerWrapper.connect(virtualNewFile, new LanguageServerWrapper.LSPFileConnectionInfo(null,null, null,true));
             }
         }
         return oldUri;
