@@ -11,7 +11,7 @@
 
 package com.redhat.devtools.lsp4ij.features.documentSymbol;
 
-import com.redhat.devtools.lsp4ij.fixtures.LSPDocumentSymbolBreadcrumbsInfoProviderFixtureTestCase;
+import com.redhat.devtools.lsp4ij.fixtures.LSPBreadcrumbsProviderFixtureTestCase;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * Tests the document symbol-based breadcrumbs info provider for TypeScript.
  */
-public class TypeScriptDocumentSymbolBreadcrumbsInfoProviderTest extends LSPDocumentSymbolBreadcrumbsInfoProviderFixtureTestCase {
+public class TypeScriptBreadcrumbsProviderTest extends LSPBreadcrumbsProviderFixtureTestCase {
 
     private static final String TEST_FILE_NAME = "test.ts";
 
@@ -151,7 +151,7 @@ public class TypeScriptDocumentSymbolBreadcrumbsInfoProviderTest extends LSPDocu
             ]
             """;
 
-    public TypeScriptDocumentSymbolBreadcrumbsInfoProviderTest() {
+    public TypeScriptBreadcrumbsProviderTest() {
         super("*.ts");
     }
 

@@ -54,12 +54,9 @@ public class LSPBreadcrumbsProvider implements BreadcrumbsProvider {
         VirtualFile virtualFile = file.getVirtualFile();
         return LanguageServiceAccessor.getInstance(project).hasAny(
                 virtualFile,
-                ls ->
-                        // The document symbols feature must be available for the file's language server
-                        ls.getClientFeatures().getDocumentSymbolFeature().isEnabled(file) &&
-                                ls.getClientFeatures().getDocumentSymbolFeature().isSupported(file) &&
-                                // And this feature must be enabled
-                                ls.getClientFeatures().getBreadcrumbsFeature().isEnabled(file)
+                // The breadcrumbs feature must be enabled and supported for the file's language server
+                ls -> ls.getClientFeatures().getBreadcrumbsFeature().isEnabled(file) &&
+                        ls.getClientFeatures().getBreadcrumbsFeature().isSupported(file)
         );
     }
 

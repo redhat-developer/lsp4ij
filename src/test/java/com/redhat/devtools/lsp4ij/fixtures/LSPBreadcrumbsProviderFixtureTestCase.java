@@ -40,9 +40,9 @@ import java.util.concurrent.TimeUnit;
  * Base test fixture for the document symbol-based breadcrumbs info provider.
  */
 @SuppressWarnings("unused")
-public abstract class LSPDocumentSymbolBreadcrumbsInfoProviderFixtureTestCase extends LSPCodeInsightFixtureTestCase {
+public abstract class LSPBreadcrumbsProviderFixtureTestCase extends LSPCodeInsightFixtureTestCase {
 
-    protected LSPDocumentSymbolBreadcrumbsInfoProviderFixtureTestCase(@NotNull String... fileNamePatterns) {
+    protected LSPBreadcrumbsProviderFixtureTestCase(@NotNull String... fileNamePatterns) {
         super(fileNamePatterns);
         setClientConfigurable(true);
     }

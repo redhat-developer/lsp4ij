@@ -24,16 +24,8 @@ import org.jetbrains.annotations.Nullable;
 @ApiStatus.Experimental
 public class LSPBreadcrumbsFeature extends AbstractLSPDocumentFeature {
 
-    private ServerCapabilities serverCapabilities;
-
     @Override
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
-        this.serverCapabilities = serverCapabilities;
-    }
-
-    public boolean isEnabled(@NotNull PsiFile file) {
-        // Default to enabled
-        return true;
     }
 
     @Override
