@@ -21,16 +21,13 @@ import com.intellij.openapi.util.IconLoader;
 import com.intellij.util.ui.ColorIcon;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenType;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenTypes;
-import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.CompletionItemKind;
-import org.eclipse.lsp4j.MarkupContent;
-import org.eclipse.lsp4j.SemanticTokenTypes;
-import org.eclipse.lsp4j.SymbolKind;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.Icon;
+import javax.swing.*;
+import java.awt.*;
 import java.awt.Color;
 import java.util.Locale;
 import java.util.Map;
@@ -258,8 +255,8 @@ public class IconMapper {
         if (tokenType != null) {
             // If this is for a custom semantic token type that expresses an inheritance relationship, swap it out now
             LSPSemanticTokenType lspSemanticTokenType = LSPSemanticTokenTypes.valueOf(tokenType);
-            if ((lspSemanticTokenType != null) && (lspSemanticTokenType.inheritFrom != null)) {
-                tokenType = lspSemanticTokenType.inheritFrom;
+            if ((lspSemanticTokenType != null) && (lspSemanticTokenType.getInheritFrom() != null)) {
+                tokenType = lspSemanticTokenType.getInheritFrom();
             }
 
             switch (tokenType) {

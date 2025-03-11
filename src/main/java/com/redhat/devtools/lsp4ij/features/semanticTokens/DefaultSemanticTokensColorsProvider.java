@@ -32,12 +32,12 @@ public class DefaultSemanticTokensColorsProvider implements SemanticTokensColors
         LSPSemanticTokenType lspSemanticTokenType = LSPSemanticTokenTypes.valueOf(tokenType);
         if (lspSemanticTokenType != null) {
             // If this is for a custom semantic token type that expresses an inheritance relationship, swap it out now
-            if (lspSemanticTokenType.inheritFrom != null) {
-                tokenType = lspSemanticTokenType.inheritFrom;
+            if (lspSemanticTokenType.getInheritFrom() != null) {
+                tokenType = lspSemanticTokenType.getInheritFrom();
             }
             // If it's for one that has a specific text attributes key, use it
-            else if (lspSemanticTokenType.textAttributesKey != null) {
-                return TextAttributesKey.find(lspSemanticTokenType.textAttributesKey);
+            else if (lspSemanticTokenType.getTextAttributesKey() != null) {
+                return TextAttributesKey.find(lspSemanticTokenType.getTextAttributesKey());
             }
         }
 

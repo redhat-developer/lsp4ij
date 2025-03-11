@@ -20,30 +20,13 @@ import org.jetbrains.annotations.Nullable;
  */
 @ApiStatus.Internal
 public class LSPSemanticTokenType {
-    /**
-     * The semantic token type name
-     */
-    public String name;
-    /**
-     * Whether or not the semantic token should be interpreted as being an identifier
-     */
-    public boolean identifier;
-    /**
-     * Whether or not the semantic token should be interpreted as being a type
-     */
-    public boolean type;
-    /**
-     * Whether or not the semantic token should be interpreted as being a keyword
-     */
-    public boolean keyword;
-    /**
-     * The name of the existing semantic token type from which this one should inherit its behavior
-     */
-    public String inheritFrom;
-    /**
-     * The text attributes key that should be used for syntax highlighting of this semantic token
-     */
-    public String textAttributesKey;
+
+    private final String name;
+    private final boolean identifier;
+    private final boolean type;
+    private final boolean keyword;
+    private final String inheritFrom;
+    private final String textAttributesKey;
 
     /**
      * Creates a custom semantic token type.
@@ -67,5 +50,56 @@ public class LSPSemanticTokenType {
         this.keyword = keyword;
         this.inheritFrom = inheritFrom;
         this.textAttributesKey = textAttributesKey;
+    }
+
+    /**
+     * The semantic token type name.
+     */
+    @NotNull
+    @ApiStatus.Internal
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Whether or not the semantic token should be interpreted as being an identifier.
+     */
+    @ApiStatus.Internal
+    public boolean isIdentifier() {
+        return identifier;
+    }
+
+    /**
+     * Whether or not the semantic token should be interpreted as being a type.
+     */
+    @ApiStatus.Internal
+    public boolean isType() {
+        return type;
+    }
+
+    /**
+     * Whether or not the semantic token should be interpreted as being a keyword.
+     */
+    @ApiStatus.Internal
+    public boolean isKeyword() {
+        return keyword;
+    }
+
+    /**
+     * The name of the existing semantic token type from which this one should inherit its behavior.
+     */
+    @Nullable
+    @ApiStatus.Internal
+    public String getInheritFrom() {
+        return inheritFrom;
+    }
+
+    /**
+     * The text attributes key that should be used for syntax highlighting of this semantic token.
+     */
+    @Nullable
+    @ApiStatus.Internal
+    public String getTextAttributesKey() {
+        return textAttributesKey;
     }
 }

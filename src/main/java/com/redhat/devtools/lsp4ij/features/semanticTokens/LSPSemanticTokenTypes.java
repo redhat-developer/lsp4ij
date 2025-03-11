@@ -56,7 +56,7 @@ public class LSPSemanticTokenTypes {
 
     static {
         for (LSPSemanticTokenType value : values) {
-            nameIndex.put(value.name, value);
+            nameIndex.put(value.getName(), value);
         }
     }
 

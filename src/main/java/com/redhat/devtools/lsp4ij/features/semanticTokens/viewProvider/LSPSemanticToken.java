@@ -21,12 +21,7 @@ import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -61,7 +56,7 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Decorator
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .map(t -> t.name)
+                    .map(t -> t.getName())
                     .collect(Collectors.toSet())
     );
 
@@ -86,8 +81,8 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Decorator
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .filter(t -> t.identifier)
-                    .map(t -> t.name)
+                    .filter(t -> t.isIdentifier())
+                    .map(t -> t.getName())
                     .collect(Collectors.toSet())
     );
 
@@ -105,8 +100,8 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Struct
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .filter(t -> t.type)
-                    .map(t -> t.name)
+                    .filter(t -> t.isType())
+                    .map(t -> t.getName())
                     .collect(Collectors.toSet())
     );
 
@@ -120,8 +115,8 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Modifier
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .filter(t -> t.keyword)
-                    .map(t -> t.name)
+                    .filter(t -> t.isKeyword())
+                    .map(t -> t.getName())
                     .collect(Collectors.toSet())
     );
 
@@ -264,9 +259,9 @@ class LSPSemanticToken {
         if ((o == null) || (getClass() != o.getClass())) return false;
         LSPSemanticToken that = (LSPSemanticToken) o;
         return Objects.equals(file, that.file) &&
-               Objects.equals(textRange, that.textRange) &&
-               Objects.equals(tokenType, that.tokenType) &&
-               Objects.equals(tokenModifiers, that.tokenModifiers);
+                Objects.equals(textRange, that.textRange) &&
+                Objects.equals(tokenType, that.tokenType) &&
+                Objects.equals(tokenModifiers, that.tokenModifiers);
     }
 
     @Override
