@@ -313,6 +313,12 @@
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
 
+        <!-- Breadcrumbs/sticky lines support using document symbols -->
+        <breadcrumbsInfoProvider
+                id="LSPTextMateDocumentSymbolBreadcrumbsInfoProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolBreadcrumbsInfoProvider"
+                order="last"/>
+
         <!-- LSP textDocument/documentHighlight request support -->
         <highlightUsagesHandlerFactory
                 id="LSPHighlightUsagesHandlerFactory"
@@ -440,7 +446,8 @@
         <!-- LSP textDocument/semanticTokens request support -->
         <highlightVisitor
                 id="LSPSemanticTokensHighlightVisitor"
-                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensHighlightVisitor"/>
+                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokensHighlightVisitor"
+                order="first"/>
         <colorSettingsPage
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
 

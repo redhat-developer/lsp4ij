@@ -6,6 +6,9 @@
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
   },
+  "editor": {
+    "enableDocumentSymbolsBreadcrumbsInfoProvider": false
+  },
   "workspaceSymbol": {
     "supportsGotoClass": false
   }

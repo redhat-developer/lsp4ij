@@ -147,6 +147,11 @@ public class LSPSemanticTokensSingleRootFileViewProvider
         helper.addSemanticToken(textRange, tokenType, tokenModifiers);
     }
 
+    @Override
+    public int getEffectiveOffset(@NotNull PsiElement element) {
+        return helper.getEffectiveOffset(element);
+    }
+
     /**
      * Returns the semantic token for the offset.
      *

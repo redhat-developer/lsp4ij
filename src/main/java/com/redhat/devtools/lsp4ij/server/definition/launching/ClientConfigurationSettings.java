@@ -67,6 +67,11 @@ public class ClientConfigurationSettings {
          * Whether or not the semantic tokens-based file view provider is enabled. Defaults to true.
          */
         public boolean enableSemanticTokensFileViewProvider = true;
+
+        /**
+         * Whether or not the document symbols-based breadcrumbs info provider is enabled. Defaults to true.
+         */
+        public boolean enableDocumentSymbolsBreadcrumbsInfoProvider = true;
     }
 
     /**

@@ -50,6 +50,16 @@ public class LSPSemanticTokenPsiElement extends LSPPsiElement implements PsiName
                 null;
     }
 
+    /**
+     * Returns the effective offset for the element.
+     *
+     * @return the element's effective offset
+     */
+    int getEffectiveOffset() {
+        int lastRequestedOffset = semanticToken.getLastRequestedOffset();
+        return lastRequestedOffset > -1 ? lastRequestedOffset : getTextOffset();
+    }
+
     @Override
     public boolean isPhysical() {
         // These do represent real text ranges in physical files

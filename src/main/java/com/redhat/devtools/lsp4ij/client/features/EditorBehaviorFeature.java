@@ -110,6 +110,17 @@ public class EditorBehaviorFeature {
         return true;
     }
 
+    /**
+     * Whether or not the document symbols-based breadcrumbs info provider is enabled.
+     *
+     * @param file the file
+     * @return true if the document symbols-based breadcrumbs info provider is enabled; otherwise false
+     */
+    public boolean isEnableDocumentSymbolsBreadcrumbsInfoProvider(@NotNull PsiFile file) {
+        // Default to enabled
+        return true;
+    }
+
     // Utility methods to check the state of these feature flags easily
 
     /**
@@ -179,6 +190,19 @@ public class EditorBehaviorFeature {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
                 file.getVirtualFile(),
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
+        );
+    }
+
+    /**
+     * Whether or not the document symbols-based breadcrumbs info provider is enabled.
+     *
+     * @param file the PSI file
+     * @return true if the document symbols-based breadcrumbs info provider is enabled; otherwise false
+     */
+    public static boolean enableDocumentSymbolsBreadcrumbsInfoProvider(@NotNull PsiFile file) {
+        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
+                file.getVirtualFile(),
+                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableDocumentSymbolsBreadcrumbsInfoProvider(file)
         );
     }
 }
