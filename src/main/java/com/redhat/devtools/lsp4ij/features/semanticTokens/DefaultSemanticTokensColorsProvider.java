@@ -29,6 +29,18 @@ public class DefaultSemanticTokensColorsProvider implements SemanticTokensColors
     public @Nullable TextAttributesKey getTextAttributesKey(@NotNull String tokenType,
                                                             @NotNull List<String> tokenModifiers,
                                                             @NotNull PsiFile file) {
+        LSPSemanticTokenType lspSemanticTokenType = LSPSemanticTokenTypes.valueOf(tokenType);
+        if (lspSemanticTokenType != null) {
+            // If this is for a custom semantic token type that expresses an inheritance relationship, swap it out now
+            if (lspSemanticTokenType.getInheritFrom() != null) {
+                tokenType = lspSemanticTokenType.getInheritFrom();
+            }
+            // If it's for one that has a specific text attributes key, use it
+            else if (lspSemanticTokenType.getTextAttributesKey() != null) {
+                return TextAttributesKey.find(lspSemanticTokenType.getTextAttributesKey());
+            }
+        }
+
         switch (tokenType) {
 
             // namespace: for identifiers that declare or reference a namespace, module, or package.
@@ -159,12 +171,6 @@ public class DefaultSemanticTokensColorsProvider implements SemanticTokensColors
             // macro: for identifiers that declare a macro.
             case SemanticTokenTypes.Macro:
                 return SemanticTokensHighlightingColors.MACRO;
-
-            // label: for identifiers that declare a label.
-            case "label":
-                // LSP doesn't define "label", but vscode defines it
-                // See https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#standard-token-types-and-modifiers
-                return SemanticTokensHighlightingColors.LABEL;
 
             // comment: for tokens that represent a comment.
             case SemanticTokenTypes.Comment:

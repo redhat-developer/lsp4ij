@@ -19,16 +19,16 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.util.ui.ColorIcon;
-import org.eclipse.lsp4j.CompletionItem;
-import org.eclipse.lsp4j.CompletionItemKind;
-import org.eclipse.lsp4j.MarkupContent;
-import org.eclipse.lsp4j.SymbolKind;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenType;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenTypes;
+import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.Color;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -157,6 +157,7 @@ public class IconMapper {
             case Variable:
                 return AllIcons.Nodes.Variable;
             case Struct:
+                // TODO: Should this be AllIcons.Nodes.Types?
                 return AllIcons.Json.Object;
             case Class:
                 return AllIcons.Nodes.Class;
@@ -210,6 +211,7 @@ public class IconMapper {
                 return AllIcons.Nodes.Variable;
             case Object:
             case Struct:
+                // TODO: Should this be AllIcons.Nodes.Types?
                 return AllIcons.Json.Object;
             case Array:
                 return AllIcons.Json.Array;
@@ -240,6 +242,59 @@ public class IconMapper {
             default:
                 return AllIcons.Nodes.EmptyNode;
         }
+    }
+
+    /**
+     * Returns the icon for the provided {@link SemanticTokenTypes} value if possible.
+     *
+     * @param tokenType the icon name as semantic token type value
+     * @return the corresponding icon, or null if no icon could be found
+     */
+    @Nullable
+    public static Icon getIcon(@Nullable String tokenType) {
+        if (tokenType != null) {
+            // If this is for a custom semantic token type that expresses an inheritance relationship, swap it out now
+            LSPSemanticTokenType lspSemanticTokenType = LSPSemanticTokenTypes.valueOf(tokenType);
+            if ((lspSemanticTokenType != null) && (lspSemanticTokenType.getInheritFrom() != null)) {
+                tokenType = lspSemanticTokenType.getInheritFrom();
+            }
+
+            switch (tokenType) {
+                case SemanticTokenTypes.Namespace:
+                    return AllIcons.Nodes.Package;
+                case SemanticTokenTypes.Type:
+                    return AllIcons.Nodes.Type;
+                case SemanticTokenTypes.Class:
+                    return AllIcons.Nodes.Class;
+                case SemanticTokenTypes.Enum:
+                    return AllIcons.Nodes.Enum;
+                case SemanticTokenTypes.Interface:
+                    return AllIcons.Nodes.Interface;
+                case SemanticTokenTypes.Struct:
+                    return AllIcons.Nodes.Type;
+                case SemanticTokenTypes.TypeParameter:
+                    return AllIcons.Nodes.Parameter;
+                case SemanticTokenTypes.Parameter:
+                    return AllIcons.Nodes.Parameter;
+                case SemanticTokenTypes.Variable:
+                    return AllIcons.Nodes.Variable;
+                case SemanticTokenTypes.Property:
+                    return AllIcons.Nodes.Property;
+                case SemanticTokenTypes.EnumMember:
+                    return AllIcons.Nodes.Field;
+                case SemanticTokenTypes.Function:
+                    return AllIcons.Nodes.Function;
+                case SemanticTokenTypes.Macro:
+                    return AllIcons.Nodes.Function;
+                case SemanticTokenTypes.Method:
+                    return AllIcons.Nodes.Method;
+                // Decorators are just annotations
+                case SemanticTokenTypes.Decorator:
+                    return AllIcons.Nodes.Annotationtype;
+                // TODO: SemanticTokenTypes.Event
+            }
+        }
+        return null;
     }
 
     private static @NotNull Icon load(String iconPath) {

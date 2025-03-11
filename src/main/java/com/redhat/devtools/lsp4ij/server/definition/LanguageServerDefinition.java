@@ -30,10 +30,11 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensC
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
+import javax.swing.Icon;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -156,6 +157,13 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      */
     public void setEnabled(boolean enabled, @Nullable Project project) {
         this.enabled = enabled;
+    }
+
+    @ApiStatus.Internal
+    public void removeAssociations() {
+        this.languageIdLanguageMappings.clear();
+        this.languageIdFileTypeMappings.clear();
+        this.languageIdFileNameMatcherMappings.clear();
     }
 
     public void registerAssociation(@NotNull Language language, @NotNull String languageId) {
