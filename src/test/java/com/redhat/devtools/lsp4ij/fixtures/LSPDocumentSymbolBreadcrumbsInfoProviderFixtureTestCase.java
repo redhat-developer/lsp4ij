@@ -73,13 +73,13 @@ public abstract class LSPDocumentSymbolBreadcrumbsInfoProviderFixtureTestCase ex
         LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
         assertNotNull(languageServer);
 
-        // Enable or disable the feature as requested
+        // Enable or disable the breadcrumbs feature as requested
         LanguageServerDefinition languageServerDefinition = languageServer.getServerDefinition();
         assertInstanceOf(languageServerDefinition, ClientConfigurableLanguageServerDefinition.class);
         ClientConfigurableLanguageServerDefinition configurableLanguageServerDefinition = (ClientConfigurableLanguageServerDefinition) languageServerDefinition;
         ClientConfigurationSettings clientConfiguration = configurableLanguageServerDefinition.getLanguageServerClientConfiguration();
         assertNotNull(clientConfiguration);
-        clientConfiguration.editor.enableDocumentSymbolsBreadcrumbsInfoProvider = enabled;
+        clientConfiguration.breadcrumbs.enabled = enabled;
 
         return file;
     }

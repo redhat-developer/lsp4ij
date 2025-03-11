@@ -54,6 +54,19 @@
         }
       }
     },
+    "breadcrumbs": {
+      "type": "object",
+      "title": "Breadcrumbs feature configuration",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "Enable breadcrumbs",
+          "description": "Whether or not document symbols-based breadcrumbs info provider is enabled.",
+          "default": true
+        }
+      }
+    },
     "editor": {
       "type": "object",
       "title": "Client-side editor behavior configuration",
@@ -87,12 +100,6 @@
           "type": "boolean",
           "title": "Enable semantic tokens-based file view provider",
           "description": "Whether or not the semantic tokens-based file view provider is enabled.",
-          "default": true
-        },
-        "enableDocumentSymbolsBreadcrumbsInfoProvider": {
-          "type": "boolean",
-          "title": "Enable breadcrumbs",
-          "description": "Whether or not document symbols-based breadcrumbs info provider is enabled.",
           "default": true
         }
       }

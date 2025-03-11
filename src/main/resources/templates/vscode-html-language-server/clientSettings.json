@@ -2,12 +2,12 @@
   "caseSensitive": false,
   "blockCommentPrefix": "<!--",
   "blockCommentSuffix": "-->",
+  "breadcrumbs": {
+    "enabled": false
+  },
   "completion": {
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
-  },
-  "editor": {
-    "enableDocumentSymbolsBreadcrumbsInfoProvider": false
   },
   "workspaceSymbol": {
     "supportsGotoClass": false

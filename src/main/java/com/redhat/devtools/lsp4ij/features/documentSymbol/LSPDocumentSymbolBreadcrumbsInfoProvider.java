@@ -25,7 +25,6 @@ import com.intellij.psi.PsiFile;
 import com.intellij.ui.breadcrumbs.BreadcrumbsProvider;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewModel.LSPDocumentSymbolViewElement;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewModel.LSPFileStructureViewElement;
 import org.jetbrains.annotations.NotNull;
@@ -60,7 +59,7 @@ public class LSPDocumentSymbolBreadcrumbsInfoProvider implements BreadcrumbsProv
                         ls.getClientFeatures().getDocumentSymbolFeature().isEnabled(file) &&
                                 ls.getClientFeatures().getDocumentSymbolFeature().isSupported(file) &&
                                 // And this feature must be enabled
-                                EditorBehaviorFeature.enableDocumentSymbolsBreadcrumbsInfoProvider(file)
+                                ls.getClientFeatures().getBreadcrumbsFeature().isEnabled(file)
         );
     }
 

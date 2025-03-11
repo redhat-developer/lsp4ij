@@ -69,11 +69,4 @@ public class UserDefinedEditorBehaviorFeature extends EditorBehaviorFeature {
         // Note that this defaults to enabled for user-defined language server definitions
         return (editorSettings == null) || editorSettings.enableSemanticTokensFileViewProvider;
     }
-
-    @Override
-    public boolean isEnableDocumentSymbolsBreadcrumbsInfoProvider(@NotNull PsiFile file) {
-        ClientConfigurationEditorSettings editorSettings = getEditorSettings();
-        // Note that this defaults to enabled for user-defined language server definitions
-        return (editorSettings == null) || editorSettings.enableDocumentSymbolsBreadcrumbsInfoProvider;
-    }
 }

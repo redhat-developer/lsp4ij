@@ -14,19 +14,12 @@ import com.intellij.ide.structureView.StructureViewModel;
 import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
-import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.jetbrains.annotations.NotNull;
@@ -35,10 +28,8 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.Icon;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
@@ -91,11 +82,6 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
                 return Collections.emptyList();
             }
 
-            // Don't start a language server for this on the EDT or it can freeze the app
-            if (ApplicationManager.getApplication().isDispatchThread() && !hasStartedLanguageServers(psiFile)) {
-                return Collections.emptyList();
-            }
-
             LSPFileSupport fileSupport = LSPFileSupport.getSupport(psiFile);
             LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
             var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
@@ -124,35 +110,6 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
                         .toList();
             }
             return Collections.emptyList();
-        }
-
-        private boolean hasStartedLanguageServers(@NotNull PsiFile psiFile) {
-            Project project = psiFile.getProject();
-            VirtualFile virtualFile = psiFile.getVirtualFile();
-
-            CompletableFuture<List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
-                    virtualFile,
-                    clientFeatures -> (clientFeatures.getServerStatus() == ServerStatus.started) &&
-                            clientFeatures.getDocumentSymbolFeature().isEnabled(psiFile),
-                    null
-            );
-
-            try {
-                waitUntilDone(languageServersFuture, psiFile);
-            } catch (ProcessCanceledException e) {
-                return false;
-            } catch (CancellationException e) {
-                return false;
-            } catch (ExecutionException e) {
-                return false;
-            }
-
-            if (!isDoneNormally(languageServersFuture)) {
-                return false;
-            }
-
-            List<LanguageServerItem> languageServers = languageServersFuture.getNow(Collections.emptyList());
-            return !ContainerUtil.isEmpty(languageServers);
         }
 
         @Override
