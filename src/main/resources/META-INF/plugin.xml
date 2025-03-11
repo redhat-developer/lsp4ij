@@ -291,7 +291,8 @@
         <!-- LSP textDocument/definition request support -->
         <gotoDeclarationHandler
                 id="LSPGotoDeclarationHandler"
-                implementation="com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler"/>
+                implementation="com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler"
+                order="first"/>
 
         <!-- LSP textDocument/documentLink request support -->
         <externalAnnotator
@@ -443,6 +444,31 @@
         <colorSettingsPage
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorSettingsPage"/>
 
+        <!-- File view provider based on textDocument/semanticTokens -->
+        <!-- We can register a view provider factory for TextMate files based on the language -->
+        <lang.fileViewProviderFactory
+                language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
+        <lang.elementManipulator
+                forClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElementManipulator"/>
+        <lang.documentationProvider
+                language=""
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider"/>
+
+        <!-- We cannot register one for plain text abstract file types, so we have to do that dynamically. Do so when a project is opened. -->
+        <postStartupActivity
+                implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar$ProjectOpenedListener"/>
+    </extensions>
+
+    <applicationListeners>
+        <!-- Also do so when file type associations change -->
+        <listener
+                class="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar$FileTypesChangedListener"
+                topic="com.intellij.openapi.fileTypes.FileTypeListener"/>
+    </applicationListeners>
+
+    <extensions defaultExtensionNs="com.intellij">
         <!-- LSP textDocument/prepareTypeHierarchy request support -->
         <typeHierarchyProvider
                 language="TEXT"
