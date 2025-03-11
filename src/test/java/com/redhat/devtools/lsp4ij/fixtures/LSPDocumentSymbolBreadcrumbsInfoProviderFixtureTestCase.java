@@ -22,7 +22,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolBreadcrumbsInfoProvider;
+import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPBreadcrumbsProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -91,7 +91,7 @@ public abstract class LSPDocumentSymbolBreadcrumbsInfoProviderFixtureTestCase ex
         PsiFile file = initialize(fileName, fileBody, mockDocumentSymbolJson, true);
 
         BreadcrumbsProvider breadcrumbsProvider = BreadcrumbsUtil.getInfoProvider(file.getLanguage());
-        assertInstanceOf(breadcrumbsProvider, LSPDocumentSymbolBreadcrumbsInfoProvider.class);
+        assertInstanceOf(breadcrumbsProvider, LSPBreadcrumbsProvider.class);
 
         // Confirm the expected breadcrumbs
         for (Map.Entry<String, List<String>> entry : expectedBreadcrumbNamesBySearchText.entrySet()) {
@@ -152,7 +152,7 @@ public abstract class LSPDocumentSymbolBreadcrumbsInfoProviderFixtureTestCase ex
 
         // It'll still be our provider
         BreadcrumbsProvider breadcrumbsProvider = BreadcrumbsUtil.getInfoProvider(file.getLanguage());
-        assertInstanceOf(breadcrumbsProvider, LSPDocumentSymbolBreadcrumbsInfoProvider.class);
+        assertInstanceOf(breadcrumbsProvider, LSPBreadcrumbsProvider.class);
 
         // But it won't actually provide any information
         for (int offset = 0; offset < fileBody.length(); offset++) {

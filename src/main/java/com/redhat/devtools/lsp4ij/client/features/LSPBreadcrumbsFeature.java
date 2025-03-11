@@ -12,54 +12,33 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Breadcrumbs/sticky lines feature. This does not correspond to an actual LSP feature but is built upon
+ * Breadcrumbs/sticky lines feature. This does not correspond directly to an LSP feature but is built upon
  * {@link LSPDocumentSymbolFeature}.
  */
 @ApiStatus.Experimental
-public class LSPBreadcrumbsFeature {
+public class LSPBreadcrumbsFeature extends AbstractLSPDocumentFeature {
 
-    private LSPClientFeatures clientFeatures;
+    private ServerCapabilities serverCapabilities;
 
-    /**
-     * Creates the editor behavior feature for the containing client features.
-     *
-     * @param clientFeatures the client features
-     */
-    public LSPBreadcrumbsFeature(@NotNull LSPClientFeatures clientFeatures) {
-        this.clientFeatures = clientFeatures;
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        this.serverCapabilities = serverCapabilities;
     }
 
-    /**
-     * Sets the containing client features.
-     *
-     * @param clientFeatures the client features.
-     */
-    void setClientFeatures(@NotNull LSPClientFeatures clientFeatures) {
-        this.clientFeatures = clientFeatures;
-    }
-
-    /**
-     * Returns the containing client features.
-     *
-     * @return the client features
-     */
-    @NotNull
-    protected LSPClientFeatures getClientFeatures() {
-        return clientFeatures;
-    }
-
-    /**
-     * Whether or not the document symbols-based breadcrumbs info provider is enabled.
-     *
-     * @param file the file
-     * @return true if the document symbols-based breadcrumbs info provider is enabled; otherwise false
-     */
     public boolean isEnabled(@NotNull PsiFile file) {
         // Default to enabled
         return true;
+    }
+
+    @Override
+    public boolean isSupported(@NotNull PsiFile file) {
+        // Requires the document symbol feature
+        return getClientFeatures().getDocumentSymbolFeature().isSupported(file);
     }
 }

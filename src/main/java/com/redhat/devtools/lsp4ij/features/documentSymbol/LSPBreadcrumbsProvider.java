@@ -37,9 +37,9 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Document symbol-based breadcrumbs info provider.
+ * LSP document symbol-based breadcrumbs provider.
  */
-public class LSPDocumentSymbolBreadcrumbsInfoProvider implements BreadcrumbsProvider {
+public class LSPBreadcrumbsProvider implements BreadcrumbsProvider {
 
     @Override
     public Language[] getLanguages() {

@@ -662,7 +662,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         if (breadcrumbsFeature != null) {
             return;
         }
-        setBreadcrumbsFeature(new LSPBreadcrumbsFeature(this));
+        setBreadcrumbsFeature(new LSPBreadcrumbsFeature());
     }
 
     /**

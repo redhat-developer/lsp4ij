@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPBreadcrumbsFeature;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings.ClientConfigurationBreadcrumbsSettings;
 import org.jetbrains.annotations.NotNull;
@@ -23,10 +22,6 @@ import org.jetbrains.annotations.Nullable;
  * User-defined breadcrumbs feature.
  */
 public class UserDefinedBreadcrumbsFeature extends LSPBreadcrumbsFeature {
-
-    public UserDefinedBreadcrumbsFeature(@NotNull LSPClientFeatures clientFeatures) {
-        super(clientFeatures);
-    }
 
     @Nullable
     private ClientConfigurationBreadcrumbsSettings getSettings() {

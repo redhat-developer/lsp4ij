@@ -315,8 +315,8 @@
 
         <!-- Breadcrumbs/sticky lines support using document symbols -->
         <breadcrumbsInfoProvider
-                id="LSPTextMateDocumentSymbolBreadcrumbsInfoProvider"
-                implementation="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolBreadcrumbsInfoProvider"
+                id="LSPBreadcrumbsProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPBreadcrumbsProvider"
                 order="last"/>
 
         <!-- LSP textDocument/documentHighlight request support -->
