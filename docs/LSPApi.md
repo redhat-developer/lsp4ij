@@ -26,6 +26,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP typeDefinition feature](#lsp-typeDefinition-feature)
 - [LSP usage feature](#lsp-usage-feature)
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
+- [LSP breadcrumbs feature](#lsp-breadcrumbs-feature)
 - [LSP editor behavior feature](#lsp-editor-behavior-feature)
 - [Language server installer](#language-server-installer)
 
@@ -649,9 +650,18 @@ or, if appropriate, the the child/descendant element that represents the declara
 | boolean isSupported()       | Returns `true` if the LSP feature is supported and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the LSP server capabilities. | Check the server capability            |
 | boolean supportsGotoClass() | Returns `true` if the LSP feature is efficient enough to support the IDE's Go To Class action which may be invoked frequently and `false` otherwise.                                     | `false`                                |
 
+## LSP Breadcrumbs Feature
+
+Unlike most features above, `LSPBreadcrumbsFeature` does **not** correspond directly to an LSP feature, but it does build upon `LSPDocumentSymbolFeature` to add breadcrumbs and sticky lines behavior to the IDE. It is _enabled by default_ for all language server definitions except for the HTML and XML language server definition templates. Those implementing custom language server integrations can opt out of these features if desired by overriding the respective methods listed below.
+
+| API                             | Description                                                                                                  | Default Behaviour |
+|---------------------------------|--------------------------------------------------------------------------------------------------------------|-------------------|
+| boolean isEnabled(PsiFile file) | Returns `true` if the the document symbols-based breadcrumbs info provider is enabled and `false` otherwise. | `true`            |
+=======
+
 ## LSP Editor Behavior Feature
 
-Unlike the features above, `LSPEditorFeature` does **not** correspond to an LSP feature. Instead it represents IDE editor behavior features, enhancements, and fixes that, alongside the language server-provided features, help provide an optimal editor experience for LSP4IJ-integrated file types. Note that these features are _disabled by default_ for `LanguageServerDefinition` and _enabled by default_ for `UserDefinedLanguageServerDefinition`. Those implementing custom language server integrations can opt into these features if desired by overriding the respective methods listed below.
+Unlike most features above, `LSPEditorFeature` does **not** correspond to an LSP feature. Instead it represents IDE editor behavior features, enhancements, and fixes that, alongside the language server-provided features, help provide an optimal editor experience for LSP4IJ-integrated file types. Note that these features are _disabled by default_ for `LanguageServerDefinition` and _enabled by default_ for `UserDefinedLanguageServerDefinition`. Those implementing custom language server integrations can opt into these features if desired by overriding the respective methods listed below.
 
 | API                                                            | Description                                                                                                                       | Default Behaviour                                                                                    |
 |----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|

@@ -654,8 +654,9 @@ If you need other mapping:
 
 ### Document Symbol
 
-[textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) is implemented with 
-the `lang.psiStructureViewFactory` extension point. By default, LSP4IJ registers the `lang.psiStructureViewFactory` with
+#### Structure View
+
+The IDE's `lang.psiStructureViewFactory` extension point is implemented using [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol). By default, LSP4IJ registers the `lang.psiStructureViewFactory` with
 [LSPDocumentSymbolStructureViewFactory](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/documentSymbol/LSPDocumentSymbolStructureViewFactory.java) class for `TEXT` and `textmate` languages:
 
 ```xml
@@ -689,6 +690,16 @@ which opens the standard `File Structure` with `Ctrl+F12` / `Cmd+F12`
 You can also open the `Structure` view using the `View / Tool Windows / Structure` menu:
 
 ![textDocument/documentSymbol](./images/lsp-support/textDocument_documentSymbol.gif)
+
+#### Breadcrumbs and Sticky Lines
+
+The IDE's `breadcrumbsInfoProvider` extension point is also implemented using [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol). LSP4IJ registers the extension point for all file types and languages but filters at runtime for those associated with configured language server definitions.
+
+The feature is _enabled by default_ but can be disabled by overriding the respective feature flag either in code by overriding `LSPBreadcrumbsFeature#isEnabled()` (custom language server definitions) or client configuration (user-defined language server definitions). Note that sticky lines are only supported in JetBrains 2024.1+ IDE versions.
+
+Here is an example of breadcrumbs and sticky lines in TypeScript:
+
+![textDocument/documentSymbol breadcrumbs](./images/lsp-support/textDocument_documentSymbol_breadcrumbs.gif)
 
 ### Call Hierarchy
 

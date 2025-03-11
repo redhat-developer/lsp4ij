@@ -2,6 +2,9 @@
   "caseSensitive": true,
   "blockCommentPrefix": "<!--",
   "blockCommentSuffix": "-->",
+  "breadcrumbs": {
+    "enabled": false
+  },
   "completion": {
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false

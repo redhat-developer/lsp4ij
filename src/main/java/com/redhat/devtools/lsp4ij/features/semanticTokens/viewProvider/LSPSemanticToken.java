@@ -21,7 +21,12 @@ import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -134,6 +139,7 @@ class LSPSemanticToken {
     private final boolean isFileLevel;
     private final LSPSemanticTokenElementType elementType;
     private volatile LSPSemanticTokenPsiElement element = null;
+    private final ThreadLocal<Integer> lastRequestedOffsetPtr = new InheritableThreadLocal<>();
 
     /**
      * Creates a new semantic token.
@@ -252,6 +258,27 @@ class LSPSemanticToken {
             }
         }
         return element;
+    }
+
+    /**
+     * Stores the last requested offset for which a file-level semantic token was returned as a thread local.
+     *
+     * @param offset the last requested offset
+     */
+    void setLastRequestedOffset(int offset) {
+        if (isFileLevel) {
+            lastRequestedOffsetPtr.set(offset);
+        }
+    }
+
+    /**
+     * Returns the last requested offset for which a file-level semantic token was returned from a thread local.
+     *
+     * @return the last requested offset or -1 if none has been stored
+     */
+    int getLastRequestedOffset() {
+        Integer lastRequestedOffset = isFileLevel ? lastRequestedOffsetPtr.get() : null;
+        return lastRequestedOffset != null ? lastRequestedOffset : -1;
     }
 
     @Override

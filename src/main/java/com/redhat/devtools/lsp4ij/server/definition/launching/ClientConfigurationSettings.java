@@ -37,6 +37,16 @@ public class ClientConfigurationSettings {
     }
 
     /**
+     * Client-side breadcrumbs settings.
+     */
+    public static class ClientConfigurationBreadcrumbsSettings {
+        /**
+         * Whether or not the document symbols-based breadcrumbs info provider is enabled. Defaults to true.
+         */
+        public boolean enabled = true;
+    }
+
+    /**
      * Client-side editor behavior settings.
      */
     public static class ClientConfigurationEditorSettings {
@@ -193,12 +203,17 @@ public class ClientConfigurationSettings {
     public @NotNull String statementTerminatorCharacters = "";
 
     /**
-     * Client-side code completion settings
+     * Client-side code completion settings.
      */
     public @NotNull ClientConfigurationCompletionSettings completion = new ClientConfigurationCompletionSettings();
 
     /**
-     * Client-side editor behavior settings
+     * Client-side breadcrumbs settings.
+     */
+    public @NotNull ClientConfigurationBreadcrumbsSettings breadcrumbs = new ClientConfigurationBreadcrumbsSettings();
+
+    /**
+     * Client-side editor behavior settings.
      */
     public @NotNull ClientConfigurationEditorSettings editor = new ClientConfigurationEditorSettings();
 
@@ -208,7 +223,7 @@ public class ClientConfigurationSettings {
     public @NotNull ClientConfigurationFormatSettings format = new ClientConfigurationFormatSettings();
 
     /**
-     * Client-side workspace symbol settings
+     * Client-side workspace symbol settings.
      */
     public @NotNull ClientConfigurationWorkspaceSymbolSettings workspaceSymbol = new ClientConfigurationWorkspaceSymbolSettings();
 }

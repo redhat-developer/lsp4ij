@@ -12,6 +12,7 @@
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
 import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
 import com.intellij.util.ThreeState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -152,4 +153,12 @@ interface LSPSemanticTokensContainer {
     void addSemanticToken(@NotNull TextRange textRange,
                           @Nullable String tokenType,
                           @Nullable List<String> tokenModifiers);
+
+    /**
+     * Returns the effective offset for the provided element.
+     *
+     * @param element the element
+     * @return the element's effective offset or -1 if none is available
+     */
+    int getEffectiveOffset(@NotNull PsiElement element);
 }

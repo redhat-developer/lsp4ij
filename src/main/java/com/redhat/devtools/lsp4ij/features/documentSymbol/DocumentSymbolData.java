@@ -10,8 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentSymbol;
 
-import javax.swing.Icon;
-
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
@@ -20,10 +19,12 @@ import com.intellij.psi.impl.FakePsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
-
 import org.eclipse.lsp4j.DocumentSymbol;
+import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import javax.swing.Icon;
 
 
 /**
@@ -37,7 +38,7 @@ public class DocumentSymbolData extends FakePsiElement {
     private final @NotNull PsiFile psiFile;
     private final DocumentSymbolData parent;
     private final @NotNull LanguageServerItem languageServer;
-    private TextRange textRange;
+    private volatile TextRange textRange = null;
     private DocumentSymbolData[] cachedChildren;
 
     public DocumentSymbolData(@NotNull DocumentSymbol documentSymbol,
@@ -83,7 +84,13 @@ public class DocumentSymbolData extends FakePsiElement {
     @Override
     public TextRange getTextRange() {
         if (textRange == null) {
-            this.textRange = LSPIJUtils.toTextRange(documentSymbol.getRange(), LSPIJUtils.getDocument(psiFile.getVirtualFile()));
+            synchronized (this) {
+                if (textRange == null) {
+                    Range range = documentSymbol.getRange();
+                    Document document = LSPIJUtils.getDocument(psiFile);
+                    this.textRange = (range != null) && (document != null) ? LSPIJUtils.toTextRange(range, document) : psiFile.getTextRange();
+                }
+            }
         }
         return textRange;
     }
