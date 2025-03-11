@@ -33,7 +33,7 @@ jobs:
       - name: Build with Gradle
         run: |
           LATEST_EAP_SNAPSHOT=$(./gradlew printProductsReleases | grep 'IC-' | head -n 1 | cut -d'-' -f2)
-          ./gradlew check -PplatformVersion=LATEST-EAP-SNAPSHOT
+          ./gradlew check -PplatformVersion=$LATEST_EAP_SNAPSHOT
 
       - name: Collect Tests Result
         uses: actions/upload-artifact@v4

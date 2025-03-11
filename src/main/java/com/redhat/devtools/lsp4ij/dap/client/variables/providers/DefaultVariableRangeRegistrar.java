@@ -65,8 +65,8 @@ public class DefaultVariableRangeRegistrar implements VariableRangeRegistrar {
                                             int end,
                                             @NotNull Document document,
                                             @NotNull DebugVariableContext context) {
-        if ("identifier".equalsIgnoreCase(tokenType.getDebugName())
-                || "character".equalsIgnoreCase(tokenType.getDebugName())) {
+        String tokenName = tokenType.toString();
+        if ("identifier".equalsIgnoreCase(tokenName) || "character".equalsIgnoreCase(tokenName)) {
             var textRange = new TextRange(start, end);
             String variableName = document.getText(textRange);
             context.addVariableRange(variableName, textRange);
