@@ -23,6 +23,7 @@ public class LSPSemanticTokenType {
 
     private final String name;
     private final boolean identifier;
+    private final boolean declaration;
     private final boolean type;
     private final boolean keyword;
     private final String inheritFrom;
@@ -33,6 +34,7 @@ public class LSPSemanticTokenType {
      *
      * @param name              the name
      * @param identifier        whether or not the token represents an identifier
+     * @param declaration       whether or not the token represents a declaration
      * @param type              whether or not the token represents a type
      * @param keyword           whether or not the token represents a keyword
      * @param inheritFrom       an optional existing semantic token type from which this one should inherit its behavior
@@ -40,12 +42,14 @@ public class LSPSemanticTokenType {
      */
     LSPSemanticTokenType(@NotNull String name,
                          boolean identifier,
+                         boolean declaration,
                          boolean type,
                          boolean keyword,
                          @Nullable String inheritFrom,
                          @Nullable String textAttributesKey) {
         this.name = name;
         this.identifier = identifier;
+        this.declaration = declaration;
         this.type = type;
         this.keyword = keyword;
         this.inheritFrom = inheritFrom;
@@ -67,6 +71,14 @@ public class LSPSemanticTokenType {
     @ApiStatus.Internal
     public boolean isIdentifier() {
         return identifier;
+    }
+
+    /**
+     * Whether or not the semantic token should be interpreted as being a declaration.
+     */
+    @ApiStatus.Internal
+    public boolean isDeclaration() {
+        return declaration;
     }
 
     /**

@@ -31,6 +31,7 @@ public class LSPSemanticTokenTypes {
             true,
             false,
             false,
+            false,
             null,
             SemanticTokensHighlightingColors.LABEL.getExternalName()
     );
@@ -41,14 +42,27 @@ public class LSPSemanticTokenTypes {
             true,
             false,
             false,
+            false,
             SemanticTokenTypes.Method,
+            null
+    );
+
+    // SourceKit "identifier" which should be considered a declaration
+    private static final LSPSemanticTokenType Identifier = new LSPSemanticTokenType(
+            "identifier",
+            true,
+            true,
+            false,
+            false,
+            SemanticTokenTypes.Variable,
             null
     );
 
     // All custom semantic token types
     private static final LSPSemanticTokenType[] values = new LSPSemanticTokenType[]{
             Label,
-            Member
+            Member,
+            Identifier
     };
 
     // An index for finding a custom semantic token type by its name

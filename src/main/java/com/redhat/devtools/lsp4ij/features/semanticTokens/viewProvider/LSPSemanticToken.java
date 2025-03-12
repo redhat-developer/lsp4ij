@@ -15,6 +15,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenType;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.LSPSemanticTokenTypes;
 import org.eclipse.lsp4j.SemanticTokenModifiers;
 import org.eclipse.lsp4j.SemanticTokenTypes;
@@ -61,7 +62,7 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Decorator
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .map(t -> t.getName())
+                    .map(LSPSemanticTokenType::getName)
                     .collect(Collectors.toSet())
     );
 
@@ -86,8 +87,8 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Decorator
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .filter(t -> t.isIdentifier())
-                    .map(t -> t.getName())
+                    .filter(LSPSemanticTokenType::isIdentifier)
+                    .map(LSPSemanticTokenType::getName)
                     .collect(Collectors.toSet())
     );
 
@@ -105,8 +106,8 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Struct
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .filter(t -> t.isType())
-                    .map(t -> t.getName())
+                    .filter(LSPSemanticTokenType::isType)
+                    .map(LSPSemanticTokenType::getName)
                     .collect(Collectors.toSet())
     );
 
@@ -120,10 +121,16 @@ class LSPSemanticToken {
                     SemanticTokenTypes.Modifier
             ),
             Arrays.stream(LSPSemanticTokenTypes.values())
-                    .filter(t -> t.isKeyword())
-                    .map(t -> t.getName())
+                    .filter(LSPSemanticTokenType::isKeyword)
+                    .map(LSPSemanticTokenType::getName)
                     .collect(Collectors.toSet())
     );
+
+    // Semantic token types that should be interpreted as representing declarations
+    private static final Set<String> DECLARATION_TOKEN_TYPES = Arrays.stream(LSPSemanticTokenTypes.values())
+            .filter(LSPSemanticTokenType::isDeclaration)
+            .map(LSPSemanticTokenType::getName)
+            .collect(Collectors.toSet());
 
     // Semantic token modifiers that should be interpreted as representing declarations
     private static final Set<String> DECLARATION_TOKEN_MODIFIERS = Set.of(
@@ -222,7 +229,7 @@ class LSPSemanticToken {
         if (tokenType != null) {
             // If this is an identifier token, see if it's a declaration or a reference
             if (IDENTIFIER_TOKEN_TYPES.contains(tokenType)) {
-                return ContainerUtil.intersects(DECLARATION_TOKEN_MODIFIERS, tokenModifiers) ?
+                return DECLARATION_TOKEN_TYPES.contains(tokenType) || ContainerUtil.intersects(DECLARATION_TOKEN_MODIFIERS, tokenModifiers) ?
                         LSPSemanticTokenElementType.DECLARATION :
                         LSPSemanticTokenElementType.REFERENCE;
             }
