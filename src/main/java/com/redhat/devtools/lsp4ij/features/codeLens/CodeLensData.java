@@ -24,8 +24,47 @@ import java.util.concurrent.CompletableFuture;
  * @param languageServer         the language server which has created the codeLens.
  * @param resolvedCodeLensFuture the codeLens/resolve future and null otherwise.
  */
-record CodeLensData(@NotNull CodeLens codeLens,
-                    @NotNull LanguageServerItem languageServer,
-                    @Nullable CompletableFuture<CodeLens> resolvedCodeLensFuture) {
+class CodeLensData {
 
+    private @NotNull CodeLens codeLens;
+    private final @NotNull LanguageServerItem languageServer;
+    private @Nullable boolean toResolve;
+    private CompletableFuture<CodeLens> resolveCodeLensFuture;
+
+    public CodeLensData(@NotNull CodeLens codeLens,
+                        @NotNull LanguageServerItem languageServer,
+                        @Nullable boolean toResolve) {
+        this.codeLens = codeLens;
+        this.languageServer = languageServer;
+        this.toResolve = toResolve;
+    }
+
+    public @NotNull CodeLens getCodeLens() {
+        return codeLens;
+    }
+
+    public @NotNull LanguageServerItem getLanguageServer() {
+        return languageServer;
+    }
+
+    public @Nullable boolean isToResolve() {
+        return toResolve;
+    }
+
+    public CompletableFuture<CodeLens> resolveCodeLens() {
+        if (resolveCodeLensFuture != null) {
+            return resolveCodeLensFuture;
+        }
+        resolveCodeLensFuture = languageServer
+                .getTextDocumentService()
+                .resolveCodeLens(codeLens);
+        resolveCodeLensFuture
+                .thenAccept(cl -> {
+                    if(cl != null) {
+                        codeLens = cl;
+                        toResolve = false;
+                    }
+                });
+        return resolveCodeLensFuture;
+    }
 }

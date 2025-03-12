@@ -331,12 +331,17 @@
 
         <!-- LSP textDocument/codeLens request support -->
         <codeInsight.codeVisionProviderFactory
+                id="DummyCodeVisionProviderFactory"
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.DummyCodeVisionProviderFactory"/>
         <config.codeVisionGroupSettingProvider
+                id="LSPCodeLensSettingsProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSettingsProvider"/>
         <codeInsight.codeVisionProvider
                 id="LSPCodeLensProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider"/>
+        <editorFactoryListener
+                id="LSPCodeLensEditorFactoryListener"
+                implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensEditorFactoryListener" />
 
         <!-- LSP textDocument/inlayHint requests support -->
         <codeInsight.declarativeInlayProviderFactory

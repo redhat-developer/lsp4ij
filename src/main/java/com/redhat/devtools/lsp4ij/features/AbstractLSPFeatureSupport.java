@@ -73,6 +73,10 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
         return isValidLSPFuture() ? future : null;
     }
 
+    public @Nullable CompletableFuture<Result> getFuture() {
+        return future;
+    }
+
     /**
      * Cancel previous LSP requests and load the LSP requests for all language servers applying to a given Psi file or project by using the given cancellation support.
      *

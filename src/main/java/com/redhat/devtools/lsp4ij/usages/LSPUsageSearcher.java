@@ -88,7 +88,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                                 var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, project);
                                 if (psiElement != null) {
                                     VirtualFile psiElementFile = LSPIJUtils.getFile(psiElement);
-                                    if ((psiElementFile != null) && searchScope.contains(psiElementFile)) {
+                                    if (psiElementFile != null) {
                                         processor.process(new UsageInfo2UsageAdapter(new UsageInfo(psiElement)));
                                     }
                                 }
@@ -115,9 +115,8 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                     if (usages != null) {
                         List<LSPUsagePsiElement> filteredUsages = new ArrayList<>(usages);
                         filteredUsages.removeIf(usage -> ContainerUtil.exists(usages, otherUsage -> {
-                            // Remove any usages that aren't included in the search scope
                             VirtualFile usageFile = LSPIJUtils.getFile(usage);
-                            if ((usageFile == null) || !searchScope.contains(usageFile)) {
+                            if ((usageFile == null) /*||*!searchScope.contains(usageFile)*/) {
                                 return true;
                             }
 
