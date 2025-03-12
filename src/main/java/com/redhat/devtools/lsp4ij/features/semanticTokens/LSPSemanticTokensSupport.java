@@ -18,8 +18,8 @@ import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.eclipse.lsp4j.SemanticTokensParams;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -32,6 +32,14 @@ import java.util.concurrent.CompletableFuture;
  * </ul>
  */
 public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<SemanticTokensParams, SemanticTokensData> {
+
+    private static final SemanticTokensLegend DEFAULT_LEGEND;
+
+    static {
+        DEFAULT_LEGEND = new SemanticTokensLegend();
+        DEFAULT_LEGEND.setTokenModifiers(Collections.emptyList());
+        DEFAULT_LEGEND.setTokenTypes(Collections.emptyList());
+    }
 
     public LSPSemanticTokensSupport(@NotNull PsiFile file) {
         super(file);
@@ -91,10 +99,20 @@ public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<
                 });
     }
 
-    @Nullable
+    @NotNull
     private static SemanticTokensLegend getLegend(LanguageServerItem languageServer) {
+        var semanticTokenFeature = languageServer.getClientFeatures().getSemanticTokensFeature();
+        SemanticTokensLegend legend = semanticTokenFeature.getLegend();
+        if (legend != null) {
+            return legend;
+        }
         var serverCapabilities = languageServer.getServerCapabilities();
-        return serverCapabilities.getSemanticTokensProvider() != null ? serverCapabilities.getSemanticTokensProvider().getLegend() : null;
+        if (serverCapabilities != null &&
+                serverCapabilities.getSemanticTokensProvider() != null &&
+                serverCapabilities.getSemanticTokensProvider().getLegend() != null) {
+            return serverCapabilities.getSemanticTokensProvider().getLegend();
+        }
+        return DEFAULT_LEGEND;
     }
 
 }

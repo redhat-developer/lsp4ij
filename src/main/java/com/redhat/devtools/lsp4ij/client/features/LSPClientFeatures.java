@@ -1480,6 +1480,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
                     getReferencesFeature().getReferencesCapabilityRegistry();
             // register 'textDocument/rename' capability
             case LSPRequestConstants.TEXT_DOCUMENT_RENAME -> getRenameFeature().getRenameCapabilityRegistry();
+            // register 'textDocument/semanticTokens' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_SEMANTIC_TOKENS ->
+                    getSemanticTokensFeature().getSemanticTokensCapabilityRegistry();
             // register 'textDocument/signatureHelp' capability
             case LSPRequestConstants.TEXT_DOCUMENT_SIGNATURE_HELP ->
                     getSignatureHelpFeature().getSignatureHelpCapabilityRegistry();

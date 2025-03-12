@@ -166,4 +166,8 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
         return capability != null && capability;
     }
 
+    public List<T> getOptions() {
+        return dynamicCapabilities;
+    }
+
 }
