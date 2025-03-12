@@ -13,6 +13,8 @@ package com.redhat.devtools.lsp4ij.client.features;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.server.capabilities.SemanticTokensCapabilityRegistry;
+import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -21,10 +23,52 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * LSP semanticTokens feature.
+ * LSP semanticToken feature.
  */
 @ApiStatus.Experimental
 public class LSPSemanticTokensFeature extends AbstractLSPDocumentFeature implements SemanticTokensColorsProvider {
+
+    private SemanticTokensCapabilityRegistry semanticTokensCapabilityRegistry;
+    private @Nullable ServerCapabilities serverCapabilities;
+
+    @Override
+    public boolean isSupported(@NotNull PsiFile file) {
+        return isSemanticTokensSupported(file);
+    }
+
+    /**
+     * Returns true if the file associated with a language server can support semanticTokenss and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the file associated with a language server can support semanticToken and false otherwise.
+     */
+    public boolean isSemanticTokensSupported(@NotNull PsiFile file) {
+        return getSemanticTokensCapabilityRegistry().isSemanticTokensSupported(file);
+    }
+
+    public SemanticTokensCapabilityRegistry getSemanticTokensCapabilityRegistry() {
+        if (semanticTokensCapabilityRegistry == null) {
+            initSemanticTokensCapabilityRegistry();
+        }
+        return semanticTokensCapabilityRegistry;
+    }
+
+    private synchronized void initSemanticTokensCapabilityRegistry() {
+        if (semanticTokensCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        semanticTokensCapabilityRegistry = new SemanticTokensCapabilityRegistry(clientFeatures);
+        semanticTokensCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        this.serverCapabilities= serverCapabilities;
+        if (semanticTokensCapabilityRegistry != null) {
+            semanticTokensCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
+    }
 
     /**
      * Returns the {@link TextAttributesKey} to use for colorization for the given token type and given token modifiers and null otherwise.
@@ -45,25 +89,15 @@ public class LSPSemanticTokensFeature extends AbstractLSPDocumentFeature impleme
                 .getTextAttributesKey(tokenType,tokenModifiers, file);
     }
 
-    @Override
-    public boolean isSupported(@NotNull PsiFile file) {
-        return isSemanticTokensSupported(file);
-    }
-
-    /**
-     * Returns true if the file associated with a language server can support semanticTokens and false otherwise.
-     *
-     * @param file the file.
-     * @return true if the file associated with a language server can support semanticTokens and false otherwise.
-     */
-    public boolean isSemanticTokensSupported(@NotNull PsiFile file) {
-        var serverCapabilities = getClientFeatures().getServerWrapper().getServerCapabilitiesSync();
-        return serverCapabilities != null &&
-                serverCapabilities.getSemanticTokensProvider() != null;
-    }
-
-    @Override
-    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
-        // Do nothing
+    public @Nullable SemanticTokensLegend getLegend() {
+        if (serverCapabilities != null &&
+                serverCapabilities.getSemanticTokensProvider() != null &&
+                serverCapabilities.getSemanticTokensProvider().getLegend() != null) {
+            return serverCapabilities.getSemanticTokensProvider().getLegend();
+        }
+        if (semanticTokensCapabilityRegistry != null) {
+            return semanticTokensCapabilityRegistry.getLegend();
+        }
+        return null;
     }
 }
