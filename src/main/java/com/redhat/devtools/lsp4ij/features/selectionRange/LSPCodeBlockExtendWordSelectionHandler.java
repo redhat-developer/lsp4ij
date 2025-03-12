@@ -57,7 +57,9 @@ public class LSPCodeBlockExtendWordSelectionHandler extends AbstractLSPExtendWor
         int currentLineStartOffset = document.getLineStartOffset(currentLineNumber);
         int currentLineEndOffset = document.getLineEndOffset(currentLineNumber);
         int effectiveOffset = Math.max(offset, currentLineStartOffset);
-        while ((effectiveOffset <= currentLineEndOffset) && Character.isWhitespace(editorText.charAt(effectiveOffset))) {
+        while ((effectiveOffset <= currentLineEndOffset) &&
+                (effectiveOffset < editorText.length()) &&
+                Character.isWhitespace(editorText.charAt(effectiveOffset))) {
             effectiveOffset++;
         }
 
