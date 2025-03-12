@@ -100,18 +100,16 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                             .stream()
                             .filter(LSPCodeLensSupport::isValidCodeLens)
                             .forEach(codeLens -> {
-                                CompletableFuture<CodeLens> resolvedCodeLensFuture = null;
                                 var codeLensFeature = languageServer.getClientFeatures().getCodeLensFeature();
-                                if (codeLens.getCommand() == null && codeLensFeature.isResolveCodeLensSupported(file)) {
+                                boolean toResolve = codeLens.getCommand() == null && codeLensFeature.isResolveCodeLensSupported(file);
                                     // - the codelens has no command, and the language server supports codeLens/resolve
                                     // prepare the future which resolves the codelens.
-                                    resolvedCodeLensFuture = cancellationSupport.execute(languageServer
+                                    /*resolvedCodeLensFuture = cancellationSupport.execute(languageServer
                                             .getTextDocumentService()
-                                            .resolveCodeLens(codeLens), languageServer, LSPRequestConstants.CODE_LENS_RESOLVE);
-                                }
-                                if (codeLensFeature.getText(codeLens) != null || resolvedCodeLensFuture != null) {
+                                            .resolveCodeLens(codeLens), languageServer, LSPRequestConstants.CODE_LENS_RESOLVE);*/
+                                if (codeLensFeature.getText(codeLens) != null || toResolve) {
                                     // The codelens content is filled or the codelens must be resolved
-                                    data.add(new CodeLensData(codeLens, languageServer, resolvedCodeLensFuture));
+                                    data.add(new CodeLensData(codeLens, languageServer, toResolve));
                                 }
                             });
                     return data;
