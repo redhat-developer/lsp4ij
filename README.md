@@ -55,6 +55,7 @@ You can find more documentation in:
 ## Articles
 
  * [Meet LSP4IJ, a new LSP Client for JetBrains-based IDEs](https://idetools.dev/blog/lsp4ij-announcement/)
+ * [Meet LSP4IJ, a new Debug Adapter Protocol for JetBrains-based IDEs](https://idetools.dev/blog/lsp4ij-dap-announcement/)
 
 ## Who is using LSP4IJ?
 
