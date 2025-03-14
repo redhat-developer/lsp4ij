@@ -424,6 +424,7 @@ public class LSPIJUtils {
                 if (editor != null && endPosition != null && startPosition != endPosition) {
                     var endOffset = LSPIJUtils.toOffset(endPosition, document);
                     editor.getSelectionModel().setSelection(startOffset, endOffset);
+                    editor.getCaretModel().moveToOffset(endOffset);
                 }
                 return editor != null;
             }
