@@ -61,8 +61,12 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     @Override
     public void dispose() {
         super.dispose();
-        LSPDocumentSymbolSupport documentSymbolSupport = LSPFileSupport.getSupport(psiFile).getDocumentSymbolSupport();
-        documentSymbolSupport.cancel();
+        // Do not clear the document symbol cache when the view is disposed.
+        // This method is called when switching to another editor.
+        // Clearing the cache at this point would cause the document symbols to be reloaded every time the editor is reopened, which is not performance-efficient.
+        // The document symbol cache should only be invalidated when the file content changes, not when switching between editors.
+        // LSPDocumentSymbolSupport documentSymbolSupport = LSPFileSupport.getSupport(psiFile).getDocumentSymbolSupport();
+        // documentSymbolSupport.cancel();
     }
 
     static class LSPFileStructureViewElement extends PsiTreeElementBase<PsiFile> {
