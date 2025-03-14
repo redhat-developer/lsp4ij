@@ -100,7 +100,7 @@ public abstract class LSPHierarchyNodeDescriptor<T> extends HierarchyNodeDescrip
         if(element instanceof LSPHierarchyItemPsiElement lspElement) {
            range = lspElement.getRange();
         }
-        LSPIJUtils.openInEditor(file, range != null ? range.getStart() : null, requestFocus, getProject());
+        LSPIJUtils.openInEditor(file, range != null ? range.getStart() : null, null, requestFocus, getProject());
     }
 
     public boolean isBase() {
