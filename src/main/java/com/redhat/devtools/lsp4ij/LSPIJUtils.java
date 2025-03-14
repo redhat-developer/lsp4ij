@@ -436,7 +436,7 @@ public class LSPIJUtils {
                 OpenFileDescriptor desc = new OpenFileDescriptor(project, file, LSPIJUtils.toOffset(startPosition, document));
                 var startOffset = LSPIJUtils.toOffset(startPosition, document);
                 var editor = FileEditorManager.getInstance(project).openTextEditor(desc, focusEditor);
-                if (editor != null && endPosition != null && startPosition != endPosition) {
+                if (editor != null && endPosition != null && !startPosition.equals(endPosition)) {
                     var endOffset = LSPIJUtils.toOffset(endPosition, document);
                     editor.getSelectionModel().setSelection(startOffset, endOffset);
                     editor.getCaretModel().moveToOffset(endOffset);
