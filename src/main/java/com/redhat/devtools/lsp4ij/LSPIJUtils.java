@@ -241,7 +241,7 @@ public class LSPIJUtils {
      *
      * @param fileUri            the file Uri to open.
      * @param startPosition      the start position.
-     * @param endPosition        the end position to make it selectable.
+     * @param endPosition        the end position to make it selected.
      * @param focusEditor        true if editor will take the focus and false otherwise.
      * @param createFileIfNeeded true if file must be created if doesn't exist and false otherwise.
      * @param fileUriSupport     the file Uri support.
@@ -292,11 +292,10 @@ public class LSPIJUtils {
     }
 
     /**
-     * Open the given fileUrl in an editor.
+     * Open the given fileUrl in an editor and make the range selected.
      *
      * @param fileUri            the file Uri to open.
-     * @param startPosition      the start position.
-     * @param endPosition        the end position to make it selectable.
+     * @param position      the start position.
      * @param focusEditor        true if editor will take the focus and false otherwise.
      * @param createFileIfNeeded true if file must be created if doesn't exist and false otherwise.
      * @param fileUriSupport     the file Uri support.
@@ -304,12 +303,12 @@ public class LSPIJUtils {
      * @return true if file Url can be opened and false otherwise.
      */
     public static boolean openInEditor(@NotNull String fileUri,
-                                       @Nullable Position startPosition,
+                                       @Nullable Position position,
                                        boolean focusEditor,
                                        boolean createFileIfNeeded,
                                        @Nullable FileUriSupport fileUriSupport,
                                        @NotNull Project project) {
-        return openInEditor(fileUri, startPosition, null, focusEditor, createFileIfNeeded, fileUriSupport, project);
+       return openInEditor(fileUri, position, null, focusEditor, createFileIfNeeded, fileUriSupport, project);
     }
 
     private static boolean createFileAndOpenInEditor(@NotNull String fileUri, @NotNull Project project) {
@@ -375,7 +374,7 @@ public class LSPIJUtils {
     public static boolean openInEditor(@Nullable VirtualFile file,
                                        @Nullable Position position,
                                        @NotNull Project project) {
-        return openInEditor(file, position, null, true, project);
+        return openInEditor(file, position, true, project);
     }
 
     /**
@@ -383,7 +382,7 @@ public class LSPIJUtils {
      *
      * @param file          the file.
      * @param startPosition the start position.
-     * @param endPosition   the end position to make it selectable.
+     * @param endPosition   the end position to make it selected.
      * @param focusEditor   true if editor will take the focus and false otherwise.
      * @param project       the project.
      * @return true if the file was opened and false otherwise.
@@ -408,6 +407,22 @@ public class LSPIJUtils {
         return false;
     }
 
+    /**
+     * Open the given file with the given position in an editor.
+     *
+     * @param file        the file.
+     * @param position    the position.
+     * @param focusEditor true if editor will take the focus and false otherwise.
+     * @param project     the project.
+     * @return true if the file was opened and false otherwise.
+     */
+    public static boolean openInEditor(@Nullable VirtualFile file,
+                                       @Nullable Position position,
+                                       boolean focusEditor,
+                                       @NotNull Project project) {
+        return openInEditor(file, position, null, focusEditor, project);
+    }
+
     private static boolean doOpenInEditor(@NotNull VirtualFile file,
                                           @Nullable Position startPosition,
                                           @Nullable Position endPosition,
@@ -418,8 +433,8 @@ public class LSPIJUtils {
             return FileEditorManager.getInstance(project).openFile(file, true).length > 0;
         } else {
             if (document != null) {
+                OpenFileDescriptor desc = new OpenFileDescriptor(project, file, LSPIJUtils.toOffset(startPosition, document));
                 var startOffset = LSPIJUtils.toOffset(startPosition, document);
-                OpenFileDescriptor desc = new OpenFileDescriptor(project, file, startOffset);
                 var editor = FileEditorManager.getInstance(project).openTextEditor(desc, focusEditor);
                 if (editor != null && endPosition != null && startPosition != endPosition) {
                     var endOffset = LSPIJUtils.toOffset(endPosition, document);

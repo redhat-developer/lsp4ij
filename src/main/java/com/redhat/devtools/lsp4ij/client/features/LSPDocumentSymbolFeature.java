@@ -119,7 +119,7 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
                          @NotNull PsiFile psiFile,
                          boolean requestFocus) {
         var selectionRange = documentSymbol.getSelectionRange();
-        LSPIJUtils.openInEditor(psiFile.getVirtualFile(), selectionRange.getStart(), null, requestFocus, psiFile.getProject());
+        LSPIJUtils.openInEditor(psiFile.getVirtualFile(), selectionRange.getStart(), requestFocus, psiFile.getProject());
     }
 
     public boolean canNavigate(@NotNull DocumentSymbol documentSymbol,
