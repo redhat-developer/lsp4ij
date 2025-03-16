@@ -24,10 +24,9 @@ import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Helper class for {@link LSPSemanticTokensFileViewProvider} implementations to help fulfill its interface.
@@ -153,7 +152,7 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
             @Override
             @NotNull
             public Result<Map<Integer, LSPSemanticToken>> compute() {
-                Map<Integer, LSPSemanticToken> semanticTokensByOffset = Collections.synchronizedMap(new HashMap<>());
+                Map<Integer, LSPSemanticToken> semanticTokensByOffset = new ConcurrentHashMap<>();
                 return Result.create(semanticTokensByOffset, file);
             }
         });
