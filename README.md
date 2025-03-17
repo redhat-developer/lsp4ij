@@ -81,6 +81,7 @@ Here are some projects that use LSP4IJ:
  * [GroovyScript for IntelliJ](https://github.com/IntegerLimit/GroovyScriptPlugin)
  * [Redscript Intellij](https://github.com/pawrequest/redscript-intellij)
  * [AngelScript Language Server for IntelliJ](https://github.com/pawrequest/redscript-intellij)
+ * [RobotCode - Robot Framework Support](https://robotcode.io)
 
 ## Requirements
 
