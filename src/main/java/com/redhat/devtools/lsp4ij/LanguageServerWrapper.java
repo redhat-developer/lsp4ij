@@ -239,7 +239,7 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public boolean isEnabled() {
-        return serverDefinition.isEnabled(initialProject);
+        return !isDisposed() && serverDefinition.isEnabled(initialProject);
     }
 
     /**
@@ -509,6 +509,9 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public void dispose(boolean refreshEditorFeature) {
+        if (disposed) {
+            return;
+        }
         this.disposed = true;
         stopAndRefreshEditorFeature(refreshEditorFeature, false);
         stopDispatcher();
