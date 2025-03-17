@@ -106,7 +106,7 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
                 PsiFile targetFile = namedElement.getContainingFile();
                 return "<html><code>" + elementName + "</code>" +
                        // If the source and target are in different files, include the target file name
-                       ((sourceElement != null) && !Objects.equals(targetFile, sourceElement.getContainingFile()) ?
+                       ((targetFile != null) && (sourceElement != null) && !Objects.equals(targetFile, sourceElement.getContainingFile()) ?
                                " in <code>" + targetFile.getName() + "</code>" :
                                "") +
                        "</html>";
