@@ -14,20 +14,12 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
-import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-
-import static com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider.collectApplicableCodeLens;
 
 /**
  * Manages the viewport for unresolved code lens elements, scheduling their resolution
@@ -41,7 +33,8 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
     private final @NotNull Editor editor;
     private int firstViewportLine;
     private int lastViewportLine;
-    private @Nullable CompletableFuture<Void> pendingRefreshTask; // Tracks the currently scheduled refresh task
+    private long modificationStamp;
+    private Alarm scrollStopAlarm = new Alarm();
 
     /**
      * Initializes the context for managing unresolved code lens elements in a given editor.
@@ -86,81 +79,26 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
      * Resolves unresolved code lens elements in the current viewport and refreshes the editor accordingly.
      * If a previous refresh task is pending, it will be cancelled before scheduling a new one.
      *
-     * @param data             The unresolved code lens data to resolve.
+     * @param result             The unresolved code lens data to resolve.
      * @param file             The associated PSI file containing the code.
      * @param firstViewportLine The first visible line in the editor's viewport.
      * @param lastViewportLine  The last visible line in the editor's viewport.
-     * @param modificationStamp The timestamp used for version tracking of the code file.
      */
-    public void resolveAndRefreshUnresolvedCodeLensInViewport(@NotNull List<CodeLensData> data,
-                                                              @NotNull PsiFile file,
-                                                              int firstViewportLine,
-                                                              int lastViewportLine,
-                                                              long modificationStamp) {
-        if (pendingRefreshTask != null) {
-            pendingRefreshTask.cancel(true); // Cancel any pending refresh task
-        }
-
-        pendingRefreshTask = delayedExecution(VIEWPORT_CHANGE_DELAY_MS)
-                .thenRun(() -> {
-                    if (isSameViewportRange(firstViewportLine, lastViewportLine)) {
-                        resolveAndRefreshVisibleCodeLens(data, file, firstViewportLine, lastViewportLine, modificationStamp);
-                    }
-                });
-    }
-
-    /**
-     * Delays the execution for a specified time before proceeding with the next operation,
-     * periodically checking for cancellation requests.
-     *
-     * @param timeout The delay time in milliseconds before the operation is executed.
-     * @return A CompletableFuture that completes after the specified delay.
-     */
-    private static CompletableFuture<Void> delayedExecution(long timeout) {
-        return CompletableFutures.computeAsync(cancelChecker -> {
-            long start = System.currentTimeMillis();
-            while (System.currentTimeMillis() - start < timeout) {
-                cancelChecker.checkCanceled();
-                try {
-                    Thread.sleep(5); // Sleep in small intervals to allow cancellation checks
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    throw new CancellationException(); // Ensure cancellation exception is thrown when interrupted
-                }
+    public void refreshCodeVision(@NotNull CodeLensDataResult result,
+                                  @NotNull PsiFile file,
+                                  int firstViewportLine,
+                                  int lastViewportLine) {
+        scrollStopAlarm.cancelAllRequests();
+        scrollStopAlarm.addRequest(() -> {
+            if (isSameViewportRange(firstViewportLine, lastViewportLine)
+                    && result.hasToResolve(firstViewportLine, lastViewportLine)
+                    && !hasFileChanged(file)) {
+                // The viewport hasn't changed (no scrolling occurred) there are some codelens to resolve and file has not changed
+                // , so we proceed to refresh
+                EditorFeatureManager.getInstance(editor.getProject()).
+                    refreshEditorFeature(file.getVirtualFile(), EditorFeatureType.CODE_VISION, false);
             }
-            return null;
-        });
-    }
-
-    /**
-     * Resolves the code lens elements visible in the editor's current viewport and triggers a refresh.
-     *
-     * @param data             The unresolved code lens data.
-     * @param file             The associated PSI file.
-     * @param firstViewportLine The first visible line in the viewport.
-     * @param lastViewportLine  The last visible line in the viewport.
-     * @param modificationStamp The modification timestamp for version control.
-     */
-    private void resolveAndRefreshVisibleCodeLens(@NotNull List<CodeLensData> data,
-                                                  @NotNull PsiFile file,
-                                                  int firstViewportLine,
-                                                  int lastViewportLine,
-                                                  long modificationStamp) {
-        // Collect the unresolved code lens elements that are visible within the current viewport range
-        @Nullable CompletableFuture<Void> allResolve =
-                collectApplicableCodeLens(data, null, editor);
-        if (allResolve != null) {
-            // After resolving the code lens, refresh only the elements within the current viewport range
-            allResolve
-                    .thenRun(() -> {
-                        if (isSameViewportRange(firstViewportLine, lastViewportLine)) {
-                            // The viewport hasn't changed (no scrolling occurred), so we proceed to refresh
-                            EditorFeatureManager.getInstance(editor.getProject())
-                                    .refreshEditorFeatureWhenAllDone(new HashSet<>(Arrays.asList(allResolve)),
-                                            modificationStamp, file, EditorFeatureType.CODE_VISION);
-                        }
-                    });
-        }
+        }, VIEWPORT_CHANGE_DELAY_MS);
     }
 
     /**
@@ -176,11 +114,22 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
 
     @Override
     public void dispose() {
-        if (pendingRefreshTask != null) {
-            if (!pendingRefreshTask.isDone()) {
-                pendingRefreshTask.cancel(true);
-            }
-            pendingRefreshTask = null;
+        if (scrollStopAlarm != null) {
+            scrollStopAlarm.cancelAllRequests();
+            scrollStopAlarm = null;
         }
+    }
+
+    /**
+     * Returns true if the file content has changed and false otherwise.
+     * @param file the file.
+     * @return true if the file content has changed and false otherwise.
+     */
+    public boolean hasFileChanged(@NotNull PsiFile file) {
+        if (modificationStamp != file.getModificationStamp()) {
+            modificationStamp = file.getModificationStamp();
+            return true;
+        }
+        return false;
     }
 }

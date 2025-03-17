@@ -19,17 +19,14 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Code lens Data
- *
- * @param codeLens               the LSP codeLens
- * @param languageServer         the language server which has created the codeLens.
- * @param resolvedCodeLensFuture the codeLens/resolve future and null otherwise.
  */
-class CodeLensData {
+public class CodeLensData {
 
     private @NotNull CodeLens codeLens;
     private final @NotNull LanguageServerItem languageServer;
     private @Nullable boolean toResolve;
     private CompletableFuture<CodeLens> resolveCodeLensFuture;
+    private CodeLensDataResult result;
 
     public CodeLensData(@NotNull CodeLens codeLens,
                         @NotNull LanguageServerItem languageServer,
@@ -63,8 +60,13 @@ class CodeLensData {
                     if(cl != null) {
                         codeLens = cl;
                         toResolve = false;
+                        result.decrementResolve();
                     }
                 });
         return resolveCodeLensFuture;
+    }
+
+    void setResult(CodeLensDataResult result) {
+        this.result = result;
     }
 }
