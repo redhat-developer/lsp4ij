@@ -137,7 +137,7 @@ public class CompletableFutures {
                 // check psi file
                 if (file != null) {
                     if (modificationStamp != file.getModificationStamp()) {
-                        throw new CancellationException("Psi file has changed.");
+                        throw new PsiFileChangedException();
                     }
                 }
                 // wait for 25 ms
@@ -216,4 +216,9 @@ public class CompletableFutures {
         });
     }
 
+    public static CompletableFuture<Void> allOf(CompletableFuture<?>... cfs) {
+        var allOff =  CompletableFuture.allOf(cfs);
+        CancellationSupport.forwardCancellation(allOff, cfs);
+        return allOff;
+    }
 }

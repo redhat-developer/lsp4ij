@@ -28,9 +28,9 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
@@ -40,10 +40,12 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
 
 import static com.intellij.codeInsight.codeVision.CodeVisionState.Ready;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -107,33 +109,43 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                 return CodeVisionState.Companion.getREADY_EMPTY();
             }
 
-            CompletableFuture<List<CodeLensData>> future = fetchCodeLenses(psiFile);
-            waitUntilDone(future, psiFile);
+            LSPCodeLensSupport codeLensSupport = LSPFileSupport.getSupport(psiFile).getCodeLensSupport();
+            LSPCodeLensEditorFactoryListener.setCodelensSupport(editor, codeLensSupport);
+            CompletableFuture<CodeLensDataResult> future = fetchCodeLenses(codeLensSupport);
+            try {
+                waitUntilDone(future, psiFile);
+            } catch (PsiFileChangedException e) {
+                // The file content has changed, cancel the LSP textDocument/codeLens requests.
+                codeLensSupport.cancel();
+                throw e;
+            }
             if (isDoneNormally(future)) {
                 List<Pair<TextRange, CodeVisionEntry>> result = new ArrayList<>();
-                List<CodeLensData> data = future.getNow(null);
+                CodeLensDataResult data = future.getNow(null);
                 if (data == null) {
                     return CodeVisionState.Companion.getREADY_EMPTY();
                 }
-                if (!data.isEmpty()) {
-                    List<CodeLensData> applicableCodeLens = new ArrayList<>();
-                    @Nullable CompletableFuture<Void> allResolve =
-                            collectApplicableCodeLens(data, applicableCodeLens, editor);
-                    if (allResolve != null) {
-                        try {
-                            waitUntilDone(allResolve, psiFile, 500);
-                        }
-                        catch (TimeoutException e) {
-                            // Ignore timeout exception
-                        }
-                        if (!isDoneNormally(allResolve)) {
-                            final long modificationStamp = psiFile.getModificationStamp();
-                            allResolve
-                                    .thenRun(() -> {
-                                        EditorFeatureManager.getInstance(project)
-                                                .refreshEditorFeatureWhenAllDone(new HashSet<>(Arrays.asList(allResolve)),
-                                                        modificationStamp, psiFile, EditorFeatureType.CODE_VISION);
-                                    });
+                var codelensData = data.getCodeLensData();
+                if (!codelensData.isEmpty()) {
+                    List<CodeLensData> applicableCodeLens = codelensData;
+                    if (data.hasToResolve()) {
+                        // There is some codelens to resolve
+                        applicableCodeLens = new ArrayList<>();
+                        var resolveContext = LSPCodeLensEditorFactoryListener.getCodeLensResolveContext(editor);
+                        // Get the codelens to resolve which are inside the view port range (visible lines)
+                        @Nullable CompletableFuture<Void> visibleCodeLensToResolve =
+                                collectApplicableCodeLens(codelensData,
+                                        applicableCodeLens,
+                                        resolveContext.getFirstViewportLine(),
+                                        resolveContext.getLastViewportLine());
+                        if (visibleCodeLensToResolve != null) {
+                            // Resolve all visible code lens
+                            try {
+                                waitUntilDone(visibleCodeLensToResolve, psiFile);
+                            } catch (PsiFileChangedException e) {
+                                visibleCodeLensToResolve.cancel(true);
+                                return CodeVisionState.NotReady.INSTANCE;
+                            }
                         }
                     }
 
@@ -183,54 +195,27 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
      * This method processes code lens data, filtering them based on whether they need to be resolved and if they are
      * within the currently visible lines in the editor.
      *
-     * @param data A list of code lens data to be evaluated.
+     * @param data               A list of code lens data to be evaluated.
      * @param applicableCodeLens A list to collect the code lenses that are applicable for the editor's viewport.
-     * @param editor The editor instance used to determine the visible lines.
+     * @param firstVisibleLine   The first visible line.
+     * @param lastVisibleLine    The first visible line.
      * @return A CompletableFuture that completes when all applicable code lens are resolved.
      */
     @Nullable
-    public static CompletableFuture<Void> collectApplicableCodeLens(@NotNull List<CodeLensData> data,
-                                                                    @Nullable List<CodeLensData> applicableCodeLens,
-                                                                    @NotNull Editor editor) {
+    private static CompletableFuture<Void> collectApplicableCodeLens(@NotNull List<CodeLensData> data,
+                                                                     @NotNull List<CodeLensData> applicableCodeLens,
+                                                                     int firstVisibleLine,
+                                                                     int lastVisibleLine) {
 
         if (data.isEmpty()) {
             return null;
         }
 
-        // Variable to hold the code lens data that needs to be resolved and is within the visible lines.
-        List<CodeLensData> visibleCodeLensToResolve = null;
-
-        // Iterate over the provided code lens data to filter and categorize it.
-        for (var codeLensData : data) {
-            // Check if the code lens needs resolution.
-            if (codeLensData.isToResolve()) {
-                // Retrieve the current viewport context to check the visible lines.
-                var resolveContext = LSPCodeLensEditorFactoryListener.getCodeLensResolveContext(editor);
-                int firstVisibleLine = resolveContext.getFirstViewportLine();
-                int lastVisibleLine = resolveContext.getLastViewportLine();
-                int codeLensLine = getCodeLensLine(codeLensData); // Get the line number where the code lens should be shown.
-
-                // Check if the code lens is within the visible viewport range.
-                if (codeLensLine >= firstVisibleLine && codeLensLine <= lastVisibleLine) {
-                    // If the list for visible code lenses to resolve is not yet initialized, initialize it.
-                    if (visibleCodeLensToResolve == null) {
-                        visibleCodeLensToResolve = new ArrayList<>();
-                    }
-                    // Add the code lens data to the list of visible code lenses that need resolution.
-                    visibleCodeLensToResolve.add(codeLensData);
-
-                    // If the applicableCodeLens list is provided, add the code lens to it as well.
-                    if (applicableCodeLens != null) {
-                        applicableCodeLens.add(codeLensData);
-                    }
-                }
-            } else {
-                // If the code lens doesn't need resolution, add it to the applicableCodeLens list.
-                if (applicableCodeLens != null) {
-                    applicableCodeLens.add(codeLensData);
-                }
-            }
-        }
+        // Collect the visible codelens to resolve
+        List<CodeLensData> visibleCodeLensToResolve = getVisibleCodeLensToResolve(data,
+                applicableCodeLens,
+                firstVisibleLine,
+                lastVisibleLine);
 
         // If there are any code lenses to resolve within the visible viewport, resolve them asynchronously.
         if (visibleCodeLensToResolve != null) {
@@ -241,11 +226,42 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                     .toList(); // Collect the futures in a list.
 
             // Return a CompletableFuture that completes when all resolve futures are done.
-            return CompletableFuture.allOf(resolveFutures.toArray(new CompletableFuture[0]));
+            return CompletableFutures.allOf(resolveFutures.toArray(new CompletableFuture[0]));
         }
 
         // If no code lenses need to be resolved, return null.
         return null;
+    }
+
+    private static @Nullable List<CodeLensData> getVisibleCodeLensToResolve(@NotNull List<CodeLensData> data,
+                                                                            @NotNull List<CodeLensData> applicableCodeLens,
+                                                                            int firstVisibleLine,
+                                                                            int lastVisibleLine) {
+        // Variable to hold the code lens data that needs to be resolved and is within the visible lines.
+        List<CodeLensData> visibleCodeLensToResolve = null;
+
+        // Iterate over the provided code lens data to filter and categorize it.
+        for (var codeLensData : data) {
+            // Check if the code lens needs resolution.
+            if (codeLensData.isToResolve()) {
+                int codeLensLine = getCodeLensLine(codeLensData); // Get the line number where the code lens should be shown.
+
+                // Check if the code lens is within the visible viewport range.
+                if (codeLensLine >= firstVisibleLine && codeLensLine <= lastVisibleLine) {
+                    // If the list for visible code lenses to resolve is not yet initialized, initialize it.
+                    if (visibleCodeLensToResolve == null) {
+                        visibleCodeLensToResolve = new ArrayList<>();
+                    }
+                    // Add the code lens data to the list of visible code lenses that need resolution.
+                    visibleCodeLensToResolve.add(codeLensData);
+                    applicableCodeLens.add(codeLensData);
+                }
+            } else {
+                // If the code lens doesn't need resolution, add it to the applicableCodeLens list.
+                applicableCodeLens.add(codeLensData);
+            }
+        }
+        return visibleCodeLensToResolve;
     }
 
     private static CodeVisionState computeCodeVisionUnderReadAction(@NotNull ThrowableComputable<CodeVisionState, Throwable> computable,
@@ -272,18 +288,17 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
         }
     }
 
-    static int sortCodeLensByLine(CodeLensData cl1, CodeLensData cl2) {
-        return getCodeLensLine(cl2) - getCodeLensLine(cl1);
+    static int sortCodeLensByLine(@NotNull CodeLensData cl1, @NotNull CodeLensData cl2) {
+        return getCodeLensLine(cl1) - getCodeLensLine(cl2);
     }
 
     public static int getCodeLensLine(CodeLensData codeLensData) {
         return codeLensData.getCodeLens().getRange().getStart().getLine();
     }
 
-    private static CompletableFuture<List<CodeLensData>> fetchCodeLenses(@NotNull PsiFile psiFile) {
-        LSPCodeLensSupport codeLensSupport = LSPFileSupport.getSupport(psiFile).getCodeLensSupport();
-        var params = new CodeLensParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
-        CompletableFuture<List<CodeLensData>> future;
+    private static CompletableFuture<CodeLensDataResult> fetchCodeLenses(@NotNull LSPCodeLensSupport codeLensSupport) {
+        var params = new CodeLensParams(LSPIJUtils.toTextDocumentIdentifier(codeLensSupport.getFile().getVirtualFile()));
+        CompletableFuture<CodeLensDataResult> future;
         try {
             future = codeLensSupport.getCodeLenses(params);
         } catch (CancellationException e) {

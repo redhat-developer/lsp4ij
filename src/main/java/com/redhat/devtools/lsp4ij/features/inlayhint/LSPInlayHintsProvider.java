@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -64,7 +63,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
 
         try {
             // Wait until the future while 200ms and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile, 200);
+            waitUntilDone(future, psiFile);
             if (isDoneNormally(future)) {
 
                 // Collect inlay hints
@@ -81,11 +80,11 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
                         });
             }
             return;
-        } catch (TimeoutException ignore) {
+        /*} catch (TimeoutException ignore) {
             // the future which collects all textDocument/inlayHint for all servers is not finished
             // add it to the pending futures to refresh again the UI when this future will be finished.
             pendingFutures.add(future);
-        } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+        */} catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {

@@ -34,23 +34,27 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'codeLens/resolve' requests</li>
  * </ul>
  */
-public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLensParams, List<CodeLensData>> {
+public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLensParams, CodeLensDataResult> {
 
     public LSPCodeLensSupport(@NotNull PsiFile file) {
         super(file);
     }
 
-    public CompletableFuture<List<CodeLensData>> getCodeLenses(CodeLensParams params) {
+    public CompletableFuture<CodeLensDataResult> getCodeLenses(@NotNull CodeLensParams params) {
+        if (!super.checkValid()) {
+            super.cancel();
+        }
         return super.getFeatureData(params);
     }
 
     @Override
-    protected CompletableFuture<List<CodeLensData>> doLoad(CodeLensParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<CodeLensDataResult> doLoad(@NotNull CodeLensParams params,
+                                                           @NotNull CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
         return getCodeLenses(file, params, cancellationSupport);
     }
 
-    private static @NotNull CompletableFuture<List<CodeLensData>> getCodeLenses(@NotNull PsiFile file,
+    private static @NotNull CompletableFuture<CodeLensDataResult> getCodeLenses(@NotNull PsiFile file,
                                                                                 @NotNull CodeLensParams params,
                                                                                 @NotNull CancellationSupport cancellationSupport) {
 
@@ -76,7 +80,7 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
                 .thenApply(codeLensData -> {
                     // Sort codelens by line number
                     codeLensData.sort(LSPCodeLensProvider::sortCodeLensByLine);
-                    return codeLensData;
+                    return new CodeLensDataResult(codeLensData);
                 });
     }
 
