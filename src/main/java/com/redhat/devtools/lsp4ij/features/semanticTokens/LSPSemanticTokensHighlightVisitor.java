@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.source.tree.LeafElement;
@@ -22,6 +21,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.eclipse.lsp4j.SemanticTokensParams;
 import org.jetbrains.annotations.ApiStatus;
@@ -108,14 +108,14 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         try {
             waitUntilDone(semanticTokensFuture, file);
         } catch (
-                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                PsiFileChangedException e) {
             //TODO delete block when minimum required version is 2024.2
             semanticTokensSupport.cancel();
-            return null;
+            throw e;
         } catch (CancellationException e) {
             // cancel the LSP requests textDocument/semanticTokens/full
-            semanticTokensSupport.cancel();
-            return null;
+            //semanticTokensSupport.cancel();
+            throw e;
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/semanticTokens/full' request", e);
             return null;

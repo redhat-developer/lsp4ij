@@ -15,17 +15,17 @@ import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.Icon;
+import javax.swing.*;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
@@ -93,12 +93,12 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
             try {
                 waitUntilDone(documentSymbolFuture, psiFile);
             } catch (
-                    ProcessCanceledException e) { //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                    PsiFileChangedException e) { //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                 documentSymbolSupport.cancel();
                 throw e;
             } catch (CancellationException e) {
-                documentSymbolSupport.cancel();
-                return Collections.emptyList();
+                //documentSymbolSupport.cancel();
+                throw e;
             } catch (ExecutionException e) {
                 return Collections.emptyList();
             }
