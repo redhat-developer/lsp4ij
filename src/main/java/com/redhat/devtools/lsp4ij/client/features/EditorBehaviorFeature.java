@@ -12,9 +12,14 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * Client-side editor behavior feature. This does not correspond to an actual LSP feature.
@@ -176,9 +181,23 @@ public class EditorBehaviorFeature {
      * @return true if the semantic tokens-based file view provider is enabled; otherwise false
      */
     public static boolean enableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
-        );
+        // TODO: Roll out this same pattern for all such client config accessors to minimize the need to call hasAny()
+        return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
+            @Override
+            @NotNull
+            public Result<Boolean> compute() {
+                boolean result = LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
+                        file.getVirtualFile(),
+                        ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
+                );
+
+                // Should evict if the file or any language server definition config that could affect the file changes
+                Set<Object> dependencies = new LinkedHashSet<>();
+                dependencies.add(file);
+                dependencies.addAll(LanguageServiceAccessor.getInstance(file.getProject()).getModificationTrackers(file));
+
+                return Result.create(result, dependencies.toArray());
+            }
+        });
     }
 }

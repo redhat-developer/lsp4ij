@@ -111,7 +111,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
             if (debugPortChanged) {
                 existing.setDebugPort(newSettings.getDebugPort());
             }
-            boolean debugSuspendChanged = newSettings.isDebugSuspend() != newSettings.isDebugSuspend();
+            boolean debugSuspendChanged = newSettings.isDebugSuspend() != existing.isDebugSuspend();
             if (debugSuspendChanged) {
                 existing.setDebugSuspend(existing.isDebugSuspend());
             }

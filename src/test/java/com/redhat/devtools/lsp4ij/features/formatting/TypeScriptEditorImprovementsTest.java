@@ -361,7 +361,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
     // This exercises LSPEditorImprovementsEnterBetweenBracesHandler
 
     public void testEnterBetweenBraces_spaces() {
-        testEnterBetweenSpaces(false);
+        testEnterBetweenBraces(false);
     }
 
     public void testEnterBetweenBracesDisabled_spaces() {
@@ -369,14 +369,14 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
     }
 
     public void testEnterBetweenBraces_tabs() {
-        testEnterBetweenSpaces(true);
+        testEnterBetweenBraces(true);
     }
 
     public void testEnterBetweenBracesDisabled_tabs() {
         testEnterBetweenSpacesDisabled(true);
     }
 
-    private void testEnterBetweenSpaces(boolean useTabCharacter) {
+    private void testEnterBetweenBraces(boolean useTabCharacter) {
         String fileBody = adjustIndent(
                 """
                 export class Foo {
