@@ -26,11 +26,16 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Client-side editor behavior feature. This does not correspond to an actual LSP feature.
  */
 @ApiStatus.Experimental
 public class EditorBehaviorFeature {
+
+    private static final Map<String, Key<CachedValue<Boolean>>> CACHE_KEYS = new ConcurrentHashMap<>();
 
     private LSPClientFeatures clientFeatures;
 
@@ -195,9 +200,7 @@ public class EditorBehaviorFeature {
     ) {
         if (virtualFile == null) return false;
 
-        // Create a compact cache key if possible
-        String virtualFileId = virtualFile instanceof VirtualFileWithId virtualFileWithId ? String.valueOf(virtualFileWithId.getId()) : virtualFile.getPath();
-        Key<CachedValue<Boolean>> cacheKey = Key.create(featureFlagChecker.getClass().getName() + "::" + virtualFileId);
+        Key<CachedValue<Boolean>> cacheKey = getCacheKey(virtualFile, featureFlagChecker);
         return CachedValuesManager.getManager(project).getCachedValue(
                 project,
                 cacheKey,
@@ -218,5 +221,16 @@ public class EditorBehaviorFeature {
                 },
                 false
         );
+    }
+
+    @NotNull
+    private static Key<CachedValue<Boolean>> getCacheKey(
+            @NotNull VirtualFile virtualFile,
+            @NotNull FeatureFlagChecker featureFlagChecker
+    ) {
+        // Create a compact cache key if possible
+        String virtualFileId = virtualFile instanceof VirtualFileWithId virtualFileWithId ? String.valueOf(virtualFileWithId.getId()) : virtualFile.getPath();
+        String cacheKeyName = featureFlagChecker.getClass().getName() + "::" + virtualFileId;
+        return CACHE_KEYS.computeIfAbsent(cacheKeyName, Key::create);
     }
 }
