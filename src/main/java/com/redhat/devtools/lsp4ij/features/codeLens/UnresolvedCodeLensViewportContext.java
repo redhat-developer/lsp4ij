@@ -34,7 +34,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
     private int firstViewportLine;
     private int lastViewportLine;
     private long modificationStamp;
-    private Alarm scrollStopAlarm = new Alarm();
+    private Alarm scrollStopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
 
     /**
      * Initializes the context for managing unresolved code lens elements in a given editor.
