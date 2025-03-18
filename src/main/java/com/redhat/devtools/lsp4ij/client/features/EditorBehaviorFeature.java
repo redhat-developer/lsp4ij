@@ -11,15 +11,20 @@
 
 package com.redhat.devtools.lsp4ij.client.features;
 
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValue;
+import com.intellij.psi.util.CachedValueProvider.Result;
 import com.intellij.psi.util.CachedValuesManager;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.LinkedHashSet;
-import java.util.Set;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Client-side editor behavior feature. This does not correspond to an actual LSP feature.
@@ -125,10 +130,7 @@ public class EditorBehaviorFeature {
      * otherwise false
      */
     public static boolean enableStringLiteralImprovements(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableStringLiteralImprovements(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableStringLiteralImprovements);
     }
 
     /**
@@ -139,10 +141,7 @@ public class EditorBehaviorFeature {
      * file; otherwise false
      */
     public static boolean enableStatementTerminatorImprovements(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableStatementTerminatorImprovements(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableStatementTerminatorImprovements);
     }
 
     /**
@@ -153,10 +152,7 @@ public class EditorBehaviorFeature {
      * @return true if the fix is enabled by at least one language server for the file; otherwise false
      */
     public static boolean enableEnterBetweenBracesFix(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableEnterBetweenBracesFix(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableEnterBetweenBracesFix);
     }
 
     /**
@@ -168,10 +164,7 @@ public class EditorBehaviorFeature {
      * least one language server for the file; otherwise false
      */
     public static boolean enableTextMateNestedBracesImprovements(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateNestedBracesImprovements(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableTextMateNestedBracesImprovements);
     }
 
     /**
@@ -181,23 +174,49 @@ public class EditorBehaviorFeature {
      * @return true if the semantic tokens-based file view provider is enabled; otherwise false
      */
     public static boolean enableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
-        // TODO: Roll out this same pattern for all such client config accessors to minimize the need to call hasAny()
-        return CachedValuesManager.getCachedValue(file, new CachedValueProvider<>() {
-            @Override
-            @NotNull
-            public Result<Boolean> compute() {
-                boolean result = LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                        file.getVirtualFile(),
-                        ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
-                );
+        return isEnabled(file, EditorBehaviorFeature::isEnableSemanticTokensFileViewProvider);
+    }
 
-                // Should evict if the file or any language server definition config that could affect the file changes
-                Set<Object> dependencies = new LinkedHashSet<>();
-                dependencies.add(file);
-                dependencies.addAll(LanguageServiceAccessor.getInstance(file.getProject()).getModificationTrackers(file));
+    private interface FeatureFlagChecker {
+        boolean isEnabled(@NotNull EditorBehaviorFeature editorBehaviorFeature, @NotNull PsiFile file);
+    }
 
-                return Result.create(result, dependencies.toArray());
-            }
-        });
+    private static boolean isEnabled(
+            @NotNull PsiFile file,
+            @NotNull FeatureFlagChecker featureFlagChecker
+    ) {
+        return isEnabled(file.getProject(), file.getVirtualFile(), featureFlagChecker);
+    }
+
+    private static boolean isEnabled(
+            @NotNull Project project,
+            @Nullable VirtualFile virtualFile,
+            @NotNull FeatureFlagChecker featureFlagChecker
+    ) {
+        if (virtualFile == null) return false;
+
+        // Create a compact cache key if possible
+        String virtualFileId = virtualFile instanceof VirtualFileWithId virtualFileWithId ? String.valueOf(virtualFileWithId.getId()) : virtualFile.getPath();
+        Key<CachedValue<Boolean>> cacheKey = Key.create(featureFlagChecker.getClass().getName() + "::" + virtualFileId);
+        return CachedValuesManager.getManager(project).getCachedValue(
+                project,
+                cacheKey,
+                () -> {
+                    PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
+                    if (file == null) {
+                        return Result.create(false, LanguageServersRegistry.getInstance().getModificationTracker());
+                    }
+
+                    return Result.create(
+                            LanguageServiceAccessor.getInstance(project).hasAny(
+                                    virtualFile,
+                                    ls -> featureFlagChecker.isEnabled(ls.getClientFeatures().getEditorBehaviorFeature(), file)
+                            ),
+                            // Evict if any language server definition config that could affect the file changes
+                            LanguageServiceAccessor.getInstance(project).getModificationTrackers(file).toArray()
+                    );
+                },
+                false
+        );
     }
 }

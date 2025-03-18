@@ -141,6 +141,9 @@ public abstract class LSPClientSideOnTypeFormattingFixtureTestCase extends LSPCo
             ClientConfigurationSettings clientConfiguration = configurableLanguageServerDefinition.getLanguageServerClientConfiguration();
             assertNotNull(clientConfiguration);
             clientConfigCustomizer.accept(clientConfiguration);
+
+            // Bump the modification count since we changed settings directly
+            languageServerDefinition.incrementModificationCount();
         }
 
         EditorTestUtil.buildInitialFoldingsInBackground(editor);
