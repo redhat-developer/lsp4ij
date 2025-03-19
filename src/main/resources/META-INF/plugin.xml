@@ -318,6 +318,9 @@
                 id="LSPBreadcrumbsProvider"
                 implementation="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPBreadcrumbsProvider"
                 order="last"/>
+        <postStartupActivity
+                id="LSPBreadcrumbsRefreshListener"
+                implementation="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPBreadcrumbsRefreshListener"/>
 
         <!-- LSP textDocument/documentHighlight request support -->
         <highlightUsagesHandlerFactory
