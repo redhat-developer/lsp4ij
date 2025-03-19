@@ -492,10 +492,12 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void updateStatus(ServerStatus serverStatus) {
-        this.serverStatus = serverStatus;
+        // If this is an "interesting" status change, increment the language server definition's modification tracker before firing events
+        if ((serverStatus != null) && (serverStatus != ServerStatus.none) && (this.serverStatus != serverStatus)) {
+            serverDefinition.incrementModificationCount();
+        }
 
-        // Increment the language server definition's modification tracker before firing events
-        serverDefinition.incrementModificationCount();
+        this.serverStatus = serverStatus;
 
         if (languageClient != null) {
             languageClient.handleServerStatusChanged(serverStatus);
