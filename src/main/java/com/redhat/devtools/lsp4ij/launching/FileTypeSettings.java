@@ -15,8 +15,10 @@ package com.redhat.devtools.lsp4ij.launching;
 
 import com.intellij.util.xmlb.annotations.Attribute;
 import com.intellij.util.xmlb.annotations.XCollection;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -47,6 +49,10 @@ public class FileTypeSettings {
         this.patterns = patterns;
     }
 
+    public FileTypeSettings(@NotNull FileTypeSettings fileType) {
+        this(fileType.getName(), fileType.getPatterns() != null ? new ArrayList<>(fileType.getPatterns()) : null);
+    }
+
     /**
      * Returns the file type name.
      * @return the file type name.
@@ -64,7 +70,7 @@ public class FileTypeSettings {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         FileTypeSettings that = (FileTypeSettings) o;
-        return Objects.equals(name, that.name) && Objects.equals(patterns, that.patterns);
+        return Objects.equals(name, that.name) && Objects.deepEquals(patterns, that.patterns);
     }
 
     @Override
