@@ -29,6 +29,7 @@ import com.intellij.xml.breadcrumbs.BreadcrumbsPanel;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.client.features.LSPBreadcrumbsFeature;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import kotlin.Unit;
@@ -56,28 +57,30 @@ public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageS
     @Override
     public void handleStatusChanged(LanguageServerWrapper languageServer) {
         if (languageServer.getServerStatus() == ServerStatus.started) {
-            Project project = languageServer.getProject();
-            for (VirtualFile virtualFile : FileEditorManager.getInstance(project).getOpenFiles()) {
-                PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
-                if ((file != null) &&
-                    languageServer.getClientFeatures().getBreadcrumbsFeature().isSupported(file) &&
-                    languageServer.getClientFeatures().getBreadcrumbsFeature().isEnabled(file)) {
-                    for (Editor editor : LSPIJUtils.editorsForFile(virtualFile, project)) {
-                        BreadcrumbsPanel breadcrumbsComponent = BreadcrumbsPanel.getBreadcrumbsComponent(editor);
-                        if (breadcrumbsComponent != null) {
-                            // Only add a listener to the editor once
-                            if (editor.getUserData(ADDED_BREADCRUMB_LISTENER) == null) {
-                                breadcrumbsComponent.addBreadcrumbListener(new LSPBreadcrumbListener(file, editor), breadcrumbsComponent);
-                                editor.putUserData(ADDED_BREADCRUMB_LISTENER, true);
-                            }
+            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                Project project = languageServer.getProject();
+                LSPBreadcrumbsFeature breadcrumbsFeature = languageServer.getClientFeatures().getBreadcrumbsFeature();
 
-                            // Denote the file as needing restart and queue an update to its breadcrumbs
-                            file.putUserData(NEEDS_RESTART, true);
-                            ApplicationManager.getApplication().invokeLater(breadcrumbsComponent::queueUpdate);
+                for (VirtualFile virtualFile : FileEditorManager.getInstance(project).getOpenFiles()) {
+                    PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
+                    if ((file != null) && breadcrumbsFeature.isSupported(file) && breadcrumbsFeature.isEnabled(file)) {
+                        for (Editor editor : LSPIJUtils.editorsForFile(virtualFile, project)) {
+                            BreadcrumbsPanel breadcrumbsComponent = BreadcrumbsPanel.getBreadcrumbsComponent(editor);
+                            if (breadcrumbsComponent != null) {
+                                // Only add a listener to the editor once
+                                if (editor.getUserData(ADDED_BREADCRUMB_LISTENER) == null) {
+                                    breadcrumbsComponent.addBreadcrumbListener(new LSPBreadcrumbListener(file, editor), breadcrumbsComponent);
+                                    editor.putUserData(ADDED_BREADCRUMB_LISTENER, true);
+                                }
+
+                                // Denote the file as needing restart and queue an update to its breadcrumbs
+                                file.putUserData(NEEDS_RESTART, true);
+                                ApplicationManager.getApplication().invokeLater(breadcrumbsComponent::queueUpdate);
+                            }
                         }
                     }
                 }
-            }
+            });
         }
     }
 
@@ -104,6 +107,8 @@ public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageS
             // If the file is still valid and needs restart, clear that flag and schedule restart
             if (file.isValid() && (file.getUserData(NEEDS_RESTART) == Boolean.TRUE)) {
                 file.putUserData(NEEDS_RESTART, false);
+                // We must force the modification stamp to increment or sticky lines won't be recomputed
+                file.clearCaches();
                 ApplicationManager.getApplication().invokeLater(() -> DaemonCodeAnalyzer.getInstance(file.getProject()).restart(file));
             }
         }
