@@ -21,6 +21,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -39,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Language server accessor.
@@ -52,6 +54,7 @@ public class LanguageServiceAccessor implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
 
     private final Project project;
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
@@ -587,6 +590,13 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Increments the language server definition's modification tracker.
+     */
+    void incrementModificationCount() {
+        modificationTracker.incModificationCount();
+    }
+
+    /**
      * Returns the modification trackers for all language server definitions for the file.
      *
      * @param file the PSI file
@@ -597,16 +607,34 @@ public class LanguageServiceAccessor implements Disposable {
     public Set<ModificationTracker> getModificationTrackers(@NotNull PsiFile file) {
         Set<ModificationTracker> modificationTrackers = new LinkedHashSet<>();
 
-        // Add the registry-level modification tracker
+        // Add the registry-level modification tracker for language server definition additions/removals
         modificationTrackers.add(LanguageServersRegistry.getInstance().getModificationTracker());
 
-        // Add modification trackers for all of the file's language server definitions
+        // Add modification trackers for all of the file's language server definitions for config changes
         VirtualFile virtualFile = file.getVirtualFile();
         if (virtualFile != null) {
             MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(virtualFile, project, true);
             if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
-                for (LanguageServerDefinition languageServerDefinition : mappings.getMatched()) {
+                Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
+                for (LanguageServerDefinition languageServerDefinition : languageServerDefinitions) {
                     modificationTrackers.add(languageServerDefinition.getModificationTracker());
+                }
+
+                // Add modification trackers for the file's language server wrappers for status changes
+                Set<LanguageServerWrapper> languageServerWrappers = getStartedServers()
+                        .stream()
+                        .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
+                        .collect(Collectors.toSet());
+                for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
+                    if (languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())) {
+                        modificationTrackers.add(languageServerWrapper.getModificationTracker());
+                    }
+                }
+
+                // If there are language server definitions for this file for which we don't have wrappers, add the
+                // project-level modification tracker so that we still know about status changes
+                if (languageServerWrappers.size() < languageServerDefinitions.size()) {
+                    modificationTrackers.add(modificationTracker);
                 }
             }
         }

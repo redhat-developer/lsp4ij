@@ -19,6 +19,8 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
@@ -125,6 +127,8 @@ public class LanguageServerWrapper implements Disposable {
     private final ExecutorService dispatcher;
 
     private final ExecutorService listener;
+
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -491,10 +495,12 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-    private void updateStatus(ServerStatus serverStatus) {
-        // If this is an "interesting" status change, increment the language server definition's modification tracker before firing events
-        if ((serverStatus != null) && (serverStatus != ServerStatus.none) && (this.serverStatus != serverStatus)) {
-            serverDefinition.incrementModificationCount();
+    private void updateStatus(@NotNull ServerStatus serverStatus) {
+        // If this is an "interesting" status change, increment the wrapper's modification tracker and the project-level
+        // modification tracker before firing events
+        if ((this.serverStatus != serverStatus) && (serverStatus != ServerStatus.none)) {
+            modificationTracker.incModificationCount();
+            LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
         }
 
         this.serverStatus = serverStatus;
@@ -1257,5 +1263,15 @@ public class LanguageServerWrapper implements Disposable {
 
     URI toUri(@NotNull VirtualFile file) {
         return FileUriSupport.getFileUri(file, getClientFeatures());
+    }
+
+    /**
+     * Returns the language server wrapper's modification tracker.
+     *
+     * @return the modification tracker
+     */
+    @NotNull
+    ModificationTracker getModificationTracker() {
+        return modificationTracker;
     }
 }
