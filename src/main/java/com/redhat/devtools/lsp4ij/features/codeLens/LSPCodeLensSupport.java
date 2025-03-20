@@ -41,9 +41,6 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
     }
 
     public CompletableFuture<CodeLensDataResult> getCodeLenses(@NotNull CodeLensParams params) {
-        if (!super.checkValid()) {
-            super.cancel();
-        }
         return super.getFeatureData(params);
     }
 
