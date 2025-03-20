@@ -498,7 +498,7 @@ public class LanguageServerWrapper implements Disposable {
 
     private void updateStatus(@NotNull ServerStatus serverStatus) {
         // If this is an "interesting" status change, increment the project-level modification tracker and the wrapper's
-        // modification tracker and  before firing events
+        // modification tracker before firing events
         if ((this.serverStatus != serverStatus) && (serverStatus != ServerStatus.none)) {
             LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
             incrementModificationCount();
