@@ -81,9 +81,6 @@ public abstract class LSPBreadcrumbsProviderFixtureTestCase extends LSPCodeInsig
         assertNotNull(clientConfiguration);
         clientConfiguration.breadcrumbs.enabled = enabled;
 
-        // Bump the modification count since we changed settings directly
-        languageServer.getServerWrapper().incrementModificationCount();
-
         return file;
     }
 
