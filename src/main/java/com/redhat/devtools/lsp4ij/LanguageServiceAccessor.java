@@ -590,7 +590,7 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
-     * Increments the language server definition's modification tracker.
+     * Increments the project-level language server accessor's modification tracker when any server status has changed.
      */
     void incrementModificationCount() {
         modificationTracker.incModificationCount();
