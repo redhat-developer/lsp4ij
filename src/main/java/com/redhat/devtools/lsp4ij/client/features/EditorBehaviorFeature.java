@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.psi.PsiFile;
@@ -205,9 +206,9 @@ public class EditorBehaviorFeature {
                 cacheKey,
                 () -> {
                     PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
-                    if (file == null) {
-                        // If we couldn't find the PSI file, return false/disabled, but evict based on overall accessor changes
-                        return Result.create(false, LanguageServiceAccessor.getInstance(project).getModificationTracker());
+                    if ((file == null) || !file.isValid()) {
+                        // If we couldn't find the PSI file, return false/disabled with no caching
+                        return Result.create(false, ModificationTracker.EVER_CHANGED);
                     }
 
                     return Result.create(

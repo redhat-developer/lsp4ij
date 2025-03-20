@@ -600,17 +600,6 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
-     * Returns the project-level language server accessor's modification tracker.
-     *
-     * @return the project-level language server accessor's modification tracker
-     */
-    @NotNull
-    @ApiStatus.Internal
-    public SimpleModificationTracker getModificationTracker() {
-        return modificationTracker;
-    }
-
-    /**
      * Increments the project-level language server accessor's modification tracker when any server status has changed.
      */
     void incrementModificationCount() {
