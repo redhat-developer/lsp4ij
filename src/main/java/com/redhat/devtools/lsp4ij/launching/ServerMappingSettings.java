@@ -51,6 +51,12 @@ public class ServerMappingSettings {
 
     }
 
+    public ServerMappingSettings(@NotNull ServerMappingSettings settings) {
+        this(settings.getLanguage(),
+                settings.fileType != null ? new FileTypeSettings(settings.fileType) : null,
+                settings.getLanguageId());
+    }
+
     private ServerMappingSettings(@Nullable String language,
                                   @Nullable FileTypeSettings fileType,
                                   @Nullable String languageId) {
@@ -170,6 +176,4 @@ public class ServerMappingSettings {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
-
-
 }

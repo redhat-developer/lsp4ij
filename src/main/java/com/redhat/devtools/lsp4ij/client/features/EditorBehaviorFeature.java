@@ -20,7 +20,6 @@ import com.intellij.psi.util.CachedValue;
 import com.intellij.psi.util.CachedValueProvider.Result;
 import com.intellij.psi.util.CachedValuesManager;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -207,7 +206,8 @@ public class EditorBehaviorFeature {
                 () -> {
                     PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
                     if (file == null) {
-                        return Result.create(false, LanguageServersRegistry.getInstance().getModificationTracker());
+                        // If we couldn't find the PSI file, return false/disabled, but evict based on overall accessor changes
+                        return Result.create(false, LanguageServiceAccessor.getInstance(project).getModificationTracker());
                     }
 
                     return Result.create(

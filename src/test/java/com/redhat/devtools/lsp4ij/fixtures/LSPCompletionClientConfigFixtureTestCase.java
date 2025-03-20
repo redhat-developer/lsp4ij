@@ -116,7 +116,7 @@ public abstract class LSPCompletionClientConfigFixtureTestCase extends LSPCodeIn
             clientConfigCustomizer.accept(clientConfiguration);
 
             // Bump the modification count since we changed settings directly
-            languageServerDefinition.incrementModificationCount();
+            languageServer.getServerWrapper().incrementModificationCount();
         }
 
         // Move to the offset at which completion should be triggered

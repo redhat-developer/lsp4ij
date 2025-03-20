@@ -20,9 +20,7 @@ import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypes;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.Pair;
-import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -65,7 +63,6 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
     private SemanticTokensColorsProvider semanticTokensColorsProvider;
-    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     public LanguageServerDefinition(@NotNull String id,
                                     @NotNull String name,
@@ -356,24 +353,5 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
             }
         }
         return null;
-    }
-
-    /**
-     * Returns the language server definition's modification tracker.
-     *
-     * @return the modification tracker
-     */
-    @NotNull
-    @ApiStatus.Internal
-    public ModificationTracker getModificationTracker() {
-        return modificationTracker;
-    }
-
-    /**
-     * Increments the language server definition's modification tracker.
-     */
-    @ApiStatus.Internal
-    public void incrementModificationCount() {
-        modificationTracker.incModificationCount();
     }
 }

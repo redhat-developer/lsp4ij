@@ -49,6 +49,7 @@ import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -496,11 +497,11 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void updateStatus(@NotNull ServerStatus serverStatus) {
-        // If this is an "interesting" status change, increment the wrapper's modification tracker and the project-level
-        // modification tracker before firing events
+        // If this is an "interesting" status change, increment the project-level modification tracker and the wrapper's
+        // modification tracker and  before firing events
         if ((this.serverStatus != serverStatus) && (serverStatus != ServerStatus.none)) {
-            modificationTracker.incModificationCount();
             LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
+            incrementModificationCount();
         }
 
         this.serverStatus = serverStatus;
@@ -1273,5 +1274,13 @@ public class LanguageServerWrapper implements Disposable {
     @NotNull
     ModificationTracker getModificationTracker() {
         return modificationTracker;
+    }
+
+    /**
+     * Increments the language server wrapper's modification tracker.
+     */
+    @ApiStatus.Internal
+    public void incrementModificationCount() {
+        modificationTracker.incModificationCount();
     }
 }

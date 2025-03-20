@@ -121,7 +121,7 @@ public abstract class LSPServerSideOnTypeFormattingFixtureTestCase extends LSPCo
             clientConfigCustomizer.accept(clientConfiguration);
 
             // Bump the modification count since we changed settings directly
-            languageServerDefinition.incrementModificationCount();
+            languageServer.getServerWrapper().incrementModificationCount();
         }
 
         EditorTestUtil.buildInitialFoldingsInBackground(editor);

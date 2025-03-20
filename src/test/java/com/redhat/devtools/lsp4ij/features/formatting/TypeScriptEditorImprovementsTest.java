@@ -139,7 +139,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         // Disable string literal improvements
         getClientConfigurationSettings(languageServer).editor.enableStringLiteralImprovements = false;
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -189,7 +189,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         // Configure semicolon as a statement terminator
         getClientConfigurationSettings(languageServer).statementTerminatorCharacters = ";";
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -219,7 +219,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         // Configure semicolon as a statement terminator
         getClientConfigurationSettings(languageServer).statementTerminatorCharacters = ";";
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -253,7 +253,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         // Disable statement terminator improvements
         settings.editor.enableStatementTerminatorImprovements = false;
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -283,7 +283,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         // Configure semicolon as a statement terminator
         getClientConfigurationSettings(languageServer).statementTerminatorCharacters = ";";
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -315,7 +315,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         clientConfigurationSettings.lineCommentPrefix = "//";
         clientConfigurationSettings.statementTerminatorCharacters = ";";
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -353,7 +353,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         clientConfigurationSettings.blockCommentSuffix = "*/";
         clientConfigurationSettings.statementTerminatorCharacters = ";";
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -493,7 +493,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         // Disable the enter-between-braces fix
         getClientConfigurationSettings(languageServer).editor.enableEnterBetweenBracesFix = false;
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();
@@ -616,7 +616,7 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         // Disable TextMate Bundles file improvements
         getClientConfigurationSettings(languageServer).editor.enableTextMateNestedBracesImprovements = false;
         // Bump the modification count since we changed settings directly
-        languageServer.getServerDefinition().incrementModificationCount();
+        languageServer.getServerWrapper().incrementModificationCount();
 
         Editor editor = myFixture.getEditor();
         Document document = editor.getDocument();

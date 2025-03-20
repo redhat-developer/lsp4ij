@@ -21,7 +21,6 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.LightVirtualFile;
@@ -84,8 +83,6 @@ public class LanguageServersRegistry {
     private final List<ProviderInfo<? extends Object>> inlayHintsProviders = new ArrayList<>();
 
     private final Set<Language> customLanguageFindUsages = new HashSet<>();
-
-    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     private LanguageServersRegistry() {
         initialize();
@@ -402,9 +399,6 @@ public class LanguageServersRegistry {
             settings.setClientConfigurationContent(definitionFromSettings.getClientConfigurationContent());
             UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
         }
-
-        // Increment the registry-level modification tracker
-        modificationTracker.incModificationCount();
     }
 
     private void updateAssociations(@NotNull LanguageServerDefinition definition,
@@ -433,9 +427,6 @@ public class LanguageServersRegistry {
                 LOGGER.error("Error while server definition is removed of the language server '" + languageServerId + "'", e);
             }
         }
-
-        // Increment the registry-level modification tracker
-        modificationTracker.incModificationCount();
     }
 
     private void removeAssociationsFor(LanguageServerDefinition definition) {
@@ -458,9 +449,6 @@ public class LanguageServersRegistry {
         request.serverDefinition().setInitializationOptionsContent(request.initializationOptionsContent());
         request.serverDefinition().setClientConfigurationContent(request.clientConfigurationContent());
 
-        // Increment the language server definition modification tracker
-        request.serverDefinition().incrementModificationCount();
-
         // remove associations
         removeAssociationsFor(request.serverDefinition());
         // Update associations
@@ -473,6 +461,7 @@ public class LanguageServersRegistry {
         boolean includeSystemEnvironmentVariablesChanged = settings.isIncludeSystemEnvironmentVariables() != request.includeSystemEnvironmentVariables();
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), request.mappings());
         boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
+        boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
         boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
         // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
 
@@ -487,7 +476,7 @@ public class LanguageServersRegistry {
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-            mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
+            mappingsChanged || configurationContentChanged || clientConfigurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -498,6 +487,7 @@ public class LanguageServersRegistry {
                     includeSystemEnvironmentVariablesChanged,
                     mappingsChanged,
                     configurationContentChanged,
+                    clientConfigurationContentChanged,
                     initializationOptionsContentChanged);
             if (notify) {
                 handleChangeEvent(event);
@@ -630,16 +620,5 @@ public class LanguageServersRegistry {
     @Nullable
     public List<String> getFileExtensions(String languageId) {
         return languageIdFileExtensionsCache.get(languageId);
-    }
-
-    /**
-     * Returns the registry-level modification tracker.
-     *
-     * @return the registry-level modification tracker
-     */
-    @NotNull
-    @ApiStatus.Internal
-    public SimpleModificationTracker getModificationTracker() {
-        return modificationTracker;
     }
 }
