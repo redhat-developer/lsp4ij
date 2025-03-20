@@ -505,7 +505,8 @@
              - textDocument/implementation
         -->
         <elementDescriptionProvider
-                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageElementDescriptionProvider"/>
+                implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageElementDescriptionProvider"
+                order="last"/>
         <customUsageSearcher
                 order="last"
                 implementation="com.redhat.devtools.lsp4ij.usages.LSPUsageSearcher"/>

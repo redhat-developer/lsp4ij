@@ -26,6 +26,7 @@ import com.intellij.usageView.UsageViewTypeLocation;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
 import org.jetbrains.annotations.NotNull;
@@ -51,6 +52,11 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
             if (realElement != null) {
                 element = realElement;
             }
+        }
+
+        // If it's not one of ours, don't provide a description
+        if (!(element instanceof LSPPsiElement)) {
+            return null;
         }
 
         // Usage declaration type
