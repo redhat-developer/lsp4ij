@@ -107,7 +107,7 @@ final class LSPDocumentSymbolUtils {
             var structureViewTreeElement = pending.remove();
             // If this is file-level, collect its children/descendants
             if (structureViewTreeElement instanceof LSPFileStructureViewElement fileStructureViewElement) {
-                pending.addAll(Arrays.asList(fileStructureViewElement.getChildren()));
+                pending.addAll(fileStructureViewElement.getChildrenBase());
             }
 
             // Otherwise add document symbol datas that contain the offset in a breadth-first manner so that the last one is
@@ -122,7 +122,7 @@ final class LSPDocumentSymbolUtils {
                     containingDocumentSymbolDatas.add(documentSymbolData);
 
                     // And all children/descendants that also contain the offset
-                    pending.addAll(Arrays.asList(documentSymbolViewElement.getChildren()));
+                    pending.addAll(documentSymbolViewElement.getChildrenBase());
                 }
             }
         }
