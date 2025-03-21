@@ -14,7 +14,6 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 import com.intellij.codeInsight.editorActions.TypedHandlerDelegate;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
@@ -24,11 +23,10 @@ import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockProvider;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionTriggerTypedHandler;
 import com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport;
@@ -36,10 +34,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Typed handler for LSP4IJ-managed files that performs automatic on-type formatting for specific keystrokes.
@@ -52,11 +51,6 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                             @NotNull Project project,
                             @NotNull Editor editor,
                             @NotNull PsiFile file) {
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
-            // The file is not associated to a language server
-            return super.charTyped(charTyped, project, editor, file);
-        }
-
         LSPFormattingFeature formattingFeature = getFormattingFeature(file);
         if (formattingFeature != null) {
             boolean rangeFormattingSupported = formattingFeature.isRangeFormattingSupported(file);
@@ -128,43 +122,36 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
 
     @Nullable
     private static LSPFormattingFeature getFormattingFeature(@NotNull PsiFile file) {
+        if (ProjectIndexingManager.isIndexingAll()) {
+            // while indexing, we do nothing
+            return null;
+        }
+        if (!hasLanguageServerSupportingOnlyFormatting(file)) {
+            // The file is not associated to a language server which supports only formatting
+            return null;
+        }
         Project project = file.getProject();
         VirtualFile virtualFile = file.getVirtualFile();
 
-        CompletableFuture<@NotNull List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(project).getLanguageServers(
-                virtualFile,
+        CompletableFuture<@NotNull List<LanguageServerItem>> future = LanguageServiceAccessor.getInstance(project)
+                .getLanguageServers(virtualFile,
                 // Client-side on-type formatting shouldn't trigger a language server to start
-                f -> (f.getServerStatus() == ServerStatus.started) &&
-                     f.getFormattingFeature().isEnabled(file) &&
-                     // Must support formatting
-                     f.getFormattingFeature().isFormattingSupported(file),
-                null
+                f -> f.getFormattingFeature().isEnabled(file),
+                f -> f.getFormattingFeature().isFormattingSupported(file)
         );
 
-        //noinspection TryWithIdenticalCatches
+        // Wait until the future while 500ms and stop the wait if there are some ProcessCanceledException.
         try {
-            // wait few ms to get formatting features to avoid freezing UI
-            // when server started and didOpen must occur.
-            languageServersFuture.get(500, TimeUnit.MILLISECONDS);
-        } catch (ProcessCanceledException e) {
-            return null;
-        } catch (CancellationException e) {
-            return null;
-        } catch (ExecutionException e) {
-            return null;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return null;
-        } catch (TimeoutException e) {
+            waitUntilDone(future, file, 500);
+        } catch (Exception e) {
             return null;
         }
-
-        if (!isDoneNormally(languageServersFuture)) {
+        if (!isDoneNormally(future)) {
             return null;
         }
 
         // Just return the first matching language server, if any
-        List<LanguageServerItem> languageServers = languageServersFuture.getNow(Collections.emptyList());
+        List<LanguageServerItem> languageServers = future.getNow(Collections.emptyList());
         LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
         return languageServer != null ? languageServer.getClientFeatures().getFormattingFeature() : null;
     }
@@ -344,5 +331,16 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         } else {
             CodeStyleManager.getInstance(project).reformatText(file, Collections.singletonList(textRange));
         }
+    }
+
+    private static boolean hasLanguageServerSupportingOnlyFormatting(@NotNull PsiFile file) {
+        return LanguageServiceAccessor.getInstance(file.getProject())
+                .hasAny(file.getVirtualFile(), ls -> {
+                    var clientFeatures = ls.getClientFeatures();
+                    return clientFeatures.getFormattingFeature().isEnabled(file) &&
+                            clientFeatures.getFormattingFeature().isSupported(file) &&
+                            (!clientFeatures.getOnTypeFormattingFeature().isEnabled(file) ||
+                            !clientFeatures.getOnTypeFormattingFeature().isSupported(file));
+                });
     }
 }

@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -60,8 +59,8 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
         CompletableFuture<List<ColorData>> future = colorSupport.getColors(params);
 
         try {
-            // Wait until the future while 200ms and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile, 200);
+            // Wait until the future is done and stop the wait if there are some ProcessCanceledException.
+            waitUntilDone(future, psiFile);
             if (isDoneNormally(future)) {
 
                 // Collect color information
@@ -79,10 +78,6 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                                         toPresentation(list, factory))
                         );
             }
-        } catch (TimeoutException ignore) {
-            // the future which collects all textDocument/documentColor for all servers is not finished
-            // add it to the pending futures to refresh again the UI when this future will be finished.
-            pendingFutures.add(future);
         } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
         } catch (CancellationException ignore) {
