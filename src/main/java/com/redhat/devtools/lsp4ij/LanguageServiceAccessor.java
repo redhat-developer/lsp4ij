@@ -267,8 +267,8 @@ public class LanguageServiceAccessor implements Disposable {
         // We get the Document instance now, to avoid creating a new Read Action thread to get it from the file.
         // The document instance is only used when the file is opened, to add
         // LSP document listener to manage didOpen, didChange, etc.
-        boolean writeAccessAllowed = !ApplicationManager.getApplication().isWriteAccessAllowed();
-        boolean readAccessAllowed = !ApplicationManager.getApplication().isWriteAccessAllowed();
+        boolean writeAccessAllowed = ApplicationManager.getApplication().isWriteAccessAllowed();
+        boolean readAccessAllowed = ApplicationManager.getApplication().isReadAccessAllowed();
         Document document = readAccessAllowed || (!writeAccessAllowed) ? LSPIJUtils.getDocument(file) : null;
 
         // Try to get document, languageId information (used by didOpen) for each matched language server wrapper
