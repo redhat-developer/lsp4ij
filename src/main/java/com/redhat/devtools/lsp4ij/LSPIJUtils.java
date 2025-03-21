@@ -45,6 +45,7 @@ import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -731,7 +732,12 @@ public class LSPIJUtils {
     }
 
     public static @Nullable TextRange toTextRange(@NotNull Range range, @NotNull Document document) {
-        return toTextRange(range, document, null, false);
+        return toTextRange(range, document, null, false, -1);
+    }
+
+    @ApiStatus.Internal
+    public static @Nullable TextRange toTextRange(@NotNull Range range, @NotNull Document document, int docLengthPrefetched) {
+        return toTextRange(range, document, null, false, docLengthPrefetched);
     }
 
     /**
@@ -745,7 +751,7 @@ public class LSPIJUtils {
     public static @Nullable TextRange toTextRange(@NotNull Range range,
                                                   @NotNull Document document,
                                                   boolean adjust) {
-        return toTextRange(range, document, null, adjust);
+        return toTextRange(range, document, null, adjust, -1);
     }
 
     /**
@@ -760,10 +766,18 @@ public class LSPIJUtils {
                                                   @NotNull Document document,
                                                   @Nullable PsiFile file,
                                                   boolean adjust) {
+        return toTextRange(range, document, file, adjust, -1);
+    }
+
+    private static @Nullable TextRange toTextRange(@NotNull Range range,
+                                                  @NotNull Document document,
+                                                  @Nullable PsiFile file,
+                                                  boolean adjust,
+                                                  int docLengthPrefetched) {
         try {
+            int docLength = docLengthPrefetched >= 0 ? docLengthPrefetched : document.getTextLength();
             int start = LSPIJUtils.toOffset(range.getStart(), document);
             int end = LSPIJUtils.toOffset(range.getEnd(), document);
-            int docLength = document.getTextLength();
             if (start > end || end > docLength) {
                 // Language server reports invalid range, ignore it.
                 return null;
