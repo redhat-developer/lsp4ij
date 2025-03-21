@@ -20,7 +20,13 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileWithId;
+import com.intellij.psi.util.CachedValue;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
@@ -36,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 /**
@@ -47,7 +54,10 @@ import java.util.function.Predicate;
  */
 @ApiStatus.Internal
 public class LanguageServiceAccessor implements Disposable {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
+
+    private static final Map<String, Key<CachedValue<Boolean>>> CACHE_KEYS = new ConcurrentHashMap<>();
 
     private final Project project;
 
@@ -55,12 +65,14 @@ public class LanguageServiceAccessor implements Disposable {
 
         @Override
         public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
+            modificationTracker.incModificationCount();
             // Check all projects for files that match the added language server and start it if necessary
             checkCurrentlyOpenFiles(event.serverDefinitions);
         }
 
         @Override
         public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
+            modificationTracker.incModificationCount();
             // Dispose all servers which are removed
             // and remove code vision, inlay hints, folding from editors
             List<LanguageServerWrapper> serversToDispose = startedServers
@@ -76,6 +88,9 @@ public class LanguageServiceAccessor implements Disposable {
 
         @Override
         public void handleChanged(@NotNull LanguageServerChangedEvent event) {
+            if (event.mappingsChanged) {
+                modificationTracker.incModificationCount();
+            }
             if (event.commandChanged ||
                     event.userEnvironmentVariablesChanged ||
                     event.includeSystemEnvironmentVariablesChanged ||
@@ -89,6 +104,7 @@ public class LanguageServiceAccessor implements Disposable {
             }
         }
     };
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     public static LanguageServiceAccessor getInstance(@NotNull Project project) {
         return project.getService(LanguageServiceAccessor.class);
@@ -191,11 +207,21 @@ public class LanguageServiceAccessor implements Disposable {
         if (startedServers.isEmpty()) {
             return false;
         }
-        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project, true);
+        MatchedLanguageServerDefinitions mappings = getCachedMatchedLanguageServerDefinitions(file, project, true);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             return false;
         }
         var matched = mappings.getMatched();
+        if (hasAny(filter, startedServers, matched)) return true;
+        var asyncMatched = mappings.getAsyncMatched();
+        if (asyncMatched != null && asyncMatched.isDone()) {
+            matched =  asyncMatched.getNow(Collections.emptySet());
+            if (hasAny(filter, startedServers, matched)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasAny(@NotNull Predicate<LanguageServerWrapper> filter, Set<LanguageServerWrapper> startedServers, Set<LanguageServerDefinition> matched) {
         for (var startedServer : startedServers) {
             if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
                     matched.contains(startedServer.getServerDefinition()) && filter.test(startedServer)) {
@@ -256,7 +282,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                                             @Nullable LanguageServerDefinition matchServerDefinition) {
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(file, matchServerDefinition, beforeStartingServerFilter);
-        var matchedServersNow= matchedServers.getNow(Collections.emptyList());
+        var matchedServersNow = matchedServers.getNow(Collections.emptyList());
         if (matchedServers.isDone() && matchedServersNow.isEmpty()) {
             // None language servers matches the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -326,7 +352,7 @@ public class LanguageServiceAccessor implements Disposable {
             if (uri != null && !ls.isConnectedTo(uri)) {
                 // The file is not connected to the current language server
                 // Get the required information for the didOpen (text and languageId) which requires a ReadAction.
-                if(document != null) {
+                if (document != null) {
                     if (connectionFileInfo == null) {
                         connectionFileInfo = new HashMap<>();
                     }
@@ -359,7 +385,7 @@ public class LanguageServiceAccessor implements Disposable {
             @NotNull VirtualFile file,
             @Nullable LanguageServerDefinition matchServerDefinition,
             @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
-        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project, false);
+        MatchedLanguageServerDefinitions mappings = getCachedMatchedLanguageServerDefinitions(file, project, false);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             // There are no mapping for the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -461,6 +487,27 @@ public class LanguageServiceAccessor implements Disposable {
         public CompletableFuture<Set<LanguageServerDefinition>> getAsyncMatched() {
             return asyncMatched;
         }
+    }
+
+    private MatchedLanguageServerDefinitions getCachedMatchedLanguageServerDefinitions(@NotNull VirtualFile file,
+                                                                                       @NotNull Project fileProject,
+                                                                                       boolean ignoreMatch) {
+        // Create a compact cache key if possible
+        Key cacheKey = getCacheKey(file);
+        return CachedValuesManager.getManager(project)
+                .getCachedValue(project,
+                        cacheKey,
+                        () -> CachedValueProvider.Result.create(
+                                getMatchedLanguageServerDefinitions(file, fileProject, false),
+                                modificationTracker)
+                        ,false
+                        );
+    }
+
+    private static @NotNull Key getCacheKey(@NotNull VirtualFile file) {
+        String virtualFileId = file instanceof VirtualFileWithId virtualFileWithId ? String.valueOf(virtualFileWithId.getId()) : file.getPath();
+        String cacheKeyName = virtualFileId;
+        return CACHE_KEYS.computeIfAbsent(cacheKeyName, Key::create);
     }
 
     /**

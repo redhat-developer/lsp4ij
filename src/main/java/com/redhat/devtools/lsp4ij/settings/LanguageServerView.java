@@ -179,18 +179,21 @@ public class LanguageServerView implements Disposable {
                 List<ServerMappingSettings> languageMappings = userDefinedLanguageServerSettings.getMappings()
                         .stream()
                         .filter(mapping -> !StringUtils.isEmpty(mapping.getLanguage()))
+                        .map(mapping -> new ServerMappingSettings(mapping))
                         .collect(Collectors.toList());
                 this.setLanguageMappings(languageMappings);
 
                 List<ServerMappingSettings> fileTypeMappings = userDefinedLanguageServerSettings.getMappings()
                         .stream()
                         .filter(mapping -> !StringUtils.isEmpty(mapping.getFileType()))
+                        .map(mapping -> new ServerMappingSettings(mapping))
                         .collect(Collectors.toList());
                 this.setFileTypeMappings(fileTypeMappings);
 
                 List<ServerMappingSettings> fileNamePatternMappings = userDefinedLanguageServerSettings.getMappings()
                         .stream()
                         .filter(mapping -> mapping.getFileNamePatterns() != null)
+                        .map(mapping -> new ServerMappingSettings(mapping))
                         .collect(Collectors.toList());
                 this.setFileNamePatternMappings(fileNamePatternMappings);
             }
