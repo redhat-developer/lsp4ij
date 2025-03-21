@@ -19,6 +19,8 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
@@ -33,7 +35,12 @@ import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
-import com.redhat.devtools.lsp4ij.server.*;
+import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
+import com.redhat.devtools.lsp4ij.server.CannotStartServerException;
+import com.redhat.devtools.lsp4ij.server.LanguageServerException;
+import com.redhat.devtools.lsp4ij.server.ProcessDataProvider;
+import com.redhat.devtools.lsp4ij.server.ServerWasStoppedException;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
@@ -42,14 +49,30 @@ import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -105,6 +128,8 @@ public class LanguageServerWrapper implements Disposable {
     private final ExecutorService dispatcher;
 
     private final ExecutorService listener;
+
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -471,8 +496,16 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-    private void updateStatus(ServerStatus serverStatus) {
+    private void updateStatus(@NotNull ServerStatus serverStatus) {
+        // If this is an "interesting" status change, increment the project-level modification tracker and the wrapper's
+        // modification tracker before firing events
+        if ((this.serverStatus != serverStatus) && (serverStatus != ServerStatus.none)) {
+            LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
+            incrementModificationCount();
+        }
+
         this.serverStatus = serverStatus;
+
         if (languageClient != null) {
             languageClient.handleServerStatusChanged(serverStatus);
         }
@@ -1233,4 +1266,21 @@ public class LanguageServerWrapper implements Disposable {
         return FileUriSupport.getFileUri(file, getClientFeatures());
     }
 
+    /**
+     * Returns the language server wrapper's modification tracker.
+     *
+     * @return the modification tracker
+     */
+    @NotNull
+    ModificationTracker getModificationTracker() {
+        return modificationTracker;
+    }
+
+    /**
+     * Increments the language server wrapper's modification tracker.
+     */
+    @ApiStatus.Internal
+    public void incrementModificationCount() {
+        modificationTracker.incModificationCount();
+    }
 }
