@@ -109,7 +109,7 @@ final class LSPServerSideOnTypeFormattingHelper {
 
     private static boolean hasLanguageServerSupportingOnTypeFormatting(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject())
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures()
+                .hasAny(file, ls -> ls.getClientFeatures()
                         .getOnTypeFormattingFeature()
                         .isSupported(file));
     }

@@ -121,7 +121,7 @@ public class EditorBehaviorFeature {
      */
     public static boolean enableStringLiteralImprovements(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
+                file,
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableStringLiteralImprovements(file)
         );
     }
@@ -135,7 +135,7 @@ public class EditorBehaviorFeature {
      */
     public static boolean enableStatementTerminatorImprovements(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
+                file,
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableStatementTerminatorImprovements(file)
         );
     }
@@ -149,7 +149,7 @@ public class EditorBehaviorFeature {
      */
     public static boolean enableEnterBetweenBracesFix(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
+                file,
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableEnterBetweenBracesFix(file)
         );
     }
@@ -164,7 +164,7 @@ public class EditorBehaviorFeature {
      */
     public static boolean enableTextMateNestedBracesImprovements(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
+                file,
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateNestedBracesImprovements(file)
         );
     }
@@ -177,7 +177,7 @@ public class EditorBehaviorFeature {
      */
     public static boolean enableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
+                file,
                 ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
         );
     }

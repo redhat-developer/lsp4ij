@@ -129,7 +129,7 @@ public abstract class AbstractLSPGoToAction extends AnAction {
         }
         // Check if the file can support the feature
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> canSupportFeature(ls.getClientFeatures(), file));
+                .hasAny(file, ls -> canSupportFeature(ls.getClientFeatures(), file));
     }
 
 

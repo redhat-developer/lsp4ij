@@ -115,7 +115,7 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
         }
         Project project = file.getProject();
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> canSupportFormatting(ls, file));
+                .hasAny(file, ls -> canSupportFormatting(ls, file));
     }
 
     private boolean canSupportFormatting(LanguageServerWrapper ls, PsiFile file) {

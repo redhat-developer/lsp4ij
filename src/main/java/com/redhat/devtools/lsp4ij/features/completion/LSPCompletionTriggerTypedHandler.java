@@ -62,14 +62,14 @@ public class LSPCompletionTriggerTypedHandler extends TypedHandlerDelegate {
     @ApiStatus.Internal
     public static boolean hasLanguageServerSupportingCompletionTriggerCharacters(char charTyped, Project project, PsiFile file) {
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures()
+                .hasAny(file, ls -> ls.getClientFeatures()
                         .getCompletionFeature()
                         .isCompletionTriggerCharactersSupported(file, String.valueOf(charTyped)));
     }
 
     private static boolean hasLanguageServerSupportingSignatureTriggerCharacters(char charTyped, Project project, PsiFile file) {
         return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures()
+                .hasAny(file, ls -> ls.getClientFeatures()
                                 .getSignatureHelpFeature()
                                 .isSignatureTriggerCharactersSupported(file, String.valueOf(charTyped)));
     }

@@ -15,7 +15,6 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -44,9 +43,8 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrarTest extends
         // Initialize the language server
         Project project = cssFile.getProject();
         try {
-            VirtualFile virtualFile = cssFile.getVirtualFile();
             LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(virtualFile, null, null)
+                    .getLanguageServers(cssFile, null, null)
                     .get(5000, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             fail(e.getMessage());

@@ -400,7 +400,7 @@ public final class LSPIJEditorUtils {
         @Nullable
         private static LSPClientFeatures getClientFeatures(@NotNull PsiFile file) {
             CompletableFuture<List<LanguageServerItem>> languageServersFuture = LanguageServiceAccessor.getInstance(file.getProject()).getLanguageServers(
-                    file.getVirtualFile(),
+                    file,
                     clientFeatures -> StringUtil.isNotEmpty(clientFeatures.getLineCommentPrefix(file)) ||
                                       StringUtil.isNotEmpty(clientFeatures.getBlockCommentPrefix(file)) ||
                                       StringUtil.isNotEmpty(clientFeatures.getBlockCommentSuffix(file)),

@@ -566,6 +566,16 @@ public class LSPIJUtils {
 
 
     /**
+     * Returns the virtual file corresponding to the PSI file.
+     *
+     * @param psiFile the PSI file
+     * @return the virtual file, or {@code null} if the file exists only in memory.
+     */
+    public static @Nullable VirtualFile getFile(@NotNull PsiFile psiFile) {
+       return psiFile.getVirtualFile();
+    }
+
+    /**
      * Returns the virtual file corresponding to the PSI element.
      *
      * @param element the PSI element
@@ -573,7 +583,7 @@ public class LSPIJUtils {
      */
     public static @Nullable VirtualFile getFile(@NotNull PsiElement element) {
         PsiFile psFile = element.getContainingFile();
-        return psFile != null ? psFile.getVirtualFile() : null;
+        return psFile != null ? getFile(psFile) : null;
     }
 
     /**
