@@ -19,7 +19,6 @@ import com.intellij.lang.Language;
 import com.intellij.lang.LanguageUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Conditions;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.breadcrumbs.BreadcrumbsProvider;
@@ -30,7 +29,7 @@ import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStruc
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.Icon;
+import javax.swing.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,9 +50,8 @@ public class LSPBreadcrumbsProvider implements BreadcrumbsProvider {
     private boolean isSupported(@NotNull PsiElement element) {
         Project project = element.getProject();
         PsiFile file = element.getContainingFile();
-        VirtualFile virtualFile = file.getVirtualFile();
         return LanguageServiceAccessor.getInstance(project).hasAny(
-                virtualFile,
+                file,
                 // The breadcrumbs feature must be enabled and supported for the file's language server
                 ls -> ls.getClientFeatures().getBreadcrumbsFeature().isEnabled(file) &&
                         ls.getClientFeatures().getBreadcrumbsFeature().isSupported(file)

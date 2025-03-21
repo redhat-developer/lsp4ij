@@ -31,19 +31,8 @@ import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
-import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
-import com.redhat.devtools.lsp4ij.server.definition.ServerFileTypeMapping;
-import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
-import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
-import com.redhat.devtools.lsp4ij.server.definition.extension.ExtensionLanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean;
-import com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean;
-import com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean;
-import com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean;
-import com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean;
+import com.redhat.devtools.lsp4ij.server.definition.*;
+import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.usages.LSPFindUsagesProvider;
 import org.jetbrains.annotations.ApiStatus;
@@ -286,13 +275,13 @@ public class LanguageServersRegistry {
     /**
      * @param language the language
      * @param fileType the file type.
-     * @param file
+     * @param fileName the file name
      * @return the {@link LanguageServerDefinition}s <strong>directly</strong> associated to the given content-type.
      * This does <strong>not</strong> include the one that match transitively as per content-type hierarchy
      */
-    List<LanguageServerFileAssociation> findLanguageServerDefinitionFor(final @Nullable Language language, @Nullable FileType fileType, @NotNull VirtualFile file) {
+    List<LanguageServerFileAssociation> findLanguageServerDefinitionFor(final @Nullable Language language, @Nullable FileType fileType, @NotNull String fileName) {
         return fileAssociations.stream()
-                .filter(mapping -> mapping.match(language, fileType, file.getName()))
+                .filter(mapping -> mapping.match(language, fileType, fileName))
                 .collect(Collectors.toList());
     }
 
@@ -475,7 +464,7 @@ public class LanguageServersRegistry {
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-            mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
+                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -523,7 +512,9 @@ public class LanguageServersRegistry {
         if (file == null) {
             return false;
         }
-        return isFileSupported(file.getVirtualFile(), file.getProject());
+        Language language = file.getLanguage();
+        FileType fileType = file.getFileType();
+        return isFileSupported(language, fileType, file.getName(), null, file, file.getProject());
     }
 
     /**
@@ -539,15 +530,25 @@ public class LanguageServersRegistry {
         }
         Language language = LSPIJUtils.getFileLanguage(file, project);
         FileType fileType = file.getFileType();
+        return isFileSupported(language, fileType, file.getName(), file, null, project);
+    }
+
+    private boolean isFileSupported(@Nullable Language language,
+                                    @Nullable FileType fileType,
+                                    @NotNull String filename,
+                                    @Nullable VirtualFile file,
+                                    @Nullable PsiFile psiFile,
+                                    @NotNull Project project) {
         if (fileAssociations
                 .stream()
-                .anyMatch(mapping -> mapping.match(language, fileType, file.getName()))) {
-            if (!file.isInLocalFileSystem()) {
-                if (file instanceof LightVirtualFile) {
+                .anyMatch(mapping -> mapping.match(language, fileType, filename))) {
+            VirtualFile f = file != null ? file : psiFile.getVirtualFile();
+            if (!f.isInLocalFileSystem()) {
+                if (f instanceof LightVirtualFile) {
                     return false;
                 }
-                PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-                if (psiFile != null && !psiFile.isPhysical()) {
+                PsiFile pf = psiFile != null ? psiFile : LSPIJUtils.getPsiFile(file, project);
+                if (pf != null && !pf.isPhysical()) {
                     return false;
                 }
             }

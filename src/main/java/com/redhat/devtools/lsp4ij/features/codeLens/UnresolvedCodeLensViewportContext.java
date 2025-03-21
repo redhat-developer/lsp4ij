@@ -97,7 +97,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
                 // The viewport hasn't changed (no scrolling occurred) there are some codelens to resolve and file has not changed
                 // , so we proceed to refresh
                 EditorFeatureManager.getInstance(editor.getProject()).
-                        refreshEditorFeature(file.getVirtualFile(), EditorFeatureType.CODE_VISION, false);
+                        refreshEditorFeature(file, EditorFeatureType.CODE_VISION, false);
             }
         }, VIEWPORT_CHANGE_DELAY_MS);
     }

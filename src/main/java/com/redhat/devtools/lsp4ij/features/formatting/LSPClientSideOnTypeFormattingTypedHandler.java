@@ -17,7 +17,6 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
@@ -131,10 +130,8 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
             return null;
         }
         Project project = file.getProject();
-        VirtualFile virtualFile = file.getVirtualFile();
-
         CompletableFuture<@NotNull List<LanguageServerItem>> future = LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(virtualFile,
+                .getLanguageServers(file,
                 // Client-side on-type formatting shouldn't trigger a language server to start
                 f -> f.getFormattingFeature().isEnabled(file),
                 f -> f.getFormattingFeature().isFormattingSupported(file)
@@ -335,7 +332,7 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
 
     private static boolean hasLanguageServerSupportingOnlyFormatting(@NotNull PsiFile file) {
         return LanguageServiceAccessor.getInstance(file.getProject())
-                .hasAny(file.getVirtualFile(), ls -> {
+                .hasAny(file, ls -> {
                     var clientFeatures = ls.getClientFeatures();
                     return clientFeatures.getFormattingFeature().isEnabled(file) &&
                             clientFeatures.getFormattingFeature().isSupported(file) &&

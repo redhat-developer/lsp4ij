@@ -25,6 +25,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -78,22 +79,46 @@ public class EditorFeatureManager implements Disposable {
     public void refreshEditorFeature(@NotNull VirtualFile file,
                                      @NotNull EditorFeatureType featureType,
                                      boolean clearLSPCache) {
+        refreshEditorFeature(null, file, featureType, clearLSPCache);
+    }
+
+    /**
+     * Refresh IntelliJ editor feature (code visions, inlay hints, folding, etc).
+     *
+     * @param file          the file opened in one or several editors.
+     * @param featureType   the feature type to refresh (code visions, inlay hints, folding, etc, or all)
+     * @param clearLSPCache true if LSP feature data cache (ex : LSP CodeLens) must be evicted and false otherwise.
+     */
+    public void refreshEditorFeature(@NotNull PsiFile file,
+                                     @NotNull EditorFeatureType featureType,
+                                     boolean clearLSPCache) {
+        refreshEditorFeature(file, null, featureType, clearLSPCache);
+    }
+
+    /**
+     * Refresh IntelliJ editor feature (code visions, inlay hints, folding, etc).
+     *
+     * @param file          the file opened in one or several editors.
+     * @param featureType   the feature type to refresh (code visions, inlay hints, folding, etc, or all)
+     * @param clearLSPCache true if LSP feature data cache (ex : LSP CodeLens) must be evicted and false otherwise.
+     */
+    private void refreshEditorFeature(@Nullable PsiFile psiFile,
+                                     @Nullable VirtualFile file,
+                                     @NotNull EditorFeatureType featureType,
+                                     boolean clearLSPCache) {
         ReadAction.nonBlocking((Callable<RefreshEditorFeatureContext>) () -> {
                     // Get the Psi file.
-                    PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-                    if (psiFile == null) {
-                        return null;
-                    }
-
+                    VirtualFile f = file != null ? file : LSPIJUtils.getFile(psiFile);
+                    PsiFile pf = psiFile != null ? psiFile : LSPIJUtils.getPsiFile(file, project);
                     // Get opened editors used to display the content of the file.
-                    Editor[] editors = LSPIJUtils.editorsForFile(file, project);
+                    Editor[] editors = LSPIJUtils.editorsForFile(f, project);
                     if (editors.length == 0) {
                         return null;
                     }
 
                     if (clearLSPCache) {
                         // Clear LSP cache
-                        clearLSPCache(psiFile, featureType);
+                        clearLSPCache(pf, featureType);
                     }
 
                     final List<Runnable> runnables = new ArrayList<>();
@@ -102,9 +127,9 @@ public class EditorFeatureManager implements Disposable {
                         // (IntelliJ stores generally the modification time stamp of the Psi file to avoid refreshing the feature if Psi file doesn't change)
                         clearEditorCache(editor, project, featureType);
                         // Collect runnable which must be executed on UI step.
-                        collectUiRunnables(psiFile, editor, featureType, runnables);
+                        collectUiRunnables(pf, editor, featureType, runnables);
                     }
-                    return new RefreshEditorFeatureContext(psiFile, runnables);
+                    return new RefreshEditorFeatureContext(pf, runnables);
                 })
                 .coalesceBy(file, featureType, clearLSPCache)
                 .finishOnUiThread(ModalityState.any(), context -> {
@@ -137,7 +162,7 @@ public class EditorFeatureManager implements Disposable {
                     // Check if PsiFile was not modified
                     if (modificationStamp == psiFile.getModificationStamp()) {
                         // All pending futures are finished, refresh the feature
-                        refreshEditorFeature(psiFile.getVirtualFile(), feature, false);
+                        refreshEditorFeature(psiFile, feature, false);
                     }
                     return null;
                 });

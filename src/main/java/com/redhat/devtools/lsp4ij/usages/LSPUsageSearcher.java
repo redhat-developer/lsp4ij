@@ -65,14 +65,9 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                 return;
             }
 
-            VirtualFile virtualFile = file.getVirtualFile();
-            if (virtualFile == null) {
-                return;
-            }
-
             Project project = element.getProject();
             if (!LanguageServiceAccessor.getInstance(project).hasAny(
-                    virtualFile,
+                    file,
                     l -> l.getClientFeatures().getUsageFeature().isSupported(file)
             )) {
                 return;

@@ -62,7 +62,7 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
         // to avoid having some block when ReadAction#compute is required (ex: call of LSP4IJUtils#getDocument).
         try {
             LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file.getVirtualFile(), null, null)
+                    .getLanguageServers(file, null, null)
                     .get(5000, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             e.printStackTrace();

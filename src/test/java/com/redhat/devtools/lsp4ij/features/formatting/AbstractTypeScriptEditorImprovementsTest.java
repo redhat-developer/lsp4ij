@@ -46,7 +46,7 @@ abstract class AbstractTypeScriptEditorImprovementsTest extends LSPCodeInsightFi
             Project project = myFixture.getProject();
             PsiFile file = myFixture.getFile();
             ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file.getVirtualFile(), null, null)
+                    .getLanguageServers(file, null, null)
                     .get(5000, TimeUnit.MILLISECONDS));
         } catch (Exception e) {
             fail(e.getMessage());

@@ -97,7 +97,7 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
 
     private static boolean isStatementTerminatorCharacter(@NotNull PsiFile file, char charTyped) {
         return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file.getVirtualFile(),
+                file,
                 ls -> ls.getClientFeatures().getStatementTerminatorCharacters(file).indexOf(charTyped) > -1
         );
     }
