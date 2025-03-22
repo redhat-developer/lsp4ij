@@ -864,7 +864,8 @@ public class LanguageServerWrapper implements Disposable {
      * @return all LSP files connected to this language server.
      */
     public Collection<LSPVirtualFileData> getConnectedFiles() {
-        return Collections.unmodifiableCollection(connectedDocuments.values());
+        // Create a new array list to avoid ConcurrentModificationException
+        return new ArrayList<>(connectedDocuments.values());
     }
 
     /**
