@@ -512,7 +512,7 @@ public class LanguageServersRegistry {
         if (file == null) {
             return false;
         }
-        Language language = file.getLanguage();
+        Language language = LSPIJUtils.getFileLanguage(file);
         FileType fileType = file.getFileType();
         return isFileSupported(language, fileType, file.getName(), null, file, file.getProject());
     }
