@@ -25,6 +25,7 @@ public interface LanguageServerDefinitionListener {
 
     abstract class LanguageServerDefinitionEvent {
         protected final Project project;
+
         LanguageServerDefinitionEvent(@NotNull Project project) {
             this.project = project;
         }
@@ -65,6 +66,7 @@ public interface LanguageServerDefinitionListener {
         public final boolean mappingsChanged;
         public final boolean configurationChanged;
         public final boolean initializationOptionsContentChanged;
+        public final boolean clientConfigurationContentChanged;
 
         public LanguageServerChangedEvent(@NotNull Project project,
                                           @NotNull LanguageServerDefinition serverDefinition,
@@ -74,7 +76,8 @@ public interface LanguageServerDefinitionListener {
                                           boolean includeSystemEnvironmentVariablesChanged,
                                           boolean mappingsChanged,
                                           boolean configurationContentChanged,
-                                          boolean initializationOptionsContentChanged) {
+                                          boolean initializationOptionsContentChanged,
+                                          boolean clientConfigurationContentChanged) {
             super(project);
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
@@ -84,6 +87,7 @@ public interface LanguageServerDefinitionListener {
             this.mappingsChanged = mappingsChanged;
             this.configurationChanged = configurationContentChanged;
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;
+            this.clientConfigurationContentChanged = clientConfigurationContentChanged;
         }
     }
 
