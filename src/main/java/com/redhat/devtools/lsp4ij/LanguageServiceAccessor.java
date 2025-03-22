@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -189,23 +190,37 @@ public class LanguageServiceAccessor implements Disposable {
      * @return true if the given file matches one of started language server with the given filter and false otherwise.
      */
     public boolean hasAny(@NotNull PsiFile file,
-                          @NotNull Predicate<LanguageServerWrapper> filter) {
+                        @NotNull Predicate<LanguageServerWrapper> filter) {
+        var result = hasAny(file, filter, ls -> true);
+        return result != null ? result.booleanValue() : false;
+    }
+
+    /**
+     * Returns true if the given file matches one of started language server with the given filter and false otherwise.
+     *
+     * @param file   the file.
+     * @param filter the filter.
+     * @return true if the given file matches one of started language server with the given filter and false otherwise.
+     */
+    public <T> T hasAny(@NotNull PsiFile file,
+                          @NotNull Predicate<LanguageServerWrapper> filter,
+                          @NotNull Function<LanguageServerWrapper, T> collector) {
         var startedServers = getStartedServers();
         if (startedServers.isEmpty()) {
-            return false;
+            return null;
         }
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
-            return false;
+            return null;
         }
         var matched = mappings.getMatched();
         for (var startedServer : startedServers) {
             if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
                     matched.contains(startedServer.getServerDefinition()) && filter.test(startedServer)) {
-                return true;
+                return collector.apply(startedServer);
             }
         }
-        return false;
+        return null;
     }
 
     @NotNull

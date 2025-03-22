@@ -21,7 +21,6 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
@@ -33,11 +32,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Typed handler for LSP4IJ-managed files that performs automatic on-type formatting for specific keystrokes.
@@ -125,32 +121,14 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
             // while indexing, we do nothing
             return null;
         }
-        if (!hasLanguageServerSupportingOnlyFormatting(file)) {
-            // The file is not associated to a language server which supports only formatting
-            return null;
-        }
-        Project project = file.getProject();
-        CompletableFuture<@NotNull List<LanguageServerItem>> future = LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file,
-                // Client-side on-type formatting shouldn't trigger a language server to start
-                f -> f.getFormattingFeature().isEnabled(file),
-                f -> f.getFormattingFeature().isFormattingSupported(file)
-        );
-
-        // Wait until the future while 500ms and stop the wait if there are some ProcessCanceledException.
-        try {
-            waitUntilDone(future, file, 500);
-        } catch (Exception e) {
-            return null;
-        }
-        if (!isDoneNormally(future)) {
-            return null;
-        }
-
-        // Just return the first matching language server, if any
-        List<LanguageServerItem> languageServers = future.getNow(Collections.emptyList());
-        LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
-        return languageServer != null ? languageServer.getClientFeatures().getFormattingFeature() : null;
+        return LanguageServiceAccessor.getInstance(file.getProject())
+                .hasAny(file, ls -> {
+                    var clientFeatures = ls.getClientFeatures();
+                    return clientFeatures.getFormattingFeature().isEnabled(file) &&
+                            clientFeatures.getFormattingFeature().isSupported(file) &&
+                            (!clientFeatures.getOnTypeFormattingFeature().isEnabled(file) ||
+                                    !clientFeatures.getOnTypeFormattingFeature().isSupported(file));
+                }, ls -> ls.getClientFeatures().getFormattingFeature());
     }
 
     @NotNull
@@ -330,14 +308,4 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         }
     }
 
-    private static boolean hasLanguageServerSupportingOnlyFormatting(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject())
-                .hasAny(file, ls -> {
-                    var clientFeatures = ls.getClientFeatures();
-                    return clientFeatures.getFormattingFeature().isEnabled(file) &&
-                            clientFeatures.getFormattingFeature().isSupported(file) &&
-                            (!clientFeatures.getOnTypeFormattingFeature().isEnabled(file) ||
-                            !clientFeatures.getOnTypeFormattingFeature().isSupported(file));
-                });
-    }
 }
