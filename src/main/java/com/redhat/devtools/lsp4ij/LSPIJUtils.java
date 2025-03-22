@@ -448,6 +448,16 @@ public class LSPIJUtils {
         }
     }
 
+    @NotNull
+    public static Language getFileLanguage(@NotNull PsiFile file) {
+        // file.getLanguage() returns the initial file language
+        // but doesn't take care of the LanguageSubstitutor
+        // In IJ Quarkus, HTML file language becomes Qute file language by using the QuteLanguageSubstitutor
+        // - file.getLanguage() -> HTML language
+        // - file.getViewProvider().getBaseLanguage() -> Qute language
+        return file.getViewProvider().getBaseLanguage();
+    }
+
     /**
      * Returns the file language of the given file and null otherwise.
      *
@@ -1423,4 +1433,5 @@ public class LSPIJUtils {
                 .map(l -> new LocationData(new Location(l.getTargetUri(), l.getTargetSelectionRange() != null ? l.getTargetSelectionRange() : l.getTargetRange()), languageServer))
                 .toList();
     }
+
 }

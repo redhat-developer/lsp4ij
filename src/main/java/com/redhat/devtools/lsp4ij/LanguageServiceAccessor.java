@@ -484,7 +484,7 @@ public class LanguageServiceAccessor implements Disposable {
         // look for running language servers via content-type
         Queue<Object> languages = new LinkedList<>();
         Set<Object> processedContentTypes = new HashSet<>();
-        Language language = psiFile.getLanguage();
+        Language language = LSPIJUtils.getFileLanguage(psiFile);
         if (language != null) {
             languages.add(language);
         }
