@@ -239,7 +239,8 @@ public class LanguageServiceAccessor implements Disposable {
 
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
         for (var startedServer : startedServers) {
-            if (matchedServerDefinitions.contains(startedServer.getServerDefinition())) {
+            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
+                    matchedServerDefinitions.contains(startedServer.getServerDefinition())) {
                 processor.accept(startedServer);
             }
         }

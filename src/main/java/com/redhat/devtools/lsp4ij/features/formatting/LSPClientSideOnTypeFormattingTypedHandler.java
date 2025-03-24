@@ -23,7 +23,6 @@ import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature.FormattingScope;
 import com.redhat.devtools.lsp4ij.features.codeBlockProvider.LSPCodeBlockProvider;
@@ -51,13 +50,14 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                             @NotNull Project project,
                             @NotNull Editor editor,
                             @NotNull PsiFile file) {
-        // Gather all of the relevant client configuration
-        Ref<Boolean> rangeFormattingSupportedRef = Ref.create(false);
-        ClientSideOnTypeFormattingSettings onTypeFormattingSettings = new ClientSideOnTypeFormattingSettings();
-        LanguageServiceAccessor.getInstance(project).processLanguageServers(
-                file,
-                ls -> {
-                    if (ls.getServerStatus() == ServerStatus.started) {
+        // Only if there's a server for the file that supports formatting and doesn't support server-side on-type formatting
+        if (hasLanguageServerSupportingOnlyFormatting(file)) {
+            // Gather all of the relevant client configuration
+            Ref<Boolean> rangeFormattingSupportedRef = Ref.create(false);
+            ClientSideOnTypeFormattingSettings onTypeFormattingSettings = new ClientSideOnTypeFormattingSettings();
+            LanguageServiceAccessor.getInstance(project).processLanguageServers(
+                    file,
+                    ls -> {
                         LSPFormattingFeature formattingFeature = ls.getClientFeatures().getFormattingFeature();
                         rangeFormattingSupportedRef.set(rangeFormattingSupportedRef.get() || formattingFeature.isRangeFormattingSupported(file));
 
@@ -78,65 +78,65 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                         onTypeFormattingSettings.formatOnCompletionTrigger |= formattingFeature.isFormatOnCompletionTrigger(file);
                         onTypeFormattingSettings.formatOnCompletionTriggerCharacters += formattingFeature.getFormatOnCompletionTriggerCharacters(file);
                     }
-                }
-        );
-        boolean rangeFormattingSupported = rangeFormattingSupportedRef.get();
-
-        // Close braces
-        if (onTypeFormattingSettings.formatOnCloseBrace &&
-                // Make sure the formatter supports formatting of the configured scope
-                ((onTypeFormattingSettings.formatOnCloseBraceScope == FormattingScope.FILE) || rangeFormattingSupported)) {
-            Map.Entry<Character, Character> bracePair = ContainerUtil.find(
-                    LSPIJEditorUtils.getBracePairs(file).entrySet(),
-                    entry -> entry.getValue() == charTyped
             );
-            if (bracePair != null) {
-                Character openBraceChar = bracePair.getKey();
-                Character closeBraceChar = bracePair.getValue();
-                if (StringUtil.isEmpty(onTypeFormattingSettings.formatOnCloseBraceCharacters) ||
-                        (onTypeFormattingSettings.formatOnCloseBraceCharacters.indexOf(closeBraceChar) > -1)) {
-                    return handleCloseBraceTyped(
+            boolean rangeFormattingSupported = rangeFormattingSupportedRef.get();
+
+            // Close braces
+            if (onTypeFormattingSettings.formatOnCloseBrace &&
+                    // Make sure the formatter supports formatting of the configured scope
+                    ((onTypeFormattingSettings.formatOnCloseBraceScope == FormattingScope.FILE) || rangeFormattingSupported)) {
+                Map.Entry<Character, Character> bracePair = ContainerUtil.find(
+                        LSPIJEditorUtils.getBracePairs(file).entrySet(),
+                        entry -> entry.getValue() == charTyped
+                );
+                if (bracePair != null) {
+                    Character openBraceChar = bracePair.getKey();
+                    Character closeBraceChar = bracePair.getValue();
+                    if (StringUtil.isEmpty(onTypeFormattingSettings.formatOnCloseBraceCharacters) ||
+                            (onTypeFormattingSettings.formatOnCloseBraceCharacters.indexOf(closeBraceChar) > -1)) {
+                        return handleCloseBraceTyped(
+                                project,
+                                editor,
+                                file,
+                                onTypeFormattingSettings.formatOnCloseBraceScope,
+                                openBraceChar,
+                                closeBraceChar
+                        );
+                    }
+                }
+            }
+
+            // Statement terminators
+            if (onTypeFormattingSettings.formatOnStatementTerminator &&
+                    // Make sure the formatter supports formatting of the configured scope
+                    ((onTypeFormattingSettings.formatOnStatementTerminatorScope == FormattingScope.FILE) || rangeFormattingSupported)) {
+                if (StringUtil.isNotEmpty(onTypeFormattingSettings.formatOnStatementTerminatorCharacters) &&
+                        (onTypeFormattingSettings.formatOnStatementTerminatorCharacters.indexOf(charTyped) > -1)) {
+                    return handleStatementTerminatorTyped(
                             project,
                             editor,
                             file,
-                            onTypeFormattingSettings.formatOnCloseBraceScope,
-                            openBraceChar,
-                            closeBraceChar
+                            onTypeFormattingSettings.formatOnStatementTerminatorScope,
+                            charTyped
                     );
                 }
             }
-        }
 
-        // Statement terminators
-        if (onTypeFormattingSettings.formatOnStatementTerminator &&
-                // Make sure the formatter supports formatting of the configured scope
-                ((onTypeFormattingSettings.formatOnStatementTerminatorScope == FormattingScope.FILE) || rangeFormattingSupported)) {
-            if (StringUtil.isNotEmpty(onTypeFormattingSettings.formatOnStatementTerminatorCharacters) &&
-                    (onTypeFormattingSettings.formatOnStatementTerminatorCharacters.indexOf(charTyped) > -1)) {
-                return handleStatementTerminatorTyped(
-                        project,
-                        editor,
-                        file,
-                        onTypeFormattingSettings.formatOnStatementTerminatorScope,
-                        charTyped
-                );
-            }
-        }
-
-        // Completion triggers
-        if (onTypeFormattingSettings.formatOnCompletionTrigger &&
-                // Make sure the formatter supports range formatting
-                rangeFormattingSupported &&
-                // It must be a completion trigger character for the language no matter what
-                LSPCompletionTriggerTypedHandler.hasLanguageServerSupportingCompletionTriggerCharacters(charTyped, project, file)) {
-            // But the subset that should trigger completion can be configured
-            if (StringUtil.isEmpty(onTypeFormattingSettings.formatOnCompletionTriggerCharacters) ||
-                    (onTypeFormattingSettings.formatOnCompletionTriggerCharacters.indexOf(charTyped) > -1)) {
-                return handleCompletionTriggerTyped(
-                        project,
-                        editor,
-                        file
-                );
+            // Completion triggers
+            if (onTypeFormattingSettings.formatOnCompletionTrigger &&
+                    // Make sure the formatter supports range formatting
+                    rangeFormattingSupported &&
+                    // It must be a completion trigger character for the language no matter what
+                    LSPCompletionTriggerTypedHandler.hasLanguageServerSupportingCompletionTriggerCharacters(charTyped, project, file)) {
+                // But the subset that should trigger completion can be configured
+                if (StringUtil.isEmpty(onTypeFormattingSettings.formatOnCompletionTriggerCharacters) ||
+                        (onTypeFormattingSettings.formatOnCompletionTriggerCharacters.indexOf(charTyped) > -1)) {
+                    return handleCompletionTriggerTyped(
+                            project,
+                            editor,
+                            file
+                    );
+                }
             }
         }
 
@@ -318,4 +318,14 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         }
     }
 
+    private static boolean hasLanguageServerSupportingOnlyFormatting(@NotNull PsiFile file) {
+        return LanguageServiceAccessor.getInstance(file.getProject())
+                .hasAny(file, ls -> {
+                    var clientFeatures = ls.getClientFeatures();
+                    return clientFeatures.getFormattingFeature().isEnabled(file) &&
+                            clientFeatures.getFormattingFeature().isSupported(file) &&
+                            (!clientFeatures.getOnTypeFormattingFeature().isEnabled(file) ||
+                                    !clientFeatures.getOnTypeFormattingFeature().isSupported(file));
+                });
+    }
 }
