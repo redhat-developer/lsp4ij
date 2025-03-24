@@ -231,12 +231,17 @@ public class LanguageServiceAccessor implements Disposable {
         if (startedServers.isEmpty()) {
             return;
         }
+
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             return;
         }
+
+        Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
         for (var startedServer : startedServers) {
-            processor.accept(startedServer);
+            if (matchedServerDefinitions.contains(startedServer.getServerDefinition())) {
+                processor.accept(startedServer);
+            }
         }
     }
 
