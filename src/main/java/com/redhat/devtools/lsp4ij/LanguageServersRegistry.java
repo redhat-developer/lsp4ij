@@ -544,12 +544,12 @@ public class LanguageServersRegistry {
         if (fileAssociations
                 .stream()
                 .anyMatch(mapping -> mapping.match(language, fileType, filename))) {
-            VirtualFile f = file != null ? file : psiFile.getVirtualFile();
-            if (!f.isInLocalFileSystem()) {
+            @Nullable VirtualFile f = file != null ? file : psiFile.getVirtualFile();
+            if (f!= null && !f.isInLocalFileSystem()) {
                 if (f instanceof LightVirtualFile) {
                     return false;
                 }
-                PsiFile pf = psiFile != null ? psiFile : LSPIJUtils.getPsiFile(file, project);
+                @Nullable PsiFile pf = psiFile != null ? psiFile : LSPIJUtils.getPsiFile(file, project);
                 if (pf != null && !pf.isPhysical()) {
                     return false;
                 }
