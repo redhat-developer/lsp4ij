@@ -35,8 +35,19 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -206,6 +217,29 @@ public class LanguageServiceAccessor implements Disposable {
             }
         }
         return false;
+    }
+
+    /**
+     * Applies the provided processor to all language servers for the specified file.
+     *
+     * @param file      the file
+     * @param processor the processor
+     */
+    public void processLanguageServers(@NotNull PsiFile file,
+                                       @NotNull Consumer<LanguageServerWrapper> processor) {
+        var startedServers = getStartedServers();
+        if (startedServers.isEmpty()) {
+            return;
+        }
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
+        if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
+            return;
+        }
+        for (var startedServer : startedServers) {
+            if (ServerStatus.started.equals(startedServer.getServerStatus())) {
+                processor.accept(startedServer);
+            }
+        }
     }
 
     @NotNull
