@@ -35,8 +35,19 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -208,6 +219,33 @@ public class LanguageServiceAccessor implements Disposable {
         return false;
     }
 
+    /**
+     * Applies the provided processor to all language servers for the specified file.
+     *
+     * @param file      the file
+     * @param processor the processor
+     */
+    public void processLanguageServers(@NotNull PsiFile file,
+                                       @NotNull Consumer<LanguageServerWrapper> processor) {
+        var startedServers = getStartedServers();
+        if (startedServers.isEmpty()) {
+            return;
+        }
+
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
+        if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
+            return;
+        }
+
+        Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
+        for (var startedServer : startedServers) {
+            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
+                    matchedServerDefinitions.contains(startedServer.getServerDefinition())) {
+                processor.accept(startedServer);
+            }
+        }
+    }
+
     @NotNull
     public CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                                    @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
@@ -259,7 +297,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                                             @Nullable LanguageServerDefinition matchServerDefinition) {
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(psiFile, matchServerDefinition, beforeStartingServerFilter);
-        var matchedServersNow= matchedServers.getNow(Collections.emptyList());
+        var matchedServersNow = matchedServers.getNow(Collections.emptyList());
         if (matchedServers.isDone() && matchedServersNow.isEmpty()) {
             // None language servers matches the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -330,7 +368,7 @@ public class LanguageServiceAccessor implements Disposable {
             if (uri != null && !ls.isConnectedTo(uri)) {
                 // The file is not connected to the current language server
                 // Get the required information for the didOpen (text and languageId) which requires a ReadAction.
-                if(document != null) {
+                if (document != null) {
                     if (connectionFileInfo == null) {
                         connectionFileInfo = new HashMap<>();
                     }
@@ -397,7 +435,7 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Get or create a language server wrapper for the given server definitions and add then to the given  matched servers.
      *
-     * @param psiFile                       the file.
+     * @param psiFile                    the file.
      * @param serverDefinitions          the server definitions.
      * @param matchedServers             the list to update with get/created language server.
      * @param beforeStartingServerFilter
@@ -470,7 +508,7 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Returns the matched language server definitions for the given file.
      *
-     * @param psiFile        the file.
+     * @param psiFile     the file.
      * @param ignoreMatch true if {@link DocumentMatcher} must be ignored when mapping matches the given file and false otherwise.
      * @return the matched language server definitions for the given file.
      */
