@@ -21,7 +21,6 @@ import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
-import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -56,7 +55,7 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
 
     @Override
     public boolean isEnabled() {
-        return !ProjectIndexingManager.isIndexingAll() && getFile() != null;
+        return getFile() != null;
     }
 
     @Override
