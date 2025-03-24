@@ -55,10 +55,10 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         // Gather all of the relevant client configuration
         BooleanRef rangeFormattingSupportedRef = BooleanRef.create();
         BooleanRef formatOnCloseBraceRef = BooleanRef.create();
-        ComparableRef<FormattingScope> formatOnCloseBraceScopeRef = ComparableRef.create();
+        ComparableRef<FormattingScope> formatOnCloseBraceScopeRef = ComparableRef.create(FormattingScope.CODE_BLOCK);
         StringRef formatOnCloseBraceCharactersRef = StringRef.create();
         BooleanRef formatOnStatementTerminatorRef = BooleanRef.create();
-        ComparableRef<FormattingScope> formatOnStatementTerminatorScopeRef = ComparableRef.create();
+        ComparableRef<FormattingScope> formatOnStatementTerminatorScopeRef = ComparableRef.create(FormattingScope.STATEMENT);
         StringRef formatOnStatementTerminatorCharactersRef = StringRef.create();
         BooleanRef formatOnCompletionTriggerRef = BooleanRef.create();
         StringRef formatOnCompletionTriggerCharactersRef = StringRef.create();
