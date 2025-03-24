@@ -505,7 +505,7 @@ public class LanguageServiceAccessor implements Disposable {
             }
             // Loop for server/language mapping
             for (LanguageServerFileAssociation mapping : LanguageServersRegistry.getInstance()
-                    .findLanguageServerDefinitionFor(currentLanguage, currentFileType, file.getName())) {
+                    .findLanguageServerDefinitionFor(currentLanguage, currentFileType, psiFile.getName())) {
                 if (mapping == null || !mapping.isEnabled(project) || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
                     // the mapping is disabled
                     // or the server definition has been already added
