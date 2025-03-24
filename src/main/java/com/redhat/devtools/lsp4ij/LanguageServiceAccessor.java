@@ -236,9 +236,7 @@ public class LanguageServiceAccessor implements Disposable {
             return;
         }
         for (var startedServer : startedServers) {
-            if (ServerStatus.started.equals(startedServer.getServerStatus())) {
-                processor.accept(startedServer);
-            }
+            processor.accept(startedServer);
         }
     }
 
@@ -293,7 +291,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                                             @Nullable LanguageServerDefinition matchServerDefinition) {
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(psiFile, matchServerDefinition, beforeStartingServerFilter);
-        var matchedServersNow= matchedServers.getNow(Collections.emptyList());
+        var matchedServersNow = matchedServers.getNow(Collections.emptyList());
         if (matchedServers.isDone() && matchedServersNow.isEmpty()) {
             // None language servers matches the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -364,7 +362,7 @@ public class LanguageServiceAccessor implements Disposable {
             if (uri != null && !ls.isConnectedTo(uri)) {
                 // The file is not connected to the current language server
                 // Get the required information for the didOpen (text and languageId) which requires a ReadAction.
-                if(document != null) {
+                if (document != null) {
                     if (connectionFileInfo == null) {
                         connectionFileInfo = new HashMap<>();
                     }
@@ -431,7 +429,7 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Get or create a language server wrapper for the given server definitions and add then to the given  matched servers.
      *
-     * @param psiFile                       the file.
+     * @param psiFile                    the file.
      * @param serverDefinitions          the server definitions.
      * @param matchedServers             the list to update with get/created language server.
      * @param beforeStartingServerFilter
@@ -504,7 +502,7 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Returns the matched language server definitions for the given file.
      *
-     * @param psiFile        the file.
+     * @param psiFile     the file.
      * @param ignoreMatch true if {@link DocumentMatcher} must be ignored when mapping matches the given file and false otherwise.
      * @return the matched language server definitions for the given file.
      */
