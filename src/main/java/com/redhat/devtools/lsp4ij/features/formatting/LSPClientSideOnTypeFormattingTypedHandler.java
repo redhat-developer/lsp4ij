@@ -85,7 +85,6 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         // Close braces
         if (onTypeFormattingSettings.formatOnCloseBrace &&
                 // Make sure the formatter supports formatting of the configured scope
-                (onTypeFormattingSettings.formatOnCloseBraceScope != null) &&
                 ((onTypeFormattingSettings.formatOnCloseBraceScope == FormattingScope.FILE) || rangeFormattingSupported)) {
             Map.Entry<Character, Character> bracePair = ContainerUtil.find(
                     LSPIJEditorUtils.getBracePairs(file).entrySet(),
@@ -111,7 +110,6 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
         // Statement terminators
         if (onTypeFormattingSettings.formatOnStatementTerminator &&
                 // Make sure the formatter supports formatting of the configured scope
-                (onTypeFormattingSettings.formatOnStatementTerminatorScope != null) &&
                 ((onTypeFormattingSettings.formatOnStatementTerminatorScope == FormattingScope.FILE) || rangeFormattingSupported)) {
             if (StringUtil.isNotEmpty(onTypeFormattingSettings.formatOnStatementTerminatorCharacters) &&
                     (onTypeFormattingSettings.formatOnStatementTerminatorCharacters.indexOf(charTyped) > -1)) {
