@@ -118,10 +118,11 @@ public class ProjectIndexingManager implements Disposable {
      * @return the execute LSP feature status for the given Psi file.
      */
     public static ExecuteLSPFeatureStatus canExecuteLSPFeature(@Nullable PsiFile file) {
-        if (file == null) {
+        if (file == null || !LanguageServersRegistry.getInstance().isFileSupported(file)) {
+            // The file is not associated to a language server, don't execute the LSP feature.
             return ExecuteLSPFeatureStatus.NOT;
         }
-        return canExecuteLSPFeature(file.getVirtualFile(), file.getProject());
+        return doCanExecuteLSPFeature(file.getVirtualFile(), file.getProject());
     }
 
     /**
@@ -137,6 +138,11 @@ public class ProjectIndexingManager implements Disposable {
             // The file is not associated to a language server, don't execute the LSP feature.
             return ExecuteLSPFeatureStatus.NOT;
         }
+        return doCanExecuteLSPFeature(file, project);
+    }
+
+    private static @NotNull ExecuteLSPFeatureStatus doCanExecuteLSPFeature(@Nullable VirtualFile file,
+                                                                           @NotNull Project project) {
         ProjectIndexingManager manager = getInstance(project);
         if (manager.isIndexingAll()) {
             // The file is associated to a language server, but the project is indexing

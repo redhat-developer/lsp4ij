@@ -79,7 +79,7 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
 
         // Check if the file can support the feature
         if (!LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getImplementationFeature().isImplementationSupported(file))) {
+                .hasAny(file, ls -> ls.getClientFeatures().getImplementationFeature().isImplementationSupported(file))) {
             return;
         }
 

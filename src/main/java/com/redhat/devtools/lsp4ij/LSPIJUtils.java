@@ -45,6 +45,7 @@ import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -447,6 +448,16 @@ public class LSPIJUtils {
         }
     }
 
+    @NotNull
+    public static Language getFileLanguage(@NotNull PsiFile file) {
+        // file.getLanguage() returns the initial file language
+        // but doesn't take care of the LanguageSubstitutor
+        // In IJ Quarkus, HTML file language becomes Qute file language by using the QuteLanguageSubstitutor
+        // - file.getLanguage() -> HTML language
+        // - file.getViewProvider().getBaseLanguage() -> Qute language
+        return file.getViewProvider().getBaseLanguage();
+    }
+
     /**
      * Returns the file language of the given file and null otherwise.
      *
@@ -565,6 +576,16 @@ public class LSPIJUtils {
 
 
     /**
+     * Returns the virtual file corresponding to the PSI file.
+     *
+     * @param psiFile the PSI file
+     * @return the virtual file, or {@code null} if the file exists only in memory.
+     */
+    public static @Nullable VirtualFile getFile(@NotNull PsiFile psiFile) {
+       return psiFile.getVirtualFile();
+    }
+
+    /**
      * Returns the virtual file corresponding to the PSI element.
      *
      * @param element the PSI element
@@ -572,7 +593,7 @@ public class LSPIJUtils {
      */
     public static @Nullable VirtualFile getFile(@NotNull PsiElement element) {
         PsiFile psFile = element.getContainingFile();
-        return psFile != null ? psFile.getVirtualFile() : null;
+        return psFile != null ? getFile(psFile) : null;
     }
 
     /**
@@ -731,7 +752,12 @@ public class LSPIJUtils {
     }
 
     public static @Nullable TextRange toTextRange(@NotNull Range range, @NotNull Document document) {
-        return toTextRange(range, document, null, false);
+        return toTextRange(range, document, null, false, -1);
+    }
+
+    @ApiStatus.Internal
+    public static @Nullable TextRange toTextRange(@NotNull Range range, @NotNull Document document, int docLengthPrefetched) {
+        return toTextRange(range, document, null, false, docLengthPrefetched);
     }
 
     /**
@@ -745,7 +771,7 @@ public class LSPIJUtils {
     public static @Nullable TextRange toTextRange(@NotNull Range range,
                                                   @NotNull Document document,
                                                   boolean adjust) {
-        return toTextRange(range, document, null, adjust);
+        return toTextRange(range, document, null, adjust, -1);
     }
 
     /**
@@ -760,10 +786,18 @@ public class LSPIJUtils {
                                                   @NotNull Document document,
                                                   @Nullable PsiFile file,
                                                   boolean adjust) {
+        return toTextRange(range, document, file, adjust, -1);
+    }
+
+    private static @Nullable TextRange toTextRange(@NotNull Range range,
+                                                  @NotNull Document document,
+                                                  @Nullable PsiFile file,
+                                                  boolean adjust,
+                                                  int docLengthPrefetched) {
         try {
+            int docLength = docLengthPrefetched >= 0 ? docLengthPrefetched : document.getTextLength();
             int start = LSPIJUtils.toOffset(range.getStart(), document);
             int end = LSPIJUtils.toOffset(range.getEnd(), document);
-            int docLength = document.getTextLength();
             if (start > end || end > docLength) {
                 // Language server reports invalid range, ignore it.
                 return null;
@@ -1399,4 +1433,5 @@ public class LSPIJUtils {
                 .map(l -> new LocationData(new Location(l.getTargetUri(), l.getTargetSelectionRange() != null ? l.getTargetSelectionRange() : l.getTargetRange()), languageServer))
                 .toList();
     }
+
 }

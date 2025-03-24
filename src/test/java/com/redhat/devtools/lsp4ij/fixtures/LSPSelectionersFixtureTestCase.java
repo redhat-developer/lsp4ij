@@ -72,7 +72,7 @@ public abstract class LSPSelectionersFixtureTestCase extends LSPCodeInsightFixtu
         // Initialize the language server
         try {
             LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file.getVirtualFile(), null, null)
+                    .getLanguageServers(file, null, null)
                     .get(5000, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             fail(e.getMessage());

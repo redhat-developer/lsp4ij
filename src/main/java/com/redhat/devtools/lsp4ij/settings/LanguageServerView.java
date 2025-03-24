@@ -101,7 +101,7 @@ public class LanguageServerView implements Disposable {
                     && isEquals(this.getCommandLine(), settings.getCommandLine())
                     && Objects.equals(this.getEnvData().getEnvs(), settings.getUserEnvironmentVariables())
                     && this.getEnvData().isPassParentEnvs() == settings.isIncludeSystemEnvironmentVariables()
-                    && Objects.equals(this.getMappings(), settings.getMappings())
+                    && Objects.deepEquals(this.getMappings(), settings.getMappings())
                     && isEquals(this.getConfigurationContent(), settings.getConfigurationContent())
                     && isEquals(this.getConfigurationSchemaContent(), settings.getConfigurationSchemaContent())
                     && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent())
@@ -179,18 +179,27 @@ public class LanguageServerView implements Disposable {
                 List<ServerMappingSettings> languageMappings = userDefinedLanguageServerSettings.getMappings()
                         .stream()
                         .filter(mapping -> !StringUtils.isEmpty(mapping.getLanguage()))
+                        .map(mapping ->
+                            ServerMappingSettings.createLanguageMappingSettings(mapping.getLanguage(), mapping.getLanguageId())
+                        )
                         .collect(Collectors.toList());
                 this.setLanguageMappings(languageMappings);
 
                 List<ServerMappingSettings> fileTypeMappings = userDefinedLanguageServerSettings.getMappings()
                         .stream()
                         .filter(mapping -> !StringUtils.isEmpty(mapping.getFileType()))
+                        .map(mapping ->
+                            ServerMappingSettings.createFileTypeMappingSettings(mapping.getFileType(), mapping.getLanguageId())
+                        )
                         .collect(Collectors.toList());
                 this.setFileTypeMappings(fileTypeMappings);
 
                 List<ServerMappingSettings> fileNamePatternMappings = userDefinedLanguageServerSettings.getMappings()
                         .stream()
                         .filter(mapping -> mapping.getFileNamePatterns() != null)
+                        .map(mapping ->
+                                ServerMappingSettings.createFileNamePatternsMappingSettings(mapping.getFileNamePatterns(), mapping.getLanguageId())
+                        )
                         .collect(Collectors.toList());
                 this.setFileNamePatternMappings(fileNamePatternMappings);
             }

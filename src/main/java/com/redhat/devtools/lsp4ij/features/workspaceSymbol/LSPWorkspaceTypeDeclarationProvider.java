@@ -30,7 +30,6 @@ import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionParam
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
 import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
-import org.eclipse.lsp4j.Location;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -84,7 +83,7 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         }
 
         if (!LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getTypeDefinitionFeature().isTypeDefinitionSupported(file))) {
+                .hasAny(file, ls -> ls.getClientFeatures().getTypeDefinitionFeature().isTypeDefinitionSupported(file))) {
             return null;
         }
 

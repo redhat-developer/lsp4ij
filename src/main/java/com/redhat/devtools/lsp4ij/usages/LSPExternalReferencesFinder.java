@@ -105,7 +105,7 @@ public final class LSPExternalReferencesFinder {
         // Determine whether or not to search/match in a case-sensitive manner based on client configuration
         Project project = file.getProject();
         boolean caseSensitive = LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().isCaseSensitive(file));
+                .hasAny(file, ls -> ls.getClientFeatures().isCaseSensitive(file));
 
         if (progressIndicator != null) {
             progressIndicator.setText("Finding usages of '" + wordText + "'");

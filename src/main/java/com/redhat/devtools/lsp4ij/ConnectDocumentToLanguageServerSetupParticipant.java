@@ -65,11 +65,14 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
     }
 
     private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {
-        // Force the start of all languages servers mapped with the given file
-        // Server capabilities filter is set to null to avoid waiting
-        // for the start of the server when server capabilities are checked
-        LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, null, null);
+        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+        if (psiFile != null) {
+            // Force the start of all languages servers mapped with the given file
+            // Server capabilities filter is set to null to avoid waiting
+            // for the start of the server when server capabilities are checked
+            LanguageServiceAccessor.getInstance(project)
+                    .getLanguageServers(psiFile, null, null);
+        }
     }
 
 }

@@ -21,6 +21,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
@@ -34,8 +35,19 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -153,11 +165,13 @@ public class LanguageServiceAccessor implements Disposable {
                                                           @NotNull Project project) {
         VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
         for (VirtualFile file : files) {
-            sendDidOpenAndRefreshEditorFeatureFor(file, serverDefinition);
+            // TODO : revisit that
+            PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+            sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition);
         }
     }
 
-    private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull VirtualFile file,
+    private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull PsiFile file,
                                                        @NotNull LanguageServerDefinition serverDefinition) {
         ReadAction.nonBlocking(() -> {
                     // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
@@ -185,13 +199,13 @@ public class LanguageServiceAccessor implements Disposable {
      * @param filter the filter.
      * @return true if the given file matches one of started language server with the given filter and false otherwise.
      */
-    public boolean hasAny(@NotNull VirtualFile file,
+    public boolean hasAny(@NotNull PsiFile file,
                           @NotNull Predicate<LanguageServerWrapper> filter) {
         var startedServers = getStartedServers();
         if (startedServers.isEmpty()) {
             return false;
         }
-        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project, true);
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             return false;
         }
@@ -203,6 +217,33 @@ public class LanguageServiceAccessor implements Disposable {
             }
         }
         return false;
+    }
+
+    /**
+     * Applies the provided processor to all language servers for the specified file.
+     *
+     * @param file      the file
+     * @param processor the processor
+     */
+    public void processLanguageServers(@NotNull PsiFile file,
+                                       @NotNull Consumer<LanguageServerWrapper> processor) {
+        var startedServers = getStartedServers();
+        if (startedServers.isEmpty()) {
+            return;
+        }
+
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
+        if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
+            return;
+        }
+
+        Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
+        for (var startedServer : startedServers) {
+            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
+                    matchedServerDefinitions.contains(startedServer.getServerDefinition())) {
+                processor.accept(startedServer);
+            }
+        }
     }
 
     @NotNull
@@ -243,20 +284,20 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     @NotNull
-    public CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
+    public CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull PsiFile file,
                                                                                    @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                                    @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
         return getLanguageServers(file, beforeStartingServerFilter, afterStartingServerFilter, null);
     }
 
     @NotNull
-    CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull VirtualFile file,
+    CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull PsiFile psiFile,
                                                                             @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                             @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
                                                                             @Nullable LanguageServerDefinition matchServerDefinition) {
         // Collect started (or not) language servers which matches the given file.
-        CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(file, matchServerDefinition, beforeStartingServerFilter);
-        var matchedServersNow= matchedServers.getNow(Collections.emptyList());
+        CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(psiFile, matchServerDefinition, beforeStartingServerFilter);
+        var matchedServersNow = matchedServers.getNow(Collections.emptyList());
         if (matchedServers.isDone() && matchedServersNow.isEmpty()) {
             // None language servers matches the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -267,9 +308,10 @@ public class LanguageServiceAccessor implements Disposable {
         // We get the Document instance now, to avoid creating a new Read Action thread to get it from the file.
         // The document instance is only used when the file is opened, to add
         // LSP document listener to manage didOpen, didChange, etc.
-        boolean writeAccessAllowed = !ApplicationManager.getApplication().isWriteAccessAllowed();
-        boolean readAccessAllowed = !ApplicationManager.getApplication().isWriteAccessAllowed();
-        Document document = readAccessAllowed || (!writeAccessAllowed) ? LSPIJUtils.getDocument(file) : null;
+        boolean writeAccessAllowed = ApplicationManager.getApplication().isWriteAccessAllowed();
+        boolean readAccessAllowed = ApplicationManager.getApplication().isReadAccessAllowed();
+        Document document = readAccessAllowed || (!writeAccessAllowed) ? LSPIJUtils.getDocument(psiFile) : null;
+        var file = psiFile.getVirtualFile();
 
         // Try to get document, languageId information (used by didOpen) for each matched language server wrapper
         // since here we should be in Read Action allowed
@@ -326,7 +368,7 @@ public class LanguageServiceAccessor implements Disposable {
             if (uri != null && !ls.isConnectedTo(uri)) {
                 // The file is not connected to the current language server
                 // Get the required information for the didOpen (text and languageId) which requires a ReadAction.
-                if(document != null) {
+                if (document != null) {
                     if (connectionFileInfo == null) {
                         connectionFileInfo = new HashMap<>();
                     }
@@ -356,10 +398,10 @@ public class LanguageServiceAccessor implements Disposable {
 
     @NotNull
     private CompletableFuture<Collection<LanguageServerWrapper>> getMatchedLanguageServersWrappers(
-            @NotNull VirtualFile file,
+            @NotNull PsiFile file,
             @Nullable LanguageServerDefinition matchServerDefinition,
             @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
-        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, project, false);
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, false);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             // There are no mapping for the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -393,12 +435,12 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Get or create a language server wrapper for the given server definitions and add then to the given  matched servers.
      *
-     * @param file                       the file.
+     * @param psiFile                    the file.
      * @param serverDefinitions          the server definitions.
      * @param matchedServers             the list to update with get/created language server.
      * @param beforeStartingServerFilter
      */
-    private void collectLanguageServersFromDefinition(@Nullable VirtualFile file,
+    private void collectLanguageServersFromDefinition(@Nullable PsiFile psiFile,
                                                       @NotNull Set<LanguageServerDefinition> serverDefinitions,
                                                       @NotNull Set<LanguageServerWrapper> matchedServers,
                                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
@@ -408,7 +450,7 @@ public class LanguageServiceAccessor implements Disposable {
                 // Loop for started language servers
                 for (var startedServer : startedServers) {
                     if (startedServer.getServerDefinition().equals(serverDefinition)
-                            && (file == null || startedServer.canOperate(file))
+                            && (psiFile == null || startedServer.canOperate(psiFile.getVirtualFile()))
                             && (beforeStartingServerFilter == null || beforeStartingServerFilter.test(startedServer.getClientFeatures()))) {
                         // A started language server match the file, use it
                         matchedServers.add(startedServer);
@@ -466,26 +508,25 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Returns the matched language server definitions for the given file.
      *
-     * @param file        the file.
-     * @param fileProject the file project.
+     * @param psiFile     the file.
      * @param ignoreMatch true if {@link DocumentMatcher} must be ignored when mapping matches the given file and false otherwise.
      * @return the matched language server definitions for the given file.
      */
-    private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull VirtualFile file,
-                                                                                 @NotNull Project fileProject,
+    private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull PsiFile psiFile,
                                                                                  boolean ignoreMatch) {
 
+        var file = psiFile.getVirtualFile();
         Set<LanguageServerDefinition> syncMatchedDefinitions = null;
         Set<LanguageServerFileAssociation> asyncMatchedDefinitions = null;
 
         // look for running language servers via content-type
         Queue<Object> languages = new LinkedList<>();
         Set<Object> processedContentTypes = new HashSet<>();
-        Language language = LSPIJUtils.getFileLanguage(file, project);
+        Language language = LSPIJUtils.getFileLanguage(psiFile);
         if (language != null) {
             languages.add(language);
         }
-        FileType fileType = file.getFileType();
+        FileType fileType = psiFile.getFileType();
         languages.add(fileType);
 
         while (!languages.isEmpty()) {
@@ -502,7 +543,7 @@ public class LanguageServiceAccessor implements Disposable {
             }
             // Loop for server/language mapping
             for (LanguageServerFileAssociation mapping : LanguageServersRegistry.getInstance()
-                    .findLanguageServerDefinitionFor(currentLanguage, currentFileType, file)) {
+                    .findLanguageServerDefinitionFor(currentLanguage, currentFileType, psiFile.getName())) {
                 if (mapping == null || !mapping.isEnabled(project) || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
                     // the mapping is disabled
                     // or the server definition has been already added
@@ -514,7 +555,7 @@ public class LanguageServiceAccessor implements Disposable {
                     }
                     syncMatchedDefinitions.add(mapping.getServerDefinition());
                 } else {
-                    if (mapping.shouldBeMatchedAsynchronously(fileProject)) {
+                    if (mapping.shouldBeMatchedAsynchronously(project)) {
                         // Async mapping
                         // Mapping must be done asynchronously because the match of DocumentMatcher of the mapping need to be done asynchronously
                         // This usecase comes from for instance when custom match need to collect classes from the Java project and requires read only action.
@@ -524,7 +565,7 @@ public class LanguageServiceAccessor implements Disposable {
                         asyncMatchedDefinitions.add(mapping);
                     } else {
                         // Sync mapping
-                        if (match(file, fileProject, mapping)) {
+                        if (match(file, project, mapping)) {
                             if (syncMatchedDefinitions == null) {
                                 syncMatchedDefinitions = new HashSet<>();
                             }
@@ -543,7 +584,7 @@ public class LanguageServiceAccessor implements Disposable {
                 async = CompletableFuture.allOf(asyncMatchedDefinitions
                                 .stream()
                                 .map(mapping -> mapping
-                                        .matchAsync(file, fileProject)
+                                        .matchAsync(file, project)
                                         .thenApply(result -> {
                                             if (result) {
                                                 serverDefinitions.add(mapping.getServerDefinition());

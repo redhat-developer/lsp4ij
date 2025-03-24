@@ -181,7 +181,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         // At this step we consider that language servers are started, we just wait for 200ms
         // to avoid freezing the UI
         if (LanguageServiceAccessor.getInstance(project)
-                .hasAny(file.getVirtualFile(), ls -> ls.getClientFeatures().getRenameFeature().isRenameSupported(file))) {
+                .hasAny(file, ls -> ls.getClientFeatures().getRenameFeature().isRenameSupported(file))) {
             // There is at least one language server providing rename support for the file.
             try {
                 searchingRenameHandlers = true;
