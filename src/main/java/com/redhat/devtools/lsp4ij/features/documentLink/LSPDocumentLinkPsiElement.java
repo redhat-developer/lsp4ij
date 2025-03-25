@@ -13,9 +13,10 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentLink;
 
+import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
-import com.intellij.psi.PsiElement;
+import com.intellij.psi.*;
 import com.intellij.psi.impl.FakePsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -30,22 +31,32 @@ public class LSPDocumentLinkPsiElement extends FakePsiElement {
     private final String fileUri;
     private final @NotNull FileUriSupport fileUriSupport;
     private final @NotNull Project project;
+    private final PsiFile file;
 
     public LSPDocumentLinkPsiElement(@NotNull String fileUri, @NotNull FileUriSupport fileUriSupport, @NotNull Project project){
         this.fileUri = fileUri;
         this.fileUriSupport = fileUriSupport;
         this.project = project;
+        PsiFileFactory factory = PsiFileFactory.getInstance(project);
+        file = factory.createFileFromText("dummy", UnknownFileType.INSTANCE, "");
     }
 
+    @NotNull
     @Override
-    public @NotNull Project getProject() {
-        return project;
+    public Project getProject() throws PsiInvalidElementAccessException {
+        return file.getProject();
     }
 
     @Override
     public PsiElement getParent() {
-        return null;
+        return file;
     }
+
+    @Override
+    public PsiFile getContainingFile() {
+        return file;
+    }
+
 
     @Override
     public boolean canNavigate() {
