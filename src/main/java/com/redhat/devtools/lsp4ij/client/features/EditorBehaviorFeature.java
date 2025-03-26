@@ -213,7 +213,7 @@ public class EditorBehaviorFeature {
 
                     return Result.create(
                             LanguageServiceAccessor.getInstance(project).hasAny(
-                                    virtualFile,
+                                    file,
                                     ls -> featureFlagChecker.isEnabled(ls.getClientFeatures().getEditorBehaviorFeature(), file)
                             ),
                             // Evict if any language server definition config that could affect the file changes
