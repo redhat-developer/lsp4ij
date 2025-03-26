@@ -199,6 +199,9 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
         assertNotNull(clientConfiguration);
         clientConfiguration.editor.enableSemanticTokensFileViewProvider = enabled;
 
+        // We have to bump the modification tracker explicitly
+        languageServer.getServerWrapper().incrementModificationCount();
+
         // Force a highlighting pass to populate the view provider's semantic tokens
         myFixture.doHighlighting();
 

@@ -20,6 +20,8 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -35,20 +37,11 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Language server accessor.
@@ -62,17 +55,24 @@ public class LanguageServiceAccessor implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
 
     private final Project project;
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
         @Override
         public void handleAdded(@NotNull LanguageServerDefinitionListener.LanguageServerAddedEvent event) {
+            // Bump the accessor-level modification tracker
+            modificationTracker.incModificationCount();
+
             // Check all projects for files that match the added language server and start it if necessary
             checkCurrentlyOpenFiles(event.serverDefinitions);
         }
 
         @Override
         public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
+            // Bump the accessor-level modification tracker
+            modificationTracker.incModificationCount();
+
             // Dispose all servers which are removed
             // and remove code vision, inlay hints, folding from editors
             List<LanguageServerWrapper> serversToDispose = startedServers
@@ -88,16 +88,20 @@ public class LanguageServiceAccessor implements Disposable {
 
         @Override
         public void handleChanged(@NotNull LanguageServerChangedEvent event) {
+            List<LanguageServerWrapper> languageServerWrappers = startedServers
+                    .stream()
+                    .filter(server -> event.serverDefinition.equals(server.getServerDefinition()))
+                    .toList();
+
+            // Bump the modification trackers
+            languageServerWrappers.forEach(LanguageServerWrapper::incrementModificationCount);
+
+            // Restart all servers where command or mappings has changed
             if (event.commandChanged ||
                     event.userEnvironmentVariablesChanged ||
                     event.includeSystemEnvironmentVariablesChanged ||
                     event.mappingsChanged) {
-                // Restart all servers where command or mappings has changed
-                List<LanguageServerWrapper> serversToRestart = startedServers
-                        .stream()
-                        .filter(server -> event.serverDefinition.equals(server.getServerDefinition()))
-                        .toList();
-                serversToRestart.forEach(LanguageServerWrapper::restart);
+                languageServerWrappers.forEach(LanguageServerWrapper::restart);
             }
         }
     };
@@ -625,4 +629,42 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
+    /**
+     * Increments the project-level language server accessor's modification tracker when any server status has changed.
+     */
+    void incrementModificationCount() {
+        modificationTracker.incModificationCount();
+    }
+
+    /**
+     * Returns the modification trackers for all language server definitions for the file.
+     *
+     * @param file the PSI file
+     * @return all relevant modification trackers
+     */
+    @NotNull
+    @ApiStatus.Internal
+    public Set<ModificationTracker> getModificationTrackers(@NotNull PsiFile file) {
+        Set<ModificationTracker> modificationTrackers = new LinkedHashSet<>();
+
+        // Add the accessor-level modification tracker for language server definition additions/removals
+        modificationTrackers.add(modificationTracker);
+
+        // Add modification trackers for all of the file's language server wrappers for config changes
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
+        if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
+            Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
+            Set<LanguageServerWrapper> languageServerWrappers = getStartedServers()
+                    .stream()
+                    .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
+                    .collect(Collectors.toSet());
+            for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
+                if (languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())) {
+                    modificationTrackers.add(languageServerWrapper.getModificationTracker());
+                }
+            }
+        }
+
+        return modificationTrackers;
+    }
 }

@@ -19,6 +19,8 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
@@ -42,6 +44,7 @@ import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -105,6 +108,8 @@ public class LanguageServerWrapper implements Disposable {
     private final ExecutorService dispatcher;
 
     private final ExecutorService listener;
+
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
 
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -471,8 +476,16 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-    private void updateStatus(ServerStatus serverStatus) {
+    private void updateStatus(@NotNull ServerStatus serverStatus) {
+        // If this is an "interesting" status change, increment the project-level modification tracker and the wrapper's
+        // modification tracker before firing events
+        if ((this.serverStatus != serverStatus) && (serverStatus != ServerStatus.none)) {
+            LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
+            incrementModificationCount();
+        }
+
         this.serverStatus = serverStatus;
+
         if (languageClient != null) {
             languageClient.handleServerStatusChanged(serverStatus);
         }
@@ -1234,4 +1247,21 @@ public class LanguageServerWrapper implements Disposable {
         return FileUriSupport.getFileUri(file, getClientFeatures());
     }
 
+    /**
+     * Returns the language server wrapper's modification tracker.
+     *
+     * @return the modification tracker
+     */
+    @NotNull
+    ModificationTracker getModificationTracker() {
+        return modificationTracker;
+    }
+
+    /**
+     * Increments the language server wrapper's modification tracker.
+     */
+    @ApiStatus.Internal
+    public void incrementModificationCount() {
+        modificationTracker.incModificationCount();
+    }
 }
