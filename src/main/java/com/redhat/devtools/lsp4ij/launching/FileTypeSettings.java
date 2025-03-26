@@ -15,10 +15,8 @@ package com.redhat.devtools.lsp4ij.launching;
 
 import com.intellij.util.xmlb.annotations.Attribute;
 import com.intellij.util.xmlb.annotations.XCollection;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -47,10 +45,6 @@ public class FileTypeSettings {
     public FileTypeSettings(@Nullable String name, @Nullable List<String> patterns) {
         this.name = name;
         this.patterns = patterns;
-    }
-
-    public FileTypeSettings(@NotNull FileTypeSettings fileType) {
-        this(fileType.getName(), fileType.getPatterns() != null ? new ArrayList<>(fileType.getPatterns()) : null);
     }
 
     /**
