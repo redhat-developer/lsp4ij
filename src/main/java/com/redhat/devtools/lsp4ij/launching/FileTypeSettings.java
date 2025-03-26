@@ -64,7 +64,7 @@ public class FileTypeSettings {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         FileTypeSettings that = (FileTypeSettings) o;
-        return Objects.equals(name, that.name) && Objects.equals(patterns, that.patterns);
+        return Objects.equals(name, that.name) && Objects.deepEquals(patterns, that.patterns);
     }
 
     @Override

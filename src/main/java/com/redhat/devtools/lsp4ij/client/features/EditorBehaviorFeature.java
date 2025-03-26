@@ -11,16 +11,31 @@
 
 package com.redhat.devtools.lsp4ij.client.features;
 
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.util.CachedValue;
+import com.intellij.psi.util.CachedValueProvider.Result;
+import com.intellij.psi.util.CachedValuesManager;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Client-side editor behavior feature. This does not correspond to an actual LSP feature.
  */
 @ApiStatus.Experimental
 public class EditorBehaviorFeature {
+
+    private static final Map<String, Key<CachedValue<Boolean>>> CACHE_KEYS = new ConcurrentHashMap<>();
 
     private LSPClientFeatures clientFeatures;
 
@@ -120,10 +135,7 @@ public class EditorBehaviorFeature {
      * otherwise false
      */
     public static boolean enableStringLiteralImprovements(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file,
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableStringLiteralImprovements(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableStringLiteralImprovements);
     }
 
     /**
@@ -134,10 +146,7 @@ public class EditorBehaviorFeature {
      * file; otherwise false
      */
     public static boolean enableStatementTerminatorImprovements(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file,
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableStatementTerminatorImprovements(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableStatementTerminatorImprovements);
     }
 
     /**
@@ -148,10 +157,7 @@ public class EditorBehaviorFeature {
      * @return true if the fix is enabled by at least one language server for the file; otherwise false
      */
     public static boolean enableEnterBetweenBracesFix(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file,
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableEnterBetweenBracesFix(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableEnterBetweenBracesFix);
     }
 
     /**
@@ -163,10 +169,7 @@ public class EditorBehaviorFeature {
      * least one language server for the file; otherwise false
      */
     public static boolean enableTextMateNestedBracesImprovements(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file,
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableTextMateNestedBracesImprovements(file)
-        );
+        return isEnabled(file, EditorBehaviorFeature::isEnableTextMateNestedBracesImprovements);
     }
 
     /**
@@ -176,9 +179,59 @@ public class EditorBehaviorFeature {
      * @return true if the semantic tokens-based file view provider is enabled; otherwise false
      */
     public static boolean enableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file,
-                ls -> ls.getClientFeatures().getEditorBehaviorFeature().isEnableSemanticTokensFileViewProvider(file)
+        return isEnabled(file, EditorBehaviorFeature::isEnableSemanticTokensFileViewProvider);
+    }
+
+    private interface FeatureFlagChecker {
+        boolean isEnabled(@NotNull EditorBehaviorFeature editorBehaviorFeature, @NotNull PsiFile file);
+    }
+
+    private static boolean isEnabled(
+            @NotNull PsiFile file,
+            @NotNull FeatureFlagChecker featureFlagChecker
+    ) {
+        return isEnabled(file.getProject(), file.getVirtualFile(), featureFlagChecker);
+    }
+
+    private static boolean isEnabled(
+            @NotNull Project project,
+            @Nullable VirtualFile virtualFile,
+            @NotNull FeatureFlagChecker featureFlagChecker
+    ) {
+        if (virtualFile == null) return false;
+
+        Key<CachedValue<Boolean>> cacheKey = getCacheKey(virtualFile, featureFlagChecker);
+        return CachedValuesManager.getManager(project).getCachedValue(
+                project,
+                cacheKey,
+                () -> {
+                    PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
+                    if ((file == null) || !file.isValid()) {
+                        // If we couldn't find the PSI file, return false/disabled with no caching
+                        return Result.create(false, ModificationTracker.EVER_CHANGED);
+                    }
+
+                    return Result.create(
+                            LanguageServiceAccessor.getInstance(project).hasAny(
+                                    file,
+                                    ls -> featureFlagChecker.isEnabled(ls.getClientFeatures().getEditorBehaviorFeature(), file)
+                            ),
+                            // Evict if any language server definition config that could affect the file changes
+                            LanguageServiceAccessor.getInstance(project).getModificationTrackers(file).toArray()
+                    );
+                },
+                false
         );
+    }
+
+    @NotNull
+    private static Key<CachedValue<Boolean>> getCacheKey(
+            @NotNull VirtualFile virtualFile,
+            @NotNull FeatureFlagChecker featureFlagChecker
+    ) {
+        // Create a compact cache key if possible
+        String virtualFileId = virtualFile instanceof VirtualFileWithId virtualFileWithId ? String.valueOf(virtualFileWithId.getId()) : virtualFile.getPath();
+        String cacheKeyName = featureFlagChecker.getClass().getName() + "::" + virtualFileId;
+        return CACHE_KEYS.computeIfAbsent(cacheKeyName, Key::create);
     }
 }
