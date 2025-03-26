@@ -65,7 +65,6 @@ public interface LanguageServerDefinitionListener {
         public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean mappingsChanged;
         public final boolean configurationChanged;
-        public final boolean clientConfigurationChanged;
         public final boolean initializationOptionsContentChanged;
         public final boolean clientConfigurationContentChanged;
 
@@ -77,8 +76,8 @@ public interface LanguageServerDefinitionListener {
                                           boolean includeSystemEnvironmentVariablesChanged,
                                           boolean mappingsChanged,
                                           boolean configurationContentChanged,
-                                          boolean clientConfigurationContentChanged,
-                                          boolean initializationOptionsContentChanged) {
+                                          boolean initializationOptionsContentChanged,
+                                          boolean clientConfigurationContentChanged) {
             super(project);
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
@@ -87,7 +86,6 @@ public interface LanguageServerDefinitionListener {
             this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.mappingsChanged = mappingsChanged;
             this.configurationChanged = configurationContentChanged;
-            this.clientConfigurationChanged = clientConfigurationContentChanged;
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;
             this.clientConfigurationContentChanged = clientConfigurationContentChanged;
         }

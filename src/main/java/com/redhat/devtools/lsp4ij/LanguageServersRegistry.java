@@ -450,9 +450,8 @@ public class LanguageServersRegistry {
         boolean includeSystemEnvironmentVariablesChanged = settings.isIncludeSystemEnvironmentVariables() != request.includeSystemEnvironmentVariables();
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), request.mappings());
         boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
-        boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
         boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
-        // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
+        boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
 
         settings.setServerName(request.name());
         settings.setCommandLine(request.commandLine());
@@ -461,11 +460,11 @@ public class LanguageServersRegistry {
         settings.setConfigurationContent(request.configurationContent());
         settings.setConfigurationSchemaContent(request.configurationSchemaContent());
         settings.setInitializationOptionsContent(request.initializationOptionsContent());
-        settings.setClientConfigurationContent(request.clientConfigurationContent);
+        settings.setClientConfigurationContent(request.clientConfigurationContent());
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-            mappingsChanged || configurationContentChanged || clientConfigurationContentChanged || initializationOptionsContentChanged) {
+            mappingsChanged || configurationContentChanged || initializationOptionsContentChanged || clientConfigurationContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -476,8 +475,8 @@ public class LanguageServersRegistry {
                     includeSystemEnvironmentVariablesChanged,
                     mappingsChanged,
                     configurationContentChanged,
-                    clientConfigurationContentChanged,
-                    initializationOptionsContentChanged);
+                    initializationOptionsContentChanged,
+                    clientConfigurationContentChanged);
             if (notify) {
                 handleChangeEvent(event);
             }
