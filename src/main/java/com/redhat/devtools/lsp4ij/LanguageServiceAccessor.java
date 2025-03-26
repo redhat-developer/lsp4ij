@@ -37,17 +37,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -663,7 +653,7 @@ public class LanguageServiceAccessor implements Disposable {
         // Add modification trackers for all of the file's language server wrappers for config changes
         VirtualFile virtualFile = file.getVirtualFile();
         if (virtualFile != null) {
-            MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(virtualFile, project, true);
+            MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
             if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
                 Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
                 Set<LanguageServerWrapper> languageServerWrappers = getStartedServers()
