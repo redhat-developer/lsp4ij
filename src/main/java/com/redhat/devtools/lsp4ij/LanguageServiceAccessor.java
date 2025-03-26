@@ -651,19 +651,16 @@ public class LanguageServiceAccessor implements Disposable {
         modificationTrackers.add(modificationTracker);
 
         // Add modification trackers for all of the file's language server wrappers for config changes
-        VirtualFile virtualFile = file.getVirtualFile();
-        if (virtualFile != null) {
-            MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
-            if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
-                Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
-                Set<LanguageServerWrapper> languageServerWrappers = getStartedServers()
-                        .stream()
-                        .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
-                        .collect(Collectors.toSet());
-                for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
-                    if (languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())) {
-                        modificationTrackers.add(languageServerWrapper.getModificationTracker());
-                    }
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
+        if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
+            Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
+            Set<LanguageServerWrapper> languageServerWrappers = getStartedServers()
+                    .stream()
+                    .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
+                    .collect(Collectors.toSet());
+            for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
+                if (languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())) {
+                    modificationTrackers.add(languageServerWrapper.getModificationTracker());
                 }
             }
         }
