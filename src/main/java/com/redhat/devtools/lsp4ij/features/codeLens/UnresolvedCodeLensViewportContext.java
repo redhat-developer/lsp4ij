@@ -26,7 +26,7 @@ import java.awt.*;
  * and refreshing the editor once the resolution is complete. This class tracks the
  * currently visible lines and ensures efficient refreshing through debounce logic.
  */
-public class UnresolvedCodeLensViewportContext implements Disposable  {
+public class UnresolvedCodeLensViewportContext implements Disposable {
 
     private static final long VIEWPORT_CHANGE_DELAY_MS = 500L; // Debounce delay before processing viewport changes
 
@@ -34,7 +34,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
     private int firstViewportLine;
     private int lastViewportLine;
     private long modificationStamp;
-    private Alarm scrollStopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+    private volatile Alarm scrollStopAlarm = null;
 
     /**
      * Initializes the context for managing unresolved code lens elements in a given editor.
@@ -79,8 +79,8 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
      * Resolves unresolved code lens elements in the current viewport and refreshes the editor accordingly.
      * If a previous refresh task is pending, it will be cancelled before scheduling a new one.
      *
-     * @param result             The unresolved code lens data to resolve.
-     * @param file             The associated PSI file containing the code.
+     * @param result            The unresolved code lens data to resolve.
+     * @param file              The associated PSI file containing the code.
      * @param firstViewportLine The first visible line in the editor's viewport.
      * @param lastViewportLine  The last visible line in the editor's viewport.
      */
@@ -88,6 +88,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
                                   @NotNull PsiFile file,
                                   int firstViewportLine,
                                   int lastViewportLine) {
+        var scrollStopAlarm = getScrollStopAlarm();
         scrollStopAlarm.cancelAllRequests();
         scrollStopAlarm.addRequest(() -> {
             if (isSameViewportRange(firstViewportLine, lastViewportLine)
@@ -96,9 +97,20 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
                 // The viewport hasn't changed (no scrolling occurred) there are some codelens to resolve and file has not changed
                 // , so we proceed to refresh
                 EditorFeatureManager.getInstance(editor.getProject()).
-                    refreshEditorFeature(file.getVirtualFile(), EditorFeatureType.CODE_VISION, false);
+                        refreshEditorFeature(file, EditorFeatureType.CODE_VISION, false);
             }
         }, VIEWPORT_CHANGE_DELAY_MS);
+    }
+
+    private Alarm getScrollStopAlarm() {
+        if (scrollStopAlarm == null) {
+            synchronized (this) {
+                if (scrollStopAlarm == null) {
+                    scrollStopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+                }
+            }
+        }
+        return scrollStopAlarm;
     }
 
     /**
@@ -114,14 +126,11 @@ public class UnresolvedCodeLensViewportContext implements Disposable  {
 
     @Override
     public void dispose() {
-        if (scrollStopAlarm != null) {
-            scrollStopAlarm.cancelAllRequests();
-            scrollStopAlarm = null;
-        }
     }
 
     /**
      * Returns true if the file content has changed and false otherwise.
+     *
      * @param file the file.
      * @return true if the file content has changed and false otherwise.
      */

@@ -25,6 +25,7 @@ public interface LanguageServerDefinitionListener {
 
     abstract class LanguageServerDefinitionEvent {
         protected final Project project;
+
         LanguageServerDefinitionEvent(@NotNull Project project) {
             this.project = project;
         }
@@ -66,6 +67,7 @@ public interface LanguageServerDefinitionListener {
         public final boolean configurationChanged;
         public final boolean clientConfigurationChanged;
         public final boolean initializationOptionsContentChanged;
+        public final boolean clientConfigurationContentChanged;
 
         public LanguageServerChangedEvent(@NotNull Project project,
                                           @NotNull LanguageServerDefinition serverDefinition,
@@ -87,6 +89,7 @@ public interface LanguageServerDefinitionListener {
             this.configurationChanged = configurationContentChanged;
             this.clientConfigurationChanged = clientConfigurationContentChanged;
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;
+            this.clientConfigurationContentChanged = clientConfigurationContentChanged;
         }
     }
 

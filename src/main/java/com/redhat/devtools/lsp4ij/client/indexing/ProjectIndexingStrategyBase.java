@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.client.indexing;
 
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
@@ -96,10 +97,10 @@ public abstract class ProjectIndexingStrategyBase {
             while (!manager.filesToRefresh.isEmpty()) {
                 var files = new HashSet<>(manager.filesToRefresh);
                 for (var file : files) {
-
+                    var psiFile = LSPIJUtils.getPsiFile(file, manager.project);
                     // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
                     LanguageServiceAccessor.getInstance(manager.project)
-                            .getLanguageServers(file, null, null)
+                            .getLanguageServers(psiFile, null, null)
                             .thenAccept(servers -> {
                                 // textDocument/didOpen notification has been sent
                                 if (servers.isEmpty()) {
@@ -109,7 +110,7 @@ public abstract class ProjectIndexingStrategyBase {
                                 // Refresh all features (code vision, inlay hints, folding,etc)
                                 // of editors which edit the current file.
                                 EditorFeatureManager.getInstance(manager.project)
-                                        .refreshEditorFeature(file, EditorFeatureType.ALL, true);
+                                        .refreshEditorFeature(psiFile, EditorFeatureType.ALL, true);
 
                             });
                 }

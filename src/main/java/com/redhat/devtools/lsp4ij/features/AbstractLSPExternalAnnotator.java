@@ -34,7 +34,7 @@ public abstract class AbstractLSPExternalAnnotator<InitialInfoType, AnnotationRe
 
     @Override
     public final void apply(@NotNull PsiFile file, @Nullable AnnotationResultType annotationResult, @NotNull AnnotationHolder holder) {
-        if (isAlreadyApplied(holder.getCurrentAnnotationSession())) {
+        if (isAlreadyApplied(file, holder.getCurrentAnnotationSession())) {
             return;
         }
         try {
@@ -48,12 +48,20 @@ public abstract class AbstractLSPExternalAnnotator<InitialInfoType, AnnotationRe
 
     /**
      * Return true if the LSP external annotator has been already applied from the given session and false otherwise.
-     * @param session
      *
+     * @param file
+     * @param session
      * @return true if the LSP external annotator has been already applied from the given session and false otherwise.
      */
-    private boolean isAlreadyApplied(AnnotationSession session) {
-        return session.getUserData(appliedKey) != null;
+    private boolean isAlreadyApplied(@NotNull PsiFile file, @NotNull AnnotationSession session) {
+        if(session.getUserData(appliedKey) != null) {
+            return true;
+        }
+        var files = file.getViewProvider().getAllFiles();
+        if (files.size() > 1 && files.indexOf(file) > 0) {
+            return true;
+        }
+        return false;
     }
 
     public abstract void doApply(@NotNull PsiFile file, @Nullable AnnotationResultType annotationResult, @NotNull AnnotationHolder holder);

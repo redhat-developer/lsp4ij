@@ -113,7 +113,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
             }
             boolean debugSuspendChanged = newSettings.isDebugSuspend() != existing.isDebugSuspend();
             if (debugSuspendChanged) {
-                existing.setDebugSuspend(existing.isDebugSuspend());
+                existing.setDebugSuspend(newSettings.isDebugSuspend());
             }
             boolean errorReportingKindChanged = newSettings.getErrorReportingKind() != null && !(isEquals(existing.getErrorReportingKind(), newSettings.getErrorReportingKind()));
             if (errorReportingKindChanged) {

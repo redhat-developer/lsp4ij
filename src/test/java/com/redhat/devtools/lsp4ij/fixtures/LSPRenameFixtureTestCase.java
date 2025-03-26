@@ -192,7 +192,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
             // we wait for some ms.
             try {
                 LanguageServiceAccessor.getInstance(file.getProject())
-                        .getLanguageServers(file.getVirtualFile(), null, null)
+                        .getLanguageServers(file, null, null)
                         .get(5000, TimeUnit.MILLISECONDS);
             } catch (Exception e) {
                 e.printStackTrace();

@@ -96,12 +96,7 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                             if (targetFile == null) {
                                 // The LSP document link file doesn't exist, open a file dialog
                                 // which asks if user want to create the file.
-                                // At this step we cannot open a dialog directly, we need to open the dialog
-                                // with invoke later.
-                                LSPIJUtils.openInEditor(target, null, true, true, fileUriSupport, project);
-                                // Return an empty response here.
-                                // If user accepts to create the file, the open is done after the creation of the file.
-                                return PsiElement.EMPTY_ARRAY;
+                                return new PsiElement[]{new LSPDocumentLinkPsiElement(target, fileUriSupport, project)};
                             }
                             return new PsiElement[]{LSPIJUtils.getPsiFile(targetFile, project)};
                         }

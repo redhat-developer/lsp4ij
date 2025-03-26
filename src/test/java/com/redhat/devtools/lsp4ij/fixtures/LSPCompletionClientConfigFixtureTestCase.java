@@ -89,7 +89,7 @@ public abstract class LSPCompletionClientConfigFixtureTestCase extends LSPCodeIn
         List<LanguageServerItem> languageServers = new LinkedList<>();
         try {
             ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file.getVirtualFile(), null, null)
+                    .getLanguageServers(file, null, null)
                     .get(5000, TimeUnit.MILLISECONDS));
         } catch (Exception e) {
             fail(e.getMessage());

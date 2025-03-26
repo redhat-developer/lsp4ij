@@ -30,8 +30,7 @@ import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 /**
  * Utility class for working with document symbols.
@@ -82,7 +81,12 @@ final class LSPDocumentSymbolUtils {
         LSPDocumentSymbolStructureViewModel structureViewModel = getStructureViewModel(element);
         if (structureViewModel != null) {
             PsiFile file = element.getContainingFile();
-            List<DocumentSymbolData> containingDocumentSymbolDatas = getContainingDocumentSymbolDatas(file, structureViewModel.getRoot(), offset);
+            Document document = LSPIJUtils.getDocument(file);
+            if (document == null) {
+                return null;
+            }
+            int docLength = document.getTextLength();
+            List<DocumentSymbolData> containingDocumentSymbolDatas = getContainingDocumentSymbolDatas(document, docLength, structureViewModel.getRoot(), offset);
             // Breadth-first search, so the last one is the closest one
             return ContainerUtil.getLastItem(containingDocumentSymbolDatas);
         }
@@ -91,33 +95,34 @@ final class LSPDocumentSymbolUtils {
     }
 
     @NotNull
-    private static List<DocumentSymbolData> getContainingDocumentSymbolDatas(@NotNull PsiFile file,
-                                                                             @NotNull StructureViewTreeElement structureViewTreeElement,
+    private static List<DocumentSymbolData> getContainingDocumentSymbolDatas(@NotNull Document document,
+                                                                             int docLength,
+                                                                             @NotNull StructureViewTreeElement root,
                                                                              int offset) {
+        Queue<StructureViewTreeElement> pending = new ArrayDeque<>(256);
+        pending.add(root);
         List<DocumentSymbolData> containingDocumentSymbolDatas = new LinkedList<>();
 
-        // If this is file-level, collect its children/descendants
-        if (structureViewTreeElement instanceof LSPFileStructureViewElement fileStructureViewElement) {
-            for (StructureViewTreeElement child : fileStructureViewElement.getChildren()) {
-                ContainerUtil.addAllNotNull(containingDocumentSymbolDatas, getContainingDocumentSymbolDatas(file, child, offset));
+        while (!pending.isEmpty()) {
+            var structureViewTreeElement = pending.remove();
+            // If this is file-level, collect its children/descendants
+            if (structureViewTreeElement instanceof LSPFileStructureViewElement fileStructureViewElement) {
+                pending.addAll(fileStructureViewElement.getChildrenBase());
             }
-        }
 
-        // Otherwise add document symbol datas that contain the offset in a breadth-first manner so that the last one is
-        // the closest one for the offset
-        else if (structureViewTreeElement instanceof LSPDocumentSymbolViewElement documentSymbolViewElement) {
-            DocumentSymbolData documentSymbolData = documentSymbolViewElement.getElement();
-            DocumentSymbol documentSymbol = documentSymbolData != null ? documentSymbolData.getDocumentSymbol() : null;
-            Range documentSymbolRange = documentSymbol != null ? documentSymbol.getRange() : null;
-            Document document = documentSymbolRange != null ? LSPIJUtils.getDocument(file) : null;
-            TextRange textRange = document != null ? LSPIJUtils.toTextRange(documentSymbolRange, document) : null;
-            if ((textRange != null) && textRange.containsOffset(offset)) {
-                // Add this one
-                containingDocumentSymbolDatas.add(documentSymbolData);
+            // Otherwise add document symbol datas that contain the offset in a breadth-first manner so that the last one is
+            // the closest one for the offset
+            else if (structureViewTreeElement instanceof LSPDocumentSymbolViewElement documentSymbolViewElement) {
+                DocumentSymbolData documentSymbolData = documentSymbolViewElement.getElement();
+                DocumentSymbol documentSymbol = documentSymbolData != null ? documentSymbolData.getDocumentSymbol() : null;
+                Range documentSymbolRange = documentSymbol != null ? documentSymbol.getRange() : null;
+                TextRange textRange = documentSymbolRange != null ? LSPIJUtils.toTextRange(documentSymbolRange, document, docLength) : null;
+                if ((textRange != null) && textRange.containsOffset(offset)) {
+                    // Add this one
+                    containingDocumentSymbolDatas.add(documentSymbolData);
 
-                // And all children/descendants that also contain the offset
-                for (StructureViewTreeElement child : documentSymbolViewElement.getChildren()) {
-                    ContainerUtil.addAllNotNull(containingDocumentSymbolDatas, getContainingDocumentSymbolDatas(file, child, offset));
+                    // And all children/descendants that also contain the offset
+                    pending.addAll(documentSymbolViewElement.getChildrenBase());
                 }
             }
         }

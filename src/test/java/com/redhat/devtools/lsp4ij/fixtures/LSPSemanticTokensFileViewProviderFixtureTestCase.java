@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.intellij.lang.ASTNode;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiReference;
@@ -183,9 +182,8 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
         List<LanguageServerItem> languageServers = new LinkedList<>();
         try {
             Project project = file.getProject();
-            VirtualFile virtualFile = file.getVirtualFile();
             ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(virtualFile, null, null)
+                    .getLanguageServers(file, null, null)
                     .get(5000, TimeUnit.MILLISECONDS));
         } catch (Exception e) {
             fail(e.getMessage());

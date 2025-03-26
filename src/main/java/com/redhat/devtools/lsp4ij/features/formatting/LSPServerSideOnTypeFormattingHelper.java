@@ -18,7 +18,8 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.DocumentOnTypeFormattingParams;
 import org.eclipse.lsp4j.FormattingOptions;
 import org.eclipse.lsp4j.Position;
@@ -58,8 +59,11 @@ final class LSPServerSideOnTypeFormattingHelper {
     static boolean applyOnTypeFormatting(char charTyped,
                                          @NotNull Editor editor,
                                          @NotNull PsiFile file) {
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
-            // The file is not associated to a language server
+        if (ProjectIndexingManager.isIndexingAll()) {
+            return false;
+        }
+        if (!hasLanguageServerSupportingOnTypeFormatting(file)) {
+            // The file is not associated to a language server which supports on type formatting
             return false;
         }
         // If so, issue a request for on-type formatting
@@ -102,4 +106,12 @@ final class LSPServerSideOnTypeFormattingHelper {
         LSPIJUtils.applyEdits(editor, document, textEdits);
         return true;
     }
+
+    private static boolean hasLanguageServerSupportingOnTypeFormatting(@NotNull PsiFile file) {
+        return LanguageServiceAccessor.getInstance(file.getProject())
+                .hasAny(file, ls -> ls.getClientFeatures()
+                        .getOnTypeFormattingFeature()
+                        .isSupported(file));
+    }
+
 }

@@ -80,7 +80,7 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
                                                                   @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                   @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
         return LanguageServiceAccessor.getInstance(file.getProject())
-                .getLanguageServers(file.getVirtualFile(),
+                .getLanguageServers(file,
                         beforeStartingServerFilter,
                         afterStartingServerFilter);
     }
