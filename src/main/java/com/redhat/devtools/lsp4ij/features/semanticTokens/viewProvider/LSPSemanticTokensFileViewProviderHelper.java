@@ -33,33 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticTokensContainer {
 
-    /**
-     * Simple short-duration thread-local cache for the file view provider's PSI file to minimize read-through during
-     * burst reads of information from the file view provider.
-     */
-    private static final class CachedPsiFile {
-        // Cache a valid PSI file for up to one second
-        private static final int MAX_DURATION = 1000;
-
-        private final PsiFile file;
-        private final long created = System.currentTimeMillis();
-
-        private CachedPsiFile(@NotNull PsiFile file) {
-            this.file = file;
-        }
-
-        @Nullable
-        private PsiFile getFile() {
-            return isValid() ? file : null;
-        }
-
-        private boolean isValid() {
-            return file.isValid() && ((System.currentTimeMillis() - created) < MAX_DURATION);
-        }
-    }
-
     private final LSPSemanticTokensFileViewProvider fileViewProvider;
-    private final ThreadLocal<CachedPsiFile> cachedFilePtr = new InheritableThreadLocal<>();
     private final ThreadLocal<Integer> effectiveOffsetPtr = new InheritableThreadLocal<>();
 
     /**
@@ -73,19 +47,10 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
 
     @Nullable
     private PsiFile getFile() {
-        // Try the cache first
-        CachedPsiFile cachedFile = cachedFilePtr.get();
-        PsiFile file = cachedFile != null ? cachedFile.getFile() : null;
-        if (file == null) {
-            // There should only be one PSI file
-            List<PsiFile> allFiles = fileViewProvider.getAllFiles();
-            PsiFile fileCandidate = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
-            if ((fileCandidate != null) && fileCandidate.isValid() && EditorBehaviorFeature.enableSemanticTokensFileViewProvider(fileCandidate)) {
-                cachedFilePtr.set(new CachedPsiFile(fileCandidate));
-                file = fileCandidate;
-            }
-        }
-        return file;
+        // There should only be one PSI file
+        List<PsiFile> allFiles = fileViewProvider.getAllFiles();
+        PsiFile file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
+        return (file != null) && file.isValid() && EditorBehaviorFeature.enableSemanticTokensFileViewProvider(file) ? file : null;
     }
 
     @Override
@@ -204,8 +169,8 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
         if (semanticTokensByOffset != null) {
             LSPSemanticToken semanticToken = new LSPSemanticToken(file, textRange, tokenType, tokenModifiers);
 
-            // Index the token for its text range
-            for (int offset = textRange.getStartOffset(); offset <= textRange.getEndOffset(); offset++) {
+            // Index the token for its text range up to but not including the end offset
+            for (int offset = textRange.getStartOffset(); offset < textRange.getEndOffset(); offset++) {
                 semanticTokensByOffset.put(offset, semanticToken);
             }
         }
