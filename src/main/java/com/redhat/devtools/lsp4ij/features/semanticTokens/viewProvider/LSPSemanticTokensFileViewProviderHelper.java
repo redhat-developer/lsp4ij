@@ -169,8 +169,8 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
         if (semanticTokensByOffset != null) {
             LSPSemanticToken semanticToken = new LSPSemanticToken(file, textRange, tokenType, tokenModifiers);
 
-            // Index the token for its text range
-            for (int offset = textRange.getStartOffset(); offset <= textRange.getEndOffset(); offset++) {
+            // Index the token for its text range up to but not including the end offset
+            for (int offset = textRange.getStartOffset(); offset < textRange.getEndOffset(); offset++) {
                 semanticTokensByOffset.put(offset, semanticToken);
             }
         }
