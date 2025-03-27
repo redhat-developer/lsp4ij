@@ -45,12 +45,13 @@ public class LSPDiagnosticsForServer {
 
     private final LanguageServerItem languageServer;
 
-    private final VirtualFile file;
+    private final @Nullable VirtualFile file;
 
     // Map which contains all current diagnostics (as key) and future which load associated quick fixes (as value)
     private Map<Diagnostic, LSPLazyCodeActions> diagnostics;
 
-    public LSPDiagnosticsForServer(LanguageServerItem languageServer, VirtualFile file) {
+    public LSPDiagnosticsForServer(@NotNull LanguageServerItem languageServer,
+                                   @Nullable VirtualFile file) {
         this.languageServer = languageServer;
         this.file = file;
         this.diagnostics = Collections.emptyMap();
@@ -64,12 +65,12 @@ public class LSPDiagnosticsForServer {
      *
      * @param diagnostics the new LSP published diagnosics
      */
-    public void update(List<Diagnostic> diagnostics) {
+    public void update(@NotNull List<Diagnostic> diagnostics) {
         // initialize diagnostics map
         this.diagnostics = toMap(diagnostics, this.diagnostics);
     }
 
-    private Map<Diagnostic, LSPLazyCodeActions> toMap(List<Diagnostic> diagnostics,
+    private Map<Diagnostic, LSPLazyCodeActions> toMap(@NotNull List<Diagnostic> diagnostics,
                                                       Map<Diagnostic, LSPLazyCodeActions> existingDiagnostics) {
         // Collect quick fixes from LSP code action
         Map<Diagnostic, LSPLazyCodeActions> map = new HashMap<>(diagnostics.size());
@@ -99,6 +100,7 @@ public class LSPDiagnosticsForServer {
                 diagnosticsGroupByCoveredRange.add(data);
             }
         }
+
         // Associate each diagnostic with the list of code actions to load for a given range
         for (DiagnosticData data : diagnosticsGroupByCoveredRange) {
             var action = new LSPLazyCodeActions(data.diagnostics(), file, languageServer);
@@ -132,7 +134,7 @@ public class LSPDiagnosticsForServer {
      *
      * @return the current diagnostics for the file reported by the language server.
      */
-    public Set<Diagnostic> getDiagnostics() {
+    public Collection<Diagnostic> getDiagnostics() {
         return diagnostics.keySet();
     }
 

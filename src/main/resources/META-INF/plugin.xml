@@ -277,6 +277,12 @@
                 id="LSPDiagnosticAnnotator"
                 language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
+        <localInspection id="LSPLocalInspectionTool"
+                         language=""
+                         enabledByDefault="true"
+                         groupName="Language Servers"
+                         displayName="Diagnostics"
+                         implementationClass="com.redhat.devtools.lsp4ij.features.inspection.LSPLocalInspectionTool"/>
 
         <!-- LSP textDocument/completion request support -->
         <typedHandler id="LSPCompletionTriggerTypedHandler"

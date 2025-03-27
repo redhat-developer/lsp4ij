@@ -150,7 +150,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     private void refreshCodeLensForAllOpenedFiles() {
-        for (var fileData : wrapper.getConnectedFiles()) {
+        for (var fileData : wrapper.getOpenedFiles()) {
             VirtualFile file = fileData.getFile();
             EditorFeatureManager.getInstance(getProject())
                     .refreshEditorFeature(file, EditorFeatureType.CODE_VISION, true);
@@ -168,7 +168,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     private void refreshInlayHintsForAllOpenedFiles() {
-        for (var fileData : wrapper.getConnectedFiles()) {
+        for (var fileData : wrapper.getOpenedFiles()) {
             VirtualFile file = fileData.getFile();
             EditorFeatureManager efm = EditorFeatureManager.getInstance(getProject());
             efm.refreshEditorFeature(file, EditorFeatureType.INLAY_HINT, true);
@@ -189,7 +189,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     private void refreshSemanticTokensForAllOpenedFiles() {
         // Received request 'workspace/semanticTokens/refresh
         ReadAction.nonBlocking((Callable<Void>) () -> {
-                    for (var fileData : wrapper.getConnectedFiles()) {
+                    for (var fileData : wrapper.getOpenedFiles()) {
                         VirtualFile file = fileData.getFile();
                         PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                         if (psiFile != null) {

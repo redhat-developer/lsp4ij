@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 import com.intellij.codeHighlighting.HighlightDisplayLevel;
 import com.intellij.codeInsight.daemon.HighlightDisplayKey;
 import com.intellij.codeInspection.InspectionProfile;
+import com.intellij.codeInspection.ProblemHighlightType;
 import com.intellij.lang.annotation.HighlightSeverity;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.jetbrains.annotations.NotNull;
@@ -34,7 +35,31 @@ public class SeverityMapping {
     }
 
     /**
+     * Maps language server's {@link DiagnosticSeverity} to Intellij's {@link ProblemHighlightType}
+     *
+     * @param severity the {@link DiagnosticSeverity} to map
+     * @return the matching {@link ProblemHighlightType}
+     */
+    public static @NotNull ProblemHighlightType toProblemHighlightType(@Nullable DiagnosticSeverity severity) {
+        if (severity == null) {
+            return ProblemHighlightType.ERROR;
+        }
+        switch (severity) {
+            case Warning:
+                return ProblemHighlightType.WARNING;
+            case Hint:
+            case Information:
+                // Annotation is not shown when ProblemHighlightType.Information severity is used
+                // ProblemHighlightType.WEAK_WARNING is used in this case.
+                return ProblemHighlightType.WEAK_WARNING;
+            default:
+                return ProblemHighlightType.ERROR;
+        }
+    }
+
+    /**
      * Maps language server's {@link DiagnosticSeverity} to Intellij's {@link HighlightSeverity}
+     *
      * @param severity the {@link DiagnosticSeverity} to map
      * @return the matching {@link HighlightSeverity}
      */
@@ -82,11 +107,12 @@ public class SeverityMapping {
 
     /**
      * Returns {@link DiagnosticSeverity} as lower case, or <code>none</code> if severity is <code>null</code>.
+     *
      * @param severity the {@link DiagnosticSeverity} to transform as {@link String}
      * @return {@link DiagnosticSeverity} as lower case, or <code>none</code> if severity is <code>null</code>.
      */
     public static @NotNull String toString(@Nullable DiagnosticSeverity severity) {
-        return (severity == null)? NONE_SEVERITY : severity.name().toLowerCase(Locale.ROOT);
+        return (severity == null) ? NONE_SEVERITY : severity.name().toLowerCase(Locale.ROOT);
     }
 
     public static DiagnosticSeverity getSeverity(String inspectionId, InspectionProfile profile) {
@@ -104,4 +130,5 @@ public class SeverityMapping {
     private static boolean isInspectionEnabled(@NotNull String inspectionId, @NotNull InspectionProfile profile) {
         return profile.isToolEnabled(HighlightDisplayKey.find(inspectionId));
     }
+
 }

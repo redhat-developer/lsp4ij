@@ -107,7 +107,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
         VirtualFile file = event.getFile();
         URI uri = languageServerWrapper.toUri(file);
         if (uri != null) {
-            LSPVirtualFileData documentListener = languageServerWrapper.connectedDocuments.get(uri);
+            OpenedDocument documentListener = languageServerWrapper.openedDocuments.get(uri);
             if (documentListener != null) {
                 // 1. Send a textDocument/didSave for the saved file
                 documentListener.getSynchronizer().documentSaved();
