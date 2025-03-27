@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.codeInsight.intention.IntentionAction;
+import com.intellij.codeInspection.LocalInspectionTool;
 import com.intellij.codeInspection.ProblemHighlightType;
 import com.intellij.lang.annotation.AnnotationBuilder;
 import com.intellij.lang.annotation.AnnotationHolder;
@@ -30,6 +31,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+
+import static com.redhat.devtools.lsp4ij.features.inspection.LSPLocalInspectionTool.ID;
 
 /**
  * LSP diagnostic feature.
@@ -64,10 +67,11 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
 
     /**
      * Create an IntelliJ annotation in the given holder by using given LSP diagnostic and fixes.
+     *
      * @param diagnostic the LSP diagnostic.
-     * @param document the document.
-     * @param fixes the fixes coming from LSP CodeAction.
-     * @param holder the annotation holder where annotation must be registered.
+     * @param document   the document.
+     * @param fixes      the fixes coming from LSP CodeAction.
+     * @param holder     the annotation holder where annotation must be registered.
      */
     public void createAnnotation(@NotNull Diagnostic diagnostic,
                                  @NotNull Document document,
@@ -131,6 +135,20 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
     @Nullable
     public HighlightSeverity getHighlightSeverity(@NotNull Diagnostic diagnostic) {
         return SeverityMapping.toHighlightSeverity(diagnostic.getSeverity());
+    }
+
+    /**
+     * Returns the IntelliJ {@link ProblemHighlightType} from the given diagnostic and null otherwise.
+     *
+     * <p>
+     * If null is returned, the diagnostic will be ignored.
+     * </p>
+     *
+     * @param diagnostic the LSP diagnostic.
+     * @return the IntelliJ {@link ProblemHighlightType} from the given diagnostic and null otherwise.
+     */
+    public ProblemHighlightType getProblemHighlightType(Diagnostic diagnostic) {
+        return SeverityMapping.toProblemHighlightType(diagnostic.getSeverity());
     }
 
     /**
@@ -252,5 +270,29 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
     @Override
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
         // Do nothing
+    }
+
+    /**
+     * Returns true if the local inspection tool is application for the given file and false otherwise.
+     *
+     * @param file       the file which must be inspected.
+     * @param inspection the local inspection tool.
+     * @return true if the local inspection tool is application for the given file and false otherwise.
+     */
+    public boolean isInspectionApplicableFor(@NotNull PsiFile file,
+                                             @NotNull LocalInspectionTool inspection) {
+        return ID.equals(inspection.getID());
+    }
+
+    /**
+     * Returns true if the local inspection tool is application for the given diagnostic and false otherwise.
+     *
+     * @param diagnostic the diagnostic which could be cover by the local inspection tool.
+     * @param inspection the local inspection tool.
+     * @return true if the local inspection tool is application for the given diagnostic and false otherwise.
+     */
+    public boolean isInspectionApplicableFor(@NotNull Diagnostic diagnostic,
+                                             @NotNull LocalInspectionTool inspection) {
+        return true;
     }
 }

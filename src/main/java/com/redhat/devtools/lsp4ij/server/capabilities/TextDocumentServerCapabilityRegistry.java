@@ -58,7 +58,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
         }
         if (editorFeatureType != null) {
             // Refresh codelens, inlay hints, folding, etc according to the register/unregister capability.
-            for (var fileData : clientFeatures.getServerWrapper().getConnectedFiles()) {
+            for (var fileData : clientFeatures.getServerWrapper().getOpenedFiles()) {
                 VirtualFile file = fileData.getFile();
                 EditorFeatureManager.getInstance(clientFeatures.getProject())
                         .refreshEditorFeature(file, editorFeatureType, true);

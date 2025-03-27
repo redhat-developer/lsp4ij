@@ -21,9 +21,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.redhat.devtools.lsp4ij.ClosedDocument;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LSPVirtualFileData;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.OpenedDocument;
 import com.redhat.devtools.lsp4ij.client.CoalesceByKey;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
@@ -86,15 +87,20 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
 
         // Update LSP diagnostic reported by the language server id
         URI fileURI = LSPIJUtils.toUri(file);
-        LSPVirtualFileData data = languageServerWrapper.getLSPVirtualFileData(fileURI);
-        if (data != null) {
-            synchronized (data) {
-                data.updateDiagnostics(params.getDiagnostics());
+        OpenedDocument openedDocument = languageServerWrapper.getOpenedDocument(fileURI);
+        if (openedDocument != null) {
+            // Diagnostics for opened file
+            synchronized (openedDocument) {
+                openedDocument.updateDiagnostics(params.getDiagnostics());
             }
             // Trigger Intellij validation to execute
             // {@link LSPDiagnosticAnnotator}.
             // which translates LSP Diagnostics into Intellij Annotation
             DaemonCodeAnalyzer.getInstance(project).restart(psiFile);
+        } else {
+            // Diagnostics for closed file
+            ClosedDocument closedDocument = languageServerWrapper.getClosedDocument(fileURI, true);
+            closedDocument.updateDiagnostics(params.getDiagnostics());
         }
     }
 }

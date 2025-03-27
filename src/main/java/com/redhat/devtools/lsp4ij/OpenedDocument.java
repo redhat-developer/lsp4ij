@@ -16,15 +16,17 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsForServer;
 import org.eclipse.lsp4j.Diagnostic;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
- * LSP data stored in {@link VirtualFile} which are used by some LSP operations.
+ * LSP opened document for a given language server.
  *
  * @author Angelo ZERR
  */
-public class LSPVirtualFileData {
+public class OpenedDocument extends LSPDocumentBase{
 
     private final VirtualFile file;
 
@@ -32,7 +34,9 @@ public class LSPVirtualFileData {
 
     private final DocumentContentSynchronizer synchronizer;
 
-    public LSPVirtualFileData(LanguageServerItem languageServer, VirtualFile file, DocumentContentSynchronizer synchronizer) {
+    public OpenedDocument(@NotNull LanguageServerItem languageServer,
+                          @NotNull VirtualFile file,
+                          DocumentContentSynchronizer synchronizer) {
         this.file = file;
         this.synchronizer = synchronizer;
         this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer,file);
@@ -55,7 +59,13 @@ public class LSPVirtualFileData {
         return diagnosticsForServer;
     }
 
-    public void updateDiagnostics(List<Diagnostic> diagnostics) {
+    @Override
+    public void updateDiagnostics(@NotNull List<Diagnostic> diagnostics) {
         diagnosticsForServer.update(diagnostics);
+    }
+
+    @Override
+    public Collection<Diagnostic> getDiagnostics() {
+        return diagnosticsForServer.getDiagnostics();
     }
 }
