@@ -12,6 +12,7 @@
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -20,12 +21,14 @@ import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.EditorBehaviorFeature;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -35,6 +38,7 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
 
     private final LSPSemanticTokensFileViewProvider fileViewProvider;
     private final ThreadLocal<Integer> effectiveOffsetPtr = new InheritableThreadLocal<>();
+    private volatile PsiFile file = null;
 
     /**
      * Creates a helper for the provided semantic tokens file view provider.
@@ -47,10 +51,39 @@ public class LSPSemanticTokensFileViewProviderHelper implements LSPSemanticToken
 
     @Nullable
     private PsiFile getFile() {
-        // There should only be one PSI file
-        List<PsiFile> allFiles = fileViewProvider.getAllFiles();
-        PsiFile file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
-        return (file != null) && file.isValid() && EditorBehaviorFeature.enableSemanticTokensFileViewProvider(file) ? file : null;
+        // Lazy-initialize the one PSI file for this view provider
+        if ((file == null) || !file.isValid()) {
+            synchronized (this) {
+                if ((file == null) || !file.isValid()) {
+                    List<PsiFile> allFiles = fileViewProvider.getAllFiles();
+                    file = allFiles.size() == 1 ? ContainerUtil.getFirstItem(allFiles) : null;
+                }
+            }
+        }
+
+        // If we have a file, only return it as non-null if the feature flag is enabled, and cache the result either way
+        if ((file != null) && file.isValid()) {
+            return CachedValuesManager.getCachedValue(
+                    file,
+                    new CachedValueProvider<>() {
+                        @Override
+                        @NotNull
+                        public Result<PsiFile> compute() {
+                            Project project = file.getProject();
+                            Object[] dependencies = ContainerUtil.union(
+                                    Set.of(file),
+                                    LanguageServiceAccessor.getInstance(project).getModificationTrackers(file)
+                            ).toArray();
+
+                            return EditorBehaviorFeature.enableSemanticTokensFileViewProvider(file) ?
+                                    Result.create(file, dependencies) :
+                                    Result.create(null, dependencies);
+                        }
+                    }
+            );
+        }
+
+        return null;
     }
 
     @Override
