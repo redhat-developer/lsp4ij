@@ -26,16 +26,17 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * Client-side editor behavior feature. This does not correspond to an actual LSP feature.
  */
 @ApiStatus.Experimental
 public class EditorBehaviorFeature {
 
-    private static final Map<String, Key<CachedValue<Boolean>>> CACHE_KEYS = new ConcurrentHashMap<>();
+    private static final @NotNull Key<Key<CachedValue<Boolean>>> STRING_LITERAL_IMPROVEMENTS_KEY = Key.create("editor.behavior.feature.string.literal.improvements");
+    private static final @NotNull Key<Key<CachedValue<Boolean>>> STATEMENT_TERMINATOR_IMPROVEMENTS_KEY = Key.create("editor.behavior.feature.statement.terminator.improvements");
+    private static final @NotNull Key<Key<CachedValue<Boolean>>> ENTER_BETWEEN_BRACES_FIX_KEY = Key.create("editor.behavior.feature.enter.between.braces.fix");
+    private static final @NotNull Key<Key<CachedValue<Boolean>>> TEXTMATE_NESTED_BRACES_IMPROVEMENTS_KEY = Key.create("editor.behavior.feature.textmate.nested.braces.improvements");
+    private static final @NotNull Key<Key<CachedValue<Boolean>>> SEMANTIC_TOKENS_FILE_VIEW_PROVIDER_KEY = Key.create("editor.behavior.feature.semantic.tokens.file.view.provider");
 
     private LSPClientFeatures clientFeatures;
 
@@ -46,7 +47,7 @@ public class EditorBehaviorFeature {
      */
     public EditorBehaviorFeature(@NotNull LSPClientFeatures clientFeatures) {
         this.clientFeatures = clientFeatures;
-    }
+     }
 
     /**
      * Sets the containing client features.
@@ -135,7 +136,7 @@ public class EditorBehaviorFeature {
      * otherwise false
      */
     public static boolean enableStringLiteralImprovements(@NotNull PsiFile file) {
-        return isEnabled(file, EditorBehaviorFeature::isEnableStringLiteralImprovements);
+        return isEnabled(file, EditorBehaviorFeature::isEnableStringLiteralImprovements, EditorBehaviorFeature.STRING_LITERAL_IMPROVEMENTS_KEY);
     }
 
     /**
@@ -146,7 +147,7 @@ public class EditorBehaviorFeature {
      * file; otherwise false
      */
     public static boolean enableStatementTerminatorImprovements(@NotNull PsiFile file) {
-        return isEnabled(file, EditorBehaviorFeature::isEnableStatementTerminatorImprovements);
+        return isEnabled(file, EditorBehaviorFeature::isEnableStatementTerminatorImprovements, EditorBehaviorFeature.STATEMENT_TERMINATOR_IMPROVEMENTS_KEY);
     }
 
     /**
@@ -157,7 +158,7 @@ public class EditorBehaviorFeature {
      * @return true if the fix is enabled by at least one language server for the file; otherwise false
      */
     public static boolean enableEnterBetweenBracesFix(@NotNull PsiFile file) {
-        return isEnabled(file, EditorBehaviorFeature::isEnableEnterBetweenBracesFix);
+        return isEnabled(file, EditorBehaviorFeature::isEnableEnterBetweenBracesFix, EditorBehaviorFeature.ENTER_BETWEEN_BRACES_FIX_KEY);
     }
 
     /**
@@ -169,7 +170,7 @@ public class EditorBehaviorFeature {
      * least one language server for the file; otherwise false
      */
     public static boolean enableTextMateNestedBracesImprovements(@NotNull PsiFile file) {
-        return isEnabled(file, EditorBehaviorFeature::isEnableTextMateNestedBracesImprovements);
+        return isEnabled(file, EditorBehaviorFeature::isEnableTextMateNestedBracesImprovements, EditorBehaviorFeature.TEXTMATE_NESTED_BRACES_IMPROVEMENTS_KEY);
     }
 
     /**
@@ -179,28 +180,31 @@ public class EditorBehaviorFeature {
      * @return true if the semantic tokens-based file view provider is enabled; otherwise false
      */
     public static boolean enableSemanticTokensFileViewProvider(@NotNull PsiFile file) {
-        return isEnabled(file, EditorBehaviorFeature::isEnableSemanticTokensFileViewProvider);
+        return isEnabled(file, EditorBehaviorFeature::isEnableSemanticTokensFileViewProvider, EditorBehaviorFeature.SEMANTIC_TOKENS_FILE_VIEW_PROVIDER_KEY);
     }
 
     private interface FeatureFlagChecker {
         boolean isEnabled(@NotNull EditorBehaviorFeature editorBehaviorFeature, @NotNull PsiFile file);
+
     }
 
     private static boolean isEnabled(
             @NotNull PsiFile file,
-            @NotNull FeatureFlagChecker featureFlagChecker
+            @NotNull FeatureFlagChecker featureFlagChecker,
+            @NotNull Key<Key<CachedValue<Boolean>>> key
     ) {
-        return isEnabled(file.getProject(), file.getVirtualFile(), featureFlagChecker);
+        return isEnabled(file.getProject(), file.getVirtualFile(), featureFlagChecker, key);
     }
 
     private static boolean isEnabled(
             @NotNull Project project,
             @Nullable VirtualFile virtualFile,
-            @NotNull FeatureFlagChecker featureFlagChecker
+            @NotNull FeatureFlagChecker featureFlagChecker,
+            @NotNull Key<Key<CachedValue<Boolean>>> key
     ) {
         if (virtualFile == null) return false;
 
-        Key<CachedValue<Boolean>> cacheKey = getCacheKey(virtualFile, featureFlagChecker);
+        Key<CachedValue<Boolean>> cacheKey = getCacheKey(virtualFile, featureFlagChecker, key);
         return CachedValuesManager.getManager(project).getCachedValue(
                 project,
                 cacheKey,
@@ -227,11 +231,17 @@ public class EditorBehaviorFeature {
     @NotNull
     private static Key<CachedValue<Boolean>> getCacheKey(
             @NotNull VirtualFile virtualFile,
-            @NotNull FeatureFlagChecker featureFlagChecker
+            @NotNull FeatureFlagChecker featureFlagChecker,
+            @NotNull Key<Key<CachedValue<Boolean>>> key
     ) {
-        // Create a compact cache key if possible
-        String virtualFileId = virtualFile instanceof VirtualFileWithId virtualFileWithId ? String.valueOf(virtualFileWithId.getId()) : virtualFile.getPath();
-        String cacheKeyName = featureFlagChecker.getClass().getName() + "::" + virtualFileId;
-        return CACHE_KEYS.computeIfAbsent(cacheKeyName, Key::create);
+        Key<CachedValue<Boolean>> cachedKey = virtualFile.getUserData(key);
+        if (cachedKey == null) {
+            // Create a compact cache key if possible
+            String virtualFileId = virtualFile instanceof VirtualFileWithId virtualFileWithId ? String.valueOf(virtualFileWithId.getId()) : virtualFile.getPath();
+            String cacheKeyName = featureFlagChecker.getClass().getName() + "::" + virtualFileId;
+            cachedKey = Key.create(cacheKeyName);
+            virtualFile.putUserData(key, cachedKey);
+        }
+        return cachedKey;
     }
 }
