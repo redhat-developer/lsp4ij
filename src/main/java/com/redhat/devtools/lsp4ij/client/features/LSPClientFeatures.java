@@ -1432,9 +1432,6 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
                     getCodeActionFeature().getCodeActionCapabilityRegistry();
             // register 'textDocument/codeLens' capability
             case LSPRequestConstants.TEXT_DOCUMENT_CODE_LENS -> getCodeLensFeature().getCodeLensCapabilityRegistry();
-            // register 'textDocument/documentColor' capability
-            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR ->
-                    getDocumentColorFeature().getDocumentColorCapabilityRegistry();
             // register 'textDocument/completion' capability
             case LSPRequestConstants.TEXT_DOCUMENT_COMPLETION ->
                     getCompletionFeature().getCompletionCapabilityRegistry();
@@ -1444,6 +1441,12 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             // register 'textDocument/definition' capability
             case LSPRequestConstants.TEXT_DOCUMENT_DEFINITION ->
                     getDefinitionFeature().getDefinitionCapabilityRegistry();
+            // register 'textDocument/diagnostic' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DIAGNOSTIC ->
+                    getDiagnosticFeature().getDiagnosticCapabilityRegistry();
+            // register 'textDocument/documentColor' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_COLOR ->
+                    getDocumentColorFeature().getDocumentColorCapabilityRegistry();
             // register 'textDocument/documentHighlight' capability
             case LSPRequestConstants.TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT ->
                     getDocumentHighlightFeature().getDocumentHighlightCapabilityRegistry();

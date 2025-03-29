@@ -282,7 +282,7 @@
                          enabledByDefault="true"
                          groupName="Language Servers"
                          displayName="Diagnostics"
-                         implementationClass="com.redhat.devtools.lsp4ij.features.inspection.LSPLocalInspectionTool"/>
+                         implementationClass="com.redhat.devtools.lsp4ij.inspections.LSPLocalInspectionTool"/>
 
         <!-- LSP textDocument/completion request support -->
         <typedHandler id="LSPCompletionTriggerTypedHandler"

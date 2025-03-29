@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
@@ -17,12 +19,15 @@ import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
+import com.intellij.util.Alarm;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +36,7 @@ import java.util.concurrent.TimeUnit;
  * Synchronize IntelliJ document (open, content changed, close, save)
  * with LSP notifications (didOpen, didChanged, didClose, didSave).
  */
-public class DocumentContentSynchronizer implements DocumentListener {
+public class DocumentContentSynchronizer implements DocumentListener, Disposable {
 
     private static final long WAIT_AFTER_SENDING_DID_OPEN = 500L;
 
@@ -45,7 +50,11 @@ public class DocumentContentSynchronizer implements DocumentListener {
 
     private int version = 0;
     private final List<TextDocumentContentChangeEvent> changeEvents;
-    @NotNull private CompletableFuture<Void> didOpenFuture;
+    @NotNull
+    private CompletableFuture<LanguageServer> didOpenFuture;
+
+    private volatile Alarm debouncePullDiagnosticsAlarm = null;
+    private boolean diagnosticNotPulledOnDidOpen;
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull String fileUri,
@@ -66,14 +75,14 @@ public class DocumentContentSynchronizer implements DocumentListener {
         changeEvents = new ArrayList<>();
     }
 
-    public @NotNull CompletableFuture<Void> getDidOpenFuture() {
+    public @NotNull CompletableFuture<LanguageServer> getDidOpenFuture() {
         if (didOpenFuture != null) {
             return didOpenFuture;
         }
         return getDidOpenFutureSync();
     }
 
-    private synchronized @NotNull CompletableFuture<Void> getDidOpenFutureSync() {
+    private synchronized @NotNull CompletableFuture<LanguageServer> getDidOpenFutureSync() {
         if (didOpenFuture != null) {
             return didOpenFuture;
         }
@@ -88,12 +97,14 @@ public class DocumentContentSynchronizer implements DocumentListener {
         textDocument.setVersion(++version);
         didOpenFuture = languageServerWrapper
                 .getInitializedServer()
-                .thenAcceptAsync(ls -> ls.getTextDocumentService()
-                        .didOpen(new DidOpenTextDocumentParams(textDocument)))
-                .thenCompose(result ->
-                        CompletableFuture.runAsync(() -> {
+                .thenApplyAsync(ls -> {
+                    ls.getTextDocumentService()
+                            .didOpen(new DidOpenTextDocumentParams(textDocument));
+                    return ls;
+                })
+                .thenCompose(ls ->
+                        CompletableFuture.supplyAsync(() -> {
                             if (ApplicationManager.getApplication().isUnitTestMode()) {
-                                return;
                             }
                             try {
                                 // Wait 500ms after sending didOpen notification
@@ -103,8 +114,10 @@ public class DocumentContentSynchronizer implements DocumentListener {
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                             }
+                            return ls;
                         })
                 );
+        processPullDiagnosticIfNeeded(didOpenFuture, version);
         return didOpenFuture;
     }
 
@@ -141,10 +154,16 @@ public class DocumentContentSynchronizer implements DocumentListener {
             changeEvents.clear();
         }
 
+        final int version = ++this.version;
+        // send 'textDocument/didChange' notification
         DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
         changeParamsToSend.getTextDocument().setUri(fileUri);
-        changeParamsToSend.getTextDocument().setVersion(++version);
-        languageServerWrapper.sendNotification(ls -> ls.getTextDocumentService().didChange(changeParamsToSend));
+        changeParamsToSend.getTextDocument().setVersion(version);
+        var didChange = languageServerWrapper.sendNotification(ls -> {
+            ls.getTextDocumentService().didChange(changeParamsToSend);
+            return ls;
+        });
+        processPullDiagnosticIfNeeded(didChange, version);
     }
 
     @Override
@@ -210,7 +229,10 @@ public class DocumentContentSynchronizer implements DocumentListener {
         if (languageServerWrapper.isActive()) {
             TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
             DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
-            languageServerWrapper.sendNotification(ls -> ls.getTextDocumentService().didClose(params));
+            languageServerWrapper.sendNotification(ls -> {
+                ls.getTextDocumentService().didClose(params);
+                return ls;
+            });
         }
     }
 
@@ -241,4 +263,84 @@ public class DocumentContentSynchronizer implements DocumentListener {
         return version;
     }
 
+    @Override
+    public void dispose() {
+        documentClosed();
+    }
+
+    public void forcePullDiagnosticIfNeeded() {
+        if(!diagnosticNotPulledOnDidOpen) {
+            return;
+        }
+        processPullDiagnosticIfNeeded(didOpenFuture, version);
+    }
+
+    /**
+     * Process LSP pull diagnostic if the language server supports it.
+     * @param didFuture the didOpen, didChange future.
+     * @param version the current document version.
+     */
+    private void processPullDiagnosticIfNeeded(@NotNull CompletableFuture<LanguageServer> didFuture, int version) {
+        if (!isPullDiagnosticsSupported()) {
+            // The language server doesn't support pull diagnostics.
+            diagnosticNotPulledOnDidOpen = didFuture == didOpenFuture;
+            return;
+        }
+        // Initialize the Alarm which consumes 'textDocument/diagnostic' with debounce mode.
+        if (debouncePullDiagnosticsAlarm == null) {
+            debouncePullDiagnosticsAlarm = getDebouncePullDiagnosticsAlarm();
+        } else {
+            debouncePullDiagnosticsAlarm.cancelAllRequests();
+        }
+        didFuture
+                .thenApply(ls -> {
+                    // didOpen, didChange notification has been sent, consume 'textDocument/diagnostic' with debounce mode.
+                    debouncePullDiagnosticsAlarm.addRequest(() -> {
+                        if (version != this.version) {
+                            // The document has changed, do nothing
+                            return;
+                        }
+                        // Consume 'textDocument/diagnostic'
+                        DocumentDiagnosticParams params = new DocumentDiagnosticParams();
+                        params.setTextDocument(new TextDocumentIdentifier(fileUri));
+                        ls.getTextDocumentService()
+                                .diagnostic(params)
+                                .thenAcceptAsync(diagnosticReport -> {
+                                    // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticAnnotator.
+                                    if (diagnosticReport.isLeft()) {
+                                        RelatedFullDocumentDiagnosticReport fullDocumentDiagnosticReport = diagnosticReport.getLeft();
+                                        var items = fullDocumentDiagnosticReport.getItems();
+                                        // Update the diagnostics cache from the opened file
+                                        var openedDocument = languageServerWrapper.getOpenedDocument(LSPIJUtils.toUri(file));
+                                        openedDocument.updateDiagnostics(items != null ? items : Collections.emptyList());
+                                        // Refresh UI to process LSPDiagnosticAnnotator.
+                                        DaemonCodeAnalyzer.getInstance(languageServerWrapper.getProject()).restart(LSPIJUtils.getPsiFile(file, languageServerWrapper.getProject()));
+                                    } else if (diagnosticReport.isRight()) {
+                                        RelatedUnchangedDocumentDiagnosticReport relatedUnchangedDocumentDiagnosticReport = diagnosticReport.getRight();
+
+                                    }
+                                });
+                    }, 500);
+                    return ls;
+                });
+    }
+
+    public boolean isPullDiagnosticsSupported() {
+        return languageServerWrapper.getClientFeatures().getDiagnosticFeature().isDiagnosticSupported(file);
+    }
+
+    private Alarm getDebouncePullDiagnosticsAlarm() {
+        if (debouncePullDiagnosticsAlarm == null) {
+            synchronized (this) {
+                if (debouncePullDiagnosticsAlarm == null) {
+                    debouncePullDiagnosticsAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+                }
+            }
+        }
+        return debouncePullDiagnosticsAlarm;
+    }
+
+    public boolean isDiagnosticNotPulledOnDidOpen() {
+        return diagnosticNotPulledOnDidOpen;
+    }
 }

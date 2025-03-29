@@ -19,11 +19,13 @@ import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.diagnostics.SeverityMapping;
 import com.redhat.devtools.lsp4ij.hint.LSPNavigationLinkHandler;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.capabilities.DiagnosticCapabilityRegistry;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.ApiStatus;
@@ -32,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-import static com.redhat.devtools.lsp4ij.features.inspection.LSPLocalInspectionTool.ID;
+import static com.redhat.devtools.lsp4ij.inspections.LSPLocalInspectionTool.ID;
 
 /**
  * LSP diagnostic feature.
@@ -60,6 +62,8 @@ import static com.redhat.devtools.lsp4ij.features.inspection.LSPLocalInspectionT
 @ApiStatus.Experimental
 public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
 
+    private DiagnosticCapabilityRegistry diagnosticCapabilityRegistry;
+    
     @Override
     public boolean isSupported(@NotNull PsiFile file) {
         return true;
@@ -267,11 +271,6 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
         return null;
     }
 
-    @Override
-    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
-        // Do nothing
-    }
-
     /**
      * Returns true if the local inspection tool is application for the given file and false otherwise.
      *
@@ -294,5 +293,48 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
     public boolean isInspectionApplicableFor(@NotNull Diagnostic diagnostic,
                                              @NotNull LocalInspectionTool inspection) {
         return true;
+    }
+
+    /**
+     * Returns true if the file associated with a language server can support pull diagnostic and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the file associated with a language server can support pull diagnostic and false otherwise.
+     */
+    public boolean isDiagnosticSupported(@NotNull PsiFile file) {
+        return getDiagnosticCapabilityRegistry().isDiagnosticSupported(file);
+    }
+
+    /**
+     * Returns true if the file associated with a language server can support pull diagnostic and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the file associated with a language server can support pull diagnostic and false otherwise.
+     */
+    public boolean isDiagnosticSupported(@NotNull VirtualFile file) {
+        return getDiagnosticCapabilityRegistry().isDiagnosticSupported(file);
+    }
+
+    public DiagnosticCapabilityRegistry getDiagnosticCapabilityRegistry() {
+        if (diagnosticCapabilityRegistry == null) {
+            initDiagnosticCapabilityRegistry();
+        }
+        return diagnosticCapabilityRegistry;
+    }
+
+    private synchronized void initDiagnosticCapabilityRegistry() {
+        if (diagnosticCapabilityRegistry != null) {
+            return;
+        }
+        var clientFeatures = getClientFeatures();
+        diagnosticCapabilityRegistry = new DiagnosticCapabilityRegistry(clientFeatures);
+        diagnosticCapabilityRegistry.setServerCapabilities(clientFeatures.getServerWrapper().getServerCapabilitiesSync());
+    }
+
+    @Override
+    public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
+        if (diagnosticCapabilityRegistry != null) {
+            diagnosticCapabilityRegistry.setServerCapabilities(serverCapabilities);
+        }
     }
 }

@@ -107,7 +107,7 @@ public class ClientCapabilitiesFactory {
     private static @NotNull TextDocumentClientCapabilities getTextDocumentClientCapabilities() {
         final var textDocumentClientCapabilities = new TextDocumentClientCapabilities();
 
-        // Publish diagnostics capabilities
+        // Support for 'textDocument/publishDiagnostics'
         final var publishDiagnosticsCapabilities = new PublishDiagnosticsCapabilities();
         publishDiagnosticsCapabilities.setDataSupport(Boolean.TRUE);
         publishDiagnosticsCapabilities.setCodeDescriptionSupport(Boolean.TRUE);
@@ -115,6 +115,12 @@ public class ClientCapabilitiesFactory {
         DiagnosticsTagSupport tagSupport = new DiagnosticsTagSupport(List.of(DiagnosticTag.Unnecessary, DiagnosticTag.Deprecated));
         publishDiagnosticsCapabilities.setTagSupport(tagSupport);
         textDocumentClientCapabilities.setPublishDiagnostics(publishDiagnosticsCapabilities);
+
+        // Support for 'textDocument/diagnostic'
+        final var diagnosticCapabilities = new DiagnosticCapabilities();
+        diagnosticCapabilities.setDynamicRegistration(Boolean.TRUE);
+        diagnosticCapabilities.setRelatedDocumentSupport(Boolean.FALSE);
+        textDocumentClientCapabilities.setDiagnostic(diagnosticCapabilities);
 
         // Code Action support
         final var codeAction = new CodeActionCapabilities(new CodeActionLiteralSupportCapabilities(

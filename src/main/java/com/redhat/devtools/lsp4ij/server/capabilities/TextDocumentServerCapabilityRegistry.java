@@ -1,3 +1,13 @@
+/*******************************************************************************
+ * Copyright (c) 2024 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.capabilities;
 
 import com.google.gson.JsonObject;
@@ -20,6 +30,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
+/**
+ * Base class for Server capability registry for 'textDocument/*'.
+ *
+ * @param <T> the LSP {@link TextDocumentRegistrationOptions}.
+ */
 public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumentRegistrationOptions> {
 
     private final @NotNull LSPClientFeatures clientFeatures;
@@ -29,7 +44,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
     private final List<T> dynamicCapabilities;
 
     public TextDocumentServerCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures) {
-     this(clientFeatures,null);
+        this(clientFeatures, null);
     }
 
     public TextDocumentServerCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures,
@@ -58,7 +73,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
         }
         if (editorFeatureType != null) {
             // Refresh codelens, inlay hints, folding, etc according to the register/unregister capability.
-            for (var fileData : clientFeatures.getServerWrapper().getOpenedFiles()) {
+            for (var fileData : clientFeatures.getServerWrapper().getOpenedDocuments()) {
                 VirtualFile file = fileData.getFile();
                 EditorFeatureManager.getInstance(clientFeatures.getProject())
                         .refreshEditorFeature(file, editorFeatureType, true);
@@ -79,9 +94,27 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
         return isSupported(file, matchServerCapabilities, null);
     }
 
-    protected boolean isSupported(@NotNull PsiFile file,
+    protected boolean isSupported(@NotNull VirtualFile file,
+                                  @NotNull Predicate<@NotNull ServerCapabilities> matchServerCapabilities) {
+        return isSupported(file, matchServerCapabilities, null);
+    }
+
+    protected boolean isSupported(@NotNull PsiFile psiFile,
                                   @NotNull Predicate<@NotNull ServerCapabilities> matchServerCapabilities,
                                   @Nullable Predicate<@NotNull T> matchOption) {
+        return isSupported(psiFile, null, matchServerCapabilities, matchOption);
+    }
+
+    protected boolean isSupported(@NotNull VirtualFile file,
+                                  @NotNull Predicate<@NotNull ServerCapabilities> matchServerCapabilities,
+                                  @Nullable Predicate<@NotNull T> matchOption) {
+        return isSupported(null, file, matchServerCapabilities, matchOption);
+    }
+
+    private boolean isSupported(@Nullable PsiFile psiFile,
+                                @Nullable VirtualFile file,
+                                @NotNull Predicate<@NotNull ServerCapabilities> matchServerCapabilities,
+                                @Nullable Predicate<@NotNull T> matchOption) {
         var serverCapabilities = getServerCapabilities();
         if (serverCapabilities != null && matchServerCapabilities.test(serverCapabilities)) {
             return true;
@@ -110,18 +143,21 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
                 // Matches language?
                 if (hasLanguage) {
                     if (!languageIdGet) {
-                        languageId = clientFeatures.getServerDefinition().getLanguageIdOrNull(file);
+                        if (psiFile == null) {
+                            psiFile = LSPIJUtils.getPsiFile(file, clientFeatures.getProject());
+                        }
+                        languageId = clientFeatures.getServerDefinition().getLanguageIdOrNull(psiFile);
                         languageIdGet = true;
                     }
                     matchDocumentSelector = (languageId == null && !hasScheme && !hasPattern) // to be compatible with LSP4IJ < 0.7.0, when languageId is not defined in the mapping, we consider that it matches the documentSelector
-                                            || filter.getLanguage().equals(languageId);
+                            || filter.getLanguage().equals(languageId);
                 }
 
                 if (!matchDocumentSelector) {
                     // Matches scheme?
                     if (hasScheme) {
                         if (fileUri == null) {
-                            fileUri = LSPIJUtils.toUri(file); // TODO: move this file Uri into LSP client features to customize the file Uri
+                            fileUri = file != null ? clientFeatures.getFileUri(file) : clientFeatures.getFileUri(LSPIJUtils.getFile(psiFile));
                         }
                         if (scheme == null) {
                             scheme = fileUri.getScheme();
@@ -135,7 +171,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
                         if (hasPattern) {
                             PathPatternMatcher patternMatcher = filter.getPathPattern();
                             if (fileUri == null) {
-                                fileUri = LSPIJUtils.toUri(file); // TODO: move this file Uri into LSP client features to customize the file Uri
+                                fileUri = file != null ? clientFeatures.getFileUri(file) : clientFeatures.getFileUri(LSPIJUtils.getFile(psiFile));
                             }
                             matchDocumentSelector = patternMatcher.matches(fileUri);
                         }
@@ -170,4 +206,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
         return dynamicCapabilities;
     }
 
+    protected @NotNull LSPClientFeatures getClientFeatures() {
+        return clientFeatures;
+    }
 }
