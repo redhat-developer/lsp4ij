@@ -189,6 +189,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
             DidChangeWatchedFilesParams params = new DidChangeWatchedFilesParams(Arrays.asList(changes));
             ls.getWorkspaceService()
                     .didChangeWatchedFiles(params);
+            return ls;
         });
     }
 

@@ -11,7 +11,7 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.features.inspection;
+package com.redhat.devtools.lsp4ij.inspections;
 
 /**
  * Default LSP local inspection tool which collect LSP doagnostics in

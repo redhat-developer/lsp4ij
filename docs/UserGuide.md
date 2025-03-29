@@ -108,7 +108,15 @@ that you can select in the left panel via the checkboxes:
 
 ![LSP Semantic Tokens Inspector](./images/LSPSemanticTokensInspector.png)
 
-### Troubleshooting
+## Inspections
+
+You can click on `Inspect Code` hyperlink available on the `Project Errors` from the `Problems` view to 
+show all LSP diagnostics errors of your project:
+
+ - from opened files.
+ - from closed files, if your language server support it. 
+
+## Troubleshooting
 
 If the `Semantic Tokens` doesn't show the expected result, please check that:
 

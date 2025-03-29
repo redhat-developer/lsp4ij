@@ -55,7 +55,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.showNotificationError;
@@ -227,6 +227,7 @@ public class LanguageServerWrapper implements Disposable {
      */
     public synchronized void restart() {
         numberOfRestartAttempts = 0;
+        serverError = null;
         setEnabled(true);
         stop();
         // start the language server
@@ -785,7 +786,7 @@ public class LanguageServerWrapper implements Disposable {
         return null;
     }
 
-    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(CompletableFuture<Void> didOpenFuture) {
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull CompletableFuture<LanguageServer> didOpenFuture) {
         if (didOpenFuture.isDone()) {
             // The didOpen has happened, no need to wait for the didOpen
             // to return the language server
@@ -830,7 +831,7 @@ public class LanguageServerWrapper implements Disposable {
             // Remove the listener from the old document stored in synchronizer
             DocumentContentSynchronizer synchronizer = data.getSynchronizer();
             synchronizer.getDocument().removeDocumentListener(synchronizer);
-            synchronizer.documentClosed();
+            synchronizer.dispose();
         }
         if (stopIfNoOpenedFiles) {
             maybeShutdown();
@@ -883,7 +884,7 @@ public class LanguageServerWrapper implements Disposable {
      *
      * @return all LSP files connected to this language server.
      */
-    public Collection<OpenedDocument> getOpenedFiles() {
+    public Collection<OpenedDocument> getOpenedDocuments() {
         // Create a new array list to avoid ConcurrentModificationException
         return new ArrayList<>(openedDocuments.values());
     }
@@ -952,12 +953,14 @@ public class LanguageServerWrapper implements Disposable {
      * Sends a notification to the wrapped language server
      *
      * @param fn LS notification to send
+     * @return
      */
-    public void sendNotification(@NotNull Consumer<LanguageServer> fn) {
+    public CompletableFuture<LanguageServer> sendNotification(@NotNull Function<LanguageServer, LanguageServer> fn) {
         // Enqueues a notification on the dispatch thread associated with the wrapped language server. This
         // ensures the interleaving of document updates and other requests in the UI is mirrored in the
         // order in which they get dispatched to the server
-        getInitializedServer().thenAcceptAsync(fn, this.dispatcher);
+        return getInitializedServer()
+                .thenApplyAsync(fn, this.dispatcher);
     }
 
     /**
