@@ -121,6 +121,7 @@ pre-filled with server name, command, mappings and potential configuration.
 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
+* [Docker Language Server](./user-defined-ls/docker-language-server.md)
 * [Erlang Language Server](./user-defined-ls/erlang-ls.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
 * [Julia Language Server](./user-defined-ls/julia.md) 
