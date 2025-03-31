@@ -1,0 +1,35 @@
+{
+  "id": "docker-language-server",
+  "name": "Docker Language Server",
+  "programArgs": {
+    "default": "docker-language-server start --stdio"
+  },
+  "languageMappings": [
+    {
+      "language": "Dockerfile",
+      "languageId": "dockerfile"
+    }
+  ],
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Docker Compose",
+        "patterns": [
+          "docker-compose.yml",
+          "docker-compose.yaml"
+        ]
+      },
+      "languageId": "dockercompose"
+    },
+    {
+      "fileType": {
+        "name": "Docker Bake",
+        "patterns": [
+          "docker-bake.hcl",
+          "docker-bake.override.hcl"
+        ]
+      },
+      "languageId": "dockerbake"
+    }
+  ]
+}
