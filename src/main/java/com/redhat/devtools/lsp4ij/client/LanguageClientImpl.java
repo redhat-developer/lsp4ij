@@ -216,18 +216,9 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     private void refreshDiagnosticsForAllOpenedFiles() {
         // Received request 'workspace/diagnostic/refresh
-        ReadAction.nonBlocking((Callable<Void>) () -> {
-                    for (var openedDocument : wrapper.getOpenedDocuments()) {
-                        VirtualFile file = openedDocument.getFile();
-                        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-                        if (psiFile != null) {
-                            // Refresh the UI
-                            DaemonCodeAnalyzer.getInstance(psiFile.getProject()).restart(psiFile);
-                        }
-                    }
-                    return null;
-                }).coalesceBy(this)
-                .submit(AppExecutorUtil.getAppExecutorService());
+        for (var openedDocument : wrapper.getOpenedDocuments()) {
+            openedDocument.getSynchronizer().refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
+        }
     }
 
     @Override

@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.server.capabilities;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.DocumentContentSynchronizer;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.DiagnosticRegistrationOptions;
@@ -81,7 +82,7 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
         // - didOpen have not processed pull diagnostic
         // - and if language server support it for now if textDocument/diagnostic has been dynamically registered.
         for (var openedDocument :  getClientFeatures().getServerWrapper().getOpenedDocuments()) {
-            openedDocument.getSynchronizer().forcePullDiagnosticIfNeeded();
+            openedDocument.getSynchronizer().refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_REGISTER_CAPABILITY);
         }
         return options;
     }

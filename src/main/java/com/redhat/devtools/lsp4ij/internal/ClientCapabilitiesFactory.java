@@ -119,7 +119,7 @@ public class ClientCapabilitiesFactory {
         // Support for 'textDocument/diagnostic'
         final var diagnosticCapabilities = new DiagnosticCapabilities();
         diagnosticCapabilities.setDynamicRegistration(Boolean.TRUE);
-        diagnosticCapabilities.setRelatedDocumentSupport(Boolean.FALSE);
+        diagnosticCapabilities.setRelatedDocumentSupport(Boolean.TRUE);
         textDocumentClientCapabilities.setDiagnostic(diagnosticCapabilities);
 
         // Code Action support

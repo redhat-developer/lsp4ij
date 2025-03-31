@@ -43,6 +43,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class DocumentContentSynchronizer implements DocumentListener, Disposable {
 
+    public enum RefreshPullDiagnosticOrigin {
+        ON_REGISTER_CAPABILITY,
+        ON_WORKSPACE_REFRESH
+    }
+
     private static final long WAIT_AFTER_SENDING_DID_OPEN = 500L;
 
     private final @NotNull LanguageServerWrapper languageServerWrapper;
@@ -273,11 +278,27 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         documentClosed();
     }
 
-    public void forcePullDiagnosticIfNeeded() {
-        if (!diagnosticNotPulledOnDidOpen) {
-            return;
+    /**
+     * Refresh pull diagnostic according the given origin.
+     *
+     * @param origin the origin (call by 'textDocument/diagnostic' by dynamic registerCapability or by 'workspace/diagnostic/refresh')
+     */
+    public void refreshPullDiagnostic(@NotNull RefreshPullDiagnosticOrigin origin) {
+        int currentVersion = version;
+        if (origin == RefreshPullDiagnosticOrigin.ON_REGISTER_CAPABILITY) {
+            // called by 'textDocument/diagnostic' by dynamic registerCapability
+            // we need to consume the 'textDocument/diagnostic' if when didOpen has occurred, the pull diagnostic
+            // capability was not enabled.
+            if (!diagnosticNotPulledOnDidOpen) {
+                // the didOpen have already consumed the 'textDocument/diagnostic', do nothing
+                return;
+            }
+        } else if (origin == RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH) {
+            // called by 'workspace/diagnostic/refresh'
+            // Set version to -1 to force the call of the pull diagnostic even if version has not changed.
+            currentVersion = -1;
         }
-        processPullDiagnosticIfNeeded(didOpenFuture, version);
+        processPullDiagnosticIfNeeded(null, currentVersion);
     }
 
     /**
@@ -286,12 +307,28 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * @param didFuture the didOpen, didChange future.
      * @param version   the current document version.
      */
-    private void processPullDiagnosticIfNeeded(@NotNull CompletableFuture<LanguageServer> didFuture, int version) {
+    private void processPullDiagnosticIfNeeded(@Nullable CompletableFuture<LanguageServer> didFuture, int version) {
+        boolean debounceValidation = didFuture != null;
         if (!isPullDiagnosticsSupported()) {
             // The language server doesn't support pull diagnostics.
-            diagnosticNotPulledOnDidOpen = didFuture == didOpenFuture;
+            diagnosticNotPulledOnDidOpen = didFuture != null && didFuture == didOpenFuture;
             return;
         }
+        if (!debounceValidation) {
+            // Refresh pull diagnostic without debounce
+            if (version != -1 && version != this.version) {
+                // The document has changed, do nothing
+                return;
+            }
+            var ls = didOpenFuture.getNow(null);
+            if (ls == null) {
+                // The didOpen is not finished, ignore the pull diagnostic
+                return;
+            }
+            refreshPullDiagnostic(version, ls);
+            return;
+        }
+        // Refresh pull diagnostic with debounce (after a didOpen , didChange).
         // Initialize the Alarm which consumes 'textDocument/diagnostic' with debounce mode.
         if (debouncePullDiagnosticsAlarm == null) {
             debouncePullDiagnosticsAlarm = getDebouncePullDiagnosticsAlarm();
@@ -302,44 +339,47 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 .thenApply(ls -> {
                     // didOpen, didChange notification has been sent, consume 'textDocument/diagnostic' with debounce mode.
                     debouncePullDiagnosticsAlarm.addRequest(() -> {
-                        if (version != this.version) {
+                        if (version != -1 && version != this.version) {
                             // The document has changed, do nothing
                             return;
                         }
-
-                        // Consume 'textDocument/diagnostic'
-                        DocumentDiagnosticParams params = new DocumentDiagnosticParams();
-                        params.setTextDocument(new TextDocumentIdentifier(fileUri));
-                        ls.getTextDocumentService()
-                                .diagnostic(params)
-                                .thenAcceptAsync(diagnosticReport -> {
-                                    if (version != this.version) {
-                                        // The document has changed, do nothing
-                                        return;
-                                    }
-                                    // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticAnnotator.
-                                    if (diagnosticReport.isLeft()) {
-                                        RelatedFullDocumentDiagnosticReport fullDocumentDiagnosticReport = diagnosticReport.getLeft();
-                                        var items = fullDocumentDiagnosticReport.getItems();
-                                        // Update the diagnostics cache from the opened file
-                                        var openedDocument = languageServerWrapper.getOpenedDocument(LSPIJUtils.toUri(file));
-                                        openedDocument.updateDiagnostics(items != null ? items : Collections.emptyList());
-                                        // Refresh UI to process LSPDiagnosticAnnotator.
-                                        refreshLSPDiagnostics();
-                                    } else if (diagnosticReport.isRight()) {
-                                        RelatedUnchangedDocumentDiagnosticReport relatedUnchangedDocumentDiagnosticReport = diagnosticReport.getRight();
-
-                                    }
-
-                                });
+                        refreshPullDiagnostic(version, ls);
                     }, 500);
                     return ls;
                 });
     }
 
+    private void refreshPullDiagnostic(int version, LanguageServer ls) {
+        // Consume 'textDocument/diagnostic'
+        DocumentDiagnosticParams params = new DocumentDiagnosticParams();
+        params.setTextDocument(new TextDocumentIdentifier(fileUri));
+        ls.getTextDocumentService()
+                .diagnostic(params)
+                .thenAcceptAsync(diagnosticReport -> {
+                    if (version != -1 && version != this.version) {
+                        // The document has changed, do nothing
+                        return;
+                    }
+                    // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticAnnotator.
+                    if (diagnosticReport.isLeft()) {
+                        RelatedFullDocumentDiagnosticReport fullDocumentDiagnosticReport = diagnosticReport.getLeft();
+                        var items = fullDocumentDiagnosticReport.getItems();
+                        // Update the diagnostics cache from the opened file
+                        var openedDocument = languageServerWrapper.getOpenedDocument(LSPIJUtils.toUri(file));
+                        openedDocument.updateDiagnostics(items != null ? items : Collections.emptyList());
+                        // Refresh UI to process LSPDiagnosticAnnotator.
+                        refreshLSPDiagnostics();
+                    } else if (diagnosticReport.isRight()) {
+                        // TODO ...
+                        RelatedUnchangedDocumentDiagnosticReport relatedUnchangedDocumentDiagnosticReport = diagnosticReport.getRight();
+                    }
+
+                });
+    }
+
     private void refreshLSPDiagnostics() {
         var project = languageServerWrapper.getProject();
-        var coalesceBy = new CoalesceByKey("textDocument/diagnostics", fileUri);
+        var coalesceBy = new CoalesceByKey("textDocument/diagnostic", fileUri);
         var executeInSmartMode = DumbService.getInstance(project).isDumb();
         var action = ReadAction.nonBlocking((Callable<Void>) () -> {
                     var psiFile = LSPIJUtils.getPsiFile(file, project);
