@@ -110,11 +110,13 @@ that you can select in the left panel via the checkboxes:
 
 ## Inspections
 
-You can click on `Inspect Code` hyperlink available on the `Project Errors` from the `Problems` view to 
-show all LSP diagnostics errors of your project:
+You can click on `Inspect Code...` hyperlink available on the `Project Errors` from the `Problems` view to 
+show all LSP diagnostics errors of your project in the `Language Servers` local inspection tool:
 
  - from opened files.
  - from closed files, if your language server support it. 
+
+![Inspect Code...](./images/LSPInspectCode.png)
 
 ## Troubleshooting
 
