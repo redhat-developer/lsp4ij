@@ -298,6 +298,89 @@ public class MyLSPDiagnosticFeature extends LSPDiagnosticFeature {
 }
 ```
 
+### Customize Inspections
+
+LSP4IJ supports [Inspect Code...](UserGuide.md#inspections) which show all diagnostics
+in the `Language Servers` local inspection tool node.
+
+You can show diagnostics from your language server node in a custom local inspection tool. Here a sample which shows JavaScript and TypeScript
+files form a custom `JS/TS files` node:
+
+![Customize Inspect Code...](./images/LSPInspectCodeCustom.png)
+
+Create 2 local inspection tool classes like this:
+
+```java
+package my.language.server.inspections;
+
+import com.redhat.devtools.lsp4ij.inspections.LSPLocalInspectionToolBase;
+
+public class JavaScriptLocalInspectionTool extends LSPLocalInspectionToolBase {
+
+  public static final String ID = "JavaScriptLocalInspectionTool";
+  
+}
+```
+and 
+
+```java
+package my.language.server.inspections;
+
+import com.redhat.devtools.lsp4ij.inspections.LSPLocalInspectionToolBase;
+
+public class TypeScriptLocalInspectionTool extends LSPLocalInspectionToolBase {
+
+  public static final String ID = "TypeScriptLocalInspectionTool";
+  
+}
+```
+
+and declare them like this:
+
+```xml
+<localInspection id="TypeScriptLocalInspectionTool"
+                 language=""
+                 enabledByDefault="true"
+                 groupName="JS/TS files"
+                 displayName="TypeScript"
+                 implementationClass="my.language.server.inspections.TypeScriptLocalInspectionTool"/>
+<localInspection id="JavaScriptLocalInspectionTool"
+                 language=""
+                 enabledByDefault="true"
+                 groupName="JS/TS files"
+                 displayName="JavaScript"
+                 implementationClass="my.language.server.inspections.JavaScriptLocalInspectionTool"/>
+```
+
+Create a diagnostic feature like this:
+
+```java
+package my.language.server;
+
+import com.intellij.codeInspection.LocalInspectionTool;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.client.features.LSPDiagnosticFeature;
+import my.language.server.inspections.JavaScriptLocalInspectionTool;
+import my.language.server.inspections.TypeScriptLocalInspectionTool;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLSPDiagnosticFeature extends LSPDiagnosticFeature {
+
+    @Override
+    public boolean isInspectionApplicableFor(@NotNull PsiFile file,
+                                             @NotNull LocalInspectionTool inspection) {
+        if (file.getName().endsWith(".ts")) {
+            return TypeScriptLocalInspectionTool.ID.equals(inspection.getID());
+        }
+        if (file.getName().endsWith(".js")) {
+            return JavaScriptLocalInspectionTool.ID.equals(inspection.getID());
+        }
+        return super.isInspectionApplicableFor(file, inspection);
+    }
+}
+```
+
+
 ## LSP DocumentHighlight Feature
 
 | API                               | Description                                                                                                                                                                                                                        | Default Behaviour           |
