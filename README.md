@@ -83,6 +83,7 @@ Here are some projects that use LSP4IJ:
  * [AngelScript Language Server for IntelliJ](https://github.com/sashi0034/angel-intellij)
  * [RobotCode - Robot Framework Support](https://robotcode.io)
  * [IntelliJ-gno](https://github.com/gnoverse/intellij-gno)
+ * [SAP CDS Language Support for IntelliJ](https://github.com/cap-js/cds-intellij)
 
 ## Requirements
 
