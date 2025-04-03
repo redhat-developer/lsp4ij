@@ -16,14 +16,14 @@ To get language support for files from the Docker ecosystem (Dockerfiles, Compos
 
 ## Configuring your JetBrains IDE
 
-3. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
+1. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
-4. Select **Dockerfile Language Server** as the template from the available options.
+2. Select **Docker Language Server** as the template from the available options.
 
-6. **Optional**: You may also customize the Mappings section according to your preferences.
+3. **Optional**: You may also customize the Mappings section according to your preferences.
 
-7. **Optional**: You may also customize the Configuration section according to your preferences.
+4. **Optional**: You may also customize the Configuration section according to your preferences.
 
-8. **Click OK** to apply the changes. You should now have language support for Dockerfiles, Compose files, and Bake files enabled in your IDE:
+5. **Click OK** to apply the changes. You should now have language support for Dockerfiles, Compose files, and Bake files enabled in your IDE:
 
 ![Docker Language Server output in the LSP console](../images/user-defined-ls/docker-language-server/console-output.png)
