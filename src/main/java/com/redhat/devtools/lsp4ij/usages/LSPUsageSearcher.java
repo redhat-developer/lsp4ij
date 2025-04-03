@@ -140,16 +140,13 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                 LOGGER.error("Error while collection LSP Usages", e);
             }
 
-            // TODO : as this external reference process can be very slow (for our IJ Quarkus);
-            // the call of processExternalReferences is commented.
-            //  Reactivate it just for some language servers (by using an lsp client featurees)
             // For completeness' sake, also collect external usages to LSP (pseudo-)elements
-            /*LSPExternalReferencesFinder.processExternalReferences(
+            LSPExternalReferencesFinder.processExternalReferences(
                     file,
                     element.getTextOffset(),
                     searchScope,
                     reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
-            );*/
+            );
         });
     }
 

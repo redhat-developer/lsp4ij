@@ -135,6 +135,31 @@ This menu action either opens the reference in a popup or navigates to the refer
 
 [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is used also via [Find Usages](./UserGuide.md#find-usages) to show references.
 
+#### External References
+
+LSP4IJ supports integration of externally-added references to language server-derived symbols when appropriate. External
+references are those that are added client-side by either the same plugin or by other installed plugins, e.g., in a
+polyglot environment where symbols in one language can be referenced in other languages.
+
+When enabled, this ensures that external references are included in **Find Usages** results and during symbol rename
+operations. This feature is _disabled by default_ but can be enabled for a custom language server implementation by
+overriding `LSPReferencesFeature#processExternalReferences(PsiFile)` to return `true`, or for a user-defined language
+server definition, by setting `references.processExternalReferences` to `true` in client configuration, e.g.:
+
+```json
+{
+  "references": {
+    "processExternalReferences": true
+  }
+}
+```
+
+This feature should **only** be enabled if you are **explicitly** aware of plugins that might be contributing 
+client-side external references to a language server's symbols. Note that enabling this feature will result in a
+textual search, albeit indexed, of the search scope for the symbol name for which references have been requested.
+This can result in longer overall references search times in larger projects and/or where the language server is
+supplementary to first-class IDE language support.  
+
 ### Implementation
 
 The [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) is consumed with:

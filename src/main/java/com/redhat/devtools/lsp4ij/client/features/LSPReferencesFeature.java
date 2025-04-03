@@ -62,5 +62,16 @@ public class LSPReferencesFeature extends AbstractLSPDocumentFeature {
             referencesCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
     }
-    
+
+    /**
+     * Determines whether or not client-side external references should be processed for LSP4IJ symbols in the
+     * specified file.
+     *
+     * @param file the file
+     * @return true if client-side external references should be processed; otherwise false
+     */
+    public boolean processExternalReferences(@NotNull PsiFile file) {
+        // Default to disabled
+        return false;
+    }
 }

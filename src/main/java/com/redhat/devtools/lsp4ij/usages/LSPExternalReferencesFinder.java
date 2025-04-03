@@ -70,22 +70,29 @@ public final class LSPExternalReferencesFinder {
                                                  int offset,
                                                  @NotNull SearchScope searchScope,
                                                  @NotNull Processor<PsiReference> processor) {
-        VirtualFile virtualFile = file.getVirtualFile();
-        if (virtualFile != null) {
-            Document document = LSPIJUtils.getDocument(virtualFile);
-            TextRange wordTextRange = document != null ? LSPIJUtils.getWordRangeAt(document, file, offset) : null;
-            if (wordTextRange != null) {
-                LSPPsiElement wordElement = new LSPPsiElement(file, wordTextRange);
-                String wordText = wordElement.getText();
-                if (StringUtil.isNotEmpty(wordText)) {
-                    processExternalReferences(
-                            file,
-                            wordText,
-                            wordTextRange,
-                            searchScope,
-                            ProgressManager.getInstance().getProgressIndicator(),
-                            processor
-                    );
+        // Only if enabled by at least one of the file's language servers
+        Project project = file.getProject();
+        if (LanguageServiceAccessor.getInstance(project).hasAny(
+                file,
+                ls -> ls.getClientFeatures().getReferencesFeature().processExternalReferences(file)
+        )) {
+            VirtualFile virtualFile = file.getVirtualFile();
+            if (virtualFile != null) {
+                Document document = LSPIJUtils.getDocument(virtualFile);
+                TextRange wordTextRange = document != null ? LSPIJUtils.getWordRangeAt(document, file, offset) : null;
+                if (wordTextRange != null) {
+                    LSPPsiElement wordElement = new LSPPsiElement(file, wordTextRange);
+                    String wordText = wordElement.getText();
+                    if (StringUtil.isNotEmpty(wordText)) {
+                        processExternalReferences(
+                                file,
+                                wordText,
+                                wordTextRange,
+                                searchScope,
+                                ProgressManager.getInstance().getProgressIndicator(),
+                                processor
+                        );
+                    }
                 }
             }
         }

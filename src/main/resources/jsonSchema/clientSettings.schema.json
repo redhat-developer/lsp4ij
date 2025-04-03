@@ -192,6 +192,19 @@
         }
       }
     },
+    "references": {
+      "type": "object",
+      "title": "Client-side references configuration",
+      "additionalProperties": false,
+      "properties": {
+        "processExternalReferences": {
+          "type": "boolean",
+          "title": "Process external references",
+          "description": "Whether or not client-side external references should be processed for symbols from this language server.",
+          "default": false
+        }
+      }
+    },
     "workspaceSymbol": {
       "type": "object",
       "title": "Client-side workspace symbol configuration",

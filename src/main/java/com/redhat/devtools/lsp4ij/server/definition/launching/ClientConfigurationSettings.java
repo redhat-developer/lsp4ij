@@ -168,6 +168,16 @@ public class ClientConfigurationSettings {
     }
 
     /**
+     * Client-side references settings.
+     */
+    public static class ClientConfigurationReferencesSettings {
+        /**
+         * Whether or not client-side external references should be processed.
+         */
+        public boolean processExternalReferences = false;
+    }
+
+    /**
      * Client-side workspace symbol settings.
      */
     public static class ClientConfigurationWorkspaceSymbolSettings {
@@ -221,6 +231,11 @@ public class ClientConfigurationSettings {
      * Client-side format settings.
      */
     public @NotNull ClientConfigurationFormatSettings format = new ClientConfigurationFormatSettings();
+
+    /**
+     * Client-side references settings.
+     */
+    public @NotNull ClientConfigurationReferencesSettings references = new ClientConfigurationReferencesSettings();
 
     /**
      * Client-side workspace symbol settings.
