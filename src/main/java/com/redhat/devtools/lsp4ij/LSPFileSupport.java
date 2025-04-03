@@ -10,10 +10,16 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.Alarm;
+import com.intellij.util.concurrency.AppExecutorUtil;
+import com.redhat.devtools.lsp4ij.client.CoalesceByKey;
 import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyIncomingCallsSupport;
 import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyOutgoingCallsSupport;
 import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPPrepareCallHierarchySupport;
@@ -42,8 +48,11 @@ import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSuppo
 import com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPPrepareTypeHierarchySupport;
 import com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchySubtypesSupport;
 import com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchySupertypesSupport;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.concurrent.Callable;
 
 /**
  * LSP file support stored in the opened {@link PsiFile} with key "lsp.file.support"
@@ -53,6 +62,11 @@ import org.jetbrains.annotations.NotNull;
 public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     private static final Key<LSPFileSupport> LSP_FILE_SUPPORT_KEY = Key.create("lsp.file.support");
+    public static final @NotNull CancelChecker NO_CANCELLABLE_CHECKER = () -> {
+    };
+
+    private volatile Alarm refreshPsiFileAlarm = null;
+
     private final PsiFile file;
 
     private final LSPCodeLensSupport codeLensSupport;
@@ -433,6 +447,53 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     }
 
     /**
+     * Call 'DaemonCodeAnalyzer.getInstance(project).restart(file);' with debounce.
+     */
+    public void restartDaemonCodeAnalyzerWithDebounce() {
+        restartDaemonCodeAnalyzerWithDebounce(NO_CANCELLABLE_CHECKER);
+    }
+
+    /**
+     * Call 'DaemonCodeAnalyzer.getInstance(project).restart(file);' with debounce by checking the given cancel checker.
+     *
+     * @param cancelChecker the cancel checker.
+     */
+    public void restartDaemonCodeAnalyzerWithDebounce(@NotNull CancelChecker cancelChecker) {
+        if (cancelChecker.isCanceled()) {
+            return;
+        }
+        var alarm = getRefreshPsiFileAlarm();
+        alarm.cancelAllRequests();
+        alarm.addRequest(() -> {
+            var project = file.getProject();
+            var coalesceBy = new CoalesceByKey("psiFile/refresh", file.getVirtualFile().getUrl());
+            var executeInSmartMode = DumbService.getInstance(project).isDumb();
+            var action = ReadAction.nonBlocking((Callable<Void>) () -> {
+                        if (!cancelChecker.isCanceled()) {
+                            DaemonCodeAnalyzer.getInstance(project).restart(file);
+                        }
+                        return null;
+                    }).expireWith(this)
+                    .coalesceBy(coalesceBy);
+            if (executeInSmartMode) {
+                action.inSmartMode(project);
+            }
+            action.submit(AppExecutorUtil.getAppExecutorService());
+        }, 1000);
+    }
+
+    private Alarm getRefreshPsiFileAlarm() {
+        if (refreshPsiFileAlarm == null) {
+            synchronized (this) {
+                if (refreshPsiFileAlarm == null) {
+                    refreshPsiFileAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+                }
+            }
+        }
+        return refreshPsiFileAlarm;
+    }
+
+    /**
      * Return the existing LSP file support for the given Psi file, or create a new one if necessary.
      *
      * @param file the Psi file.
@@ -468,4 +529,5 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     public PsiFile getFile() {
         return file;
     }
+
 }

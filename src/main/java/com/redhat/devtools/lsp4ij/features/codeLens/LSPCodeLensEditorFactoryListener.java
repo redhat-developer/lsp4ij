@@ -86,7 +86,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
             }
 
             // Get valid LSP codelens future.
-            var resultFuture = codeLensSupport.getValidLSPFuture();
+            var resultFuture = codeLensSupport.getFuture();
             if (resultFuture != null && resultFuture.isDone()) {
                 var result = resultFuture.getNow(null);
                 if (result == null || !result.hasToResolve(context.getFirstViewportLine(), context.getLastViewportLine())) {

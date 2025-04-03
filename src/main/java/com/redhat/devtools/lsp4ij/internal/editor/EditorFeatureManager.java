@@ -12,7 +12,6 @@
 package com.redhat.devtools.lsp4ij.internal.editor;
 
 import com.google.common.collect.Sets;
-import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
@@ -22,6 +21,7 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -137,7 +137,7 @@ public class EditorFeatureManager implements Disposable {
                         // No opened editors associated from any language servers.
                         return;
                     }
-                    DaemonCodeAnalyzer.getInstance(project).restart(context.file());
+                    LSPFileSupport.getSupport(context.file()).restartDaemonCodeAnalyzerWithDebounce();
                     for (var runnable : context.runnables()) {
                         runnable.run();
                     }

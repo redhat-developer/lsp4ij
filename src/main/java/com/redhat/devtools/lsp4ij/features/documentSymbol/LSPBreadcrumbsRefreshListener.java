@@ -14,7 +14,6 @@
 
 package com.redhat.devtools.lsp4ij.features.documentSymbol;
 
-import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -26,6 +25,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.ui.components.breadcrumbs.Crumb;
 import com.intellij.xml.breadcrumbs.BreadcrumbListener;
 import com.intellij.xml.breadcrumbs.BreadcrumbsPanel;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -109,7 +109,7 @@ public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageS
                 file.putUserData(NEEDS_RESTART, false);
                 // We must force the modification stamp to increment or sticky lines won't be recomputed
                 file.clearCaches();
-                ApplicationManager.getApplication().invokeLater(() -> DaemonCodeAnalyzer.getInstance(file.getProject()).restart(file));
+                ApplicationManager.getApplication().invokeLater(() -> LSPFileSupport.getSupport(file).restartDaemonCodeAnalyzerWithDebounce());
             }
         }
     }

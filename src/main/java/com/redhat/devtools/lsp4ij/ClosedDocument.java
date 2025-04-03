@@ -30,8 +30,11 @@ public class ClosedDocument extends LSPDocumentBase {
     private List<Diagnostic> diagnostics;
 
     @Override
-    public void updateDiagnostics(@NotNull List<Diagnostic> diagnostics) {
+    public boolean updateDiagnostics(@NotNull List<Diagnostic> diagnostics) {
+        boolean changed = isDiagnosticsChanged(this.diagnostics != null ? this.diagnostics : Collections.emptyList(), diagnostics);
         this.diagnostics = diagnostics;
+        return changed;
+
     }
 
     @Override

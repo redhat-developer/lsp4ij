@@ -107,11 +107,9 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         CompletableFuture<SemanticTokensData> semanticTokensFuture = semanticTokensSupport.getSemanticTokens(params);
         try {
             waitUntilDone(semanticTokensFuture, file);
-        } catch (
-                PsiFileChangedException e) {
-            //TODO delete block when minimum required version is 2024.2
+        } catch (PsiFileChangedException e) {
             semanticTokensSupport.cancel();
-            throw e;
+            return null;
         } catch (CancellationException e) {
             // cancel the LSP requests textDocument/semanticTokens/full
             //semanticTokensSupport.cancel();

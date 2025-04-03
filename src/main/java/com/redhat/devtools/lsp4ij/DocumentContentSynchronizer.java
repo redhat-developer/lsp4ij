@@ -10,20 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
-import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.util.Alarm;
-import com.intellij.util.concurrency.AppExecutorUtil;
-import com.redhat.devtools.lsp4ij.client.CoalesceByKey;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -33,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -367,33 +361,12 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                         // Update the diagnostics cache from the opened file
                         var openedDocument = languageServerWrapper.getOpenedDocument(LSPIJUtils.toUri(file));
                         openedDocument.updateDiagnostics(items != null ? items : Collections.emptyList());
-                        // Refresh UI to process LSPDiagnosticAnnotator.
-                        refreshLSPDiagnostics();
                     } else if (diagnosticReport.isRight()) {
                         // TODO ...
                         RelatedUnchangedDocumentDiagnosticReport relatedUnchangedDocumentDiagnosticReport = diagnosticReport.getRight();
                     }
 
                 });
-    }
-
-    private void refreshLSPDiagnostics() {
-        var project = languageServerWrapper.getProject();
-        var coalesceBy = new CoalesceByKey("textDocument/diagnostic", fileUri);
-        var executeInSmartMode = DumbService.getInstance(project).isDumb();
-        var action = ReadAction.nonBlocking((Callable<Void>) () -> {
-                    var psiFile = LSPIJUtils.getPsiFile(file, project);
-                    if (psiFile == null) {
-                        return null;
-                    }
-                    DaemonCodeAnalyzer.getInstance(project).restart(psiFile);
-                    return null;
-                }).expireWith(languageServerWrapper)
-                .coalesceBy(coalesceBy);
-        if (executeInSmartMode) {
-            action.inSmartMode(project);
-        }
-        action.submit(AppExecutorUtil.getAppExecutorService());
     }
 
     public boolean isPullDiagnosticsSupported() {

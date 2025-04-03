@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPDocumentBase;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -61,13 +62,16 @@ public class LSPDiagnosticsForServer {
         return languageServer.getClientFeatures();
     }
     /**
-     * Update the new LSP published diagnosics.
+     * Update the new LSP published diagnostics.
      *
-     * @param diagnostics the new LSP published diagnosics
+     * @param diagnostics the new LSP published diagnostics
      */
-    public void update(@NotNull List<Diagnostic> diagnostics) {
+    public boolean update(@NotNull List<Diagnostic> diagnostics) {
+        Collection<Diagnostic> oldDiagnostic = this.diagnostics != null ? this.diagnostics.keySet() : Collections.emptySet();
+        boolean changed = LSPDocumentBase.isDiagnosticsChanged(oldDiagnostic, diagnostics);
         // initialize diagnostics map
         this.diagnostics = toMap(diagnostics, this.diagnostics);
+        return changed;
     }
 
     private Map<Diagnostic, LSPLazyCodeActions> toMap(@NotNull List<Diagnostic> diagnostics,
