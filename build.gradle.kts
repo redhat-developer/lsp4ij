@@ -103,7 +103,8 @@ intellijPlatform {
                 }
                 subList(indexOf(start) + 1, indexOf(end))
                     .joinToString("\n")
-                    .replace("](./", "](https://raw.githubusercontent.com/redhat-developer/lsp4ij/main/")
+                    .replace("](./docs/images", "](https://raw.githubusercontent.com/redhat-developer/lsp4ij/main/docs/images")
+                    .replace("](./", "](https://github.com/redhat-developer/lsp4ij/blob/main")
                     .let(::markdownToHTML)
             }
         }
