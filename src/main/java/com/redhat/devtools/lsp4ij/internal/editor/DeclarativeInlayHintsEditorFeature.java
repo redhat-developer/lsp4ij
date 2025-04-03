@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal.editor;
 
-import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.codeInsight.hints.declarative.impl.DeclarativeInlayHintsPassFactory;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
@@ -49,7 +48,7 @@ public class DeclarativeInlayHintsEditorFeature implements EditorFeature {
                                   @NotNull List<Runnable> runnableList) {
         Runnable runnable = () -> {
             // Refresh the annotations, inlay hints both
-            DaemonCodeAnalyzer.getInstance(file.getProject()).restart(file);
+            LSPFileSupport.getSupport(file).restartDaemonCodeAnalyzerWithDebounce();
         };
         runnableList.add(runnable);
     }

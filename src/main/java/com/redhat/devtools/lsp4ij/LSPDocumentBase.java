@@ -29,7 +29,7 @@ public abstract class LSPDocumentBase {
      *
      * @param diagnostics the new diagnostics.
      */
-    public abstract void updateDiagnostics(@NotNull List<Diagnostic> diagnostics);
+    public abstract boolean updateDiagnostics(@NotNull List<Diagnostic> diagnostics);
 
     /**
      * Returns the current diagnostics for the file reported by the language server.
@@ -37,4 +37,24 @@ public abstract class LSPDocumentBase {
      * @return the current diagnostics for the file reported by the language server.
      */
     public abstract Collection<Diagnostic> getDiagnostics();
+
+    /**
+     * Returns true if the old and new diagnostics list changed and false otherwise.
+     * @param oldDiagnostics old diagnostics
+     * @param newDiagnostics new diagnostics
+     * @return true if the old and new diagnostics list changed and false otherwise.
+     */
+    public static boolean isDiagnosticsChanged(@NotNull Collection<Diagnostic> oldDiagnostics,
+                                               @NotNull Collection<Diagnostic> newDiagnostics) {
+        if (oldDiagnostics.size() != newDiagnostics.size()) {
+            return true;
+        }
+        for(var d : newDiagnostics) {
+            if (!oldDiagnostics.contains(d)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

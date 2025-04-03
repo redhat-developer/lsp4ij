@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.client;
 
 import com.google.gson.JsonObject;
-import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
@@ -193,10 +192,11 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
                         VirtualFile file = openedDocument.getFile();
                         PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                         if (psiFile != null) {
+                            var fileSupport = LSPFileSupport.getSupport(psiFile);
                             // Evict the semantic tokens cache
-                            LSPFileSupport.getSupport(psiFile).getSemanticTokensSupport().cancel();
+                            fileSupport.getSemanticTokensSupport().cancel();
                             // Refresh the UI
-                            DaemonCodeAnalyzer.getInstance(psiFile.getProject()).restart(psiFile);
+                            fileSupport.restartDaemonCodeAnalyzerWithDebounce();
                         }
                     }
                     return null;

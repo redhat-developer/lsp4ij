@@ -52,6 +52,17 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
         if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
             return Boolean.FALSE;
         }
+        // Loop for language server which report diagnostics for the given file
+        // and mark all opened documents as 'displaying diagnostics'
+        URI fileUri = LSPIJUtils.toUri(file);
+        var servers = LanguageServiceAccessor.getInstance(file.getProject())
+                .getStartedServers();
+        for (var ls : servers) {
+            OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
+            if (openedDocument != null) {
+                openedDocument.markAsDisplayingDiagnostics();
+            }
+        }
         return Boolean.TRUE;
     }
 
@@ -72,12 +83,12 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
         var servers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getStartedServers();
         for (var ls : servers) {
-            OpenedDocument data = ls.getOpenedDocument(fileUri);
-            if (data != null) {
+            OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
+            if (openedDocument != null) {
                 // The file is mapped with the current language server
-                var ds = data.getDiagnosticsForServer();
+                var ds = openedDocument.getDiagnosticsForServer();
                 // Loop for LSP diagnostics to transform it to Intellij annotation.
-                for (Diagnostic diagnostic : data.getDiagnostics()) {
+                for (Diagnostic diagnostic : openedDocument.getDiagnostics()) {
                     ProgressManager.checkCanceled();
                     createAnnotation(diagnostic, document, file, ds, holder);
                 }
