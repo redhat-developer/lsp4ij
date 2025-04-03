@@ -30,6 +30,7 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         // Use the extended feature implementations
         setCompletionFeature(new UserDefinedCompletionFeature());
         setFormattingFeature(new UserDefinedFormattingFeature());
+        setReferencesFeature(new UserDefinedReferencesFeature());
         setWorkspaceSymbolFeature(new UserDefinedWorkspaceSymbolFeature());
         setBreadcrumbsFeature(new UserDefinedBreadcrumbsFeature());
         setEditorBehaviorFeature(new UserDefinedEditorBehaviorFeature(this));
