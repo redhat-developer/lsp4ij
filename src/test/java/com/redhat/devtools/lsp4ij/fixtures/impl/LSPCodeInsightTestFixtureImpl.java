@@ -18,6 +18,7 @@ import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.TempDirTestFixture;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightTestFixture;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -26,6 +27,12 @@ import org.jetbrains.annotations.NotNull;
 public class LSPCodeInsightTestFixtureImpl extends CodeInsightTestFixtureImpl implements LSPCodeInsightTestFixture {
     public LSPCodeInsightTestFixtureImpl(@NotNull IdeaProjectTestFixture projectFixture, @NotNull TempDirTestFixture tempDirTestFixture) {
         super(projectFixture, tempDirTestFixture);
+    }
+
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
+        MockLanguageServer.reset();
     }
 
     @Override
