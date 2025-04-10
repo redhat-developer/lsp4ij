@@ -54,19 +54,19 @@ public class DAPStackFrame extends XStackFrame {
 
     @Override
     public void customizePresentation(@NotNull ColoredTextContainer component) {
-        Source source = stackFrame.getSource();
-        String sourceName = source != null ? source.getName() : null;
-        if (StringUtils.isNotBlank(sourceName)) {
-            component.append(sourceName, SimpleTextAttributes.REGULAR_ATTRIBUTES);
-        } else {
-            component.append(XDebuggerBundle.message("invalid.frame"), SimpleTextAttributes.ERROR_ATTRIBUTES);
-        }
+        component.append(stackFrame.getName(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
         int line = stackFrame.getLine();
         if (line > 0) {
             component.append(":" + line, SimpleTextAttributes.REGULAR_ATTRIBUTES);
         }
-        component.append(" at ", SimpleTextAttributes.REGULAR_ATTRIBUTES);
-        component.append(stackFrame.getName(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
+        component.append(", ", SimpleTextAttributes.REGULAR_ATTRIBUTES);
+        Source source = stackFrame.getSource();
+        String sourceName = source != null ? source.getName() : null;
+        if (sourceName != null && StringUtils.isNotBlank(sourceName)) {
+            component.append(sourceName, SimpleTextAttributes.REGULAR_ATTRIBUTES);
+        } else {
+            component.append(XDebuggerBundle.message("invalid.frame"), SimpleTextAttributes.ERROR_ATTRIBUTES);
+        }
         component.setIcon(AllIcons.Debugger.Frame);
     }
 
