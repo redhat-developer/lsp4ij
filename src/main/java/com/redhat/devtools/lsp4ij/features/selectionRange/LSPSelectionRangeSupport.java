@@ -196,6 +196,7 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
                     }
                     return selectionRanges.stream()
                             .filter(Objects::nonNull)
+                            .filter(selectionRange -> selectionRange.getRange() != null)
                             .toList();
                 });
     }
