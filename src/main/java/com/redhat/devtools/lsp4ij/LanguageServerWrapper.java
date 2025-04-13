@@ -90,7 +90,7 @@ public class LanguageServerWrapper implements Disposable {
     private Future<?> launcherFuture;
 
     private int numberOfRestartAttempts;
-    private CompletableFuture<Void> initializeFuture;
+    private @Nullable CompletableFuture<Void> initializeFuture;
     private LanguageServer languageServer;
     private LanguageClientImpl languageClient;
     private ServerCapabilities serverCapabilities;
@@ -744,6 +744,9 @@ public class LanguageServerWrapper implements Disposable {
             // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
             Document optionalDocument = fileConnectionInfo.document();
             Document document = optionalDocument != null ? optionalDocument : LSPIJUtils.getDocument(file);
+            if (document == null) {
+                return CompletableFuture.completedFuture(null);
+            }
 
             synchronized (closedDocuments) {
                 closedDocuments.remove(fileUri);
@@ -998,6 +1001,9 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public void registerCapability(RegistrationParams params) {
+        if (initializeFuture == null) {
+            return;
+        }
         initializeFuture.thenRun(() -> {
             params.getRegistrations().forEach(reg -> {
                 if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
@@ -1239,7 +1245,11 @@ public class LanguageServerWrapper implements Disposable {
         if (fileOperationsManager == null) {
             return false;
         }
-        return fileOperationsManager.canWillRenameFiles(LSPIJUtils.toUri(file), file.isDirectory());
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canWillRenameFiles(uri, file.isDirectory());
     }
 
     /**
@@ -1252,7 +1262,11 @@ public class LanguageServerWrapper implements Disposable {
         if (fileOperationsManager == null) {
             return false;
         }
-        return fileOperationsManager.canDidRenameFiles(LSPIJUtils.toUri(file), file.isDirectory());
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canDidRenameFiles(uri, file.isDirectory());
     }
 
     @NotNull

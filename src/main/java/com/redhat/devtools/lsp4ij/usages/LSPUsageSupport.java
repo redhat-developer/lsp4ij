@@ -170,8 +170,9 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
     }
 
     private static BiFunction<? super List<? extends Location>, Throwable, ? extends List<LSPUsagePsiElement>> reportUsages2(
-            LanguageServerItem ls, Project project,
-            LSPUsagePsiElement.UsageKind usageKind) {
+            @NotNull LanguageServerItem ls,
+            @NotNull Project project,
+            @NotNull LSPUsagePsiElement.UsageKind usageKind) {
         return (locations, error) -> {
             if (error != null) {
                 return Collections.emptyList();
@@ -182,7 +183,8 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
 
     @NotNull
     private static BiFunction<Either<List<? extends Location>, List<? extends LocationLink>>, Throwable, List<LSPUsagePsiElement>> reportUsages(
-            LanguageServerItem ls, @NotNull Project project,
+            @NotNull LanguageServerItem ls,
+            @NotNull Project project,
             @NotNull LSPUsagePsiElement.UsageKind usageKind) {
         return (locations, error) -> {
             if (error != null) {

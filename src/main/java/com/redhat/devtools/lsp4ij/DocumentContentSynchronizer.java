@@ -54,8 +54,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     private int version = 0;
     private final List<TextDocumentContentChangeEvent> changeEvents;
-    @NotNull
-    private CompletableFuture<LanguageServer> didOpenFuture;
+    private @Nullable CompletableFuture<LanguageServer> didOpenFuture;
 
     private volatile Alarm debouncePullDiagnosticsAlarm = null;
     private boolean diagnosticNotPulledOnDidOpen;

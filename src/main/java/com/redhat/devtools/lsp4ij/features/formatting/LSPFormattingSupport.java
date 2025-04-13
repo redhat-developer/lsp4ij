@@ -86,7 +86,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
             // Ignore the error
             formattingRequest.onTextReady(formattingRequest.getDocumentText());
         } else {
-            formattingRequest.onError("LSP formatting error", error.getMessage() != null ? error.getMessage() :  error.getClass().getName());
+            formattingRequest.onError("LSP formatting error", error.getMessage() != null ? error.getMessage() : error.getClass().getName());
         }
     }
 
@@ -169,7 +169,8 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
     private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(@Nullable Integer tabSize,
                                                                                        @Nullable Boolean insertSpaces,
                                                                                        @NotNull TextRange textRange,
-                                                                                       @NotNull Document document, LanguageServerItem languageServer) {
+                                                                                       @NotNull Document document,
+                                                                                       @NotNull LanguageServerItem languageServer) {
         DocumentRangeFormattingParams params = new DocumentRangeFormattingParams();
         params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.getFileUri(getFile().getVirtualFile(), languageServer.getClientFeatures()).toASCIIString()));
         FormattingOptions options = new FormattingOptions();
@@ -180,10 +181,8 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
             options.setInsertSpaces(insertSpaces);
         }
         params.setOptions(options);
-        if (document != null) {
-            Range range = LSPIJUtils.toRange(textRange, document);
-            params.setRange(range);
-        }
+        Range range = LSPIJUtils.toRange(textRange, document);
+        params.setRange(range);
         return params;
     }
 }

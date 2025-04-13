@@ -41,7 +41,11 @@ public class LSPNavigationLinkHandler extends TooltipLinkHandler {
     @Override
     public boolean handleLink(@NotNull String fileUrl,
                               @NotNull Editor editor) {
-        return LSPIJUtils.openInEditor(fileUrl, null, true, true, null, editor.getProject());
+        var project = editor.getProject();
+        if (project == null) {
+            return false;
+        }
+        return LSPIJUtils.openInEditor(fileUrl, null, true, true, null, project);
     }
 
     /**

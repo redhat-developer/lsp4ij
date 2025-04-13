@@ -92,10 +92,12 @@ public final class CompletionProposalTools {
                 return indentOptions;
             }
         }
-        Language language = provider.getBaseLanguage();
-        CommonCodeStyleSettings.IndentOptions indentOptions = settings.getLanguageIndentOptions(language);
-        if (indentOptions != null) {
-            return indentOptions;
+        if (provider != null) {
+            Language language = provider.getBaseLanguage();
+            CommonCodeStyleSettings.IndentOptions indentOptions = settings.getLanguageIndentOptions(language);
+            if (indentOptions != null) {
+                return indentOptions;
+            }
         }
         return settings.getIndentOptions();
     }

@@ -44,7 +44,10 @@ public class LSPGoToImplementationAction extends AbstractLSPGoToAction {
     }
 
     @Override
-    protected CompletableFuture<List<LocationData>> getLocations(PsiFile psiFile, Document document, Editor editor, int offset) {
+    protected CompletableFuture<List<LocationData>> getLocations(@NotNull PsiFile psiFile,
+                                                                 @NotNull Document document,
+                                                                 @NotNull Editor editor,
+                                                                 int offset) {
         LSPImplementationSupport implementationSupport = LSPFileSupport.getSupport(psiFile).getImplementationSupport();
         var params = new LSPImplementationParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);

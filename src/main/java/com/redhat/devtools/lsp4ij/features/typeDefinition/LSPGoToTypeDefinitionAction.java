@@ -44,7 +44,10 @@ public class LSPGoToTypeDefinitionAction extends AbstractLSPGoToAction {
     }
 
     @Override
-    protected CompletableFuture<List<LocationData>> getLocations(PsiFile psiFile, Document document, Editor editor, int offset) {
+    protected CompletableFuture<List<LocationData>> getLocations(@NotNull PsiFile psiFile,
+                                                                 @NotNull Document document,
+                                                                 @NotNull Editor editor,
+                                                                 int offset) {
         LSPTypeDefinitionSupport typeDefinitionSupport = LSPFileSupport.getSupport(psiFile).getTypeDefinitionSupport();
         var params = new LSPTypeDefinitionParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);

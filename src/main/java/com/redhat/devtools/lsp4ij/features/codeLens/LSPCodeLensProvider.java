@@ -177,7 +177,9 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                                 CodeVisionEntry entry = codeLensFeature.createCodeVisionEntry(codeLens, providerId, context);
                                 if (entry != null) {
                                     TextRange textRange = LSPIJUtils.toTextRange(codeLens.getRange(), editor.getDocument(), null, true);
-                                    result.add(new Pair<>(textRange, entry));
+                                    if (textRange != null) {
+                                        result.add(new Pair<>(textRange, entry));
+                                    }
                                 }
                             }
                         }

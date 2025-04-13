@@ -73,6 +73,9 @@ public class LSPUsagesManager {
             default: {
                 // Open locations in a Popup
                 @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
+                if (editor == null) {
+                    return;
+                }
                 LocationData ref = locations.get(0);
                 LSPUsageTriggeredPsiElement element = toUsageTriggeredPsiElement(ref.location(), ref.languageServer().getClientFeatures(), project);
                 if (element != null) {
