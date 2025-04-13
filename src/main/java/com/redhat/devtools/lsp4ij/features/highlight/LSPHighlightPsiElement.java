@@ -34,7 +34,7 @@ public class LSPHighlightPsiElement extends LSPPsiElement {
         this.kind = kind;
     }
 
-    public DocumentHighlightKind getKind() {
+    public @NotNull DocumentHighlightKind getKind() {
         return kind;
     }
 

@@ -47,7 +47,7 @@ public abstract class LSPHierarchyProviderBase implements HierarchyProvider {
             return null;
         }
 
-        if (ProjectIndexingManager.getInstance(project).isIndexingAll()) {
+        if (ProjectIndexingManager.isIndexingAll()) {
             return null;
         }
 

@@ -29,7 +29,7 @@ public class LSPHierarchyItemPsiElement extends LSPPsiElement {
     private static final TextRange DUMMY_TEXT_RANGE = new TextRange(0,0);
     private final @Nullable Range range;
 
-    public LSPHierarchyItemPsiElement(@Nullable PsiFile file,
+    public LSPHierarchyItemPsiElement(@NotNull PsiFile file,
                                       @Nullable Range range,
                                       @NotNull String name) {
         super(file, DUMMY_TEXT_RANGE);

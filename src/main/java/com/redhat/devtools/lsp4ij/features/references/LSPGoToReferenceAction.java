@@ -44,7 +44,10 @@ public class LSPGoToReferenceAction extends AbstractLSPGoToAction {
     }
 
     @Override
-    protected CompletableFuture<List<LocationData>> getLocations(PsiFile psiFile, Document document, Editor editor, int offset) {
+    protected CompletableFuture<List<LocationData>> getLocations(@NotNull PsiFile psiFile,
+                                                                 @NotNull Document document,
+                                                                 @NotNull Editor editor,
+                                                                 int offset) {
         LSPReferenceSupport referenceSupport = LSPFileSupport.getSupport(psiFile).getReferenceSupport();
         var params = new LSPReferenceParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> referencesFuture = referenceSupport.getReferences(params);

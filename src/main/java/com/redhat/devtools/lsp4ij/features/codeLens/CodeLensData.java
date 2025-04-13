@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.codeLens;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.CodeLens;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -24,13 +23,13 @@ public class CodeLensData {
 
     private @NotNull CodeLens codeLens;
     private final @NotNull LanguageServerItem languageServer;
-    private @Nullable boolean toResolve;
+    private boolean toResolve;
     private CompletableFuture<CodeLens> resolveCodeLensFuture;
     private CodeLensDataResult result;
 
     public CodeLensData(@NotNull CodeLens codeLens,
                         @NotNull LanguageServerItem languageServer,
-                        @Nullable boolean toResolve) {
+                        boolean toResolve) {
         this.codeLens = codeLens;
         this.languageServer = languageServer;
         this.toResolve = toResolve;
@@ -44,7 +43,7 @@ public class CodeLensData {
         return languageServer;
     }
 
-    public @Nullable boolean isToResolve() {
+    public boolean isToResolve() {
         return toResolve;
     }
 

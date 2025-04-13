@@ -50,6 +50,9 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
 
     @Override
     public PsiElement @Nullable [] getGotoDeclarationTargets(@Nullable PsiElement sourceElement, int offset, Editor editor) {
+        if (sourceElement == null) {
+            return PsiElement.EMPTY_ARRAY;
+        }
         PsiFile psiFile = sourceElement.getContainingFile();
         if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return PsiElement.EMPTY_ARRAY;
@@ -87,7 +90,7 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                 for (DocumentLinkData documentLinkData : documentLinks) {
                     DocumentLink documentLink = documentLinkData.documentLink();
                     TextRange range = LSPIJUtils.toTextRange(documentLink.getRange(), document);
-                    if (range.contains(offset)) {
+                    if (range != null && range.contains(offset)) {
                         // The Ctrl+Click has been done in a LSP document link,try to open the document.
                         final String target = documentLink.getTarget();
                         if (target != null && !target.isEmpty()) {

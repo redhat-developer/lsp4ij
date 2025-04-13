@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.TextRange;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -22,6 +23,6 @@ import org.jetbrains.annotations.Nullable;
  * @param textRange the text range and null otherwise.
  * @param document the document.
  */
-public record LSPFormattingParams(@Nullable Integer tabSize, @Nullable Boolean insertSpaces, @Nullable TextRange textRange, @Nullable Document document) {
+public record LSPFormattingParams(@Nullable Integer tabSize, @Nullable Boolean insertSpaces, @Nullable TextRange textRange, @NotNull Document document) {
 
 }

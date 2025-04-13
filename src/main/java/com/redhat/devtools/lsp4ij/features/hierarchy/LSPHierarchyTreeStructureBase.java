@@ -51,19 +51,21 @@ public abstract class LSPHierarchyTreeStructureBase<T> extends HierarchyTreeStru
         final List<LSPHierarchyNodeDescriptor> descriptors = new ArrayList<>();
         if (descriptor instanceof LSPHierarchyNodeDescriptor lspDescriptor) {
             final PsiElement element = lspDescriptor.getPsiElement();
-            PsiFile psiFile = element.getContainingFile();
-            if (lspDescriptor.isBase()) {
-                // fill with:
-                // - prepareCallHierarchy
-                // - prepareTypeHierarchy
-                int offset = element.getTextRange().getStartOffset();
-                Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
-                buildRoot(lspDescriptor, psiFile, document, offset, descriptors);
-            } else {
-                // fill with:
-                // - callHierarchy/incomingCalls / callHierarchy/outgoingCalls
-                // - typeHierarchy/subtypes / typeHierarchy/supertypes
-                buildChildren(lspDescriptor, psiFile, (T) lspDescriptor.getHierarchyItem(), descriptors);
+            if (element != null) {
+                PsiFile psiFile = element.getContainingFile();
+                if (lspDescriptor.isBase()) {
+                    // fill with:
+                    // - prepareCallHierarchy
+                    // - prepareTypeHierarchy
+                    int offset = element.getTextRange().getStartOffset();
+                    Document document = LSPIJUtils.getDocument(psiFile.getVirtualFile());
+                    buildRoot(lspDescriptor, psiFile, document, offset, descriptors);
+                } else {
+                    // fill with:
+                    // - callHierarchy/incomingCalls / callHierarchy/outgoingCalls
+                    // - typeHierarchy/subtypes / typeHierarchy/supertypes
+                    buildChildren(lspDescriptor, psiFile, (T) lspDescriptor.getHierarchyItem(), descriptors);
+                }
             }
         }
         return ArrayUtil.toObjectArray(descriptors);
@@ -74,6 +76,9 @@ public abstract class LSPHierarchyTreeStructureBase<T> extends HierarchyTreeStru
                                           @Nullable Range range,
                                           @NotNull String name,
                                           @Nullable FileUriSupport fileUriSupport) {
+        if (uri == null) {
+            return null;
+        }
         VirtualFile file = FileUriSupport.findFileByUri(uri, fileUriSupport);
         if (file == null) {
             return null;

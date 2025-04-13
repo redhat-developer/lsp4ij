@@ -89,12 +89,16 @@ public abstract class LSPHierarchyNodeDescriptor<T> extends HierarchyNodeDescrip
 
     @Override
     public boolean canNavigate() {
-        return getPsiElement().getContainingFile() != null;
+        var element = getPsiElement();
+        return element != null && element.getContainingFile() != null;
     }
 
     @Override
     public void navigate(boolean requestFocus) {
         PsiElement element = getPsiElement();
+        if (element == null) {
+            return;
+        }
         VirtualFile file = element.getContainingFile().getVirtualFile();
         Range range = null;
         if(element instanceof LSPHierarchyItemPsiElement lspElement) {

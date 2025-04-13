@@ -72,7 +72,7 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
             openBraceOffset = offset - 1;
             openBraceChar = documentChars.charAt(offset - 1);
             closeBraceChar = LSPIJEditorUtils.getCloseBraceCharacter(file, openBraceChar);
-        } else if (LSPIJEditorUtils.isCloseBraceCharacter(file, documentChars.charAt(offset))) {
+        } else if ((offset < documentLength) && LSPIJEditorUtils.isCloseBraceCharacter(file, documentChars.charAt(offset))) {
             closeBraceOffset = offset;
             closeBraceChar = documentChars.charAt(offset);
             openBraceChar = LSPIJEditorUtils.getOpenBraceCharacter(file, closeBraceChar);
