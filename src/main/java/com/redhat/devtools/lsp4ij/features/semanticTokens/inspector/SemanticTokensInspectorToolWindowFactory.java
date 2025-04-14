@@ -14,6 +14,8 @@ import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowFactory;
+import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.openapi.wm.ex.ToolWindowManagerListener;
 import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
@@ -34,5 +36,19 @@ public class SemanticTokensInspectorToolWindowFactory implements ToolWindowFacto
                 LanguageServerBundle.message("lsp.semantic.tokens.inspector.title"), false);
         content.setDisposer(semanticTokensInspectorView);
         contentManager.addContent(content);
+
+        project.getMessageBus().connect().subscribe(ToolWindowManagerListener.TOPIC, new ToolWindowManagerListener() {
+            @Override
+            public void stateChanged(@NotNull ToolWindowManager toolWindowManager, @NotNull ToolWindowManagerEventType changeType) {
+                if (changeType == ToolWindowManagerEventType.HideToolWindow && !toolWindowManager.isStripeButtonShow(toolWindow)) {
+                    toolWindow.setAvailable(false);
+                }
+            }
+        });
+    }
+
+    @Override
+    public boolean shouldBeAvailable(@NotNull Project project) {
+        return false;
     }
 }

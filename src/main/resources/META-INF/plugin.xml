@@ -804,8 +804,7 @@
                 file="colorSchemes/SemanticTokensLight.xml"/>
     </extensions>
 
-    <!-- Launch configuration Language servers -->
-
+    <!-- Actions for Language Servers view -->
     <actions resource-bundle="messages.LanguageServerBundle">
         <action
                 id="lsp.console.explorer.restart"
@@ -823,6 +822,15 @@
                 id="lsp.console.explorer.copy.command"
                 class="com.redhat.devtools.lsp4ij.console.explorer.actions.CopyStartServerCommandAction"
                 icon="AllIcons.Actions.Copy"/>
+    </actions>
+
+    <!-- Actions for Semantic Tokens Inspector view -->
+    <actions>
+        <action id="ActivateSemanticTokensInspectorToolWindow"
+                class="com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.ActivateSemanticTokensInspectorToolWindowAction"
+                icon="AllIcons.General.InspectionsEye">
+            <add-to-group group-id="ActivateToolWindowActions"/>
+        </action>
     </actions>
 
     <!-- LSP link handlers -->
