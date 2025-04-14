@@ -85,6 +85,7 @@ Here are some projects that use LSP4IJ:
  * [IntelliJ-gno](https://github.com/gnoverse/intellij-gno)
  * [SAP CDS Language Support for IntelliJ](https://github.com/cap-js/cds-intellij)
  * [RyeCharm](https://github.com/InSyncWithFoo/ryecharm)
+ * [Huly Code](https://github.com/hcengineering/huly-code)
 
 ## Requirements
 
