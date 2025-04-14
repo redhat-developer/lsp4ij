@@ -84,6 +84,7 @@ Here are some projects that use LSP4IJ:
  * [RobotCode - Robot Framework Support](https://robotcode.io)
  * [IntelliJ-gno](https://github.com/gnoverse/intellij-gno)
  * [SAP CDS Language Support for IntelliJ](https://github.com/cap-js/cds-intellij)
+ * [RyeCharm](https://github.com/InSyncWithFoo/ryecharm)
 
 ## Requirements
 
