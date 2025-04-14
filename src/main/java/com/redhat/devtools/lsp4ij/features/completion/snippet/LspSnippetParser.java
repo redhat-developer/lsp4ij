@@ -261,7 +261,13 @@ public class LspSnippetParser {
     private String readString(int... stopOn) throws IOException {
         startCapture();
         do {
-            read();
+            if (current == '\\') {
+                pauseCapture();
+                readEscape();
+                startCapture();
+            } else {
+                read();
+            }
             for (int i = 0; i < stopOn.length; i++) {
                 if (current == stopOn[i]) {
                     return endCapture();
@@ -272,14 +278,33 @@ public class LspSnippetParser {
         return endCapture();
     }
 
+    private void readEscape() throws IOException {
+        // here current is equals to '\'
+        // read the next character
+        read();
+        switch (current) {
+            case '}':
+            case '|':
+            case '\\':
+            case ',':
+            case '$':
+                // escaped character
+                // ex: \{ --> store just {
+                captureBuffer.append((char) current);
+                break;
+            default:
+                // non-escaped character, keep the previous read character '\'
+                // ex: \n --> stores \n
+                captureBuffer.append("\\");
+                captureBuffer.append((char) current);
+                break;
+        }
+        // read the next character
+        read();
+    }
+
     private void handleText() throws IOException {
         String text = readString('$');
-        if (!text.isEmpty() && text.charAt(text.length() - 1) == '\\') {
-            if (readChar('$')) {
-                // Escape \$ to add '$' only as text.
-                text = text.substring(0, text.length() - 1) + '$';
-            }
-        }
         handler.text(text);
     }
 
@@ -345,6 +370,12 @@ public class LspSnippetParser {
             captureBuffer = new StringBuilder();
         }
         captureStart = index - 1;
+    }
+
+    private void pauseCapture() {
+        int end = current == -1 ? index : index - 1;
+        captureBuffer.append(buffer, captureStart, end - captureStart);
+        captureStart = -1;
     }
 
     private String endCapture() {
