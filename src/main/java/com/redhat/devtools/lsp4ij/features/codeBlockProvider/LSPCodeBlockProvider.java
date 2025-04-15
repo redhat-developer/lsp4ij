@@ -29,6 +29,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import static com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder.isFoldingRangesAvailable;
+import static com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport.isSelectionRangesAvailable;
+
 /**
  * Code block provider that uses information from {@link LSPSelectionRangeSupport} and {@link LSPFoldingRangeBuilder}.
  */
@@ -143,6 +146,11 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                                                      int openBraceOffset,
                                                      @Nullable Character closeBraceChar,
                                                      int closeBraceOffset) {
+        // Check if it exists a started language server which support LSP selectionRanges
+        if (!isSelectionRangesAvailable(file)) {
+            return null;
+        }
+
         Document document = editor.getDocument();
         List<TextRange> selectionTextRanges = LSPSelectionRangeSupport.getSelectionTextRanges(file, editor, offset);
         if (!ContainerUtil.isEmpty(selectionTextRanges)) {
@@ -215,7 +223,12 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                                                    int openBraceOffset,
                                                    @Nullable Character closeBraceChar,
                                                    int closeBraceOffset) {
-        List<FoldingRange> foldingRanges = LSPFoldingRangeBuilder.getFoldingRanges(file);
+        // Check if it exists a started language server which support LSP selectionRange
+        if (!isFoldingRangesAvailable(file)) {
+            return null;
+        }
+
+        List<FoldingRange> foldingRanges = LSPFoldingRangeBuilder.getFoldingRanges(file, 500);
         if (!ContainerUtil.isEmpty(foldingRanges)) {
             CharSequence documentChars = document.getCharsSequence();
             int documentLength = documentChars.length();
@@ -258,9 +271,9 @@ public class LSPCodeBlockProvider implements CodeBlockProvider {
                     }
                     // Otherwise see if it starts and ends with a known brace pair and we'll find the "closest" below
                     else if (textRange.containsOffset(offset) &&
-                             (openBraceOffset == -1) &&
-                             (closeBraceOffset == -1) &&
-                             LSPIJEditorUtils.isOpenBraceCharacter(file, startChar)) {
+                            (openBraceOffset == -1) &&
+                            (closeBraceOffset == -1) &&
+                            LSPIJEditorUtils.isOpenBraceCharacter(file, startChar)) {
                         Character pairedCloseBraceChar = LSPIJEditorUtils.getCloseBraceCharacter(file, startChar);
                         if ((pairedCloseBraceChar != null) && (pairedCloseBraceChar == endChar)) {
                             containingTextRanges.add(textRange);

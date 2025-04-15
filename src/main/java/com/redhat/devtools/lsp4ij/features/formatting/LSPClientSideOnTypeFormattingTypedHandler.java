@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
+import static com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport.isSelectionRangesAvailable;
 
 /**
  * Typed handler for LSP4IJ-managed files that performs automatic on-type formatting for specific keystrokes.
@@ -217,6 +218,11 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                                                          @NotNull PsiFile file,
                                                          @NotNull FormattingScope formattingScope,
                                                          char statementTerminatorChar) {
+        // Check if it exists a started language server which support LSP selectionRange
+        if (!isSelectionRangesAvailable(file)) {
+            return Result.CONTINUE;
+        }
+
         TextRange formatTextRange = null;
 
         int offset = editor.getCaretModel().getOffset();
