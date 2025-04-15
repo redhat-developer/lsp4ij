@@ -24,6 +24,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.FoldingRange;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
@@ -81,9 +83,27 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         }
     }
 
+    /**
+     * Returns true if there is a started language server which supports LSP foldingRanges and false otherwise.
+     * @param file the Psi file
+     * @return true if there is a started language server which supports LSP foldingRanges and false otherwise.
+     */
+    public static boolean isFoldingRangesAvailable(@NotNull PsiFile file) {
+        return (LanguageServiceAccessor.getInstance(file.getProject()).hasAny(file, ls -> {
+            var foldingRangeFeature = ls.getClientFeatures().getFoldingRangeFeature();
+            return foldingRangeFeature.isEnabled(file) && foldingRangeFeature.isSupported(file);
+        }));
+    }
+
     @NotNull
     @ApiStatus.Internal
     public static List<FoldingRange> getFoldingRanges(@Nullable PsiFile file) {
+        return getFoldingRanges(file, null);
+    }
+
+    @NotNull
+    @ApiStatus.Internal
+    public static List<FoldingRange> getFoldingRanges(@Nullable PsiFile file, @Nullable Integer timeout) {
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             return Collections.emptyList();
         }
@@ -97,7 +117,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         var params = new FoldingRangeRequestParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
         CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges(params);
         try {
-            waitUntilDone(foldingRangesFuture, file);
+            waitUntilDone(foldingRangesFuture, file, timeout);
         } catch (
                 ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
@@ -106,6 +126,9 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         } catch (CancellationException e) {
             // cancel the LSP requests textDocument/foldingRanges
             foldingRangeSupport.cancel();
+            return Collections.emptyList();
+        } catch(TimeoutException e) {
+            // Ignore timeout error
             return Collections.emptyList();
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/foldingRanges' request", e);

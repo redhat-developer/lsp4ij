@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 
 import static com.intellij.codeInsight.editorActions.ExtendWordSelectionHandlerBase.expandToWholeLinesWithBlanks;
+import static com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRangeSupport.isSelectionRangesAvailable;
 
 /**
  * Implementation of the IDE's extendWordSelectionHandler EP for LSP4IJ files against textDocument/selectionRange.
@@ -57,6 +58,11 @@ public class LSPExtendWordSelectionHandler extends AbstractLSPExtendWordSelectio
                                   @NotNull Editor editor) {
         PsiFile file = element.getContainingFile();
         if (file == null) {
+            return null;
+        }
+
+        // Check if it exists a started language server which support LSP selectionRange
+        if (!isSelectionRangesAvailable(file)) {
             return null;
         }
 
