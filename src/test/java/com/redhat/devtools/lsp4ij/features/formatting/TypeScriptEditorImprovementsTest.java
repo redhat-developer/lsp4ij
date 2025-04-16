@@ -18,6 +18,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.testFramework.EditorTestUtil;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
 import org.jetbrains.annotations.NotNull;
@@ -507,13 +508,22 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         caretModel.moveToOffset(bracketsOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
         String enterBetweenBracketsFileBody = adjustIndent(
-                """
-                        export class Foo {
-                            values = [
-                            <caret>];
-                            bar() {}
-                        }
-                        """,
+                // NOTE: Once 2023.3 is no longer supported, this can use only the first expected value
+                LSPIJUtils.isVersionAtLeast(2024, 1) ?
+                        """
+                                export class Foo {
+                                    values = [
+                                        <caret>];
+                                    bar() {}
+                                }
+                                """ :
+                        """
+                                export class Foo {
+                                    values = [
+                                    <caret>];
+                                    bar() {}
+                                }
+                                """,
                 useTabCharacter
         );
         assertEquals(enterBetweenBracketsFileBody.replace(CARET, ""), document.getText());
@@ -525,14 +535,24 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         caretModel.moveToOffset(parensOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
         String enterBetweenParensFileBody = adjustIndent(
-                """
-                        export class Foo {
-                            values = [
-                            ];
-                            bar(
-                            <caret>) {}
-                        }
-                        """,
+                // NOTE: Once 2023.3 is no longer supported, this can use only the first expected value
+                LSPIJUtils.isVersionAtLeast(2024, 1) ?
+                        """
+                                export class Foo {
+                                    values = [
+                                        ];
+                                    bar(
+                                        <caret>) {}
+                                }
+                                """ :
+                        """
+                                export class Foo {
+                                    values = [
+                                    ];
+                                    bar(
+                                    <caret>) {}
+                                }
+                                """,
                 useTabCharacter
         );
         assertEquals(enterBetweenParensFileBody.replace(CARET, ""), document.getText());
@@ -544,15 +564,26 @@ public class TypeScriptEditorImprovementsTest extends AbstractTypeScriptEditorIm
         caretModel.moveToOffset(bracesOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
         String enterBetweenBracesFileBody = adjustIndent(
-                """
-                        export class Foo {
-                            values = [
-                            ];
-                            bar(
-                            ) {
-                            <caret>}
-                        }
-                        """,
+                // NOTE: Once 2023.3 is no longer supported, this can use only the first expected value
+                LSPIJUtils.isVersionAtLeast(2024, 1) ?
+                        """
+                                export class Foo {
+                                    values = [
+                                        ];
+                                    bar(
+                                        ) {
+                                            <caret>}
+                                }
+                                """ :
+                        """
+                                export class Foo {
+                                    values = [
+                                    ];
+                                    bar(
+                                    ) {
+                                    <caret>}
+                                }
+                                """,
                 useTabCharacter
         );
         assertEquals(enterBetweenBracesFileBody.replace(CARET, ""), document.getText());
