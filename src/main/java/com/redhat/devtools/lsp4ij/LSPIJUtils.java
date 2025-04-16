@@ -16,6 +16,7 @@ import com.intellij.lang.LanguageUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.application.ex.ApplicationInfoEx;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
@@ -34,6 +35,8 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.util.Trinity;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.*;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -1434,4 +1437,82 @@ public class LSPIJUtils {
                 .toList();
     }
 
+    // IDE version check utilities to support branching logic based on the host IDE version
+
+    /**
+     * Determines whether or not the host IDE is at least the specified major/minor version.
+     *
+     * @param minimumMajorVersion the major version number
+     * @param minimumMinorVersion the minor version number
+     * @return true if the host IDE is at least the specified major/minor version; otherwise false
+     */
+    public static boolean isVersionAtLeast(
+            int minimumMajorVersion,
+            int minimumMinorVersion
+    ) {
+        return isVersionAtLeast(
+                minimumMajorVersion,
+                minimumMinorVersion,
+                0,
+                0
+        );
+    }
+
+    /**
+     * Determines whether or not the host IDE is at least the specified major/minor/patch/hotfix version.
+     *
+     * @param minimumMajorVersion  the major version number
+     * @param minimumMinorVersion  the minor version number
+     * @param minimumPatchVersion  the patch version number
+     * @param minimumHotfixVersion the hotfix version number
+     * @return true if the host IDE is at least the specified major/minor/patch/hotfix version; otherwise false
+     */
+    public static boolean isVersionAtLeast(
+            int minimumMajorVersion,
+            int minimumMinorVersion,
+            int minimumPatchVersion,
+            int minimumHotfixVersion
+    ) {
+        try {
+            Integer majorVersion = getMajorVersion();
+            Trinity<Integer, Integer, Integer> minorPatchHotfixVersion = getMinorPatchHotfixVersion();
+            if ((majorVersion != null) && (minorPatchHotfixVersion != null)) {
+                Integer minorVersion = minorPatchHotfixVersion.getFirst();
+                Integer patchVersion = minorPatchHotfixVersion.getSecond();
+                Integer hotfixVersion = minorPatchHotfixVersion.getThird();
+                if ((majorVersion > minimumMajorVersion) ||
+                    ((majorVersion == minimumMajorVersion) && (minorVersion > minimumMinorVersion)) ||
+                    ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion > minimumPatchVersion)) ||
+                    ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion == minimumPatchVersion) && (hotfixVersion >= minimumHotfixVersion))) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Failed to check the version number.", e);
+        }
+
+        return false;
+    }
+
+    @Nullable
+    private static Integer getMajorVersion() {
+        String majorVersionString = ApplicationInfoEx.getInstanceEx().getMajorVersion();
+        return (majorVersionString != null) ? Integer.valueOf(majorVersionString) : null;
+    }
+
+    @Nullable
+    private static Trinity<Integer, Integer, Integer> getMinorPatchHotfixVersion() {
+        String minorVersionString = ApplicationInfoEx.getInstanceEx().getMinorVersion();
+        if (StringUtil.isEmpty(minorVersionString)) {
+            return null;
+        }
+
+        // Might be of the form X.Y.Z, X.Y, or similar
+        List<String> minorVersionComponents = StringUtil.split(minorVersionString, ".");
+        //noinspection SizeReplaceableByIsEmpty
+        int minorVersion = minorVersionComponents.size() > 0 ? Integer.parseInt(minorVersionComponents.get(0)) : 0;
+        int patchVersion = minorVersionComponents.size() > 1 ? Integer.parseInt(minorVersionComponents.get(1)) : 0;
+        int hotfixVersion = minorVersionComponents.size() > 2 ? Integer.parseInt(minorVersionComponents.get(2)) : 0;
+        return Trinity.create(minorVersion, patchVersion, hotfixVersion);
+    }
 }

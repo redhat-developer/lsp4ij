@@ -18,6 +18,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.testFramework.EditorTestUtil;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 
 /**
  * These verify that editor improvements are disabled by default in custom (i.e., non-user-defined) language servers.
@@ -124,13 +125,23 @@ public class TypeScriptCustomLanguageServerEditorImprovementsTest extends Abstra
         int bracketsOffset = fileBody.indexOf("[]") + 1;
         caretModel.moveToOffset(bracketsOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
-        String enterBetweenBracketsFileBody = """
-                export class Foo {
-                    values = [
-                    <caret>];
-                    bar() {}
-                }
-                """;
+        String enterBetweenBracketsFileBody =
+                // NOTE: Once 2023.3 is no longer supported, this can use only the first expected value
+                LSPIJUtils.isVersionAtLeast(2024, 1) ?
+                        """
+                                export class Foo {
+                                    values = [
+                                        <caret>];
+                                    bar() {}
+                                }
+                                """ :
+                        """
+                                export class Foo {
+                                    values = [
+                                    <caret>];
+                                    bar() {}
+                                }
+                                """;
         assertEquals(enterBetweenBracketsFileBody.replace(CARET, ""), document.getText());
         assertEquals(enterBetweenBracketsFileBody.indexOf(CARET), caretModel.getOffset());
 
@@ -139,14 +150,25 @@ public class TypeScriptCustomLanguageServerEditorImprovementsTest extends Abstra
         int parensOffset = fileBody.indexOf("()") + 1;
         caretModel.moveToOffset(parensOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
-        String enterBetweenParensFileBody = """
-                export class Foo {
-                    values = [
-                    ];
-                    bar(
-                    <caret>) {}
-                }
-                """;
+        String enterBetweenParensFileBody =
+                // NOTE: Once 2023.3 is no longer supported, this can use only the first expected value
+                LSPIJUtils.isVersionAtLeast(2024, 1) ?
+                        """
+                                export class Foo {
+                                    values = [
+                                        ];
+                                    bar(
+                                        <caret>) {}
+                                }
+                                """ :
+                        """
+                                export class Foo {
+                                    values = [
+                                    ];
+                                    bar(
+                                    <caret>) {}
+                                }
+                                """;
         assertEquals(enterBetweenParensFileBody.replace(CARET, ""), document.getText());
         assertEquals(enterBetweenParensFileBody.indexOf(CARET), caretModel.getOffset());
 
@@ -155,15 +177,27 @@ public class TypeScriptCustomLanguageServerEditorImprovementsTest extends Abstra
         int bracesOffset = fileBody.indexOf("{}") + 1;
         caretModel.moveToOffset(bracesOffset);
         EditorTestUtil.performTypingAction(editor, '\n');
-        String enterBetweenBracesFileBody = """
-                export class Foo {
-                    values = [
-                    ];
-                    bar(
-                    ) {
-                    <caret>}
-                }
-                """;
+        String enterBetweenBracesFileBody =
+                // NOTE: Once 2023.3 is no longer supported, this can use only the first expected value
+                LSPIJUtils.isVersionAtLeast(2024, 1) ?
+                        """
+                                export class Foo {
+                                    values = [
+                                        ];
+                                    bar(
+                                        ) {
+                                            <caret>}
+                                }
+                                """ :
+                        """
+                                export class Foo {
+                                    values = [
+                                    ];
+                                    bar(
+                                    ) {
+                                    <caret>}
+                                }
+                                """;
         assertEquals(enterBetweenBracesFileBody.replace(CARET, ""), document.getText());
         assertEquals(enterBetweenBracesFileBody.indexOf(CARET), caretModel.getOffset());
     }
