@@ -294,6 +294,8 @@
                          groupName="Language Servers"
                          displayName="Diagnostics"
                          implementationClass="com.redhat.devtools.lsp4ij.inspections.LSPLocalInspectionTool"/>
+        <problemFileHighlightFilter id ="LSPProblemFileHighlightFilter"
+                                    implementation="com.redhat.devtools.lsp4ij.features.diagnostics.LSPProblemFileHighlightFilter"/>
 
         <!-- LSP textDocument/completion request support -->
         <typedHandler id="LSPCompletionTriggerTypedHandler"

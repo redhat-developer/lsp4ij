@@ -15,11 +15,14 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.problems.WolfTheProblemSolver;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.ClosedDocument;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.OpenedDocument;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.jetbrains.annotations.NotNull;
 
@@ -53,7 +56,8 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
         if (project.isDisposed()) {
             return;
         }
-        VirtualFile file = FileUriSupport.findFileByUri(params.getUri(), languageServerWrapper.getClientFeatures());
+        var clientFeatures = languageServerWrapper.getClientFeatures();
+        VirtualFile file = FileUriSupport.findFileByUri(params.getUri(), clientFeatures);
         if (file == null) {
             return;
         }
@@ -70,6 +74,13 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
             // Update diagnostics for closed file
             ClosedDocument closedDocument = languageServerWrapper.getClosedDocument(fileURI, true);
             closedDocument.updateDiagnostics(params.getDiagnostics());
+        }
+
+        WolfTheProblemSolver wolf = WolfTheProblemSolver.getInstance(project);
+        if (ContainerUtil.exists(params.getDiagnostics(), diagnostic -> diagnostic.getSeverity() == DiagnosticSeverity.Error)) {
+            wolf.reportProblemsFromExternalSource(file, languageServerWrapper);
+        } else {
+            wolf.clearProblemsFromExternalSource(file, languageServerWrapper);
         }
     }
 
