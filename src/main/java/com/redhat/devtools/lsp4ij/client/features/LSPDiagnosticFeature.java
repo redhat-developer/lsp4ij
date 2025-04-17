@@ -337,4 +337,13 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
             diagnosticCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
     }
+
+    /**
+     * Returns the diagnostic identifier to use to cache "pull" diagnostics.
+     *
+     * @return the diagnostic identifier to use to cache "pull" diagnostics.
+     */
+    public @NotNull String getDiagnosticIdentifier() {
+        return getDiagnosticCapabilityRegistry().getDiagnosticIdentifier();
+    }
 }

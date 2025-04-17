@@ -49,7 +49,11 @@ public class LSPDiagnosticsForServer {
     private final @Nullable VirtualFile file;
 
     // Map which contains all current diagnostics (as key) and future which load associated quick fixes (as value)
-    private Map<Diagnostic, LSPLazyCodeActions> diagnostics;
+    private @NotNull Map<Diagnostic, LSPLazyCodeActions> diagnostics;
+
+    private @Nullable Map<String /* diagnostic identifier */, Collection<Diagnostic>> diagnosticsPerIdentifier;
+
+    private String firstIdentifier;
 
     public LSPDiagnosticsForServer(@NotNull LanguageServerItem languageServer,
                                    @Nullable VirtualFile file) {
@@ -58,24 +62,67 @@ public class LSPDiagnosticsForServer {
         this.diagnostics = Collections.emptyMap();
     }
 
-    public LSPClientFeatures getClientFeatures() {
-        return languageServer.getClientFeatures();
-    }
     /**
      * Update the new LSP published diagnostics.
      *
-     * @param diagnostics the new LSP published diagnostics
+     * @param identifier the diagnostic identifier
+     * @param diagnostics the new LSP published/pulled diagnostics
      */
-    public boolean update(@NotNull List<Diagnostic> diagnostics) {
-        Collection<Diagnostic> oldDiagnostic = this.diagnostics != null ? this.diagnostics.keySet() : Collections.emptySet();
-        boolean changed = LSPDocumentBase.isDiagnosticsChanged(oldDiagnostic, diagnostics);
+    public boolean update(@NotNull String identifier,
+                          @NotNull List<Diagnostic> diagnostics) {
+        if (diagnosticsPerIdentifier == null) {
+            // At this step there are
+            // - no cached diagnostics
+            // - cached diagnostics which was only published or only pulled
+            if (firstIdentifier == null) {
+                // Store the first diagnostic identifier which updates the diagnostics cache (ex: lsp4ij.publish, lsp4ij.pull)
+                firstIdentifier = identifier;
+            } else {
+                // If the new identifier is different from the first diagnostic identifier
+                // we use diagnosticsPerIdentifier which maintains diagnostics for each identifier (pull, publish)
+                if (!firstIdentifier.equals(identifier)) {
+                    // We need to have several diagnostic cache
+                    diagnosticsPerIdentifier = new HashMap<>();
+                    diagnosticsPerIdentifier.put(firstIdentifier, this.diagnostics.keySet());
+                }
+            }
+        }
+
+        Collection<Diagnostic> oldDiagnostics = getOldDiagnostics();
+        Collection<Diagnostic> newDiagnostics = getNewDiagnostics(identifier, diagnostics);
+        boolean changed = LSPDocumentBase.isDiagnosticsChanged(oldDiagnostics, newDiagnostics);
         // initialize diagnostics map
-        this.diagnostics = toMap(diagnostics, this.diagnostics);
+        this.diagnostics = toMap(newDiagnostics, this.diagnostics);
+        if (diagnosticsPerIdentifier != null) {
+            // Cache must manage several diagnostic identifier (pull, publish), we store the new diagnostics in the cache for the given identifier
+            diagnosticsPerIdentifier.put(identifier, diagnostics);
+        }
         return changed;
     }
 
-    private Map<Diagnostic, LSPLazyCodeActions> toMap(@NotNull List<Diagnostic> diagnostics,
-                                                      Map<Diagnostic, LSPLazyCodeActions> existingDiagnostics) {
+    private Collection<Diagnostic> getOldDiagnostics() {
+        return this.diagnostics != null ? this.diagnostics.keySet() : Collections.emptySet();
+    }
+
+    private Collection<Diagnostic> getNewDiagnostics(@NotNull String identifier,
+                                                     @NotNull List<Diagnostic> diagnostics) {
+        if (diagnosticsPerIdentifier == null) {
+            // Just one diagnostic identifier, use the new diagnostics
+            return diagnostics;
+        }
+        // The cache manages several diagnostic identifiers (pull, publish)
+        // Merge of the new diagnostics list with diagnostics stored for other identifiers.
+        Set<Diagnostic> newDiagnostics = new HashSet<>(diagnostics);
+        for(var entry : diagnosticsPerIdentifier.entrySet()) {
+            if (!entry.getKey().equals(identifier)) {
+                newDiagnostics.addAll(entry.getValue());
+            }
+        }
+        return newDiagnostics;
+    }
+
+    private Map<Diagnostic, LSPLazyCodeActions> toMap(@NotNull Collection<Diagnostic> diagnostics,
+                                                      @NotNull Map<Diagnostic, LSPLazyCodeActions> existingDiagnostics) {
         // Collect quick fixes from LSP code action
         Map<Diagnostic, LSPLazyCodeActions> map = new HashMap<>(diagnostics.size());
         // Sort diagnostics by range
@@ -167,6 +214,15 @@ public class LSPDiagnosticsForServer {
             return false;
         }
         return languageServerWrapper.getClientFeatures().getCodeActionFeature().isCodeActionSupported(file);
+    }
+
+    /**
+     * Returns the client features.
+     *
+     * @return the client features.
+     */
+    public LSPClientFeatures getClientFeatures() {
+        return languageServer.getClientFeatures();
     }
 
 }

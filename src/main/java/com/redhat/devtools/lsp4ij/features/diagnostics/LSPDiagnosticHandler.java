@@ -15,10 +15,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.ClosedDocument;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
-import com.redhat.devtools.lsp4ij.OpenedDocument;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.jetbrains.annotations.NotNull;
@@ -60,17 +57,7 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
 
         // Update LSP diagnostic reported by the language server id
         URI fileURI = LSPIJUtils.toUri(file);
-        OpenedDocument openedDocument = languageServerWrapper.getOpenedDocument(fileURI);
-        if (openedDocument != null) {
-            // Update diagnostics for opened file
-            synchronized (openedDocument) {
-                openedDocument.updateDiagnostics(params.getDiagnostics());
-            }
-        } else {
-            // Update diagnostics for closed file
-            ClosedDocument closedDocument = languageServerWrapper.getClosedDocument(fileURI, true);
-            closedDocument.updateDiagnostics(params.getDiagnostics());
-        }
+        languageServerWrapper.updateDiagnostics(fileURI, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, params.getDiagnostics());
     }
 
 }

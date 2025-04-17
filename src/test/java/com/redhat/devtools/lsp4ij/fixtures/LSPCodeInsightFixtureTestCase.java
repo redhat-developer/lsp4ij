@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.fixtures;
 
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
@@ -76,5 +78,17 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
 
     private void unregisterServer() {
         LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), serverDefinition);
+    }
+
+    /**
+     * Wait for DaemonCodeAnalyzer restart has finished.
+     */
+    protected void waitForDaemonCodeAnalyzerFinished() {
+        long start = System.currentTimeMillis();
+        while(((DaemonCodeAnalyzerImpl) DaemonCodeAnalyzer.getInstance(myFixture.getProject())).isRunning()) {
+            if (System.currentTimeMillis() - start > 5000) {
+                throw new RuntimeException("Stop to wait for DaemonCodeAnalyzer.retart()");
+            }
+        }
     }
 }

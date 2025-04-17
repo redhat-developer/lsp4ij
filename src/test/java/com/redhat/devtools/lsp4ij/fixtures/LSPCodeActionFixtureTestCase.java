@@ -97,7 +97,7 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
         MockLanguageServer.INSTANCE.setCodeActions(wrappedCodeActions);
-        MockLanguageServer.INSTANCE.setDiagnostics(diagnostics);
+        MockLanguageServer.INSTANCE.setPublishDiagnostics(diagnostics);
         myFixture.configureByText(fileName, editorContentText);
 
         // Collect IntelliJ Quick fixes / Intention actions
@@ -139,9 +139,9 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
         if (resolvedCodeActionJson != null) {
             // Emulate resolve code action
             // Replace edit/document/uri with the file URI to update file correctly
+            // Load and update language server with the emulated resolved code action
             resolvedCodeActionJson = resolvedCodeActionJson
                     .formatted(LSPIJUtils.toUriAsString(myFixture.getFile()));
-            // Load and update language server with the emulated resolved code action
             CodeAction resolvedCodeAction = JSONUtils.getLsp4jGson()
                     .fromJson(resolvedCodeActionJson, new TypeToken<CodeAction>() {
                     }.getType());

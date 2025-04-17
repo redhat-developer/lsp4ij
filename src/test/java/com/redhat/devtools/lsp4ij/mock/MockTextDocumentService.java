@@ -21,6 +21,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Either3;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.TextDocumentService;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.net.URI;
@@ -56,7 +57,8 @@ public class MockTextDocumentService implements TextDocumentService {
     private Function<?, ? extends CompletableFuture<?>> _futureFactory;
     private List<LanguageClient> remoteProxies;
     private Location[] mockReferences = new Location[0];
-    private List<Diagnostic> diagnostics;
+    private List<Diagnostic> publishDiagnostics;
+    private DocumentDiagnosticReport pullDiagnostics;
     private List<Either<Command, CodeAction>> mockCodeActions;
     private CodeAction mockResolvedCodeAction;
     private List<ColorInformation> mockDocumentColors;
@@ -219,27 +221,23 @@ public class MockTextDocumentService implements TextDocumentService {
             didOpenCallback.complete(params);
             didOpenCallback = null;
         }
-
-        if (this.diagnostics != null && !this.diagnostics.isEmpty()) {
-            // we're not sure which remote proxy to use, but we know we should only use one
-            // per didOpen
-            // for proper LS interaction; so a strategy is to use the first one and rotate
-            // the others
-            // for further executions
-            synchronized (this.remoteProxies) {
-                // and we synchronize to avoid concurrent read/write on the list
-                this.remoteProxies.get(0).publishDiagnostics(
-                        new PublishDiagnosticsParams(params.getTextDocument().getUri(), this.diagnostics));
-                Collections.rotate(this.remoteProxies, 1);
-            }
+        String uri = params.getTextDocument().getUri();
+        if (this.publishDiagnostics != null && !this.publishDiagnostics.isEmpty()) {
+            publishDiagnostics(new PublishDiagnosticsParams(uri, this.publishDiagnostics));
         }
-//		if (this.foldingRanges != null && !this.foldingRanges.isEmpty()) {
-//			synchronized (this.remoteProxies) {
-//				// and we synchronize to avoid concurrent read/write on the list
-//				this.remoteProxies.get(0).foldpublishDiagnostics(
-//						new PublishDiagnosticsParams(params.getTextDocument().getUri(), this.diagnostics));
-//				Collections.rotate(this.remoteProxies, 1);
-//		}
+    }
+
+    public void publishDiagnostics(@NotNull PublishDiagnosticsParams params) {
+        // we're not sure which remote proxy to use, but we know we should only use one
+        // per didOpen
+        // for proper LS interaction; so a strategy is to use the first one and rotate
+        // the others
+        // for further executions
+        synchronized (this.remoteProxies) {
+            // and we synchronize to avoid concurrent read/write on the list
+            this.remoteProxies.get(0).publishDiagnostics(params);
+            Collections.rotate(this.remoteProxies, 1);
+        }
     }
 
     @Override
@@ -353,8 +351,12 @@ public class MockTextDocumentService implements TextDocumentService {
         this.codeActionRequests = 0;
     }
 
-    public void setDiagnostics(List<Diagnostic> diagnostics) {
-        this.diagnostics = diagnostics;
+    public void setPublishDiagnostics(List<Diagnostic> publishDiagnostics) {
+        this.publishDiagnostics = publishDiagnostics;
+    }
+
+    public void setPullDiagnostics(DocumentDiagnosticReport pullDiagnostics) {
+        this.pullDiagnostics = pullDiagnostics;
     }
 
     public void addRemoteProxy(LanguageClient remoteProxy) {
@@ -441,6 +443,11 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
         return CompletableFuture.completedFuture(this.mockSemanticTokens);
+    }
+
+    @Override
+    public CompletableFuture<DocumentDiagnosticReport> diagnostic(DocumentDiagnosticParams params) {
+        return CompletableFuture.completedFuture(this.pullDiagnostics);
     }
 
     private static final Range DUMMY_RANGE = new Range(new Position(0, 0), new Position(0, 0));

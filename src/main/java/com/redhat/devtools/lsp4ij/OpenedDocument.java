@@ -15,7 +15,6 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsForServer;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jetbrains.annotations.NotNull;
@@ -31,8 +30,6 @@ import java.util.concurrent.CancellationException;
  */
 public class OpenedDocument extends LSPDocumentBase {
 
-    private volatile Alarm refreshDiagnosticsAlarm = null;
-
     private final VirtualFile file;
 
     private final LSPDiagnosticsForServer diagnosticsForServer;
@@ -47,6 +44,7 @@ public class OpenedDocument extends LSPDocumentBase {
         this.file = file;
         this.synchronizer = synchronizer;
         this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer,file);
+        this.displayingDiagnosticsTime = -1;
     }
 
     /**
@@ -67,9 +65,10 @@ public class OpenedDocument extends LSPDocumentBase {
     }
 
     @Override
-    public boolean updateDiagnostics(@NotNull List<Diagnostic> diagnostics) {
+    public boolean updateDiagnostics(@NotNull String identifier,
+                                     @NotNull List<Diagnostic> diagnostics) {
         updatedDiagnosticsTime = System.currentTimeMillis();
-        if (diagnosticsForServer.update(diagnostics)) {
+        if (diagnosticsForServer.update(identifier, diagnostics)) {
             // LSP diagnostics has changed
             final PsiFile psiFile = LSPIJUtils.getPsiFile(file, diagnosticsForServer.getClientFeatures().getProject());
             if (psiFile != null) {
@@ -99,8 +98,11 @@ public class OpenedDocument extends LSPDocumentBase {
 
     boolean isDiagnosticsMustBeRefreshed(long displayingDiagnosticsTime) {
         long lastDisplayingDiagnosticsTime = getDisplayingDiagnosticsTime();
-        return displayingDiagnosticsTime !=  lastDisplayingDiagnosticsTime// is diagnostics are already displayed with LSPDiagnosticAnnotator ?
-                || updatedDiagnosticsTime < lastDisplayingDiagnosticsTime; // is update of diagnostics has been done after the last display of diagnostics
+        if (lastDisplayingDiagnosticsTime == -1) {
+            return false;
+        }
+        return displayingDiagnosticsTime != lastDisplayingDiagnosticsTime// are diagnostics already displayed with LSPDiagnosticAnnotator?
+                || updatedDiagnosticsTime > lastDisplayingDiagnosticsTime; // has the diagnostics update occurred after the last display?
     }
 
     long getDisplayingDiagnosticsTime() {
