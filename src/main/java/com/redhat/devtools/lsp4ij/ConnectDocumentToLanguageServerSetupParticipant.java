@@ -16,7 +16,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import org.jetbrains.annotations.NotNull;
 
@@ -43,12 +42,12 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // to avoid starting language server in the EDT Thread which could freeze IJ.
         // Wait for indexing is finished and read action is enabled
         // --> force the start of all languages servers mapped with the given file when indexing is finished and read action is allowed
-        ProjectIndexingManager
+        /*ProjectIndexingManager
                 .waitForIndexingAll()
                 .thenApplyAsync(unused -> {
                     connectToLanguageServer(file, project);
                     return null;
-                });
+                });*/
     }
 
     @Override
