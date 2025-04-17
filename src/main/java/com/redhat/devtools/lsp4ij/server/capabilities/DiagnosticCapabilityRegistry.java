@@ -15,7 +15,9 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.DocumentContentSynchronizer;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.LSPDocumentBase;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.DiagnosticRegistrationOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
@@ -77,13 +79,29 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
 
     @Override
     public @Nullable DiagnosticRegistrationOptions registerCapability(@NotNull JsonObject registerOptions) {
-        var options =  super.registerCapability(registerOptions);
+        var options = super.registerCapability(registerOptions);
         // Force the pull diagnostic for all opened document
         // - didOpen have not processed pull diagnostic
         // - and if language server support it for now if textDocument/diagnostic has been dynamically registered.
-        for (var openedDocument :  getClientFeatures().getServerWrapper().getOpenedDocuments()) {
-            openedDocument.getSynchronizer().refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_REGISTER_CAPABILITY);
+        for (var openedDocument : getClientFeatures().getServerWrapper().getOpenedDocuments()) {
+            openedDocument.getSynchronizer()
+                    .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_REGISTER_CAPABILITY);
         }
         return options;
+    }
+
+    /**
+     * Returns the diagnostic identifier declared in the {@link DiagnosticRegistrationOptions} and "pull" otherwise.
+     *
+     * @return the diagnostic identifier declared in the {@link DiagnosticRegistrationOptions} and "pull" otherwise.
+     */
+    public @NotNull String getDiagnosticIdentifier() {
+        for (var option : getOptions()) {
+            String identifier = option.getIdentifier();
+            if (!StringUtils.isEmpty(identifier)) {
+                return identifier;
+            }
+        }
+        return LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
     }
 }

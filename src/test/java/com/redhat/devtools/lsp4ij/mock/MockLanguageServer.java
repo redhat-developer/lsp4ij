@@ -138,6 +138,7 @@ public final class MockLanguageServer implements LanguageServer {
 		capabilities.setLinkedEditingRangeProvider(new LinkedEditingRangeRegistrationOptions());
 		capabilities.setTypeHierarchyProvider(new TypeHierarchyRegistrationOptions());
 		capabilities.setFoldingRangeProvider(new FoldingRangeProviderOptions());
+		capabilities.setDiagnosticProvider(new DiagnosticRegistrationOptions());
 		return capabilities;
 	}
 
@@ -264,8 +265,12 @@ public final class MockLanguageServer implements LanguageServer {
 		this.delay = l;
 	}
 
-	public void setDiagnostics(List<Diagnostic> diagnostics) {
-		this.textDocumentService.setDiagnostics(diagnostics);
+	public void setPublishDiagnostics(List<Diagnostic> diagnostics) {
+		this.textDocumentService.setPublishDiagnostics(diagnostics);
+	}
+
+	public void setPullDiagnostics(DocumentDiagnosticReport pullDiagnostics) {
+		this.textDocumentService.setPullDiagnostics(pullDiagnostics);
 	}
 
 	public void setCodeActions(List<Either<Command, CodeAction>> codeActions) {

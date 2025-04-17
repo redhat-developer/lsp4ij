@@ -24,12 +24,16 @@ import java.util.List;
  */
 public abstract class LSPDocumentBase {
 
+    public static final String PUBLISH_DIAGNOSTIC_IDENTIFIER = "lsp4ij.publish";
+    public static final String PULL_DIAGNOSTIC_IDENTIFIER = "lsp4ij.pull";
+
     /**
      * Update the diagnostics
-     *
+     * @param identifier the diagnostic identifier used to cache diagnostics.
      * @param diagnostics the new diagnostics.
      */
-    public abstract boolean updateDiagnostics(@NotNull List<Diagnostic> diagnostics);
+    public abstract boolean updateDiagnostics(@NotNull String identifier,
+                                              @NotNull List<Diagnostic> diagnostics);
 
     /**
      * Returns the current diagnostics for the file reported by the language server.

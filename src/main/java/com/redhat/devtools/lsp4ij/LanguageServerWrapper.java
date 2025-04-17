@@ -70,7 +70,9 @@ public class LanguageServerWrapper implements Disposable {
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
-    record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText, @Nullable String languageId, boolean waitForDidOpen) {}
+    record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
+                                 @Nullable String languageId, boolean waitForDidOpen) {
+    }
 
     private MessageBusConnection messageBusConnection;
 
@@ -381,7 +383,7 @@ public class LanguageServerWrapper implements Disposable {
                     }).thenRun(() -> this.languageServer.initialized(new InitializedParams())).thenRun(() -> {
                         initializeFuture.thenRunAsync(() -> {
                             for (VirtualFile fileToReconnect : filesToReconnect) {
-                                connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null,true));
+                                connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
                             }
                         });
 
@@ -702,9 +704,9 @@ public class LanguageServerWrapper implements Disposable {
      *     the method return a CompletableFuture which returns null.
      * </p>
      *
-     * @param file             the file to connect to the language server
+     * @param file               the file to connect to the language server
      * @param fileConnectionInfo the document of the file and null otherwise. In the null case, the document will be retrieved from the file
-     *                         by using a blocking read action.
+     *                           by using a blocking read action.
      * @return the completable future with the language server instance or null.
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
@@ -1267,6 +1269,30 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         return fileOperationsManager.canDidRenameFiles(uri, file.isDirectory());
+    }
+
+    /**
+     * Update diagnostics for the given file URi.
+     * @param fileUri the file uri.
+     * @param identifier the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
+     * @param diagnostics the diagnostics to update.
+     */
+    public void updateDiagnostics(@NotNull URI fileUri,
+                                  @NotNull String identifier,
+                                  @NotNull List<Diagnostic> diagnostics) {
+        var openedDocument = getOpenedDocument(fileUri);
+        if (openedDocument != null) {
+            // Update diagnostics for opened file
+            synchronized (openedDocument) {
+                openedDocument.updateDiagnostics(identifier, diagnostics);
+            }
+        } else {
+            // Update diagnostics for closed file
+            var closedDocument = getClosedDocument(fileUri, true);
+            synchronized (closedDocument) {
+                closedDocument.updateDiagnostics(identifier, diagnostics);
+            }
+        }
     }
 
     @NotNull

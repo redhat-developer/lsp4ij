@@ -51,7 +51,7 @@ public interface FileUriSupport {
     @Nullable
     VirtualFile findFileByUri(@NotNull String fileUri);
 
-    @Nullable
+    @NotNull
     public static URI getFileUri(@NotNull VirtualFile file,
                                  @Nullable FileUriSupport fileUriSupport) {
         URI fileUri = fileUriSupport != null ? fileUriSupport.getFileUri(file) : null;

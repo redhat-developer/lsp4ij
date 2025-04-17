@@ -479,7 +479,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
                 action.inSmartMode(project);
             }
             action.submit(AppExecutorUtil.getAppExecutorService());
-        }, 1000);
+        }, 2000);
     }
 
     private Alarm getRefreshPsiFileAlarm() {

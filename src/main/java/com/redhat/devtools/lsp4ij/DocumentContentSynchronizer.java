@@ -19,6 +19,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.util.Alarm;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -28,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -282,7 +285,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             // called by 'textDocument/diagnostic' by dynamic registerCapability
             // we need to consume the 'textDocument/diagnostic' if when didOpen has occurred, the pull diagnostic
             // capability was not enabled.
-            if (!diagnosticNotPulledOnDidOpen) {
+            if (!isDiagnosticNotPulledOnDidOpen()) {
                 // the didOpen have already consumed the 'textDocument/diagnostic', do nothing
                 return;
             }
@@ -300,8 +303,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * @param didFuture the didOpen, didChange future.
      * @param version   the current document version.
      */
-    private void processPullDiagnosticIfNeeded(@Nullable CompletableFuture<LanguageServer> didFuture, int version) {
-        boolean debounceValidation = didFuture != null;
+    private void processPullDiagnosticIfNeeded(@Nullable CompletableFuture<LanguageServer> didFuture,
+                                               int version) {
+        boolean debounceValidation = didFuture != null && !ApplicationManager.getApplication().isUnitTestMode();
         if (!isPullDiagnosticsSupported()) {
             // The language server doesn't support pull diagnostics.
             diagnosticNotPulledOnDidOpen = didFuture != null && didFuture == didOpenFuture;
@@ -313,12 +317,15 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 // The document has changed, do nothing
                 return;
             }
+            if (didOpenFuture == null) {
+                return;
+            }
             var ls = didOpenFuture.getNow(null);
             if (ls == null) {
                 // The didOpen is not finished, ignore the pull diagnostic
-                return;
+                didOpenFuture.
+                        thenAccept(readyLs -> refreshPullDiagnostic(version, readyLs));
             }
-            refreshPullDiagnostic(version, ls);
             return;
         }
         // Refresh pull diagnostic with debounce (after a didOpen , didChange).
@@ -342,30 +349,55 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 });
     }
 
-    private void refreshPullDiagnostic(int version, LanguageServer ls) {
+    private void refreshPullDiagnostic(int version, @NotNull LanguageServer ls) {
         // Consume 'textDocument/diagnostic'
         DocumentDiagnosticParams params = new DocumentDiagnosticParams();
         params.setTextDocument(new TextDocumentIdentifier(fileUri));
         ls.getTextDocumentService()
                 .diagnostic(params)
                 .thenAcceptAsync(diagnosticReport -> {
-                    if (version != -1 && version != this.version) {
+                    if (diagnosticReport == null || (version != -1 && version != this.version)) {
                         // The document has changed, do nothing
                         return;
                     }
+                    var clientFeatures = languageServerWrapper.getClientFeatures();
                     // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticAnnotator.
                     if (diagnosticReport.isLeft()) {
-                        RelatedFullDocumentDiagnosticReport fullDocumentDiagnosticReport = diagnosticReport.getLeft();
-                        var items = fullDocumentDiagnosticReport.getItems();
+                        RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
                         // Update the diagnostics cache from the opened file
-                        var openedDocument = languageServerWrapper.getOpenedDocument(LSPIJUtils.toUri(file));
-                        openedDocument.updateDiagnostics(items != null ? items : Collections.emptyList());
+                        updatePullDiagnostics(file, fileReport, clientFeatures);
                     } else if (diagnosticReport.isRight()) {
-                        // TODO ...
-                        RelatedUnchangedDocumentDiagnosticReport relatedUnchangedDocumentDiagnosticReport = diagnosticReport.getRight();
+                        RelatedUnchangedDocumentDiagnosticReport allFilesReport = diagnosticReport.getRight();
+                        Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments = allFilesReport.getRelatedDocuments();
+                        if (relatedDocuments != null) {
+                            for (var relatedDocument : relatedDocuments.entrySet()) {
+                                String documentUri = relatedDocument.getKey();
+                                Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport> fileReport = relatedDocument.getValue();
+                                if (fileReport != null) {
+                                    if (fileReport.isLeft()) {
+                                        VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
+                                        if (file != null) {
+                                            updatePullDiagnostics(file, fileReport.getLeft(), clientFeatures);
+                                        }
+                                    } else if (fileReport.isRight()) {
+                                        // TODO: implement UnchangedDocumentDiagnosticReport
+                                    }
+                                }
+                            }
+                        }
                     }
 
                 });
+    }
+
+    private void updatePullDiagnostics(@NotNull VirtualFile file,
+                                       @NotNull FullDocumentDiagnosticReport diagnosticReport,
+                                       @NotNull LSPClientFeatures clientFeatures) {
+        // Update diagnostics for the opened/closed document
+        var fileUri = FileUriSupport.getFileUri(file, clientFeatures);
+        List<Diagnostic> diagnostics = diagnosticReport.getItems() != null ? diagnosticReport.getItems() : Collections.emptyList();
+        String identifier = clientFeatures.getDiagnosticFeature().getDiagnosticIdentifier();
+        languageServerWrapper.updateDiagnostics(fileUri, identifier, diagnostics);
     }
 
     public boolean isPullDiagnosticsSupported() {
@@ -383,7 +415,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         return debouncePullDiagnosticsAlarm;
     }
 
-    public boolean isDiagnosticNotPulledOnDidOpen() {
+    private boolean isDiagnosticNotPulledOnDidOpen() {
         return diagnosticNotPulledOnDidOpen;
     }
 }
