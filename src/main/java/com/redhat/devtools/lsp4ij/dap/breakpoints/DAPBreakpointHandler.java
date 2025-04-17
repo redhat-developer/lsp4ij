@@ -17,7 +17,6 @@ import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
-import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -174,7 +173,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
 
     @Nullable
     public XBreakpoint<DAPBreakpointProperties> findBreakpoint(@NotNull StackFrame stackFrame) {
-        Path filePath = Paths.get(stackFrame.getSource().getPath().trim());
+        Path filePath = Paths.get(stackFrame.getSource().getPath().trim()).normalize();
         if (filePath == null) {
             return null;
         }
