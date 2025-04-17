@@ -224,8 +224,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
-                                                                    InputStream in, OutputStream out,
-                                                                    ExecutorService threadPool) {
+                                                                      InputStream in, OutputStream out,
+                                                                      ExecutorService threadPool) {
         return DSPLauncher.createClientLauncher(this, in, out, threadPool, wrapper);
     }
 
@@ -378,11 +378,25 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 && debugMode == DebugMode.LAUNCH;
         if (shouldSendTerminateRequest) {
             sentTerminateRequest = true;
-            server.terminate(new TerminateArguments()).thenRunAsync(this::dispose);
+            server.terminate(new TerminateArguments())
+                    .thenRunAsync(this::dispose);
         } else {
             final var arguments = new DisconnectArguments();
-            arguments.setTerminateDebuggee(true);
-            server.disconnect(arguments).thenRunAsync(this::dispose);
+            // Here we don't set terminateDebuggee to true otherwise, the debuggee (ex: debugpy) is terminated.
+            // According to the 'setTerminateDebuggee' specification:
+            /**
+             * Indicates whether the debuggee should be terminated when the debugger is
+             * disconnected.
+             * If unspecified, the debug adapter is free to do whatever it thinks is best.
+             * The attribute is only honored by a debug adapter if the corresponding
+             * capability `supportTerminateDebuggee` is true.
+             */
+            // terminateDebuggee?: boolean;
+            // arguments.setTerminateDebuggee(true);
+            // TODO: manage this 'terminateDebuggee' with an UI settings
+            // to provide the capability to terminate the debuggee when user click on stop button.
+            server.disconnect(arguments)
+                    .thenRunAsync(this::dispose);
         }
     }
 
