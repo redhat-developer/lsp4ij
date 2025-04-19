@@ -108,17 +108,7 @@ that you can select in the left panel via the checkboxes:
 
 ![LSP Semantic Tokens Inspector](./images/LSPSemanticTokensInspector.png)
 
-## Inspections
-
-You can click on `Inspect Code...` hyperlink available on the `Project Errors` from the `Problems` view to 
-show all LSP diagnostics errors of your project in the `Language Servers` local inspection tool:
-
- - from opened files.
- - from closed files, if your language server support it. 
-
-![Inspect Code...](./images/LSPInspectCode.png)
-
-## Troubleshooting
+### Troubleshooting
 
 If the `Semantic Tokens` doesn't show the expected result, please check that:
 
@@ -126,3 +116,20 @@ If the `Semantic Tokens` doesn't show the expected result, please check that:
 LSP request `textDocument/semanticTokens/full`
  * uses the [Semantic Tokens Inspector](#semantic-tokens-inspector) to understand more how the 
 file content is tokenized. Problem could come if LSP4IJ doesn't support some token types / modifiers.
+
+## Show Problem in Project View
+
+When language server reports some diagnostics for a given file with `error severity`, the `file from the project view
+is highlighted as an error`:
+
+![Problem in Project View](./images/LSPProblemInProjectView.png)
+
+## Inspections
+
+You can click on `Inspect Code...` hyperlink available on the `Project Errors` from the `Problems` view to
+show all LSP diagnostics errors of your project in the `Language Servers` local inspection tool:
+
+- from opened files.
+- from closed files, if your language server support it.
+
+![Inspect Code...](./images/LSPInspectCode.png)

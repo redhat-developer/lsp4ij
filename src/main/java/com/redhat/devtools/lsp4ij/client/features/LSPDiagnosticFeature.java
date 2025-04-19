@@ -151,8 +151,28 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
      * @param diagnostic the LSP diagnostic.
      * @return the IntelliJ {@link ProblemHighlightType} from the given diagnostic and null otherwise.
      */
-    public ProblemHighlightType getProblemHighlightType(Diagnostic diagnostic) {
+    public ProblemHighlightType getProblemHighlightType(@NotNull Diagnostic diagnostic) {
         return SeverityMapping.toProblemHighlightType(diagnostic.getSeverity());
+    }
+
+    /**
+     * Returns the {@link ProblemHighlightType} from the given tags and null otherwise.
+     *
+     * @param tags the diagnostic tags.
+     * @return the {@link ProblemHighlightType} from the given tags and null otherwise.
+     */
+    @Nullable
+    public ProblemHighlightType getProblemHighlightType(@Nullable List<DiagnosticTag> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return null;
+        }
+        if (tags.contains(DiagnosticTag.Unnecessary)) {
+            return ProblemHighlightType.LIKE_UNUSED_SYMBOL;
+        }
+        if (tags.contains(DiagnosticTag.Deprecated)) {
+            return ProblemHighlightType.LIKE_DEPRECATED;
+        }
+        return null;
     }
 
     /**
@@ -252,26 +272,6 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Returns the {@link ProblemHighlightType} from the given tags and null otherwise.
-     *
-     * @param tags the diagnostic tags.
-     * @return the {@link ProblemHighlightType} from the given tags and null otherwise.
-     */
-    @Nullable
-    public ProblemHighlightType getProblemHighlightType(@Nullable List<DiagnosticTag> tags) {
-        if (tags == null || tags.isEmpty()) {
-            return null;
-        }
-        if (tags.contains(DiagnosticTag.Unnecessary)) {
-            return ProblemHighlightType.LIKE_UNUSED_SYMBOL;
-        }
-        if (tags.contains(DiagnosticTag.Deprecated)) {
-            return ProblemHighlightType.LIKE_DEPRECATED;
-        }
-        return null;
-    }
-
-    /**
      * Returns true if the local inspection tool is application for the given file and false otherwise.
      *
      * @param file       the file which must be inspected.
@@ -315,6 +315,24 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
         return getDiagnosticCapabilityRegistry().isDiagnosticSupported(file);
     }
 
+    /**
+     * Returns the diagnostic identifier to use to cache "pull" diagnostics.
+     *
+     * @return the diagnostic identifier to use to cache "pull" diagnostics.
+     */
+    public @NotNull String getDiagnosticIdentifier() {
+        return getDiagnosticCapabilityRegistry().getDiagnosticIdentifier();
+    }
+
+    /**
+     * Returns true if the given file can report problem in the Project View and false otherwise.
+     * @param file the file or null otherwise
+     * @return true if the given file can report problem in the Project View and false otherwise.
+     */
+    public boolean canReportProblem(@NotNull VirtualFile file) {
+        return true;
+    }
+
     public DiagnosticCapabilityRegistry getDiagnosticCapabilityRegistry() {
         if (diagnosticCapabilityRegistry == null) {
             initDiagnosticCapabilityRegistry();
@@ -338,12 +356,4 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
         }
     }
 
-    /**
-     * Returns the diagnostic identifier to use to cache "pull" diagnostics.
-     *
-     * @return the diagnostic identifier to use to cache "pull" diagnostics.
-     */
-    public @NotNull String getDiagnosticIdentifier() {
-        return getDiagnosticCapabilityRegistry().getDiagnosticIdentifier();
-    }
 }

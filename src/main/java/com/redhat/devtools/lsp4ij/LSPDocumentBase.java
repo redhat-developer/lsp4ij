@@ -42,23 +42,6 @@ public abstract class LSPDocumentBase {
      */
     public abstract Collection<Diagnostic> getDiagnostics();
 
-    /**
-     * Returns true if the old and new diagnostics list changed and false otherwise.
-     * @param oldDiagnostics old diagnostics
-     * @param newDiagnostics new diagnostics
-     * @return true if the old and new diagnostics list changed and false otherwise.
-     */
-    public static boolean isDiagnosticsChanged(@NotNull Collection<Diagnostic> oldDiagnostics,
-                                               @NotNull Collection<Diagnostic> newDiagnostics) {
-        if (oldDiagnostics.size() != newDiagnostics.size()) {
-            return true;
-        }
-        for(var d : newDiagnostics) {
-            if (!oldDiagnostics.contains(d)) {
-                return true;
-            }
-        }
-        return false;
-    }
+    public abstract boolean hasErrors();
 
 }

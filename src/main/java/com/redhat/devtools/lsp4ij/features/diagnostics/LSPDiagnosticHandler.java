@@ -15,12 +15,12 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.*;
+import com.redhat.devtools.lsp4ij.LSPDocumentBase;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.PublishDiagnosticsParams;
 import org.jetbrains.annotations.NotNull;
 
-import java.net.URI;
 import java.util.function.Consumer;
 
 /**
@@ -56,8 +56,9 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
         }
 
         // Update LSP diagnostic reported by the language server id
-        URI fileURI = LSPIJUtils.toUri(file);
-        languageServerWrapper.updateDiagnostics(fileURI, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, params.getDiagnostics());
+        languageServerWrapper.updateDiagnostics(file,
+                LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER,
+                params.getDiagnostics());
     }
 
 }
