@@ -394,10 +394,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                                        @NotNull FullDocumentDiagnosticReport diagnosticReport,
                                        @NotNull LSPClientFeatures clientFeatures) {
         // Update diagnostics for the opened/closed document
-        var fileUri = FileUriSupport.getFileUri(file, clientFeatures);
         List<Diagnostic> diagnostics = diagnosticReport.getItems() != null ? diagnosticReport.getItems() : Collections.emptyList();
         String identifier = clientFeatures.getDiagnosticFeature().getDiagnosticIdentifier();
-        languageServerWrapper.updateDiagnostics(fileUri, identifier, diagnostics);
+        languageServerWrapper.updateDiagnostics(file, identifier, diagnostics);
     }
 
     public boolean isPullDiagnosticsSupported() {

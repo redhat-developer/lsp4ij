@@ -108,4 +108,9 @@ public class OpenedDocument extends LSPDocumentBase {
     long getDisplayingDiagnosticsTime() {
         return displayingDiagnosticsTime;
     }
+
+    @Override
+    public boolean hasErrors() {
+        return  diagnosticsForServer.hasErrors();
+    }
 }

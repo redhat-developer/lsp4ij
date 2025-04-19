@@ -20,11 +20,13 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.OpenedDocument;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPExternalAnnotator;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jetbrains.annotations.NotNull;
@@ -72,19 +74,24 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
     }
 
     @Override
-    public void doApply(@NotNull PsiFile file, Boolean applyAnnotator, @NotNull AnnotationHolder holder) {
+    public void doApply(@NotNull PsiFile psiFile, Boolean applyAnnotator, @NotNull AnnotationHolder holder) {
         if (!applyAnnotator) {
             return;
         }
-        URI fileUri = LSPIJUtils.toUri(file);
-        Document document = LSPIJUtils.getDocument(file.getVirtualFile());
+        VirtualFile file = psiFile.getVirtualFile();;
+        if (file == null) {
+            return;
+        }
+
+        Document document = LSPIJUtils.getDocument(file);
         if (document == null) {
             return;
         }
         // Loop for language server which report diagnostics for the given file
-        var servers = LanguageServiceAccessor.getInstance(file.getProject())
+        var servers = LanguageServiceAccessor.getInstance(psiFile.getProject())
                 .getStartedServers();
         for (var ls : servers) {
+            URI fileUri = FileUriSupport.getFileUri(file,ls.getClientFeatures());
             OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
             if (openedDocument != null) {
                 // The file is mapped with the current language server
@@ -92,7 +99,7 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
                 // Loop for LSP diagnostics to transform it to Intellij annotation.
                 for (Diagnostic diagnostic : openedDocument.getDiagnostics()) {
                     ProgressManager.checkCanceled();
-                    createAnnotation(diagnostic, document, file, ds, holder);
+                    createAnnotation(diagnostic, document, psiFile, ds, holder);
                 }
             }
         }

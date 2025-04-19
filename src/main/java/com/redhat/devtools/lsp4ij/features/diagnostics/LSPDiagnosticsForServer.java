@@ -16,12 +16,12 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPDocumentBase;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.codeAction.quickfix.LSPLazyCodeActions;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.util.Ranges;
@@ -29,6 +29,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+
+import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.isDiagnosticsChanged;
 
 /**
  * LSP diagnostics holder for a file reported by a language server. This class holds:
@@ -41,6 +43,8 @@ import java.util.*;
  * @author Angelo ZERR
  */
 public class LSPDiagnosticsForServer {
+
+    private boolean hasErrors;
 
     private record DiagnosticData(Range range, List<Diagnostic> diagnostics) {};
 
@@ -90,7 +94,7 @@ public class LSPDiagnosticsForServer {
 
         Collection<Diagnostic> oldDiagnostics = getOldDiagnostics();
         Collection<Diagnostic> newDiagnostics = getNewDiagnostics(identifier, diagnostics);
-        boolean changed = LSPDocumentBase.isDiagnosticsChanged(oldDiagnostics, newDiagnostics);
+        boolean changed = isDiagnosticsChanged(oldDiagnostics, newDiagnostics);
         // initialize diagnostics map
         this.diagnostics = toMap(newDiagnostics, this.diagnostics);
         if (diagnosticsPerIdentifier != null) {
@@ -123,6 +127,7 @@ public class LSPDiagnosticsForServer {
 
     private Map<Diagnostic, LSPLazyCodeActions> toMap(@NotNull Collection<Diagnostic> diagnostics,
                                                       @NotNull Map<Diagnostic, LSPLazyCodeActions> existingDiagnostics) {
+        hasErrors = false;
         // Collect quick fixes from LSP code action
         Map<Diagnostic, LSPLazyCodeActions> map = new HashMap<>(diagnostics.size());
         // Sort diagnostics by range
@@ -138,6 +143,9 @@ public class LSPDiagnosticsForServer {
         // Group diagnostics by covered range
         List<DiagnosticData> diagnosticsGroupByCoveredRange = new ArrayList<>();
         for (Diagnostic diagnostic : sortedDiagnostics) {
+            if (!hasErrors && diagnostic.getSeverity() != null && diagnostic.getSeverity() == DiagnosticSeverity.Error) {
+                hasErrors = true;
+            }
             DiagnosticData data = getDiagnosticWhichCoversTheRange(diagnostic.getRange(), diagnosticsGroupByCoveredRange);
             if (data != null) {
                 data.diagnostics().add(diagnostic);
@@ -225,4 +233,7 @@ public class LSPDiagnosticsForServer {
         return languageServer.getClientFeatures();
     }
 
+    public boolean hasErrors() {
+        return hasErrors;
+    }
 }

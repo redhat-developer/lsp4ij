@@ -29,6 +29,7 @@ import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.internal.ClientCapabilitiesFactory;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
@@ -604,13 +605,27 @@ public class LanguageServerWrapper implements Disposable {
             while (!this.openedDocuments.isEmpty()) {
                 disconnect(this.openedDocuments.keySet().iterator().next(), false);
             }
-            this.closedDocuments.clear();
+                while (!this.closedDocuments.isEmpty()) {
+                    URI fileUri = closedDocuments.keySet().iterator().next();
+                    closedDocuments.remove(fileUri);
+                    clearProblem(fileUri);
+                }
             this.languageServer = null;
             this.languageClient = null;
 
             if (messageBusConnection != null) {
                 messageBusConnection.disconnect();
             }
+        }
+    }
+
+    private void clearProblem(@NotNull URI fileUri) {
+        if (isDisposed()) {
+            return;
+        }
+        VirtualFile file = FileUriSupport.findFileByUri(fileUri.toASCIIString(), getClientFeatures());
+        if (file != null && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
+            LSPDiagnosticUtils.clearProblem(file, getProject());
         }
     }
 
@@ -831,12 +846,13 @@ public class LanguageServerWrapper implements Disposable {
         if (fileUri == null) {
             return;
         }
-        OpenedDocument data = this.openedDocuments.remove(fileUri);
-        if (data != null) {
+        OpenedDocument openedDocument = this.openedDocuments.remove(fileUri);
+        if (openedDocument != null) {
             // Remove the listener from the old document stored in synchronizer
-            DocumentContentSynchronizer synchronizer = data.getSynchronizer();
+            DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
             synchronizer.getDocument().removeDocumentListener(synchronizer);
             synchronizer.dispose();
+            clearProblem(fileUri);
         }
         if (stopIfNoOpenedFiles) {
             maybeShutdown();
@@ -1273,25 +1289,37 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * Update diagnostics for the given file URi.
-     * @param fileUri the file uri.
+     * @param file the virtual file.
      * @param identifier the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
      * @param diagnostics the diagnostics to update.
      */
-    public void updateDiagnostics(@NotNull URI fileUri,
+    public void updateDiagnostics(@NotNull VirtualFile file,
                                   @NotNull String identifier,
                                   @NotNull List<Diagnostic> diagnostics) {
-        var openedDocument = getOpenedDocument(fileUri);
-        if (openedDocument != null) {
+        var clientFeatures = getClientFeatures();
+        var fileUri = FileUriSupport.getFileUri(file, clientFeatures);
+        LSPDocumentBase openedOrClosedDocument = null;
+        openedOrClosedDocument = getOpenedDocument(fileUri);
+        if (openedOrClosedDocument != null) {
             // Update diagnostics for opened file
-            synchronized (openedDocument) {
-                openedDocument.updateDiagnostics(identifier, diagnostics);
+            synchronized (openedOrClosedDocument) {
+                openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
             }
         } else {
             // Update diagnostics for closed file
-            var closedDocument = getClosedDocument(fileUri, true);
-            synchronized (closedDocument) {
-                closedDocument.updateDiagnostics(identifier, diagnostics);
+            openedOrClosedDocument = getClosedDocument(fileUri, true);
+            synchronized (openedOrClosedDocument) {
+                openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
             }
+        }
+        if(openedOrClosedDocument == null) {
+            return;
+        }
+
+        if (clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
+            // Report problem in the Project View if the opened/closed document
+            // has at least one diagnosis with a severity of error
+            LSPDiagnosticUtils.reportProblem(file, openedOrClosedDocument, getProject());
         }
     }
 
