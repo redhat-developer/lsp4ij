@@ -143,7 +143,8 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                     try {
                         R result = code.apply(indicator);
                         return new ResultOrError<R>(result, null);
-                    } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                    } catch (
+                            ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                         //TODO delete block when minimum required version is 2024.2
                         return new ResultOrError<R>(null, e);
                     } catch (CancellationException | IndexNotReadyException e) {
@@ -180,7 +181,12 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                 nonBlockingReadActionPromise.cancel();
             }
         }
-        return super.cancel(mayInterruptIfRunning);
+        try {
+            return super.cancel(mayInterruptIfRunning);
+        } catch (Throwable e) {
+            // Ignore any error while cancelling
+            return false;
+        }
     }
 
 }

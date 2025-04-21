@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointProperties;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.*;
@@ -326,7 +327,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void dispose() {
         if (debugProtocolFuture != null) {
-            debugProtocolFuture.cancel(true);
+            CancellationSupport.cancel(debugProtocolFuture);
+
             /*
              * If the debugProtocolFuture is running the message loop on the same thread we
              * are in currently, the cancel call will set the interrupt flag. That isn't

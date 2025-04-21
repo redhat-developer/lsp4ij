@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -188,8 +189,6 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * Cancel if needed the LSP request textDocument/codeAction
      */
     public void cancel() {
-        if (lspCodeActionRequest != null && !lspCodeActionRequest.isDone()) {
-            lspCodeActionRequest.cancel(true);
-        }
+        CancellationSupport.cancel(lspCodeActionRequest);
     }
 }

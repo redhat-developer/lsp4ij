@@ -115,7 +115,12 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
     public boolean cancel(boolean mayInterruptIfRunning) {
         processHandler.removeProcessListener(this);
         processHandler.putUserData(SERVER_READY_TRACKER_KEY, null);
-        return super.cancel(mayInterruptIfRunning);
+        try {
+            return super.cancel(mayInterruptIfRunning);
+        } catch (Throwable e) {
+            // Ignore any error while cancelling
+            return false;
+        }
     }
 
     @NotNull

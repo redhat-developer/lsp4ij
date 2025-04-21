@@ -29,6 +29,7 @@ import com.intellij.openapi.ui.popup.LightweightWindowEvent;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
@@ -54,13 +55,13 @@ public class ServerMessageHandler {
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage">window/logMessage</a> specification.
      *
      * @param serverDefinition the language server definition.
-     * @param params  the message request parameters.
-     * @param project the project.
+     * @param params           the message request parameters.
+     * @param project          the project.
      */
     public static void logMessage(@NotNull LanguageServerDefinition serverDefinition,
                                   @NotNull MessageParams params,
                                   @NotNull Project project) {
-        LSPConsoleToolWindowPanel.showLog(serverDefinition, params, project );
+        LSPConsoleToolWindowPanel.showLog(serverDefinition, params, project);
     }
 
     private static Icon messageTypeToIcon(MessageType type) {
@@ -103,8 +104,8 @@ public class ServerMessageHandler {
      * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showMessageRequest">window/showMessageRequest</a> specification.
      *
      * @param languageServerName the language server name.
-     * @param params  the message request parameters.
-     * @param project the project.
+     * @param params             the message request parameters.
+     * @param project            the project.
      */
     public static CompletableFuture<MessageActionItem> showMessageRequest(@NotNull String languageServerName,
                                                                           @NotNull ShowMessageRequestParams params,
@@ -135,21 +136,17 @@ public class ServerMessageHandler {
                             }
                         });
                     }
-                    notification.whenExpired(()-> {
-                        if (!future.isDone()) {
-                            future.cancel(true);
-                        }
+                    notification.whenExpired(() -> {
+                        CancellationSupport.cancel(future);
                     });
 
                     Notifications.Bus.notify(notification, project);
-                    var balloon= notification.getBalloon();
+                    var balloon = notification.getBalloon();
                     if (balloon != null) {
                         balloon.addListener(new JBPopupListener() {
                             @Override
                             public void onClosed(@NotNull LightweightWindowEvent event) {
-                                if (!future.isDone()) {
-                                    future.cancel(true);
-                                }
+                                CancellationSupport.cancel(future);
                             }
                         });
                     }

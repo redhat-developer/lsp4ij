@@ -144,7 +144,7 @@ public class CompletableFutures {
                 future.get(25, TimeUnit.MILLISECONDS);
             } catch (TimeoutException ignore) {
                 long time = System.currentTimeMillis() - start;
-                if (timeout != null  && time > timeout) {
+                if (timeout != null && time > timeout) {
                     throw ignore;
                 }
                 if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 &&
@@ -198,15 +198,10 @@ public class CompletableFutures {
                 } catch (
                         ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                     //TODO delete block when minimum required version is 2024.2
-                    if (!future.isCancelled()) {
-                        // Case when user click on cancel of progress Task.
-                        future.cancel(true);
-                    }
+                    // Case when user click on cancel of progress Task.
+                    CancellationSupport.cancel(future);
                 } catch (CancellationException e) {
-                    if (!future.isCancelled()) {
-                        // Case when user click on cancel of progress Task.
-                        future.cancel(true);
-                    }
+                    CancellationSupport.cancel(future);
                 } catch (Exception e) {
                     // Do nothing, error should be handled by the block code
                     // which consumes the future:
@@ -217,7 +212,7 @@ public class CompletableFutures {
     }
 
     public static CompletableFuture<Void> allOf(CompletableFuture<?>... cfs) {
-        var allOff =  CompletableFuture.allOf(cfs);
+        var allOff = CompletableFuture.allOf(cfs);
         CancellationSupport.forwardCancellation(allOff, cfs);
         return allOff;
     }
