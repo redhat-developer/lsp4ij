@@ -18,6 +18,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -77,9 +78,7 @@ public class ProjectIndexingManager implements Disposable {
 
     @Override
     public void dispose() {
-        if (waitForIndexingAllFuture != null) {
-            waitForIndexingAllFuture.cancel(true);
-        }
+        CancellationSupport.cancel(waitForIndexingAllFuture);
     }
 
     public static CompletableFuture<Void> waitForIndexingAll() {

@@ -37,10 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.*;
 import java.util.function.BiFunction;
 
 /**
@@ -105,9 +102,7 @@ public class CancellationSupport implements CancelChecker {
                                             @Nullable String featureName,
                                             boolean handleLanguageServerError) {
         if (cancelled) {
-            if (!future.isDone()) {
-                future.cancel(true);
-            }
+            CancellationSupport.cancel(future);
             throw new ProcessCanceledException();
         } else {
             // Add the future to the list of the futures to cancel (when CancellationSupport.cancel() is called)
@@ -225,9 +220,7 @@ public class CancellationSupport implements CancelChecker {
         }
         this.cancelled = true;
         for (CompletableFuture<?> futureToCancel : futuresToCancel) {
-            if (!futureToCancel.isDone()) {
-                futureToCancel.cancel(true);
-            }
+            CancellationSupport.cancel(futureToCancel);
         }
         futuresToCancel.clear();
     }
@@ -251,12 +244,28 @@ public class CancellationSupport implements CancelChecker {
             if (t instanceof CancellationException) {
                 if (to != null) {
                     for (var f : to) {
-                        f.cancel(true);
+                        cancel(f);
                     }
                 }
             }
             return null;
         });
+    }
+
+    /**
+     * Cancel the given future with any error.
+     *
+     * @param future the future to cancel.
+     */
+    public static void cancel(@Nullable Future<?> future) {
+        if (future != null && future.isDone()) {
+            try {
+                future.cancel(true);
+            } catch (Throwable e) {
+                // Ignore any error while cancelling the future.
+                LOGGER.warn("Unexpected error while cancelling future", e);
+            }
+        }
     }
 
 }

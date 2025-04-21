@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.ClientCapabilitiesFactory;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
@@ -573,7 +574,7 @@ public class LanguageServerWrapper implements Disposable {
             }
 
             if (this.initializeFuture != null) {
-                this.initializeFuture.cancel(true);
+                CancellationSupport.cancel(this.initializeFuture);
                 this.initializeFuture = null;
             }
 
@@ -654,9 +655,7 @@ public class LanguageServerWrapper implements Disposable {
             }
         }
 
-        if (serverFuture != null) {
-            serverFuture.cancel(true);
-        }
+        CancellationSupport.cancel(serverFuture);
 
         if (provider != null) {
             provider.stop();

@@ -34,6 +34,7 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -227,12 +228,8 @@ public class DAPDebugProcess extends XDebugProcess {
                     .executeOnPooledThread(() -> {
                         try {
                             status = Status.STOPPING;
-                            if (serverReadyFuture != null && !CompletableFutures.isDoneNormally(serverReadyFuture)) {
-                                serverReadyFuture.cancel(true);
-                            }
-                            if (connectToServerFuture != null && !CompletableFutures.isDoneNormally(connectToServerFuture)) {
-                                connectToServerFuture.cancel(true);
-                            }
+                            CancellationSupport.cancel(serverReadyFuture);
+                            CancellationSupport.cancel(connectToServerFuture);
                             if (parentClient != null) {
                                 parentClient.terminate();
                             }

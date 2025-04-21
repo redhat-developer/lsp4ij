@@ -28,6 +28,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -143,7 +144,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                             try {
                                 waitUntilDone(visibleCodeLensToResolve, psiFile);
                             } catch (PsiFileChangedException e) {
-                                visibleCodeLensToResolve.cancel(true);
+                                CancellationSupport.cancel(visibleCodeLensToResolve);
                                 return CodeVisionState.NotReady.INSTANCE;
                             }
                         }

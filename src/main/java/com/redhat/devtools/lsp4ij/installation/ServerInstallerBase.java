@@ -16,6 +16,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -137,9 +138,9 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                 } catch (ProcessCanceledException e) {
                     //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                     //TODO delete block when minimum required version is 2024.2
-                    installFuture.cancel(true);
+                    CancellationSupport.cancel(installFuture);
                 } catch (CancellationException e) {
-                    installFuture.cancel(true);
+                    CancellationSupport.cancel(installFuture);
                 } catch (Throwable e) {
                     status = ServerInstallationStatus.NOT_INSTALLED;
                     installFuture.completeExceptionally(e);
