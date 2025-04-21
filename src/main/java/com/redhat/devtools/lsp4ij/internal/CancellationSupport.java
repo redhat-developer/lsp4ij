@@ -258,7 +258,7 @@ public class CancellationSupport implements CancelChecker {
      * @param future the future to cancel.
      */
     public static void cancel(@Nullable Future<?> future) {
-        if (future != null && future.isDone()) {
+        if (future != null && !future.isDone()) {
             try {
                 future.cancel(true);
             } catch (Throwable e) {
