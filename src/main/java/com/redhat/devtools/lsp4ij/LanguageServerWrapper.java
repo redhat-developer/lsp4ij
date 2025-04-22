@@ -29,6 +29,7 @@ import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -40,6 +41,8 @@ import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
@@ -131,6 +134,19 @@ public class LanguageServerWrapper implements Disposable {
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
     // error notification displayed when server start fails.
     private @Nullable Notification errorNotification;
+
+    // LSP traces
+    public record LSPTrace(@NotNull Message message,
+                           @NotNull MessageConsumer messageConsumer,
+                           @NotNull ServerTrace serverTrace,
+                           @NotNull TracingMessageConsumer tracing) {
+        public String toMessage() {
+            return tracing.log(message, messageConsumer, serverTrace);
+        }
+    }
+
+    private @Nullable TracingMessageConsumer tracing;
+    private @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
 
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
@@ -290,6 +306,14 @@ public class LanguageServerWrapper implements Disposable {
             final VirtualFile rootURI = getRootURI();
             this.launcherFuture = new CompletableFuture<>();
             this.initializeFuture = CompletableFuture.supplyAsync(() -> {
+
+                        // Initialize LSP traces
+                        if (tracing != null) {
+                            tracing = null;
+                        }
+                        if (traces != null) {
+                            traces = null;
+                        }
 
                         var provider = this.lspStreamProvider = serverDefinition.createConnectionProvider(initialProject);
                         initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
@@ -606,11 +630,11 @@ public class LanguageServerWrapper implements Disposable {
             while (!this.openedDocuments.isEmpty()) {
                 disconnect(this.openedDocuments.keySet().iterator().next(), false);
             }
-                while (!this.closedDocuments.isEmpty()) {
-                    URI fileUri = closedDocuments.keySet().iterator().next();
-                    closedDocuments.remove(fileUri);
-                    clearProblem(fileUri);
-                }
+            while (!this.closedDocuments.isEmpty()) {
+                URI fileUri = closedDocuments.keySet().iterator().next();
+                closedDocuments.remove(fileUri);
+                clearProblem(fileUri);
+            }
             this.languageServer = null;
             this.languageClient = null;
 
@@ -660,6 +684,7 @@ public class LanguageServerWrapper implements Disposable {
         if (provider != null) {
             provider.stop();
         }
+
     }
 
     private void shutdownLanguageServerInstance(LanguageServer languageServerInstance) throws Exception {
@@ -1288,8 +1313,9 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * Update diagnostics for the given file URi.
-     * @param file the virtual file.
-     * @param identifier the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
+     *
+     * @param file        the virtual file.
+     * @param identifier  the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
      * @param diagnostics the diagnostics to update.
      */
     public void updateDiagnostics(@NotNull VirtualFile file,
@@ -1311,7 +1337,7 @@ public class LanguageServerWrapper implements Disposable {
                 openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
             }
         }
-        if(openedOrClosedDocument == null) {
+        if (openedOrClosedDocument == null) {
             return;
         }
 
@@ -1360,5 +1386,61 @@ public class LanguageServerWrapper implements Disposable {
     @ApiStatus.Internal
     public void incrementModificationCount() {
         modificationTracker.incModificationCount();
+    }
+
+    // ------------- LSP Traces
+
+    /**
+     * Add LSP trace in the cached LSP traces.
+     *
+     * @param message         the LSP request/response message to display in the LSP consle.
+     * @param messageConsumer the message consumer.
+     * @return true if trace has been add in the LSP cache traces and false otherwise.
+     */
+    public boolean addTrace(@NotNull Message message,
+                            @NotNull MessageConsumer messageConsumer) {
+        ServerTrace serverTrace = getServerTrace();
+        if (serverTrace == ServerTrace.off) {
+            return false;
+        }
+        initLSPTracesIfNeeded();
+        traces.add(new LSPTrace(message, messageConsumer, serverTrace, tracing));
+        return true;
+    }
+
+    private void initLSPTracesIfNeeded() {
+        if (traces == null) {
+            synchronized (this) {
+                if (traces == null) {
+                    traces = new ConcurrentLinkedQueue<>();
+                    tracing = new TracingMessageConsumer();
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns the LSP cached traces.
+     *
+     * @return the LSP cached traces.
+     */
+    public ConcurrentLinkedQueue<LSPTrace> getTraces() {
+        initLSPTracesIfNeeded();
+        return traces;
+    }
+
+    /**
+     * Returns the configured server trace.
+     *
+     * @return the configured server trace.
+     */
+    public @NotNull ServerTrace getServerTrace() {
+        ServerTrace serverTrace = null;
+        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings =
+                UserDefinedLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(getServerDefinition().getId());
+        if (settings != null) {
+            serverTrace = settings.getServerTrace();
+        }
+        return serverTrace != null ? serverTrace : ServerTrace.getDefaultValue();
     }
 }

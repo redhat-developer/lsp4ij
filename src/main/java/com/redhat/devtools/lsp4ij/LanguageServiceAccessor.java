@@ -110,7 +110,7 @@ public class LanguageServiceAccessor implements Disposable {
         return project.getService(LanguageServiceAccessor.class);
     }
 
-    private LanguageServiceAccessor(Project project) {
+    private LanguageServiceAccessor(@NotNull Project project) {
         this.project = project;
         LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(serverDefinitionListener);
     }

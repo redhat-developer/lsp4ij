@@ -13,18 +13,17 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.project.Project;
+import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIfNeeded;
 
@@ -33,15 +32,17 @@ import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIf
  *
  * @author Angelo ZERR
  */
+@ApiStatus.Internal
 public class LanguageServerExplorerLifecycleListener implements LanguageServerLifecycleListener {
 
-    private final Map<LanguageServerWrapper, TracingMessageConsumer> tracingPerServer = new HashMap<>(10);
+    private static final long TRACE_FLUSH_DELAY_MS = 500L; // Debounce delay before flushing LSP traces
 
+    private volatile Alarm traceFlushAlarm;
     private boolean disposed;
 
     private final LanguageServerExplorer explorer;
 
-    public LanguageServerExplorerLifecycleListener(LanguageServerExplorer explorer) {
+    public LanguageServerExplorerLifecycleListener(@NotNull LanguageServerExplorer explorer) {
         this.explorer = explorer;
     }
 
@@ -53,23 +54,43 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     }
 
     @Override
-    public void handleLSPMessage(Message message, MessageConsumer messageConsumer, LanguageServerWrapper languageServer) {
+    public void handleLSPMessage(@NotNull Message message,
+                                 @NotNull MessageConsumer messageConsumer,
+                                 @NotNull LanguageServerWrapper languageServer) {
         if (explorer.isDisposed()) {
             return;
         }
-        LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
-        ServerTrace serverTrace = getServerTrace(explorer.getProject(), languageServer.getServerDefinition().getId());
-        if (serverTrace == ServerTrace.off) {
-            return;
-        }
 
-        ApplicationManager.getApplication()
-                .executeOnPooledThread(() -> {
-                    TracingMessageConsumer tracing = getLSPRequestCacheFor(languageServer);
-                    String log = tracing.log(message, messageConsumer, serverTrace);
-                    invokeLaterIfNeeded(() -> showTrace(processTreeNode, log));
-                });
+        if (languageServer.addTrace(message, messageConsumer)) {
+            scheduleFlushLogs(languageServer);
+        }
     }
+
+    private void scheduleFlushLogs(@NotNull LanguageServerWrapper languageServer) {
+        var traceFlushAlarm = getTraceFlushAlarm();
+        traceFlushAlarm.addRequest(() -> {
+            if (disposed || explorer.isDisposed()) return;
+
+            // Get cached LSP traces
+            ConcurrentLinkedQueue<LanguageServerWrapper.LSPTrace> traces = languageServer.getTraces();
+            if (traces == null || traces.isEmpty()) return;
+
+            // There are some LSP traces to display inthe LSP console
+            StringBuilder batch = new StringBuilder();
+            LanguageServerWrapper.LSPTrace lspTrace;
+            // Merge LSP traces in one String
+            while ((lspTrace = traces.poll()) != null) {
+                batch.append(lspTrace.toMessage());
+            }
+
+            // Flush logs in the UI Thread
+            if (batch.length() > 0) {
+                LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
+                invokeLaterIfNeeded(() -> showTrace(processTreeNode, batch.toString()));
+            }
+        }, TRACE_FLUSH_DELAY_MS);
+    }
+
 
     @Override
     public void handleError(LanguageServerWrapper languageServer, Throwable exception) {
@@ -81,33 +102,8 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         invokeLaterIfNeeded(() -> showError(processTreeNode, exception));
     }
 
-    private TracingMessageConsumer getLSPRequestCacheFor(LanguageServerWrapper languageServer) {
-        TracingMessageConsumer cache = tracingPerServer.get(languageServer);
-        if (cache != null) {
-            return cache;
-        }
-        synchronized (tracingPerServer) {
-            cache = tracingPerServer.get(languageServer);
-            if (cache != null) {
-                return cache;
-            }
-            cache = new TracingMessageConsumer();
-            tracingPerServer.put(languageServer, cache);
-            return cache;
-        }
-    }
-
-
-    private static ServerTrace getServerTrace(Project project, String languageServerId) {
-        ServerTrace serverTrace = null;
-        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(languageServerId);
-        if (settings != null) {
-            serverTrace = settings.getServerTrace();
-        }
-        return serverTrace != null ? serverTrace : ServerTrace.getDefaultValue();
-    }
-
-    private LanguageServerProcessTreeNode updateServerStatus(LanguageServerWrapper languageServer, ServerStatus serverStatus, boolean selectProcess) {
+    private @Nullable LanguageServerProcessTreeNode updateServerStatus(@NotNull LanguageServerWrapper languageServer,
+                                                                       @Nullable ServerStatus serverStatus, boolean selectProcess) {
         LanguageServerTreeNode serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
         if (serverNode == null) {
             // Should never occur.
@@ -160,6 +156,17 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         explorer.showError(processTreeNode, exception);
     }
 
+    private Alarm getTraceFlushAlarm() {
+        if (traceFlushAlarm == null) {
+            synchronized (this) {
+                if (traceFlushAlarm == null) {
+                    traceFlushAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+                }
+            }
+        }
+        return traceFlushAlarm;
+    }
+
     public boolean isDisposed() {
         return disposed;
     }
@@ -167,7 +174,6 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     @Override
     public void dispose() {
         disposed = true;
-        tracingPerServer.clear();
     }
 
 }
