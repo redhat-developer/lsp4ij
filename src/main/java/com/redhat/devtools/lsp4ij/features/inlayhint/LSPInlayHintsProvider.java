@@ -84,8 +84,8 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             // the future which collects all textDocument/inlayHint for all servers is not finished
             // add it to the pending futures to refresh again the UI when this future will be finished.
             pendingFutures.add(future);
-        */} catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
+        */} catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+            throw e;
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/inlayHint' request", e);

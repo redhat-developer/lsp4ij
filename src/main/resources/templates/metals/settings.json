@@ -1,41 +1,62 @@
 {
-  "serverVersion": "1.2.2",
-  "serverProperties": [
-    "-Xmx1G"
-  ],
-  "coursierMirror": "",
-  "ammoniteJvmProperties": [],
-  "excludedPackages": [],
-  "showInferredType": "false",
-  "showImplicitArguments": false,
-  "showImplicitConversionsAndClasses": false,
-  "javaHome": "",
-  "sbtScript": "",
-  "millScript": "",
-  "mavenScript": "",
-  "gradleScript": "",
-  "scalafmtConfigPath": "",
-  "scalafixConfigPath": "",
-  "scalafixRulesDependencies": [],
-  "bloopVersion": "",
-  "bloopJvmProperties": [],
-  "bloopSbtAlreadyInstalled": true,
-  "customRepositories": [],
-  "superMethodLensesEnabled": true,
-  "enableStripMarginOnTypeFormatting": true,
-  "enableIndentOnPaste": false,
-  "verboseCompilation": true,
-  "enableSemanticHighlighting": true,
-  "testUserInterface": "Test Explorer",
-  "customProjectRoot": "",
-  "fallbackScalaVersion": "automatic",
-  "javaFormat": {
-    "eclipseConfigPath": "",
-    "eclipseProfile": ""
-  },
-  "scalaCliLauncher": "",
-  "suggestLatestUpgrade": false,
-  "trace": {
-    "server": "verbose"
+  "metals": {
+    "disableReleaseNotes": false,
+    "serverVersion": "1.5.2",
+    "serverProperties": [
+      "-Xmx2G",
+      "-XX:+UseZGC",
+      "-XX:ZUncommitDelay=30",
+      "-XX:ZCollectionInterval=5",
+      "-XX:+IgnoreUnrecognizedVMOptions"
+    ],
+    "coursierMirror": "",
+    "excludedPackages": [],
+    "inlayHints": {
+      "inferredTypes": {
+        "enable": true
+      },
+      "implicitArguments": {
+        "enable": true
+      },
+      "implicitConversions": {
+        "enable": true
+      },
+      "typeParameters": {
+        "enable": true
+      },
+      "hintsInPatternMatch": {
+        "enable": true
+      }
+    },
+    "javaHome": "",
+    "metalsJavaHome": "",
+    "javaVersion": "17",
+    "sbtScript": "",
+    "millScript": "",
+    "mavenScript": "",
+    "gradleScript": "",
+    "scalafmtConfigPath": "",
+    "scalafixConfigPath": "",
+    "scalafixRulesDependencies": [],
+    "bloopVersion": "",
+    "bloopJvmProperties": [],
+    "bloopSbtAlreadyInstalled": true,
+    "customRepositories": [],
+    "superMethodLensesEnabled": true,
+    "enableStripMarginOnTypeFormatting": true,
+    "enableIndentOnPaste": false,
+    "verboseCompilation": true,
+    "enableSemanticHighlighting": true,
+    "testUserInterface": "Test Explorer",
+    "customProjectRoot": "",
+    "fallbackScalaVersion": "automatic",
+    "javaFormat": {
+      "eclipseConfigPath": "",
+      "eclipseProfile": ""
+    },
+    "scalaCliLauncher": "",
+    "suggestLatestUpgrade": false,
+    "defaultBspToBuildTool": false,
+    "autoImportBuilds": "off"
   }
 }
