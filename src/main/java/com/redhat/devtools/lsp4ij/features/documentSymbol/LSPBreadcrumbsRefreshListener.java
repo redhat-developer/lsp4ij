@@ -36,12 +36,14 @@ import kotlin.Unit;
 import kotlin.coroutines.Continuation;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Refreshes the breadcrumbs and sticky lines for open editor tabs when a language server has started.
  */
+@ApiStatus.Internal
 public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageServerLifecycleListener {
 
     private static final Key<Boolean> ADDED_BREADCRUMB_LISTENER = Key.create(LSPBreadcrumbsRefreshListener.class + ".ADDED_BREADCRUMB_LISTENER");
