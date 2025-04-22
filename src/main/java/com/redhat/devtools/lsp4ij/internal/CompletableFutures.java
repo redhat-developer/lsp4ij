@@ -142,6 +142,9 @@ public class CompletableFutures {
                 }
                 // wait for 25 ms
                 future.get(25, TimeUnit.MILLISECONDS);
+            } catch (CancellationException e) {
+                // race condition, a cancel has occurred when future.get(...) is called.
+                throw e;
             } catch (TimeoutException ignore) {
                 long time = System.currentTimeMillis() - start;
                 if (timeout != null && time > timeout) {
