@@ -25,6 +25,7 @@ group = prop("pluginGroup")
 version = prop("pluginVersion")
 
 val lsp4jVersion = prop("lsp4jVersion")
+val lsp4jDebugVersion = prop("lsp4jDebugVersion")
 val flexmarkVersion = prop("flexmarkVersion")
 
 // Configure project's dependencies
@@ -68,8 +69,18 @@ dependencies {
         testFramework(TestFrameworkType.Platform)
     }
 
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j:$lsp4jVersion")
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.debug:$lsp4jVersion")
+    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j:$lsp4jVersion") {
+        exclude(group = "org.eclipse.lsp4j", module="org.eclipse.lsp4j.jsonrpc")
+    }
+    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:$lsp4jVersion") {
+        exclude(group = "com.google.code.gson", module = "gson")
+    }
+    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.debug:$lsp4jDebugVersion") {
+        exclude(group = "org.eclipse.lsp4j", module = "org.eclipse.lsp4j.jsonrpc.debug")
+    }
+    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc.debug:$lsp4jDebugVersion") {
+        exclude(group = "com.google.code.gson", module = "gson")
+    }
 
     implementation("com.vladsch.flexmark:flexmark:$flexmarkVersion")
     implementation("com.vladsch.flexmark:flexmark-ext-tables:$flexmarkVersion")
