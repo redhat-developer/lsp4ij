@@ -15,6 +15,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.Alarm;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.jetbrains.annotations.NotNull;
@@ -97,7 +98,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
                 // The viewport hasn't changed (no scrolling occurred) there are some codelens to resolve and file has not changed
                 // , so we proceed to refresh
                 EditorFeatureManager.getInstance(editor.getProject()).
-                        refreshEditorFeature(file, EditorFeatureType.CODE_VISION, false);
+                        refreshEditorFeature(file, EditorFeatureType.CODE_VISION, false, new PsiFileCancelChecker(file));
             }
         }, VIEWPORT_CHANGE_DELAY_MS);
     }

@@ -11,7 +11,6 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-
 package com.redhat.devtools.lsp4ij.features.documentSymbol;
 
 import com.intellij.openapi.application.ApplicationManager;

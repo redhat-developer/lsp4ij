@@ -46,10 +46,6 @@ public class DeclarativeInlayHintsEditorFeature implements EditorFeature {
     public void collectUiRunnable(@NotNull Editor editor,
                                   @NotNull PsiFile file,
                                   @NotNull List<Runnable> runnableList) {
-        Runnable runnable = () -> {
-            // Refresh the annotations, inlay hints both
-            LSPFileSupport.getSupport(file).restartDaemonCodeAnalyzerWithDebounce();
-        };
-        runnableList.add(runnable);
+        // Do nothing
     }
 }

@@ -22,6 +22,8 @@ import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
+import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -152,7 +154,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         for (var openedDocument : wrapper.getOpenedDocuments()) {
             VirtualFile file = openedDocument.getFile();
             EditorFeatureManager.getInstance(getProject())
-                    .refreshEditorFeature(file, EditorFeatureType.CODE_VISION, true);
+                    .refreshEditorFeature(file, EditorFeatureType.CODE_VISION, true, new VirtualFileCancelChecker(file));
         }
     }
 
@@ -170,8 +172,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         for (var openedDocument : wrapper.getOpenedDocuments()) {
             VirtualFile file = openedDocument.getFile();
             EditorFeatureManager efm = EditorFeatureManager.getInstance(getProject());
-            efm.refreshEditorFeature(file, EditorFeatureType.INLAY_HINT, true);
-            efm.refreshEditorFeature(file, EditorFeatureType.DECLARATIVE_INLAY_HINT, true);
+            efm.refreshEditorFeature(file, EditorFeatureType.DECLARATIVE_INLAY_HINT, true, new VirtualFileCancelChecker(file));
         }
     }
 
@@ -196,7 +197,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
                             // Evict the semantic tokens cache
                             fileSupport.getSemanticTokensSupport().cancel();
                             // Refresh the UI
-                            fileSupport.restartDaemonCodeAnalyzerWithDebounce();
+                            fileSupport.restartDaemonCodeAnalyzerWithDebounce(new PsiFileCancelChecker(psiFile));
                         }
                     }
                     return null;
@@ -217,7 +218,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     private void refreshDiagnosticsForAllOpenedFiles() {
         // Received request 'workspace/diagnostic/refresh
         for (var openedDocument : wrapper.getOpenedDocuments()) {
-            openedDocument.getSynchronizer().refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
+            openedDocument.getSynchronizer()
+                    .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
         }
     }
 

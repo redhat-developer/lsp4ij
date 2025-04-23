@@ -51,8 +51,6 @@ public class InlayHintsEditorFeature implements EditorFeature {
     // InlayHintsPassFactory.Companion.clearModificationStamp(editor)
     private Method clearModificationStampMethod;
 
-    private boolean errorLogged;
-
     @Override
     public EditorFeatureType getFeatureType() {
         return EditorFeatureType.INLAY_HINT;
@@ -87,11 +85,7 @@ public class InlayHintsEditorFeature implements EditorFeature {
     public void collectUiRunnable(@NotNull Editor editor,
                                   @NotNull PsiFile file,
                                   @NotNull List<Runnable> runnableList) {
-        Runnable runnable = () -> {
-            // Refresh the annotations, inlay hints both
-        	LSPFileSupport.getSupport(file).restartDaemonCodeAnalyzerWithDebounce();
-        };
-        runnableList.add(runnable);
+        // Do nothing
     }
 
     private void loadInlayHintsPassFactoryIfNeeded() throws ClassNotFoundException, InvocationTargetException, InstantiationException, IllegalAccessException, NoSuchFieldException, NoSuchMethodException {

@@ -61,7 +61,10 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             return;
         }
 
+        // Update UI server status
+        updateServerStatus(languageServer, null, false);
         if (languageServer.addTrace(message, messageConsumer)) {
+            // Display traces in LSP console
             scheduleFlushLogs(languageServer);
         }
     }
