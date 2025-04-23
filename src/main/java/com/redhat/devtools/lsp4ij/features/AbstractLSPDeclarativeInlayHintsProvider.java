@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.Command;
@@ -28,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.awt.event.InputEvent;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -98,7 +100,9 @@ public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayH
                 // Some LSP requests:
                 // - textDocument/inlayHint, inlayHint/resolve
                 // are pending, wait for their completion and refresh the declarative inlay hints UI to render them
-                EditorFeatureManager.getInstance(project).refreshEditorFeatureWhenAllDone(pendingFutures, modificationStamp, psiFile, EditorFeatureType.DECLARATIVE_INLAY_HINT);
+                EditorFeatureManager.getInstance(project)
+                        .refreshEditorFeatureWhenAllDone(new HashSet<>(pendingFutures), psiFile, EditorFeatureType.DECLARATIVE_INLAY_HINT, new PsiFileCancelChecker(psiFile, modificationStamp));
+                pendingFutures.clear();
             }
         }
     }

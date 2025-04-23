@@ -26,6 +26,7 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.Command;
@@ -35,6 +36,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.InputEvent;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -78,7 +80,7 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                 }
                 Project project = psiFile.getProject();
                 if (project.isDisposed()) {
-                    // InlayHint must not be collected
+                    // Color must not be collected
                     return true;
                 }
 
@@ -89,7 +91,10 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                         // Some LSP requests:
                         // - textDocument/colorInformation
                         // are pending, wait for their completion and refresh the inlay hints UI to render them
-                        EditorFeatureManager.getInstance(project).refreshEditorFeatureWhenAllDone(pendingFutures, modificationStamp, psiFile, EditorFeatureType.INLAY_HINT);
+                        EditorFeatureManager.getInstance(project)
+                                .refreshEditorFeatureWhenAllDone(new HashSet<>(pendingFutures), psiFile, EditorFeatureType.INLAY_HINT,
+                                        new PsiFileCancelChecker(psiFile, modificationStamp));
+                        pendingFutures.clear();
                     }
                 } catch (CancellationException e) {
                     // Do nothing

@@ -23,6 +23,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -78,8 +79,9 @@ public class EditorFeatureManager implements Disposable {
      */
     public void refreshEditorFeature(@NotNull VirtualFile file,
                                      @NotNull EditorFeatureType featureType,
-                                     boolean clearLSPCache) {
-        refreshEditorFeature(null, file, featureType, clearLSPCache);
+                                     boolean clearLSPCache,
+                                     @NotNull CancelChecker cancelChecker) {
+        refreshEditorFeature(null, file, featureType, clearLSPCache, cancelChecker);
     }
 
     /**
@@ -91,8 +93,9 @@ public class EditorFeatureManager implements Disposable {
      */
     public void refreshEditorFeature(@NotNull PsiFile file,
                                      @NotNull EditorFeatureType featureType,
-                                     boolean clearLSPCache) {
-        refreshEditorFeature(file, null, featureType, clearLSPCache);
+                                     boolean clearLSPCache,
+                                     @NotNull CancelChecker cancelChecker) {
+        refreshEditorFeature(file, null, featureType, clearLSPCache, cancelChecker);
     }
 
     /**
@@ -103,9 +106,13 @@ public class EditorFeatureManager implements Disposable {
      * @param clearLSPCache true if LSP feature data cache (ex : LSP CodeLens) must be evicted and false otherwise.
      */
     private void refreshEditorFeature(@Nullable PsiFile psiFile,
-                                     @Nullable VirtualFile file,
-                                     @NotNull EditorFeatureType featureType,
-                                     boolean clearLSPCache) {
+                                      @Nullable VirtualFile file,
+                                      @NotNull EditorFeatureType featureType,
+                                      boolean clearLSPCache,
+                                      @NotNull CancelChecker cancelChecker) {
+        if (cancelChecker.isCanceled()) {
+            return;
+        }
         ReadAction.nonBlocking((Callable<RefreshEditorFeatureContext>) () -> {
                     // Get the Psi file.
                     VirtualFile f = file != null ? file : LSPIJUtils.getFile(psiFile);
@@ -113,6 +120,10 @@ public class EditorFeatureManager implements Disposable {
                     // Get opened editors used to display the content of the file.
                     Editor[] editors = LSPIJUtils.editorsForFile(f, project);
                     if (editors.length == 0) {
+                        return null;
+                    }
+
+                    if (cancelChecker.isCanceled()) {
                         return null;
                     }
 
@@ -137,7 +148,7 @@ public class EditorFeatureManager implements Disposable {
                         // No opened editors associated from any language servers.
                         return;
                     }
-                    LSPFileSupport.getSupport(context.file()).restartDaemonCodeAnalyzerWithDebounce();
+                    LSPFileSupport.getSupport(context.file()).restartDaemonCodeAnalyzerWithDebounce(cancelChecker);
                     for (var runnable : context.runnables()) {
                         runnable.run();
                     }
@@ -148,21 +159,20 @@ public class EditorFeatureManager implements Disposable {
      * Waits for all futures in the provided list to finish, then refreshes the given editor feature if the file has not
      * been modified since.
      *
-     * @param pendingFutures    a list of futures to wait for
-     * @param modificationStamp the initial file modification timestamp
-     * @param psiFile           the file to check the timestamp of
-     * @param feature           the editor feature to refresh
+     * @param pendingFutures a list of futures to wait for
+     * @param psiFile        the file to check the timestamp of
+     * @param feature        the editor feature to refresh
      */
     public void refreshEditorFeatureWhenAllDone(@NotNull Set<CompletableFuture<?>> pendingFutures,
-                                                long modificationStamp,
                                                 @NotNull PsiFile psiFile,
-                                                @NotNull EditorFeatureType feature) {
+                                                @NotNull EditorFeatureType feature,
+                                                @NotNull CancelChecker cancelChecker) {
         CompletableFuture.allOf(pendingFutures.toArray(new CompletableFuture[0]))
                 .thenApplyAsync(_unused -> {
                     // Check if PsiFile was not modified
-                    if (modificationStamp == psiFile.getModificationStamp()) {
+                    if (!cancelChecker.isCanceled()) {
                         // All pending futures are finished, refresh the feature
-                        refreshEditorFeature(psiFile, feature, false);
+                        refreshEditorFeature(psiFile, feature, false, cancelChecker);
                     }
                     return null;
                 });

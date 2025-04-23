@@ -16,6 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.files.PathPatternMatcher;
+import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
@@ -76,7 +77,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
             for (var fileData : clientFeatures.getServerWrapper().getOpenedDocuments()) {
                 VirtualFile file = fileData.getFile();
                 EditorFeatureManager.getInstance(clientFeatures.getProject())
-                        .refreshEditorFeature(file, editorFeatureType, true);
+                        .refreshEditorFeature(file, editorFeatureType, true, new VirtualFileCancelChecker(file));
             }
         }
         return t;

@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDeclarativeInlayHintsProvider;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -62,7 +63,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         CompletableFuture<List<InlayHintData>> future = inlayHintSupport.getInlayHints(params);
 
         try {
-            // Wait until the future while 200ms and stop the wait if there are some ProcessCanceledException.
+            // Wait until the future and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiFile);
             if (isDoneNormally(future)) {
 
@@ -79,13 +80,13 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
                             buildInlayHints(psiFile, list, position, inlayHintsSink);
                         });
             }
-            return;
-        /*} catch (TimeoutException ignore) {
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/inlayHint requests.
+            inlayHintSupport.cancel();
+        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             // the future which collects all textDocument/inlayHint for all servers is not finished
             // add it to the pending futures to refresh again the UI when this future will be finished.
             pendingFutures.add(future);
-        */} catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            throw e;
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/inlayHint' request", e);

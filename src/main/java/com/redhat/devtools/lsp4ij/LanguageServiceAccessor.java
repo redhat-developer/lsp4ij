@@ -26,6 +26,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -188,7 +189,7 @@ public class LanguageServiceAccessor implements Disposable {
                                 }
                                 // refresh IJ code visions, inlay hints, folding features
                                 EditorFeatureManager.getInstance(project)
-                                        .refreshEditorFeature(file, EditorFeatureType.ALL, true);
+                                        .refreshEditorFeature(file, EditorFeatureType.ALL, true, new PsiFileCancelChecker(file));
                             });
 
                 })

@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.client.indexing;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.jetbrains.annotations.ApiStatus;
@@ -110,7 +111,7 @@ public abstract class ProjectIndexingStrategyBase {
                                 // Refresh all features (code vision, inlay hints, folding,etc)
                                 // of editors which edit the current file.
                                 EditorFeatureManager.getInstance(manager.project)
-                                        .refreshEditorFeature(psiFile, EditorFeatureType.ALL, true);
+                                        .refreshEditorFeature(psiFile, EditorFeatureType.ALL, true, new PsiFileCancelChecker(psiFile));
 
                             });
                 }

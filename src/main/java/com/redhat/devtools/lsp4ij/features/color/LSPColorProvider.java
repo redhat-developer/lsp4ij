@@ -22,6 +22,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPInlayHintsProvider;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.Color;
 import org.eclipse.lsp4j.DocumentColorParams;
 import org.jetbrains.annotations.NotNull;
@@ -78,8 +79,13 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                                         toPresentation(list, factory))
                         );
             }
-        } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/documentColor requests.
+            colorSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            // the future which collects all textDocument/documentColor for all servers is not finished
+            // add it to the pending futures to refresh again the UI when this future will be finished.
+            pendingFutures.add(future);
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/documentColor' request", e);
