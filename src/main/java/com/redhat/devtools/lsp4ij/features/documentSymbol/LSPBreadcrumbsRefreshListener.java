@@ -33,6 +33,7 @@ import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
+import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.ApiStatus;
@@ -108,9 +109,18 @@ public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageS
             // If the file is still valid and needs restart, clear that flag and schedule restart
             if (file.isValid() && (file.getUserData(NEEDS_RESTART) == Boolean.TRUE)) {
                 file.putUserData(NEEDS_RESTART, false);
-                // We must force the modification stamp to increment or sticky lines won't be recomputed
-                file.clearCaches();
-                ApplicationManager.getApplication().invokeLater(() -> LSPFileSupport.getSupport(file).restartDaemonCodeAnalyzerWithDebounce());
+                LSPFileSupport fileSupport = LSPFileSupport.getSupport(file);
+                LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
+                var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
+                var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
+                documentSymbolFuture
+                        .thenApply(symbols -> {
+                            // We must force the modification stamp to increment or sticky lines won't be recomputed
+                            file.clearCaches();
+                            ApplicationManager.getApplication().invokeLater(() -> fileSupport.restartDaemonCodeAnalyzerWithDebounce());
+                            return symbols;
+                        });
+
             }
         }
     }
