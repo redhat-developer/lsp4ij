@@ -16,7 +16,6 @@ import com.intellij.codeInsight.hints.presentation.PresentationFactory;
 import com.intellij.lang.Language;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.layout.LCFlags;
@@ -26,9 +25,6 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
-import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,20 +32,12 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.InputEvent;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-
-import static com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager.getPendingFutures;
 
 /*
  * Abstract class used to display IntelliJ inlay hints.
  */
 public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvider<NoSettings> {
-
-    private static final Key<Set<CompletableFuture<?>>> INLAY_HINTS_PENDING_FUTURES_KEY =
-            Key.create("lsp.inlay.hints.pending.futures");
 
     private static final InlayHintsCollector EMPTY_INLAY_HINTS_COLLECTOR = (psiElement, editor, inlayHintsSink) -> {
         // Do nothing
@@ -70,7 +58,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
             return EMPTY_INLAY_HINTS_COLLECTOR;
         }
 
-        final long modificationStamp = psiFile.getModificationStamp();
         return new FactoryInlayHintsCollector(editor) {
 
             @Override
@@ -85,17 +72,7 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                 }
 
                 try {
-                    final Set<CompletableFuture<?>> pendingFutures = getPendingFutures(editor, INLAY_HINTS_PENDING_FUTURES_KEY);
-                    doCollect(psiFile, editor, getFactory(), inlayHintsSink, pendingFutures);
-                    if (!pendingFutures.isEmpty()) {
-                        // Some LSP requests:
-                        // - textDocument/colorInformation
-                        // are pending, wait for their completion and refresh the inlay hints UI to render them
-                        EditorFeatureManager.getInstance(project)
-                                .refreshEditorFeatureWhenAllDone(new HashSet<>(pendingFutures), psiFile, EditorFeatureType.INLAY_HINT,
-                                        new PsiFileCancelChecker(psiFile, modificationStamp));
-                        pendingFutures.clear();
-                    }
+                    doCollect(psiFile, editor, getFactory(), inlayHintsSink);
                 } catch (CancellationException e) {
                     // Do nothing
                 }
@@ -163,14 +140,13 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         }
         LSPCommandContext context = new LSPCommandContext(command, file, LSPCommandContext.ExecutedBy.INLAY_HINT, editor, languageServer)
                 .setSource(event != null ? (Component) event.getSource() : null)
-                        .setInputEvent(event);
+                .setInputEvent(event);
         CommandExecutor.executeCommand(context);
     }
 
     protected abstract void doCollect(@NotNull PsiFile psiFile,
-                                      @NotNull Editor editor,
-                                      @NotNull PresentationFactory factory,
-                                      @NotNull InlayHintsSink inlayHintsSink,
-                                      @NotNull Set<CompletableFuture<?>> pendingFutures);
+                                                      @NotNull Editor editor,
+                                                      @NotNull PresentationFactory factory,
+                                                      @NotNull InlayHintsSink inlayHintsSink);
 
 }
