@@ -62,15 +62,18 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         }
 
         // Update UI server status
-        updateServerStatus(languageServer, null, false);
+        LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
         if (languageServer.addTrace(message, messageConsumer)) {
             // Display traces in LSP console
-            scheduleFlushLogs(languageServer);
+            scheduleFlushLogs(languageServer, processTreeNode);
         }
     }
 
-    private void scheduleFlushLogs(@NotNull LanguageServerWrapper languageServer) {
-        var traceFlushAlarm = getTraceFlushAlarm();
+    private void scheduleFlushLogs(@NotNull LanguageServerWrapper languageServer, LanguageServerProcessTreeNode processTreeNode) {
+        var traceFlushAlarm = languageServer.getTraceFlushAlarm();
+        if(traceFlushAlarm == null) {
+            return;
+        }
         traceFlushAlarm.addRequest(() -> {
             if (disposed || explorer.isDisposed()) return;
 
@@ -78,7 +81,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             ConcurrentLinkedQueue<LanguageServerWrapper.LSPTrace> traces = languageServer.getTraces();
             if (traces == null || traces.isEmpty()) return;
 
-            // There are some LSP traces to display inthe LSP console
+            // There are some LSP traces to display in the LSP console
             StringBuilder batch = new StringBuilder();
             LanguageServerWrapper.LSPTrace lspTrace;
             // Merge LSP traces in one String
@@ -88,7 +91,6 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
 
             // Flush logs in the UI Thread
             if (batch.length() > 0) {
-                LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
                 invokeLaterIfNeeded(() -> showTrace(processTreeNode, batch.toString()));
             }
         }, TRACE_FLUSH_DELAY_MS);
@@ -157,17 +159,6 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             return;
         }
         explorer.showError(processTreeNode, exception);
-    }
-
-    private Alarm getTraceFlushAlarm() {
-        if (traceFlushAlarm == null) {
-            synchronized (this) {
-                if (traceFlushAlarm == null) {
-                    traceFlushAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
-                }
-            }
-        }
-        return traceFlushAlarm;
     }
 
     public boolean isDisposed() {
