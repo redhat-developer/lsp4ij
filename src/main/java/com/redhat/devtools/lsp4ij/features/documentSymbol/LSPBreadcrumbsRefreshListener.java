@@ -109,6 +109,8 @@ public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageS
             // If the file is still valid and needs restart, clear that flag and schedule restart
             if (file.isValid() && (file.getUserData(NEEDS_RESTART) == Boolean.TRUE)) {
                 file.putUserData(NEEDS_RESTART, false);
+
+                // Refresh breadcrumb when LSP Symbols are available.
                 LSPFileSupport fileSupport = LSPFileSupport.getSupport(file);
                 LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
                 var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
