@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -50,10 +49,9 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
 
     @Override
     protected void doCollect(@NotNull PsiFile psiFile,
-                             @NotNull Editor editor,
-                             @NotNull PresentationFactory factory,
-                             @NotNull InlayHintsSink inlayHintsSink,
-                             @NotNull Set<CompletableFuture<?>> pendingFutures) {
+                                             @NotNull Editor editor,
+                                             @NotNull PresentationFactory factory,
+                                             @NotNull InlayHintsSink inlayHintsSink) {
         // Get LSP color information from cache or create them
         LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
         var params = new DocumentColorParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
@@ -85,7 +83,7 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
         } catch (ProcessCanceledException e) {
             // the future which collects all textDocument/documentColor for all servers is not finished
             // add it to the pending futures to refresh again the UI when this future will be finished.
-            pendingFutures.add(future);
+            colorSupport.refreshEditorFeatureWhenReady();
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/documentColor' request", e);

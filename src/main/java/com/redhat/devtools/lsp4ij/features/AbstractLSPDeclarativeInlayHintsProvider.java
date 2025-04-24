@@ -13,35 +13,23 @@ package com.redhat.devtools.lsp4ij.features;
 import com.intellij.codeInsight.hints.declarative.*;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
-import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.awt.event.InputEvent;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-
-import static com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager.getPendingFutures;
 
 /*
  * Abstract class used to display IntelliJ inlay hints.
  */
 public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayHintsProvider {
-
-    private static final Key<Set<CompletableFuture<?>>> DECLARATIVE_INLAY_HINTS_PENDING_FUTURES_KEY =
-            Key.create("lsp.declarative.inlay.hints.pending.futures");
 
     private static final SharedBypassCollector EMPTY_INLAY_HINTS_COLLECTOR = (psiElement, inlayHintsSink) -> {
         // Do nothing
@@ -52,9 +40,7 @@ public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayH
         if (ProjectIndexingManager.canExecuteLSPFeature(psiFile) != ExecuteLSPFeatureStatus.NOW) {
             return EMPTY_INLAY_HINTS_COLLECTOR;
         }
-
-        final long modificationStamp = psiFile.getModificationStamp();
-        return new Collector(editor, modificationStamp);
+        return new Collector(editor);
     }
 
     protected void executeCommand(@Nullable Command command,
@@ -73,17 +59,14 @@ public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayH
 
     protected abstract void doCollect(@NotNull PsiFile psiFile,
                                       @NotNull Editor editor,
-                                      @NotNull InlayTreeSink inlayHintsSink,
-                                      @NotNull Set<CompletableFuture<?>> pendingFutures);
+                                      @NotNull InlayTreeSink inlayHintsSink);
 
 
     private class Collector implements OwnBypassCollector {
         private final @NotNull Editor editor;
-        private final long modificationStamp;
 
-        public Collector(@NotNull Editor editor, long modificationStamp) {
+        public Collector(@NotNull Editor editor) {
             this.editor = editor;
-            this.modificationStamp = modificationStamp;
         }
 
         @Override
@@ -93,17 +76,7 @@ public abstract class AbstractLSPDeclarativeInlayHintsProvider implements InlayH
                 // InlayHint must not be collected
                 return;
             }
-
-            final Set<CompletableFuture<?>> pendingFutures = getPendingFutures(editor, DECLARATIVE_INLAY_HINTS_PENDING_FUTURES_KEY);
-            doCollect(psiFile, editor, inlayTreeSink, pendingFutures);
-            if (!pendingFutures.isEmpty()) {
-                // Some LSP requests:
-                // - textDocument/inlayHint, inlayHint/resolve
-                // are pending, wait for their completion and refresh the declarative inlay hints UI to render them
-                EditorFeatureManager.getInstance(project)
-                        .refreshEditorFeatureWhenAllDone(new HashSet<>(pendingFutures), psiFile, EditorFeatureType.DECLARATIVE_INLAY_HINT, new PsiFileCancelChecker(psiFile, modificationStamp));
-                pendingFutures.clear();
-            }
+            doCollect(psiFile, editor, inlayTreeSink);
         }
     }
 }

@@ -13,9 +13,10 @@ package com.redhat.devtools.lsp4ij.features.color;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentRefreshableFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.DocumentColorParams;
 import org.jetbrains.annotations.NotNull;
 
@@ -31,10 +32,10 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'textDocument/documentColor' requests</li>
  * </ul>
  */
-public class LSPColorSupport extends AbstractLSPDocumentFeatureSupport<DocumentColorParams, List<ColorData>> {
+public class LSPColorSupport extends AbstractLSPDocumentRefreshableFeatureSupport<DocumentColorParams, List<ColorData>> {
 
     public LSPColorSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, EditorFeatureType.INLAY_HINT);
     }
 
     public CompletableFuture<List<ColorData>> getColors(DocumentColorParams params) {
@@ -53,8 +54,8 @@ public class LSPColorSupport extends AbstractLSPDocumentFeatureSupport<DocumentC
                                                                          @NotNull CancellationSupport cancellationSupport) {
 
         return getLanguageServers(file,
-                        f -> f.getDocumentColorFeature().isEnabled(file),
-                        f -> f.getDocumentColorFeature().isSupported(file))
+                f -> f.getDocumentColorFeature().isEnabled(file),
+                f -> f.getDocumentColorFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have color capability

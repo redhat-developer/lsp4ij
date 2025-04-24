@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -54,8 +53,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     @Override
     protected void doCollect(@NotNull PsiFile psiFile,
                              @NotNull Editor editor,
-                             @NotNull InlayTreeSink inlayHintsSink,
-                             @NotNull Set<CompletableFuture<?>> pendingFutures) {
+                             @NotNull InlayTreeSink inlayHintsSink) {
         // Get LSP inlay hints from cache or create them
         LSPInlayHintsSupport inlayHintSupport = LSPFileSupport.getSupport(psiFile).getInlayHintsSupport();
         Range viewPortRange = getViewPortRange(editor);
@@ -86,7 +84,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             // the future which collects all textDocument/inlayHint for all servers is not finished
             // add it to the pending futures to refresh again the UI when this future will be finished.
-            pendingFutures.add(future);
+            inlayHintSupport.refreshEditorFeatureWhenReady();
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/inlayHint' request", e);
