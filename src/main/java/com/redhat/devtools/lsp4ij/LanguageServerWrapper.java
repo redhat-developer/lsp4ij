@@ -632,7 +632,10 @@ public class LanguageServerWrapper implements Disposable {
         } finally {
             this.launcherFuture = null;
             this.lspStreamProvider = null;
-            this.initializeFuture = null;
+            if (this.initializeFuture != null) {
+                CancellationSupport.cancel(this.initializeFuture);
+                this.initializeFuture = null;
+            }
 
             while (!this.openedDocuments.isEmpty()) {
                 disconnect(this.openedDocuments.keySet().iterator().next(), false);
