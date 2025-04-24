@@ -25,6 +25,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.Alarm;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -148,6 +149,7 @@ public class LanguageServerWrapper implements Disposable {
 
     private @Nullable TracingMessageConsumer tracing;
     private @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
+    private @Nullable Alarm traceFlushAlarm;
 
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
@@ -362,6 +364,9 @@ public class LanguageServerWrapper implements Disposable {
                         }
 
                         UnaryOperator<MessageConsumer> wrapper = consumer -> (message -> {
+                            if (isDisposed()) {
+                                return;
+                            }
                             logMessage(message, consumer);
                             try {
                                 // To avoid having some lock problem when message is written in the stream output
@@ -627,6 +632,7 @@ public class LanguageServerWrapper implements Disposable {
         } finally {
             this.launcherFuture = null;
             this.lspStreamProvider = null;
+            this.initializeFuture = null;
 
             while (!this.openedDocuments.isEmpty()) {
                 disconnect(this.openedDocuments.keySet().iterator().next(), false);
@@ -690,18 +696,20 @@ public class LanguageServerWrapper implements Disposable {
 
     private void shutdownLanguageServerInstance(LanguageServer languageServerInstance) throws Exception {
         CompletableFuture<Object> shutdown = languageServerInstance.shutdown();
-        try {
-            shutdown.get(5, TimeUnit.SECONDS);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-        } catch (TimeoutException ex) {
-            String message = "Timeout error while shutdown the language server '" + serverDefinition.getId() + "'";
-            LOGGER.warn(message, ex);
-            throw new Exception(message, ex);
-        } catch (Exception ex) {
-            String message = "Error while shutdown the language server '" + serverDefinition.getId() + "'";
-            LOGGER.warn(message, ex);
-            throw new Exception(message, ex);
+        if (!isDisposed()) {
+            try {
+                shutdown.get(5, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            } catch (TimeoutException ex) {
+                String message = "Timeout error while shutdown the language server '" + serverDefinition.getId() + "'";
+                LOGGER.warn(message, ex);
+                throw new Exception(message, ex);
+            } catch (Exception ex) {
+                String message = "Error while shutdown the language server '" + serverDefinition.getId() + "'";
+                LOGGER.warn(message, ex);
+                throw new Exception(message, ex);
+            }
         }
     }
 
@@ -1444,4 +1452,16 @@ public class LanguageServerWrapper implements Disposable {
         }
         return serverTrace != null ? serverTrace : ServerTrace.getDefaultValue();
     }
+
+    public Alarm getTraceFlushAlarm() {
+        if (traceFlushAlarm == null) {
+            synchronized (this) {
+                if (traceFlushAlarm == null) {
+                    traceFlushAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+                }
+            }
+        }
+        return traceFlushAlarm.isDisposed() ? null : traceFlushAlarm;
+    }
+
 }

@@ -39,9 +39,6 @@ public class LSPPostStartupActivity implements ProjectActivity, DumbAware {
             // to report telemetry events for added/removed LanguageServerDefinition.
             TelemetryManager.instance().initialize();
         }
-        // Force the load of the user defined language server settings for the given project
-        // to avoid initializing it when LSP message are logged (which could block the IJ startup or crash the language server)
-        UserDefinedLanguageServerSettings.getInstance(project);
         return null;
     }
 }
