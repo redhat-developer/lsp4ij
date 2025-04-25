@@ -14,6 +14,7 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.DumbService;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.psi.PsiFile;
@@ -120,6 +121,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPPrepareTypeHierarchySupport prepareTypeHierarchySupport;
     private final LSPTypeHierarchySubtypesSupport typeHierarchySubtypesSupport;
     private final LSPTypeHierarchySupertypesSupport typeHierarchySupertypesSupport;
+    private boolean disposed;
 
     private LSPFileSupport(@NotNull PsiFile file) {
         this.file = file;
@@ -152,10 +154,14 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.typeHierarchySubtypesSupport = new LSPTypeHierarchySubtypesSupport(file);
         this.typeHierarchySupertypesSupport = new LSPTypeHierarchySupertypesSupport(file);
         file.putUserData(LSP_FILE_SUPPORT_KEY, this);
+        // When project is disposed, we dispose the LSP file support
+        Disposer.register(file.getProject(), this);
+
     }
 
     @Override
     public void dispose() {
+        this.disposed = true;
         // cancel all LSP requests
         file.putUserData(LSP_FILE_SUPPORT_KEY, null);
         getCodeLensSupport().cancel();
@@ -463,6 +469,9 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
             return;
         }
         var alarm = getRefreshPsiFileAlarm();
+        if (alarm == null) {
+            return;
+        }
         alarm.cancelAllRequests();
         alarm.addRequest(() -> {
             var project = file.getProject();
@@ -483,6 +492,9 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     }
 
     private Alarm getRefreshPsiFileAlarm() {
+        if (disposed) {
+            return null;
+        }
         if (refreshPsiFileAlarm == null) {
             synchronized (this) {
                 if (refreshPsiFileAlarm == null) {
@@ -490,7 +502,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
                 }
             }
         }
-        return refreshPsiFileAlarm;
+        return refreshPsiFileAlarm.isDisposed() ? null : refreshPsiFileAlarm;
     }
 
     /**
