@@ -86,6 +86,7 @@ Here are some projects that use LSP4IJ:
  * [SAP CDS Language Support for IntelliJ](https://github.com/cap-js/cds-intellij)
  * [RyeCharm](https://github.com/InSyncWithFoo/ryecharm)
  * [Huly Code](https://github.com/hcengineering/huly-code)
+ * [SDLB LSP](https://github.com/smart-data-lake/sdl-lsp)
 
 ## Requirements
 
