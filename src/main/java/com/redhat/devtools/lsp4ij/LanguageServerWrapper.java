@@ -318,6 +318,10 @@ public class LanguageServerWrapper implements Disposable {
                             traces = null;
                         }
 
+                        if (this.lspStreamProvider != null) {
+                            // Ensure process is stopped before starting a new process
+                            this.lspStreamProvider.stop();
+                        }
                         var provider = this.lspStreamProvider = serverDefinition.createConnectionProvider(initialProject);
                         initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
 
