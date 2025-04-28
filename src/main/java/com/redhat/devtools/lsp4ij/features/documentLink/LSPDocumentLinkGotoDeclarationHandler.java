@@ -38,6 +38,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import static com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkPsiElement.isHttpUrl;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
@@ -94,13 +95,19 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                         // The Ctrl+Click has been done in a LSP document link,try to open the document.
                         final String target = documentLink.getTarget();
                         if (target != null && !target.isEmpty()) {
+                            String tooltip = documentLink.getTooltip();
                             FileUriSupport fileUriSupport = documentLinkData.languageServer().getClientFeatures();
-                            VirtualFile targetFile = FileUriSupport.findFileByUri(target, fileUriSupport );
+                            if (isHttpUrl(target)) {
+                                // the target is a Http url which must be opened in the browser
+                                return new PsiElement[]{new LSPDocumentLinkPsiElement(target, tooltip, fileUriSupport, project)};
+                            }
+                            VirtualFile targetFile = FileUriSupport.findFileByUri(target, fileUriSupport);
                             if (targetFile == null) {
                                 // The LSP document link file doesn't exist, open a file dialog
                                 // which asks if user want to create the file.
-                                return new PsiElement[]{new LSPDocumentLinkPsiElement(target, fileUriSupport, project)};
+                                return new PsiElement[]{new LSPDocumentLinkPsiElement(target, tooltip, fileUriSupport, project)};
                             }
+                            // The file exists, open it in an editor
                             return new PsiElement[]{LSPIJUtils.getPsiFile(targetFile, project)};
                         }
                     }
