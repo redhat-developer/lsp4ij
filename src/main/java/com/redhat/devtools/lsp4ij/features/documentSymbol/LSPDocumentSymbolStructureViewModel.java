@@ -86,6 +86,13 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
                 return Collections.emptyList();
             }
 
+            if (!LSPFileSupport.hasSupport(psiFile)) {
+                // Don't force file support creation
+                // Ex: when file is closed, document symbol must return an empty list.
+                return Collections.emptyList();
+            }
+
+
             LSPFileSupport fileSupport = LSPFileSupport.getSupport(psiFile);
             LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
             var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
