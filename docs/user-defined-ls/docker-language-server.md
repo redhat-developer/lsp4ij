@@ -24,6 +24,8 @@ To get language support for files from the Docker ecosystem (Dockerfiles, Compos
 
 4. **Optional**: You may also customize the Configuration section according to your preferences.
 
+    - The Docker Language Server collects telemetry by default. You can configure this behaviour by modifying the Initialization Options. See [here](https://github.com/docker/docker-language-server/blob/main/TELEMETRY.md) for detailed information about what telemetry is collected.
+
 5. **Click OK** to apply the changes. You should now have language support for Dockerfiles, Compose files, and Bake files enabled in your IDE:
 
 ![Docker Language Server output in the LSP console](../images/user-defined-ls/docker-language-server/console-output.png)
