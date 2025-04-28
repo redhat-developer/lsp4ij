@@ -321,6 +321,9 @@
         <gotoDeclarationHandler
                 id="LSPDocumentLinkGotoDeclarationHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
+        <lang.documentationProvider
+                language=""
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkDocumentationProvider"/>
 
         <!-- LSP textDocument/documentSymbol request support -->
         <lang.psiStructureViewFactory

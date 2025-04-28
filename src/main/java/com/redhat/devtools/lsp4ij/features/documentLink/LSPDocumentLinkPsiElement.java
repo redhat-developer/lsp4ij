@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentLink;
 
+import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.fileTypes.UnknownFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
@@ -20,6 +21,7 @@ import com.intellij.psi.*;
 import com.intellij.psi.impl.FakePsiElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,9 +34,14 @@ public class LSPDocumentLinkPsiElement extends FakePsiElement {
     private final @NotNull FileUriSupport fileUriSupport;
     private final @NotNull Project project;
     private final PsiFile file;
+    private final @Nullable String tooltip;
 
-    public LSPDocumentLinkPsiElement(@NotNull String fileUri, @NotNull FileUriSupport fileUriSupport, @NotNull Project project){
+    public LSPDocumentLinkPsiElement(@NotNull String fileUri,
+                                     @Nullable String tooltip,
+                                     @NotNull FileUriSupport fileUriSupport,
+                                     @NotNull Project project){
         this.fileUri = fileUri;
+        this.tooltip = tooltip;
         this.fileUriSupport = fileUriSupport;
         this.project = project;
         PsiFileFactory factory = PsiFileFactory.getInstance(project);
@@ -65,6 +72,10 @@ public class LSPDocumentLinkPsiElement extends FakePsiElement {
 
     @Override
     public void navigate(boolean requestFocus) {
+        if(isHttpUrl(fileUri)) {
+            BrowserUtil.browse(fileUri);
+            return;
+        }
         // The LSP document link file doesn't exist, open a file dialog
         // which asks if user want to create the file.
         // At this step we cannot open a dialog directly, we need to open the dialog
@@ -80,5 +91,12 @@ public class LSPDocumentLinkPsiElement extends FakePsiElement {
     @Override
     public boolean isValid() {
         return true;
+    }
+
+    public @NotNull String getLabel() {
+        return StringUtils.isEmpty(tooltip) ? fileUri : tooltip;
+    }
+    public static boolean isHttpUrl(String target) {
+        return target.startsWith("http:") || target.startsWith("https:");
     }
 }
