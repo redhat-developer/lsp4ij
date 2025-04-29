@@ -15,6 +15,8 @@
       "fileType": {
         "name": "Docker Compose",
         "patterns": [
+          "compose.yaml",
+          "compose.yml",
           "docker-compose.yml",
           "docker-compose.yaml"
         ]
