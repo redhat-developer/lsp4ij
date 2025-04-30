@@ -465,13 +465,16 @@
 
         <!-- LSP textDocument/selectionRange request support -->
         <extendWordSelectionHandler
-                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPExtendWordSelectionHandler"
                 id="LSPExtendWordSelectionHandler"
+                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPExtendWordSelectionHandler"
                 order="first"/>
         <extendWordSelectionHandler
-                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPCodeBlockExtendWordSelectionHandler"
                 id="LSPCodeBlockExtendWordSelectionHandler"
+                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPCodeBlockExtendWordSelectionHandler"
                 order="first, before LSPExtendWordSelectionHandler"/>
+        <basicWordSelectionFilter
+                id="LSPWordSelectionFilter"
+                implementation="com.redhat.devtools.lsp4ij.features.selectionRange.LSPWordSelectionFilter"/>
 
         <!-- LSP textDocument/semanticTokens request support -->
         <highlightVisitor

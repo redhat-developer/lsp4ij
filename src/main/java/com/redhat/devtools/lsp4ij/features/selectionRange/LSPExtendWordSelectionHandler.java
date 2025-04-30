@@ -12,12 +12,10 @@ package com.redhat.devtools.lsp4ij.features.selectionRange;
 
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -41,13 +39,11 @@ public class LSPExtendWordSelectionHandler extends AbstractLSPExtendWordSelectio
         }
 
         // These should all be safely non-null now
-        Project project = element.getProject();
         PsiFile file = element.getContainingFile();
 
         // Only if textDocument/selectionRange is supported for the file
         //noinspection DataFlowIssue
-        return LanguageServiceAccessor.getInstance(project)
-                .hasAny(file, ls -> ls.getClientFeatures().getSelectionRangeFeature().isSelectionRangeSupported(file));
+        return isSelectionRangesAvailable(file);
     }
 
     @Override
@@ -97,4 +93,5 @@ public class LSPExtendWordSelectionHandler extends AbstractLSPExtendWordSelectio
 
         return new ArrayList<>(textRanges);
     }
+
 }
