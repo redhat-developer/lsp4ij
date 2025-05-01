@@ -273,6 +273,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     @Override
+    public void breakpoint(BreakpointEventArguments args) {
+        if (BreakpointEventArgumentsReason.CHANGED.equals(args.getReason())) {
+            var breakpoint = args.getBreakpoint();
+            if (breakpoint != null) {
+                // breakpoint with a given id changed (ex: verified changed)
+                // update the Intellij Breakpoint with those information.
+                debugProcess.getBreakpointHandler()
+                        .updateBreakpoint(breakpoint, null);
+            }
+        }
+    }
+
+    @Override
     public void stopped(StoppedEventArguments args) {
         var server = getDebugProtocolServer();
         if (server == null) {
@@ -406,13 +419,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProcess.getSession();
     }
 
-    public void continue_(int threadId) {
+    public CompletableFuture<ContinueResponse> continue_(int threadId) {
         if (debugProtocolServer == null) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(threadId);
-        debugProtocolServer.continue_(args);
+        return debugProtocolServer
+                .continue_(args);
     }
 
     public void next(int threadId) {
