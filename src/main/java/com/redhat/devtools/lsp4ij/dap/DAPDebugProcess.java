@@ -85,7 +85,7 @@ public class DAPDebugProcess extends XDebugProcess {
         this.isDebug = isDebug;
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
         this.serverDescriptor = dapState.getServerDescriptor();
-        this.breakpointHandler = new DAPBreakpointHandler(serverDescriptor, project);
+        this.breakpointHandler = new DAPBreakpointHandler(session, serverDescriptor, project);
         this.status = Status.NONE;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
@@ -284,11 +284,24 @@ public class DAPDebugProcess extends XDebugProcess {
 
     @Override
     public void resume(@Nullable XSuspendContext context) {
+        resume(context, null);
+    }
+
+    private void resume(@Nullable XSuspendContext context,
+                        @Nullable XSourcePosition runToCursorPosition) {
         if (context instanceof DAPSuspendContext dapContext) {
             Integer threadId = dapContext.getThreadId();
             if (threadId != null) {
+                // Continue...
                 DAPClient client = dapContext.getClient();
-                client.continue_(threadId);
+                var result = client.continue_(threadId);
+                if (runToCursorPosition != null) {
+                    // "Run to Cursor" has been used, remove her temporary breakpoint
+                    // after the 'continue' DAP request.
+                    result
+                            .thenRun(() -> getBreakpointHandler()
+                                    .unregisterTemporaryBreakpoint(runToCursorPosition));
+                }
             }
         }
     }
@@ -353,9 +366,9 @@ public class DAPDebugProcess extends XDebugProcess {
     public void runToPosition(@NotNull XSourcePosition position,
                               @Nullable XSuspendContext context) {
         getBreakpointHandler()
-                .sendTemporaryBreakpoint(position)// Send a temporary breakpoint with the proper position to the DAP server
+                .registerTemporaryBreakpoint(position)// Send a temporary breakpoint with the proper position to the DAP server
                 .thenApply(unused -> {
-                    resume(context); // and resume the debugger
+                    resume(context, position); // and resume the debugger
                     return null;
                 });
     }

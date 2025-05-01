@@ -7,7 +7,7 @@ This section provides an overview of the supported DAP features for IntelliJ:
 
 Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events) support:
 
-* ❌ [Breakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Breakpoint).
+* ✅ [Breakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Breakpoint).
 * ❌ [Capabilities](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Capabilities).
 * ❌ [Continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued).
 * ❌ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited).
