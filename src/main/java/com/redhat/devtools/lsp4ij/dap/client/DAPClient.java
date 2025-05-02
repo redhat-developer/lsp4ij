@@ -10,14 +10,22 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.client;
 
+import com.intellij.codeInsight.hint.HintManager;
+import com.intellij.codeInsight.hint.HintManagerImpl;
+import com.intellij.codeInsight.hint.HintUtil;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
+import com.intellij.ui.LightweightHint;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.frame.XSuspendContext;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
@@ -39,14 +47,20 @@ import org.eclipse.lsp4j.jsonrpc.validation.ReflectiveMessageValidator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.*;
+import java.awt.*;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.Thread;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.function.UnaryOperator;
+
+import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
 
 /**
  * Debug Protocol Adapter (DAP) client implementation.
@@ -153,7 +167,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
         CompletableFuture<?> launchAttachFuture = getDebugProtocolServer()
                 .initialize(arguments)
-                .thenAccept((Capabilities capabilities) -> {
+                .thenAccept(capabilities -> {
                     monitor.checkCanceled();
                     monitor.setFraction(10d / 100d);
                     if (capabilities == null) {
@@ -184,18 +198,44 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (isDebug) {
             configurationDoneFuture = configurationDoneFuture
                     .thenCompose(v -> {
+                        // client sends zero or more setBreakpoints requests
                         monitor.checkCanceled();
                         monitor.setFraction(60d / 100d);
                         monitor.setText2("Sending breakpoints");
                         return debugProcess
                                 .getBreakpointHandler()
                                 .initialize(getDebugProtocolServer(), getCapabilities());
+                    })
+                    .thenCompose(v -> {
+                        // client sends a setExceptionBreakpoints request
+                        // if one or more exceptionBreakpointFilters have been defined
+                        // (or if supportsConfigurationDoneRequest is not true)
+                        monitor.checkCanceled();
+                        monitor.setFraction(70d / 100d);
+                        monitor.setText2("Sending exception breakpoints filters");
+
+                        var filters = getCapabilities().getExceptionBreakpointFilters();
+                        if (filters != null) {
+                            SetExceptionBreakpointsArguments args = new SetExceptionBreakpointsArguments();
+                            args.setFilters(Arrays
+                                    .stream(filters)
+                                    .map(ExceptionBreakpointsFilter::getFilter)
+                                    .toArray(String[]::new));
+
+                            return getDebugProtocolServer()
+                                    .setExceptionBreakpoints(args)
+                                    .thenAccept(r -> {
+
+                                    });
+                        }
+                        return CompletableFuture.completedFuture(null);
                     });
         }
         configurationDoneFuture = configurationDoneFuture
                 .thenCompose(v -> {
+                    // client sends one configurationDone request to indicate the end of the configuration.
                     monitor.checkCanceled();
-                    monitor.setFraction(70d / 100d);
+                    monitor.setFraction(80d / 100d);
                     monitor.setText2("Sending configuration done");
                     if (Boolean.TRUE.equals(getCapabilities().getSupportsConfigurationDoneRequest())) {
                         return getDebugProtocolServer().configurationDone(new ConfigurationDoneArguments());
@@ -314,7 +354,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                             .thenAcceptAsync(stackTraceResponse -> {
                                 StackFrame[] stackFrames = stackTraceResponse.getStackFrames();
                                 if (stackFrames != null && stackFrames.length > 0) {
-                                    XBreakpoint<DAPBreakpointProperties> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrames[0]);
+                                    var stackFrame = stackFrames[0];
+                                    XBreakpoint<DAPBreakpointProperties> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrame);
                                     XSuspendContext context = getSession().getSuspendContext();
                                     if (context == null) {
                                         context = new DAPSuspendContext(this);
@@ -323,6 +364,29 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                     XDebugSession session = getSession();
                                     if (breakpoint == null) {
                                         session.positionReached(context);
+
+                                        if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
+                                            var sourcePosition = context.getActiveExecutionStack() != null ?
+                                                    context.getActiveExecutionStack().getTopFrame().getSourcePosition() : null;
+                                            if (sourcePosition != null) {
+                                                var file = sourcePosition.getFile();
+                                                Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
+                                                if (editors != null && editors.length > 0) {
+                                                    var editor = editors[0];
+                                                    var document = editor.getDocument();
+                                                    int startOffset = document.getLineStartOffset(sourcePosition.getLine());
+                                                    int endOffset = sourcePosition.getOffset();
+
+                                                    // Wait few millise
+                                                    try {
+                                                        Thread.sleep(1000);
+                                                    } catch (InterruptedException e) {
+                                                        throw new RuntimeException(e);
+                                                    }
+                                                    showErrorHint(editor, args.getText() + " " + args.getDescription(), startOffset, endOffset);
+                                                }
+                                            }
+                                        }
                                     } else {
                                         session.breakpointReached(breakpoint, null, context);
                                     }
@@ -330,6 +394,35 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                             });
                 });
     }
+
+    static void showErrorHint(@NotNull Editor editor, @NotNull String text, int startOffset, int endOffset) {
+        if (ApplicationManager.getApplication().isUnitTestMode()) {
+            return;
+        }
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            doShowErrorHint(editor, text, startOffset, endOffset);
+        } else {
+            ApplicationManager.getApplication()
+                    .invokeLater(() -> doShowErrorHint(editor, text, startOffset, endOffset));
+        }
+    }
+
+    private static void doShowErrorHint(@NotNull Editor editor, @NotNull String hintText, int startOffset, int endOffset) {
+        JComponent label = HintUtil.createErrorLabel(hintText);
+        LightweightHint hint = new LightweightHint(label) {
+            @Override
+            public boolean vetoesHiding() {
+                return true;
+            }
+        };
+        final VisualPosition pos1 = editor.offsetToVisualPosition(startOffset);
+        //final VisualPosition pos2 = editor.offsetToVisualPosition(endOffset);
+        final Point p = getHintPosition(hint, editor, pos1, HintManager.DEFAULT);
+        int hintFlags = HintManager.HIDE_BY_OTHER_HINT | HintManager.HIDE_BY_ESCAPE | HintManager.UPDATE_BY_SCROLLING;
+        HintManagerImpl.getInstanceImpl()
+                .showEditorHint(hint, editor, p, hintFlags, 50000, false);
+    }
+
 
     @Override
     public void terminated(TerminatedEventArguments args) {
