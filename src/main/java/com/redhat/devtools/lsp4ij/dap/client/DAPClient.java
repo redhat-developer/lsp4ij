@@ -366,24 +366,34 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                         session.positionReached(context);
 
                                         if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
-                                            var sourcePosition = context.getActiveExecutionStack() != null ?
+                                            // The stopped event comes from an Exception
+                                            // Show an error hint with the exception description in the proper line
+                                            var sourcePosition = context.getActiveExecutionStack() != null
+                                                    && context.getActiveExecutionStack().getTopFrame() != null ?
                                                     context.getActiveExecutionStack().getTopFrame().getSourcePosition() : null;
                                             if (sourcePosition != null) {
                                                 var file = sourcePosition.getFile();
                                                 Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
                                                 if (editors != null && editors.length > 0) {
                                                     var editor = editors[0];
-                                                    var document = editor.getDocument();
-                                                    int startOffset = document.getLineStartOffset(sourcePosition.getLine());
-                                                    int endOffset = sourcePosition.getOffset();
+                                                    int offset = sourcePosition.getOffset();
 
-                                                    // Wait few millise
+                                                    // Wait few ms to be sure that scroll of the editor
+                                                    // has occurred before computing the error hint position.
+                                                    // TODO: remove this timer by detecting that scroll editor is finished
+                                                    // to display the error hint
                                                     try {
                                                         Thread.sleep(1000);
                                                     } catch (InterruptedException e) {
                                                         throw new RuntimeException(e);
                                                     }
-                                                    showErrorHint(editor, args.getText() + " " + args.getDescription(), startOffset, endOffset);
+                                                    StringBuilder error = new StringBuilder("Exception has occurred: ");
+                                                    error.append(args.getText());
+                                                    if (StringUtils.isNotBlank(args.getDescription())) {
+                                                        error.append("\n");
+                                                        error.append(args.getDescription());
+                                                    }
+                                                    showErrorHint(editor, error.toString(), offset);
                                                 }
                                             }
                                         }
@@ -395,28 +405,22 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 });
     }
 
-    static void showErrorHint(@NotNull Editor editor, @NotNull String text, int startOffset, int endOffset) {
+    static void showErrorHint(@NotNull Editor editor, @NotNull String text, int offset) {
         if (ApplicationManager.getApplication().isUnitTestMode()) {
             return;
         }
         if (ApplicationManager.getApplication().isDispatchThread()) {
-            doShowErrorHint(editor, text, startOffset, endOffset);
+            doShowErrorHint(editor, text, offset);
         } else {
             ApplicationManager.getApplication()
-                    .invokeLater(() -> doShowErrorHint(editor, text, startOffset, endOffset));
+                    .invokeLater(() -> doShowErrorHint(editor, text, offset));
         }
     }
 
-    private static void doShowErrorHint(@NotNull Editor editor, @NotNull String hintText, int startOffset, int endOffset) {
+    private static void doShowErrorHint(@NotNull Editor editor, @NotNull String hintText, int offset) {
         JComponent label = HintUtil.createErrorLabel(hintText);
-        LightweightHint hint = new LightweightHint(label) {
-            @Override
-            public boolean vetoesHiding() {
-                return true;
-            }
-        };
-        final VisualPosition pos1 = editor.offsetToVisualPosition(startOffset);
-        //final VisualPosition pos2 = editor.offsetToVisualPosition(endOffset);
+        LightweightHint hint = new LightweightHint(label);
+        final VisualPosition pos1 = editor.offsetToVisualPosition(offset);
         final Point p = getHintPosition(hint, editor, pos1, HintManager.DEFAULT);
         int hintFlags = HintManager.HIDE_BY_OTHER_HINT | HintManager.HIDE_BY_ESCAPE | HintManager.UPDATE_BY_SCROLLING;
         HintManagerImpl.getInstanceImpl()
