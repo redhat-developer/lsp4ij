@@ -91,17 +91,18 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
     }
 
     /**
-     * Returns the diagnostic identifier declared in the {@link DiagnosticRegistrationOptions} and "pull" otherwise.
+     * Returns the diagnostic identifier declared in the {@link DiagnosticRegistrationOptions} and null otherwise.
      *
-     * @return the diagnostic identifier declared in the {@link DiagnosticRegistrationOptions} and "pull" otherwise.
+     * @return the diagnostic identifier declared in the {@link DiagnosticRegistrationOptions} and null otherwise.
      */
-    public @NotNull String getDiagnosticIdentifier() {
+    public @Nullable String getDiagnosticIdentifier() {
         for (var option : getOptions()) {
             String identifier = option.getIdentifier();
             if (!StringUtils.isEmpty(identifier)) {
                 return identifier;
             }
         }
-        return LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+        var serverCapabilities = getServerCapabilities();
+        return serverCapabilities != null && serverCapabilities.getDiagnosticProvider() != null  ? serverCapabilities.getDiagnosticProvider().getIdentifier() : null;
     }
 }

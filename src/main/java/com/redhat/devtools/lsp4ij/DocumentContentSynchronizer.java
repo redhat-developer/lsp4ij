@@ -20,7 +20,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -110,15 +110,15 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 })
                 .thenCompose(ls ->
                         CompletableFuture.supplyAsync(() -> {
-                            if (ApplicationManager.getApplication().isUnitTestMode()) {
-                            }
-                            try {
-                                // Wait 500ms after sending didOpen notification
-                                // to be sure that the notification has been sent before
-                                // consuming other LSP request like 'textDocument/codeLens'.
-                                TimeUnit.MILLISECONDS.sleep(WAIT_AFTER_SENDING_DID_OPEN);
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
+                            if (!ApplicationManager.getApplication().isUnitTestMode()) {
+                                try {
+                                    // Wait 500ms after sending didOpen notification
+                                    // to be sure that the notification has been sent before
+                                    // consuming other LSP request like 'textDocument/codeLens'.
+                                    TimeUnit.MILLISECONDS.sleep(WAIT_AFTER_SENDING_DID_OPEN);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
                             }
                             return ls;
                         })
@@ -352,6 +352,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private void refreshPullDiagnostic(int version, @NotNull LanguageServer ls) {
         // Consume 'textDocument/diagnostic'
         DocumentDiagnosticParams params = new DocumentDiagnosticParams();
+        params.setIdentifier(getPullIdentifier());
         params.setTextDocument(new TextDocumentIdentifier(fileUri));
         ls.getTextDocumentService()
                 .diagnostic(params)
@@ -365,7 +366,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                     if (diagnosticReport.isLeft()) {
                         RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
                         // Update the diagnostics cache from the opened file
-                        updatePullDiagnostics(file, fileReport, clientFeatures);
+                        updatePullDiagnostics(file, fileReport);
                     } else if (diagnosticReport.isRight()) {
                         RelatedUnchangedDocumentDiagnosticReport allFilesReport = diagnosticReport.getRight();
                         Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments = allFilesReport.getRelatedDocuments();
@@ -377,7 +378,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                                     if (fileReport.isLeft()) {
                                         VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
                                         if (file != null) {
-                                            updatePullDiagnostics(file, fileReport.getLeft(), clientFeatures);
+                                            updatePullDiagnostics(file, fileReport.getLeft());
                                         }
                                     } else if (fileReport.isRight()) {
                                         // TODO: implement UnchangedDocumentDiagnosticReport
@@ -391,12 +392,20 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     }
 
     private void updatePullDiagnostics(@NotNull VirtualFile file,
-                                       @NotNull FullDocumentDiagnosticReport diagnosticReport,
-                                       @NotNull LSPClientFeatures clientFeatures) {
+                                       @NotNull FullDocumentDiagnosticReport diagnosticReport) {
         // Update diagnostics for the opened/closed document
         List<Diagnostic> diagnostics = diagnosticReport.getItems() != null ? diagnosticReport.getItems() : Collections.emptyList();
-        String identifier = clientFeatures.getDiagnosticFeature().getDiagnosticIdentifier();
+        String identifier = getPullIdentifier();
+        if (identifier == null) {
+            identifier = LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+        }
         languageServerWrapper.updateDiagnostics(file, identifier, diagnostics);
+    }
+
+    @Nullable
+    private String getPullIdentifier() {
+        var clientFeatures = languageServerWrapper.getClientFeatures();
+        return clientFeatures.getDiagnosticFeature().getDiagnosticIdentifier();
     }
 
     public boolean isPullDiagnosticsSupported() {
