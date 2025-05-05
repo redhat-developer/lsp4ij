@@ -33,6 +33,7 @@ import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.InitializeRequestArgumentsPathFormat;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,7 +52,7 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     protected final @NotNull RunConfigurationOptions options;
     protected final @NotNull ExecutionEnvironment environment;
     private final @Nullable DebugAdapterServerDefinition serverDefinition;
-    private @NotNull DebugAdapterVariableSupport variableSupport;
+    private @Nullable DebugAdapterVariableSupport variableSupport;
 
     public DebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
                                   @NotNull ExecutionEnvironment environment,
@@ -188,7 +189,7 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
      * @param variableSupport the DAP variable support.
      * @return the server descriptor.
      */
-    public final DebugAdapterDescriptor setVariableSupport(@NotNull DebugAdapterVariableSupport variableSupport) {
+    public final @NotNull DebugAdapterDescriptor setVariableSupport(@NotNull DebugAdapterVariableSupport variableSupport) {
         variableSupport.setServerDescriptor(this);
         this.variableSupport = variableSupport;
         return this;

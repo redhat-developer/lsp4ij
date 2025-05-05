@@ -898,6 +898,8 @@
                 implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationType"/>
         <xdebugger.breakpointType
                 implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointType"/>
+        <xdebugger.breakpointType
+                implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointType"/>
         <completion.contributor id="DAPCompletionProcessor"
                                 language="any"
                                 implementationClass="com.redhat.devtools.lsp4ij.dap.completion.DAPCompletionProcessor"/>
