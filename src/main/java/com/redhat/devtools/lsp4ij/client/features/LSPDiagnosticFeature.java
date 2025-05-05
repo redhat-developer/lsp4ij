@@ -316,11 +316,11 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
-     * Returns the diagnostic identifier to use to cache "pull" diagnostics.
+     * Returns the diagnostic identifier and null otherwise.
      *
-     * @return the diagnostic identifier to use to cache "pull" diagnostics.
+     * @return the diagnostic identifier and null otherwise.
      */
-    public @NotNull String getDiagnosticIdentifier() {
+    public @Nullable String getDiagnosticIdentifier() {
         return getDiagnosticCapabilityRegistry().getDiagnosticIdentifier();
     }
 
