@@ -15,6 +15,7 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
@@ -39,13 +40,15 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
 public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAPBreakpointProperties>> {
 
     private static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
+    private static final SourceBreakpoint[] EMPTY_SOURCE_BREAKPOINTS = new SourceBreakpoint[0];
+    public static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture[0];
 
     private final @NotNull XDebugSession debugSession;
     private final @NotNull DebugAdapterDescriptor adapterDescriptor;
     private final @NotNull Project project;
     private final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     private @Nullable Capabilities capabilities;
-    private final List<XBreakpoint> breakpoints = ContainerUtil.createConcurrentList();
+    private final List<XBreakpoint<DAPBreakpointProperties>> breakpoints = ContainerUtil.createConcurrentList();
 
     private record TemporaryBreakpoint(@NotNull XSourcePosition sourcePosition, boolean add) {
     }
@@ -73,12 +76,13 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
     @Override
     public void unregisterBreakpoint(@NotNull XLineBreakpoint<DAPBreakpointProperties> breakpoint,
                                      boolean temporary) {
-        if (!supportsBreakpoint(breakpoint)) {
+        var sourcePosition = breakpoint.getSourcePosition();
+        if (!supportsBreakpoint(breakpoint) || sourcePosition == null) {
             return;
         }
         breakpoints.remove(breakpoint);
         sendBreakpoints(null,
-                new TemporaryBreakpoint(breakpoint.getSourcePosition(), false));
+                new TemporaryBreakpoint(sourcePosition, false));
     }
 
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
@@ -96,14 +100,16 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
 
         // Convert list of IJ XBreakpoint -> LSP SourceBreakpoint
         Map<Source, List<SourceBreakpoint>> targetBreakpoints = new HashMap<>();
-        for (XBreakpoint breakpoint : breakpoints) {
+        for (XBreakpoint<DAPBreakpointProperties> breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
-            addSourceBreakpoint(sourcePosition, targetBreakpoints);
+            if (sourcePosition != null) {
+                addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), targetBreakpoints);
+            }
         }
 
         if (temporaryBreakpoint != null) {
             if (temporaryBreakpoint.add()) {
-                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), targetBreakpoints);
+                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, targetBreakpoints);
             } else {
                 // Removed IntelliJ breakpoint
                 // Create a Source with empty source breakpoints if it doesn't exist,
@@ -143,8 +149,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
                 iterator.remove();
             }
         }
-        return CompletableFuture.allOf(setBreakpointsFutures
-                .toArray(new CompletableFuture[setBreakpointsFutures.size()]));
+        return CompletableFuture.allOf(setBreakpointsFutures.toArray(EMPTY_COMPLETABLE_FUTURES));
     }
 
     private static @NotNull SetBreakpointsArguments getSetBreakpointsArguments(@NotNull Source source,
@@ -157,8 +162,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
         final var arguments = new SetBreakpointsArguments();
         arguments.setSource(source);
         arguments.setLines(lines);
-        arguments.setBreakpoints(sourceBreakpoints
-                .toArray(new SourceBreakpoint[sourceBreakpoints.size()]));
+        arguments.setBreakpoints(sourceBreakpoints.toArray(EMPTY_SOURCE_BREAKPOINTS));
         arguments.setSourceModified(false);
         return arguments;
     }
@@ -195,12 +199,16 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
     }
 
     private static void addSourceBreakpoint(@NotNull XSourcePosition sourcePosition,
+                                            @Nullable XExpression conditionExpression,
                                             @NotNull Map<Source, List<SourceBreakpoint>> targetBreakpoints) {
         Source source = toDAPSource(sourcePosition);
         int lineNumber = getLineNumber(sourcePosition);
         SourceBreakpoint sourceBreakpoint = new SourceBreakpoint();
         sourceBreakpoint.setLine(lineNumber);
-
+        if (conditionExpression != null) {
+            // Breakpoint with condition
+            sourceBreakpoint.setCondition(conditionExpression.getExpression());
+        }
         List<SourceBreakpoint> sourceBreakpoints = targetBreakpoints
                 .computeIfAbsent(source, s -> new ArrayList<>());
         sourceBreakpoints.add(sourceBreakpoint);
@@ -217,7 +225,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
      * Register the given source position as temporary breakpoint.
      *
      * @param sourcePosition the temporary breakpoint.
-     * @return
+     * @return the completable future.
      */
     public CompletableFuture<@Nullable Void> registerTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
         return sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, true));
@@ -227,7 +235,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
      * Un-register the given source position as temporary breakpoint.
      *
      * @param sourcePosition the temporary breakpoint.
-     * @return
+     * @return the completable future.
      */
     public CompletableFuture<@Nullable Void> unregisterTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
         return sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, false));
@@ -239,7 +247,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
      * @param breakpoint breakpoint to consider
      * @return whether this target can install the given breakpoint
      */
-    public boolean supportsBreakpoint(XBreakpoint breakpoint) {
+    public boolean supportsBreakpoint(XBreakpoint<DAPBreakpointProperties> breakpoint) {
         if (!(breakpoint.getType() instanceof DAPBreakpointType)) {
             return false;
         }
@@ -300,10 +308,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
             return null;
         }
         Path filePath = Paths.get(source.getPath().trim());
-        if (filePath == null) {
-            return null;
-        }
-        for (XBreakpoint breakpoint : breakpoints) {
+        for (XBreakpoint<DAPBreakpointProperties> breakpoint : breakpoints) {
             XSourcePosition breakpointPosition = breakpoint.getSourcePosition();
             if (breakpointPosition == null) {
                 continue;
@@ -318,7 +323,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
     }
 
     /**
-     * Update IntelliJ breakpoint with the given DAP breakoint information.
+     * Update IntelliJ breakpoint with the given DAP breakpoint information.
      *
      * @param breakpoint   the DAP breakpoint information.
      * @param ijBreakpoint the IJ Breakpoint and null otherwise.

@@ -29,12 +29,12 @@ import org.jetbrains.annotations.Nullable;
 public class DAPExpressionCodeFragment extends PsiFileBase {
 
     private final @NotNull FileType fileType;
-    private final @NotNull DAPDebugProcess debugProcess;
+    private final @Nullable DAPDebugProcess debugProcess;
 
     public DAPExpressionCodeFragment(@NotNull CharSequence text,
                                      @NotNull FileType fileType,
                                      @NotNull Language language,
-                                     @NotNull DAPDebugProcess debugProcess,
+                                     @Nullable DAPDebugProcess debugProcess,
                                      @NotNull Project project) {
         super(new SingleRootFileViewProvider(PsiManager.getInstance(project),
                 new LightVirtualFile("DAPExpressionCodeFragment." + fileType.getDefaultExtension(), fileType, text)),
@@ -56,6 +56,6 @@ public class DAPExpressionCodeFragment extends PsiFileBase {
     }
 
     public @Nullable DAPStackFrame getCurrentDapStackFrame() {
-        return debugProcess.getCurrentDapStackFrame();
+        return debugProcess != null ? debugProcess.getCurrentDapStackFrame() : null;
     }
 }

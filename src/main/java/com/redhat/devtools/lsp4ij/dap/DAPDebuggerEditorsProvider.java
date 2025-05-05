@@ -31,10 +31,10 @@ import org.jetbrains.annotations.Nullable;
 public class DAPDebuggerEditorsProvider extends XDebuggerEditorsProviderBase {
 
     private final @Nullable FileType fileType;
-    private final @NotNull DAPDebugProcess debugProcess;
+    private final @Nullable DAPDebugProcess debugProcess;
 
     public DAPDebuggerEditorsProvider(@Nullable FileType fileType,
-                                      @NotNull DAPDebugProcess debugProcess) {
+                                      @Nullable DAPDebugProcess debugProcess) {
         this.fileType = fileType != null ? fileType : PlainTextFileType.INSTANCE;
         this.debugProcess = debugProcess;
     }

@@ -22,6 +22,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
@@ -54,7 +55,7 @@ public class LSPClientSideOnTypeFormattingTypedHandler extends TypedHandlerDeleg
                             @NotNull Project project,
                             @NotNull Editor editor,
                             @NotNull PsiFile file) {
-        if (!ProjectIndexingManager.isIndexing(project)) {
+        if (!ProjectIndexingManager.isIndexing(project) && LanguageServersRegistry.getInstance().isFileSupported(file)) {
             // Gather all of the relevant client configuration
             Ref<Boolean> rangeFormattingSupportedRef = Ref.create(false);
             ClientSideOnTypeFormattingSettings onTypeFormattingSettings = new ClientSideOnTypeFormattingSettings();
