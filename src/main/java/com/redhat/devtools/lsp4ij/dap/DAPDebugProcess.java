@@ -29,6 +29,7 @@ import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
@@ -65,6 +66,8 @@ public class DAPDebugProcess extends XDebugProcess {
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
     private final @NotNull DAPBreakpointHandler breakpointHandler;
+    private final @NotNull DAPExceptionBreakpointHandler exceptionBreakpointHandler;
+
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
     private final boolean isDebug;
@@ -86,6 +89,7 @@ public class DAPDebugProcess extends XDebugProcess {
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
         this.serverDescriptor = dapState.getServerDescriptor();
         this.breakpointHandler = new DAPBreakpointHandler(session, serverDescriptor, project);
+        exceptionBreakpointHandler = new DAPExceptionBreakpointHandler(session, serverDescriptor, project);
         this.status = Status.NONE;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
@@ -342,7 +346,7 @@ public class DAPDebugProcess extends XDebugProcess {
 
     @Override
     public XBreakpointHandler<?> @NotNull [] getBreakpointHandlers() {
-        return new XBreakpointHandler[]{breakpointHandler};
+        return new XBreakpointHandler[]{breakpointHandler, exceptionBreakpointHandler};
     }
 
     public @NotNull DAPBreakpointHandler getBreakpointHandler() {
