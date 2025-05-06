@@ -497,6 +497,9 @@
         <!-- File view provider based on textDocument/semanticTokens -->
         <!-- We can register a view provider factory for TextMate files based on the language -->
         <lang.fileViewProviderFactory
+                language="TEXT"
+                implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
+        <lang.fileViewProviderFactory
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
         <lang.elementManipulator
