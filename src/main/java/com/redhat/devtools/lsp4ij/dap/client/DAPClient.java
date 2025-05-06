@@ -216,17 +216,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
                         var filters = getCapabilities().getExceptionBreakpointFilters();
                         if (filters != null) {
-                            SetExceptionBreakpointsArguments args = new SetExceptionBreakpointsArguments();
-                            args.setFilters(Arrays
-                                    .stream(filters)
-                                    .map(ExceptionBreakpointsFilter::getFilter)
-                                    .toArray(String[]::new));
-
-                            return getDebugProtocolServer()
-                                    .setExceptionBreakpoints(args)
-                                    .thenAccept(r -> {
-
-                                    });
+                            return debugProcess
+                                    .getBreakpointHandler()
+                                    .sendExceptionBreakpointFilters(filters, getDebugProtocolServer());
                         }
                         return CompletableFuture.completedFuture(null);
                     });
@@ -238,7 +230,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     monitor.setFraction(80d / 100d);
                     monitor.setText2("Sending configuration done");
                     if (Boolean.TRUE.equals(getCapabilities().getSupportsConfigurationDoneRequest())) {
-                        return getDebugProtocolServer().configurationDone(new ConfigurationDoneArguments());
+                        return getDebugProtocolServer()
+                                .configurationDone(new ConfigurationDoneArguments());
                     }
                     return CompletableFuture.completedFuture(null);
                 });

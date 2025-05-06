@@ -42,10 +42,25 @@ import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtil
 @ApiStatus.Experimental
 public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
 
+    private final @NotNull String id;
+
     public DefaultDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
                                          @NotNull ExecutionEnvironment environment,
-                                         @Nullable DebugAdapterServerDefinition serverDefinition) {
+                                         @NotNull DebugAdapterServerDefinition serverDefinition) {
         super(options, environment, serverDefinition);
+        this.id = serverDefinition.getId();
+    }
+
+    public DefaultDebugAdapterDescriptor(@NotNull DAPRunConfigurationOptions options,
+                                         @NotNull ExecutionEnvironment environment,
+                                         @NotNull String runConfigurationName) {
+        super(options, environment, null);
+        this.id = runConfigurationName;
+    }
+
+    @Override
+    public @NotNull String getId() {
+        return id;
     }
 
     // Start the Debug Adapter server.

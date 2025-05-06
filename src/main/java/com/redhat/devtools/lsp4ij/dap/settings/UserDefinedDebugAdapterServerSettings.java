@@ -22,10 +22,12 @@ import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.XCollection;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import org.eclipse.lsp4j.debug.ExceptionBreakpointsFilter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.logging.Filter;
 
 /**
  * User defined debug adapter server settings.
@@ -77,11 +79,33 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
 
     public void removeSettings(String debugAdapterServerId) {
         myState.myState.remove(debugAdapterServerId);
+        myState.myFilters.remove(debugAdapterServerId);
         fireStateChanged();
     }
 
     public Collection<ItemSettings> getSettings() {
         return myState.myState.values();
+    }
+
+    /**
+     * Returns the Debug Adapter server settings for the given server Id and null otherwise.
+     *
+     * @param debugAdapterServerId the Debug Adapter server id.
+     * @return the Debug Adapter server settings for the given server Id and null otherwise.
+     */
+    @Nullable
+    public FilterItemSettings getFilterSettings(@NotNull String debugAdapterServerId) {
+        return myState.myFilters.get(debugAdapterServerId);
+    }
+
+    /**
+     * Register the Debug Adapter descriptor factory settings exception filter for the given factory Id.
+     * @param debugAdapterServerId the Debug Adapter descriptor factory id.
+     * @param settings the Debug Adapter descriptor factory settings.
+     */
+    public void setFilterSettings(@NotNull String debugAdapterServerId, @NotNull FilterItemSettings settings) {
+        myState.myFilters.put(debugAdapterServerId, settings);
+        fireStateChanged();
     }
 
     /**
@@ -249,12 +273,31 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
         public void setAttachPort(String attachPort) {
             this.attachPort = attachPort;
         }
+
+    }
+
+    public static class FilterItemSettings {
+
+        @XCollection(elementTypes = ExceptionBreakpointsFilter.class)
+        private Collection<ExceptionBreakpointsFilter> exceptionBreakpointsFilters;
+
+        public void setExceptionBreakpointsFilters(Collection<ExceptionBreakpointsFilter> exceptionBreakpointsFilters) {
+            this.exceptionBreakpointsFilters = exceptionBreakpointsFilters;
+        }
+
+        public Collection<ExceptionBreakpointsFilter> getExceptionBreakpointsFilters() {
+            return exceptionBreakpointsFilters;
+        }
     }
 
     public static class MyState {
         @Tag("state")
         @XCollection
-        public Map<String, ItemSettings> myState = new TreeMap<>();
+        public Map<String /* server id */, ItemSettings> myState = new TreeMap<>();
+
+        @Tag("filters")
+        @XCollection
+        public Map<String /* server id */, FilterItemSettings> myFilters= new TreeMap<>();
 
         MyState() {
         }
