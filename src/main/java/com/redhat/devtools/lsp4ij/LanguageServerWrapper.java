@@ -1420,6 +1420,10 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         initLSPTracesIfNeeded();
+        if (traces == null) {
+            // This case can occur when language server is restarted
+            return false;
+        }
         traces.add(new LSPTrace(message, messageConsumer, serverTrace, tracing));
         return true;
     }
