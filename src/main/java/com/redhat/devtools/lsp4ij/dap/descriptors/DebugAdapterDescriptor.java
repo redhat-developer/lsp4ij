@@ -61,6 +61,10 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         this.serverDefinition = serverDefinition;
     }
 
+    public String getId() {
+        return serverDefinition != null ? serverDefinition.getId() : null;
+    }
+
     // Start the Debug Adapter server.
 
     /**

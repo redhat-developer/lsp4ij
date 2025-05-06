@@ -14,6 +14,8 @@ import com.intellij.execution.ExecutionResult;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.ExecutionConsole;
+import com.intellij.execution.ui.RunnerLayoutUi;
+import com.intellij.execution.ui.layout.PlaceInGrid;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -21,6 +23,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.AppUIUtil;
+import com.intellij.ui.content.Content;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
@@ -28,7 +31,9 @@ import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
+import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
@@ -233,6 +238,7 @@ public class DAPDebugProcess extends XDebugProcess {
                             if (parentClient != null) {
                                 parentClient.terminate();
                             }
+                            breakpointHandler.dispose();
                             print("Disconnected successfully from the debug server.",
                                     ConsoleViewContentType.SYSTEM_OUTPUT);
                         } catch (Exception e) {
@@ -372,4 +378,25 @@ public class DAPDebugProcess extends XDebugProcess {
                     return null;
                 });
     }
+
+    @Override
+    public @NotNull XDebugTabLayouter createTabLayouter() {
+        return new XDebugTabLayouter() {
+
+            @Override
+            public void registerAdditionalContent(@NotNull RunnerLayoutUi ui) {
+                // Register "Exception Breakpoints" panel
+                registerBreakpointsPanel(ui);
+            }
+
+            private void registerBreakpointsPanel(@NotNull RunnerLayoutUi ui) {
+                var breakpointsPanel = breakpointHandler.getExceptionBreakpointsPanel();
+                final Content breakpointsContent = ui.createContent(
+                        "dap-breakpoints-panel", breakpointsPanel, "Exception Breakpoints",  null, breakpointsPanel.getDefaultFocusedComponent());
+                breakpointsContent.setCloseable(false);
+                ui.addContent(breakpointsContent, 0, PlaceInGrid.left, false);
+            }
+        };
+    }
+
 }

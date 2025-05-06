@@ -236,7 +236,7 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         var debugAdapterServer = getDebugAdapterServer();
         DebugAdapterDescriptor serverDescriptor = debugAdapterServer != null ?
                 debugAdapterServer.getFactory().createDebugAdapterDescriptor(getOptions(), environment) :
-                new DefaultDebugAdapterDescriptor(getOptions(), environment, null);
+                new DefaultDebugAdapterDescriptor(getOptions(), environment, getName());
         return new DAPCommandLineState(serverDescriptor, getOptions(), environment);
     }
 

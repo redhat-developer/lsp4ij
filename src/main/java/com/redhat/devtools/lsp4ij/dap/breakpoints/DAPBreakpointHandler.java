@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -37,29 +38,31 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
 /**
  * Debug Adapter Protocol (DAP) breakpoint handler.
  */
-public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAPBreakpointProperties>> {
+public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAPBreakpointProperties>> implements Disposable {
 
     private static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
     private static final SourceBreakpoint[] EMPTY_SOURCE_BREAKPOINTS = new SourceBreakpoint[0];
     public static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture[0];
 
     private final @NotNull XDebugSession debugSession;
-    private final @NotNull DebugAdapterDescriptor adapterDescriptor;
+    private final @NotNull DebugAdapterDescriptor debugAdapterDescriptor;
     private final @NotNull Project project;
     private final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     private @Nullable Capabilities capabilities;
     private final List<XBreakpoint<DAPBreakpointProperties>> breakpoints = ContainerUtil.createConcurrentList();
+    private final @NotNull DAPExceptionBreakpointsPanel exceptionBreakpointsPanel;
 
     private record TemporaryBreakpoint(@NotNull XSourcePosition sourcePosition, boolean add) {
     }
 
     public DAPBreakpointHandler(@NotNull XDebugSession debugSession,
-                                @NotNull DebugAdapterDescriptor adapterDescriptor,
+                                @NotNull DebugAdapterDescriptor debugAdapterDescriptor,
                                 @NotNull Project project) {
         super(DAPBreakpointType.class);
         this.debugSession = debugSession;
-        this.adapterDescriptor = adapterDescriptor;
+        this.debugAdapterDescriptor = debugAdapterDescriptor;
         this.project = project;
+        this.exceptionBreakpointsPanel = new DAPExceptionBreakpointsPanel(this);
     }
 
     @Override
@@ -256,7 +259,7 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
         if (sourcePosition == null) {
             return false;
         }
-        return adapterDescriptor.isDebuggableFile(sourcePosition.getFile(), project);
+        return debugAdapterDescriptor.isDebuggableFile(sourcePosition.getFile(), project);
     }
 
     private static int getLineNumber(@NotNull XSourcePosition sourcePosition) {
@@ -342,5 +345,77 @@ public class DAPBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<DAP
                 debugSession.setBreakpointInvalid(lineBreakpoint, breakpoint.getMessage());
             }
         }
+    }
+
+    /**
+     * Returns the exception breakpoints panel which host exception breakpoint filter
+     * get during the initialization of the DAP server.
+     *
+     * @return the exception breakpoints panel which host exception breakpoint filter
+     * * get during the initialization of the DAP server.
+     */
+    public @NotNull DAPExceptionBreakpointsPanel getExceptionBreakpointsPanel() {
+        return exceptionBreakpointsPanel;
+    }
+
+    /**
+     * Returns the DAP server descriptor.
+     *
+     * @return the DAP server descriptor.
+     */
+    public @NotNull DebugAdapterDescriptor getDebugAdapterDescriptor() {
+        return debugAdapterDescriptor;
+    }
+
+    /**
+     * Send exception breakpoint filters to the all initialized DAP servers.
+     */
+    public void sendExceptionBreakpointFilters() {
+        var applicableFilters = getExceptionBreakpointsPanel().getApplicableFilters();
+        for (var server : debugProtocolServers) {
+            sendExceptionBreakpointFilters(applicableFilters, server);
+        }
+    }
+
+    /**
+     * Send exception breakpoint filters to the given server.
+     *
+     * @param filters             all filters (enabled/disabled) coming from the DAP server.
+     * @param debugProtocolServer the DAP server.
+     * @return the future.
+     */
+    public CompletableFuture<Void> sendExceptionBreakpointFilters(ExceptionBreakpointsFilter[] filters,
+                                                                  IDebugProtocolServer debugProtocolServer) {
+        var applicableFilters = getExceptionBreakpointsPanel()
+                .refresh(filters);
+        return sendExceptionBreakpointFilters(
+                applicableFilters, debugProtocolServer);
+    }
+
+    /**
+     * Send exception breakpoint filters to the given server.
+     *
+     * @param applicableFilters   the applicable exception breakpoint filters.
+     * @param debugProtocolServer the DAP server.
+     * @return the future.
+     */
+    private CompletableFuture<Void> sendExceptionBreakpointFilters(Collection<ExceptionBreakpointsFilter> applicableFilters,
+                                                                   IDebugProtocolServer debugProtocolServer) {
+        SetExceptionBreakpointsArguments args = new SetExceptionBreakpointsArguments();
+        args.setFilters(
+                applicableFilters
+                        .stream()
+                        .map(ExceptionBreakpointsFilter::getFilter)
+                        .toArray(String[]::new));
+        return debugProtocolServer
+                .setExceptionBreakpoints(args)
+                .thenAccept(r -> {
+                });
+    }
+
+
+    @Override
+    public void dispose() {
+        debugProtocolServers.clear();
     }
 }
