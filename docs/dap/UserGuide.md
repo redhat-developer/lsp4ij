@@ -18,17 +18,63 @@ Here is an example with `JavaScript debugging`, which uses the [VSCode JS Debug 
 
 To configure debugging with DAP, you need to fill in:
 
-- The `Server` tab to specify the DAP server:
+### Server tab
+
+The `Server` tab to specify the DAP server:
 
   ![DAP Configuration Type/Server](./images/DAP_config_type_server.png)
 
-- The `Mappings` tab to specify the files which can be debugged to allow adding/removing breakpoints:
+### Mappings tab
+
+The `Mappings` tab to specify the files which can be debugged to allow adding/removing breakpoints:
 
 ![DAP Configuration Type/Mappings](./images/DAP_config_type_mappings.png)
 
-- The `Configuration` tab to specify the working directory and the file you want to run/debug:
+### Configuration tab
+
+The `Configuration` tab to specify the working directory and the file you want to run/debug:
 
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
+
+## Breakpoints
+
+### Adding breakpoint
+
+When a file can be debugged using a DAP server specified in the [Mappings tab](#mappings-tab), a breakpoint can be added.
+
+![DAP Breakpoint set](./images/DAP_breakpoint_set.png)
+
+### Verify breakpoint
+
+When the DAP server starts, breakpoints are sent to it, and it responds with the status of those breakpoints — 
+whether they are validated or not.
+
+For example, when the DAP server [VSCode JS Debug](./user-defined-dap/vscode-js-debug.md) starts, it invalidates all breakpoints.:
+
+![DAP Breakpoint invalid](./images/DAP_breakpoint_invalid.png)
+
+When the program starts, it checks and validates the breakpoints.
+
+![DAP Breakpoint invalid](./images/DAP_breakpoint_checked.png)
+
+### Conditional breakpoint
+
+Conditional breakpoints are also supported. Here is an example of a conditional breakpoint written in JavaScript:
+
+![DAP Conditional Breakpoint](./images/DAP_conditional_breakpoint.png)
+
+### Exception breakpoint
+
+Some DAP servers support exception breakpoints. If so, you must first run the configuration process, 
+which starts the DAP server and retrieves the list of available exception breakpoints. 
+This list is accessible through the `Exception Breakpoints` menu:
+
+![DAP exception breakpoints](./images/DAP_exception_breakpoints.png)
+
+The first time, the selected exception breakpoints 
+are based on the default configuration provided by the DAP server.
+
+You can then select or deselect the exception breakpoints you want to use.
 
 ## Inline value
 
