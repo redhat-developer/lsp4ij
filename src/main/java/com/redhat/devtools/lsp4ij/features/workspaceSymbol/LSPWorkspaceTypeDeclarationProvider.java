@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionParam
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
 import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -88,7 +89,7 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         }
 
         LSPTypeDefinitionSupport typeDefinitionSupport = LSPFileSupport.getSupport(file).getTypeDefinitionSupport();
-        var params = new LSPTypeDefinitionParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
+        var params = new LSPTypeDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
         try {
             waitUntilDone(typeDefinitionsFuture, file);

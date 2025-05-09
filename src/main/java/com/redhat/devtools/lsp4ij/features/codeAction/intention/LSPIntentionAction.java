@@ -20,10 +20,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
-import org.eclipse.lsp4j.CodeActionContext;
-import org.eclipse.lsp4j.CodeActionParams;
-import org.eclipse.lsp4j.CodeActionTriggerKind;
-import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
@@ -62,6 +59,6 @@ public abstract class LSPIntentionAction extends LSPLazyCodeActionIntentionActio
         Range range = LSPIJUtils.toRange(caret.getSelectionRange(), document);
         CodeActionContext context = new CodeActionContext(Collections.emptyList());
         context.setTriggerKind(CodeActionTriggerKind.Automatic);
-        return new CodeActionParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()), range, context);
+        return new CodeActionParams(new TextDocumentIdentifier(), range, context);
     }
 }

@@ -25,6 +25,7 @@ import com.redhat.devtools.lsp4ij.features.AbstractLSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.Color;
 import org.eclipse.lsp4j.DocumentColorParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +55,7 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                                              @NotNull InlayHintsSink inlayHintsSink) {
         // Get LSP color information from cache or create them
         LSPColorSupport colorSupport = LSPFileSupport.getSupport(psiFile).getColorSupport();
-        var params = new DocumentColorParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
+        var params = new DocumentColorParams(new TextDocumentIdentifier());
         CompletableFuture<List<ColorData>> future = colorSupport.getColors(params);
 
         try {

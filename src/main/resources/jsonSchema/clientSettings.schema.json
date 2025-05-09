@@ -35,6 +35,19 @@
       "description": "The statement terminator characters in the language grammar.",
       "default": ""
     },
+    "uriSupport": {
+      "type": "object",
+      "title": "Client-side Uri support configuration",
+      "additionalProperties": false,
+      "properties": {
+        "encoded": {
+          "type": "boolean",
+          "title": "Encode uri with vscode style (ex: file:///c%3A/Users)",
+          "description": "Encode uri with vscode style (ex: file:///c%3A/Users).",
+          "default": false
+        }
+      }
+    },
     "completion": {
       "type": "object",
       "title": "Client-side completion configuration",

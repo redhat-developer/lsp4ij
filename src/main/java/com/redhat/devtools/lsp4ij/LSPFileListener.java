@@ -36,7 +36,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     private final LanguageServerWrapper languageServerWrapper;
     private final FileSystemWatcherManager fileSystemWatcherManager;
 
-    public LSPFileListener(LanguageServerWrapper languageServerWrapper) {
+    public LSPFileListener(@NotNull LanguageServerWrapper languageServerWrapper) {
         this.languageServerWrapper = languageServerWrapper;
         this.fileSystemWatcherManager = new FileSystemWatcherManager();
     }
@@ -153,7 +153,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     }
 
     private FileEvent fe(URI uri, FileChangeType type) {
-        return new FileEvent(uri.toASCIIString(), type);
+        return new FileEvent(languageServerWrapper.toUriString(uri), type);
     }
 
     /**
@@ -167,8 +167,8 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
      * @return URI of the file before renaming
      */
     private @NotNull URI didRename(@NotNull VirtualFile virtualParentFile,
-                                      @NotNull String oldFileName,
-                                      @NotNull VirtualFile virtualNewFile) {
+                                   @NotNull String oldFileName,
+                                   @NotNull VirtualFile virtualNewFile) {
         URI parentFileUri = languageServerWrapper.toUri(virtualParentFile);
         URI oldUri = parentFileUri.resolve(oldFileName);
         boolean docIsConnected = languageServerWrapper.isConnectedTo(oldUri);
@@ -178,7 +178,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
             // 2. Send a textDocument/didOpen for the new file name
             URI newUri = languageServerWrapper.toUri(virtualNewFile);
             if (!languageServerWrapper.isConnectedTo(newUri)) {
-                languageServerWrapper.connect(virtualNewFile, new LanguageServerWrapper.LSPFileConnectionInfo(null,null, null,true));
+                languageServerWrapper.connect(virtualNewFile, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true));
             }
         }
         return oldUri;

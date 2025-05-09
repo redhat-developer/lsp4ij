@@ -18,6 +18,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
@@ -122,7 +123,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @param diagnostics the LSP diagnostic.
      * @return list of Intellij {@link IntentionAction} which are used to create Intellij QuickFix.
      */
-    private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(List<Diagnostic> diagnostics) {
+    private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(@NotNull List<Diagnostic> diagnostics) {
         return CompletableFutures
                 .computeAsyncCompose(cancelChecker -> languageServer
                         .getInitializedServer()
@@ -131,7 +132,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                             cancelChecker.checkCanceled();
 
                             // Collect code action for the given file by using the language server
-                            CodeActionParams params = createCodeActionParams(diagnostics, file);
+                            CodeActionParams params = createCodeActionParams(diagnostics, file, languageServer.getClientFeatures());
                             return ls.getTextDocumentService()
                                     .codeAction(params)
                                     .thenApply(codeActions -> {
@@ -164,9 +165,12 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @param file        the file.
      * @return the LSP code action parameters for the given diagnostic and file.
      */
-    private static CodeActionParams createCodeActionParams(List<Diagnostic> diagnostics, VirtualFile file) {
+    private static CodeActionParams createCodeActionParams(@NotNull List<Diagnostic> diagnostics,
+                                                           @NotNull VirtualFile file,
+                                                           @NotNull FileUriSupport fileUriSupport) {
         CodeActionParams params = new CodeActionParams();
-        params.setTextDocument(LSPIJUtils.toTextDocumentIdentifier(file));
+        var identifier = new TextDocumentIdentifier(FileUriSupport.toString(file, fileUriSupport));
+        params.setTextDocument(identifier);
         // As diagnostic list is never empty, and it is sorted by the max range, the code action range parameter is the first diagnostic
         Range range = diagnostics.get(0).getRange();
         params.setRange(range);

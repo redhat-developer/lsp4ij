@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,7 @@ public class LSPGoToDeclarationAction extends AbstractLSPGoToAction {
                                                                  @NotNull Editor editor,
                                                                  int offset) {
         LSPDeclarationSupport declarationSupport = LSPFileSupport.getSupport(psiFile).getDeclarationSupport();
-        var params = new LSPDeclarationParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
+        var params = new LSPDeclarationParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> declarationsFuture = declarationSupport.getDeclarations(params);
         try {
             waitUntilDone(declarationsFuture, psiFile);

@@ -21,10 +21,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import org.eclipse.lsp4j.DocumentOnTypeFormattingParams;
-import org.eclipse.lsp4j.FormattingOptions;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.TextEdit;
+import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +69,7 @@ final class LSPServerSideOnTypeFormattingHelper {
         Document document = editor.getDocument();
         Position position = LSPIJUtils.toPosition(offset, document);
         DocumentOnTypeFormattingParams onTypeFormattingParams = new DocumentOnTypeFormattingParams(
-                LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()),
+                new TextDocumentIdentifier(),
                 new FormattingOptions(LSPIJUtils.getTabSize(editor), LSPIJUtils.isInsertSpaces(editor)),
                 position,
                 String.valueOf(charTyped)

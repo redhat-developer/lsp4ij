@@ -60,7 +60,7 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         if (document == null) {
             return;
         }
-        final TextDocumentIdentifier textDocument = LSPIJUtils.toTextDocumentIdentifier(file);
+        final TextDocumentIdentifier textDocument = new TextDocumentIdentifier();
         final Position position = LSPIJUtils.toPosition(offset, document);
 
         // Step 1: consume the LSP 'textDocument/prepareRename' request

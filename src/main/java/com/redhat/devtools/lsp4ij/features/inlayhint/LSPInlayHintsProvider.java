@@ -57,7 +57,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         // Get LSP inlay hints from cache or create them
         LSPInlayHintsSupport inlayHintSupport = LSPFileSupport.getSupport(psiFile).getInlayHintsSupport();
         Range viewPortRange = getViewPortRange(editor);
-        InlayHintParams params = new InlayHintParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), viewPortRange);
+        InlayHintParams params = new InlayHintParams(new TextDocumentIdentifier(), viewPortRange);
         CompletableFuture<List<InlayHintData>> future = inlayHintSupport.getInlayHints(params);
 
         try {

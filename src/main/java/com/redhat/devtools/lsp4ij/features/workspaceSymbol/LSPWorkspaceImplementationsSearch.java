@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationParam
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
 import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +91,7 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
 
         int offset = element.getTextRange().getStartOffset();
         LSPImplementationParams params = new LSPImplementationParams(
-                LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()),
+                new TextDocumentIdentifier(),
                 LSPIJUtils.toPosition(offset, document),
                 offset
         );

@@ -61,7 +61,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
     private static @NotNull CompletableFuture<List<LSPUsagePsiElement>> collectUsages(@NotNull PsiFile file,
                                                                                       @NotNull LSPUsageSupportParams params,
                                                                                       @NotNull CancellationSupport cancellationSupport) {
-        var textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile());
+        var textDocumentIdentifier = new TextDocumentIdentifier();
         Project project = file.getProject();
         return getLanguageServers(file,
                         f -> f.getUsageFeature().isEnabled(file),

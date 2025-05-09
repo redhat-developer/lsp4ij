@@ -22,6 +22,15 @@ import org.jetbrains.annotations.Nullable;
  * Client-side settings for a user-defined language server configuration.
  */
 public class ClientConfigurationSettings {
+
+    /**
+     * Client-side code completion settings.
+     */
+    public static class ClientConfigurationUriSupportSettings {
+
+        public boolean encoded = false;
+    }
+
     /**
      * Client-side code completion settings.
      */
@@ -211,6 +220,11 @@ public class ClientConfigurationSettings {
      * The statement terminator characters in the language grammar. Defaults to none.
      */
     public @NotNull String statementTerminatorCharacters = "";
+
+    /**
+     * Client-side Uri support settings.
+     */
+    public @NotNull ClientConfigurationUriSupportSettings uriSupport = new ClientConfigurationUriSupportSettings();
 
     /**
      * Client-side code completion settings.

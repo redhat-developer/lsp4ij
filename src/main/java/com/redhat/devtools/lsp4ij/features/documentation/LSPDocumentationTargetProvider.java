@@ -26,6 +26,7 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -68,7 +69,7 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
         if (document == null) {
             return Collections.emptyList();
         }
-        var params = new LSPHoverParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document), offset);
+        var params = new LSPHoverParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         LSPHoverSupport hoverSupport = LSPFileSupport.getSupport(psiFile).getHoverSupport();
         CompletableFuture<List<HoverData>> hoverFuture = hoverSupport.getHover(params);
 

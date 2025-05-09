@@ -239,7 +239,7 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
      */
     @NotNull
     private static SignatureHelpParams toSignatureHelpParams(@NotNull ParameterInfoContext context, @NotNull SignatureHelpTriggerKind kind) {
-        TextDocumentIdentifier identifier = LSPIJUtils.toTextDocumentIdentifier(context.getFile().getVirtualFile());
+        TextDocumentIdentifier identifier = new TextDocumentIdentifier();
         Position position = LSPIJUtils.toPosition(context.getOffset(), context.getEditor().getDocument());
         SignatureHelpContext signatureHelpContext = new SignatureHelpContext();
         signatureHelpContext.setTriggerKind(kind);

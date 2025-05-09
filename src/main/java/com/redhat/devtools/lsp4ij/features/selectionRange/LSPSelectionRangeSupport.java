@@ -70,7 +70,7 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
 
         // Consume LSP 'textDocument/selectionRanges' request
         LSPSelectionRangeSupport selectionRangeSupport = LSPFileSupport.getSupport(file).getSelectionRangeSupport();
-        TextDocumentIdentifier textDocumentIdentifier = LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile());
+        TextDocumentIdentifier textDocumentIdentifier = new TextDocumentIdentifier();
         Position position = LSPIJUtils.toPosition(offset, document);
         var params = new LSPSelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position), offset);
         CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);

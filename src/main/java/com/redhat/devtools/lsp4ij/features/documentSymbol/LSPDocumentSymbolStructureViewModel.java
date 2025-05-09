@@ -22,6 +22,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentSymbolParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -95,7 +96,7 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
 
             LSPFileSupport fileSupport = LSPFileSupport.getSupport(psiFile);
             LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
-            var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
+            var params = new DocumentSymbolParams(new TextDocumentIdentifier());
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
             try {
                 waitUntilDone(documentSymbolFuture, psiFile);

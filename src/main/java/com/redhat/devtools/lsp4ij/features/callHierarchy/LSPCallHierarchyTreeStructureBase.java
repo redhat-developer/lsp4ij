@@ -22,6 +22,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyNodeDescriptor;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyTreeStructureBase;
 import org.eclipse.lsp4j.CallHierarchyItem;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ public abstract class LSPCallHierarchyTreeStructureBase extends LSPHierarchyTree
                              @NotNull List<LSPHierarchyNodeDescriptor> descriptors) {
         // Consume LSP 'textDocument/prepareCallHierarchy' request
         LSPPrepareCallHierarchySupport prepareCallHierarchySupport = LSPFileSupport.getSupport(psiFile).getPrepareCallHierarchySupport();
-        var params = new LSPCallHierarchyPrepareParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
+        var params = new LSPCallHierarchyPrepareParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<CallHierarchyItemData>> prepareCallHierarchyFuture = prepareCallHierarchySupport.getPrepareCallHierarchies(params);
         try {
             waitUntilDone(prepareCallHierarchyFuture, psiFile);
