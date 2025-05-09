@@ -22,10 +22,7 @@ import com.intellij.refactoring.listeners.RefactoringElementListener;
 import com.intellij.refactoring.rename.RenamePsiElementProcessor;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.util.IncorrectOperationException;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -38,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
@@ -70,7 +68,7 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
         var project = file.getProject();
 
         // Create LSP rename files parameters.
-        var params = createtRenameFilesParams(file, newName);
+        Map<LanguageServerWrapper, RenameFilesParams> paramsPerServer = new HashMap<>();
 
         // Prepare future of LSP 'workspace/willRenameFiles' request
         CancellationSupport cancellationSupport = new CancellationSupport();
@@ -88,11 +86,15 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                             List<CompletableFuture<WorkspaceEditData>> r = languageServerItems
                                     .stream()
                                     .filter(ls -> ls.isWillRenameFilesSupported(file))
-                                    .map(ls -> cancellationSupport
-                                            .execute(ls.getWorkspaceService().willRenameFiles(params),
-                                                    ls,
-                                                    LSPRequestConstants.WORKSPACE_WILL_RENAME_FILES)
-                                            .thenApplyAsync(we -> new WorkspaceEditData(we, ls)))
+                                    .map(ls -> {
+                                        var params = createtRenameFilesParams(file, newName, ls.getClientFeatures());
+                                        paramsPerServer.put(ls.getServerWrapper(), params);
+                                        return cancellationSupport
+                                                .execute(ls.getWorkspaceService().willRenameFiles(params),
+                                                        ls,
+                                                        LSPRequestConstants.WORKSPACE_WILL_RENAME_FILES)
+                                                .thenApplyAsync(we -> new WorkspaceEditData(we, ls));
+                                    })
                                     .toList();
 
                             // TODO: we return the WorkspaceEdit of the first language server, what about when there are several
@@ -116,7 +118,7 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
             // Future has been done correctly, create a fake PsiElement which stores the WorkspaceEdit
             WorkspaceEditData editData = willRenameFilesFuture.getNow(null);
             if (editData != null && editData.edit() != null) {
-
+                var params = paramsPerServer.get(editData.languageServer().getServerWrapper());
                 LSPRenameFilesContextHolder.set(new LSPRenameFilesContext(params, Collections.singletonList(editData.languageServer()), file));
 
                 var edit = editData.edit();
@@ -183,8 +185,9 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
 
     @NotNull
     private static RenameFilesParams createtRenameFilesParams(@NotNull PsiFile file,
-                                                              @NotNull String newName) {
-        String oldFileUri = LSPIJUtils.toUri(file).toASCIIString();
+                                                              @NotNull String newName,
+                                                              @Nullable FileUriSupport fileUriSupport) {
+        String oldFileUri = FileUriSupport.toString(file.getVirtualFile(), fileUriSupport);
         int index = oldFileUri.lastIndexOf('/');
         String newFileUri = oldFileUri.substring(0, index) + "/" + newName;
         return new RenameFilesParams(List.of(new FileRename(oldFileUri, newFileUri)));

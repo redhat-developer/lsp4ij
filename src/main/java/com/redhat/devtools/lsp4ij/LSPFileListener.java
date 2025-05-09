@@ -36,7 +36,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     private final LanguageServerWrapper languageServerWrapper;
     private final FileSystemWatcherManager fileSystemWatcherManager;
 
-    public LSPFileListener(LanguageServerWrapper languageServerWrapper) {
+    public LSPFileListener(@NotNull LanguageServerWrapper languageServerWrapper) {
         this.languageServerWrapper = languageServerWrapper;
         this.fileSystemWatcherManager = new FileSystemWatcherManager();
     }
@@ -153,7 +153,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
     }
 
     private FileEvent fe(URI uri, FileChangeType type) {
-        return new FileEvent(uri.toASCIIString(), type);
+        return new FileEvent(languageServerWrapper.toUriString(uri), type);
     }
 
     /**

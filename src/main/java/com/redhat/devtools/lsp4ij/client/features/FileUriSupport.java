@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,21 +21,13 @@ import java.net.URI;
  */
 public interface FileUriSupport {
 
-    public static final FileUriSupport DEFAULT = new FileUriSupport() {
+    public static final FileUriSupport DEFAULT = new FileUriSupportBase(false);
 
-        @Override
-        public @Nullable URI getFileUri(@NotNull VirtualFile file) {
-            return LSPIJUtils.toUri(file);
-        }
-
-        @Override
-        public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
-            return LSPIJUtils.findResourceFor(fileUri);
-        }
-    };
+    public static final FileUriSupport ENCODED = new FileUriSupportBase(true);
 
     /**
      * Returns the file Uri from the given virtual file and null otherwise.
+     *
      * @param file the virtual file.
      * @return the file Uri from the given virtual file and null otherwise.
      */
@@ -45,13 +36,16 @@ public interface FileUriSupport {
 
     /**
      * Returns the virtual file found by the given file Uri and null otherwise.
+     *
      * @param fileUri the file Uri.
      * @return the virtual file found by the given file Uri and null otherwise.
      */
     @Nullable
     VirtualFile findFileByUri(@NotNull String fileUri);
 
-    @NotNull
+    String toString(@NotNull URI fileUri);
+
+    @Nullable
     public static URI getFileUri(@NotNull VirtualFile file,
                                  @Nullable FileUriSupport fileUriSupport) {
         URI fileUri = fileUriSupport != null ? fileUriSupport.getFileUri(file) : null;
@@ -69,5 +63,29 @@ public interface FileUriSupport {
             return file;
         }
         return DEFAULT.findFileByUri(fileUri);
+    }
+
+    @Nullable
+    public static String toString(@Nullable VirtualFile file,
+                                  @Nullable FileUriSupport fileUriSupport) {
+        if (file == null) {
+            return null;
+        }
+        URI fileUri = getFileUri(file, fileUriSupport);
+        if (fileUri == null) {
+            return null;
+        }
+        return toString(fileUri, fileUriSupport);
+    }
+
+
+    @Nullable
+    public static String toString(@NotNull URI fileUri,
+                                  @Nullable FileUriSupport fileUriSupport) {
+        String uri = fileUriSupport != null ? fileUriSupport.toString(fileUri) : null;
+        if (uri != null) {
+            return uri;
+        }
+        return DEFAULT.toString(fileUri);
     }
 }
