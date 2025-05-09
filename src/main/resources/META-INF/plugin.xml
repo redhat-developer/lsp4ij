@@ -267,8 +267,6 @@
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingDumbAndScanningStrategy"/>
         <applicationService
-                serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
-        <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry"/>
         <applicationService
                 id="com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings"
