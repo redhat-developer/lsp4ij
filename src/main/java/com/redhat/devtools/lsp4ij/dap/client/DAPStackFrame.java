@@ -23,6 +23,7 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XValueChildrenList;
+import com.redhat.devtools.lsp4ij.dap.DAPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
@@ -31,9 +32,11 @@ import org.eclipse.lsp4j.debug.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+
+import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
 
 /**
  * Debug Adapter Protocol (DAP) stack frame.
@@ -73,9 +76,12 @@ public class DAPStackFrame extends XStackFrame {
     @Override
     public @Nullable XSourcePosition getSourcePosition() {
         if (sourcePosition == null && stackFrame.getSource() != null) {
-            String path = stackFrame.getSource().getPath();
+            Path filePath = getValidFilePath(stackFrame.getSource());
+            if (filePath == null) {
+                return null;
+            }
             try {
-                VirtualFile file = VfsUtil.findFile(Paths.get(path), true);
+                VirtualFile file = VfsUtil.findFile(filePath, true);
                 sourcePosition = XDebuggerUtil.getInstance().createPosition(file, stackFrame.getLine() - 1);
             } catch (Exception e) {
                 // Invalid path...
