@@ -28,6 +28,8 @@ import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.internal.capabilities.CodeLensOptionsAdapter;
+import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
@@ -191,7 +193,12 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     }
 
     public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
-        return new Launcher.Builder<>();
+        return new Launcher.Builder<S>()
+                .configureGson(builder -> {
+                    // Add a custom CodeLensOptionsAdapter to support old language server
+                    // which declares codeLenProvider with a boolean instead of Json object.
+                    builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
+                });
     }
 
     public boolean supportsCurrentEditMode(@NotNull Project project) {
