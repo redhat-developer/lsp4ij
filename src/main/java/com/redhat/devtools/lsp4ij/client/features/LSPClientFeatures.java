@@ -41,6 +41,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private ServerInstaller serverInstaller;
 
+    private FileUriSupport fileUriSupport;
+
     private LSPCallHierarchyFeature callHierarchyFeature;
 
     private LSPCodeActionFeature codeActionFeature;
@@ -99,6 +101,10 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private EditorBehaviorFeature editorBehaviorFeature;
 
+    public LSPClientFeatures() {
+        setFileUriSupport(FileUriSupport.DEFAULT);
+    }
+
     /**
      * Returns true if the language server is enabled for the given file and false otherwise. Default to true
      *
@@ -122,7 +128,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             var status = serverInstaller
                     .checkInstallation()
                     .getNow(null);
-            if (status != null && status == ServerInstallationStatus.INSTALLED) {
+            if (status == ServerInstallationStatus.INSTALLED) {
                 // The language server is correctly installed, enable it
                 return true;
             }
@@ -173,6 +179,11 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public void initializeParams(@NotNull InitializeParams initializeParams) {
     }
 
+    public LSPClientFeatures setFileUriSupport(FileUriSupport fileUriSupport) {
+        this.fileUriSupport = fileUriSupport;
+        return this;
+    }
+
     /**
      * Overrides this method if you need to generate custom URI.
      *
@@ -181,7 +192,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable URI getFileUri(@NotNull VirtualFile file) {
-        return null;
+        return fileUriSupport != null ? fileUriSupport.getFileUri(file) : null;
     }
 
     /**
@@ -192,7 +203,17 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
-        return null;
+        return fileUriSupport != null ? fileUriSupport.findFileByUri(fileUri) : null;
+    }
+
+    @Override
+    public String toString(@NotNull VirtualFile file) {
+        return fileUriSupport != null ? fileUriSupport.toString(file) : null;
+    }
+
+    @Override
+    public @Nullable String toString(@NotNull URI fileUri, boolean directory) {
+        return fileUriSupport != null ? fileUriSupport.toString(fileUri, directory) : null;
     }
 
     /**

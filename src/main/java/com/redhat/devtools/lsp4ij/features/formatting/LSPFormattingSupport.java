@@ -154,7 +154,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
                                                                              @Nullable Boolean insertSpaces,
                                                                              @NotNull LanguageServerItem languageServer) {
         DocumentFormattingParams params = new DocumentFormattingParams();
-        params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.getFileUri(getFile().getVirtualFile(), languageServer.getClientFeatures()).toASCIIString()));
+        params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.toString(getFile().getVirtualFile(), languageServer.getClientFeatures())));
         FormattingOptions options = new FormattingOptions();
         if (tabSize != null) {
             options.setTabSize(tabSize);
@@ -172,7 +172,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
                                                                                        @NotNull Document document,
                                                                                        @NotNull LanguageServerItem languageServer) {
         DocumentRangeFormattingParams params = new DocumentRangeFormattingParams();
-        params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.getFileUri(getFile().getVirtualFile(), languageServer.getClientFeatures()).toASCIIString()));
+        params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.toString(getFile().getVirtualFile(), languageServer.getClientFeatures())));
         FormattingOptions options = new FormattingOptions();
         if (tabSize != null) {
             options.setTabSize(tabSize);

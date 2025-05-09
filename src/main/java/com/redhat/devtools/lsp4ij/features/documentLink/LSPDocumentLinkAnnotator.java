@@ -29,6 +29,7 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPExternalAnnotator;
 import org.eclipse.lsp4j.DocumentLinkParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -63,7 +64,7 @@ public class LSPDocumentLinkAnnotator extends AbstractLSPExternalAnnotator<List<
         }
         // Consume LSP 'textDocument/documentLink' request
         LSPDocumentLinkSupport documentLinkSupport = LSPFileSupport.getSupport(psiFile).getDocumentLinkSupport();
-        var params = new DocumentLinkParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()));
+        var params = new DocumentLinkParams(new TextDocumentIdentifier());
         documentLinkSupport.cancel();
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {

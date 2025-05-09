@@ -70,7 +70,7 @@ public class LSPCompletionContributor extends CompletionContributor {
 
         // Get LSP completion items from cache or create them
         boolean autoPopup = parameters.isAutoPopup();
-        LSPCompletionParams params = new LSPCompletionParams(LSPIJUtils.toTextDocumentIdentifier(file),
+        LSPCompletionParams params = new LSPCompletionParams(new TextDocumentIdentifier(),
                 LSPIJUtils.toPosition(offset, document),
                 offset,
                 autoPopup ? getCompletionChar(offset, document) : null,

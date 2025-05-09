@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.eclipse.lsp4j.SemanticTokensParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -103,7 +104,7 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
     private static LazyHighlightInfo[] highlightSemanticTokens(@NotNull PsiFile file, @Nullable HighlightInfoHolder holder) {
         // Consume LSP 'textDocument/semanticTokens/full' request
         LSPSemanticTokensSupport semanticTokensSupport = LSPFileSupport.getSupport(file).getSemanticTokensSupport();
-        var params = new SemanticTokensParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
+        var params = new SemanticTokensParams(new TextDocumentIdentifier());
         CompletableFuture<SemanticTokensData> semanticTokensFuture = semanticTokensSupport.getSemanticTokens(params);
         try {
             waitUntilDone(semanticTokensFuture, file);

@@ -34,6 +34,7 @@ import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
 import org.eclipse.lsp4j.DocumentSymbolParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.ApiStatus;
@@ -113,7 +114,7 @@ public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageS
                 // Refresh breadcrumb when LSP Symbols are available.
                 LSPFileSupport fileSupport = LSPFileSupport.getSupport(file);
                 LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
-                var params = new DocumentSymbolParams(LSPIJUtils.toTextDocumentIdentifier(file.getVirtualFile()));
+                var params = new DocumentSymbolParams(new TextDocumentIdentifier());
                 var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
                 documentSymbolFuture
                         .thenApply(symbols -> {

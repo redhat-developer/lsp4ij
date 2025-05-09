@@ -19,6 +19,7 @@ import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.net.URI;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -88,6 +89,6 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
     protected static void updateTextDocumentUri(@NotNull TextDocumentIdentifier textDocument,
                                                 @NotNull PsiFile file,
                                                 @NotNull LanguageServerItem languageServer) {
-        textDocument.setUri(FileUriSupport.getFileUri(file.getVirtualFile(), languageServer.getClientFeatures()).toASCIIString());
+        textDocument.setUri(FileUriSupport.toString(file.getVirtualFile(), languageServer.getClientFeatures()));
     }
 }

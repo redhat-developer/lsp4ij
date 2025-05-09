@@ -35,6 +35,7 @@ import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -300,7 +301,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
     }
 
     private static CompletableFuture<CodeLensDataResult> fetchCodeLenses(@NotNull LSPCodeLensSupport codeLensSupport) {
-        var params = new CodeLensParams(LSPIJUtils.toTextDocumentIdentifier(codeLensSupport.getFile().getVirtualFile()));
+        var params = new CodeLensParams(new TextDocumentIdentifier());
         CompletableFuture<CodeLensDataResult> future;
         try {
             future = codeLensSupport.getCodeLenses(params);

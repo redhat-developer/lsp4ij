@@ -363,7 +363,7 @@ public class LanguageServerWrapper implements Disposable {
                         initParams.setProcessId(getParentProcessId());
 
                         if (rootURI != null) {
-                            initParams.setRootUri(LSPIJUtils.toUriAsString(rootURI));
+                            initParams.setRootUri(toUriString(rootURI));
                             initParams.setRootPath(rootURI.getPath());
                         }
 
@@ -478,7 +478,7 @@ public class LanguageServerWrapper implements Disposable {
         initParams.setClientInfo(getClientInfo());
         initParams.setTrace(this.lspStreamProvider.getTrace(rootURI));
 
-        var folders = LSPIJUtils.toWorkspaceFolders(initialProject);
+        var folders = LSPIJUtils.toWorkspaceFolders(initialProject, getClientFeatures());
         initParams.setWorkspaceFolders(folders);
 
         // Customize initialize params if needed
@@ -815,7 +815,7 @@ public class LanguageServerWrapper implements Disposable {
                     return ls2;
                 }
 
-                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(fileUri.toASCIIString(), file, document, fileConnectionInfo.documentText(), fileConnectionInfo.languageId());
+                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(toUriString(fileUri), file, document, fileConnectionInfo.documentText(), fileConnectionInfo.languageId());
                 document.addDocumentListener(synchronizer);
                 OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
                 LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
@@ -833,14 +833,14 @@ public class LanguageServerWrapper implements Disposable {
         if (fileUri == null) {
             return null;
         }
-        var existingData = openedDocuments.get(fileUri);
-        if (existingData != null) {
+        var openedDocument = openedDocuments.get(fileUri);
+        if (openedDocument != null) {
             if (!waitForDidOpen) {
                 return CompletableFuture.completedFuture(languageServer);
             }
             // The file is already connected.
             // returns the language server instance when didOpen happened
-            var didOpenFuture = existingData.getSynchronizer().getDidOpenFuture();
+            var didOpenFuture = openedDocument.getSynchronizer().getDidOpenFuture();
             return getLanguageServerWhenDidOpen(didOpenFuture);
         }
         return null;
@@ -1382,8 +1382,35 @@ public class LanguageServerWrapper implements Disposable {
         return clientFeatures;
     }
 
+    /**
+     * Converts the given {@link VirtualFile} to a {@link URI}, taking into account client-specific features.
+     *
+     * @param file the virtual file to convert, must not be {@code null}
+     * @return the corresponding URI, or {@code null} if the conversion fails
+     */
+    @Nullable
     URI toUri(@NotNull VirtualFile file) {
         return FileUriSupport.getFileUri(file, getClientFeatures());
+    }
+
+    /**
+     * Converts the given {@link URI} to its string representation using client-specific formatting rules.
+     *
+     * @param uri the URI to convert, must not be {@code null}
+     * @return the string representation of the URI
+     */
+    public String toUriString(@NotNull URI uri) {
+        return FileUriSupport.toString(uri, getClientFeatures());
+    }
+
+    /**
+     * Converts the given {@link VirtualFile} to its URI string representation using client-specific formatting rules.
+     *
+     * @param file the virtual file to convert, must not be {@code null}
+     * @return the URI string representation of the virtual file
+     */
+    public String toUriString(@NotNull VirtualFile file) {
+        return FileUriSupport.toString(file, getClientFeatures());
     }
 
     /**

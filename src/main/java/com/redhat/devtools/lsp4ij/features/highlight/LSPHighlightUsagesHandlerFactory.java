@@ -26,6 +26,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -74,7 +75,7 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         int offset = TargetElementUtil.adjustOffset(psiFile, document, editor.getCaretModel().getOffset());
 
         // Consume LSP 'textDocument/documentHighlight' request
-        var params = new LSPDocumentHighlightParams(LSPIJUtils.toTextDocumentIdentifier(file), LSPIJUtils.toPosition(offset, document), offset);
+        var params = new LSPDocumentHighlightParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         LSPHighlightSupport highlightSupport = LSPFileSupport.getSupport(psiFile).getHighlightSupport();
         CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
         try {

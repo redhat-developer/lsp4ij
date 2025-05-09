@@ -136,7 +136,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<List<WorkspaceFolder>> workspaceFolders() {
-        return CompletableFuture.supplyAsync(() -> LSPIJUtils.toWorkspaceFolders(project));
+        return CompletableFuture.supplyAsync(() -> LSPIJUtils.toWorkspaceFolders(project, wrapper.getClientFeatures()));
     }
 
 

@@ -32,7 +32,6 @@ import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.Trinity;
@@ -69,11 +68,9 @@ public class LSPIJUtils {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPIJUtils.class);
 
-    private static final Key<URI> DEFAULT_LSP_FILE_URI_KEY = Key.create("lsp.file.uri");
+    public static final String JAR_PROTOCOL = "jar";
 
-    private static final String JAR_PROTOCOL = "jar";
-
-    private static final String JRT_PROTOCOL = "jrt";
+    public static final String JRT_PROTOCOL = "jrt";
 
     private static final String JAR_SCHEME = JAR_PROTOCOL + ":";
 
@@ -299,7 +296,7 @@ public class LSPIJUtils {
      * Open the given fileUrl in an editor and make the range selected.
      *
      * @param fileUri            the file Uri to open.
-     * @param position      the start position.
+     * @param position           the start position.
      * @param focusEditor        true if editor will take the focus and false otherwise.
      * @param createFileIfNeeded true if file must be created if doesn't exist and false otherwise.
      * @param fileUriSupport     the file Uri support.
@@ -312,7 +309,7 @@ public class LSPIJUtils {
                                        boolean createFileIfNeeded,
                                        @Nullable FileUriSupport fileUriSupport,
                                        @NotNull Project project) {
-       return openInEditor(fileUri, position, null, focusEditor, createFileIfNeeded, fileUriSupport, project);
+        return openInEditor(fileUri, position, null, focusEditor, createFileIfNeeded, fileUriSupport, project);
     }
 
     private static boolean createFileAndOpenInEditor(@NotNull String fileUri, @NotNull Project project) {
@@ -508,13 +505,7 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull VirtualFile file) {
-        URI fileUri = file.getUserData(DEFAULT_LSP_FILE_URI_KEY);
-        if (fileUri == null) {
-            // Cache the file Uri to avoid recomputing again
-            fileUri = toUri(VfsUtilCore.virtualToIoFile(file));
-            file.putUserData(DEFAULT_LSP_FILE_URI_KEY, fileUri);
-        }
-        return fileUri;
+        return toUri(VfsUtilCore.virtualToIoFile(file));
     }
 
     public static @Nullable String toUriAsString(@NotNull PsiFile psFile) {
@@ -523,19 +514,7 @@ public class LSPIJUtils {
     }
 
     public static @NotNull String toUriAsString(@NotNull VirtualFile file) {
-        String protocol = file.getFileSystem().getProtocol();
-        if (JAR_PROTOCOL.equals(protocol) || JRT_PROTOCOL.equals(protocol)) {
-            return Objects.requireNonNull(VfsUtilCore.convertToURL(file.getUrl())).toExternalForm();
-        }
-        String uri = toUri(VfsUtilCore.virtualToIoFile(file)).toASCIIString();
-        if (file.isDirectory()) {
-            // For directory case, remove last '/'
-            char last = uri.charAt(uri.length() - 1);
-            if (last == '/' || last == '\\') {
-                return uri.substring(0, uri.length() - 1);
-            }
-        }
-        return uri;
+        return Objects.requireNonNull(FileUriSupport.toString(file, null));
     }
 
     /**
@@ -585,7 +564,7 @@ public class LSPIJUtils {
      * @return the virtual file, or {@code null} if the file exists only in memory.
      */
     public static @Nullable VirtualFile getFile(@NotNull PsiFile psiFile) {
-       return psiFile.getVirtualFile();
+        return psiFile.getVirtualFile();
     }
 
     /**
@@ -699,14 +678,18 @@ public class LSPIJUtils {
     }
 
     @NotNull
-    public static List<WorkspaceFolder> toWorkspaceFolders(@NotNull Project project) {
+    public static List<WorkspaceFolder> toWorkspaceFolders(@NotNull Project project,
+                                                           @NotNull FileUriSupport fileUriSupport) {
         Set<VirtualFile> roots = getRoots(project);
         List<WorkspaceFolder> workspaceFolders = new ArrayList<>(roots.size());
         for (var root : roots) {
-            WorkspaceFolder folder = new WorkspaceFolder();
-            folder.setUri(Objects.requireNonNull(toUriAsString(root)));
-            folder.setName(root.getName());
-            workspaceFolders.add(folder);
+            String workspaceUri = FileUriSupport.toString(root, fileUriSupport);
+            if (workspaceUri != null) {
+                WorkspaceFolder folder = new WorkspaceFolder();
+                folder.setUri(workspaceUri);
+                folder.setName(root.getName());
+                workspaceFolders.add(folder);
+            }
         }
         return workspaceFolders;
     }
@@ -793,10 +776,10 @@ public class LSPIJUtils {
     }
 
     private static @Nullable TextRange toTextRange(@NotNull Range range,
-                                                  @NotNull Document document,
-                                                  @Nullable PsiFile file,
-                                                  boolean adjust,
-                                                  int docLengthPrefetched) {
+                                                   @NotNull Document document,
+                                                   @Nullable PsiFile file,
+                                                   boolean adjust,
+                                                   int docLengthPrefetched) {
         try {
             int docLength = docLengthPrefetched >= 0 ? docLengthPrefetched : document.getTextLength();
             int start = LSPIJUtils.toOffset(range.getStart(), document);
@@ -893,8 +876,7 @@ public class LSPIJUtils {
     }
 
     private static TextRange findBestTextRangeAt(@Nullable PsiFile file, int offset) {
-        TextRange fileTextRange = file.getTextRange();
-        PsiElement element = file.findElementAt(Math.max(offset - 1, 0));
+        PsiElement element = file != null ? file.findElementAt(Math.max(offset - 1, 0)) : null;
         if (element != null) {
             TextRange textRange = element.getTextRange();
             if (offset == textRange.getEndOffset()) {
@@ -1157,10 +1139,6 @@ public class LSPIJUtils {
         return EditorFactory.getInstance().getEditors(document, project);
     }
 
-    public static TextDocumentIdentifier toTextDocumentIdentifier(VirtualFile file) {
-        return new TextDocumentIdentifier(toUriAsString(file));
-    }
-
     /**
      * Apply text edits to the given document and move the caret offset of the given editor if needed.
      *
@@ -1218,7 +1196,7 @@ public class LSPIJUtils {
         final int oldCaretOffset = editor != null ? editor.getCaretModel().getOffset() : -1;
         int newCaretOffset = oldCaretOffset;
         // Apply each text edit to update the given document
-        for (var pair: pairs) {
+        for (var pair : pairs) {
             var edit = pair.first;
             var marker = pair.second;
             int increment = applyEdit(marker.getStartOffset(), marker.getEndOffset(), edit.getNewText(), document, oldCaretOffset);
@@ -1481,9 +1459,9 @@ public class LSPIJUtils {
                 Integer patchVersion = minorPatchHotfixVersion.getSecond();
                 Integer hotfixVersion = minorPatchHotfixVersion.getThird();
                 if ((majorVersion > minimumMajorVersion) ||
-                    ((majorVersion == minimumMajorVersion) && (minorVersion > minimumMinorVersion)) ||
-                    ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion > minimumPatchVersion)) ||
-                    ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion == minimumPatchVersion) && (hotfixVersion >= minimumHotfixVersion))) {
+                        ((majorVersion == minimumMajorVersion) && (minorVersion > minimumMinorVersion)) ||
+                        ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion > minimumPatchVersion)) ||
+                        ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion == minimumPatchVersion) && (hotfixVersion >= minimumHotfixVersion))) {
                     return true;
                 }
             }

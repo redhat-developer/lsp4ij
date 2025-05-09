@@ -110,19 +110,19 @@ public class CommandExecutor {
 
         // 3. tentative fallback
         if (file != null && command.getArguments() != null) {
-                LanguageServerItem languageServer = context.getPreferredLanguageServer();
-                FileUriSupport fileUriSupport = languageServer != null ? languageServer.getClientFeatures() : null;
-                WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), file, fileUriSupport);
-                if (edit != null) {
-                    if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+            LanguageServerItem languageServer = context.getPreferredLanguageServer();
+            FileUriSupport fileUriSupport = languageServer != null ? languageServer.getClientFeatures() : null;
+            WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), file, fileUriSupport);
+            if (edit != null) {
+                if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+                    LSPIJUtils.applyWorkspaceEdit(edit);
+                } else {
+                    return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<LSPCommandResponse>) () -> {
                         LSPIJUtils.applyWorkspaceEdit(edit);
-                    } else {
-                        return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<LSPCommandResponse>) () -> {
-                            LSPIJUtils.applyWorkspaceEdit(edit);
-                            return LSPCommandResponse.FOUND;
-                        });
-                    }
-                    return LSPCommandResponse.FOUND;
+                        return LSPCommandResponse.FOUND;
+                    });
+                }
+                return LSPCommandResponse.FOUND;
             }
         }
         if (context.isShowNotificationError()) {
@@ -152,7 +152,7 @@ public class CommandExecutor {
      * @param languageServer            the language server for which the {@code command} is
      *                                  applicable.
      * @param preferredLanguageServerId the preferred language server Id.
-     * @param project the project.
+     * @param project                   the project.
      * @return the LSP command response.
      */
     private static LSPCommandResponse executeCommandServerSide(@NotNull Command command,
@@ -278,14 +278,13 @@ public class CommandExecutor {
         return contextBuilder.build();
     }
 
-    // TODO consider using Entry/SimpleEntry instead
-    private static final class Pair<K, V> {
-        K key;
-        V value;
+    private static final class FileChanges {
+        @NotNull URI fileUri;
+        @NotNull List<TextEdit> edits;
 
-        Pair(K key, V value) {
-            this.key = key;
-            this.value = value;
+        FileChanges(@NotNull URI fileUri, @NotNull List<TextEdit> edits) {
+            this.fileUri = fileUri;
+            this.edits = edits;
         }
     }
 
@@ -301,7 +300,7 @@ public class CommandExecutor {
                                                      @Nullable FileUriSupport fileUriSupport) {
         Map<String, List<TextEdit>> changes = new HashMap<>();
         URI initialUri = FileUriSupport.getFileUri(initialFile, fileUriSupport);
-        Pair<URI, List<TextEdit>> currentEntry = new Pair<>(initialUri, new ArrayList<>());
+        FileChanges currentFileChanges = new FileChanges(initialUri, new ArrayList<>());
         commandArguments.stream().flatMap(item -> {
             if (item instanceof List) {
                 return ((List<?>) item).stream();
@@ -309,56 +308,48 @@ public class CommandExecutor {
                 return Stream.of(item);
             }
         }).forEach(arg -> {
-            if (arg instanceof String) {
-                changes.put(currentEntry.key.toASCIIString(), currentEntry.value);
-                VirtualFile resource = FileUriSupport.findFileByUri((String) arg, fileUriSupport);
-                if (resource != null) {
-                    currentEntry.key = FileUriSupport.getFileUri(resource, fileUriSupport);
-                    currentEntry.value = new ArrayList<>();
-                }
+            if (arg instanceof String fileStringUri) {
+                updateChanges(currentFileChanges, changes, fileUriSupport);
+                updateChanges(fileStringUri, currentFileChanges, fileUriSupport);
             } else if (arg instanceof WorkspaceEdit) {
                 changes.putAll(((WorkspaceEdit) arg).getChanges());
             } else if (arg instanceof TextEdit) {
-                currentEntry.value.add((TextEdit) arg);
+                currentFileChanges.edits.add((TextEdit) arg);
             } else if (arg instanceof Map) {
                 Gson gson = new Gson(); // TODO? retrieve the GSon used by LS
                 TextEdit edit = gson.fromJson(gson.toJson(arg), TextEdit.class);
                 if (isValid(edit)) {
-                    currentEntry.value.add(edit);
+                    currentFileChanges.edits.add(edit);
                 }
             } else if (arg instanceof JsonPrimitive json) {
                 if (json.isString()) {
-                    changes.put(currentEntry.key.toASCIIString(), currentEntry.value);
-                    VirtualFile resource = FileUriSupport.findFileByUri(json.getAsString(), fileUriSupport);
-                    if (resource != null) {
-                        currentEntry.key = FileUriSupport.getFileUri(resource, fileUriSupport);
-                        currentEntry.value = new ArrayList<>();
-                    }
+                    updateChanges(currentFileChanges, changes, fileUriSupport);
+                    updateChanges(json.getAsString(), currentFileChanges, fileUriSupport);
                 }
             } else if (arg instanceof JsonArray array) {
                 Gson gson = new Gson(); // TODO? retrieve the GSon used by LS
                 array.forEach(elt -> {
                     TextEdit edit = gson.fromJson(gson.toJson(elt), TextEdit.class);
                     if (isValid(edit)) {
-                        currentEntry.value.add(edit);
+                        currentFileChanges.edits.add(edit);
                     }
                 });
             } else if (arg instanceof JsonObject) {
                 Gson gson = new Gson(); // TODO? retrieve the GSon used by LS
                 WorkspaceEdit wEdit = gson.fromJson((JsonObject) arg, WorkspaceEdit.class);
                 Map<String, List<TextEdit>> entries = wEdit.getChanges();
-                if (wEdit != null && !entries.isEmpty()) {
+                if (!entries.isEmpty()) {
                     changes.putAll(entries);
                 } else {
                     TextEdit edit = gson.fromJson((JsonObject) arg, TextEdit.class);
                     if (isValid(edit)) {
-                        currentEntry.value.add(edit);
+                        currentFileChanges.edits.add(edit);
                     }
                 }
             }
         });
-        if (!currentEntry.value.isEmpty()) {
-            changes.put(currentEntry.key.toASCIIString(), currentEntry.value);
+        if (!currentFileChanges.edits.isEmpty()) {
+            updateChanges(currentFileChanges, changes, fileUriSupport);
         }
         if (changes.isEmpty()) {
             return null;
@@ -372,6 +363,28 @@ public class CommandExecutor {
         WorkspaceEdit workspaceEdit = new WorkspaceEdit();
         workspaceEdit.setChanges(changes);
         return workspaceEdit;
+    }
+
+    private static void updateChanges(@NotNull String fileStringUri,
+                                      @NotNull FileChanges currentFileChanges,
+                                      @Nullable FileUriSupport fileUriSupport) {
+        VirtualFile resource = FileUriSupport.findFileByUri(fileStringUri, fileUriSupport);
+        if (resource != null) {
+            var fileUri = FileUriSupport.getFileUri(resource, fileUriSupport);
+            if (fileUri != null) {
+                currentFileChanges.fileUri = fileUri;
+                currentFileChanges.edits = new ArrayList<>();
+            }
+        }
+    }
+
+    private static void updateChanges(@NotNull FileChanges currentFileChanges,
+                                      @NotNull Map<String, List<TextEdit>> changes,
+                                      @Nullable FileUriSupport fileUriSupport) {
+        var fileUri = FileUriSupport.toString(currentFileChanges.fileUri, fileUriSupport);
+        if (fileUri != null) {
+            changes.put(fileUri, currentFileChanges.edits);
+        }
     }
 
     private static boolean isValid(TextEdit edit) {

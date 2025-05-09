@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.SemanticTokenTypes;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -132,7 +133,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         // Consume LSP 'textDocument/definition' request
         PsiFile psiFile = sourceElement.getContainingFile();
         LSPDefinitionSupport definitionSupport = LSPFileSupport.getSupport(psiFile).getDefinitionSupport();
-        var params = new LSPDefinitionParams(LSPIJUtils.toTextDocumentIdentifier(psiFile.getVirtualFile()), LSPIJUtils.toPosition(offset, document), offset);
+        var params = new LSPDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
         try {
             waitUntilDone(definitionsFuture, psiFile);
