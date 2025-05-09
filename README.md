@@ -87,6 +87,7 @@ Here are some projects that use LSP4IJ:
  * [RyeCharm](https://github.com/InSyncWithFoo/ryecharm)
  * [Huly Code](https://github.com/hcengineering/huly-code)
  * [SDLB LSP](https://github.com/smart-data-lake/sdl-lsp)
+ * [Bloc Linter Support for IntelliJ](https://github.com/felangel/bloc)
 
 ## Requirements
 
