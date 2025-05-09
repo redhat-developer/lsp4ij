@@ -16,11 +16,9 @@ import com.intellij.lang.Language;
 import com.intellij.lang.findUsages.EmptyFindUsagesProvider;
 import com.intellij.lang.findUsages.LanguageFindUsages;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.fileTypes.FileNameMatcher;
-import com.intellij.openapi.fileTypes.FileType;
-import com.intellij.openapi.fileTypes.FileTypeManager;
-import com.intellij.openapi.fileTypes.PlainTextLanguage;
+import com.intellij.openapi.fileTypes.*;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.LightVirtualFile;
@@ -178,13 +176,13 @@ public class LanguageServersRegistry {
         }
     }
 
+    /**
+     * Collect languages from the declared mappings and associate
+     * for each language an instance of LSPInlayHintsProvider, LSPColorProvider
+     * LSPFindUsagesProvider to activate inlay hint, color, and find usages for those languages.
+     */
     private void updateLanguages() {
-
-        Set<Language> distinctLanguages = fileAssociations
-                .stream()
-                .map(LanguageServerFileAssociation::getLanguage)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        Set<Language> distinctLanguages = getDistinctLanguages();
         // When a file is not linked to a language
         //  - if the file is associated to a textmate to support syntax coloration
         //  - otherwise if the file is associated (by default) to plain/text file type
@@ -205,6 +203,67 @@ public class LanguageServersRegistry {
         // register LSPFindUsagesProvider automatically
         // for all languages associated with a language server.
         updateFindUsagesProvider(distinctLanguages);
+    }
+
+    /**
+     * Returns all distinct languages which are associated with a language server.
+     *
+     * @return all distinct languages which are associated with a language server.
+     */
+    private @NotNull Set<Language> getDistinctLanguages() {
+        List<Pair<Language, List<FileNameMatcher>>> languageMatchers = null;
+        Set<Language> distinctLanguages = new HashSet<>();
+        for (var association : fileAssociations) {
+            var language = association.getLanguage();
+            if (language != null) {
+                // case1: Language mapping
+                distinctLanguages.add(language);
+            } else {
+                var fileType = association.getFileType();
+                if (fileType != null) {
+                    // case 2: FileType mapping, collect the language is file type is a LanguageFileType
+                    if (fileType instanceof LanguageFileType languageFileType) {
+                        language = languageFileType.getLanguage();
+                        distinctLanguages.add(language);
+                    }
+                } else {
+                    var fileNameMatchers = association.getFileNameMatchers();
+                    if (fileNameMatchers != null) {
+                        // case 3: file name matchers mapping
+                        if (languageMatchers == null) {
+                            // Initialize list of Language /  List<FileNameMatcher> by using the standard IntelliJ registered file types.
+                            languageMatchers = new ArrayList<>();
+                            FileTypeManager fileTypeManager = FileTypeManager.getInstance();
+                            for (FileType ft : fileTypeManager.getRegisteredFileTypes()) {
+                                if (ft instanceof LanguageFileType languageFileType) {
+                                    languageMatchers.add(Pair.create(languageFileType.getLanguage(), fileTypeManager.getAssociations(languageFileType)));
+                                }
+                            }
+                        }
+                        // Loop for file name matchers mappings to try to get languages
+                        for (var fileNameMatcher : fileNameMatchers) {
+                            String fileName = fileNameMatcher.getPresentableString();
+                            for (var languageMatcher : languageMatchers) {
+                                if (match(fileName, languageMatcher.getSecond())) {
+                                    distinctLanguages.add(languageMatcher.getFirst());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return distinctLanguages;
+    }
+
+    private static boolean match(@NotNull String fileName,
+                                 @NotNull List<FileNameMatcher> matchers) {
+        for (var matcher : matchers) {
+            if (matcher.acceptsCharSequence(fileName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void updateDeclarativeInlayHintsProviders(Set<Language> distinctLanguages) {
@@ -449,6 +508,10 @@ public class LanguageServersRegistry {
         boolean userEnvironmentVariablesChanged = !Objects.equals(settings.getUserEnvironmentVariables(), request.userEnvironmentVariables());
         boolean includeSystemEnvironmentVariablesChanged = settings.isIncludeSystemEnvironmentVariables() != request.includeSystemEnvironmentVariables();
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), request.mappings());
+        if (mappingsChanged) {
+            updateLanguages();
+        }
+
         boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
         boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
         boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
@@ -464,7 +527,7 @@ public class LanguageServersRegistry {
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-            mappingsChanged || configurationContentChanged || initializationOptionsContentChanged || clientConfigurationContentChanged) {
+                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged || clientConfigurationContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -544,7 +607,7 @@ public class LanguageServersRegistry {
                 .stream()
                 .anyMatch(mapping -> mapping.match(language, fileType, filename))) {
             @Nullable VirtualFile f = file != null ? file : psiFile.getVirtualFile();
-            if (f!= null && !f.isInLocalFileSystem()) {
+            if (f != null && !f.isInLocalFileSystem()) {
                 if (f instanceof LightVirtualFile) {
                     return false;
                 }
