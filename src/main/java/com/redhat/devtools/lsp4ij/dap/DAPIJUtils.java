@@ -11,7 +11,12 @@
 package com.redhat.devtools.lsp4ij.dap;
 
 import com.intellij.openapi.vfs.VirtualFile;
+import org.eclipse.lsp4j.debug.Source;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Debug Adapter Protocol (DAP) utilities.
@@ -32,4 +37,20 @@ public class DAPIJUtils {
         return file.getName();
     }
 
+    /**
+     * Returns the valid path of the DAP source path and null otherwise.
+     *
+     * @param source the DAP source.
+     * @return the valid path of the DAP source path and null otherwise.
+     */
+    public static @Nullable Path getValidFilePath(@NotNull Source source) {
+        try {
+            // ex: source.path = C:\Users\XXXX\IdeaProjects\test-ls\bar.ts
+            return Paths.get(source.getPath().trim());
+        } catch (Exception e) {
+            // Invalid path...
+            // ex: <node_internals>/internal/modules/cjs/loader
+            return null;
+        }
+    }
 }
