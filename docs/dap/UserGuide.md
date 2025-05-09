@@ -76,6 +76,17 @@ are based on the default configuration provided by the DAP server.
 
 You can then select or deselect the exception breakpoints you want to use.
 
+Take a sample JavaScript file containing an error:
+
+![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample.png)
+
+In this example, no breakpoints are defined. 
+However, when you start the DAP server, it stops at the line with the line error:
+
+![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample_stop.png)
+
+This happens because `Caught Exceptions` is selected.
+
 ## Inline value
 
 The values of the variables are displayed inline, but this is not perfect because a DAP server generally cannot handle variable positions (only their values). 
