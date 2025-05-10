@@ -41,6 +41,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private ServerInstaller serverInstaller;
 
+    private FileUriSupport fileUriSupport;
+
     private LSPCallHierarchyFeature callHierarchyFeature;
 
     private LSPCodeActionFeature codeActionFeature;
@@ -98,6 +100,10 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
     private EditorBehaviorFeature editorBehaviorFeature;
+
+    public LSPClientFeatures() {
+        setFileUriSupport(FileUriSupport.ENCODED);
+    }
 
     /**
      * Returns true if the language server is enabled for the given file and false otherwise. Default to true
@@ -173,6 +179,11 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public void initializeParams(@NotNull InitializeParams initializeParams) {
     }
 
+    public LSPClientFeatures setFileUriSupport(FileUriSupport fileUriSupport) {
+        this.fileUriSupport = fileUriSupport;
+        return this;
+    }
+
     /**
      * Overrides this method if you need to generate custom URI.
      *
@@ -181,7 +192,7 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable URI getFileUri(@NotNull VirtualFile file) {
-        return null;
+        return fileUriSupport != null ? fileUriSupport.getFileUri(file) : null;
     }
 
     /**
@@ -192,7 +203,12 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
-        return null;
+        return fileUriSupport != null ? fileUriSupport.findFileByUri(fileUri) : null;
+    }
+
+    @Override
+    public @Nullable String toString(@NotNull URI fileUri) {
+        return fileUriSupport != null ? fileUriSupport.toString(fileUri) : null;
     }
 
     /**

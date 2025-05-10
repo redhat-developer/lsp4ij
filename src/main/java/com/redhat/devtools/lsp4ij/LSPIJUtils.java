@@ -299,7 +299,7 @@ public class LSPIJUtils {
      * Open the given fileUrl in an editor and make the range selected.
      *
      * @param fileUri            the file Uri to open.
-     * @param position      the start position.
+     * @param position           the start position.
      * @param focusEditor        true if editor will take the focus and false otherwise.
      * @param createFileIfNeeded true if file must be created if doesn't exist and false otherwise.
      * @param fileUriSupport     the file Uri support.
@@ -312,7 +312,7 @@ public class LSPIJUtils {
                                        boolean createFileIfNeeded,
                                        @Nullable FileUriSupport fileUriSupport,
                                        @NotNull Project project) {
-       return openInEditor(fileUri, position, null, focusEditor, createFileIfNeeded, fileUriSupport, project);
+        return openInEditor(fileUri, position, null, focusEditor, createFileIfNeeded, fileUriSupport, project);
     }
 
     private static boolean createFileAndOpenInEditor(@NotNull String fileUri, @NotNull Project project) {
@@ -585,7 +585,7 @@ public class LSPIJUtils {
      * @return the virtual file, or {@code null} if the file exists only in memory.
      */
     public static @Nullable VirtualFile getFile(@NotNull PsiFile psiFile) {
-       return psiFile.getVirtualFile();
+        return psiFile.getVirtualFile();
     }
 
     /**
@@ -699,14 +699,25 @@ public class LSPIJUtils {
     }
 
     @NotNull
-    public static List<WorkspaceFolder> toWorkspaceFolders(@NotNull Project project) {
+    public static List<WorkspaceFolder> toWorkspaceFolders(@NotNull Project project,
+                                                           @NotNull FileUriSupport fileUriSupport) {
         Set<VirtualFile> roots = getRoots(project);
         List<WorkspaceFolder> workspaceFolders = new ArrayList<>(roots.size());
         for (var root : roots) {
-            WorkspaceFolder folder = new WorkspaceFolder();
-            folder.setUri(Objects.requireNonNull(toUriAsString(root)));
-            folder.setName(root.getName());
-            workspaceFolders.add(folder);
+            var rootUri = FileUriSupport.getFileUri(root, fileUriSupport);
+            if (rootUri != null) {
+                String workspaceUri = FileUriSupport.toString(rootUri, fileUriSupport);
+                if (workspaceUri != null) {
+                    if (workspaceUri.endsWith("/")) {
+                        // Remove last slash like vscode does
+                        workspaceUri = workspaceUri.substring(0, workspaceUri.length() - 1);
+                    }
+                    WorkspaceFolder folder = new WorkspaceFolder();
+                    folder.setUri(workspaceUri);
+                    folder.setName(root.getName());
+                    workspaceFolders.add(folder);
+                }
+            }
         }
         return workspaceFolders;
     }
@@ -793,10 +804,10 @@ public class LSPIJUtils {
     }
 
     private static @Nullable TextRange toTextRange(@NotNull Range range,
-                                                  @NotNull Document document,
-                                                  @Nullable PsiFile file,
-                                                  boolean adjust,
-                                                  int docLengthPrefetched) {
+                                                   @NotNull Document document,
+                                                   @Nullable PsiFile file,
+                                                   boolean adjust,
+                                                   int docLengthPrefetched) {
         try {
             int docLength = docLengthPrefetched >= 0 ? docLengthPrefetched : document.getTextLength();
             int start = LSPIJUtils.toOffset(range.getStart(), document);
@@ -1218,7 +1229,7 @@ public class LSPIJUtils {
         final int oldCaretOffset = editor != null ? editor.getCaretModel().getOffset() : -1;
         int newCaretOffset = oldCaretOffset;
         // Apply each text edit to update the given document
-        for (var pair: pairs) {
+        for (var pair : pairs) {
             var edit = pair.first;
             var marker = pair.second;
             int increment = applyEdit(marker.getStartOffset(), marker.getEndOffset(), edit.getNewText(), document, oldCaretOffset);
@@ -1481,9 +1492,9 @@ public class LSPIJUtils {
                 Integer patchVersion = minorPatchHotfixVersion.getSecond();
                 Integer hotfixVersion = minorPatchHotfixVersion.getThird();
                 if ((majorVersion > minimumMajorVersion) ||
-                    ((majorVersion == minimumMajorVersion) && (minorVersion > minimumMinorVersion)) ||
-                    ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion > minimumPatchVersion)) ||
-                    ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion == minimumPatchVersion) && (hotfixVersion >= minimumHotfixVersion))) {
+                        ((majorVersion == minimumMajorVersion) && (minorVersion > minimumMinorVersion)) ||
+                        ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion > minimumPatchVersion)) ||
+                        ((majorVersion == minimumMajorVersion) && (minorVersion == minimumMinorVersion) && (patchVersion == minimumPatchVersion) && (hotfixVersion >= minimumHotfixVersion))) {
                     return true;
                 }
             }
