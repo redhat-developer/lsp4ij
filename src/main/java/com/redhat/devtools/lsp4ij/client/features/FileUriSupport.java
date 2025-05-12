@@ -21,9 +21,15 @@ import java.net.URI;
  */
 public interface FileUriSupport {
 
-    public static final FileUriSupport DEFAULT = new FileUriSupportBase(false);
+    public static final FileUriSupport DEFAULT = new FileUriSupportBase();
 
-    public static final FileUriSupport ENCODED = new FileUriSupportBase(true);
+    public static final FileUriSupport ENCODED = new FileUriSupportBase() {
+
+        @Override
+        protected boolean isEncoded() {
+            return true;
+        }
+    };
 
     /**
      * Returns the file Uri from the given virtual file and null otherwise.
