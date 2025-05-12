@@ -13,7 +13,6 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.diagnostics;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -30,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Collection;
+import java.util.concurrent.Callable;
 
 /**
  * LSP diagnostic utilities.
@@ -73,20 +73,19 @@ public class LSPDiagnosticUtils {
     public static void reportProblem(@NotNull VirtualFile file,
                                      @Nullable LSPDocumentBase document,
                                      @NotNull Project project) {
-        boolean hasErrors = isHasErrors(file, document, project);
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            ReadAction.nonBlocking(() -> {
-                reportProblem(file, project, hasErrors);
-            }).submit(AppExecutorUtil.getAppExecutorService());
-        } else {
-            reportProblem(file, project, hasErrors);
-        }
+        ReadAction.nonBlocking((Callable<Void>) () -> {
+                    boolean hasErrors = isHasErrors(file, document, project);
+                    reportProblem(file, project, hasErrors);
+                    return null;
+                })
+                .coalesceBy(file, project)
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     private static boolean isHasErrors(@NotNull VirtualFile file,
                                        @Nullable LSPDocumentBase document,
                                        @NotNull Project project) {
-        boolean hasErrors = document != null ? document.hasErrors() : false;
+        boolean hasErrors = document != null && document.hasErrors();
         if (!hasErrors) {
             hasErrors = hasErrors(file, project);
         }
@@ -154,12 +153,11 @@ public class LSPDiagnosticUtils {
     public static void clearProblem(@NotNull VirtualFile file,
                                     @NotNull Project project) {
         WolfTheProblemSolver wolf = WolfTheProblemSolver.getInstance(project);
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            ReadAction.nonBlocking(() -> {
-                wolf.clearProblemsFromExternalSource(file, LSP4IJ_REPORT_PROBLEM_SOURCE);
-            }).submit(AppExecutorUtil.getAppExecutorService());
-        } else {
-            wolf.clearProblemsFromExternalSource(file, LSP4IJ_REPORT_PROBLEM_SOURCE);
-        }
+        ReadAction.nonBlocking((Callable<Void>) () -> {
+                    wolf.clearProblemsFromExternalSource(file, LSP4IJ_REPORT_PROBLEM_SOURCE);
+                    return null;
+                })
+                .coalesceBy(file, project)
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 }
