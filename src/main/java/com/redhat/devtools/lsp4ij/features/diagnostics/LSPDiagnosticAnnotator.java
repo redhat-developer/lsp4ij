@@ -23,9 +23,9 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.OpenedDocument;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.OpenedDocument;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPExternalAnnotator;
 import org.eclipse.lsp4j.Diagnostic;
@@ -56,10 +56,10 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
         }
         // Loop for language server which report diagnostics for the given file
         // and mark all opened documents as 'displaying diagnostics'
-        URI fileUri = LSPIJUtils.toUri(file);
         var servers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getStartedServers();
         for (var ls : servers) {
+            URI fileUri = FileUriSupport.getFileUri(file.getVirtualFile(), ls.getClientFeatures());
             OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
             if (openedDocument != null) {
                 openedDocument.markAsDisplayingDiagnostics();
@@ -78,7 +78,7 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
         if (!applyAnnotator) {
             return;
         }
-        VirtualFile file = psiFile.getVirtualFile();;
+        VirtualFile file = psiFile.getVirtualFile();
         if (file == null) {
             return;
         }
@@ -91,7 +91,7 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
         var servers = LanguageServiceAccessor.getInstance(psiFile.getProject())
                 .getStartedServers();
         for (var ls : servers) {
-            URI fileUri = FileUriSupport.getFileUri(file,ls.getClientFeatures());
+            URI fileUri = FileUriSupport.getFileUri(file, ls.getClientFeatures());
             OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
             if (openedDocument != null) {
                 // The file is mapped with the current language server

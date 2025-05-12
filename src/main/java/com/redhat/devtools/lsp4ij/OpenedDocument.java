@@ -99,7 +99,7 @@ public class OpenedDocument extends LSPDocumentBase {
     boolean isDiagnosticsMustBeRefreshed(long displayingDiagnosticsTime) {
         long lastDisplayingDiagnosticsTime = getDisplayingDiagnosticsTime();
         if (lastDisplayingDiagnosticsTime == -1) {
-            return false;
+            return true;
         }
         return displayingDiagnosticsTime != lastDisplayingDiagnosticsTime// are diagnostics already displayed with LSPDiagnosticAnnotator?
                 || updatedDiagnosticsTime > lastDisplayingDiagnosticsTime; // has the diagnostics update occurred after the last display?
