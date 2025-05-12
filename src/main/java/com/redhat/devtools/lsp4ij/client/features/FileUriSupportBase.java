@@ -33,17 +33,6 @@ import static com.redhat.devtools.lsp4ij.LSPIJUtils.JRT_PROTOCOL;
  */
 public class FileUriSupportBase implements FileUriSupport {
 
-    private final boolean encoded;
-
-    /**
-     * Creates a new instance with URI encoding configuration.
-     *
-     * @param encoded {@code true} if the URI string representations should be encoded; {@code false} otherwise
-     */
-    public FileUriSupportBase(boolean encoded) {
-        this.encoded = encoded;
-    }
-
     @Override
     public @Nullable URI getFileUri(@NotNull VirtualFile file) {
         return LSPIJUtils.toUri(file);
@@ -66,7 +55,7 @@ public class FileUriSupportBase implements FileUriSupport {
 
     @Override
     public @Nullable String toString(@NotNull URI fileUri, boolean directory) {
-        String uri = encoded ? UriFormatter.asFormatted(fileUri, false) : fileUri.toASCIIString();
+        String uri = isEncoded() ? UriFormatter.asFormatted(fileUri, false) : fileUri.toASCIIString();
         if (directory) {
             // For directory case, remove last '/'
             char last = uri.charAt(uri.length() - 1);
@@ -75,5 +64,9 @@ public class FileUriSupportBase implements FileUriSupport {
             }
         }
         return uri;
+    }
+
+    protected boolean isEncoded() {
+        return false;
     }
 }

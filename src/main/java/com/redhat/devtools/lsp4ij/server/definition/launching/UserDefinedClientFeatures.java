@@ -43,42 +43,7 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         setWorkspaceSymbolFeature(new UserDefinedWorkspaceSymbolFeature());
         setBreadcrumbsFeature(new UserDefinedBreadcrumbsFeature());
         setEditorBehaviorFeature(new UserDefinedEditorBehaviorFeature(this));
-    }
-
-    @Override
-    public @Nullable URI getFileUri(@NotNull VirtualFile file) {
-        ClientConfigurationSettings clientConfiguration = getClientConfigurationSettings();
-        if (clientConfiguration != null && clientConfiguration.uriSupport.encoded) {
-            return FileUriSupport.ENCODED.getFileUri(file);
-        }
-        return FileUriSupport.DEFAULT.getFileUri(file);
-    }
-
-    @Override
-    public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
-        ClientConfigurationSettings clientConfiguration = getClientConfigurationSettings();
-        if (clientConfiguration != null && clientConfiguration.uriSupport.encoded) {
-            return FileUriSupport.ENCODED.findFileByUri(fileUri);
-        }
-        return FileUriSupport.DEFAULT.findFileByUri(fileUri);
-    }
-
-    @Override
-    public String toString(@NotNull VirtualFile file) {
-        ClientConfigurationSettings clientConfiguration = getClientConfigurationSettings();
-        if (clientConfiguration != null && clientConfiguration.uriSupport.encoded) {
-            return FileUriSupport.ENCODED.toString(file);
-        }
-        return FileUriSupport.DEFAULT.toString(file);
-    }
-
-    @Override
-    public @Nullable String toString(@NotNull URI fileUri, boolean directory) {
-        ClientConfigurationSettings clientConfiguration = getClientConfigurationSettings();
-        if (clientConfiguration != null && clientConfiguration.uriSupport.encoded) {
-            return FileUriSupport.ENCODED.toString(fileUri, directory);
-        }
-        return FileUriSupport.DEFAULT.toString(fileUri, directory);
+        setFileUriSupport(new UserDefinedFileUriSupport(this));
     }
 
     public boolean isCaseSensitive(@NotNull PsiFile file) {
@@ -114,7 +79,7 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         return clientConfiguration != null ? clientConfiguration.statementTerminatorCharacters : super.getStatementTerminatorCharacters(file);
     }
 
-    private @Nullable ClientConfigurationSettings getClientConfigurationSettings() {
+    public @Nullable ClientConfigurationSettings getClientConfigurationSettings() {
         ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
         return serverDefinition.getLanguageServerClientConfiguration();
     }
