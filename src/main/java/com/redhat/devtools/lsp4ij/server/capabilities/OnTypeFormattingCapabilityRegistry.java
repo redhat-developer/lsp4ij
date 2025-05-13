@@ -85,7 +85,9 @@ public class OnTypeFormattingCapabilityRegistry extends TextDocumentServerCapabi
                     DocumentOnTypeFormattingOptions onTypeFormattingOptions = sc.getDocumentOnTypeFormattingProvider();
                     if (onTypeFormattingOptions != null) {
                         ContainerUtil.addIfNotNull(onTypeFormattingTriggerCharacters, onTypeFormattingOptions.getFirstTriggerCharacter());
-                        ContainerUtil.addAllNotNull(onTypeFormattingTriggerCharacters, onTypeFormattingOptions.getMoreTriggerCharacter());
+                        if (onTypeFormattingOptions.getMoreTriggerCharacter() != null) {
+                            ContainerUtil.addAllNotNull(onTypeFormattingTriggerCharacters, onTypeFormattingOptions.getMoreTriggerCharacter());
+                        }
                     }
                     return onTypeFormattingTriggerCharacters.contains(charTyped);
                 }
