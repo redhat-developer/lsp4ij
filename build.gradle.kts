@@ -55,7 +55,7 @@ dependencies {
         /*
          * platformVersion check for JSON breaking changes since 2024.3
          */
-        if (prop("platformVersion").startsWith("25")) {
+        if (prop("platformVersion").startsWith("25") || prop("platformVersion").startsWith("2025.")) {
             platformBundledPlugins.add("com.intellij.modules.json")
         }
         println("use bundled Plugins: $platformBundledPlugins")
