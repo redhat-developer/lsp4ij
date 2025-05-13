@@ -675,7 +675,7 @@ JavaDoc on `com.intellij.openapi.Disposable` and [here](https://plugins.jetbrain
 
 ### LSPCommandAction
 
-If the language server support requires to implement a custom client command, you can extend
+If the language server support requires to implement a custom client command related to codelens, inlay hints, etc., you can extend
 [LSPCommandAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/LSPCommandAction.java) and register it
 in `plugin.xml` with a `standard` action element.
 
@@ -705,7 +705,7 @@ to open `references/implementations` in a popup when  clicking on a `Codelens` :
 
 ### Execute a command
 
-If you need to `execute an LSP org.eclipse.lsp4j.Command` of your language server in a `View` for example, you can use `CommandExecutor` like this:
+If you need to `execute an LSP org.eclipse.lsp4j.Command` of your language server in e.g a `View` or a regular IntelliJ `AnAction`, you can use `CommandExecutor` like this:
 
 ```java
 Command command = new Command("My command", "command.from.your.ls");
