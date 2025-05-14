@@ -15,14 +15,12 @@ import com.intellij.codeInsight.daemon.impl.HighlightVisitor;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.impl.source.tree.LeafElement;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
-import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.eclipse.lsp4j.SemanticTokensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.ApiStatus;
@@ -38,9 +36,8 @@ import java.util.concurrent.ExecutionException;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
-
 /**
- * LSP 'textDocument/semanticTokens support by implementing IntelliJ {@link HighlightVisitor}.
+ * LSP 'textDocument/semanticTokens' support by implementing IntelliJ {@link HighlightVisitor}.
  *
  * <p>
  * Implementing {@link HighlightVisitor} gives the capability to have an existing highlighter (custom highlighter, TextMate highlighter)
@@ -52,7 +49,8 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPSemanticTokensHighlightVisitor.class);
-    ;
+
+    private @Nullable SemanticTokensData semanticTokens;
 
     @Override
     public boolean suitableForFile(@NotNull PsiFile file) {
@@ -68,13 +66,22 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
             return true;
         }
         try {
-            if (SimpleLanguageUtils.isSupported(file.getLanguage())) {
-                highlightSemanticTokens(file, holder);
-                this.lazyInfos = null;
-                this.holder = null;
-            } else {
-                this.lazyInfos = highlightSemanticTokens(file, null);
-                this.holder = holder;
+            this.lazyInfos = null;
+            this.holder = null;
+            this.semanticTokens = getSemanticTokens(file);
+            if (semanticTokens != null) {
+                if (!semanticTokens.shouldVisitPsiElement(file)) {
+                    // the PsiFile must highlight the file without using HighlightVisitor#visit(PsiElement)
+                    // ex : file is a TextMate, PlainText file.
+                    highlightSemanticTokens(file, semanticTokens, holder);
+                    this.lazyInfos = null;
+                    this.holder = null;
+                } else {
+                    // The PsiFile is a custom PsiFile with proper tokenization of PsiElements
+                    // the file must be highlighted with by using HighlightVisitor#visit(PsiElement)
+                    this.lazyInfos = highlightSemanticTokens(file, semanticTokens, null);
+                    this.holder = holder;
+                }
             }
             action.run();
         } finally {
@@ -86,11 +93,14 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
 
     @Override
     public void visit(@NotNull PsiElement element) {
-        if (lazyInfos == null || !(element instanceof LeafElement))
+        if (semanticTokens == null || lazyInfos == null || !semanticTokens.isEligibleForSemanticHighlighting(element)) {
+            // The current PsiElement must not be highlighted with semantic tokens.
             return;
+        }
         int start = element.getTextOffset();
-        if (start < 0)
+        if (start < 0) {
             return;
+        }
         int end = start + element.getTextLength();
         for (int i = start; i < end && i < lazyInfos.length; i++) {
             var info = lazyInfos[i];
@@ -101,7 +111,7 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         }
     }
 
-    private static LazyHighlightInfo[] highlightSemanticTokens(@NotNull PsiFile file, @Nullable HighlightInfoHolder holder) {
+    private static @Nullable SemanticTokensData getSemanticTokens(@NotNull PsiFile file) {
         // Consume LSP 'textDocument/semanticTokens/full' request
         LSPSemanticTokensSupport semanticTokensSupport = LSPFileSupport.getSupport(file).getSemanticTokensSupport();
         var params = new SemanticTokensParams(new TextDocumentIdentifier());
@@ -121,27 +131,32 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         }
 
         if (isDoneNormally(semanticTokensFuture)) {
-            // textDocument/semanticTokens/full has been collected correctly, create list of IJ HighlightInfo from LSP SemanticTokens data
-            SemanticTokensData semanticTokens = semanticTokensFuture.getNow(null);
-            if (semanticTokens != null) {
-                var document = LSPIJUtils.getDocument(file.getVirtualFile());
-                if (document == null) {
-                    return null;
-                }
-                if (holder != null) {
-                    semanticTokens.highlight(file, document, (start, end, colorKey) ->
-                            holder.add(LazyHighlightInfo.resolve(start, end, colorKey)));
-                    return null;
-                } else {
-                    var infos = new LazyHighlightInfo[document.getTextLength()];
-                    semanticTokens.highlight(file, document, (start, end, colorKey) ->
-                            infos[start] = new LazyHighlightInfo(end, colorKey));
-                    return infos;
-                }
-            }
+            return semanticTokensFuture.getNow(null);
         }
         return null;
     }
+
+    private static LazyHighlightInfo[] highlightSemanticTokens(@NotNull PsiFile file,
+                                                               @NotNull SemanticTokensData semanticTokens,
+                                                               @Nullable HighlightInfoHolder holder) {
+
+        // textDocument/semanticTokens/full has been collected correctly, create list of IJ HighlightInfo from LSP SemanticTokens data
+        var document = LSPIJUtils.getDocument(file.getVirtualFile());
+        if (document == null) {
+            return null;
+        }
+        if (holder != null) {
+            semanticTokens.highlight(file, document, (start, end, colorKey) ->
+                    holder.add(LazyHighlightInfo.resolve(start, end, colorKey)));
+            return null;
+        } else {
+            var infos = new LazyHighlightInfo[document.getTextLength()];
+            semanticTokens.highlight(file, document, (start, end, colorKey) ->
+                    infos[start] = new LazyHighlightInfo(end, colorKey));
+            return infos;
+        }
+    }
+
 
     @Override
     public @NotNull HighlightVisitor clone() {

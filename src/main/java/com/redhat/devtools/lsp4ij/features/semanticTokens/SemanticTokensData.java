@@ -16,8 +16,10 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.client.features.LSPSemanticTokensFeature;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensHighlightInfo;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorData;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.inspector.SemanticTokensInspectorManager;
@@ -25,6 +27,7 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemant
 import org.eclipse.lsp4j.SemanticTokens;
 import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -36,19 +39,22 @@ import java.util.List;
  */
 public class SemanticTokensData {
 
-    private final SemanticTokens semanticTokens;
-    private final SemanticTokensLegend semanticTokensLegend;
-    private final SemanticTokensColorsProvider semanticTokensColorsProvider;
+    private final @NotNull SemanticTokens semanticTokens;
+    private final @NotNull SemanticTokensLegend semanticTokensLegend;
+    private final @NotNull SemanticTokensColorsProvider semanticTokensColorsProvider;
+    private final @NotNull LSPSemanticTokensFeature semanticTokensFeature;
 
     public SemanticTokensData(@NotNull SemanticTokens semanticTokens,
                               @NotNull SemanticTokensLegend semanticTokensLegend,
-                              @NotNull SemanticTokensColorsProvider semanticTokensColorsProvider) {
+                              @NotNull SemanticTokensColorsProvider semanticTokensColorsProvider,
+                              @NotNull LSPSemanticTokensFeature semanticTokensFeature) {
         this.semanticTokens = semanticTokens;
         this.semanticTokensLegend = semanticTokensLegend;
         this.semanticTokensColorsProvider = semanticTokensColorsProvider;
+        this.semanticTokensFeature = semanticTokensFeature;
     }
 
-    public SemanticTokens getSemanticTokens() {
+    public @NotNull SemanticTokens getSemanticTokens() {
         return semanticTokens;
     }
 
@@ -57,7 +63,7 @@ public class SemanticTokensData {
      *
      * @param file     the file.
      * @param document the document.
-     * @param addInfo  callback to collect {@link HighlightInfo} created from the semantic tokens data.
+     * @param addInfo  callback to collect {@link HighlightInfo} created from the semantic-tokens data.
      */
     public void highlight(@NotNull PsiFile file,
                           @NotNull Document document,
@@ -110,7 +116,6 @@ public class SemanticTokensData {
                     case 4: // token modifier
                         prevLine = line;
                         List<String> tokenModifiers = tokenModifiers(data, semanticTokensLegend.getTokenModifiers());
-                        int colorIndex = 0;//UsedColors.getOrAddColorIndex((UserDataHolderEx) context, tokenType, highlighter.getColorsCount());
                         int start = offset;
                         int end = offset + length;
                         TextAttributesKey colorKey = tokenType != null ? semanticTokensColorsProvider.getTextAttributesKey(tokenType, tokenModifiers, file) : null;
@@ -138,7 +143,7 @@ public class SemanticTokensData {
     }
 
     private List<String> tokenModifiers(Integer data, List<String> legend) {
-        if (data.intValue() == 0) {
+        if (data == 0) {
             return Collections.emptyList();
         }
         final var bitSet = BitSet.valueOf(new long[]{data});
@@ -153,10 +158,30 @@ public class SemanticTokensData {
         return tokenModifiers;
     }
 
-    private String tokenType(Integer index, List<String> tokenTypes) {
+    private @Nullable String tokenType(Integer index, List<String> tokenTypes) {
         if (index == null || index >= tokenTypes.size()) {
             return null;
         }
         return tokenTypes.get(index);
+    }
+
+    /**
+     * Determines whether the given file should be visited for semantic token processing.
+     *
+     * @param file the PSI file.
+     * return {@code true} if elements should be visited via {@code HighlightVisitor}, {@code false} otherwise.
+     */
+    public boolean shouldVisitPsiElement(@NotNull PsiFile file) {
+        return semanticTokensFeature.shouldVisitPsiElement(file);
+    }
+
+    /**
+     * Determines whether the given PSI element should be highlighted using semantic tokens.
+     *
+     * @param element the PSI element to check.
+     * @return {@code true} if the element should be highlighted, {@code false} otherwise.
+     */
+    public boolean isEligibleForSemanticHighlighting(@NotNull PsiElement element) {
+        return semanticTokensFeature.isEligibleForSemanticHighlighting(element);
     }
 }

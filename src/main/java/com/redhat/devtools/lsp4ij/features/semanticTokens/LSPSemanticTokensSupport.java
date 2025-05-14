@@ -95,7 +95,10 @@ public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<
                         // textDocument/semanticTokens/full may return null
                         return null;
                     }
-                    return new SemanticTokensData(semanticTokens, getLegend(languageServer), languageServer.getSemanticTokensColorsProvider());
+                    return new SemanticTokensData(semanticTokens,
+                            getLegend(languageServer),
+                            languageServer.getSemanticTokensColorsProvider(),
+                            languageServer.getClientFeatures().getSemanticTokensFeature());
                 });
     }
 
