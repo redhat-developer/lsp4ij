@@ -12,10 +12,12 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens;
 
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
+import org.jetbrains.annotations.NotNull;
 
 import static com.intellij.codeHighlighting.RainbowHighlighter.RAINBOW_ELEMENT;
 
 public record LazyHighlightInfo(int end, TextAttributesKey colorKey) {
+
     @FunctionalInterface
     public interface Consumer {
         void accept(int start, int end, TextAttributesKey colorKey);
@@ -25,7 +27,7 @@ public record LazyHighlightInfo(int end, TextAttributesKey colorKey) {
         return resolve(start, end, colorKey);
     }
 
-    public static HighlightInfo resolve(int start, int end, TextAttributesKey colorKey) {
+    public static HighlightInfo resolve(int start, int end, @NotNull TextAttributesKey colorKey) {
         return HighlightInfo
                 .newHighlightInfo(RAINBOW_ELEMENT)
                 .range(start, end)
