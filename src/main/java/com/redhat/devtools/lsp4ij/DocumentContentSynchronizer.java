@@ -20,7 +20,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -50,7 +49,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private final @NotNull LanguageServerWrapper languageServerWrapper;
     private final @NotNull Document document;
     private final @NotNull String fileUri;
-    private final TextDocumentSyncKind syncKind;
+    private final @NotNull TextDocumentSyncOptions syncOptions;
     private final @NotNull VirtualFile file;
     private final @Nullable String documentText;
     private final @Nullable String languageId;
@@ -68,11 +67,11 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                                        @NotNull Document document,
                                        @Nullable String documentText,
                                        @Nullable String languageId,
-                                       @Nullable TextDocumentSyncKind syncKind) {
+                                       @NotNull TextDocumentSyncOptions syncOptions) {
         this.languageServerWrapper = languageServerWrapper;
         this.file = file;
         this.fileUri = fileUri;
-        this.syncKind = syncKind != null ? syncKind : TextDocumentSyncKind.Full;
+        this.syncOptions = syncOptions;
         this.document = document;
         this.documentText = documentText;
         this.languageId = languageId;
@@ -92,6 +91,13 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         if (didOpenFuture != null) {
             return didOpenFuture;
         }
+
+        if (!syncOptions.getOpenClose()) {
+            // Don't send textDocument/didOpen
+            return didOpenFuture = languageServerWrapper
+                    .getInitializedServer();
+        }
+
         // add a document buffer
         TextDocumentItem textDocument = new TextDocumentItem();
         textDocument.setUri(this.fileUri);
@@ -130,6 +136,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     @Override
     public void documentChanged(@NotNull DocumentEvent event) {
         DocumentListener.super.documentChanged(event);
+        var syncKind = getTextDocumentSyncKind();
         if (syncKind == TextDocumentSyncKind.None) {
             return;
         }
@@ -174,7 +181,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     @Override
     public void beforeDocumentChange(@NotNull DocumentEvent event) {
-        if (syncKind == TextDocumentSyncKind.Incremental) {
+        if (getTextDocumentSyncKind() == TextDocumentSyncKind.Incremental) {
             // this really needs to happen before event gets actually
             // applied, to properly compute positions
             synchronized (changeEvents) {
@@ -218,24 +225,29 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     }
 
     public void documentSaved() {
-        ServerCapabilities serverCapabilities = languageServerWrapper.getServerCapabilities();
-        if (serverCapabilities != null) {
-            Either<TextDocumentSyncKind, TextDocumentSyncOptions> textDocumentSync = serverCapabilities.getTextDocumentSync();
-            if (textDocumentSync.isRight() && textDocumentSync.getRight().getSave() == null) {
-                return;
-            }
+        var saveOptions = syncOptions.getSave();
+        if ((saveOptions.isLeft() && !saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() == null)) {
+            // Don't send textDocument/didSave
+            return;
         }
-        TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
-        DidSaveTextDocumentParams params = new DidSaveTextDocumentParams(identifier, document.getText());
-        languageServerWrapper.getInitializedServer().thenAcceptAsync(ls -> ls.getTextDocumentService().didSave(params));
+
+        // Send textDocument/didSave
+        languageServerWrapper.sendNotification(ls -> {
+            TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
+            boolean includedText = saveOptions.isRight() && saveOptions.getRight().getIncludeText() != null && saveOptions.getRight().getIncludeText();
+            DidSaveTextDocumentParams params = new DidSaveTextDocumentParams(identifier, includedText ? document.getText() : null);
+            ls.getTextDocumentService().didSave(params);
+            return ls;
+        });
     }
 
     public void documentClosed() {
         // When LS is shut down all documents are being disconnected. No need to send "didClose" message to the LS that is being shut down or not yet started
-        if (languageServerWrapper.isActive()) {
-            TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
-            DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
+        if (syncOptions.getOpenClose() && languageServerWrapper.isActive()) {
+            // Send textDocument/didClose
             languageServerWrapper.sendNotification(ls -> {
+                TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
+                DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
                 ls.getTextDocumentService().didClose(params);
                 return ls;
             });
@@ -248,7 +260,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * @return the text document sync kind capabilities of the server and {@link TextDocumentSyncKind#Full} otherwise.
      */
     private TextDocumentSyncKind getTextDocumentSyncKind() {
-        return syncKind;
+        return syncOptions.getChange();
     }
 
     /**
