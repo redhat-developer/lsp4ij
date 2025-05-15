@@ -44,7 +44,7 @@ public class LanguageServerItem {
     public LanguageServerItem(@Nullable LanguageServer server, @NotNull LanguageServerWrapper serverWrapper) {
         this.server = server;
         this.serverWrapper = serverWrapper;
-        this.serverCapabilities = serverWrapper.getServerCapabilities();
+        this.serverCapabilities = serverWrapper.getServerCapabilitiesSync();
     }
 
     /**

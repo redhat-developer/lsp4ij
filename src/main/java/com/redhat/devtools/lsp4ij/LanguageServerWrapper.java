@@ -34,8 +34,8 @@ import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.internal.capabilities.ClientCapabilitiesFactory;
 import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
+import com.redhat.devtools.lsp4ij.internal.capabilities.ClientCapabilitiesFactory;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
@@ -76,6 +76,15 @@ public class LanguageServerWrapper implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerWrapper.class);
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
+
+    private static final @NotNull TextDocumentSyncOptions DEFAULT_SYNC_OPTIONS;
+
+    static {
+        DEFAULT_SYNC_OPTIONS = new TextDocumentSyncOptions();
+        DEFAULT_SYNC_OPTIONS.setOpenClose(true);
+        DEFAULT_SYNC_OPTIONS.setChange(TextDocumentSyncKind.None);
+        DEFAULT_SYNC_OPTIONS.setSave(true);
+    }
 
     record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
                                  @Nullable String languageId, boolean waitForDidOpen) {
@@ -864,17 +873,26 @@ public class LanguageServerWrapper implements Disposable {
                                                                           @NotNull Document document,
                                                                           @Nullable String documentText,
                                                                           @Nullable String languageId) {
+        TextDocumentSyncOptions syncOptions = createSyncOptions();
+        return new DocumentContentSynchronizer(this, fileUri, file, document, documentText, languageId, syncOptions);
+    }
+
+    private @NotNull TextDocumentSyncOptions createSyncOptions() {
         Either<TextDocumentSyncKind, TextDocumentSyncOptions> syncOptions = initializeFuture == null ? null
                 : this.serverCapabilities.getTextDocumentSync();
-        TextDocumentSyncKind syncKind = null;
         if (syncOptions != null) {
-            if (syncOptions.isRight()) {
-                syncKind = syncOptions.getRight().getChange();
-            } else if (syncOptions.isLeft()) {
-                syncKind = syncOptions.getLeft();
+            if (syncOptions.isLeft()) {
+                TextDocumentSyncKind change = syncOptions.getLeft();
+                TextDocumentSyncOptions newSyncOptions = new TextDocumentSyncOptions();
+                newSyncOptions.setOpenClose(true);
+                newSyncOptions.setChange(change);
+                newSyncOptions.setSave(true);
+                return newSyncOptions;
+            } else if (syncOptions.isRight()) {
+                return syncOptions.getRight();
             }
         }
-        return new DocumentContentSynchronizer(this, fileUri, file, document, documentText, languageId, syncKind);
+        return DEFAULT_SYNC_OPTIONS;
     }
 
     void disconnect(@NotNull VirtualFile file, boolean stopIfNoOpenedFiles) {
@@ -970,23 +988,6 @@ public class LanguageServerWrapper implements Disposable {
         return closedDocument;
     }
 
-    /**
-     * Starts and returns the language server, regardless of if it is initialized.
-     * If not in the UI Thread, will wait to return the initialized server.
-     *
-     * @deprecated use {@link #getInitializedServer()} instead.
-     */
-    @Deprecated
-    @Nullable
-    public LanguageServer getServer() {
-        CompletableFuture<LanguageServer> languageServerFuture = getInitializedServer();
-        if (ApplicationManager.getApplication().isDispatchThread()) { // UI Thread
-            return this.languageServer;
-        } else {
-            return languageServerFuture.join();
-        }
-    }
-
     public LanguageServer getLanguageServer() {
         return languageServer;
     }
@@ -1022,30 +1023,6 @@ public class LanguageServerWrapper implements Disposable {
         // order in which they get dispatched to the server
         return getInitializedServer()
                 .thenApplyAsync(fn, this.dispatcher);
-    }
-
-    /**
-     * Warning: this is a long running operation
-     *
-     * @return the server capabilities, or null if initialization job didn't
-     * complete
-     */
-    @Nullable
-    public ServerCapabilities getServerCapabilities() {
-        try {
-            getInitializedServer().get(10, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            LOGGER.warn("LanguageServer not initialized after 10s", e); //$NON-NLS-1$
-        } catch (ExecutionException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-        } catch (CancellationException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-        } catch (InterruptedException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-            Thread.currentThread().interrupt();
-        }
-
-        return this.serverCapabilities;
     }
 
     /**
@@ -1096,7 +1073,7 @@ public class LanguageServerWrapper implements Disposable {
                                 .fromJson((JsonObject) reg.getRegisterOptions(),
                                         ExecuteCommandOptions.class);
                         List<String> newCommands = executeCommandOptions.getCommands();
-                        if (!newCommands.isEmpty()) {
+                        if (newCommands != null && !newCommands.isEmpty()) {
                             addRegistration(reg, () -> unregisterCommands(newCommands));
                             registerCommands(newCommands);
                         }
@@ -1158,21 +1135,19 @@ public class LanguageServerWrapper implements Disposable {
         folders.setSupported(enable);
     }
 
-    synchronized void registerCommands(List<String> newCommands) {
-        ServerCapabilities caps = this.getServerCapabilities();
-        if (caps != null) {
-            ExecuteCommandOptions commandProvider = caps.getExecuteCommandProvider();
+    synchronized void registerCommands(@NotNull List<String> newCommands) {
+        ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
+        if (serverCapabilities != null) {
+            ExecuteCommandOptions commandProvider = serverCapabilities.getExecuteCommandProvider();
             if (commandProvider == null) {
                 commandProvider = new ExecuteCommandOptions(new ArrayList<>());
-                caps.setExecuteCommandProvider(commandProvider);
+                serverCapabilities.setExecuteCommandProvider(commandProvider);
             }
             List<String> existingCommands = commandProvider.getCommands();
             for (String newCmd : newCommands) {
                 assert !existingCommands.contains(newCmd) : "Command already registered '" + newCmd + "'"; //$NON-NLS-1$ //$NON-NLS-2$
                 existingCommands.add(newCmd);
             }
-        } else {
-            throw new IllegalStateException("Dynamic command registration failed! Server not yet initialized?"); //$NON-NLS-1$
         }
     }
 
@@ -1190,13 +1165,13 @@ public class LanguageServerWrapper implements Disposable {
         });
     }
 
-    void unregisterCommands(List<String> cmds) {
-        ServerCapabilities caps = this.getServerCapabilities();
-        if (caps != null) {
-            ExecuteCommandOptions commandProvider = caps.getExecuteCommandProvider();
+    void unregisterCommands(@NotNull List<String> commands) {
+        ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
+        if (serverCapabilities != null) {
+            ExecuteCommandOptions commandProvider = serverCapabilities.getExecuteCommandProvider();
             if (commandProvider != null) {
                 List<String> existingCommands = commandProvider.getCommands();
-                existingCommands.removeAll(cmds);
+                existingCommands.removeAll(commands);
             }
         }
     }
