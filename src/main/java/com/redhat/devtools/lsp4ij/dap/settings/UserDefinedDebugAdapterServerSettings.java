@@ -165,6 +165,8 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
         private String attachAddress;
         private String attachPort;
 
+        private String installerConfiguration;
+
         public String getServerId() {
             return debugAdapterServerId;
         }
@@ -274,6 +276,13 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
             this.attachPort = attachPort;
         }
 
+        public String getInstallerConfiguration() {
+            return installerConfiguration;
+        }
+
+        public void setInstallerConfiguration(String installerConfiguration) {
+            this.installerConfiguration = installerConfiguration;
+        }
     }
 
     public static class FilterItemSettings {

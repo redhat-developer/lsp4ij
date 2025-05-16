@@ -27,15 +27,18 @@ import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.dap.*;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
+import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.SchemaBackedJsonTextField;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -67,6 +70,7 @@ public class DebugAdapterServerPanel implements Disposable {
     private List<LaunchConfiguration> launchConfigurations;
     private AttachFieldAndPreviewLabel attachPortPreview;
     private AttachFieldAndPreviewLabel attachAddressPreview;
+    private InstallerPanel installerPanel;
 
     public enum EditionMode {
         NEW_USER_DEFINED,
@@ -130,6 +134,10 @@ public class DebugAdapterServerPanel implements Disposable {
         addMappingsTab(mainTabbedPane, mode);
         // Configuration tab
         addConfigurationTab(mainTabbedPane);
+        if (mode != EditionMode.EDIT_EXTENSION) {
+            // Installer tab
+            addInstallerTab(mainTabbedPane);
+        }
     }
 
     private void addServerTab(JBTabbedPane tabbedPane, JComponent description, EditionMode mode, boolean showFactoryCombo) {
@@ -258,6 +266,15 @@ public class DebugAdapterServerPanel implements Disposable {
             selectAttachDebugMode();
         });
 
+    }
+
+    private void addInstallerTab(@NotNull JBTabbedPane tabbedPane) {
+        FormBuilder installerTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.installer"), false);
+        this.installerPanel = new InstallerPanel(installerTab, commandLine, true, project);
+    }
+
+    public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
+        this.installerPanel.setCommandLineUpdater(commandLineUpdater);
     }
 
     private void createLaunchTab(@NotNull JBTabbedPane tabbedPane) {
@@ -502,6 +519,9 @@ public class DebugAdapterServerPanel implements Disposable {
         refreshLaunchConfigurations(launchConfigurations);
         setAttachAddress(serverDefinition.getAttachAddress());
         setAttachPort(serverDefinition.getAttachPort());
+
+        // Update installer configuration
+        setInstallerConfiguration(serverDefinition.getInstallerConfiguration());
     }
 
     @NotNull
@@ -724,8 +744,28 @@ public class DebugAdapterServerPanel implements Disposable {
         return serverTraceComboBox;
     }
 
+
+    public void setInstallerConfiguration(@Nullable String installerConfiguration) {
+        if(installerPanel == null) {
+            return;
+        }
+        var installerConfigurationWidget = installerPanel.getInstallerConfigurationWidget();
+        installerConfigurationWidget.setText(getText(installerConfiguration));
+        installerConfigurationWidget.setCaretPosition(0);
+    }
+
+    public @Nullable String getInstallerConfiguration() {
+        return installerPanel != null ? installerPanel.getInstallerConfigurationWidget().getText() : null;
+    }
+
+    public @Nullable DebugAdapterServerDefinition getCurrentServer() {
+        return currentServer;
+    }
+
     @Override
     public void dispose() {
-
+        if (installerPanel != null) {
+            installerPanel.dispose();
+        }
     }
 }

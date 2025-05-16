@@ -125,6 +125,7 @@ public class DAPTemplateManager {
     public DAPTemplate createDapTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         try {
             String templateJson = null;
+            String installerJson = null;
             List<LaunchConfiguration> launchConfigurations = new ArrayList<>();
 
             for (VirtualFile file : templateFolder.getChildren()) {
@@ -134,6 +135,8 @@ public class DAPTemplateManager {
                 String fileName = file.getName();
                 if (TEMPLATE_FILE_NAME.equals(fileName)) {
                     templateJson = VfsUtilCore.loadText(file);
+                } else if (INSTALLER_FILE_NAME.equals(fileName)) {
+                    installerJson = VfsUtilCore.loadText(file);
                 } else {
                     DebugMode type = getDebugMode(fileName);
                     if (type != null) {
@@ -158,6 +161,7 @@ public class DAPTemplateManager {
 
             DAPTemplate template = gson.fromJson(templateJson, DAPTemplate.class);
             template.setLaunchConfigurations(launchConfigurations);
+            template.setInstallerConfiguration(installerJson);
             return template;
         }
         catch(Exception e) {

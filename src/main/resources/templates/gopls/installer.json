@@ -1,0 +1,26 @@
+{
+  "id": "gopls",
+  "name": "Install and verify Go Language Server",
+  "check": {
+    "exec": {
+      "name": "Check Go Language Server",
+      "command": {
+        "windows": "where go",
+        "default": "which go"
+      }
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Go Language Server Globally",
+      "command": "go install golang.org/x/tools/gopls@latest"
+    },
+    "onSuccess": {
+      "configureServer": {
+        "name": "Configure Go Language Server command",
+        "command": "gopls -mode=stdio",
+        "update": true
+      }
+    }
+  }
+}

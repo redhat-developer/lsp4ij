@@ -1,0 +1,58 @@
+{
+  "repository": {
+    "check-node-runtime": {
+      "name": "Checking Node.js runtime...",
+      "type": "exec",
+      "command": {
+        "windows": "where node",
+        "default": "which node"
+      },
+      "onFail": {
+        "type": "showMessage",
+        "message": "Node.js was not found in your PATH. It is required.",
+        "actions": [
+          {
+            "label": "Visit Node.js website",
+            "type": "openUrl",
+            "url": "https://nodejs.org/"
+          },
+          {
+            "label": "Continue anyway",
+            "type": "continue"
+          }
+        ]
+      }
+    },
+    "check-typescript": {
+      "name": "Check TypeScript installation",
+      "type": "exec",
+      "command": {
+        "windows": "where tsc",
+        "default": "which tsc"
+      },
+      "onFail": {
+        "type": "showMessage",
+        "message": "TypeScript (tsc) not found. Please install TypeScript globally.",
+        "actions": [
+          {
+            "label": "Install TypeScript globally",
+            "type": "exec",
+            "command": {
+              "default": [
+                "npm",
+                "install",
+                "-g",
+                "typescript"
+              ]
+            }
+          },
+          {
+            "label": "Visit TypeScript website",
+            "type": "openUrl",
+            "url": "https://www.typescriptlang.org/"
+          }
+        ]
+      }
+    }
+  }
+}

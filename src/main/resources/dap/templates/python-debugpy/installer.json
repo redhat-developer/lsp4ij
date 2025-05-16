@@ -1,0 +1,12 @@
+{
+  "id": "debugpy",
+  "name": "Install and verify debugpy DAP Server",
+  "check": {
+  },
+  "run": {
+    "exec": {
+      "name": "Install 'debugpy'",
+      "command": "pip install debugpy"
+    }
+  }
+}

@@ -3,7 +3,7 @@
   "name": "TypeScript Language Server",
   "programArgs": {
     "default": "sh -c \"typescript-language-server --stdio\"",
-    "windows": "typescript-language-server --stdio"
+    "windows": "typescript-language-server.cmd --stdio"
   },
   "fileTypeMappings": [
     {

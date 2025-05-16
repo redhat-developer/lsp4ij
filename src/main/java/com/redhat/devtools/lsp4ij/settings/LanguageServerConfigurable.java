@@ -66,7 +66,7 @@ public class LanguageServerConfigurable extends NamedConfigurable<LanguageServer
     @Override
     public JComponent createOptionsPanel() {
         if (myView == null) {
-            myView = new LanguageServerView(languageServerDefinition, this, project);
+            myView = new LanguageServerView(languageServerDefinition, this, true, project);
         }
         return myView.getComponent();
     }

@@ -1,0 +1,45 @@
+{
+  "id": "typescript-language-server-installer",
+  "name": "Install and verify TypeScript Language Server",
+  "check": {
+    "exec": {
+      "name": "Check typescript-language-server",
+      "command": {
+        "windows": "where typescript-language-server",
+        "default": "which typescript-language-server"
+      }
+    }
+  },
+  "run": {
+    "showMessage": {
+      "name": "typescript-language-server is not installed. How to do you want to install it?",
+      "actions": [
+        {
+          "exec": {
+            "name": "Globally",
+            "command": {
+              "windows": [
+                "npm.cmd",
+                "install",
+                "-g",
+                "typescript-language-server"
+              ],
+              "default": [
+                "npm",
+                "install",
+                "-g",
+                "typescript-language-server"
+              ]
+            }
+          }
+        },
+        {
+          "openUrl": {
+            "name": "Visit typescript-language-server GitHub",
+            "url": "https://github.com/typescript-language-server/typescript-language-server"
+          }
+        }
+      ]
+    }
+  }
+}

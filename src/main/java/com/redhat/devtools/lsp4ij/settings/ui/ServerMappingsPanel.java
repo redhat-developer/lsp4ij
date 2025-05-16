@@ -44,11 +44,11 @@ public class ServerMappingsPanel {
     private FileNamePatternServerMappingTablePanel fileNamePatternMappingsPanel;
     private JBTabbedPane tabbedPane;
 
-    public ServerMappingsPanel(FormBuilder builder, boolean editable) {
+    public ServerMappingsPanel(@NotNull FormBuilder builder, boolean editable) {
         createContent(builder, editable);
     }
 
-    private void createContent(FormBuilder builder, boolean editable) {
+    private void createContent(@NotNull FormBuilder builder, boolean editable) {
         tabbedPane = new JBTabbedPane();
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.mappings.title"), tabbedPane, true);
 

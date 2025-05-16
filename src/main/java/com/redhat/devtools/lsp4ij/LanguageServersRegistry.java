@@ -168,7 +168,8 @@ public class LanguageServersRegistry {
                                 launch.getConfigurationContent(),
                                 launch.getConfigurationSchemaContent(),
                                 launch.getInitializationOptionsContent(),
-                                launch.getClientConfigurationContent()),
+                                launch.getClientConfigurationContent(),
+                                launch.getInstallerConfigurationContent()),
                         mappings);
             }
         } catch (Exception e) {
@@ -438,13 +439,12 @@ public class LanguageServersRegistry {
             settings.setCommandLine(definitionFromSettings.getCommandLine());
             settings.setUserEnvironmentVariables(definitionFromSettings.getUserEnvironmentVariables());
             settings.setIncludeSystemEnvironmentVariables(definitionFromSettings.isIncludeSystemEnvironmentVariables());
-            if (mappings != null) {
-                settings.setMappings(toServerMappingSettings(mappings));
-            }
+            settings.setMappings(toServerMappingSettings(mappings));
             settings.setConfigurationContent(definitionFromSettings.getConfigurationContent());
             settings.setConfigurationSchemaContent(definitionFromSettings.getConfigurationSchemaContent());
             settings.setInitializationOptionsContent(definitionFromSettings.getInitializationOptionsContent());
             settings.setClientConfigurationContent(definitionFromSettings.getClientConfigurationContent());
+            settings.setInstallerConfigurationContent(definitionFromSettings.getInstallerConfigurationContent());
             UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
         }
     }
@@ -496,6 +496,7 @@ public class LanguageServersRegistry {
         request.serverDefinition().setConfigurationContent(request.configurationContent());
         request.serverDefinition().setInitializationOptionsContent(request.initializationOptionsContent());
         request.serverDefinition().setClientConfigurationContent(request.clientConfigurationContent());
+        request.serverDefinition().setInstallerConfigurationContent(request.installerConfigurationContent());
 
         // remove associations
         removeAssociationsFor(request.serverDefinition());
@@ -515,6 +516,7 @@ public class LanguageServersRegistry {
         boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
         boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
         boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
+        boolean installerConfigurationContentChanged = !Objects.equals(settings.getInstallerConfigurationContent(), request.installerConfigurationContent());
 
         settings.setServerName(request.name());
         settings.setCommandLine(request.commandLine());
@@ -524,10 +526,13 @@ public class LanguageServersRegistry {
         settings.setConfigurationSchemaContent(request.configurationSchemaContent());
         settings.setInitializationOptionsContent(request.initializationOptionsContent());
         settings.setClientConfigurationContent(request.clientConfigurationContent());
+        settings.setInstallerConfigurationContent(request.installerConfigurationContent());
         settings.setMappings(request.mappings());
 
-        if (nameChanged || commandChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
-                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged || clientConfigurationContentChanged) {
+        if (nameChanged || commandChanged || userEnvironmentVariablesChanged ||
+                includeSystemEnvironmentVariablesChanged ||
+                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged ||
+                clientConfigurationContentChanged || installerConfigurationContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -539,7 +544,8 @@ public class LanguageServersRegistry {
                     mappingsChanged,
                     configurationContentChanged,
                     initializationOptionsContentChanged,
-                    clientConfigurationContentChanged);
+                    clientConfigurationContentChanged,
+                    installerConfigurationContentChanged);
             if (notify) {
                 handleChangeEvent(event);
             }
@@ -671,7 +677,8 @@ public class LanguageServersRegistry {
                                                 @Nullable String configurationContent,
                                                 @Nullable String configurationSchemaContent,
                                                 @Nullable String initializationOptionsContent,
-                                                @Nullable String clientConfigurationContent) {
+                                                @Nullable String clientConfigurationContent,
+                                                @Nullable String installerConfigurationContent) {
     }
 
     /**

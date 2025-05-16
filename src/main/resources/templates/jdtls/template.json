@@ -1,5 +1,5 @@
 {
-  "id": "jdtls",
+  "id": "jdt-ls",
   "name": "JDT Language Server",
   "dev": true,
   "programArgs": {
