@@ -220,6 +220,14 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setAttachConfiguration(attachConfiguration);
     }
 
+    public String getInstallerConfiguration() {
+        return getOptions().getInstallerConfiguration();
+    }
+
+    public void setInstallerConfiguration(String installerConfiguration) {
+        getOptions().setInstallerConfiguration(installerConfiguration);
+    }
+
     @NotNull
     @Override
     public SettingsEditor<? extends RunConfiguration> getConfigurationEditor() {

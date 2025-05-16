@@ -19,6 +19,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -36,7 +37,7 @@ import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtil
  * {@link com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition} implementation to start a
  * language server with a process command defined by the user.
  */
-public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition implements ClientConfigurableLanguageServerDefinition {
+public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition implements ClientConfigurableLanguageServerDefinition, CommandLineUpdater {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);//$NON-NLS-1$
 
@@ -53,6 +54,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private Object initializationOptions;
     private String clientConfigurationContent;
     private ClientConfigurationSettings clientConfiguration;
+    private Object installerConfiguration;
+    private String installerConfigurationContent;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
                                                @Nullable String templateId,
@@ -64,7 +67,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String configurationContent,
                                                @Nullable String configurationSchemaContent,
                                                @Nullable String initializationOptionsContent,
-                                               @Nullable String clientConfigurationContent) {
+                                               @Nullable String clientConfigurationContent,
+                                               @Nullable String installerConfigurationContent) {
         super(id, name, description, true, null, false);
         this.name = name;
         this.templateId = templateId;
@@ -75,6 +79,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.configurationSchemaContent = configurationSchemaContent;
         this.initializationOptionsContent = initializationOptionsContent;
         this.clientConfigurationContent = clientConfigurationContent;
+        this.installerConfigurationContent = installerConfigurationContent;
     }
 
     // Backward-compatible signature for clients calling without client configuration content
@@ -96,6 +101,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 configurationContent,
                 null,
                 initializationOptionsContent,
+                null,
                 null);
     }
 
@@ -133,10 +139,12 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.name = name;
     }
 
+    @Override
     public String getCommandLine() {
         return commandLine;
     }
 
+    @Override
     public void setCommandLine(String commandLine) {
         this.commandLine = commandLine;
     }
@@ -192,6 +200,15 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.clientConfiguration = null;
     }
 
+    public String getInstallerConfigurationContent() {
+        return installerConfigurationContent;
+    }
+
+    public void setInstallerConfigurationContent(String installerConfigurationContent) {
+        this.installerConfigurationContent = installerConfigurationContent;
+        this.installerConfiguration = null;
+    }
+
     public Object getLanguageServerConfiguration() {
         if (configuration == null && configurationContent != null && !configurationContent.isBlank()) {
             try {
@@ -227,6 +244,18 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         return clientConfiguration;
     }
 
+    @Nullable
+    public Object getLanguageServerInstallerConfiguration() {
+        if ((installerConfiguration == null) && (installerConfigurationContent != null) && !installerConfigurationContent.isBlank()) {
+            try {
+                installerConfiguration = JsonParser.parseReader(new StringReader(installerConfigurationContent));
+            } catch (Exception e) {
+                LOGGER.error("Error while parsing JSON installer configuration for the language server '" + getId() + "'", e);
+            }
+        }
+        return installerConfiguration;
+    }
+    
     @Override
     public @NotNull String getDisplayName() {
         return name;

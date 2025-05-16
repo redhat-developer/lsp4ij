@@ -1,0 +1,19 @@
+{
+  "id": "go-delve",
+  "name": "Install and verify go-delve DAP Server",
+  "check": {
+  },
+  "run": {
+    "exec": {
+      "name": "Install 'go-delve' release",
+      "command": "go install github.com/go-delve/delve/cmd/dlv@latest",
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure go-delve server command",
+          "command": "dlv dap",
+          "update": true
+        }
+      }
+    }
+  }
+}

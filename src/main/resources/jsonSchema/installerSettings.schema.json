@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Installer Step Schema",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "anyOf": [
+          { "$ref": "#/definitions/exec" },
+          { "$ref": "#/definitions/showMessage" }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "exec": {
+      "type": "object",
+      "properties": {
+        "exec": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "command": {
+              "type": "object",
+              "properties": {
+                "windows": {
+                  "anyOf": [
+                    { "type": "string" },
+                    {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  ]
+                },
+                "default": {
+                  "anyOf": [
+                    { "type": "string" },
+                    {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "onFail": {
+              "anyOf": [
+                { "$ref": "#/definitions/showMessage" },
+                { "$ref": "#/definitions/exec" }
+              ]
+            }
+          },
+          "required": ["command"]
+        }
+      }
+    },
+    "showMessage": {
+      "type": "object",
+      "properties": {
+        "showMessage": {
+          "type": "object",
+          "properties": {
+            "message": { "type": "string" },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": { "type": "string" },
+                  "exec": { "$ref": "#/definitions/exec/properties/exec" },
+                  "openUrl": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string" },
+                      "url": { "type": "string", "format": "uri" }
+                    },
+                    "required": ["url"]
+                  }
+                },
+                "required": ["label"]
+              }
+            }
+          },
+          "required": ["message", "actions"]
+        }
+      }
+    }
+  }
+}

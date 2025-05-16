@@ -18,7 +18,9 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.openapi.ui.messages.MessageDialog;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
@@ -26,10 +28,16 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBInsets;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
+import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import org.jetbrains.annotations.NotNull;
@@ -86,7 +94,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Template combo
         createTemplateCombo(builder);
         // Create server name,  command line, mappings, configuration UI
-        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED, project);
+        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED, true, project);
 
         // Add validation
         addValidator(this.languageServerPanel.getServerName());
@@ -224,8 +232,17 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update client configuration
         var clientConfiguration = this.languageServerPanel.getClientConfigurationWidget();
-        clientConfiguration.setText(template.getClientConfiguration() != null ? template.getClientConfiguration() : "");
-        clientConfiguration.setCaretPosition(0);
+        if (clientConfiguration != null) {
+            clientConfiguration.setText(template.getClientConfiguration() != null ? template.getClientConfiguration() : "");
+            clientConfiguration.setCaretPosition(0);
+        }
+
+        // Update installer configuration
+        var installerConfiguration = this.languageServerPanel.getInstallerConfigurationWidget();
+        if (installerConfiguration != null) {
+            installerConfiguration.setText(template.getInstallerConfiguration() != null ? template.getInstallerConfiguration() : "");
+            installerConfiguration.setCaretPosition(0);
+        }
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
@@ -299,7 +316,10 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String configuration = this.languageServerPanel.getConfiguration().getText();
         String configurationSchema = this.languageServerPanel.getConfigurationSchemaContent();
         String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
-        String clientConfiguration = this.languageServerPanel.getClientConfigurationWidget().getText();
+        String clientConfiguration = this.languageServerPanel.getClientConfigurationWidget() != null ?
+                this.languageServerPanel.getClientConfigurationWidget().getText() : null;
+        String installerConfiguration = this.languageServerPanel.getInstallerConfigurationWidget() != null ?
+                this.languageServerPanel.getInstallerConfigurationWidget().getText() : null;
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
                 templateId,
                 serverName,
@@ -310,8 +330,61 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 configuration,
                 configurationSchema,
                 initializationOptions,
-                clientConfiguration);
+                clientConfiguration,
+                installerConfiguration);
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
+
+        if (installerConfiguration != null  && StringUtils.isNotBlank(installerConfiguration) && !installerConfiguration.equals("{}")) {
+            if (MessageDialogBuilder.yesNo(LanguageServerBundle.message("new.language.server.dialog.install.title"),
+                            LanguageServerBundle.message("new.language.server.dialog.install.content"))
+                    .ask(project)) {
+                try {
+                    var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN, new CommandLineUpdater() {
+                        @Override
+                        public String getCommandLine() {
+                            return definition.getCommandLine();
+                        }
+
+                        @Override
+                        public void setCommandLine(String commandLine) {
+                            definition.setCommandLine(commandLine);
+
+                            // Update command line settings
+                            String languageServerId = definition.getId();
+                            UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+                            if (settings != null) {
+                                settings.setCommandLine(commandLine);
+                                UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
+                            }
+
+                            // Notifications
+                            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                                    project,
+                                    definition,
+                                    false,
+                                    true,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    false);
+                            LanguageServersRegistry.getInstance().handleChangeEvent(event);
+                        }
+                    });
+                    ServerInstallerManager
+                            .getInstance(project)
+                            .install(installerConfiguration, context);
+                } catch (Exception s) {
+                    Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
+                            "Install error",
+                            s.getMessage(),
+                            NotificationType.ERROR);
+                    Notifications.Bus.notify(notification, project);
+                }
+            }
+        }
     }
 
     private void addValidator(JTextComponent textComponent) {

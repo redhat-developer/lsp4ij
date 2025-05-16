@@ -42,6 +42,7 @@ public class LanguageServerTemplate {
     public static final String SETTINGS_FILE_NAME = "settings.json";
     public static final String SETTINGS_SCHEMA_FILE_NAME = "settings.schema.json";
     public static final String CLIENT_SETTINGS_FILE_NAME = "clientSettings.json";
+    public static final String INSTALLER_FILE_NAME = "installer.json";
     public static final String README_FILE_NAME = "README.md";
 
     public static final String ID_JSON_PROPERTY = "id";
@@ -58,9 +59,9 @@ public class LanguageServerTemplate {
     private static final String WINDOWS_KEY = "windows";
     private static final String MAC_KEY = "mac";
     private static final String UNIX_KEY = "unix";
-    private static final String DEFAULT_KEY = "default";
+    public static final String DEFAULT_KEY = "default";
 
-    private static final String OS_KEY = SystemInfo.isWindows ? WINDOWS_KEY : (SystemInfo.isMac ? MAC_KEY : (SystemInfo.isUnix ? UNIX_KEY : null));
+    public static final String OS_KEY = SystemInfo.isWindows ? WINDOWS_KEY : (SystemInfo.isMac ? MAC_KEY : (SystemInfo.isUnix ? UNIX_KEY : null));
 
     private String id;
     private String name;
@@ -76,6 +77,8 @@ public class LanguageServerTemplate {
     private String configurationSchema;
     private String initializationOptions;
     private String clientConfiguration;
+
+    private String installerConfiguration;
 
     public String getId() {
         return id;
@@ -178,5 +181,13 @@ public class LanguageServerTemplate {
 
     public void setClientConfiguration(String clientConfiguration) {
         this.clientConfiguration = clientConfiguration;
+    }
+
+    public String getInstallerConfiguration() {
+        return installerConfiguration;
+    }
+
+    public void setInstallerConfiguration(String installerConfiguration) {
+        this.installerConfiguration = installerConfiguration;
     }
 }

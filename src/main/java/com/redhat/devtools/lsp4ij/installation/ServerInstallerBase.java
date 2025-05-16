@@ -81,7 +81,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
     /**
      * Determines if the installation future is initialized and has not been cancelled or completed exceptionally.
      *
-     * @return true if the install future is initialized and valid, false otherwise.
+     * @return true if the installation future is initialized and valid, false otherwise.
      */
     private boolean isInstallFutureInitialized() {
         return installFuture != null && (!installFuture.isCompletedExceptionally() || !installFuture.isCancelled());

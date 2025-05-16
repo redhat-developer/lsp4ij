@@ -11,20 +11,32 @@
 package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
 import com.google.common.collect.Streams;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBInsets;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterServerListener;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager;
+import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
+import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -52,6 +64,14 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
     private JButton showInstructionButton = null;
     private UserDefinedDebugAdapterServerDefinition createdServer;
 
+    public NewDebugAdapterServerDialog(@Nullable Project project) {
+        super(project);
+        this.project = project;
+        super.setTitle(DAPBundle.message("new.debug.adapter.dialog.title"));
+        init();
+        initValidation();
+    }
+
     private static DAPTemplate[] getDAPTemplates() {
         List<DAPTemplate> templates = new ArrayList<>();
         templates.add(DAPTemplate.NONE);
@@ -59,12 +79,15 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         return templates.toArray(new DAPTemplate[0]);
     }
 
-    public NewDebugAdapterServerDialog(@Nullable Project project) {
-        super(project);
-        this.project = project;
-        super.setTitle(DAPBundle.message("new.debug.adapter.dialog.title"));
-        init();
-        initValidation();
+    private static String getCommandLine(DAPTemplate entry) {
+        StringBuilder command = new StringBuilder();
+        if (entry.getProgramArgs() != null) {
+            if (!command.isEmpty()) {
+                command.append(' ');
+            }
+            command.append(entry.getProgramArgs());
+        }
+        return command.toString();
     }
 
     @Override
@@ -131,17 +154,6 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         };
     }
 
-    /**
-     * Check that the template is not a placeholder and that it has a valid description
-     *
-     * @param template to check
-     * @return true if template is not null, not a placeholder and has a description, else false
-     */
-    private boolean hasValidDescription(@Nullable DAPTemplate template) {
-        return template != null && template != DAPTemplate.NONE
-                && template != DAPTemplate.NEW_TEMPLATE;
-    }
-
    /* @Override
     protected @NotNull Action getHelpAction() {
         return new AbstractAction() {
@@ -154,6 +166,17 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
             }
         };
     }*/
+
+    /**
+     * Check that the template is not a placeholder and that it has a valid description
+     *
+     * @param template to check
+     * @return true if template is not null, not a placeholder and has a description, else false
+     */
+    private boolean hasValidDescription(@Nullable DAPTemplate template) {
+        return template != null && template != DAPTemplate.NONE
+                && template != DAPTemplate.NEW_TEMPLATE;
+    }
 
     private void loadFromTemplate(DAPTemplate template) {
         // Update name
@@ -179,17 +202,9 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         // Attach (JSON path (ex:$port))
         debugAdapterServerPanel.setAttachAddress(StringUtils.isNotBlank(template.getAttachAddress()) ? template.getAttachAddress() : "");
         debugAdapterServerPanel.setAttachPort(StringUtils.isNotBlank(template.getAttachPort()) ? template.getAttachPort() : "");
-    }
 
-    private static String getCommandLine(DAPTemplate entry) {
-        StringBuilder command = new StringBuilder();
-        if (entry.getProgramArgs() != null) {
-            if (!command.isEmpty()) {
-                command.append(' ');
-            }
-            command.append(entry.getProgramArgs());
-        }
-        return command.toString();
+        // Update installer
+        debugAdapterServerPanel.setInstallerConfiguration(template.getInstallerConfiguration());
     }
 
     @Override
@@ -253,6 +268,7 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         var mappingsPanel = debugAdapterServerPanel.getMappingsPanel();
         String attachAddress = debugAdapterServerPanel.getAttachAddress();
         String attachPort = debugAdapterServerPanel.getAttachPort();
+        String installerConfiguration = debugAdapterServerPanel.getInstallerConfiguration();
         createdServer = new UserDefinedDebugAdapterServerDefinition(serverId,
                 serverName,
                 commandLine,
@@ -267,7 +283,61 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         createdServer.setLaunchConfigurations(launchConfigurations);
         createdServer.setAttachAddress(attachAddress);
         createdServer.setAttachPort(attachPort);
+        createdServer.setInstallerConfiguration(installerConfiguration);
         DebugAdapterManager.getInstance().addDebugAdapterServer(createdServer);
+
+        if (installerConfiguration != null && StringUtils.isNotBlank(installerConfiguration) && !installerConfiguration.equals("{}")) {
+            if (MessageDialogBuilder.yesNo(DAPBundle.message("new.debug.adapter.dialog.install.title"),
+                            DAPBundle.message("new.debug.adapter.dialog.install.content"))
+                    .ask(project)) {
+                try {
+                    var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN, new CommandLineUpdater() {
+
+                        @Override
+                        public String getCommandLine() {
+                            return createdServer.getCommandLine();
+                        }
+
+                        @Override
+                        public void setCommandLine(String commandLine) {
+                            createdServer.setCommandLine(commandLine);
+
+                            // Update command line settings
+                            String serverId = createdServer.getId();
+                            var settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(serverId);
+                            if (settings != null) {
+                                settings.setCommandLine(commandLine);
+                                UserDefinedDebugAdapterServerSettings.getInstance().setSettings(serverId, settings);
+                            }
+
+                            // Notifications
+                            DebugAdapterServerListener.ChangedEvent event = new DebugAdapterServerListener.ChangedEvent(
+                                    createdServer,
+                                    false,
+                                    true,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    false,
+                                    false);
+                            DebugAdapterManager.getInstance().handleChangeEvent(event);
+                        }
+                    });
+                    ServerInstallerManager
+                            .getInstance(project)
+                            .install(installerConfiguration, context);
+                } catch (Exception s) {
+                    Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
+                            "Install error",
+                            s.getMessage(),
+                            NotificationType.ERROR);
+                    Notifications.Bus.notify(notification, project);
+                }
+            }
+        }
     }
 
     private void addValidator(JTextComponent textComponent) {
