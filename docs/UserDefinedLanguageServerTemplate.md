@@ -1,0 +1,326 @@
+# User-defined language server template
+
+LSP4IJ provides a [default user-defined language server template](./UserDefinedLanguageServer.md#default-template),
+stored in the [templates folder](https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/templates).
+
+This section explains how to structure a user-defined template for your language server.
+
+* [`template.json`](#template-descriptor): describes the language server and file types.
+* `clientSettings.json`: contains the client capabilities and options.
+* `initializationOptions.json`: custom options passed during initialization.
+* [`installer.json`](#installer-descriptor): defines how to check, install, and configure the server.
+* `settings.json`: user-defined settings for the server.
+* `settings.schema.json`: JSON Schema for validating `settings.json`.
+
+## Template descriptor
+
+The template descriptor (`template.json`) is a JSON file used to define:
+
+* the server ID and name
+* the command to start the server
+* the file type mappings
+
+#### Example `template.json`
+
+```json
+{
+  "id": "typescript-language-server",
+  "name": "TypeScript Language Server",
+  "programArgs": {
+    "default": "sh -c \"typescript-language-server --stdio\"",
+    "windows": "typescript-language-server.cmd --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "JavaScript"
+      },
+      "languageId": "javascript"
+    },
+    {
+      "fileType": {
+        "name": "JavaScript-React",
+        "patterns": ["*.jsx"]
+      },
+      "languageId": "javascriptreact"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript",
+        "patterns": ["*.ts"]
+      },
+      "languageId": "typescript"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript-React",
+        "patterns": ["*.tsx"]
+      },
+      "languageId": "typescriptreact"
+    }
+  ]
+}
+```
+
+## Installer descriptor
+
+The installer descriptor (`installer.json`) is a JSON file used to:
+
+* `check` the current installation,
+* `run` the installation of the LSP/DAP server,
+* and optionally `configure` the start command once installation is complete.
+
+It is used when:
+
+* a user-defined language server must be installed (at creation time),
+* or when the user decides to re-install it.
+
+You can find a sample in the ![rust-analyzer installer tab](./images/user-defined-ls/rust-analyzer/installation_tab.png).
+
+It should follow this structure:
+
+```json5
+{
+  "id": "...",
+  "name": "...",
+  "check": {
+    // Declare tasks to check the installation...
+  },
+  "run": {
+    // Declare tasks to run the installation...
+  }
+}
+```
+
+`check` and `run` define starting [tasks](#task-descriptor), which can trigger other tasks using the `onFail` or `onSuccess` keys.
+
+LSP4IJ provides built-in tasks:
+
+* [exec](#task-exec) to execute a command (e.g., `npm install typescript-language-server`),
+* [download](#task-download) to retrieve a server from a given URL,
+* [configureServer](#task-configureServer) to set the launch command based on the downloaded files.
+
+To define custom tasks, you can contribute to the extension point `com.redhat.devtools.lsp4ij.installerTaskFactory`.
+
+### Task descriptor
+
+Typical task structure:
+
+```json5
+{
+  "id": "...",
+  "name": "...",
+  // custom keys depending on task type
+  "onFail": {
+    // Task to execute on failure
+  },
+  "onSuccess": {
+    // Task to execute on success
+  }
+}
+```
+
+#### Task exec
+
+Example using `npm` to install [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
+
+```json
+{
+  "id": "typescript-language-server",
+  "name": "Install and verify TypeScript Language Server",
+  "check": {
+    "exec": {
+      "name": "Check TypeScript Language Server",
+      "command": {
+        "windows": "where typescript-language-server",
+        "default": "which typescript-language-server"
+      }
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install TypeScript Language Server Globally",
+      "command": {
+        "windows": "npm.cmd install -g typescript-language-server",
+        "default": "npm install -g typescript-language-server"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure TypeScript Language Server command",
+          "command": {
+            "windows": "typescript-language-server.cmd --stdio",
+            "default": "typescript-language-server --stdio"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}
+```
+
+#### Task download
+
+Structure of a `download` task:
+
+```json5
+{
+  "download": {
+    "id": "...",
+    "name": "...",
+    "url": "...",
+    "output": {
+      "dir": "...",
+      "file": {
+        "name": "...",
+        "executable": true
+      }
+    },
+    "onFail": {},
+    "onSuccess": {}
+  }
+}
+```
+
+#### Example: downloading a JAR and configuring the start command
+
+```json
+{
+  "id": "sdl-lsp",
+  "name": "sdl-lsp",
+  "check": {},
+  "run": {
+    "download": {
+      "name": "Download sdl-lsp",
+      "url": "https://oss.sonatype.org/.../sdl-lsp-1.0-20250503.111518-23-jar-with-dependencies.jar",
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/sdl-lsp"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure sdl-lsp server command",
+          "command": "java -jar ${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}
+```
+
+> `configureServer.command` supports variable substitution with `${output.dir}` and `${output.file.name}`.
+> These values are resolved from the `output` object of the preceding `download` task.
+
+##### URL variants
+
+* Unique URL:
+
+```json
+{
+  "download": {
+    "url": "<same URL for all OS>"
+  }
+}
+```
+
+* OS-specific URLs:
+
+```json
+{
+  "download": {
+    "url": {
+      "windows": "<windows URL>",
+      "default": "<linux/mac URL>"
+    }
+  }
+}
+
+you can find a sample with [clangd installer](../src/main/resources/templates/clangd/installer.json)
+
+* OS and architecture-specific URLs:
+
+```json
+{
+  "download": {
+    "url": {
+      "windows": {
+        "x86_64": "<URL for win x86_64>",
+        "x86": "<URL for win x86>"
+      },
+      "default": "<URL for linux/mac>"
+    }
+  }
+}
+```
+
+* GitHub asset download:
+
+If DAP/LSP server can be downloaded from GitHub release like https://github.com/clojure-lsp/clojure-lsp/releases
+you can use the `github` JSON object to download the proper asset: 
+
+```json
+{
+  "download": {
+    "github": {
+      "owner": "clojure-lsp",
+      "repository": "clojure-lsp",
+      "prerelease": false,
+      "asset": {
+        "windows": "clojure-lsp-native-windows-amd64.zip",
+        "linux": {
+          "amd64": "clojure-lsp-native-linux-amd64.zip",
+          "arm64": "clojure-lsp-native-linux-aarch64.zip"
+        },
+        "mac": {
+          "aarch64": "clojure-lsp-native-macos-aarch64.zip",
+          "amd64": "clojure-lsp-native-macos-amd64.zip"
+        }
+      }
+    }
+  }
+}
+```
+
+Samples:
+
+* [clangd installer](../src/main/resources/templates/clangd/installer.json)
+* [clojure-lsp installer](../src/main/resources/templates/clojure-lsp/installer.json)
+* [rust-analyzer installer](../src/main/resources/templates/rust-analyzer/installer.json)
+
+##### Output customization
+
+You can customize the output directory and executable name:
+
+```json5
+{
+  "output": {
+    "dir": "$USER_HOME$/.lsp4ij/lsp/rust-analyzer",
+    "file": {
+      "name": {
+        "windows": "rust-analyzer.exe",
+        "linux": "rust-analyzer-aarch64-unknown-linux-gnu",
+        "mac": "rust-analyzer-aarch64-apple-darwin"
+      },
+      "executable": true
+    }
+  }
+}
+```
+
+* `dir`: base folder where the downloaded file will be saved or extracted.
+  The value is available as `${output.dir}` for use in other tasks.
+* `file.name`: name of the executable file (registered as `${output.file.name}`).
+
+#### Task configureServer
+
+Used to set the server launch command:
+
+```json5
+{
+  "configureServer": {
+    "name": "Configure sdl-lsp server command",
+    "command": "java -jar ${output.dir}/${output.file.name}",
+    "update": true
+  }
+}
+```

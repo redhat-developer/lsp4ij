@@ -335,8 +335,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
 
         if (installerConfiguration != null  && StringUtils.isNotBlank(installerConfiguration) && !installerConfiguration.equals("{}")) {
-            if (MessageDialogBuilder.yesNo(LanguageServerBundle.message("new.language.server.dialog.install.title"),
-                            LanguageServerBundle.message("new.language.server.dialog.install.content"))
+            if (MessageDialogBuilder.yesNo(LanguageServerBundle.message("new.language.server.dialog.install.title", serverName),
+                            LanguageServerBundle.message("new.language.server.dialog.install.content", serverName))
                     .ask(project)) {
                 try {
                     var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN, new CommandLineUpdater() {
