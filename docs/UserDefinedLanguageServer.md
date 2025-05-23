@@ -28,6 +28,12 @@ Once you clicked on either of them, the dialog will appear:
 
 ![New Language Server Dialog](./images/user-defined-ls/NewLanguageServerDialogEmpty.png)
 
+When you click the `OK` button, it will create the language server.  
+If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)  
+in the [Installer tab](#installer-tab), you will be prompted to confirm whether you want to execute the installer:
+
+![Installation dialog](./images/user-defined-ls/rust-analyzer/installation_dialog.png)
+
 ### Server tab
 
 The `Server tab` requires the `server name` and `command` fields to be set.
@@ -59,6 +65,12 @@ and write a command that references it in a portable way to start it.
 That command might look like this:
 
 `$PROJECT_DIR$/path/to/your/start/command`
+
+Here are some useful standard [built-in macros](https://www.jetbrains.com/help/idea/built-in-macros.html that you can use:
+
+ * `$WORKSPACE_DIR$`: The path to the workspace where the current project belongs. The workspace is the root of the open file hierarchy and can include multiple projects.
+ * `$PROJECT_DIR$`: The root of the project where run.json is located. A project is typically a collection of files for developing and building an application such as a Maven or Node.js project.
+ * `$USER_HOME$`: User home directory.
 
 Here is an example with Scala Language Server's `metals.bat` stored at the root of the project:
 
@@ -109,7 +121,20 @@ Here are configuration sample with the [typescript-language-server](https://gith
 The `Debug tab` is available when you have created the language server definition. It allows to customize the 
 level Trace used in LSP console.
 
-### Using template
+### Installer tab
+
+The `Installer tab` provides the capability to declare with JSON, the language server installation
+with task to execute like:
+
+ * `exec` to execute a command (ex: `npm install typescript-language-server` to install the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server)).
+ * `download` to download the language server from a given url according the OS.
+
+![Installer tab](images/user-defined-ls/InstallUserDefinedLanguageServer.png)
+
+This installer content will be used when you will create the language server. See [here](UserDefinedLanguageServerTemplate.md#installer-descriptor)
+to understand how to write this JSON installer descriptor.
+
+## Using template
 Template can be used to quickly create user defined language server pre-filled 
 with server name, command, mappings and potential configurations.
 
@@ -164,3 +189,5 @@ By default, each directory contains the following files, but only `template.json
 
 A `README.md` file can be added manually to each of the language server directories to provide instructions 
 for the corresponding language server.
+
+See [here](./UserDefinedLanguageServerTemplate.md) for more information about those JSON structures.
