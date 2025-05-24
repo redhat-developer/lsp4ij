@@ -46,7 +46,7 @@ import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTempl
 public class LanguageServerTemplateManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplateManager.class);
 
-    private static final String TEMPLATES_DIR = "templates";
+    private static final String TEMPLATES_DIR = "templates/lsp";
 
     private final List<LanguageServerTemplate> templates = new ArrayList<>();
 

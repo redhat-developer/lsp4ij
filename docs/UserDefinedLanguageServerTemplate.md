@@ -120,7 +120,7 @@ Typical task structure:
 }
 ```
 
-#### Task exec
+### Task exec
 
 Example using `npm` to install [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
@@ -159,7 +159,7 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
 }
 ```
 
-#### Task download
+### Task download
 
 Structure of a `download` task:
 
@@ -182,7 +182,7 @@ Structure of a `download` task:
 }
 ```
 
-#### Example: downloading a JAR and configuring the start command
+Example: downloading a JAR and configuring the start command
 
 ```json
 {
@@ -211,9 +211,7 @@ Structure of a `download` task:
 > `configureServer.command` supports variable substitution with `${output.dir}` and `${output.file.name}`.
 > These values are resolved from the `output` object of the preceding `download` task.
 
-##### URL variants
-
-* Unique URL:
+#### Unique URL:
 
 ```json
 {
@@ -223,7 +221,7 @@ Structure of a `download` task:
 }
 ```
 
-* OS-specific URLs:
+#### OS-specific URLs:
 
 ```json
 {
@@ -234,10 +232,11 @@ Structure of a `download` task:
     }
   }
 }
+```
 
-you can find a sample with [clangd installer](../src/main/resources/templates/clangd/installer.json)
+you can find a sample with [clangd installer](../src/main/resources/templates/lsp/clangd/installer.json)
 
-* OS and architecture-specific URLs:
+#### OS and architecture-specific URLs:
 
 ```json
 {
@@ -253,7 +252,7 @@ you can find a sample with [clangd installer](../src/main/resources/templates/cl
 }
 ```
 
-* GitHub asset download:
+#### GitHub asset download:
 
 If DAP/LSP server can be downloaded from GitHub release like https://github.com/clojure-lsp/clojure-lsp/releases
 you can use the `github` JSON object to download the proper asset: 
@@ -281,11 +280,46 @@ you can use the `github` JSON object to download the proper asset:
 }
 ```
 
+When download will occur, it will request https://api.github.com/repos/${owner}/${repository}/releases URL. 
+In the previous sample, URL requested will be https://api.github.com/repos/clojure-lsp/clojure-lsp/releases
+It will take the first JSON asset which matches GitHub `asset.name` (by using the `download.github.asset` rule) 
+and will return the `asset.browser_download_url`.
+
+ * `owner` (required) the github owner.
+ * `repository` (required) the github repository. 
+ * `prerelease` (optional) can be used to select pre-release or not. By default, `prerelease` is set to false.   
+ * `asset` (required) is used to select the proper file to download. You can use `*` if asset to download contains some timestamp for instance.
+
+```json
+{
+      "asset": "sdl-lsp-*-jar-with-dependencies.jar"
+ 
+}
+```
+
+If there is an asset per OS and with architecture, you can write:
+
+```json
+{
+  "asset": {
+    "windows": "clojure-lsp-native-windows-amd64.zip",
+    "linux": {
+      "amd64": "clojure-lsp-native-linux-amd64.zip",
+      "arm64": "clojure-lsp-native-linux-aarch64.zip"
+    },
+    "mac": {
+      "aarch64": "clojure-lsp-native-macos-aarch64.zip",
+      "amd64": "clojure-lsp-native-macos-amd64.zip"
+    }
+  }
+}
+```
+
 Samples:
 
-* [clangd installer](../src/main/resources/templates/clangd/installer.json)
-* [clojure-lsp installer](../src/main/resources/templates/clojure-lsp/installer.json)
-* [rust-analyzer installer](../src/main/resources/templates/rust-analyzer/installer.json)
+* [clangd installer](../src/main/resources/templates/lsp/clangd/installer.json)
+* [clojure-lsp installer](../src/main/resources/templates/lsp/clojure-lsp/installer.json)
+* [rust-analyzer installer](../src/main/resources/templates/lsp/rust-analyzer/installer.json)
 
 ##### Output customization
 

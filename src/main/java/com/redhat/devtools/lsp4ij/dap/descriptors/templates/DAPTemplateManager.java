@@ -39,7 +39,7 @@ public class DAPTemplateManager {
     
     private static final Logger LOGGER = LoggerFactory.getLogger(DAPTemplateManager.class);
 
-    private static final String TEMPLATES_DIR = "dap/templates";
+    private static final String TEMPLATES_DIR = "templates/dap";
 
     private final List<DAPTemplate> templates = new ArrayList<>();
 
