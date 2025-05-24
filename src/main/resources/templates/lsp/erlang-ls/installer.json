@@ -15,8 +15,7 @@
       "name": "Download erlang-ls",
       "github": {
         "owner": "erlang-ls",
-        "repository": "erlang_ls",
-        "prerelease": true,
+        "repository": "erlang_ls",        
         "asset": {
           "windows": "erlang_ls-win*.tar.gz",
           "linux": "erlang-linux*.zip",

@@ -12,6 +12,34 @@ This section explains how to structure a user-defined template for your language
 * `settings.json`: user-defined settings for the server.
 * `settings.schema.json`: JSON Schema for validating `settings.json`.
 
+## How to Contribute a User-Defined Language Server Template
+
+If you have [created a user-defined language server](./UserDefinedLanguageServer.md#new-language-server-dialog) 
+and want to share it with others, you can contribute it to the official template repository used by LSP4IJ. Follow the steps below to submit your contribution.
+
+### Steps to Contribute
+
+1. **Edit the `template.json`**  
+   After [exporting](./UserDefinedLanguageServer.md#exporting-templates) your language server, a folder will be generated containing `template.json`.
+  - Add a unique `id` to identify your language server.
+  - Adjust the `programArgs` section to support all relevant operating systems.
+  - See the [template descriptor](#template-descriptor) section for more details.
+
+2. **Submit a Pull Request**  
+   Add your language server template folder in the [`/templates/lsp`](https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/templates/lsp) directory.
+  - Follow the structure of existing examples like [`/templates/lsp/typescript-language-server`](https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/templates/lsp/typescript-language-server).
+
+3. **Write the Documentation**  
+   Provide documentation for your language server in the [`/docs/user-defined-ls`](https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls) folder.
+  - Use existing docs as reference, for instance: [`/docs/user-defined-ls/typescript-language-server`](https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls/typescript-language-server).
+
+### ✅ Contribution Checklist
+
+- [ ] `template.json` contains a unique `id` and correct `programArgs`
+- [ ] Template is placed under `/templates/lsp/<your-language-server-name>`
+- [ ] Documentation is placed under `/docs/user-defined-ls/<your-language-server-name>`
+- [ ] Pull Request includes only relevant files and follows the structure of existing examples
+ 
 ## Template descriptor
 
 The template descriptor (`template.json`) is a JSON file used to define:
