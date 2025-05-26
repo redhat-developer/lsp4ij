@@ -298,7 +298,7 @@ you can use the `github` JSON object to download the proper asset:
       "prerelease": false,
       "asset": {
         "windows": "clojure-lsp-native-windows-amd64.zip",
-        "linux": {
+        "unix": {
           "amd64": "clojure-lsp-native-linux-amd64.zip",
           "arm64": "clojure-lsp-native-linux-aarch64.zip"
         },
@@ -335,7 +335,7 @@ If there is an asset per OS and with architecture, you can write:
 {
   "asset": {
     "windows": "clojure-lsp-native-windows-amd64.zip",
-    "linux": {
+    "unix": {
       "amd64": "clojure-lsp-native-linux-amd64.zip",
       "arm64": "clojure-lsp-native-linux-aarch64.zip"
     },
@@ -364,7 +364,7 @@ You can customize the output directory and executable name:
     "file": {
       "name": {
         "windows": "rust-analyzer.exe",
-        "linux": "rust-analyzer-aarch64-unknown-linux-gnu",
+        "unix": "rust-analyzer-aarch64-unknown-linux-gnu",
         "mac": "rust-analyzer-aarch64-apple-darwin"
       },
       "executable": true
