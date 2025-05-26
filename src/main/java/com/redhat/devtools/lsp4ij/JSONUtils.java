@@ -284,7 +284,7 @@ public class JSONUtils {
             return false;
         }
         var primitive = element.getAsJsonPrimitive();
-        if (primitive.isString()) {
+        if (primitive.isBoolean()) {
             return primitive.getAsBoolean();
         }
         return false;

@@ -59,7 +59,6 @@ import static com.redhat.devtools.lsp4ij.LSPNotificationConstants.LSP4IJ_GENERAL
  */
 public class NewLanguageServerDialog extends DialogWrapper {
 
-    //private final ComboBox<LanguageServerTemplate> templateCombo = new ComboBox<>(new DefaultComboBoxModel<>(getLanguageServerTemplates()));
     private final Project project;
 
     private LanguageServerPanel languageServerPanel;
