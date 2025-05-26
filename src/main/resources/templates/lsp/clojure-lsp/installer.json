@@ -12,7 +12,7 @@
         "prerelease": false,
         "asset": {
           "windows": "clojure-lsp-native-windows-amd64.zip",
-          "linux": {
+          "unix": {
             "amd64": "clojure-lsp-native-linux-amd64.zip",
             "arm64": "clojure-lsp-native-linux-aarch64.zip"
           },
@@ -27,7 +27,7 @@
         "file": {
           "name": {
             "windows": "clojure-lsp.exe",
-            "linux": "clojure-lsp",
+            "unix": "clojure-lsp",
             "mac": "clojure-lsp"
           },
           "executable": true

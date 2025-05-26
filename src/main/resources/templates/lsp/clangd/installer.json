@@ -12,13 +12,13 @@
         "prerelease": true,
         "asset": {
           "windows": "clangd-windows*.zip",
-          "linux": "clangd-linux*.zip",
+          "unix": "clangd-linux*.zip",
           "mac": "clangd-mac*.zip"
         }
       },
       "url": {
         "windows": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-windows-snapshot_20250518.zip",
-        "linux": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-linux-snapshot_20250518.zip",
+        "unix": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-linux-snapshot_20250518.zip",
         "mac": " https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-mac-snapshot_20250518.zip"
       },
       "output": {
@@ -26,7 +26,7 @@
         "file": {
           "name": {
             "windows": "bin/clangd.exe",
-            "linux": "bin/clangd",
+            "unix": "bin/clangd",
             "mac": "bin/clangd"
           },
           "executable": true

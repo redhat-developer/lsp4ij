@@ -18,7 +18,7 @@
         "repository": "erlang_ls",        
         "asset": {
           "windows": "erlang_ls-win*.tar.gz",
-          "linux": "erlang-linux*.zip",
+          "unix": "erlang-linux*.zip",
           "mac": "erlang-macos*.zip"
         }
       },
