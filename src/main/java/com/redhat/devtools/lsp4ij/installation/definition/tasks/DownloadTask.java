@@ -129,9 +129,12 @@ public class DownloadTask extends InstallerTask {
                     // the file name becomes the downloaded file name
                     outputFileName = downloadedFile.getName();
                 }
-                File outputFile = outputDir.resolve(outputFileName).toFile();
+                Path outputFile = outputDir.resolve(outputFileName);
+                // Delete old server file which has been previously installed.
+                Files.deleteIfExists(outputFile);
+
                 context.print("> Copy downloaded asset '" + downloadedFile.getName() + "' in " + outputFile.toString());
-                FileUtil.copy(downloadedFile, outputFile);
+                FileUtil.copy(downloadedFile, outputFile.toFile());
                 Files.deleteIfExists(downloadedAsset);
             }
             // Update ${output.dir} property
