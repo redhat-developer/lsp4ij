@@ -46,8 +46,14 @@
         "file": {
           "name": {
             "windows": "rust-analyzer.exe",
-            "unix": "rust-analyzer-aarch64-unknown-linux-gnu",
-            "mac": "rust-analyzer-aarch64-apple-darwin"
+            "unix": {
+              "x86_64": "rust-analyzer-x86_64-unknown-linux-gnu",
+              "arm64": "rust-analyzer-aarch64-unknown-linux-gnu"
+            },
+            "mac": {
+              "x86_64": "rust-analyzer-x86_64-apple-darwin",
+              "arm64": "rust-analyzer-aarch64-apple-darwin"
+            }
           },
           "executable": true
         }
