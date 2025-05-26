@@ -33,11 +33,15 @@ and want to share it with others, you can contribute it to the official template
    Provide documentation for your language server in the [`/docs/user-defined-ls`](https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls) folder.
   - Use existing docs as reference, for instance: [`/docs/user-defined-ls/typescript-language-server`](https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls/typescript-language-server.md).
 
+4. **Reference it**  
+   Add your language server in the [`Default template`](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md#default-template).
+
 ### ✅ Contribution Checklist
 
 - [ ] `template.json` contains a unique `id` and correct `programArgs`
 - [ ] Template is placed under `/templates/lsp/<your-language-server-name>`
 - [ ] Documentation is placed under `/docs/user-defined-ls/<your-language-server-name>.md`
+- [ ] Template is listed in the [Default template](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md#default-template)
 - [ ] Pull Request includes only relevant files and follows the structure of existing examples
  
 ## Template descriptor

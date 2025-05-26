@@ -16,19 +16,17 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.ValidationInfo;
-import com.intellij.openapi.ui.messages.MessageDialog;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.HyperlinkLabel;
 import com.intellij.util.ui.FormBuilder;
-import com.intellij.util.ui.JBInsets;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
@@ -48,8 +46,6 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,20 +59,11 @@ import static com.redhat.devtools.lsp4ij.LSPNotificationConstants.LSP4IJ_GENERAL
  */
 public class NewLanguageServerDialog extends DialogWrapper {
 
-    private final ComboBox<LanguageServerTemplate> templateCombo = new ComboBox<>(new DefaultComboBoxModel<>(getLanguageServerTemplates()));
+    //private final ComboBox<LanguageServerTemplate> templateCombo = new ComboBox<>(new DefaultComboBoxModel<>(getLanguageServerTemplates()));
     private final Project project;
 
     private LanguageServerPanel languageServerPanel;
     private LanguageServerTemplate currentTemplate = null;
-    private JButton showInstructionButton = null;
-
-    private static LanguageServerTemplate[] getLanguageServerTemplates() {
-        List<LanguageServerTemplate> templates = new ArrayList<>();
-        templates.add(LanguageServerTemplate.NONE);
-        templates.add(LanguageServerTemplate.NEW_TEMPLATE);
-        templates.addAll(LanguageServerTemplateManager.getInstance().getTemplates());
-        return templates.toArray(new LanguageServerTemplate[0]);
-    }
 
     public NewLanguageServerDialog(@NotNull Project project) {
         super(project);
@@ -86,13 +73,24 @@ public class NewLanguageServerDialog extends DialogWrapper {
         initValidation();
     }
 
+    private static String getCommandLine(LanguageServerTemplate entry) {
+        StringBuilder command = new StringBuilder();
+        if (entry.getProgramArgs() != null) {
+            if (!command.isEmpty()) {
+                command.append(' ');
+            }
+            command.append(entry.getProgramArgs());
+        }
+        return command.toString();
+    }
+
     @Override
     protected @Nullable JComponent createCenterPanel() {
         FormBuilder builder = FormBuilder
                 .createFormBuilder();
 
         // Template combo
-        createTemplateCombo(builder);
+        createTemplatePanel(builder);
         // Create server name,  command line, mappings, configuration UI
         this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED, true, project);
 
@@ -105,70 +103,49 @@ public class NewLanguageServerDialog extends DialogWrapper {
         return panel;
     }
 
-    private void createTemplateCombo(FormBuilder builder) {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        templateCombo.setRenderer(new SimpleListCellRenderer<>() {
-            @Override
-            public void customize(@NotNull JList list,
-                                  @Nullable LanguageServerTemplate value,
-                                  int index,
-                                  boolean selected,
-                                  boolean hasFocus) {
-                if (value == null) {
-                    setText("");
-                } else {
-                    setText(value.getName());
-                }
-            }
+    private void createTemplatePanel(@NotNull FormBuilder builder) {
+        JPanel templatePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        // Create "Choose template..." hyperlink
+        final var selectTemplateHyperLink =  new HyperlinkLabel(LanguageServerBundle.message("new.language.server.dialog.choose.template"));
+        selectTemplateHyperLink.addHyperlinkListener(e -> {
+            openChooseTemplatePopup(selectTemplateHyperLink);
         });
-
-        showInstructionButton = super.createHelpButton(new JBInsets(0, 0, 0, 0));
-        showInstructionButton.setText("");
-        templateCombo.addItemListener(getTemplateComboListener());
-
-        panel.add(templateCombo, BorderLayout.WEST);
-        panel.add(showInstructionButton, BorderLayout.CENTER);
-        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.template"), panel);
+        templatePanel.add(selectTemplateHyperLink);
+        // or
+        templatePanel.add(new JLabel(DAPBundle.message("dap.settings.editor.server.factory.or")));
+        // Create "Import template..." hyperlink
+        final var importTemplateHyperLink =  new HyperlinkLabel(LanguageServerBundle.message("new.language.server.dialog.import.template"));
+        importTemplateHyperLink.addHyperlinkListener(e -> {
+            importTemplate();
+        });
+        templatePanel.add(importTemplateHyperLink);
+        builder.addLabeledComponent(LanguageServerBundle.message("new.language.server.dialog.template"), templatePanel);
     }
 
-    /**
-     * Create the template combo listener that handles item selection
-     *
-     * @return created ItemListener
-     */
-    private ItemListener getTemplateComboListener() {
+    private void openChooseTemplatePopup(@NotNull Component button) {
+        var searchTemplatePopupUI = new ChooseLanguageServerTemplatePopupUI(this::loadFromTemplate);
+        searchTemplatePopupUI.show(button);
+    }
+
+    private void importTemplate() {
         FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(false, true,
                 false, false, false, false);
         fileChooserDescriptor.setTitle(LanguageServerBundle.message("new.language.server.dialog.export.template.title"));
         fileChooserDescriptor.setDescription(LanguageServerBundle.message("new.language.server.dialog.export.template.description"));
 
-        return e -> {
-            // Only trigger listener on selected items to avoid double triggering
-            if (e.getStateChange() == ItemEvent.SELECTED) {
-                LanguageServerTemplate template = templateCombo.getItem();
-                if (template == LanguageServerTemplate.NEW_TEMPLATE) {
-                    VirtualFile virtualFile = FileChooser.chooseFile(fileChooserDescriptor, project, null);
-                    if (virtualFile != null) {
-                        try {
-                            template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
-                            if (template == null) {
-                                showImportErrorNotification(LanguageServerBundle.message("new.language.server.dialog.import.template.error.description"));
-                            }
-                        } catch (IOException ex) {
-                            showImportErrorNotification(ex.getLocalizedMessage());
-                        }
-                    }
-                    // Reset template to None after trying to import a custom file
-                    templateCombo.setItem(LanguageServerTemplate.NONE);
-                }
-
-                currentTemplate = template;
-                showInstructionButton.setEnabled(hasValidDescription(template));
+        VirtualFile virtualFile = FileChooser.chooseFile(fileChooserDescriptor, project, null);
+        if (virtualFile != null) {
+            try {
+                var template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
                 if (template != null) {
                     loadFromTemplate(template);
+                } else {
+                    showImportErrorNotification(LanguageServerBundle.message("new.language.server.dialog.import.template.error.description"));
                 }
+            } catch (IOException ex) {
+                showImportErrorNotification(ex.getLocalizedMessage());
             }
-        };
+        }
     }
 
     private void showImportErrorNotification(String message) {
@@ -243,17 +220,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
             installerConfiguration.setText(template.getInstallerConfiguration() != null ? template.getInstallerConfiguration() : "");
             installerConfiguration.setCaretPosition(0);
         }
-    }
-
-    private static String getCommandLine(LanguageServerTemplate entry) {
-        StringBuilder command = new StringBuilder();
-        if (entry.getProgramArgs() != null) {
-            if (!command.isEmpty()) {
-                command.append(' ');
-            }
-            command.append(entry.getProgramArgs());
-        }
-        return command.toString();
     }
 
     @Override
@@ -334,7 +300,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 installerConfiguration);
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
 
-        if (installerConfiguration != null  && StringUtils.isNotBlank(installerConfiguration) && !installerConfiguration.equals("{}")) {
+        if (installerConfiguration != null && StringUtils.isNotBlank(installerConfiguration) && !installerConfiguration.equals("{}")) {
             if (MessageDialogBuilder.yesNo(LanguageServerBundle.message("new.language.server.dialog.install.title", serverName),
                             LanguageServerBundle.message("new.language.server.dialog.install.content", serverName))
                     .ask(project)) {
@@ -401,4 +367,5 @@ public class NewLanguageServerDialog extends DialogWrapper {
         this.languageServerPanel.dispose();
         super.dispose();
     }
+
 }

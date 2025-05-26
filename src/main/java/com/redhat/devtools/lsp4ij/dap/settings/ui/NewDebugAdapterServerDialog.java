@@ -15,28 +15,23 @@ import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.HyperlinkLabel;
 import com.intellij.util.ui.FormBuilder;
-import com.intellij.util.ui.JBInsets;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterServerListener;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
-import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager;
 import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,8 +39,6 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -56,12 +49,10 @@ import java.util.UUID;
  */
 public class NewDebugAdapterServerDialog extends DialogWrapper {
 
-    private final ComboBox<DAPTemplate> templateCombo = new ComboBox<>(new DefaultComboBoxModel<>(getDAPTemplates()));
     private final Project project;
 
     private DebugAdapterServerPanel debugAdapterServerPanel;
     private DAPTemplate currentTemplate = null;
-    private JButton showInstructionButton = null;
     private UserDefinedDebugAdapterServerDefinition createdServer;
 
     public NewDebugAdapterServerDialog(@Nullable Project project) {
@@ -70,13 +61,6 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         super.setTitle(DAPBundle.message("new.debug.adapter.dialog.title"));
         init();
         initValidation();
-    }
-
-    private static DAPTemplate[] getDAPTemplates() {
-        List<DAPTemplate> templates = new ArrayList<>();
-        templates.add(DAPTemplate.NONE);
-        templates.addAll(DAPTemplateManager.getInstance().getTemplates());
-        return templates.toArray(new DAPTemplate[0]);
     }
 
     private static String getCommandLine(DAPTemplate entry) {
@@ -112,60 +96,19 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
 
     private void createTemplateCombo(FormBuilder builder) {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        templateCombo.setRenderer(new SimpleListCellRenderer<>() {
-            @Override
-            public void customize(@NotNull JList list,
-                                  @Nullable DAPTemplate value,
-                                  int index,
-                                  boolean selected,
-                                  boolean hasFocus) {
-                if (value == null) {
-                    setText("");
-                } else {
-                    setText(value.getName());
-                }
-            }
+        // Create "Choose template..." hyperlink
+        final var chooseTemplateHyperLink =  new HyperlinkLabel(DAPBundle.message("new.debug.adapter.dialog.choose.template"));
+        chooseTemplateHyperLink.addHyperlinkListener(e -> {
+            openChooseTemplatePopup(chooseTemplateHyperLink);
         });
-
-        showInstructionButton = super.createHelpButton(new JBInsets(0, 0, 0, 0));
-        showInstructionButton.setText("");
-        templateCombo.addItemListener(getTemplateComboListener());
-
-        panel.add(templateCombo, BorderLayout.WEST);
-        panel.add(showInstructionButton, BorderLayout.CENTER);
+        panel.add(chooseTemplateHyperLink, BorderLayout.WEST);
         builder.addLabeledComponent(DAPBundle.message("new.debug.adapter.dialog.template"), panel);
     }
 
-    /**
-     * Create the template combo listener that handles item selection
-     *
-     * @return created ItemListener
-     */
-    private ItemListener getTemplateComboListener() {
-        return e -> {
-            // Only trigger listener on selected items to avoid double triggering
-            if (e.getStateChange() == ItemEvent.SELECTED) {
-                currentTemplate = templateCombo.getItem();
-                showInstructionButton.setEnabled(hasValidDescription(currentTemplate));
-                if (currentTemplate != null) {
-                    loadFromTemplate(currentTemplate);
-                }
-            }
-        };
+    private void openChooseTemplatePopup(@NotNull Component button) {
+        var searchTemplatePopupUI = new ChooseDebugServerTemplatePopupUI(this::loadFromTemplate);
+        searchTemplatePopupUI.show(button);
     }
-
-   /* @Override
-    protected @NotNull Action getHelpAction() {
-        return new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (currentTemplate != null && StringUtils.isNotBlank(currentTemplate.getDescription())) {
-                    ShowInstructionDialog dialog = new ShowInstructionDialog(currentTemplate, project);
-                    dialog.show();
-                }
-            }
-        };
-    }*/
 
     /**
      * Check that the template is not a placeholder and that it has a valid description
