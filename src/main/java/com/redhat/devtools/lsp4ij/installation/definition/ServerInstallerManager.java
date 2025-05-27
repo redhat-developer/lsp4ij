@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.intellij.ide.util.DelegatingProgressIndicator;
 import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationListener;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -73,20 +74,22 @@ public class ServerInstallerManager extends InstallerTaskRegistry {
         return project.getService(ServerInstallerManager.class);
     }
 
-    private static @NotNull Notification getNotification(@NotNull InstallerContext context, Boolean checkResult, Boolean checkRun) {
+    private static @NotNull Notification getNotification(@NotNull String name, @NotNull InstallerContext context, Boolean checkResult, Boolean checkRun) {
         boolean hasError = (checkResult != null && !checkResult) || (checkRun != null && !checkRun);
         StringBuilder message = new StringBuilder();
         for (var item : context.getStatus()) {
             if (!message.isEmpty()) {
                 message.append("\n");
+                message.append(" - ");
             }
-            message.append(" - ");
             message.append(item.message());
         }
-        return new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
-                "Installation terminated " + (!hasError ? "successfully" : "with fails"),
+        var notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
+                (hasError ? "Installation of <code>" + name + "</code> failed." : "Installation of <code>" + name + "</code> completed successfully!"),
                 message.toString(),
                 hasError ? NotificationType.ERROR : NotificationType.INFORMATION);
+        notification.setListener(NotificationListener.URL_OPENING_LISTENER);
+        return notification;
     }
 
     public void install(@NotNull String installerConfigurationContent,
@@ -136,29 +139,29 @@ public class ServerInstallerManager extends InstallerTaskRegistry {
         install(installerDeclaration, context);
     }
 
-    private void install(@NotNull ServerInstallerDescriptor installerDeclaration,
+    private void install(@NotNull ServerInstallerDescriptor installerDescriptor,
                          @NotNull InstallerContext context) {
         context.clear();
-        context.print(installerDeclaration.getName());
+        context.print(installerDescriptor.getName());
 
         Boolean checkResult = null;
         Boolean checkRun = null;
         var action = context.getAction();
         if (action == InstallerContext.InstallerAction.CHECK || action == InstallerContext.InstallerAction.CHECK_AND_RUN) {
-            var check = installerDeclaration.getCheck();
+            var check = installerDescriptor.getCheck();
             if (check != null) {
                 checkResult = check.execute(context);
             }
         }
 
         if (action == InstallerContext.InstallerAction.RUN || action == InstallerContext.InstallerAction.CHECK_AND_RUN) {
-            var run = installerDeclaration.getRun();
+            var run = installerDescriptor.getRun();
             if (run != null) {
                 checkRun = run.execute(context);
             }
         }
 
-        Notification notification = getNotification(context, checkResult, checkRun);
+        Notification notification = getNotification(installerDescriptor.getName(), context, checkResult, checkRun);
         Notifications.Bus.notify(notification, context.getProject());
     }
 
