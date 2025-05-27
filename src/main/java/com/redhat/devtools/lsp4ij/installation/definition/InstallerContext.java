@@ -180,16 +180,23 @@ public class InstallerContext implements Reporter {
         print(message, ConsoleViewContentType.NORMAL_OUTPUT);
     }
 
+    public void printError(@Nullable String message, @NotNull Exception e) {
+        printError(message, e, false);
+    }
     /**
      * Prints an error message and stack trace to the console.
      *
      * @param message the contextual error message.
      * @param e       the exception to display.
      */
-    public void printError(@Nullable String message, @NotNull Exception e) {
+    public void printError(@Nullable String message, @NotNull Exception e, boolean add) {
         Writer s = new StringWriter();
         e.printStackTrace(new PrintWriter(s));
-        printError((message != null ? message : "") + s.toString());
+        printError((message != null ? message : "") + s.toString(), add);
+    }
+
+    public void printError(@Nullable String message) {
+        printError(message, false);
     }
 
     /**
@@ -197,8 +204,11 @@ public class InstallerContext implements Reporter {
      *
      * @param message the error message.
      */
-    public void printError(@Nullable String message) {
+    public void printError(@Nullable String message, boolean add) {
         print(message, ConsoleViewContentType.ERROR_OUTPUT);
+        if (add && message != null) {
+            addErrorMessage(message);
+        }
     }
 
     /**

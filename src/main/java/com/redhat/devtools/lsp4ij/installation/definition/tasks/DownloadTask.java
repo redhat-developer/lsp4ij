@@ -13,11 +13,13 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.util.system.CpuArch;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.download.DownloadUtils;
 import com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcher;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,21 +33,21 @@ import java.util.function.Function;
 
 /**
  * <pre>
-*     "download": {
-*       "name": "Download sdl-lsp",
-*       "url": "https://oss.sonatype.org/content/repositories/snapshots/io/smartdatalake/sdl-lsp/1.0-SNAPSHOT/sdl-lsp-1.0-20250503.111518-23-jar-with-dependencies.jar",
-*       "output": {
-*         "dir": "$USER_HOME$/.lsp4ij/lsp/sdl-lsp"
-*       },
-*       "onSuccess": {
-*         "configureServer": {
-*           "name": "Configure sdl-lsp server command",
-*           "command": "java -jar ${output.dir}/${output.file.name}",
-*           "update": true
-*         }
-*       }
-*     }
-* </pre>
+ *     "download": {
+ *       "name": "Download sdl-lsp",
+ *       "url": "https://oss.sonatype.org/content/repositories/snapshots/io/smartdatalake/sdl-lsp/1.0-SNAPSHOT/sdl-lsp-1.0-20250503.111518-23-jar-with-dependencies.jar",
+ *       "output": {
+ *         "dir": "$USER_HOME$/.lsp4ij/lsp/sdl-lsp"
+ *       },
+ *       "onSuccess": {
+ *         "configureServer": {
+ *           "name": "Configure sdl-lsp server command",
+ *           "command": "java -jar ${output.dir}/${output.file.name}",
+ *           "update": true
+ *         }
+ *       }
+ *     }
+ * </pre>
  */
 public class DownloadTask extends InstallerTask {
 
@@ -77,6 +79,17 @@ public class DownloadTask extends InstallerTask {
     public boolean run(@NotNull InstallerContext context) {
         String downloadUrl = getDownloadUrl(context);
         try {
+            if (downloadUrl == null) {
+                // language=html
+                String htmlError = """
+                        <p>Unable to retrieve the download URL for your platform <code>%s</code> and architecture <code>%s</code>.</p>
+                        <p>You must define a valid <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#unique-url">url</a> 
+                        or <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#github-asset-download">github.asset</a> 
+                        in your <code>installer.json</code>, matching your OS and architecture.</p>
+                        """.formatted(LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase());
+                context.printError(htmlError, true);
+                return false;
+            }
             context.print("> Downloading asset: " + downloadUrl);
 
             // Extract filename from URL
@@ -144,13 +157,23 @@ public class DownloadTask extends InstallerTask {
                 // Update ${output.file.name} property
                 context.putProperty("output.file.name", outputFileName);
 
+                Path exeFile = outputDir.resolve(outputFileName);
+                if (!Files.exists(exeFile)) {
+                    // language=HTML
+                    String htmlError = """
+                            <p>The file name <code>%s</code> specified in <a href='https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#output-customization'><code>output.file.name</code></a>
+                             for your platform <code>%s</code> and architecture <code>%s</code> 
+                            was not found in the downloaded archive at <code>%s</code>.</p>
+                            <p>Please update the <code>output.file.name</code> section of your <code>installer.json</code> to correctly match your OS and architecture.</p>
+                            """.formatted(outputFileName, LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase(), outputDir.toString());
+                    context.printError(htmlError, true);
+                    return false;
+                }
                 if (outputInfo != null && outputInfo.executable()) {
                     // Set executable permission
-                    Path exeFile = outputDir.resolve(outputFileName);
                     context.print("> Setting executable permission for: " + exeFile.toString());
-                    if (Files.exists(exeFile)) {
-                        FileUtil.setExecutable(exeFile.toFile());
-                    }
+                    FileUtil.setExecutable(exeFile.toFile());
+
                 }
             }
             context.addInfoMessage("Server has been downloaded correctly in '" + outputDir.toString() + "'");
@@ -179,6 +202,9 @@ public class DownloadTask extends InstallerTask {
             downloadUrl = assetFetcherInfo.assetFetcher().getDownloadUrl(assetFetcherInfo.releaseMatcher(),
                     assetFetcherInfo.assetMatcher(),
                     context);
+            if (downloadUrl == null) {
+                context.print("Cannot retrieve url from 'github/asset', fallback to the 'url' JSON property");
+            }
         }
         return downloadUrl != null ? downloadUrl : this.downloadUrl;
     }
