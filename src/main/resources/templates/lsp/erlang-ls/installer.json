@@ -25,7 +25,7 @@
       "output": {
         "dir": "$USER_HOME$/.lsp4ij/lsp",
         "file": {
-          "name": "erlang",
+          "name": "erlang/erlang_ls",
           "executable": true
         }
       },

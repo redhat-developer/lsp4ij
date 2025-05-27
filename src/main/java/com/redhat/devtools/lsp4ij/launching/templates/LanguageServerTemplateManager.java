@@ -34,6 +34,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -79,6 +81,8 @@ public class LanguageServerTemplateManager {
         } else {
             LOGGER.warn("No templateRoot found, no templates ");
         }
+        // Sort templates by name
+        templates.sort(Comparator.comparing(LanguageServerTemplate::getName));
     }
 
     /**
