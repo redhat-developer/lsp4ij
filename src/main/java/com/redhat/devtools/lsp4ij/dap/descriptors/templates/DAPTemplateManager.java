@@ -28,6 +28,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*;
@@ -36,16 +37,12 @@ import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*
  * DAP (Debug Adapter Protocol) template manager.
  */
 public class DAPTemplateManager {
-    
+
     private static final Logger LOGGER = LoggerFactory.getLogger(DAPTemplateManager.class);
 
     private static final String TEMPLATES_DIR = "templates/dap";
 
     private final List<DAPTemplate> templates = new ArrayList<>();
-
-    public static DAPTemplateManager getInstance() {
-        return ApplicationManager.getApplication().getService(DAPTemplateManager.class);
-    }
 
     /**
      * Loads templates from resources/templates
@@ -70,6 +67,12 @@ public class DAPTemplateManager {
         } else {
             LOGGER.warn("No templateRoot found, no templates ");
         }
+        // Sort templates by name
+        templates.sort(Comparator.comparing(DAPTemplate::getName));
+    }
+
+    public static DAPTemplateManager getInstance() {
+        return ApplicationManager.getApplication().getService(DAPTemplateManager.class);
     }
 
     /**
@@ -163,8 +166,7 @@ public class DAPTemplateManager {
             template.setLaunchConfigurations(launchConfigurations);
             template.setInstallerConfiguration(installerJson);
             return template;
-        }
-        catch(Exception e) {
+        } catch (Exception e) {
             LOGGER.warn("Error while loading DAP template", e);
             return null;
         }
