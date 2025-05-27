@@ -15,8 +15,9 @@ import com.intellij.execution.process.CapturingProcessHandler;
 import com.intellij.execution.process.ProcessOutput;
 import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
-import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
+import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
+import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,7 +25,7 @@ import java.util.List;
 
 /**
  * <pre>
- " exec": {
+ * " exec": {
  *     "name": "Check typescript-language-server",*
  *     "command": {
  *       "windows": "where typescript-language-server",
@@ -34,35 +35,45 @@ import java.util.List;
  *     }
  * }
  * </pre>
- *
  */
 public class ExecTask extends InstallerTask {
 
+    private static final int DEFAULT_TIMEOUT = 2000;
+
     private final @NotNull List<String> command;
+    private final @Nullable Integer timeout;
 
     public ExecTask(@Nullable String id,
                     @Nullable String name,
                     @Nullable InstallerTask onFail,
                     @Nullable InstallerTask onSuccess,
                     @NotNull List<String> command,
+                    @Nullable Integer timeout,
                     @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
         super(id, name, onFail, onSuccess, serverInstallerDeclaration);
         this.command = command;
+        this.timeout = timeout;
+
     }
 
     @Override
     public boolean run(@NotNull InstallerContext context) {
+        CapturingProcessHandler handler = null;
         try {
-            context.print("> " + String.join(" ", command));
+            List<String> resolvedCommand = command
+                    .stream()
+                    .map(args -> CommandUtils.resolveCommandLine(context.resolveValues(args), context.getProject()))
+                    .toList();
+            context.print("> " + String.join(" ", resolvedCommand));
 
-            GeneralCommandLine cmdLine = new GeneralCommandLine(command)
+            GeneralCommandLine cmdLine = new GeneralCommandLine(resolvedCommand)
                     .withEnvironment(EnvironmentUtil.getEnvironmentMap());
             cmdLine.setCharset(java.nio.charset.StandardCharsets.UTF_8);
 
-            CapturingProcessHandler handler = new CapturingProcessHandler(cmdLine);
-            ProcessOutput output = handler.runProcess();
+            handler = new CapturingProcessHandler(cmdLine);
+            ProcessOutput output = timeout != null ? handler.runProcess(timeout) : handler.runProcess();
 
-            if (output.getExitCode() != 0) {
+            if (timeout == null && output.getExitCode() != 0) {
                 context.printError(output.getStderr());
                 return false;
             }
@@ -72,6 +83,10 @@ public class ExecTask extends InstallerTask {
         } catch (Exception e) {
             context.printError("", e);
             return false;
+        } finally {
+            if (handler != null) {
+                handler.destroyProcess();
+            }
         }
     }
 }

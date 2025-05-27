@@ -107,7 +107,7 @@ public abstract class InstallerTaskFactoryBase implements InstallerTaskFactory {
         if (onFail == null) {
             return null;
         }
-        return serverInstallerDeclaration.getStepActionRegistry().loadStep(onFail, serverInstallerDeclaration);
+        return serverInstallerDeclaration.getStepActionRegistry().loadTask(onFail, serverInstallerDeclaration);
     }
 
     private @Nullable InstallerTask loadOnSuccess(@NotNull JsonObject json,
@@ -116,7 +116,7 @@ public abstract class InstallerTaskFactoryBase implements InstallerTaskFactory {
         if (onFail == null) {
             return null;
         }
-        return serverInstallerDeclaration.getStepActionRegistry().loadStep(onFail, serverInstallerDeclaration);
+        return serverInstallerDeclaration.getStepActionRegistry().loadTask(onFail, serverInstallerDeclaration);
     }
 
     protected abstract @NotNull InstallerTask create(@Nullable String id,

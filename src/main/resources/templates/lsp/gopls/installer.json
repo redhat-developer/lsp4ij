@@ -1,6 +1,7 @@
 {
   "id": "gopls",
   "name": "Install and verify Go Language Server",
+  "executeOnStartServer": false,
   "check": {
     "exec": {
       "name": "Check Go Language Server",

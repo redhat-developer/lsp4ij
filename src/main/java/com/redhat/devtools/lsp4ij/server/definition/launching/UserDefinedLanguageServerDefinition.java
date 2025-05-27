@@ -20,6 +20,8 @@ import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
+import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -54,7 +56,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private Object initializationOptions;
     private String clientConfigurationContent;
     private ClientConfigurationSettings clientConfiguration;
-    private Object installerConfiguration;
+    private @Nullable ServerInstallerDescriptor serverInstallerDescriptor;
     private String installerConfigurationContent;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
@@ -206,7 +208,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     public void setInstallerConfigurationContent(String installerConfigurationContent) {
         this.installerConfigurationContent = installerConfigurationContent;
-        this.installerConfiguration = null;
+        this.serverInstallerDescriptor = null;
     }
 
     public Object getLanguageServerConfiguration() {
@@ -245,15 +247,15 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     }
 
     @Nullable
-    public Object getLanguageServerInstallerConfiguration() {
-        if ((installerConfiguration == null) && (installerConfigurationContent != null) && !installerConfigurationContent.isBlank()) {
+    public ServerInstallerDescriptor getServerInstallerDescriptor() {
+        if ((serverInstallerDescriptor == null) && (installerConfigurationContent != null) && !installerConfigurationContent.isBlank()) {
             try {
-                installerConfiguration = JsonParser.parseReader(new StringReader(installerConfigurationContent));
+                serverInstallerDescriptor = ServerInstallerManager.getInstance().loadInstaller(installerConfigurationContent);
             } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON installer configuration for the language server '" + getId() + "'", e);
+                // Do nothing
             }
         }
-        return installerConfiguration;
+        return serverInstallerDescriptor;
     }
     
     @Override

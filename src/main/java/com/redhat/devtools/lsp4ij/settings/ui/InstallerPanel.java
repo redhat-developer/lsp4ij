@@ -36,6 +36,10 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * UI panel which display in a tabbed pane the server installer:
@@ -48,17 +52,17 @@ import java.awt.*;
 public class InstallerPanel implements Disposable {
 
     private final @NotNull Project project;
-    private final @NotNull CommandLineWidget commandLine;
     private final @NotNull JsonTextField installerConfigurationWidget;
     private final @NotNull ConsoleView console;
     private final boolean flushOnEachPrint;
     private @Nullable CommandLineUpdater commandLineUpdater;
+    private @Nullable Set<Runnable> onPreInstall;
+    private @Nullable Set<Runnable> onPostInstall;
 
     public InstallerPanel(@NotNull FormBuilder builder,
                           @NotNull CommandLineWidget commandLine,
                           boolean flushOnEachPrint,
                           @NotNull Project project) {
-        this.commandLine = commandLine;
         this.flushOnEachPrint = flushOnEachPrint;
         this.project = project;
         // Display on the left Json editor to fill installer.json content
@@ -84,56 +88,24 @@ public class InstallerPanel implements Disposable {
         splitter.setFirstComponent(installerConfigurationWidget.getComponent());
         splitter.setSecondComponent(console.getComponent());
         builder.addComponentFillVertically(splitter, 0);
-
-        final CommandLineUpdater commandLineUpdater = new CommandLineUpdater() {
-            @Override
-            public String getCommandLine() {
-                return commandLine.getText();
-            }
-
-            @Override
-            public void setCommandLine(String command) {
-                // Update command line widget
-                ApplicationManager.getApplication().invokeLater(() -> commandLine.setText(command));
-                if (InstallerPanel.this.commandLineUpdater != null) {
-                    // Update command from LSP/DAP server definition
-                    InstallerPanel.this.commandLineUpdater.setCommandLine(command);
-                }
-            }
-        };
         checkInstallerAction.addHyperlinkListener(e -> {
-            processInstall(installerConfigurationWidget.getText(),
-                    commandLineUpdater,
-                    console,
-                    InstallerContext.InstallerAction.CHECK);
+            processInstall(InstallerContext.InstallerAction.CHECK);
         });
 
         runInstallerAction.addHyperlinkListener(e -> {
-            processInstall(installerConfigurationWidget.getText(),
-                    commandLineUpdater,
-                    console,
-                    InstallerContext.InstallerAction.RUN);
+            processInstall(InstallerContext.InstallerAction.RUN);
         });
 
         checkAndRunInstallerAction.addHyperlinkListener(e -> {
-            processInstall(installerConfigurationWidget.getText(),
-                    commandLineUpdater,
-                    console,
-                    InstallerContext.InstallerAction.CHECK_AND_RUN);
+            processInstall(InstallerContext.InstallerAction.CHECK_AND_RUN);
         });
     }
 
-    private void processInstall(@NotNull String json,
-                                @NotNull CommandLineUpdater commandLineUpdater,
-                                @NotNull ConsoleView console,
-                                @NotNull InstallerContext.InstallerAction action) {
-        var context = new InstallerContext(project, action, commandLineUpdater)
-                .setConsole(console);
-        context.setFlushOnEachPrint(flushOnEachPrint);
-
+    private void processInstall(@NotNull InstallerContext.InstallerAction action) {
+        var context = createInstallerContext(action);
         try {
             ServerInstallerManager
-                    .getInstance(project)
+                    .getInstance()
                     .install(installerConfigurationWidget.getText(), context);
         } catch (Exception s) {
             Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
@@ -144,8 +116,34 @@ public class InstallerPanel implements Disposable {
         }
     }
 
+    private @NotNull InstallerContext createInstallerContext(InstallerContext.@NotNull InstallerAction action) {
+        var context = new InstallerContext(project, action)
+                .setConsole(console);
+        context.setFlushOnEachPrint(flushOnEachPrint);
+        context.setCommandLineUpdater(commandLineUpdater);
+        if (action == InstallerContext.InstallerAction.RUN || action == InstallerContext.InstallerAction.CHECK_AND_RUN) {
+            context.setOnPreInstall(onPreInstall);
+            context.setOnPostInstall(onPostInstall);
+        }
+        return context;
+    }
+
     public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
         this.commandLineUpdater = commandLineUpdater;
+    }
+
+    public void addPreInstallAction(@NotNull Runnable action) {
+        if (onPreInstall == null) {
+            onPreInstall = new HashSet<>();
+        }
+        onPreInstall.add(action);
+    }
+
+    public void addPostInstallAction(@NotNull Runnable action) {
+        if (onPostInstall == null) {
+            onPostInstall = new HashSet<>();
+        }
+        onPostInstall.add(action);
     }
 
     public @NotNull JsonTextField getInstallerConfigurationWidget() {

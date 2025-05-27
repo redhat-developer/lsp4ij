@@ -254,7 +254,7 @@
     <extensions defaultExtensionNs="com.intellij">
         <applicationService
             serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherManager"/>
-        <projectService
+        <applicationService
             serviceImplementation="com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager"/>
     </extensions>
 

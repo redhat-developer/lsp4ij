@@ -16,6 +16,9 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatureAware;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -95,7 +98,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      */
     @NotNull
     private synchronized CompletableFuture<ServerInstallationStatus> createInstallFuture() {
-        if (isInstallFutureInitialized()) {
+        if (installFuture != null && isInstallFutureInitialized()) {
             return installFuture;
         }
         CompletableFuture<ServerInstallationStatus> installFuture = new CompletableFuture<>();
@@ -106,7 +109,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                     indicator.setIndeterminate(false);
                     if (status == ServerInstallationStatus.NOT_INSTALLED) {
                         progressCheckingServerInstalled(indicator);
-                        status = ServerInstallationStatus.CHECKING_INSTALLED;
+                        updateStatus(ServerInstallationStatus.CHECKING_INSTALLED);
                     }
                     // Check if user has canceled the server installer task
                     ProgressManager.checkCanceled();
@@ -122,7 +125,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
 
                     // Installing the server
                     progressInstallingServer(indicator);
-                    status = ServerInstallationStatus.INSTALLING;
+                    updateStatus(ServerInstallationStatus.INSTALLING);
 
                     var beforeCode = getBeforeCode();
                     if (beforeCode != null) {
@@ -142,7 +145,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                 } catch (CancellationException e) {
                     CancellationSupport.cancel(installFuture);
                 } catch (Throwable e) {
-                    status = ServerInstallationStatus.NOT_INSTALLED;
+                    updateStatus(ServerInstallationStatus.NOT_INSTALLED);
                     installFuture.completeExceptionally(e);
                 }
             }
@@ -150,8 +153,12 @@ public abstract class ServerInstallerBase implements ServerInstaller {
         return installFuture;
     }
 
+    protected void updateStatus(@NotNull ServerInstallationStatus status) {
+        this.status = status;
+    }
+
     private void markAsInstalled(@NotNull CompletableFuture<ServerInstallationStatus> installFuture) {
-        status = ServerInstallationStatus.INSTALLED;
+        updateStatus(ServerInstallationStatus.INSTALLED);
         var afterCode = getAfterCode();
         if (afterCode != null) {
             afterCode.run();
@@ -257,4 +264,5 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      * @return the {@link Project} for the installation.
      */
     protected abstract @NotNull Project getProject();
+
 }

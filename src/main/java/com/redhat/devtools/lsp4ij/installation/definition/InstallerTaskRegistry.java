@@ -10,11 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.StringReader;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,10 +26,12 @@ import java.util.Map;
  */
 public class InstallerTaskRegistry {
 
-    private static final String INSTALLER_NAME_JSON_PROPERTY = "name";
-    private static final String INSTALLER_CHECK_JSON_PROPERTY = "check";
-    private static final String INSTALLER_RUN_JSON_PROPERTY = "run";
-    private static final String TASK_REF_JSON_PROPERTY = "ref";
+    private static final @NotNull String INSTALLER_NAME_JSON_PROPERTY = "name";
+    private static final @NotNull String INSTALLER_EXECUTE_ON_START_SERVER_JSON_PROPERTY = "executeOnStartServer";
+    private static final @NotNull String INSTALLER_CHECK_JSON_PROPERTY = "check";
+    private static final @NotNull String INSTALLER_RUN_JSON_PROPERTY = "run";
+    private static final @NotNull String TASK_REF_JSON_PROPERTY = "ref";
+
 
     private final @NotNull Map<String, InstallerTaskFactory> factories;
 
@@ -38,37 +43,52 @@ public class InstallerTaskRegistry {
         factories.put(type, factory);
     }
 
-    public @NotNull ServerInstallerDescriptor loadInstaller(@NotNull JsonObject json) {
-        String name = JSONUtils.getString(json, INSTALLER_NAME_JSON_PROPERTY);
-        ServerInstallerDescriptor serverInstallerDeclaration = new ServerInstallerDescriptor(name != null ? name : "Untitled", this);
-        loadStep(json, INSTALLER_CHECK_JSON_PROPERTY, serverInstallerDeclaration);
-        loadStep(json, INSTALLER_RUN_JSON_PROPERTY, serverInstallerDeclaration);
-        return serverInstallerDeclaration;
+    public @NotNull ServerInstallerDescriptor loadInstaller(@NotNull String json) {
+        JsonObject installer = loadJson(json);
+        return loadInstaller(installer);
     }
 
-    private void loadStep(@NotNull JsonObject json,
+    public @NotNull ServerInstallerDescriptor loadInstaller(@NotNull JsonObject json) {
+        String name = JSONUtils.getString(json, INSTALLER_NAME_JSON_PROPERTY);
+        boolean executeOnStartServer = JSONUtils.getBoolean(json, INSTALLER_EXECUTE_ON_START_SERVER_JSON_PROPERTY);
+        ServerInstallerDescriptor serverInstallerDescriptor = new ServerInstallerDescriptor(name != null ? name : "Untitled", executeOnStartServer,this);
+        loadTask(json, INSTALLER_CHECK_JSON_PROPERTY, serverInstallerDescriptor);
+        loadTask(json, INSTALLER_RUN_JSON_PROPERTY, serverInstallerDescriptor);
+        return serverInstallerDescriptor;
+    }
+
+    private JsonObject loadJson(@NotNull String installerConfigurationContent) {
+        JsonElement installerConfiguration = JsonParser.parseReader(new StringReader(installerConfigurationContent));
+        if (installerConfiguration.isJsonObject()) {
+            return installerConfiguration.getAsJsonObject();
+        } else {
+            throw new RuntimeException("Invalid Json object");
+        }
+    }
+
+    private void loadTask(@NotNull JsonObject json,
                           @NotNull String name,
-                          @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
-        JsonObject stepObject = JSONUtils.getJsonObject(json, name);
-        if (stepObject != null) {
+                          @NotNull ServerInstallerDescriptor serverInstallerDescriptor) {
+        JsonObject taskObject = JSONUtils.getJsonObject(json, name);
+        if (taskObject != null) {
             InstallerTask installerTask = null;
-            String ref = JSONUtils.getString(stepObject, TASK_REF_JSON_PROPERTY);
+            String ref = JSONUtils.getString(taskObject, TASK_REF_JSON_PROPERTY);
             if (ref != null) {
 
             } else {
-                installerTask = loadStep(stepObject, serverInstallerDeclaration);
+                installerTask = loadTask(taskObject, serverInstallerDescriptor);
             }
             if (installerTask != null) {
                 if (INSTALLER_RUN_JSON_PROPERTY.equals(name)) {
-                    serverInstallerDeclaration.setRun(installerTask);
+                    serverInstallerDescriptor.setRun(installerTask);
                 } else {
-                    serverInstallerDeclaration.setCheck(installerTask);
+                    serverInstallerDescriptor.setCheck(installerTask);
                 }
             }
         }
     }
 
-    public InstallerTask loadStep(@Nullable JsonObject stepObject,
+    public InstallerTask loadTask(@Nullable JsonObject stepObject,
                                   @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
         if (stepObject == null) {
             return null;

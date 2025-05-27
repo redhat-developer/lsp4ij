@@ -20,6 +20,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -261,7 +262,9 @@ public class LanguageServerWrapper implements Disposable {
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
-        stop();
+        if (serverStatus == ServerStatus.starting || serverStatus == ServerStatus.started) {
+            stop();
+        }
         // start the language server
         getInitializedServer()
                 .thenAccept(unused -> {
@@ -350,7 +353,6 @@ public class LanguageServerWrapper implements Disposable {
 
                         // Starting process...
                         updateStatus(ServerStatus.starting);
-                        getLanguageServerLifecycleManager().onStatusChanged(this);
                         this.currentProcessId = null;
                         this.currentProcessCommandLines = null;
                         provider.start();
@@ -440,7 +442,6 @@ public class LanguageServerWrapper implements Disposable {
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
 
                         updateStatus(ServerStatus.started);
-                        getLanguageServerLifecycleManager().onStatusChanged(this);
                     }).exceptionally(e -> {
                         if (e instanceof CompletionException) {
                             e = e.getCause();
@@ -522,31 +523,29 @@ public class LanguageServerWrapper implements Disposable {
             timer = null;
             if (!stopping) {
                 updateStatus(ServerStatus.started);
-                getLanguageServerLifecycleManager().onStatusChanged(this);
             }
         }
     }
 
-    private void updateStatus(@NotNull ServerStatus serverStatus) {
+    public void updateStatus(@NotNull ServerStatus serverStatus) {
+        boolean statusChanged = (this.serverStatus != serverStatus) && (serverStatus != ServerStatus.none);
+        this.serverStatus = serverStatus;
         // If this is an "interesting" status change, increment the project-level modification tracker and the wrapper's
         // modification tracker before firing events
-        if ((this.serverStatus != serverStatus) && (serverStatus != ServerStatus.none)) {
+        if (statusChanged) {
             LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
             incrementModificationCount();
+            getLanguageServerLifecycleManager().onStatusChanged(this);
+            if (languageClient != null) {
+                languageClient.handleServerStatusChanged(serverStatus);
+            }
+            getClientFeatures().handleServerStatusChanged(serverStatus);
         }
-
-        this.serverStatus = serverStatus;
-
-        if (languageClient != null) {
-            languageClient.handleServerStatusChanged(serverStatus);
-        }
-        getClientFeatures().handleServerStatusChanged(serverStatus);
     }
 
     private void startStopTimer() {
         timer = new Timer("Stop Language Server Timer"); //$NON-NLS-1$
         updateStatus(ServerStatus.stopping);
-        getLanguageServerLifecycleManager().onStatusChanged(this);
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -609,7 +608,6 @@ public class LanguageServerWrapper implements Disposable {
                 return;
             }
             updateStatus(ServerStatus.stopping);
-            getLanguageServerLifecycleManager().onStatusChanged(this);
 
             removeStopTimer(true);
             if (this.languageClient != null) {
@@ -638,7 +636,6 @@ public class LanguageServerWrapper implements Disposable {
                     shutdownAll(languageServerInstance, provider, serverFuture);
                     this.stopping.set(false);
                     updateStatus(ServerStatus.stopped);
-                    getLanguageServerLifecycleManager().onStatusChanged(this);
                 };
                 CompletableFuture.runAsync(shutdownKillAndStopFutureAndProvider);
             }

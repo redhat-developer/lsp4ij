@@ -102,20 +102,21 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
             return AllIcons.Actions.Cancel;
         }
         boolean hasError = languageServer.getServerError() != null;
-        switch (serverStatus) {
-            case started:
+        return switch (serverStatus) {
+            case started -> {
                 if (hasError) {
-                    return AllIcons.RunConfigurations.TestFailed;
+                    yield AllIcons.RunConfigurations.TestFailed;
                 }
-                return AllIcons.Actions.Commit;
-            case stopped:
+                yield AllIcons.Actions.Commit;
+            }
+            case stopped -> {
                 if (hasError) {
-                    return AllIcons.RunConfigurations.TestError;
+                    yield AllIcons.RunConfigurations.TestError;
                 }
-                return AllIcons.Actions.Suspend;
-            default:
-                return RUNNING_ICON;
-        }
+                yield AllIcons.Actions.Suspend;
+            }
+            default -> RUNNING_ICON;
+        };
     }
 
     public String getDisplayName() {

@@ -1,6 +1,7 @@
 {
   "id": "erlang-ls-installer",
   "name": "erlang-ls",
+  "executeOnStartServer": false,
   "check": {
     "exec": {
       "name": "Check erlang runtime",

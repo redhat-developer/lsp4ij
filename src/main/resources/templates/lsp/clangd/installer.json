@@ -1,7 +1,13 @@
 {
   "id": "clangd-installer",
   "name": "clangd",
+  "executeOnStartServer": false,
   "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
   },
   "run": {
     "download": {
