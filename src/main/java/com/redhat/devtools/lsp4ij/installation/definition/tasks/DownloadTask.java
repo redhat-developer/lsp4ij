@@ -128,7 +128,9 @@ public class DownloadTask extends InstallerTask {
                 // Downloaded asset is a zip, tar, etc file
                 if (decompressedDir != null && Files.isDirectory(decompressedDir)) {
                     // The extracted downloaded asset is a directory, adjust the dir where the server will be hosted
-                    dir = dir + "/" + decompressedDir.getName(decompressedDir.getNameCount() - 1);
+                    var decompressFolderName = decompressedDir.getName(decompressedDir.getNameCount() - 1);
+                    dir = dir + "/" + decompressFolderName;
+                    outputDir = outputDir.resolve(decompressFolderName);
                 }
             } else {
                 // Downloaded asset is a simple file (ex: *.jar file)
