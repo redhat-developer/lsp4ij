@@ -19,6 +19,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionToolbar;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
@@ -240,7 +241,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             LanguageServerDefinition serverDefinition = key.getServerDefinition();
             Project project = LSPConsoleToolWindowPanel.this.project;
             // Create the language server panel with 'Server', 'Mappings', 'Configuration', 'Debug' tabs
-            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, project);
+            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, false, project);
             loadDetailPanel(languageServerView);
 
             // Track changes of definition + settings to reload the language server detail (command, mappings, etc):
@@ -391,7 +392,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                     return;
                 }
                 if (event.serverDefinition == serverDefinition) {
-                    loadDetailPanel(languageServerView);
+                    ApplicationManager.getApplication()
+                                    .invokeLater(() -> loadDetailPanel(languageServerView));
                 }
             }
         };

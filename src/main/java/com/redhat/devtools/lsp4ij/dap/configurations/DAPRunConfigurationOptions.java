@@ -94,6 +94,10 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     private final StoredProperty<String> serverTrace = string(ServerTrace.getDefaultValue().name())
             .provideDelegate(this, "serverTrace");
 
+    // Installer settings
+    private final StoredProperty<String> installerConfiguration = string("")
+            .provideDelegate(this, "installerConfiguration");
+
     // Configuration settings
 
     @Override
@@ -288,6 +292,16 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         this.serverTrace.setValue(this, serverTrace.name());
     }
 
+    // Installer settings
+
+    public String getInstallerConfiguration() {
+        return installerConfiguration.getValue(this);
+    }
+
+    public void setInstallerConfiguration(String installerConfiguration) {
+        this.installerConfiguration.setValue(this, installerConfiguration);
+    }
+    
     public @Nullable NetworkAddressExtractor getNetworkAddressExtractor() {
         if (networkAddressExtractor != null) {
             return networkAddressExtractor;

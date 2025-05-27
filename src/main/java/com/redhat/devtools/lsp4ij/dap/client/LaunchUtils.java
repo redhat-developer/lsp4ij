@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.client;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -69,26 +70,31 @@ public class LaunchUtils {
     @NotNull
     public static Map<String, Object> getDapParameters(@Nullable String launchJson,
                                                        @Nullable Map<String, String> context) {
-        if (StringUtils.isBlank(launchJson)) {
+        if (launchJson == null || StringUtils.isBlank(launchJson)) {
             return Collections.emptyMap();
         }
 
-        for (Map.Entry<String, String> entry : context.entrySet()) {
-            String value = entry.getValue();
-            if (!StringUtils.isEmpty(value)) {
-                launchJson = launchJson.replace(entry.getKey(), value);
+        if (context != null) {
+            for (Map.Entry<String, String> entry : context.entrySet()) {
+                String value = entry.getValue();
+                if (!StringUtils.isEmpty(value)) {
+                    launchJson = launchJson.replace(entry.getKey(), value);
+                }
             }
         }
-        Type mapType = new TypeToken<Map<String, Object>>() {
-        }.getType();
-        // Conversion du JSON en Map
-        return new Gson().fromJson(launchJson, mapType);
+
+        Gson gson = new GsonBuilder()
+                .registerTypeAdapter(new TypeToken<Map<String, Object>>(){}.getType(), new IntegerPreservingMapDeserializer())
+                .create();
+
+        Type mapType = new TypeToken<Map<String, Object>>(){}.getType();
+        return gson.fromJson(launchJson, mapType);
     }
 
 
     @NotNull
     public static String resolveAttachAddress(@Nullable  String attachAddress, @NotNull Map<String, Object> parameters) {
-        if (StringUtils.isBlank(attachAddress)) {
+        if (attachAddress == null || StringUtils.isBlank(attachAddress)) {
             return "";
         }
         if (attachAddress.charAt(0) == '$') {
@@ -108,7 +114,7 @@ public class LaunchUtils {
     }
 
     public static int resolveAttachPort(@Nullable  String attachPort, Map<String, Object> parameters) {
-        if (StringUtils.isBlank(attachPort)) {
+        if (attachPort == null || StringUtils.isBlank(attachPort)) {
             return -1;
         }
         if (attachPort.charAt(0) == '$') {
@@ -116,7 +122,7 @@ public class LaunchUtils {
             Object current = parameters;
             for (var key : keys) {
                 if (current instanceof Map) {
-                    current = ((Map) current).get(key);
+                    current = ((Map<?, ?>) current).get(key);
                 }
             }
             if (current instanceof Double value) {
@@ -129,7 +135,7 @@ public class LaunchUtils {
                 return value.intValue();
             }
             if (current instanceof Integer value) {
-                return value.intValue();
+                return value;
             }
             return -1;
         }

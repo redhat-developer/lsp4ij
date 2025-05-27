@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/docker-language-server/initializationOptions.schema.json",
+  "title": "LSP4IJ Docker Language Server server initialization options JSON schema",
+  "description": "JSON schema for the Docker Language Server's server initialization options.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "telemetry": {
+      "type": "string",
+      "enum": [
+        "all",
+        "error",
+        "off"
+      ],
+      "enumDescriptions": [
+        "All telemetry will be sent",
+        "Language server errors",
+        "No telemetry will be sent"
+      ],
+      "default": "all",
+      "description": "Configures what kind of telemetry, if any, should be sent to Docker"
+    }
+  }
+}

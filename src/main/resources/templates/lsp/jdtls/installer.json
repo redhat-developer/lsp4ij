@@ -1,0 +1,29 @@
+{
+  "id": "jdt-ls",
+  "name": "jdt-ls",
+  "check": {
+  },
+  "run": {
+    "download": {
+      "name": "Download jdt-ls",
+      "url": "https://www.eclipse.org/downloads/download.php?file=/jdtls/snapshots/jdt-language-server-latest.tar.gz",
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/jdt-ls",
+        "file": {
+          "name": {
+            "windows": "bin/jdtls.bat",
+            "default": "bin/jdtls"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure jdt-ls server command",
+          "command": "\"${output.dir}/${output.file.name}\" -configuration \"USER_HOME$/.cache/jdtls\" -data \"$PROJECT_DIR$/jdtls-data\"",
+          "update": true
+        }
+      }
+    }
+  }
+}

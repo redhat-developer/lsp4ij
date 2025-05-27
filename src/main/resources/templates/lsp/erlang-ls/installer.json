@@ -1,0 +1,41 @@
+{
+  "id": "erlang-ls-installer",
+  "name": "erlang-ls",
+  "check": {
+    "exec": {
+      "name": "Check erlang runtime",
+      "command": {
+        "windows": "where erlang",
+        "default": "which erlang"
+      }
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download erlang-ls",
+      "github": {
+        "owner": "erlang-ls",
+        "repository": "erlang_ls",        
+        "asset": {
+          "windows": "erlang_ls-win*.tar.gz",
+          "unix": "erlang-linux*.zip",
+          "mac": "erlang-macos*.zip"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp",
+        "file": {
+          "name": "erlang",
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Erlang LS server command",
+          "command": "escript ${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}
