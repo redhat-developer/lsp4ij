@@ -28,18 +28,25 @@ import org.jetbrains.annotations.Nullable;
 public class ServerInstallerDescriptor {
 
     private final @NotNull String name;
+    private final boolean executeOnStartServer;
     private final @NotNull InstallerTaskRegistry installerTaskRegistry;
     private @Nullable InstallerTask check;
     private @Nullable InstallerTask run;
 
     public ServerInstallerDescriptor(@NotNull String name,
+                                     boolean executeOnStartServer,
                                      @NotNull InstallerTaskRegistry installerTaskRegistry) {
         this.name = name;
+        this.executeOnStartServer = executeOnStartServer;
         this.installerTaskRegistry = installerTaskRegistry;
     }
 
     public @NotNull String getName() {
         return name;
+    }
+
+    public boolean isExecuteOnStartServer() {
+        return executeOnStartServer;
     }
 
     public @Nullable InstallerTask getCheck() {

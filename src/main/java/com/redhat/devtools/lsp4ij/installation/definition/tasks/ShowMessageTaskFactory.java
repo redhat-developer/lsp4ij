@@ -49,7 +49,7 @@ public class ShowMessageTaskFactory extends InstallerTaskFactoryBase {
             var current = actions.get(i);
             if (current.isJsonObject()) {
                 var jsonStep = current.getAsJsonObject();
-                var action = serverInstallerDeclaration.getStepActionRegistry().loadStep(jsonStep, serverInstallerDeclaration);
+                var action = serverInstallerDeclaration.getStepActionRegistry().loadTask(jsonStep, serverInstallerDeclaration);
                 if (action != null) {
                     stepsActions.add(action);
                 }

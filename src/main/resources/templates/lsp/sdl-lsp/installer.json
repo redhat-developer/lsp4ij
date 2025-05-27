@@ -1,7 +1,13 @@
 {
   "id": "sdl-lsp",
   "name": "sdl-lsp",
+  "executeOnStartServer": false,
   "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
   },
   "run": {
     "download": {

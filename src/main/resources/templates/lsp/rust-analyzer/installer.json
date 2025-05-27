@@ -1,7 +1,13 @@
 {
   "id": "rust-analyzer-installer",
   "name": "rust-analyzer",
+  "executeOnStartServer": false,
   "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
   },
   "run": {
     "download": {

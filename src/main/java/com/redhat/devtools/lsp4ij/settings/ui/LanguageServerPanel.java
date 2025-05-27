@@ -48,6 +48,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.util.HashSet;
 
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
@@ -225,6 +226,18 @@ public class LanguageServerPanel implements Disposable {
     public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
         if (installerPanel != null) {
             this.installerPanel.setCommandLineUpdater(commandLineUpdater);
+        }
+    }
+
+    public void addPreInstallAction(@NotNull Runnable action) {
+        if (installerPanel != null) {
+            this.installerPanel.addPreInstallAction(action);
+        }
+    }
+
+    public void addPostInstallAction(@NotNull Runnable action) {
+        if (installerPanel != null) {
+            this.installerPanel.addPostInstallAction(action);
         }
     }
 

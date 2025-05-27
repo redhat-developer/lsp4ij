@@ -290,4 +290,25 @@ public class JSONUtils {
         return false;
     }
 
+    /**
+     * Retrieves an Integer value with the specified name from the given parent JSON object.
+     *
+     * @param json The source {@link JsonObject} to search in.
+     * @param name The name of the field to extract.
+     * @return The Integer value if the field exists and is a JSON string, or {@code null} otherwise.
+     */
+    public static @Nullable Integer getInteger(@NotNull JsonObject json, String name) {
+        if (!json.has(name)) {
+            return null;
+        }
+        var element = json.get(name);
+        if (!element.isJsonPrimitive()) {
+            return null;
+        }
+        var primitive = element.getAsJsonPrimitive();
+        if (primitive.isNumber()) {
+            return primitive.getAsInt();
+        }
+        return null;
+    }
 }

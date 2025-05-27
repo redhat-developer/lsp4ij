@@ -23,10 +23,12 @@ import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.launching.ui.UICommandLineUpdater;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
@@ -316,9 +318,18 @@ public class LanguageServerView implements Disposable {
                 description,
                 launchingServerDefinition ? LanguageServerPanel.EditionMode.EDIT_USER_DEFINED :
                         LanguageServerPanel.EditionMode.EDIT_EXTENSION, flushOnEachPrint, project);
-        if (languageServerDefinition instanceof CommandLineUpdater commandLineUpdater) {
-            languageServerPanel.setCommandLineUpdater(commandLineUpdater);
+        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition def) {
+            languageServerPanel.setCommandLineUpdater(new UICommandLineUpdater(def, project));
         }
+        // Stop and disable the language server when installation is started
+        languageServerPanel.addPreInstallAction(()-> {
+            LanguageServerManager.getInstance(project).stop(languageServerDefinition.getId());
+            languageServerDefinition.setEnabled(false, project);
+        });
+        // Re-enable the language server when installation is terminated
+        languageServerPanel.addPostInstallAction(()-> {
+            languageServerDefinition.setEnabled(true, project);
+        });
         this.mappingPanel = languageServerPanel.getMappingsPanel();
         return builder.getPanel();
     }

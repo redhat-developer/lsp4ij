@@ -43,14 +43,7 @@ public class ConfigureServerTask extends InstallerTask {
     @Override
     public boolean run(@NotNull InstallerContext context) {
         try {
-            String resolvedCommand = command;
-            var keys = context.getPropertyKeys();
-            for(var key : keys) {
-                String value = context.getProperty(key);
-                if (value != null) {
-                    resolvedCommand = resolvedCommand.replace("${" + key + "}", value);
-                }
-            }
+            String resolvedCommand = context.resolveValues(command);
             context.print("Start server command=" + resolvedCommand);
             var commandLineUpdater = context.getCommandLineUpdater();
             if (commandLineUpdater != null) {
@@ -63,4 +56,5 @@ public class ConfigureServerTask extends InstallerTask {
             return false;
         }
     }
+
 }

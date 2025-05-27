@@ -14,6 +14,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerManager;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatureAware;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.jetbrains.annotations.ApiStatus;
@@ -102,6 +103,24 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
     @Override
     public final void setClientFeatures(@NotNull LSPClientFeatures clientFeatures) {
         this.clientFeatures = clientFeatures;
+    }
+
+    @Override
+    protected void updateStatus(@NotNull ServerInstallationStatus status) {
+        super.updateStatus(status);
+        var serverStatus = getServerStatus(status);
+        if (serverStatus != null) {
+            clientFeatures.getServerWrapper().updateStatus(serverStatus);
+        }
+    }
+
+    private static @Nullable ServerStatus getServerStatus(@NotNull ServerInstallationStatus status) {
+        return switch (status) {
+            case CHECKING_INSTALLED -> ServerStatus.checking_installed;
+            case INSTALLING -> ServerStatus.installing;
+            case INSTALLED -> ServerStatus.installed;
+            default -> null;
+        };
     }
 
     @Override

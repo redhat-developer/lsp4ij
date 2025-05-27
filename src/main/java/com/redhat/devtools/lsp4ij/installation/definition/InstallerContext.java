@@ -60,26 +60,25 @@ public class InstallerContext implements Reporter {
 
     private final @NotNull Project project;
     private final @NotNull InstallerAction action;
-    private final @Nullable CommandLineUpdater commandLineUpdater;
+    private @Nullable CommandLineUpdater commandLineUpdater;
     private final @NotNull Map<String, String> properties;
     private boolean flushOnEachPrint;
     private @Nullable ConsoleView console;
     private @Nullable ProgressIndicator progressIndicator;
     private final @NotNull List<InstallationStatus> status;
 
+    private @Nullable Set<Runnable> onPreInstall;
+    private @Nullable Set<Runnable> onPostInstall;
     /**
      * Constructs a new {@code InstallerContext}.
      *
      * @param project             the IntelliJ {@link Project} in which the installation is taking place.
      * @param action              the {@link InstallerAction} to be performed (e.g., CHECK, RUN).
-     * @param commandLineUpdater  optional component responsible for updating the launch configuration.
      */
     public InstallerContext(@NotNull Project project,
-                            @NotNull InstallerAction action,
-                            @Nullable CommandLineUpdater commandLineUpdater) {
+                            @NotNull InstallerAction action) {
         this.project = project;
         this.action = action;
-        this.commandLineUpdater = commandLineUpdater;
         this.properties = new HashMap<>();
         this.status = new ArrayList<>();
         setFlushOnEachPrint(false);
@@ -130,6 +129,26 @@ public class InstallerContext implements Reporter {
 
     public @Nullable CommandLineUpdater getCommandLineUpdater() {
         return commandLineUpdater;
+    }
+
+    public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
+        this.commandLineUpdater = commandLineUpdater;
+    }
+
+    public void setOnPreInstall(@Nullable Set<Runnable> onPreInstall) {
+        this.onPreInstall = onPreInstall;
+    }
+
+    public @NotNull Set<Runnable> getOnPreInstall() {
+        return onPreInstall != null ? onPreInstall : Collections.emptySet();
+    }
+
+    public void setOnPostInstall(@Nullable Set<Runnable> onPostInstall) {
+        this.onPostInstall = onPostInstall;
+    }
+
+    public @NotNull Set<Runnable> getOnPostInstall() {
+        return onPostInstall != null ? onPostInstall : Collections.emptySet();
     }
 
     /**
@@ -302,6 +321,19 @@ public class InstallerContext implements Reporter {
      */
     public @NotNull List<InstallationStatus> getStatus() {
         return status;
+    }
+
+
+    public @NotNull String resolveValues(@NotNull String unresolved){
+        String resolved = unresolved;
+        var keys = getPropertyKeys();
+        for(var key : keys) {
+            String value = getProperty(key);
+            if (value != null) {
+                resolved = resolved.replace("${" + key + "}", value);
+            }
+        }
+        return resolved;
     }
 
     /**

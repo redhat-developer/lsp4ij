@@ -298,58 +298,12 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 clientConfiguration,
                 installerConfiguration);
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
+    }
 
-        if (installerConfiguration != null && StringUtils.isNotBlank(installerConfiguration) && !installerConfiguration.equals("{}")) {
-            if (MessageDialogBuilder.yesNo(LanguageServerBundle.message("new.language.server.dialog.install.title", serverName),
-                            LanguageServerBundle.message("new.language.server.dialog.install.content", serverName))
-                    .ask(project)) {
-                try {
-                    var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN, new CommandLineUpdater() {
-                        @Override
-                        public String getCommandLine() {
-                            return definition.getCommandLine();
-                        }
-
-                        @Override
-                        public void setCommandLine(String commandLine) {
-                            definition.setCommandLine(commandLine);
-
-                            // Update command line settings
-                            String languageServerId = definition.getId();
-                            UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
-                            if (settings != null) {
-                                settings.setCommandLine(commandLine);
-                                UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
-                            }
-
-                            // Notifications
-                            LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
-                                    project,
-                                    definition,
-                                    false,
-                                    true,
-                                    false,
-                                    false,
-                                    false,
-                                    false,
-                                    false,
-                                    false,
-                                    false);
-                            LanguageServersRegistry.getInstance().handleChangeEvent(event);
-                        }
-                    });
-                    ServerInstallerManager
-                            .getInstance(project)
-                            .install(installerConfiguration, context);
-                } catch (Exception s) {
-                    Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
-                            "Install error",
-                            s.getMessage(),
-                            NotificationType.ERROR);
-                    Notifications.Bus.notify(notification, project);
-                }
-            }
-        }
+    private @NotNull InstallerContext createInstallerContext(@NotNull UserDefinedLanguageServerDefinition definition) {
+        var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN);
+        context.setCommandLineUpdater(new UICommandLineUpdater(definition, project));
+        return context;
     }
 
     private void addValidator(JTextComponent textComponent) {

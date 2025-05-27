@@ -234,43 +234,9 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
                             DAPBundle.message("new.debug.adapter.dialog.install.content"))
                     .ask(project)) {
                 try {
-                    var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN, new CommandLineUpdater() {
-
-                        @Override
-                        public String getCommandLine() {
-                            return createdServer.getCommandLine();
-                        }
-
-                        @Override
-                        public void setCommandLine(String commandLine) {
-                            createdServer.setCommandLine(commandLine);
-
-                            // Update command line settings
-                            String serverId = createdServer.getId();
-                            var settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(serverId);
-                            if (settings != null) {
-                                settings.setCommandLine(commandLine);
-                                UserDefinedDebugAdapterServerSettings.getInstance().setSettings(serverId, settings);
-                            }
-
-                            // Notifications
-                            DebugAdapterServerListener.ChangedEvent event = new DebugAdapterServerListener.ChangedEvent(
-                                    createdServer,
-                                    false,
-                                    true,
-                                    false,
-                                    false,
-                                    false,
-                                    false,
-                                    false,
-                                    false,
-                                    false,
-                                    false);
-                            DebugAdapterManager.getInstance().handleChangeEvent(event);
-                        }
-                    });
+                    var context = createInstallerContext();
                     ServerInstallerManager
-                            .getInstance(project)
+                            .getInstance()
                             .install(installerConfiguration, context);
                 } catch (Exception s) {
                     Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
@@ -281,6 +247,46 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
                 }
             }
         }
+    }
+
+    private @NotNull InstallerContext createInstallerContext() {
+        var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN);
+        context.setCommandLineUpdater(new CommandLineUpdater() {
+
+            @Override
+            public String getCommandLine() {
+                return createdServer.getCommandLine();
+            }
+
+            @Override
+            public void setCommandLine(String commandLine) {
+                createdServer.setCommandLine(commandLine);
+
+                // Update command line settings
+                String serverId = createdServer.getId();
+                var settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(serverId);
+                if (settings != null) {
+                    settings.setCommandLine(commandLine);
+                    UserDefinedDebugAdapterServerSettings.getInstance().setSettings(serverId, settings);
+                }
+
+                // Notifications
+                DebugAdapterServerListener.ChangedEvent event = new DebugAdapterServerListener.ChangedEvent(
+                        createdServer,
+                        false,
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false);
+                DebugAdapterManager.getInstance().handleChangeEvent(event);
+            }
+        });
+        return context;
     }
 
     private void addValidator(JTextComponent textComponent) {
