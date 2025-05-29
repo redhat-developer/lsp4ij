@@ -69,6 +69,9 @@ public class InstallerContext implements Reporter {
 
     private @Nullable Set<Runnable> onPreInstall;
     private @Nullable Set<Runnable> onPostInstall;
+
+    private boolean showNotification;
+
     /**
      * Constructs a new {@code InstallerContext}.
      *
@@ -82,6 +85,7 @@ public class InstallerContext implements Reporter {
         this.properties = new HashMap<>();
         this.status = new ArrayList<>();
         setFlushOnEachPrint(false);
+        setShowNotification(true);
     }
 
     /**
@@ -334,6 +338,14 @@ public class InstallerContext implements Reporter {
             }
         }
         return resolved;
+    }
+
+    public void setShowNotification(boolean showNotification) {
+        this.showNotification = showNotification;
+    }
+
+    public boolean isShowNotification() {
+        return showNotification;
     }
 
     /**

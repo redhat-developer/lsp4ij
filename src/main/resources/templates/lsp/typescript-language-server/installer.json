@@ -1,6 +1,6 @@
 {
   "id": "typescript-language-server",
-  "name": "Install and verify TypeScript Language Server",
+  "name": "TypeScript Language Server",
   "executeOnStartServer": false,
   "check": {
     "exec": {

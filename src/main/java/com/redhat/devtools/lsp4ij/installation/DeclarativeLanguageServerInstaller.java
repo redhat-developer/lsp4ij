@@ -45,6 +45,7 @@ public abstract class DeclarativeLanguageServerInstaller extends LanguageServerI
             return true;
         }
         var context = createInstallerContext(InstallerContext.InstallerAction.CHECK, indicator);
+        context.setShowNotification(false);
         return ServerInstallerManager.getInstance().install(serverInstallerDescriptor, context);
     }
 
