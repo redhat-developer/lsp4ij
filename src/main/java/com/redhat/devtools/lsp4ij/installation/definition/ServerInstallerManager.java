@@ -135,6 +135,11 @@ public class ServerInstallerManager extends InstallerTaskRegistry {
         if (commandUpdater != null) {
             context.putProperty("server.command", commandUpdater.getCommandLine());
         }
+        var properties = installerDescriptor.getProperties();
+        var entrySet = properties.entrySet();
+        for (var entry : entrySet) {
+            context.putProperty(entry.getKey(), entry.getValue());
+        }
         Boolean checkResult = null;
         Boolean checkRun = null;
 

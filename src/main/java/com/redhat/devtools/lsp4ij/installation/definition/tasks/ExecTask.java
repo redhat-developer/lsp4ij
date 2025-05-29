@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.CapturingProcessHandler;
 import com.intellij.execution.process.ProcessOutput;
+import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
@@ -21,6 +22,10 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 /**
@@ -42,16 +47,19 @@ public class ExecTask extends InstallerTask {
 
     private final @NotNull List<String> command;
     private final @Nullable Integer timeout;
+    private final @Nullable String workingDir;
 
     public ExecTask(@Nullable String id,
                     @Nullable String name,
                     @Nullable InstallerTask onFail,
                     @Nullable InstallerTask onSuccess,
                     @NotNull List<String> command,
+                    @Nullable String workingDir,
                     @Nullable Integer timeout,
                     @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
         super(id, name, onFail, onSuccess, serverInstallerDeclaration);
         this.command = command;
+        this.workingDir = workingDir;
         this.timeout = timeout;
 
     }
@@ -68,6 +76,14 @@ public class ExecTask extends InstallerTask {
 
             GeneralCommandLine cmdLine = new GeneralCommandLine(resolvedCommand)
                     .withEnvironment(EnvironmentUtil.getEnvironmentMap());
+            Path workingDir = getWorkingDir(this.workingDir, context);
+            if (workingDir != null) {
+                if (!Files.exists(workingDir)) {
+                    Files.createDirectories(workingDir);
+                }
+                cmdLine = cmdLine
+                        .withWorkDirectory(workingDir.toFile());
+            }
             cmdLine.setCharset(java.nio.charset.StandardCharsets.UTF_8);
 
             handler = new CapturingProcessHandler(cmdLine);
@@ -88,5 +104,20 @@ public class ExecTask extends InstallerTask {
                 handler.destroyProcess();
             }
         }
+    }
+
+    private Path getWorkingDir(@Nullable String workingDir,
+                               @NotNull InstallerContext context) {
+        if (workingDir != null) {
+            String resolved = CommandUtils.resolveCommandLine(context.resolveValues(workingDir), context.getProject());
+            if (resolved != null) {
+                return Paths.get(resolved);
+            }
+        }
+        var projectDir = ProjectUtil.guessProjectDir(context.getProject());
+        if (projectDir != null) {
+            return projectDir.toNioPath();
+        }
+        return null;
     }
 }

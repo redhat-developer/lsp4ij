@@ -159,29 +159,32 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
 ```json
 {
   "id": "typescript-language-server",
-  "name": "Install and verify TypeScript Language Server",
+  "name": "TypeScript Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/typescript-language-server"
+  },
   "check": {
     "exec": {
-      "name": "Check TypeScript Language Server",
-      "command": {
-        "windows": "where typescript-language-server",
-        "default": "which typescript-language-server"
-      }
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
     }
   },
   "run": {
     "exec": {
-      "name": "Install TypeScript Language Server Globally",
+      "name": "Install TypeScript Language Server",
+      "workingDir": "${workingDir}",
       "command": {
-        "windows": "npm.cmd install -g typescript-language-server",
-        "default": "npm install -g typescript-language-server"
+        "windows": "npm.cmd install typescript-language-server typescript --force",
+        "default": "npm install typescript-language-server typescript --force"
       },
       "onSuccess": {
         "configureServer": {
           "name": "Configure TypeScript Language Server command",
           "command": {
-            "windows": "typescript-language-server.cmd --stdio",
-            "default": "typescript-language-server --stdio"
+            "windows": "${workingDir}/node_modules/.bin/typescript-language-server.cmd --stdio",
+            "default": "${workingDir}/node_modules/.bin/typescript-language-server --stdio"
           },
           "update": true
         }

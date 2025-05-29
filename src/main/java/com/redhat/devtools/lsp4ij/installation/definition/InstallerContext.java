@@ -61,7 +61,7 @@ public class InstallerContext implements Reporter {
     private final @NotNull Project project;
     private final @NotNull InstallerAction action;
     private @Nullable CommandLineUpdater commandLineUpdater;
-    private final @NotNull Map<String, String> properties;
+    private final @NotNull Map<String, Object> properties;
     private boolean flushOnEachPrint;
     private @Nullable ConsoleView console;
     private @Nullable ProgressIndicator progressIndicator;
@@ -161,7 +161,7 @@ public class InstallerContext implements Reporter {
      * @param key   the property name.
      * @param value the property value.
      */
-    public void putProperty(@NotNull String key, @Nullable String value) {
+    public void putProperty(@NotNull String key, @Nullable Object value) {
         properties.put(key, value);
         print("${" + key + "}=" + value);
     }
@@ -172,7 +172,7 @@ public class InstallerContext implements Reporter {
      * @param key the property name.
      * @return the corresponding value, or {@code null} if not present.
      */
-    public @Nullable String getProperty(@NotNull String key) {
+    public @Nullable Object getProperty(@NotNull String key) {
         return properties.get(key);
     }
 
@@ -332,9 +332,9 @@ public class InstallerContext implements Reporter {
         String resolved = unresolved;
         var keys = getPropertyKeys();
         for(var key : keys) {
-            String value = getProperty(key);
+            Object value = getProperty(key);
             if (value != null) {
-                resolved = resolved.replace("${" + key + "}", value);
+                resolved = resolved.replace("${" + key + "}", value.toString());
             }
         }
         return resolved;

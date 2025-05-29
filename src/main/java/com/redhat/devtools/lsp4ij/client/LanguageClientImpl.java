@@ -43,7 +43,7 @@ import java.util.function.Consumer;
  * LSP {@link LanguageClient} implementation for IntelliJ.
  */
 public class LanguageClientImpl implements LanguageClient, Disposable {
-    private final Project project;
+    private final @NotNull Project project;
     private Consumer<PublishDiagnosticsParams> diagnosticHandler;
 
     private LanguageServer server;
@@ -56,12 +56,12 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     @NotNull
     private final LSPProgressManager progressManager;
 
-    public LanguageClientImpl(Project project) {
+    public LanguageClientImpl(@NotNull Project project) {
         this.project = project;
         progressManager = new LSPProgressManager();
     }
 
-    public Project getProject() {
+    public @NotNull Project getProject() {
         return project;
     }
 

@@ -28,6 +28,7 @@ public class InstallerTaskRegistry {
 
     private static final @NotNull String INSTALLER_NAME_JSON_PROPERTY = "name";
     private static final @NotNull String INSTALLER_EXECUTE_ON_START_SERVER_JSON_PROPERTY = "executeOnStartServer";
+    private static final @NotNull String INSTALLER_PROPERTIES_JSON_PROPERTY = "properties";
     private static final @NotNull String INSTALLER_CHECK_JSON_PROPERTY = "check";
     private static final @NotNull String INSTALLER_RUN_JSON_PROPERTY = "run";
     private static final @NotNull String TASK_REF_JSON_PROPERTY = "ref";
@@ -52,9 +53,35 @@ public class InstallerTaskRegistry {
         String name = JSONUtils.getString(json, INSTALLER_NAME_JSON_PROPERTY);
         boolean executeOnStartServer = JSONUtils.getBoolean(json, INSTALLER_EXECUTE_ON_START_SERVER_JSON_PROPERTY);
         ServerInstallerDescriptor serverInstallerDescriptor = new ServerInstallerDescriptor(name != null ? name : "Untitled", executeOnStartServer,this);
+        loadProperties(json, serverInstallerDescriptor);
+        loadTask(json, INSTALLER_CHECK_JSON_PROPERTY, serverInstallerDescriptor);
         loadTask(json, INSTALLER_CHECK_JSON_PROPERTY, serverInstallerDescriptor);
         loadTask(json, INSTALLER_RUN_JSON_PROPERTY, serverInstallerDescriptor);
         return serverInstallerDescriptor;
+    }
+
+    protected void loadProperties(@NotNull JsonObject json,
+                                       @NotNull ServerInstallerDescriptor serverInstallerDescriptor) {
+        var properties = JSONUtils.getJsonObject(json, INSTALLER_PROPERTIES_JSON_PROPERTY);
+        if (properties != null) {
+            var entrySet = properties.entrySet();
+            for (var propertyObj : entrySet) {
+                String propertyName =  propertyObj.getKey();
+                JsonElement propertyValue = propertyObj.getValue();
+                if (propertyValue.isJsonPrimitive()) {
+                    var jsonPrimitive = propertyValue.getAsJsonPrimitive();
+                    if (jsonPrimitive.isString()) {
+                        serverInstallerDescriptor.addProperty(propertyName, jsonPrimitive.getAsString());
+                    } else if (jsonPrimitive.isBoolean()) {
+                        serverInstallerDescriptor.addProperty(propertyName, jsonPrimitive.getAsBoolean());
+                    } else if (jsonPrimitive.isNumber()) {
+                        serverInstallerDescriptor.addProperty(propertyName, jsonPrimitive.getAsInt());
+                    }
+                } else {
+                    serverInstallerDescriptor.addProperty(propertyName, propertyValue);
+                }
+            }
+        }
     }
 
     private JsonObject loadJson(@NotNull String installerConfigurationContent) {
