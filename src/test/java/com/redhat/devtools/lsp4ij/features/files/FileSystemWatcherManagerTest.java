@@ -42,7 +42,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class FileSystemWatcherManagerTest {
 
-    private FileSystemWatcherManager manager = new FileSystemWatcherManager();
+    final private FileSystemWatcherManager manager = new FileSystemWatcherManager();
 
     @Test
     public void jdt_ls() {
@@ -112,9 +112,6 @@ public class FileSystemWatcherManagerTest {
 
     @Test
     public void register_unregister_watchers() {
-        // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
-        String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
-
         // Register Java watcher
         String id_java = "watcher-java";
         registerWatchers(id_java, """
@@ -124,7 +121,7 @@ public class FileSystemWatcherManagerTest {
                           }
                         ]
                       }
-                """.formatted(baseDir));
+                """);
         assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java// Match "**/*.java"
         assertNoMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.ts
 
@@ -137,7 +134,7 @@ public class FileSystemWatcherManagerTest {
                           }
                         ]
                       }
-                """.formatted(baseDir));
+                """);
         assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java// Match "**/*.java"
         assertMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.java// Match "**/*.ts"
 
@@ -154,9 +151,6 @@ public class FileSystemWatcherManagerTest {
 
     @Test
     public void watcherKind() {
-        // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
-        String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
-
         // Register Java watcher
         registerWatchers("watcher-kind", """
                 {"watchers": [
@@ -181,7 +175,7 @@ public class FileSystemWatcherManagerTest {
                           }
                         ]
                       }
-                """.formatted(baseDir));
+                """);
 
         assertMatchFile(getBaseUri() + "foo.kind_null", WatchKind.Create); // file:///C:/foo.king_null// Match "**/*.kind_null"
         assertMatchFile(getBaseUri() + "foo.kind_null", WatchKind.Change); // file:///C:/foo.king_null// Match "**/*.kind_null"
@@ -710,7 +704,7 @@ public class FileSystemWatcherManagerTest {
                             "globPattern": "%s"
                           }
                           ]}
-                          """.formatted(pattern));
+                """.formatted(pattern));
         if (expected) {
             assertMatchFile(uri);
         } else {
