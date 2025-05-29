@@ -29,9 +29,11 @@ public abstract class DeclarativeLanguageServerInstaller extends LanguageServerI
 
     @Override
     public CompletableFuture<ServerInstallationStatus> checkInstallation() {
-        ServerInstallerDescriptor serverInstallerDescriptor = getServerInstallerDescriptor();
-        if (serverInstallerDescriptor == null || !canExecute(serverInstallerDescriptor)) {
-            return CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
+        if (!isInstallFutureInitialized()) {
+            ServerInstallerDescriptor serverInstallerDescriptor = getServerInstallerDescriptor();
+            if (serverInstallerDescriptor == null || !canExecute(serverInstallerDescriptor)) {
+                return CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
+            }
         }
         return super.checkInstallation();
     }
@@ -39,7 +41,7 @@ public abstract class DeclarativeLanguageServerInstaller extends LanguageServerI
     @Override
     protected boolean checkServerInstalled(@NotNull ProgressIndicator indicator) throws Exception {
         ServerInstallerDescriptor serverInstallerDescriptor = getServerInstallerDescriptor();
-        if (serverInstallerDescriptor == null || !canExecute(serverInstallerDescriptor)) {
+        if (serverInstallerDescriptor == null) {
             return true;
         }
         var context = createInstallerContext(InstallerContext.InstallerAction.CHECK, indicator);
