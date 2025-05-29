@@ -162,8 +162,10 @@ public class ServerInstallerManager extends InstallerTaskRegistry {
         }
 
         boolean hasError = (checkResult != null && !checkResult) || (checkRun != null && !checkRun);
-        Notification notification = getNotification(installerDescriptor.getName(), context, hasError);
-        Notifications.Bus.notify(notification, context.getProject());
+        if (context.isShowNotification()) {
+            Notification notification = getNotification(installerDescriptor.getName(), context, hasError);
+            Notifications.Bus.notify(notification, context.getProject());
+        }
         return !hasError;
     }
 
