@@ -13,6 +13,9 @@ package com.redhat.devtools.lsp4ij.installation.definition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Describes an installable server by declaring the installer tasks associated with it.
  * <p>
@@ -30,6 +33,7 @@ public class ServerInstallerDescriptor {
     private final @NotNull String name;
     private final boolean executeOnStartServer;
     private final @NotNull InstallerTaskRegistry installerTaskRegistry;
+    private final @NotNull Map<String, Object> properties;
     private @Nullable InstallerTask check;
     private @Nullable InstallerTask run;
 
@@ -38,6 +42,7 @@ public class ServerInstallerDescriptor {
                                      @NotNull InstallerTaskRegistry installerTaskRegistry) {
         this.name = name;
         this.executeOnStartServer = executeOnStartServer;
+        this.properties = new HashMap<>();
         this.installerTaskRegistry = installerTaskRegistry;
     }
 
@@ -63,6 +68,14 @@ public class ServerInstallerDescriptor {
 
     public void setRun(@Nullable InstallerTask run) {
         this.run = run;
+    }
+
+    public void addProperty(@NotNull String key, @Nullable Object value) {
+        properties.put(key, value);
+    }
+
+    public @NotNull Map<String, Object> getProperties() {
+        return properties;
     }
 
     public @NotNull InstallerTaskRegistry getStepActionRegistry() {

@@ -1,0 +1,18 @@
+{
+  "id": "astro-ls",
+  "name": "Astro Language Server",
+  "programArgs": {
+    "windows": "astro-ls.cmd --stdio",
+    "default": "astro-ls --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.astro"
+        ]
+      },
+      "languageId": "astro"
+    }
+  ]
+}

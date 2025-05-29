@@ -211,10 +211,17 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.serverInstallerDescriptor = null;
     }
 
-    public Object getLanguageServerConfiguration() {
-        if (configuration == null && configurationContent != null && !configurationContent.isBlank()) {
+    public Object getLanguageServerConfiguration(Project project) {
+        if (configurationContent != null && !configurationContent.isBlank()) {
             try {
-                configuration = JsonParser.parseReader(new StringReader(configurationContent));
+                if (configurationContent.contains("$")) {
+                    // Resolve magic variables like $PROJECT_DIR$
+                    String projectConfigurationContent = CommandUtils.resolveCommandLine(configurationContent, project);
+                    return JsonParser.parseReader(new StringReader(projectConfigurationContent));
+                }
+                if (configuration == null) {
+                    configuration = JsonParser.parseReader(new StringReader(configurationContent));
+                }
             } catch (Exception e) {
                 LOGGER.error("Error while parsing JSON configuration for the language server '" + getId() + "'", e);
             }
@@ -222,10 +229,17 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         return configuration;
     }
 
-    public Object getLanguageServerInitializationOptions() {
-        if (initializationOptions == null && initializationOptionsContent != null && !initializationOptionsContent.isEmpty()) {
+    public Object getLanguageServerInitializationOptions(@NotNull Project project) {
+        if (initializationOptionsContent != null && !initializationOptionsContent.isEmpty()) {
             try {
-                initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
+                if (initializationOptionsContent.contains("$")) {
+                    // Resolve magic variables like $PROJECT_DIR$
+                    String projectInitializationOptionsContent = CommandUtils.resolveCommandLine(initializationOptionsContent, project);
+                    return JsonParser.parseReader(new StringReader(projectInitializationOptionsContent));
+                }
+                if (initializationOptions == null) {
+                    initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
+                }
             } catch (Exception e) {
                 LOGGER.error("Error while parsing JSON Initialization Options for the language server '" + getId() + "'", e);
             }

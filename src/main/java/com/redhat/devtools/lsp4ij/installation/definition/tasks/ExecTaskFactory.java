@@ -46,6 +46,7 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
 
     private static final String COMMAND_JSON_PROPERTY = "command";
     private static final String TIMEOUT_JSON_PROPERTY = "timeout";
+    private static final String WORKING_DIR_JSON_PROPERTY = "workingDir";
 
     @Override
     protected @NotNull InstallerTask create(@Nullable String id,
@@ -54,7 +55,7 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
                                             @Nullable InstallerTask onSuccess,
                                             @NotNull JsonObject json,
                                             @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
-        return new ExecTask(id, name, onFail, onSuccess, getCommand(json), getTimeout(json), serverInstallerDeclaration);
+        return new ExecTask(id, name, onFail, onSuccess, getCommand(json), getWorkingDir(json), getTimeout(json), serverInstallerDeclaration);
     }
 
     private static @NotNull List<String> getCommand(@NotNull JsonObject json) {
@@ -111,6 +112,9 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
         }
     }
 
+    private @Nullable String getWorkingDir(@NotNull JsonObject json) {
+        return JSONUtils.getString(json, WORKING_DIR_JSON_PROPERTY);
+    }
 
     private @Nullable Integer getTimeout(@NotNull JsonObject json) {
         return JSONUtils.getInteger(json, TIMEOUT_JSON_PROPERTY);

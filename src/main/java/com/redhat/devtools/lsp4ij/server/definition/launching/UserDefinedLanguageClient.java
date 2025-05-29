@@ -25,7 +25,8 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
 
     private final UserDefinedLanguageListener languageServerStartedListener;
 
-    public UserDefinedLanguageClient(@NotNull UserDefinedLanguageServerDefinition serverDefinition, @NotNull Project project) {
+    public UserDefinedLanguageClient(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
+                                     @NotNull Project project) {
         super(project);
         this.serverDefinition = serverDefinition;
         this.languageServerStartedListener = new UserDefinedLanguageListener(this, project);
@@ -40,7 +41,7 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
 
     @Override
     protected Object createSettings() {
-        return serverDefinition.getLanguageServerConfiguration();
+        return serverDefinition.getLanguageServerConfiguration(getProject());
     }
 
     @Override

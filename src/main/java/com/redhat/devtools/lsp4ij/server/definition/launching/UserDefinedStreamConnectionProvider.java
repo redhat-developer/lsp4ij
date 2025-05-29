@@ -18,6 +18,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 
@@ -30,6 +31,7 @@ import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtil
 public class UserDefinedStreamConnectionProvider extends OSProcessStreamConnectionProvider {
 
     private final @NotNull UserDefinedLanguageServerDefinition serverDefinition;
+    private final @NotNull Project project;
 
     public UserDefinedStreamConnectionProvider(@NotNull String commandLine,
                                                @NotNull Map<String, String> userEnvironmentVariables,
@@ -37,11 +39,12 @@ public class UserDefinedStreamConnectionProvider extends OSProcessStreamConnecti
                                                @NotNull UserDefinedLanguageServerDefinition serverDefinition,
                                                @NotNull Project project) {
         super(createCommandLine(commandLine, userEnvironmentVariables, includeSystemEnvironmentVariables));
+        this.project = project;
         this.serverDefinition = serverDefinition;
     }
 
     @Override
-    public Object getInitializationOptions(VirtualFile rootUri) {
-        return serverDefinition.getLanguageServerInitializationOptions();
+    public Object getInitializationOptions(@Nullable VirtualFile rootUri) {
+        return serverDefinition.getLanguageServerInitializationOptions(project);
     }
 }
