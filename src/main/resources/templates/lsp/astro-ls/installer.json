@@ -3,7 +3,7 @@
   "name": "Astro Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/astro-ls"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/astro-ls"
   },
   "check": {
     "exec": {
