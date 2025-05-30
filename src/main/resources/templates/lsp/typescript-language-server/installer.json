@@ -3,7 +3,7 @@
   "name": "TypeScript Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/typescript-language-server"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/typescript-language-server"
   },
   "check": {
     "exec": {
