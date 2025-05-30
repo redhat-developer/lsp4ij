@@ -886,7 +886,11 @@ public class LanguageServerWrapper implements Disposable {
                 newSyncOptions.setSave(true);
                 return newSyncOptions;
             } else if (syncOptions.isRight()) {
-                return syncOptions.getRight();
+                TextDocumentSyncOptions newSyncOptions =  syncOptions.getRight();
+                if (newSyncOptions.getSave() == null) {
+                    newSyncOptions.setSave(true);
+                }
+                return newSyncOptions;
             }
         }
         return DEFAULT_SYNC_OPTIONS;
