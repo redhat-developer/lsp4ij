@@ -28,6 +28,14 @@ val lsp4jVersion = prop("lsp4jVersion")
 val lsp4jDebugVersion = prop("lsp4jDebugVersion")
 val flexmarkVersion = prop("flexmarkVersion")
 
+val platformVersion = prop("platformVersion")
+val ideaVersionInt = when {
+    // e.g. '20XY.Z'
+    platformVersion.length == 6 -> platformVersion.replace(".", "").substring(2).toInt()
+    // e.g. '2XY.ABCDE.12'
+    else -> platformVersion.substringBefore(".").toInt()
+}
+
 // Configure project's dependencies
 repositories {
     mavenLocal()
@@ -55,7 +63,7 @@ dependencies {
         /*
          * platformVersion check for JSON breaking changes since 2024.3
          */
-        if (prop("platformVersion").startsWith("25") || prop("platformVersion").startsWith("2025.")) {
+        if (ideaVersionInt >= 243) {
             platformBundledPlugins.add("com.intellij.modules.json")
         }
         println("use bundled Plugins: $platformBundledPlugins")
@@ -210,9 +218,8 @@ tasks {
 
     // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally
     fun supportsEnhancedClassRedefinition(): Boolean {
-        val platformVersion = properties("platformVersion").get()
         // Versions before 2024.1 don't support enhanced class redefinition
-        return !platformVersion.startsWith("2023.")
+        return ideaVersionInt >= 241
     }
 
     runIde {

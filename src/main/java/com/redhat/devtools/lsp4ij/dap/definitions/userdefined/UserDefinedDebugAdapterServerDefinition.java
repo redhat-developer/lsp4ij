@@ -14,9 +14,11 @@ import com.google.common.collect.Streams;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -45,7 +47,7 @@ import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServe
  * @see ServerMappingSettings
  * @see UserDefinedDebugAdapterDescriptorFactory
  */
-public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerDefinition {
+public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerDefinition implements CommandLineUpdater {
 
     public static final UserDefinedDebugAdapterServerDefinition NONE = new UserDefinedDebugAdapterServerDefinition("none", "NONE", "", Collections.emptyList(), Collections.emptyList());
 
@@ -65,6 +67,10 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
     private List<ServerMapping> serverMappings;
     private String attachAddress;
     private String attachPort;
+
+    // Installer
+    private @Nullable String installerConfiguration;
+
     /**
      * Creates a user-defined debug adapter server definition.
      *
@@ -160,19 +166,21 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
     }
 
     /**
-     * Returns the command line used to start the language server.
+     * Returns the command line used to start the DAP server.
      *
      * @return the command line string
      */
+    @Override
     public String getCommandLine() {
         return commandLine;
     }
 
     /**
-     * Sets the command line used to start the language server.
+     * Sets the command line used to start the DAP server.
      *
      * @param commandLine the new command line
      */
+    @Override
     public void setCommandLine(String commandLine) {
         this.commandLine = commandLine;
     }
@@ -283,5 +291,13 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
 
     public void setAttachPort(String attachPort) {
         this.attachPort = attachPort;
+    }
+
+    public @Nullable String getInstallerConfiguration() {
+        return installerConfiguration;
+    }
+
+    public void setInstallerConfiguration(@Nullable String installerConfiguration) {
+        this.installerConfiguration = installerConfiguration;
     }
 }

@@ -1,0 +1,50 @@
+{
+  "id": "clangd-installer",
+  "name": "clangd",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download clangd",
+      "github": {
+        "owner": "clangd",
+        "repository": "clangd",
+        "prerelease": true,
+        "asset": {
+          "windows": "clangd-windows*.zip",
+          "unix": "clangd-linux*.zip",
+          "mac": "clangd-mac*.zip"
+        }
+      },
+      "url": {
+        "windows": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-windows-snapshot_20250518.zip",
+        "unix": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-linux-snapshot_20250518.zip",
+        "mac": " https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-mac-snapshot_20250518.zip"
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp",
+        "file": {
+          "name": {
+            "windows": "bin/clangd.exe",
+            "unix": "bin/clangd",
+            "mac": "bin/clangd"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Clangd server command",
+          "command": "${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}

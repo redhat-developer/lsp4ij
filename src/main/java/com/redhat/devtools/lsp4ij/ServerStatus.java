@@ -19,6 +19,9 @@ package com.redhat.devtools.lsp4ij;
 public enum ServerStatus {
 
     none, // initial status
+    checking_installed,
+    installing,
+    installed,
     starting, // The language server process is starting
     started, // The language server is started without error
     stopping, // The language server is stopping

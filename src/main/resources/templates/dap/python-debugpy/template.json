@@ -1,0 +1,26 @@
+{
+  "id": "python-debugpy",
+  "name": "Python - Debugpy",
+  "attach": {
+    "address": "$connect.host",
+    "port": "$connect.port"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.py",
+          "*.rpy",
+          "*.pyw",
+          "*.cpy",
+          "*.gyp",
+          "*.gypi",
+          "*.pyi",
+          "*.ipy",
+          "*.pyt"
+        ]
+      },
+      "languageId": "python"
+    }
+  ]
+}

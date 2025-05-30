@@ -1,7 +1,0 @@
-{
-  "type": "swift-lldb",
-  "name": "Launch Swift executable",
-  "request": "launch",
-  "program": "${file}",
-  "cwd": "${workspaceFolder}"
-}

@@ -23,9 +23,12 @@ import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.launching.ui.UICommandLineUpdater;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
@@ -53,6 +56,7 @@ import java.util.stream.Collectors;
 public class LanguageServerView implements Disposable {
 
     private final LanguageServerNameProvider languageServerNameProvider;
+    private final boolean flushOnEachPrint;
 
     public interface LanguageServerNameProvider {
         String getDisplayName();
@@ -68,8 +72,9 @@ public class LanguageServerView implements Disposable {
 
     public LanguageServerView(@NotNull LanguageServerDefinition languageServerDefinition,
                               @Nullable LanguageServerNameProvider languageServerNameProvider,
-                              @NotNull Project project
-    ) {
+                              boolean flushOnEachPrint,
+                              @NotNull Project project) {
+        this.flushOnEachPrint = flushOnEachPrint;
         this.languageServerDefinition = languageServerDefinition;
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
@@ -105,7 +110,8 @@ public class LanguageServerView implements Disposable {
                     && isEquals(this.getConfigurationContent(), settings.getConfigurationContent())
                     && isEquals(this.getConfigurationSchemaContent(), settings.getConfigurationSchemaContent())
                     && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent())
-                    && isEquals(this.getClientConfigurationContent(), settings.getClientConfigurationContent()))) {
+                    && isEquals(this.getClientConfigurationContent(), settings.getClientConfigurationContent())
+                    && isEquals(this.getInstallerConfigurationContent(), settings.getInstallerConfigurationContent()))) {
                 return true;
             }
         }
@@ -175,6 +181,7 @@ public class LanguageServerView implements Disposable {
                 this.setConfigurationSchemaContent(userDefinedLanguageServerSettings.getConfigurationSchemaContent());
                 this.setInitializationOptionsContent(userDefinedLanguageServerSettings.getInitializationOptionsContent());
                 this.setClientConfigurationContent(userDefinedLanguageServerSettings.getClientConfigurationContent());
+                this.setInstallerConfigurationContent(userDefinedLanguageServerSettings.getInstallerConfigurationContent());
 
                 List<ServerMappingSettings> languageMappings = userDefinedLanguageServerSettings.getMappings()
                         .stream()
@@ -277,7 +284,8 @@ public class LanguageServerView implements Disposable {
                                     getConfigurationContent(),
                                     getConfigurationSchemaContent(),
                                     getInitializationOptionsContent(),
-                                    getClientConfigurationContent()),
+                                    getClientConfigurationContent(),
+                                    getInstallerConfigurationContent()),
                             false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -309,7 +317,19 @@ public class LanguageServerView implements Disposable {
         this.languageServerPanel = new LanguageServerPanel(builder,
                 description,
                 launchingServerDefinition ? LanguageServerPanel.EditionMode.EDIT_USER_DEFINED :
-                        LanguageServerPanel.EditionMode.EDIT_EXTENSION, project);
+                        LanguageServerPanel.EditionMode.EDIT_EXTENSION, flushOnEachPrint, project);
+        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition def) {
+            languageServerPanel.setCommandLineUpdater(new UICommandLineUpdater(def, project));
+        }
+        // Stop and disable the language server when installation is started
+        languageServerPanel.addPreInstallAction(()-> {
+            LanguageServerManager.getInstance(project).stop(languageServerDefinition.getId());
+            languageServerDefinition.setEnabled(false, project);
+        });
+        // Re-enable the language server when installation is terminated
+        languageServerPanel.addPostInstallAction(()-> {
+            languageServerDefinition.setEnabled(true, project);
+        });
         this.mappingPanel = languageServerPanel.getMappingsPanel();
         return builder.getPanel();
     }
@@ -446,10 +466,22 @@ public class LanguageServerView implements Disposable {
 
     public void setClientConfigurationContent(String configurationContent) {
         var clientConfiguration = languageServerPanel.getClientConfigurationWidget();
-        clientConfiguration.setText(configurationContent);
-        clientConfiguration.setCaretPosition(0);
+        if (clientConfiguration != null) {
+            clientConfiguration.setText(configurationContent);
+            clientConfiguration.setCaretPosition(0);
+        }
     }
 
+    public String getInstallerConfigurationContent() {
+        return languageServerPanel.getInstallerConfigurationWidget().getText();
+    }
+
+    public void setInstallerConfigurationContent(String configurationContent) {
+        var installerConfiguration = languageServerPanel.getInstallerConfigurationWidget();
+        installerConfiguration.setText(configurationContent);
+        installerConfiguration.setCaretPosition(0);
+    }
+    
     @Override
     public void dispose() {
         languageServerPanel.dispose();

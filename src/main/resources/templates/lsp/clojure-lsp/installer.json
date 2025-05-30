@@ -1,0 +1,51 @@
+{
+  "id": "clojure-lsp-installer",
+  "name": "clojure-lsp",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download clojure-lsp",
+      "github": {
+        "owner": "clojure-lsp",
+        "repository": "clojure-lsp",
+        "prerelease": false,
+        "asset": {
+          "windows": "clojure-lsp-native-windows-amd64.zip",
+          "unix": {
+            "amd64": "clojure-lsp-native-linux-amd64.zip",
+            "arm64": "clojure-lsp-native-linux-aarch64.zip"
+          },
+          "mac": {
+            "aarch64": "clojure-lsp-native-macos-aarch64.zip",
+            "amd64": "clojure-lsp-native-macos-amd64.zip"
+          }
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/clojure-lsp",
+        "file": {
+          "name": {
+            "windows": "clojure-lsp.exe",
+            "unix": "clojure-lsp",
+            "mac": "clojure-lsp"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure clojure-lsp server command",
+          "command": "${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}

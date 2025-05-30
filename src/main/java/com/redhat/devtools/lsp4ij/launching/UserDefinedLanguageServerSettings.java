@@ -125,6 +125,10 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String clientConfigurationContent = "{}";
 
+        private String installerConfigurationContent;
+
+        private boolean installAlreadyDone;
+
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
 
@@ -235,6 +239,22 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setClientConfigurationContent(String clientConfigurationContent) {
             this.clientConfigurationContent = clientConfigurationContent;
+        }
+
+        public String getInstallerConfigurationContent() {
+            return installerConfigurationContent;
+        }
+
+        public void setInstallerConfigurationContent(String installerConfigurationContent) {
+            this.installerConfigurationContent = installerConfigurationContent;
+        }
+
+        public boolean isInstallAlreadyDone() {
+            return installAlreadyDone;
+        }
+
+        public void setInstallAlreadyDone(boolean installAlreadyDone) {
+            this.installAlreadyDone = installAlreadyDone;
         }
     }
 

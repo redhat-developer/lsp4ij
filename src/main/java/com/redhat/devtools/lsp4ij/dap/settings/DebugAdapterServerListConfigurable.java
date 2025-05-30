@@ -43,15 +43,14 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- *  Show list of Debug Adapter Servers as master.
+ * Show list of Debug Adapter Servers as master.
  */
 public class DebugAdapterServerListConfigurable extends MasterDetailsComponent implements SearchableConfigurable {
 
     @NonNls
     private static final String ID = "debugAdapterDescriptorFactories";
-    private String displayNodeName = null;
     private final Project project;
-
+    private String displayNodeName = null;
     private final DebugAdapterServerListener listener = new DebugAdapterServerListener() {
 
         @Override
@@ -66,9 +65,22 @@ public class DebugAdapterServerListConfigurable extends MasterDetailsComponent i
 
         @Override
         public void handleChanged(@NotNull DebugAdapterServerListener.ChangedEvent event) {
-            // Do nothing
+            if (event.commandChanged) {
+                // The command of DAP server has changed.
+                var serverDefinition = event.serverDefinition;
+                MyNode[] selectedNodes = myTree.getSelectedNodes(MyNode.class, null);
+                for (var selectedNode : selectedNodes) {
+                    if (isUserDefined(selectedNode)) {
+                        var configurable = ((DebugAdapterServerConfigurable) selectedNode.getConfigurable());
+                        var current = configurable.getEditableObject();
+                        if (current == serverDefinition) {
+                            // -> the command field in the UI must be updated accordingly
+                            ApplicationManager.getApplication().invokeLater(configurable::reset);
+                        }
+                    }
+                }
+            }
         }
-
     };
 
     private boolean isTreeInitialized;
@@ -76,6 +88,11 @@ public class DebugAdapterServerListConfigurable extends MasterDetailsComponent i
     public DebugAdapterServerListConfigurable(@NotNull Project project) {
         this.project = project;
         DebugAdapterManager.getInstance().addDebugAdapterServerListener(listener);
+    }
+
+    private static boolean isUserDefined(MyNode node) {
+        var serverDefinition = ((DebugAdapterServerConfigurable) node.getConfigurable()).getEditableObject();
+        return serverDefinition instanceof UserDefinedDebugAdapterServerDefinition;
     }
 
     @Override
@@ -154,11 +171,6 @@ public class DebugAdapterServerListConfigurable extends MasterDetailsComponent i
         return Arrays.asList(addAction, removeAction);
     }
 
-    private static boolean isUserDefined(MyNode node) {
-        var serverDefinition = ((DebugAdapterServerConfigurable) node.getConfigurable()).getEditableObject();
-        return serverDefinition instanceof UserDefinedDebugAdapterServerDefinition;
-    }
-
     private void addDebugAdapterProtocolDefinitionNode(DebugAdapterServerDefinition serverDefinition) {
         MyNode node = new MyNode(new DebugAdapterServerConfigurable(serverDefinition, TREE_UPDATER, project));
         addNode(node, myRoot);
@@ -182,6 +194,7 @@ public class DebugAdapterServerListConfigurable extends MasterDetailsComponent i
 
     /**
      * Set the node which should be displayed when opening the setting
+     *
      * @param displayNodeName display name of the language server definition
      */
     public void setDisplayNodeName(String displayNodeName) {

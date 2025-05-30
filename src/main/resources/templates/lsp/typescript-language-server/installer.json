@@ -1,0 +1,33 @@
+{
+  "id": "typescript-language-server",
+  "name": "TypeScript Language Server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Check TypeScript Language Server",
+      "command": {
+        "windows": "where typescript-language-server",
+        "default": "which typescript-language-server"
+      }
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install TypeScript Language Server Globally",
+      "command": {
+        "windows": "npm.cmd install -g typescript-language-server",
+        "default": "npm install -g typescript-language-server"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure TypeScript Language Server command",
+          "command": {
+            "windows": "typescript-language-server.cmd --stdio",
+            "default": "typescript-language-server --stdio"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}

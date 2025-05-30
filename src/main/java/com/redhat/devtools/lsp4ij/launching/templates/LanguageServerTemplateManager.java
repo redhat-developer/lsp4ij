@@ -34,6 +34,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -46,7 +48,7 @@ import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTempl
 public class LanguageServerTemplateManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplateManager.class);
 
-    private static final String TEMPLATES_DIR = "templates";
+    private static final String TEMPLATES_DIR = "templates/lsp";
 
     private final List<LanguageServerTemplate> templates = new ArrayList<>();
 
@@ -79,6 +81,8 @@ public class LanguageServerTemplateManager {
         } else {
             LOGGER.warn("No templateRoot found, no templates ");
         }
+        // Sort templates by name
+        templates.sort(Comparator.comparing(LanguageServerTemplate::getName));
     }
 
     /**
@@ -137,6 +141,7 @@ public class LanguageServerTemplateManager {
         String settingsSchemaJson = null;
         String initializationOptionsJson = null;
         String clientSettingsJson = null;
+        String installerSettingsJson = null;
         String description = null;
 
         for (VirtualFile file : templateFolder.getChildren()) {
@@ -158,6 +163,9 @@ public class LanguageServerTemplateManager {
                     break;
                 case CLIENT_SETTINGS_FILE_NAME:
                     clientSettingsJson = VfsUtilCore.loadText(file);
+                    break;
+                case INSTALLER_FILE_NAME:
+                    installerSettingsJson = VfsUtilCore.loadText(file);
                     break;
                 case README_FILE_NAME:
                     description = VfsUtilCore.loadText(file);
@@ -190,6 +198,7 @@ public class LanguageServerTemplateManager {
         template.setConfigurationSchema(settingsSchemaJson);
         template.setInitializationOptions(initializationOptionsJson);
         template.setClientConfiguration(clientSettingsJson);
+        template.setInstallerConfiguration(installerSettingsJson);
         if (StringUtils.isNotBlank(description)) {
             template.setDescription(description);
         }
@@ -237,6 +246,7 @@ public class LanguageServerTemplateManager {
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
             String settingsSchema = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationSchemaContent();
             String clientSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getClientConfigurationContent();
+            String installerSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getInstallerConfigurationContent();
             lsName = lsDefinition.getDisplayName();
 
             writeToZip(TEMPLATE_FILE_NAME, template, zos);
@@ -244,6 +254,7 @@ public class LanguageServerTemplateManager {
             writeToZip(SETTINGS_FILE_NAME, settings, zos);
             writeToZip(SETTINGS_SCHEMA_FILE_NAME, settingsSchema, zos);
             writeToZip(CLIENT_SETTINGS_FILE_NAME, clientSettings, zos);
+            writeToZip(INSTALLER_FILE_NAME, installerSettings, zos);
             zos.closeEntry();
             count++;
         }

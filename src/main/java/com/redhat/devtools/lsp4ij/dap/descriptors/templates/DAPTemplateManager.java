@@ -28,6 +28,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*;
@@ -36,16 +37,12 @@ import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*
  * DAP (Debug Adapter Protocol) template manager.
  */
 public class DAPTemplateManager {
-    
+
     private static final Logger LOGGER = LoggerFactory.getLogger(DAPTemplateManager.class);
 
-    private static final String TEMPLATES_DIR = "dap/templates";
+    private static final String TEMPLATES_DIR = "templates/dap";
 
     private final List<DAPTemplate> templates = new ArrayList<>();
-
-    public static DAPTemplateManager getInstance() {
-        return ApplicationManager.getApplication().getService(DAPTemplateManager.class);
-    }
 
     /**
      * Loads templates from resources/templates
@@ -70,6 +67,12 @@ public class DAPTemplateManager {
         } else {
             LOGGER.warn("No templateRoot found, no templates ");
         }
+        // Sort templates by name
+        templates.sort(Comparator.comparing(DAPTemplate::getName));
+    }
+
+    public static DAPTemplateManager getInstance() {
+        return ApplicationManager.getApplication().getService(DAPTemplateManager.class);
     }
 
     /**
@@ -125,6 +128,7 @@ public class DAPTemplateManager {
     public DAPTemplate createDapTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         try {
             String templateJson = null;
+            String installerJson = null;
             List<LaunchConfiguration> launchConfigurations = new ArrayList<>();
 
             for (VirtualFile file : templateFolder.getChildren()) {
@@ -134,6 +138,8 @@ public class DAPTemplateManager {
                 String fileName = file.getName();
                 if (TEMPLATE_FILE_NAME.equals(fileName)) {
                     templateJson = VfsUtilCore.loadText(file);
+                } else if (INSTALLER_FILE_NAME.equals(fileName)) {
+                    installerJson = VfsUtilCore.loadText(file);
                 } else {
                     DebugMode type = getDebugMode(fileName);
                     if (type != null) {
@@ -158,9 +164,9 @@ public class DAPTemplateManager {
 
             DAPTemplate template = gson.fromJson(templateJson, DAPTemplate.class);
             template.setLaunchConfigurations(launchConfigurations);
+            template.setInstallerConfiguration(installerJson);
             return template;
-        }
-        catch(Exception e) {
+        } catch (Exception e) {
             LOGGER.warn("Error while loading DAP template", e);
             return null;
         }

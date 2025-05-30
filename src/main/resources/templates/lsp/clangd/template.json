@@ -1,0 +1,72 @@
+{
+  "id": "clangd",
+  "name": "Clangd",
+  "programArgs": {
+    "default": "clangd"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.c",
+          "*.i"
+        ]
+      },
+      "languageId": "c"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.cpp",
+          "*.cppm",
+          "*.cc",
+          "*.ccm",
+          "*.cxx",
+          "*.cxxm",
+          "*.c++",
+          "*.c++m",
+          "*.hpp",
+          "*.hh",
+          "*.hxx",
+          "*.h++",
+          "*.h",
+          "*.ii",
+          "*.ino",
+          "*.inl",
+          "*.ipp",
+          "*.ixx",
+          "*.tpp",
+          "*.txx",
+          "*.hpp.in",
+          "*.h.in"
+        ]
+      },
+      "languageId": "cpp"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.cu",
+          "*.cuh"
+        ]
+      },
+      "languageId": "cuda-cpp"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.m"
+        ]
+      },
+      "languageId": "objective-c"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.mm"
+        ]
+      },
+      "languageId": "objective-cpp"
+    }
+  ]
+}

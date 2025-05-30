@@ -67,6 +67,7 @@ public interface LanguageServerDefinitionListener {
         public final boolean configurationChanged;
         public final boolean initializationOptionsContentChanged;
         public final boolean clientConfigurationContentChanged;
+        public final boolean installerConfigurationContentChanged;
 
         public LanguageServerChangedEvent(@NotNull Project project,
                                           @NotNull LanguageServerDefinition serverDefinition,
@@ -77,7 +78,8 @@ public interface LanguageServerDefinitionListener {
                                           boolean mappingsChanged,
                                           boolean configurationContentChanged,
                                           boolean initializationOptionsContentChanged,
-                                          boolean clientConfigurationContentChanged) {
+                                          boolean clientConfigurationContentChanged,
+                                          boolean installerConfigurationContentChanged) {
             super(project);
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
@@ -88,6 +90,7 @@ public interface LanguageServerDefinitionListener {
             this.configurationChanged = configurationContentChanged;
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;
             this.clientConfigurationContentChanged = clientConfigurationContentChanged;
+            this.installerConfigurationContentChanged = installerConfigurationContentChanged;
         }
     }
 

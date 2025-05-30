@@ -1,0 +1,58 @@
+{
+  "id": "gopls-installer",
+  "name": "Install and verify gopls",
+  "steps": [
+    {
+      "exec": {
+        "name": "Check Go runtime",
+        "command": {
+          "windows": "where go",
+          "default": "which go"
+        },
+        "onFail": {
+          "showMessage": {
+            "name": "Go is not installed. How do you want to install it?",
+            "actions": [
+              {
+                "openUrl": {
+                  "name": "Download Go",
+                  "url": "https://golang.org/dl/"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "exec": {
+        "name": "Check gopls",
+        "command": {
+          "windows": "where gopls",
+          "default": "which gopls"
+        },
+        "onFail": {
+          "showMessage": {
+            "name": "gopls is not installed. How do you want to install it?",
+            "actions": [
+              {
+                "exec": {
+                  "name": "Install with go install",
+                  "command": {
+                    "default": ["go", "install", "golang.org/x/tools/gopls@latest"]
+                  }
+                }
+              },
+              {
+                "openUrl": {
+                  "name": "Visit gopls documentation",
+                  "url": "https://github.com/golang/tools/blob/master/gopls/README.md"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

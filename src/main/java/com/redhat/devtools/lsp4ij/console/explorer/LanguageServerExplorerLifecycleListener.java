@@ -90,7 +90,7 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             }
 
             // Flush logs in the UI Thread
-            if (batch.length() > 0) {
+            if (!batch.isEmpty()) {
                 invokeLaterIfNeeded(() -> showTrace(processTreeNode, batch.toString()));
             }
         }, TRACE_FLUSH_DELAY_MS);

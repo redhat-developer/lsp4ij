@@ -1,0 +1,28 @@
+{
+  "id": "sdl-lsp",
+  "name": "sdl-lsp",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download sdl-lsp",
+      "url": "https://oss.sonatype.org/content/repositories/snapshots/io/smartdatalake/sdl-lsp/1.0-SNAPSHOT/sdl-lsp-1.0-20250503.111518-23-jar-with-dependencies.jar",
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/sdl-lsp"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure sdl-lsp server command",
+          "command": "java -jar ${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}

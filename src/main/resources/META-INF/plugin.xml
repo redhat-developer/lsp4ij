@@ -224,6 +224,40 @@
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
     <idea-version since-build="233.*"/>
 
+    <!-- Server Installer support -->
+    <extensionPoints>
+
+        <!-- Installer task factory -->
+        <extensionPoint
+                name="installerTaskFactory"
+                beanClass="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryPointBean">
+            <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactory"/>
+        </extensionPoint>
+
+    </extensionPoints>
+
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <installerTaskFactory
+                type="exec"
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ExecTaskFactory" />
+        <installerTaskFactory
+                type="showMessage"
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ShowMessageTaskFactory" />
+        <installerTaskFactory
+                type="download"
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.DownloadTaskFactory" />
+        <installerTaskFactory
+                type="configureServer"
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ConfigureServerTaskFactory" />
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+            serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherManager"/>
+        <applicationService
+            serviceImplementation="com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager"/>
+    </extensions>
+
     <!-- LSP extension points -->
     <extensionPoints>
 

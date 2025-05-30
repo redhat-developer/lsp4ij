@@ -1,0 +1,17 @@
+{
+  "id": "sdl-lsp",
+  "name": "Smart Data Lake Language Server",
+  "programArgs": {
+    "default": "java -jar XXX-jar-with-dependencies.jar"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.conf"
+        ]
+      },
+      "languageId": "hocon"
+    }
+  ]
+}

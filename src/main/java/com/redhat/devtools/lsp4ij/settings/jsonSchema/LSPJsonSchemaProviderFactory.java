@@ -31,6 +31,7 @@ public class LSPJsonSchemaProviderFactory implements JsonSchemaProviderFactory {
     public List<JsonSchemaFileProvider> getProviders(@NotNull Project project) {
         List<JsonSchemaFileProvider> providers = new ArrayList<>();
         providers.add(new LSPClientConfigurationJsonSchemaFileProvider());
+        providers.add(new ServerInstallerJsonSchemaFileProvider());
         // Create 100 dummy JsonSchemaFileProvider used by Server / Configuration editors.
         providers.addAll(LSPServerConfigurationJsonSchemaManager.getInstance(project).getProviders());
         return providers;

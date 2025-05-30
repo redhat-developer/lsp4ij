@@ -65,6 +65,8 @@ public class DAPTemplate {
     public static final String ATTACH_ADDRESS_PROPERTY = "address";
     public static final String ATTACH_PORT_PROPERTY = "port";
 
+    public static final String INSTALLER_FILE_NAME = "installer.json";
+
     private String id;
     private String name;
     private Map<String /* OS */, String /* program args */> programArgs;
@@ -79,6 +81,8 @@ public class DAPTemplate {
 
     private String attachAddress;
     private String attachPort;
+
+    private String installerConfiguration;
 
     public String getId() {
         return id;
@@ -181,5 +185,13 @@ public class DAPTemplate {
 
     public void setAttachPort(String attachPort) {
         this.attachPort = attachPort;
+    }
+
+    public String getInstallerConfiguration() {
+        return installerConfiguration;
+    }
+
+    public void setInstallerConfiguration(String installerConfiguration) {
+        this.installerConfiguration = installerConfiguration;
     }
 }

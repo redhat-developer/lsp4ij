@@ -18,6 +18,7 @@ import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.adapters.EitherTypeAdapter;
 import org.eclipse.lsp4j.jsonrpc.messages.Either3;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
@@ -30,18 +31,16 @@ import java.util.WeakHashMap;
  */
 public class JSONUtils {
 
-    private JSONUtils() {
-    }
-
     private static final Gson LSP4J_GSON = new MessageJsonHandler(new HashMap<>()).getGson();
-
     private static final Gson EITHER_GSON = new GsonBuilder() //
             .registerTypeAdapterFactory(new EitherTypeAdapter.Factory()).create();
-
     private static final Map<ClassLoader, Either3<
             Boolean /* No Gson in the classpath of the plugin */,
             Method /* JsonElement parseString(String json) */ ,
             Method/* JsonElement parse(String json) */>> jsonParseMethodCache = new WeakHashMap<>();
+
+    private JSONUtils() {
+    }
 
     /**
      * Converts the given Object to the given class using lsp4j's GSON logic.
@@ -204,4 +203,112 @@ public class JSONUtils {
         return null;
     }
 
+    /**
+     * Retrieves a JSON object with the specified name from the given parent JSON object.
+     *
+     * @param json The source {@link JsonObject} to search in.
+     * @param name The name of the field to extract.
+     * @return The {@link JsonObject} if the field exists and is a JSON object, or {@code null} otherwise.
+     */
+    public static @Nullable JsonObject getJsonObject(@NotNull JsonObject json,
+                                                     @NotNull String name) {
+        if (!json.has(name)) {
+            return null;
+        }
+        var element = json.get(name);
+        if (!element.isJsonObject()) {
+            return null;
+        }
+        return element.getAsJsonObject();
+    }
+
+    /**
+     * Retrieves a JSON array with the specified name from the given parent JSON object.
+     *
+     * @param json The source {@link JsonObject} to search in.
+     * @param name The name of the field to extract.
+     * @return The {@link JsonArray} if the field exists and is a JSON array, or {@code null} otherwise.
+     */
+    public static @Nullable JsonArray getJsonArray(@NotNull JsonObject json,
+                                                   @NotNull String name) {
+        if (!json.has(name)) {
+            return null;
+        }
+        var element = json.get(name);
+        if (!element.isJsonArray()) {
+            return null;
+        }
+        return element.getAsJsonArray();
+    }
+
+    /**
+     * Retrieves a string value with the specified name from the given parent JSON object.
+     *
+     * @param json The source {@link JsonObject} to search in.
+     * @param name The name of the field to extract.
+     * @return The string value if the field exists and is a JSON string, or {@code null} otherwise.
+     */
+    public static @Nullable String getString(@NotNull JsonObject json,
+                                             @NotNull String name) {
+        if (!json.has(name)) {
+            return null;
+        }
+        var element = json.get(name);
+        if (!element.isJsonPrimitive()) {
+            return null;
+        }
+        var primitive = element.getAsJsonPrimitive();
+        if (primitive.isString()) {
+            return primitive.getAsString();
+        }
+        return null;
+    }
+
+    /**
+     * Retrieves a boolean value with the specified name from the given parent JSON object.
+     * <p>
+     * Note: If the field is not present, not a primitive, or not a string representing a boolean,
+     * this method returns {@code false}.
+     *
+     * @param json The source {@link JsonObject} to search in.
+     * @param name The name of the field to extract.
+     * @return The boolean value if the field exists and is a valid boolean string, otherwise {@code false}.
+     */
+    public static boolean getBoolean(@NotNull JsonObject json,
+                                     @NotNull String name) {
+        if (!json.has(name)) {
+            return false;
+        }
+        var element = json.get(name);
+        if (!element.isJsonPrimitive()) {
+            return false;
+        }
+        var primitive = element.getAsJsonPrimitive();
+        if (primitive.isBoolean()) {
+            return primitive.getAsBoolean();
+        }
+        return false;
+    }
+
+    /**
+     * Retrieves an Integer value with the specified name from the given parent JSON object.
+     *
+     * @param json The source {@link JsonObject} to search in.
+     * @param name The name of the field to extract.
+     * @return The Integer value if the field exists and is a JSON string, or {@code null} otherwise.
+     */
+    public static @Nullable Integer getInteger(@NotNull JsonObject json, String name) {
+        if (!json.has(name)) {
+            return null;
+        }
+        var element = json.get(name);
+        if (!element.isJsonPrimitive()) {
+            return null;
+        }
+        var primitive = element.getAsJsonPrimitive();
+        if (primitive.isNumber()) {
+            return primitive.getAsInt();
+        }
+        return null;
+    }
 }

@@ -129,6 +129,7 @@ public class DebugAdapterManager implements DebuggableFile {
             settings.setLaunchConfigurations(definitionFromSettings.getLaunchConfigurations());
             settings.setAttachAddress(definitionFromSettings.getAttachAddress());
             settings.setAttachPort(definitionFromSettings.getAttachPort());
+            settings.setInstallerConfiguration(definitionFromSettings.getInstallerConfiguration());
             UserDefinedDebugAdapterServerSettings.getInstance().setSettings(debugAdapterServerId, settings);
         }
     }
@@ -201,7 +202,7 @@ public class DebugAdapterManager implements DebuggableFile {
                                                                           boolean notify) {
         var serverDefinition = request.serverDefinition();
         String serverId = request.serverDefinition().getId();
-        serverDefinition.setName(request.name());
+        serverDefinition.setName(request.name() != null ? request.name() : "");
         serverDefinition.setCommandLine(request.commandLine());
         serverDefinition.setConnectTimeout(request.connectTimeout());
         serverDefinition.setDebugServerReadyPattern(request.debugServerReadyPattern());
@@ -453,6 +454,7 @@ public class DebugAdapterManager implements DebuggableFile {
                 serverDefinition.setLaunchConfigurations(setting.getLaunchConfigurations());
                 serverDefinition.setAttachAddress(setting.getAttachAddress());
                 serverDefinition.setAttachPort(setting.getAttachPort());
+                serverDefinition.setInstallerConfiguration(setting.getInstallerConfiguration());
                 addDebugAdapterServerWithoutNotification(serverDefinition);
             }
         } catch (Exception e) {
