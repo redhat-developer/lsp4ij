@@ -1,0 +1,18 @@
+{
+  "id": "svelte-language-server",
+  "name": "Svelte Language Server",
+  "programArgs": {
+    "windows": "svelteserver.cmd --stdio",
+    "default": "svelteserver --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.svelte"
+        ]
+      },
+      "languageId": "svelte"
+    }
+  ]
+}
