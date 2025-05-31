@@ -1,0 +1,35 @@
+{
+  "id": "svelte-language-server",
+  "name": "Svelte Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/svelte-language-server"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Svelte Language Server",
+      "workingDir": "${workingDir}",
+      "command": {
+        "windows": "npm.cmd install svelte-language-server --force",
+        "default": "npm install svelte-language-server --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Astro Language Server command",
+          "command": {
+            "windows": "${workingDir}/node_modules/.bin/svelteserver.cmd --stdio",
+            "default": "${workingDir}/node_modules/.bin/svelteserver --stdio"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}
