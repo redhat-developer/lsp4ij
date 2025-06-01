@@ -1,0 +1,21 @@
+{
+  "id": "ruby-rdbg",
+  "name": "Ruby Debug",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Ruby Debug",
+      "command": {
+        "windows": "cmd /C gem install debug",
+        "default": "sh -s gem install debug"
+      }
+    }
+  }
+}
