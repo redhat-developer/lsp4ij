@@ -1,6 +1,6 @@
 {
     "typescript": {
-        "tsdk": "C:/Users/${user.name}/AppData/Roaming/npm/node_modules/typescript/lib"
+        "tsdk": "$USER_HOME$/.lsp4ij/lsp/vue-js-language-server-ls/node_modules/typescript/lib"
     },
     "vue": {
         "hybridMode": false

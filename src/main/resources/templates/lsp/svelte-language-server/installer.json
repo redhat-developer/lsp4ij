@@ -16,6 +16,7 @@
     "exec": {
       "name": "Install Svelte Language Server",
       "workingDir": "${workingDir}",
+      "ignoreStderr": true,
       "command": {
         "windows": "npm.cmd install svelte-language-server --force",
         "default": "npm install svelte-language-server --force"

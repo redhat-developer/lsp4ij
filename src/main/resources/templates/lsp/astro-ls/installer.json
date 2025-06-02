@@ -16,6 +16,7 @@
     "exec": {
       "name": "Install Astro Language Server",
       "workingDir": "${workingDir}",
+      "ignoreStderr": true,
       "command": {
         "windows": "npm.cmd install @astrojs/language-server prettier-plugin-astro typescript --force",
         "default": "npm install @astrojs/language-server prettier-plugin-astro typescript --force"

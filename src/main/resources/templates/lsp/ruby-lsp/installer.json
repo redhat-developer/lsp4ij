@@ -14,7 +14,7 @@
       "name": "Install Ruby LSP",
       "command": {
         "windows": "cmd /C gem install ruby-lsp",
-        "default": "sh -s gem install ruby-lsp"
+        "default": "sh -c gem install ruby-lsp"
       }
     }
   }
