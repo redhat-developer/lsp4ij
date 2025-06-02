@@ -8,4 +8,4 @@
    This will populate the command field with a default command. When a ruby file will be opened it should install the ruby-lsp and Ruby support 
 should be available.
 
-   ![Astro LS template](../images/user-defined-ls/ruby-lsp/select_template.png)
+   ![Ruby LSP template](../images/user-defined-ls/ruby-lsp/select_template.png)

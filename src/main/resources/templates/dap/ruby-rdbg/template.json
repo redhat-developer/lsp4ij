@@ -1,0 +1,49 @@
+{
+  "id": "ruby-rdbg",
+  "name": "Ruby Debug",
+  "debugServerReadyPattern": "Debug server listening at ",
+  "attach": {
+    "port": "$port"
+  },
+  "fileTypeMappings": [
+      {
+        "fileType": {
+          "patterns": [
+            "*.rb",
+            "*.rbx",
+            "*.rjs",
+            "*.gemspec",
+            "*.rake",
+            "*.ru",
+            "*.erb",
+            "*.podspec",
+            "*.rbi",
+            "rakefile",
+            "gemfile",
+            "guardfile",
+            "podfile",
+            "capfile",
+            "cheffile",
+            "hobofile",
+            "vagrantfile",
+            "appraisals",
+            "rantfile",
+            "berksfile",
+            "berksfile.lock",
+            "thorfile",
+            "puppetfile",
+            "dangerfile",
+            "brewfile",
+            "fastfile",
+            "appfile",
+            "deliverfile",
+            "matchfile",
+            "scanfile",
+            "snapfile",
+            "gymfile"
+          ]
+        },
+        "languageId": "ruby"
+      }
+    ]
+}

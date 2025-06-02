@@ -262,7 +262,7 @@ public class LanguageServerWrapper implements Disposable {
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
-        if (serverStatus == ServerStatus.starting || serverStatus == ServerStatus.started) {
+        if (serverStatus != ServerStatus.installed) {
             stop();
         }
         // start the language server

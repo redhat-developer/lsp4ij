@@ -109,17 +109,15 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
     protected void updateStatus(@NotNull ServerInstallationStatus status) {
         super.updateStatus(status);
         var serverStatus = getServerStatus(status);
-        if (serverStatus != null) {
-            clientFeatures.getServerWrapper().updateStatus(serverStatus);
-        }
+        clientFeatures.getServerWrapper().updateStatus(serverStatus);
     }
 
-    private static @Nullable ServerStatus getServerStatus(@NotNull ServerInstallationStatus status) {
+    private static @NotNull ServerStatus getServerStatus(@NotNull ServerInstallationStatus status) {
         return switch (status) {
             case CHECKING_INSTALLED -> ServerStatus.checking_installed;
             case INSTALLING -> ServerStatus.installing;
             case INSTALLED -> ServerStatus.installed;
-            default -> null;
+            case NOT_INSTALLED -> ServerStatus.not_installed;
         };
     }
 

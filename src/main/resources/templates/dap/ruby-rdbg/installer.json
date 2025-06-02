@@ -1,6 +1,6 @@
 {
-  "id": "ruby-lsp",
-  "name": "Ruby LSP",
+  "id": "ruby-rdbg",
+  "name": "Ruby Debug",
   "executeOnStartServer": false,
   "check": {
     "exec": {
@@ -11,10 +11,10 @@
   },
   "run": {
     "exec": {
-      "name": "Install Ruby LSP",
+      "name": "Install Ruby Debug",
       "command": {
-        "windows": "cmd /C gem install ruby-lsp",
-        "default": "sh -c gem install ruby-lsp"
+        "windows": "cmd /C gem install debug",
+        "default": "sh -s gem install debug"
       }
     }
   }

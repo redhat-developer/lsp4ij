@@ -175,6 +175,7 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
     "exec": {
       "name": "Install TypeScript Language Server",
       "workingDir": "${workingDir}",
+      "ignoreStderr": true,
       "command": {
         "windows": "npm.cmd install typescript-language-server typescript --force",
         "default": "npm install typescript-language-server typescript --force"

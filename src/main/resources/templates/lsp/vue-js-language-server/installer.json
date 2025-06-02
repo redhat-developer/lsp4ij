@@ -1,0 +1,36 @@
+{
+  "id": "vue-js-language-server",
+  "name": "Vue.js Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vue-js-language-server-ls"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Vue.js Language Server",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
+      "command": {
+        "windows": "npm.cmd install @vue/language-server typescript --force",
+        "default": "npm install @vue/language-server typescript --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Vue.js Language Server command",
+          "command": {
+            "windows": "${workingDir}/node_modules/.bin/vue-language-server.cmd --stdio",
+            "default": "${workingDir}/node_modules/.bin/vue-language-server --stdio"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}
