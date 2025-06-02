@@ -21,13 +21,12 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.XCollection;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.debug.ExceptionBreakpointsFilter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.logging.Filter;
 
 /**
  * User defined debug adapter server settings.
@@ -150,6 +149,7 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
         private String debugAdapterServerId;
 
         private String serverName;
+        private String serverUrl;
 
         private Map<String, String> userEnvironmentVariables;
         private boolean includeSystemEnvironmentVariables = true;
@@ -181,6 +181,14 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
 
         public void setServerName(String serverName) {
             this.serverName = serverName;
+        }
+
+        public String getServerUrl() {
+            return serverUrl;
+        }
+
+        public void setServerUrl(String serverUrl) {
+            this.serverUrl = serverUrl;
         }
 
         /**

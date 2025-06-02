@@ -14,12 +14,12 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.Computable;
-import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.templates.ServerTemplateManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -28,14 +28,8 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -45,12 +39,11 @@ import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTempl
 /**
  * Language server template manager.
  */
-public class LanguageServerTemplateManager {
+public class LanguageServerTemplateManager extends ServerTemplateManager<LanguageServerTemplate> {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerTemplateManager.class);
 
     private static final String TEMPLATES_DIR = "templates/lsp";
-
-    private final List<LanguageServerTemplate> templates = new ArrayList<>();
 
     private String lsName;
 
@@ -62,58 +55,8 @@ public class LanguageServerTemplateManager {
      * Loads templates from resources/templates
      */
     private LanguageServerTemplateManager() {
-        VirtualFile templateRoot = getTemplateRoot();
-        if (templateRoot != null) {
-            for (VirtualFile templateDir : templateRoot.getChildren()) {
-                if (templateDir.isDirectory()) {
-                    try {
-                        LanguageServerTemplate template = importLsTemplate(templateDir);
-                        if (template != null) {
-                            templates.add(template);
-                        } else {
-                            LOGGER.warn("No template found in {}", templateDir);
-                        }
-                    } catch (IOException ex) {
-                        LOGGER.warn(ex.getLocalizedMessage(), ex);
-                    }
-                }
-            }
-        } else {
-            LOGGER.warn("No templateRoot found, no templates ");
-        }
-        // Sort templates by name
-        templates.sort(Comparator.comparing(LanguageServerTemplate::getName));
-    }
-
-    /**
-     * Load the resources/templates file as a VirtualFile from the jar
-     *
-     * @return template root as virtual file or null, if one couldn't be found
-     */
-    @Nullable
-    public VirtualFile getTemplateRoot() {
-        URL url = LanguageServerTemplateManager.class.getClassLoader().getResource(TEMPLATES_DIR);
-        if (url == null) {
-            LOGGER.warn("No " + TEMPLATES_DIR + " directory/url found");
-            return null;
-        }
-        try {
-            // url looks like jar:file:/Users/username/Library/Application%20Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates
-            String filePart = url.toURI().getRawSchemeSpecificPart(); // get un-decoded, URI compatible part
-            // filePart looks like file:/Users/username/Library/Application%20Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates
-            LOGGER.debug("Templates filePart : {}", filePart);
-            String resourcePath = new URI(filePart).getSchemeSpecificPart();// get decoded part (i.e. converts %20 to spaces ...)
-            // resourcePath looks like /Users/username/Library/Application Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates/
-            LOGGER.debug("Templates resources path from uri : {}", resourcePath);
-            return JarFileSystem.getInstance().findFileByPath(resourcePath);
-        } catch (URISyntaxException e) {
-            LOGGER.warn(e.getMessage());
-        }
-        return null;
-    }
-
-    public List<LanguageServerTemplate> getTemplates() {
-        return templates;
+        // Loads templates from resources/lsp/templates
+        super(TEMPLATES_DIR);
     }
 
     /**
@@ -122,8 +65,9 @@ public class LanguageServerTemplateManager {
      * @param templateFolder directory that contains the template files
      * @return LanguageServerTemplate or null if one couldn't be created
      */
+    @Override
     @Nullable
-    public LanguageServerTemplate importLsTemplate(@NotNull VirtualFile templateFolder) throws IOException {
+    public LanguageServerTemplate importServerTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         return createLsTemplate(templateFolder);
     }
 

@@ -2,6 +2,7 @@
   "id": "lemminx",
   "name": "XML Language Server",
   "dev": true,
+  "url": null,
   "runtime": "java",
   "programArgs": {
     "default": "-classpath \"${BASE_DIR}/org.eclipse.lemminx-uber.jar\" org.eclipse.lemminx.XMLServerLauncher"

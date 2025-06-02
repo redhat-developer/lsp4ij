@@ -8,7 +8,6 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-
 package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
 import com.google.common.collect.Streams;
@@ -26,7 +25,7 @@ import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -118,6 +117,7 @@ public class DebugAdapterServerView implements Disposable {
             UserDefinedDebugAdapterServerSettings.ItemSettings settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(debugAdapterServerId);
             if (settings != null) {
                 this.setCommandLine(settings.getCommandLine());
+                this.setServerUrl(settings.getServerUrl());
                 this.setEnvData(EnvironmentVariablesData.create(
                         settings.getUserEnvironmentVariables(),
                         settings.isIncludeSystemEnvironmentVariables()));
@@ -203,6 +203,7 @@ public class DebugAdapterServerView implements Disposable {
                             new DebugAdapterManager.UpdateDebugAdapterServerRequest(
                                     userDefinedServer,
                                     getDisplayName(),
+                                    getServerUrl(),
                                     getEnvData().getEnvs(),
                                     getEnvData().isPassParentEnvs(),
                                     getCommandLine(),
@@ -240,6 +241,9 @@ public class DebugAdapterServerView implements Disposable {
                 launchingServerDefinition ? DebugAdapterServerPanel.EditionMode.EDIT_USER_DEFINED :
                         DebugAdapterServerPanel.EditionMode.EDIT_EXTENSION, project);
         this.mappingPanel = debugAdapterServerPanel.getMappingsPanel();
+        if (debugAdapterServer instanceof UserDefinedDebugAdapterServerDefinition def) {
+            debugAdapterServerPanel.setCommandLineUpdater(new UICommandLineUpdater(def));
+        }
         return builder.getPanel();
     }
 
@@ -286,7 +290,15 @@ public class DebugAdapterServerView implements Disposable {
     public void setCommandLine(String commandLine) {
         debugAdapterServerPanel.setCommandLine(commandLine);
     }
-    
+
+    public String getServerUrl() {
+        return debugAdapterServerPanel.getServerUrl();
+    }
+
+    public void setServerUrl(String serverUrl) {
+        debugAdapterServerPanel.setServerUrl(serverUrl);
+    }
+
     public int getConnectTimeout() {
         return debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
     }

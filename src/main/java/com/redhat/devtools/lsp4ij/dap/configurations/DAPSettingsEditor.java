@@ -13,12 +13,11 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.MasterDetailsComponent;
 import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterServerListener;
-import com.redhat.devtools.lsp4ij.dap.settings.DebugAdapterServerConfigurable;
 import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugAdapterServerPanel;
+import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugCommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import org.jetbrains.annotations.NotNull;
 
@@ -68,6 +67,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
                 DebugAdapterServerPanel.EditionMode.EDIT_USER_DEFINED,
                 true,
                 project);
+        dapPanel.setCommandLineUpdater(new DebugCommandLineUpdater(dapPanel));
         myPanel = new JPanel(new BorderLayout());
         myPanel.add(builder.getPanel(), BorderLayout.CENTER);
         DebugAdapterManager.getInstance().addDebugAdapterServerListener(listener);
@@ -79,6 +79,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
 
         // Sever settings
         dapPanel.setServerName(runConfiguration.getServerName());
+        dapPanel.setServerUrl(runConfiguration.getServerUrl());
         dapPanel.setCommandLine(runConfiguration.getCommand());
         dapPanel.setServerTrace(runConfiguration.getServerTrace());
 
@@ -112,6 +113,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         // Sever settings
         runConfiguration.setServerId(dapPanel.getServerId());
         runConfiguration.setServerName(dapPanel.getServerName());
+        runConfiguration.setServerUrl(dapPanel.getServerUrl());
         runConfiguration.setCommand(dapPanel.getCommandLine());
         runConfiguration.setDebugServerWaitStrategy(dapPanel.getDebugServerWaitStrategyPanel().getDebugServerWaitStrategy());
         runConfiguration.setConnectTimeout(dapPanel.getDebugServerWaitStrategyPanel().getConnectTimeout());

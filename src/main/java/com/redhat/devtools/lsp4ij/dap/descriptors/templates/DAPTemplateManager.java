@@ -17,6 +17,7 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
+import com.redhat.devtools.lsp4ij.templates.ServerTemplateManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -36,74 +37,22 @@ import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*
 /**
  * DAP (Debug Adapter Protocol) template manager.
  */
-public class DAPTemplateManager {
+public class DAPTemplateManager extends ServerTemplateManager<DAPTemplate> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DAPTemplateManager.class);
 
     private static final String TEMPLATES_DIR = "templates/dap";
-
-    private final List<DAPTemplate> templates = new ArrayList<>();
-
-    /**
-     * Loads templates from resources/templates
-     */
-    private DAPTemplateManager() {
-        VirtualFile templateRoot = getTemplateRoot();
-        if (templateRoot != null) {
-            for (VirtualFile templateDir : templateRoot.getChildren()) {
-                if (templateDir.isDirectory()) {
-                    try {
-                        DAPTemplate template = importDapTemplate(templateDir);
-                        if (template != null) {
-                            templates.add(template);
-                        } else {
-                            LOGGER.warn("No template found in {}", templateDir);
-                        }
-                    } catch (IOException ex) {
-                        LOGGER.warn(ex.getLocalizedMessage(), ex);
-                    }
-                }
-            }
-        } else {
-            LOGGER.warn("No templateRoot found, no templates ");
-        }
-        // Sort templates by name
-        templates.sort(Comparator.comparing(DAPTemplate::getName));
-    }
 
     public static DAPTemplateManager getInstance() {
         return ApplicationManager.getApplication().getService(DAPTemplateManager.class);
     }
 
     /**
-     * Load the resources/dap/templates file as a VirtualFile from the jar
-     *
-     * @return template root as virtual file or null, if one couldn't be found
+     * Loads templates from resources/templates
      */
-    @Nullable
-    public VirtualFile getTemplateRoot() {
-        URL url = DAPTemplateManager.class.getClassLoader().getResource(TEMPLATES_DIR);
-        if (url == null) {
-            LOGGER.warn("No " + TEMPLATES_DIR + " directory/url found");
-            return null;
-        }
-        try {
-            // url looks like jar:file:/Users/username/Library/Application%20Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates
-            String filePart = url.toURI().getRawSchemeSpecificPart(); // get un-decoded, URI compatible part
-            // filePart looks like file:/Users/username/Library/Application%20Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates
-            LOGGER.debug("Templates filePart : {}", filePart);
-            String resourcePath = new URI(filePart).getSchemeSpecificPart();// get decoded part (i.e. converts %20 to spaces ...)
-            // resourcePath looks like /Users/username/Library/Application Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates/
-            LOGGER.debug("Templates resources path from uri : {}", resourcePath);
-            return JarFileSystem.getInstance().findFileByPath(resourcePath);
-        } catch (URISyntaxException e) {
-            LOGGER.warn(e.getMessage());
-        }
-        return null;
-    }
-
-    public List<DAPTemplate> getTemplates() {
-        return templates;
+    private DAPTemplateManager() {
+        // Loads templates from resources/dap/templates
+        super(TEMPLATES_DIR);
     }
 
     /**
@@ -112,8 +61,9 @@ public class DAPTemplateManager {
      * @param templateFolder directory that contains the template files
      * @return DAPTemplate or null if one couldn't be created
      */
+    @Override
     @Nullable
-    public DAPTemplate importDapTemplate(@NotNull VirtualFile templateFolder) throws IOException {
+    public DAPTemplate importServerTemplate(@NotNull VirtualFile templateFolder) throws IOException {
         return createDapTemplate(templateFolder);
     }
 

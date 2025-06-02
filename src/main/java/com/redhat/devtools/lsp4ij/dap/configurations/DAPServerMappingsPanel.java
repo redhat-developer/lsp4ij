@@ -15,7 +15,7 @@ import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ui.FileNamePatternServerMappingTablePanel;
 import com.redhat.devtools.lsp4ij.settings.ui.FileTypeServerMappingTablePanel;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerMappingTablePanel;

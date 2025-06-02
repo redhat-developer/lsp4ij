@@ -15,7 +15,7 @@ import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServerMappings;
+import static com.redhat.devtools.lsp4ij.templates.ServerMappingSettings.toServerMappings;
 
 /**
  * Represents a user-defined debug adapter server definition.
@@ -70,6 +70,7 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
 
     // Installer
     private @Nullable String installerConfiguration;
+    private @Nullable String url;
 
     /**
      * Creates a user-defined debug adapter server definition.
@@ -299,5 +300,13 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
 
     public void setInstallerConfiguration(@Nullable String installerConfiguration) {
         this.installerConfiguration = installerConfiguration;
+    }
+
+    public @Nullable String getUrl() {
+        return url;
+    }
+
+    public void setUrl(@Nullable String url) {
+        this.url = url;
     }
 }

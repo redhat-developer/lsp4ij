@@ -25,7 +25,7 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DefaultDebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -67,6 +67,14 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
 
     public void setServerName(String serverName) {
         getOptions().setServerName(serverName);
+    }
+
+    public String getServerUrl() {
+        return getOptions().getServerUrl();
+    }
+
+    public void setServerUrl(String serverUrl) {
+        getOptions().setServerUrl(serverUrl);
     }
 
     public String getCommand() {

@@ -25,15 +25,15 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UI;
 import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.launching.ui.UICommandLineUpdater;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -57,17 +57,10 @@ public class LanguageServerView implements Disposable {
 
     private final LanguageServerNameProvider languageServerNameProvider;
     private final boolean flushOnEachPrint;
-
-    public interface LanguageServerNameProvider {
-        String getDisplayName();
-    }
-
     private final JPanel myMainPanel;
     private final LanguageServerDefinition languageServerDefinition;
     private final Project project;
-
     private LanguageServerPanel languageServerPanel;
-
     private ServerMappingsPanel mappingPanel;
 
     public LanguageServerView(@NotNull LanguageServerDefinition languageServerDefinition,
@@ -88,6 +81,27 @@ public class LanguageServerView implements Disposable {
         JPanel wrapper = JBUI.Panels.simplePanel(settingsPanel);
         wrapper.setBorder(JBUI.Borders.emptyLeft(10));
         this.myMainPanel = wrapper;
+    }
+
+    static boolean isEquals(String s1, String s2) {
+        // the comparison between null and "" should return true
+        s1 = s1 == null ? "" : s1;
+        s2 = s2 == null ? "" : s2;
+        return Objects.equals(s1, s2);
+    }
+
+    static boolean isEquals(ServerTrace st1, ServerTrace st2) {
+        // the comparison between null and default value trace should return true
+        st1 = st1 == null ? ServerTrace.getDefaultValue() : st1;
+        st2 = st2 == null ? ServerTrace.getDefaultValue() : st2;
+        return Objects.equals(st1, st2);
+    }
+
+    static boolean isEquals(ErrorReportingKind k1, ErrorReportingKind k2) {
+        // the comparison between null and default value error reporting kind should return true
+        k1 = k1 == null ? ErrorReportingKind.getDefaultValue() : k1;
+        k2 = k2 == null ? ErrorReportingKind.getDefaultValue() : k2;
+        return Objects.equals(k1, k2);
     }
 
     /**
@@ -134,27 +148,6 @@ public class LanguageServerView implements Disposable {
                 isEquals(this.getReportErrorKind(), settings.getErrorReportingKind()));
     }
 
-    static boolean isEquals(String s1, String s2) {
-        // the comparison between null and "" should return true
-        s1 = s1 == null ? "" : s1;
-        s2 = s2 == null ? "" : s2;
-        return Objects.equals(s1, s2);
-    }
-
-    static boolean isEquals(ServerTrace st1, ServerTrace st2) {
-        // the comparison between null and default value trace should return true
-        st1 = st1 == null ? ServerTrace.getDefaultValue() : st1;
-        st2 = st2 == null ? ServerTrace.getDefaultValue() : st2;
-        return Objects.equals(st1, st2);
-    }
-
-    static boolean isEquals(ErrorReportingKind k1, ErrorReportingKind k2) {
-        // the comparison between null and default value error reporting kind should return true
-        k1 = k1 == null ? ErrorReportingKind.getDefaultValue() : k1;
-        k2 = k2 == null ? ErrorReportingKind.getDefaultValue() : k2;
-        return Objects.equals(k1, k2);
-    }
-
     /**
      * Update the UI from the registered language server definition + settings.
      */
@@ -169,7 +162,8 @@ public class LanguageServerView implements Disposable {
         this.setReportErrorKind(errorReportingKind);
         this.setServerTrace(serverTrace);
 
-        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition) {
+        if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition userDef) {
+            this.setServerUrl(getUrl(userDef));
             // User defined language server
             com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings userDefinedLanguageServerSettings = com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
             if (userDefinedLanguageServerSettings != null) {
@@ -187,7 +181,7 @@ public class LanguageServerView implements Disposable {
                         .stream()
                         .filter(mapping -> !StringUtils.isEmpty(mapping.getLanguage()))
                         .map(mapping ->
-                            ServerMappingSettings.createLanguageMappingSettings(mapping.getLanguage(), mapping.getLanguageId())
+                                ServerMappingSettings.createLanguageMappingSettings(mapping.getLanguage(), mapping.getLanguageId())
                         )
                         .collect(Collectors.toList());
                 this.setLanguageMappings(languageMappings);
@@ -196,7 +190,7 @@ public class LanguageServerView implements Disposable {
                         .stream()
                         .filter(mapping -> !StringUtils.isEmpty(mapping.getFileType()))
                         .map(mapping ->
-                            ServerMappingSettings.createFileTypeMappingSettings(mapping.getFileType(), mapping.getLanguageId())
+                                ServerMappingSettings.createFileTypeMappingSettings(mapping.getFileType(), mapping.getLanguageId())
                         )
                         .collect(Collectors.toList());
                 this.setFileTypeMappings(fileTypeMappings);
@@ -255,6 +249,19 @@ public class LanguageServerView implements Disposable {
         }
     }
 
+    private static @Nullable String getUrl(UserDefinedLanguageServerDefinition definition) {
+        String url = definition.getUrl();
+        if (url != null) {
+            return url;
+        }
+        String templateId = definition.getTemplateId();
+        if (templateId != null) {
+            var template = LanguageServerTemplateManager.getInstance().findTemplateById(templateId);
+            return template != null ? template.getUrl() : null;
+        }
+        return null;
+    }
+
     /**
      * Update the proper language server settings and language server definition from the UI fields.
      */
@@ -277,6 +284,7 @@ public class LanguageServerView implements Disposable {
                             new LanguageServersRegistry.UpdateServerDefinitionRequest(project,
                                     launch,
                                     getDisplayName(),
+                                    getServerUrl(),
                                     getCommandLine(),
                                     getEnvData().getEnvs(),
                                     getEnvData().isPassParentEnvs(),
@@ -322,12 +330,12 @@ public class LanguageServerView implements Disposable {
             languageServerPanel.setCommandLineUpdater(new UICommandLineUpdater(def, project));
         }
         // Stop and disable the language server when installation is started
-        languageServerPanel.addPreInstallAction(()-> {
+        languageServerPanel.addPreInstallAction(() -> {
             LanguageServerManager.getInstance(project).stop(languageServerDefinition.getId());
             languageServerDefinition.setEnabled(false, project);
         });
         // Re-enable the language server when installation is terminated
-        languageServerPanel.addPostInstallAction(()-> {
+        languageServerPanel.addPostInstallAction(() -> {
             languageServerDefinition.setEnabled(true, project);
         });
         this.mappingPanel = languageServerPanel.getMappingsPanel();
@@ -410,14 +418,22 @@ public class LanguageServerView implements Disposable {
         languageServerPanel.getCommandLine().setText(commandLine);
     }
 
-    public void setEnvData(EnvironmentVariablesData envData) {
-        if (envData != null) {
-            languageServerPanel.getEnvironmentVariables().setEnvData(envData);
-        }
+    public String getServerUrl() {
+        return languageServerPanel.getServerUrl();
+    }
+
+    private void setServerUrl(@Nullable String url) {
+        languageServerPanel.setServerUrl(url);
     }
 
     public @NotNull EnvironmentVariablesData getEnvData() {
         return languageServerPanel.getEnvironmentVariables().getEnvData();
+    }
+
+    public void setEnvData(EnvironmentVariablesData envData) {
+        if (envData != null) {
+            languageServerPanel.getEnvironmentVariables().setEnvData(envData);
+        }
     }
 
     public void setLanguageMappings(@NotNull List<ServerMappingSettings> mappings) {
@@ -481,7 +497,7 @@ public class LanguageServerView implements Disposable {
         installerConfiguration.setText(configurationContent);
         installerConfiguration.setCaretPosition(0);
     }
-    
+
     @Override
     public void dispose() {
         languageServerPanel.dispose();
@@ -491,7 +507,6 @@ public class LanguageServerView implements Disposable {
         return mappingPanel.getAllMappings();
     }
 
-
     /**
      * Returns true if the command is editing and false otherwise.
      *
@@ -499,5 +514,10 @@ public class LanguageServerView implements Disposable {
      */
     public boolean isEditingCommand() {
         return languageServerPanel.getCommandLine() != null && languageServerPanel.getCommandLine().hasFocus();
+    }
+
+
+    public interface LanguageServerNameProvider {
+        String getDisplayName();
     }
 }

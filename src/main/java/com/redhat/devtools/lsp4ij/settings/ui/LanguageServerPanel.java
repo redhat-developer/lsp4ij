@@ -82,6 +82,8 @@ public class LanguageServerPanel implements Disposable {
     private JsonTextField initializationOptionsWidget;
     private @Nullable JsonTextField clientConfigurationWidget;
     private @Nullable InstallerPanel installerPanel;
+    private @Nullable String serverUrl;
+    private HyperlinkLabel serverUrlHyperlink;
 
     public LanguageServerPanel(@NotNull FormBuilder builder,
                                @Nullable JComponent description,
@@ -183,6 +185,7 @@ public class LanguageServerPanel implements Disposable {
                               @Nullable JComponent description,
                               @NotNull EditionMode mode) {
         FormBuilder serverTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.server"));
+        createServerUrl(serverTab);
         if (description != null) {
             serverTab.addComponent(description, 0);
         }
@@ -196,6 +199,14 @@ public class LanguageServerPanel implements Disposable {
             // Command line
             createCommandLineField(serverTab);
         }
+    }
+
+    private void createServerUrl(@NotNull FormBuilder serverTab) {
+        // Add hidden server url
+        serverUrlHyperlink = new HyperlinkLabel();
+        serverUrlHyperlink.setTextWithHyperlink(LanguageServerBundle.message("language.server.url", ""));
+        serverUrlHyperlink.setVisible(false);
+        serverTab.addComponent(serverUrlHyperlink, 0);
     }
 
     private void addMappingsTab(@NotNull JBTabbedPane tabbedPane,
@@ -396,6 +407,20 @@ public class LanguageServerPanel implements Disposable {
 
     public ComboBox<ErrorReportingKind> getErrorReportingKindCombo() {
         return errorReportingKindCombo;
+    }
+
+    public void setServerUrl(@Nullable String serverUrl) {
+        this.serverUrl = serverUrl;
+        if (serverUrl == null || StringUtils.isEmpty(serverUrl)) {
+            serverUrlHyperlink.setVisible(false);
+        } else {
+            serverUrlHyperlink.setVisible(true);
+            serverUrlHyperlink.setHyperlinkTarget(serverUrl);
+        }
+    }
+
+    public @Nullable String getServerUrl() {
+        return serverUrl;
     }
 
     @Override

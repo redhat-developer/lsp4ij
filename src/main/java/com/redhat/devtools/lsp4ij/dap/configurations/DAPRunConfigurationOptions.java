@@ -24,7 +24,7 @@ import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigura
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -72,6 +72,9 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
 
     private final StoredProperty<String> serverName = string("")
             .provideDelegate(this, "serverName");
+
+    private final StoredProperty<String> serverUrl = string("")
+            .provideDelegate(this, "serverUrl");
 
     private final StoredProperty<String> command = string("")
             .provideDelegate(this, "command");
@@ -197,6 +200,14 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
 
     public void setServerName(String serverName) {
         this.serverName.setValue(this, serverName);
+    }
+
+    public String getServerUrl() {
+        return serverUrl.getValue(this);
+    }
+
+    public void setServerUrl(String serverUrl) {
+        this.serverUrl.setValue(this, serverUrl);
     }
 
     /**

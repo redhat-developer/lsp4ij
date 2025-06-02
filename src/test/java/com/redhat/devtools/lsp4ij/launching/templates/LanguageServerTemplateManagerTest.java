@@ -5,7 +5,7 @@ import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.TestApplicationManager;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.junit.Test;
@@ -47,7 +47,7 @@ public class LanguageServerTemplateManagerTest {
         assert virtualFile != null;
         LanguageServerTemplate template = null;
         try {
-            template = templateManager.importLsTemplate(virtualFile);
+            template = templateManager.importServerTemplate(virtualFile);
         } catch (IOException ex) {
             fail(ex);
         }
@@ -79,7 +79,7 @@ public class LanguageServerTemplateManagerTest {
         File ioFile = new File("src/test/resources/templates/test_template2");
         VirtualFile virtualFile = localFileSystem.refreshAndFindFileByIoFile(ioFile);
         assert virtualFile != null;
-        assertThrows(IOException.class, () -> templateManager.importLsTemplate(virtualFile));
+        assertThrows(IOException.class, () -> templateManager.importServerTemplate(virtualFile));
     }
 
     private void runExport(List<LanguageServerDefinition> templates, int expectedCount) throws IOException {
@@ -105,6 +105,7 @@ public class LanguageServerTemplateManagerTest {
                 identifier,
                 null,
                 identifier,
+                null,
                 null,
                 "cmd",
                 new HashMap<>(),

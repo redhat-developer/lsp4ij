@@ -15,7 +15,7 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.util.ui.ColumnInfo;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
