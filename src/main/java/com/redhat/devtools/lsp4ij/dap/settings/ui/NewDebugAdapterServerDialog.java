@@ -14,6 +14,7 @@ import com.google.common.collect.Streams;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.MessageDialogBuilder;
@@ -25,9 +26,7 @@ import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterServerListener;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
-import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
@@ -52,7 +51,6 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
     private final Project project;
 
     private DebugAdapterServerPanel debugAdapterServerPanel;
-    private DAPTemplate currentTemplate = null;
     private UserDefinedDebugAdapterServerDefinition createdServer;
 
     public NewDebugAdapterServerDialog(@Nullable Project project) {
@@ -84,6 +82,7 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         // Create server name,  command line, mappings, configuration UI
         this.debugAdapterServerPanel = new DebugAdapterServerPanel(builder, null, DebugAdapterServerPanel.EditionMode.NEW_USER_DEFINED, project);
         debugAdapterServerPanel.setServerId("");
+        debugAdapterServerPanel.setCommandLineUpdater(new DebugCommandLineUpdater(debugAdapterServerPanel));
 
         // Add validation
         addValidator(this.debugAdapterServerPanel.getServerNameField());
@@ -97,10 +96,8 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
     private void createTemplateCombo(FormBuilder builder) {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         // Create "Choose template..." hyperlink
-        final var chooseTemplateHyperLink =  new HyperlinkLabel(DAPBundle.message("new.debug.adapter.dialog.choose.template"));
-        chooseTemplateHyperLink.addHyperlinkListener(e -> {
-            openChooseTemplatePopup(chooseTemplateHyperLink);
-        });
+        final var chooseTemplateHyperLink = new HyperlinkLabel(DAPBundle.message("new.debug.adapter.dialog.choose.template"));
+        chooseTemplateHyperLink.addHyperlinkListener(e -> openChooseTemplatePopup(chooseTemplateHyperLink));
         panel.add(chooseTemplateHyperLink, BorderLayout.WEST);
         builder.addLabeledComponent(DAPBundle.message("new.debug.adapter.dialog.template"), panel);
     }
@@ -110,21 +107,12 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         searchTemplatePopupUI.show(button);
     }
 
-    /**
-     * Check that the template is not a placeholder and that it has a valid description
-     *
-     * @param template to check
-     * @return true if template is not null, not a placeholder and has a description, else false
-     */
-    private boolean hasValidDescription(@Nullable DAPTemplate template) {
-        return template != null && template != DAPTemplate.NONE
-                && template != DAPTemplate.NEW_TEMPLATE;
-    }
-
     private void loadFromTemplate(DAPTemplate template) {
         // Update name
         var serverName = this.debugAdapterServerPanel.getServerNameField();
         serverName.setText(template.getName() != null ? template.getName() : "");
+        // Update server Url
+        debugAdapterServerPanel.setServerUrl(template.getUrl());
 
         // Update command
         String command = getCommandLine(template);
@@ -159,7 +147,6 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
     protected @NotNull List<ValidationInfo> doValidateAll() {
         List<ValidationInfo> validations = new ArrayList<>();
         addValidationInfo(validateServerName(), validations);
-        addValidationInfo(validateCommand(), validations);
         return validations;
     }
 
@@ -179,15 +166,6 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         return null;
     }
 
-    private ValidationInfo validateCommand() {
-        // Don't validate required command when DAP server supports only "attach"
-        /*var commandLine = this.debugAdapterServerPanel.getCommandLine();
-        if (commandLine.isBlank()) {
-            String errorMessage = DAPBundle.message("new.debug.adapter.dialog.validation.commandLine.must.be.set");
-            return new ValidationInfo(errorMessage, this.debugAdapterServerPanel.getCommandLineWidget());
-        }*/
-        return null;
-    }
 
     @Override
     protected Action @NotNull [] createActions() {
@@ -201,7 +179,8 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
 
         String serverId = UUID.randomUUID().toString();
         // Register language server and mappings definition
-        String serverName = this.debugAdapterServerPanel.getServerNameField().getText();
+        String serverName = this.debugAdapterServerPanel.getServerName();
+        String serverUrl = this.debugAdapterServerPanel.getServerUrl();
         Map<String, String> userEnvironmentVariables = this.debugAdapterServerPanel.getEnvironmentVariables().getEnvs();
         boolean includeSystemEnvironmentVariables = this.debugAdapterServerPanel.getEnvironmentVariables().isPassParentEnvs();
         String commandLine = this.debugAdapterServerPanel.getCommandLine();
@@ -219,6 +198,7 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
                 Streams.concat(mappingsPanel.getFileTypeMappings().stream(),
                                 mappingsPanel.getFileNamePatternMappings().stream())
                         .toList());
+        createdServer.setUrl(serverUrl);
         createdServer.setUserEnvironmentVariables(userEnvironmentVariables);
         createdServer.setIncludeSystemEnvironmentVariables(includeSystemEnvironmentVariables);
         createdServer.setConnectTimeout(connectTimeout);
@@ -251,41 +231,7 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
 
     private @NotNull InstallerContext createInstallerContext() {
         var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN);
-        context.setCommandLineUpdater(new CommandLineUpdater() {
-
-            @Override
-            public String getCommandLine() {
-                return createdServer.getCommandLine();
-            }
-
-            @Override
-            public void setCommandLine(String commandLine) {
-                createdServer.setCommandLine(commandLine);
-
-                // Update command line settings
-                String serverId = createdServer.getId();
-                var settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(serverId);
-                if (settings != null) {
-                    settings.setCommandLine(commandLine);
-                    UserDefinedDebugAdapterServerSettings.getInstance().setSettings(serverId, settings);
-                }
-
-                // Notifications
-                DebugAdapterServerListener.ChangedEvent event = new DebugAdapterServerListener.ChangedEvent(
-                        createdServer,
-                        false,
-                        true,
-                        false,
-                        false,
-                        false,
-                        false,
-                        false,
-                        false,
-                        false,
-                        false);
-                DebugAdapterManager.getInstance().handleChangeEvent(event);
-            }
-        });
+        context.setCommandLineUpdater(new UICommandLineUpdater(createdServer));
         return context;
     }
 

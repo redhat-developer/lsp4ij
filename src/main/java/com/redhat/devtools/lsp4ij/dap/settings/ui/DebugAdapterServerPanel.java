@@ -35,11 +35,11 @@ import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
 import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.SchemaBackedJsonTextField;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -71,28 +71,19 @@ public class DebugAdapterServerPanel implements Disposable {
     private AttachFieldAndPreviewLabel attachPortPreview;
     private AttachFieldAndPreviewLabel attachAddressPreview;
     private InstallerPanel installerPanel;
-
-    public enum EditionMode {
-        NEW_USER_DEFINED,
-        EDIT_USER_DEFINED,
-        EDIT_EXTENSION;
-    }
-
     // Server settings
     private ComboBox<DebugAdapterServerDefinition> debugAdapterServerCombo;
     private JBTextField serverNameField;
-
+    private @Nullable String serverUrl;
+    private HyperlinkLabel serverUrlHyperlink;
     // Server / Launch settings
     private EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private DAPDebugServerWaitStrategyPanel debugServerWaitStrategyPanel;
-
     // Server trace
     private ComboBox<ServerTrace> serverTraceComboBox;
-
     // Mappings settings
     private DAPServerMappingsPanel mappingsPanel;
-
     // Configuration settings
     private JBTabbedPane parametersTabbedPane;
     private JRadioButton launchRadioButton;
@@ -107,7 +98,6 @@ public class DebugAdapterServerPanel implements Disposable {
     private JBTextField attachPortField;
     private ComboBox<LaunchConfiguration> attachCombo;
     private SchemaBackedJsonTextField attachConfigurationField;
-
     public DebugAdapterServerPanel(@NotNull FormBuilder builder,
                                    @Nullable JComponent description,
                                    @NotNull EditionMode mode,
@@ -122,6 +112,108 @@ public class DebugAdapterServerPanel implements Disposable {
                                    @NotNull Project project) {
         this.project = project;
         createUI(builder, description, mode, showFactoryCombo);
+    }
+
+    private static DebugAdapterServerDefinition[] getServerDefinitions() {
+        List<DebugAdapterServerDefinition> servers = new ArrayList<>();
+        servers.add(UserDefinedDebugAdapterServerDefinition.NONE);
+        servers.addAll(DebugAdapterManager.getInstance().getDebugAdapterServers());
+        return servers.toArray(new DebugAdapterServerDefinition[0]);
+    }
+
+    private static ComboBox<LaunchConfiguration> createLaunchCombo() {
+        ComboBox<LaunchConfiguration> combo = new ComboBox<>();
+        combo.setRenderer(new SimpleListCellRenderer<>() {
+            @Override
+            public void customize(@NotNull JList list,
+                                  @Nullable LaunchConfiguration launch,
+                                  int index,
+                                  boolean selected,
+                                  boolean hasFocus) {
+                if (launch == null) {
+                    setText("");
+                } else {
+                    setText(launch.getName());
+                }
+            }
+        });
+        return combo;
+    }
+
+    private static FormBuilder addTab(JBTabbedPane tabbedPane, String tabTitle) {
+        return addTab(tabbedPane, tabTitle, true);
+    }
+
+    @NotNull
+    private static FormBuilder addTab(JBTabbedPane tabbedPane, String tabTitle, boolean addToTop) {
+        FormBuilder builder = FormBuilder.createFormBuilder();
+        var tabPanel = new BorderLayoutPanel();
+        if (addToTop) {
+            tabPanel.addToTop(builder.getPanel());
+        } else {
+            tabPanel.addToCenter(builder.getPanel());
+        }
+        tabbedPane.add(tabTitle, tabPanel);
+        return builder;
+    }
+
+    /**
+     * Update preview command label with expanded macro response if needed.
+     *
+     * @param commandLine         the command line which could contains macro syntax.
+     * @param previewCommandLabel the preview command label.
+     * @param project             the project.
+     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
+     */
+    private static void updatePreviewCommand(@NotNull CommandLineWidget commandLine,
+                                             @NotNull JLabel previewCommandLabel,
+                                             @NotNull Project project) {
+        commandLine.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateLabel(previewCommandLabel);
+            }
+
+            private void updateLabel(JLabel previewCommandLabel) {
+                String preview = resolveCommandLine(commandLine.getText(), project);
+                if (preview.equals(commandLine.getText())) {
+                    previewCommandLabel.setToolTipText("");
+                    previewCommandLabel.setText("");
+                } else {
+                    previewCommandLabel.setToolTipText(preview);
+                    String shortPreview = preview.length() > COMMAND_LENGTH_MAX ? preview.substring(0, COMMAND_LENGTH_MAX) + "..." : preview;
+                    previewCommandLabel.setText(shortPreview);
+                }
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateLabel(previewCommandLabel);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateLabel(previewCommandLabel);
+            }
+        });
+    }
+
+    private static JLabel createLabelForComponent(@NotNull @NlsContexts.Label String labelText, @NotNull JComponent component) {
+        JLabel label = new JLabel(UIUtil.replaceMnemonicAmpersand(labelText));
+        label.setLabelFor(component);
+        return label;
+    }
+
+    @NotNull
+    private static String getCommandLine(@NotNull UserDefinedDebugAdapterServerDefinition entry) {
+        StringBuilder command = new StringBuilder();
+        if (entry.getCommandLine() != null) {
+            if (!command.isEmpty()) {
+                command.append(' ');
+            }
+            command.append(entry.getCommandLine());
+        }
+        return command.toString();
     }
 
     private void createUI(FormBuilder builder, JComponent description, EditionMode mode, boolean showFactoryCombo) {
@@ -167,6 +259,8 @@ public class DebugAdapterServerPanel implements Disposable {
                 if (currentServer instanceof UserDefinedDebugAdapterServerDefinition userDefinedServer) {
                     if (userDefinedServer != UserDefinedDebugAdapterServerDefinition.NONE) {
                         loadFromServerDefinition(userDefinedServer);
+                    } else {
+                        setServerUrl(null);
                     }
                 }
             });
@@ -180,6 +274,7 @@ public class DebugAdapterServerPanel implements Disposable {
             serverTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.factory.field"), serverPanel);
 
         }
+        createServerUrl(serverTab);
         if (mode == EditionMode.NEW_USER_DEFINED) {
             // Server name
             createServerNameField(serverTab);
@@ -212,13 +307,6 @@ public class DebugAdapterServerPanel implements Disposable {
             }
         });
         return hyperLink;
-    }
-
-    private static DebugAdapterServerDefinition[] getServerDefinitions() {
-        List<DebugAdapterServerDefinition> servers = new ArrayList<>();
-        servers.add(UserDefinedDebugAdapterServerDefinition.NONE);
-        servers.addAll(DebugAdapterManager.getInstance().getDebugAdapterServers());
-        return servers.toArray(new DebugAdapterServerDefinition[0]);
     }
 
     private void addMappingsTab(JBTabbedPane tabbedPane, EditionMode mode) {
@@ -319,33 +407,14 @@ public class DebugAdapterServerPanel implements Disposable {
         attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), attachCombo);
         attachConfigurationField = new SchemaBackedJsonTextField(project);
         attachConfigurationField.getDocument()
-                        .addDocumentListener(new com.intellij.openapi.editor.event.DocumentListener() {
-                            @Override
-                            public void documentChanged(com.intellij.openapi.editor.event.@NotNull DocumentEvent event) {
-                                attachAddressPreview.updatePreview();
-                                attachPortPreview.updatePreview();
-                            }
-                        });
+                .addDocumentListener(new com.intellij.openapi.editor.event.DocumentListener() {
+                    @Override
+                    public void documentChanged(com.intellij.openapi.editor.event.@NotNull DocumentEvent event) {
+                        attachAddressPreview.updatePreview();
+                        attachPortPreview.updatePreview();
+                    }
+                });
         attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.parameters.field"), attachConfigurationField);
-    }
-
-    private static ComboBox<LaunchConfiguration> createLaunchCombo() {
-        ComboBox<LaunchConfiguration> combo = new ComboBox<>();
-        combo.setRenderer(new SimpleListCellRenderer<>() {
-            @Override
-            public void customize(@NotNull JList list,
-                                  @Nullable LaunchConfiguration launch,
-                                  int index,
-                                  boolean selected,
-                                  boolean hasFocus) {
-                if (launch == null) {
-                    setText("");
-                } else {
-                    setText(launch.getName());
-                }
-            }
-        });
-        return combo;
     }
 
     public void refreshLaunchConfigurations(@Nullable List<LaunchConfiguration> launchConfigurations) {
@@ -384,21 +453,12 @@ public class DebugAdapterServerPanel implements Disposable {
         parametersTabbedPane.setSelectedIndex(0);
     }
 
-    private static FormBuilder addTab(JBTabbedPane tabbedPane, String tabTitle) {
-        return addTab(tabbedPane, tabTitle, true);
-    }
-
-    @NotNull
-    private static FormBuilder addTab(JBTabbedPane tabbedPane, String tabTitle, boolean addToTop) {
-        FormBuilder builder = FormBuilder.createFormBuilder();
-        var tabPanel = new BorderLayoutPanel();
-        if (addToTop) {
-            tabPanel.addToTop(builder.getPanel());
-        } else {
-            tabPanel.addToCenter(builder.getPanel());
-        }
-        tabbedPane.add(tabTitle, tabPanel);
-        return builder;
+    private void createServerUrl(@NotNull FormBuilder serverTab) {
+        // Add hidden server url
+        serverUrlHyperlink = new HyperlinkLabel();
+        serverUrlHyperlink.setTextWithHyperlink(LanguageServerBundle.message("language.server.url", ""));
+        serverUrlHyperlink.setVisible(false);
+        serverTab.addComponent(serverUrlHyperlink, 0);
     }
 
     private void createServerNameField(FormBuilder builder) {
@@ -416,54 +476,6 @@ public class DebugAdapterServerPanel implements Disposable {
         builder.addComponent(previewCommandLabel, 0);
     }
 
-    /**
-     * Update preview command label with expanded macro response if needed.
-     *
-     * @param commandLine         the command line which could contains macro syntax.
-     * @param previewCommandLabel the preview command label.
-     * @param project             the project.
-     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
-     */
-    private static void updatePreviewCommand(@NotNull CommandLineWidget commandLine,
-                                             @NotNull JLabel previewCommandLabel,
-                                             @NotNull Project project) {
-        commandLine.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                updateLabel(previewCommandLabel);
-            }
-
-            private void updateLabel(JLabel previewCommandLabel) {
-                String preview = resolveCommandLine(commandLine.getText(), project);
-                if (preview.equals(commandLine.getText())) {
-                    previewCommandLabel.setToolTipText("");
-                    previewCommandLabel.setText("");
-                } else {
-                    previewCommandLabel.setToolTipText(preview);
-                    String shortPreview = preview.length() > COMMAND_LENGTH_MAX ? preview.substring(0, COMMAND_LENGTH_MAX) + "..." : preview;
-                    previewCommandLabel.setText(shortPreview);
-                }
-            }
-
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                updateLabel(previewCommandLabel);
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                updateLabel(previewCommandLabel);
-            }
-        });
-    }
-
-
-    private static JLabel createLabelForComponent(@NotNull @NlsContexts.Label String labelText, @NotNull JComponent component) {
-        JLabel label = new JLabel(UIUtil.replaceMnemonicAmpersand(labelText));
-        label.setLabelFor(component);
-        return label;
-    }
-
     // Server settings
     public void updateSelectedTab(@Nullable String serverId) {
         if (!initialized) {
@@ -476,6 +488,45 @@ public class DebugAdapterServerPanel implements Disposable {
             initialized = true;
         }
     }
+
+    private void loadFromServerDefinition(@NotNull UserDefinedDebugAdapterServerDefinition serverDefinition) {
+        // Update name
+        setServerName(serverDefinition.getDisplayName());
+
+        // Update url
+        setServerUrl(serverDefinition.getUrl());
+
+        // Update wait for trace
+        updateDebugServerWaitStrategy(null, serverDefinition.getConnectTimeout(),
+                serverDefinition.getDebugServerReadyPattern());
+
+        // Update command
+        String command = getCommandLine(serverDefinition);
+        this.setCommandLine(command);
+
+        // Update mappings
+        mappingsPanel.refreshMappings(serverDefinition.getLanguageMappings(), serverDefinition.getFileTypeMappings());
+
+        // Update DAP parameters
+        var launchConfigurations = serverDefinition.getLaunchConfigurations();
+        refreshLaunchConfigurations(launchConfigurations);
+        setAttachAddress(serverDefinition.getAttachAddress());
+        setAttachPort(serverDefinition.getAttachPort());
+
+        // Update installer configuration
+        setInstallerConfiguration(serverDefinition.getInstallerConfiguration());
+    }
+
+    public JBTextField getServerNameField() {
+        return serverNameField;
+    }
+
+    public String getServerId() {
+        var serverDefinition = (DebugAdapterServerDefinition) debugAdapterServerCombo.getSelectedItem();
+        return serverDefinition != null ? serverDefinition.getId() : "";
+    }
+
+    // Server settings
 
     public void setServerId(@Nullable String serverId) {
         if (StringUtils.isNotBlank(serverId)) {
@@ -499,54 +550,6 @@ public class DebugAdapterServerPanel implements Disposable {
         }
     }
 
-    private void loadFromServerDefinition(@NotNull UserDefinedDebugAdapterServerDefinition serverDefinition) {
-        // Update name
-        setServerName(serverDefinition.getDisplayName());
-
-        // Update wait for trace
-        updateDebugServerWaitStrategy(null, serverDefinition.getConnectTimeout(),
-                serverDefinition.getDebugServerReadyPattern());
-
-        // Update command
-        String command = getCommandLine(serverDefinition);
-        this.setCommandLine(command);
-
-        // Update mappings
-        mappingsPanel.refreshMappings(serverDefinition.getLanguageMappings(), serverDefinition.getFileTypeMappings());
-
-        // Update DAP parameters
-        var launchConfigurations = serverDefinition.getLaunchConfigurations();
-        refreshLaunchConfigurations(launchConfigurations);
-        setAttachAddress(serverDefinition.getAttachAddress());
-        setAttachPort(serverDefinition.getAttachPort());
-
-        // Update installer configuration
-        setInstallerConfiguration(serverDefinition.getInstallerConfiguration());
-    }
-
-    @NotNull
-    private static String getCommandLine(@NotNull UserDefinedDebugAdapterServerDefinition entry) {
-        StringBuilder command = new StringBuilder();
-        if (entry.getCommandLine() != null) {
-            if (!command.isEmpty()) {
-                command.append(' ');
-            }
-            command.append(entry.getCommandLine());
-        }
-        return command.toString();
-    }
-
-    // Server settings
-
-    public JBTextField getServerNameField() {
-        return serverNameField;
-    }
-
-    public String getServerId() {
-        var serverDefinition = (DebugAdapterServerDefinition) debugAdapterServerCombo.getSelectedItem();
-        return serverDefinition != null ? serverDefinition.getId() : "";
-    }
-
     public String getServerName() {
         if (serverNameField == null) {
             return "";
@@ -557,6 +560,20 @@ public class DebugAdapterServerPanel implements Disposable {
     public void setServerName(String serverName) {
         if (serverNameField != null) {
             this.serverNameField.setText(getText(serverName));
+        }
+    }
+
+    public @Nullable String getServerUrl() {
+        return serverUrl;
+    }
+
+    public void setServerUrl(@Nullable String serverUrl) {
+        this.serverUrl = serverUrl;
+        if (serverUrl == null || StringUtils.isEmpty(serverUrl)) {
+            serverUrlHyperlink.setVisible(false);
+        } else {
+            serverUrlHyperlink.setVisible(true);
+            serverUrlHyperlink.setHyperlinkTarget(serverUrl);
         }
     }
 
@@ -578,12 +595,12 @@ public class DebugAdapterServerPanel implements Disposable {
         return commandLine.getText();
     }
 
-    public CommandLineWidget getCommandLineWidget() {
-        return commandLine;
-    }
-
     public void setCommandLine(String commandLine) {
         this.commandLine.setText(getText(commandLine));
+    }
+
+    public CommandLineWidget getCommandLineWidget() {
+        return commandLine;
     }
 
     public DAPDebugServerWaitStrategyPanel getDebugServerWaitStrategyPanel() {
@@ -598,11 +615,11 @@ public class DebugAdapterServerPanel implements Disposable {
         serverTraceComboBox.setSelectedItem(serverTrace);
     }
 
-    // Mappings settings
-
     public DAPServerMappingsPanel getMappingsPanel() {
         return mappingsPanel;
     }
+
+    // Mappings settings
 
     public @NotNull List<ServerMappingSettings> getMappings() {
         return mappingsPanel.getAllMappings();
@@ -628,11 +645,11 @@ public class DebugAdapterServerPanel implements Disposable {
         mappingsPanel.setFileNamePatternMappings(fileNamePatternMappings);
     }
 
-    // Configuration settings
-
     public String getWorkingDirectory() {
         return workingDirectoryField.getText();
     }
+
+    // Configuration settings
 
     public void setWorkingDirectory(String workingDirectory) {
         this.workingDirectoryField.setText(getText(workingDirectory));
@@ -653,7 +670,7 @@ public class DebugAdapterServerPanel implements Disposable {
     public void setAttachAddress(String attachAddress) {
         this.attachAddressField.setText(getText(attachAddress));
     }
-    
+
     public String getAttachPort() {
         return attachPortField.getText();
     }
@@ -684,12 +701,12 @@ public class DebugAdapterServerPanel implements Disposable {
         return "";
     }
 
-    public String getLaunchConfiguration() {
-        return launchConfigurationField.getText();
-    }
-
     public void setLaunchConfigurationId(@Nullable String launchConfigurationId) {
         selectLaunchConfigurationById(launchConfigurationId, launchCombo);
+    }
+
+    public String getLaunchConfiguration() {
+        return launchConfigurationField.getText();
     }
 
     public void setLaunchConfiguration(@Nullable String launchConfiguration) {
@@ -744,18 +761,17 @@ public class DebugAdapterServerPanel implements Disposable {
         return serverTraceComboBox;
     }
 
+    public @Nullable String getInstallerConfiguration() {
+        return installerPanel != null ? installerPanel.getInstallerConfigurationWidget().getText() : null;
+    }
 
     public void setInstallerConfiguration(@Nullable String installerConfiguration) {
-        if(installerPanel == null) {
+        if (installerPanel == null) {
             return;
         }
         var installerConfigurationWidget = installerPanel.getInstallerConfigurationWidget();
         installerConfigurationWidget.setText(getText(installerConfiguration));
         installerConfigurationWidget.setCaretPosition(0);
-    }
-
-    public @Nullable String getInstallerConfiguration() {
-        return installerPanel != null ? installerPanel.getInstallerConfigurationWidget().getText() : null;
     }
 
     public @Nullable DebugAdapterServerDefinition getCurrentServer() {
@@ -767,5 +783,11 @@ public class DebugAdapterServerPanel implements Disposable {
         if (installerPanel != null) {
             installerPanel.dispose();
         }
+    }
+
+    public enum EditionMode {
+        NEW_USER_DEFINED,
+        EDIT_USER_DEFINED,
+        EDIT_EXTENSION;
     }
 }

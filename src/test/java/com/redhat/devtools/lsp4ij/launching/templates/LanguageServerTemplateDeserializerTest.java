@@ -14,7 +14,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.intellij.openapi.util.SystemInfo;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.junit.Test;
 
 import java.util.List;

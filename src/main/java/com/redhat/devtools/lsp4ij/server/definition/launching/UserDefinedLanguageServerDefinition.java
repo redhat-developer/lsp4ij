@@ -45,6 +45,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     @SerializedName("displayName")
     private String name;
+    private String url;
     private String templateId;
     private String commandLine;
     private Map<String, String> userEnvironmentVariables;
@@ -62,6 +63,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     public UserDefinedLanguageServerDefinition(@NotNull String id,
                                                @Nullable String templateId,
                                                @NotNull String name,
+                                               @Nullable String url,
                                                @Nullable String description,
                                                @NotNull String commandLine,
                                                @NotNull Map<String, String> userEnvironmentVariables,
@@ -73,6 +75,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String installerConfigurationContent) {
         super(id, name, description, true, null, false);
         this.name = name;
+        this.url = url;
         this.templateId = templateId;
         this.commandLine = commandLine;
         this.userEnvironmentVariables = userEnvironmentVariables;
@@ -96,6 +99,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this(id,
                 null,
                 name,
+                null,
                 description,
                 commandLine,
                 userEnvironmentVariables,
@@ -139,6 +143,14 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
     }
 
     @Override

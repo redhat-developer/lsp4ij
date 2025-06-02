@@ -18,7 +18,7 @@ import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import org.jetbrains.annotations.NotNull;
 

@@ -27,7 +27,7 @@ import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
@@ -43,8 +43,8 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServerMappingSettings;
-import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServerMappings;
+import static com.redhat.devtools.lsp4ij.templates.ServerMappingSettings.toServerMappingSettings;
+import static com.redhat.devtools.lsp4ij.templates.ServerMappingSettings.toServerMappings;
 
 /**
  * Language servers registry.
@@ -161,6 +161,7 @@ public class LanguageServersRegistry {
                                 serverId,
                                 launch.getTemplateId(),
                                 launch.getServerName(),
+                                launch.getServerUrl(),
                                 "",
                                 launch.getCommandLine(),
                                 launch.getUserEnvironmentVariables(),
@@ -436,6 +437,7 @@ public class LanguageServersRegistry {
             settings.setTemplateId(definitionFromSettings.getTemplateId());
             settings.setServerId(languageServerId);
             settings.setServerName(definitionFromSettings.getDisplayName());
+            settings.setServerUrl(definitionFromSettings.getUrl());
             settings.setCommandLine(definitionFromSettings.getCommandLine());
             settings.setUserEnvironmentVariables(definitionFromSettings.getUserEnvironmentVariables());
             settings.setIncludeSystemEnvironmentVariables(definitionFromSettings.isIncludeSystemEnvironmentVariables());
@@ -490,6 +492,7 @@ public class LanguageServersRegistry {
                                                                                                         boolean notify) {
         String languageServerId = request.serverDefinition().getId();
         request.serverDefinition().setName(request.name());
+        request.serverDefinition().setUrl(request.url());
         request.serverDefinition().setCommandLine(request.commandLine());
         request.serverDefinition().setUserEnvironmentVariables(request.userEnvironmentVariables());
         request.serverDefinition().setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
@@ -519,6 +522,7 @@ public class LanguageServersRegistry {
         boolean installerConfigurationContentChanged = !Objects.equals(settings.getInstallerConfigurationContent(), request.installerConfigurationContent());
 
         settings.setServerName(request.name());
+        settings.setServerUrl(request.url());
         settings.setCommandLine(request.commandLine());
         settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
@@ -670,7 +674,9 @@ public class LanguageServersRegistry {
 
     public record UpdateServerDefinitionRequest(@NotNull Project project,
                                                 @NotNull UserDefinedLanguageServerDefinition serverDefinition,
-                                                @Nullable String name, @Nullable String commandLine,
+                                                @Nullable String name,
+                                                @Nullable String url,
+                                                @Nullable String commandLine,
                                                 @Nullable Map<String, String> userEnvironmentVariables,
                                                 boolean includeSystemEnvironmentVariables,
                                                 @NotNull List<ServerMappingSettings> mappings,

@@ -19,7 +19,7 @@ import com.intellij.openapi.ui.ComboBoxTableRenderer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.util.ui.ColumnInfo;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -20,6 +20,7 @@ import com.intellij.openapi.components.Storage;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.XCollection;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -111,6 +112,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String serverName;
 
+        private String serverUrl;
+
         private String commandLine;
 
         private Map<String, String> userEnvironmentVariables;
@@ -154,6 +157,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setServerName(String serverName) {
             this.serverName = serverName;
+        }
+
+        public String getServerUrl() {
+            return serverUrl;
+        }
+
+        public void setServerUrl(String serverUrl) {
+            this.serverUrl = serverUrl;
         }
 
         public String getCommandLine() {
