@@ -88,6 +88,7 @@ Here are some projects that use LSP4IJ:
  * [Huly Code](https://github.com/hcengineering/huly-code)
  * [SDLB LSP](https://github.com/smart-data-lake/sdl-lsp)
  * [Bloc Linter Support for IntelliJ](https://github.com/felangel/bloc)
+ * [Vala JetBrains Plugin](https://github.com/Tbusk/vala-jetbrains-plugin)
 
 ## Requirements
 
