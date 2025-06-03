@@ -1,6 +1,6 @@
 {
-  "id": "dockerfile-language-server",
-  "name": "Dockerfile Language Server",
+  "id": "docker-language-server",
+  "name": "Docker Language Server",
   "executeOnStartServer": false,
   "check": {
     "exec": {
@@ -11,7 +11,7 @@
   },
   "run": {
     "download": {
-      "name": "Download dockerfile-language-server",
+      "name": "Download docker-language-server",
       "github": {
         "owner": "docker",
         "repository": "docker-language-server",
@@ -32,7 +32,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/dockerfile-language-server",
+        "dir": "$USER_HOME$/.lsp4ij/lsp/docker-language-server",
         "file": {
           "name": {
             "windows": "docker-language-server.exe",
@@ -43,7 +43,7 @@
       },
       "onSuccess": {
         "configureServer": {
-          "name": "Configure Dockerfile Language Server command",
+          "name": "Configure Docker Language Server command",
           "command": "${output.dir}/${output.file.name} start --stdio",
           "update": true
         }
