@@ -23,9 +23,9 @@ import org.jetbrains.annotations.Nullable;
 import java.io.StringReader;
 
 /**
- * Tests for LSP {@link SettingsHelper}.
+ * Tests for LSP {@link SettingsHelper#findSettings(String, JsonObject)}.
  */
-public class SettingsHelperTest extends BasePlatformTestCase {
+public class SettingsHelper_findSettingsTest extends BasePlatformTestCase {
     // language=json
     private final String testJson = """
             {

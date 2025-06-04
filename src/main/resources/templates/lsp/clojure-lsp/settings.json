@@ -1,3 +1,132 @@
 {
-
+  "calva.useLegacyReplWindowPath": true,
+  "calva.legacyPrintBareReplWindowOutput": false,
+  "calva.outputDestinations": {
+    "evalResults": "repl-window",
+    "evalOutput": "repl-window",
+    "otherOutput": "repl-window"
+  },
+  "calva.useLiveShare": false,
+  "calva.useTestExplorer": false,
+  "calva.enableClojureLspOnStart": "always-use-first-workspace-root",
+  "calva.prettyPrintingOptions": {
+    "printEngine": "pprint",
+    "enabled": true,
+    "width": 120,
+    "maxLength": 50
+  },
+  "clojure.trace.server": "off",
+  "calva.referencesCodeLens.enabled": false,
+  "clojure.format.enable": true,
+  "calva.evalOnSave": false,
+  "calva.evaluationSendCodeToOutputWindow": false,
+  "calva.testOnSave": false,
+  "calva.showDocstringInParameterHelp": false,
+  "calva.statusColor": {
+    "light": {
+      "disconnectedColor": "#777777",
+      "launchingColor": "#000000",
+      "connectedStatusColor": "#DB9550",
+      "typeStatusColor": "#91dc47"
+    },
+    "dark": {
+      "disconnectedColor": "#aaaaaa",
+      "launchingColor": "#ffffff",
+      "connectedStatusColor": "#DB9550",
+      "typeStatusColor": "#91dc47"
+    }
+  },
+  "calva.jackInEnv": {},
+  "calva.autoSelectNReplPortFromPortFile": true,
+  "calva.autoConnectRepl": false,
+  "calva.autoStartRepl": false,
+  "calva.jackInDependencyVersions": {
+    "nrepl": "1.3.1",
+    "cider-nrepl": "0.55.4",
+    "cider/piggieback": "0.6.0"
+  },
+  "calva.clojureLspVersion": "latest",
+  "calva.clojureLspPath": "",
+  "calva.openBrowserWhenFigwheelStarted": true,
+  "calva.customREPLCommandSnippets": [],
+  "calva.customREPLHoverSnippets": [],
+  "calva.projectRootsSearchExclude": [
+    "bower_components",
+    ".bzr",
+    ".cache",
+    ".ccls-cache",
+    ".clangd",
+    ".classpath",
+    "*.code-search",
+    ".cpcache",
+    "_darcs",
+    ".DS_Store",
+    ".ensime_cache",
+    ".eunit",
+    "flow-typed",
+    "_FOSSIL_",
+    ".fslckout",
+    ".git",
+    ".hg",
+    ".idea",
+    ".joyride",
+    "node_modules",
+    ".pijul",
+    ".project",
+    ".shadow-cljs",
+    ".stack-work",
+    ".svn",
+    "target",
+    ".tox",
+    ".vscode"
+  ],
+  "calva.enableJSCompletions": true,
+  "calva.autoOpenREPLWindow": false,
+  "calva.autoOpenJackInTerminal": false,
+  "calva.autoOpenResultOutputDestination": true,
+  "calva.autoOpenInspector": true,
+  "calva.enableInspectorRainbow": false,
+  "calva.keybindingsEnabled": true,
+  "calva.showCalvaSaysOnStart": false,
+  "calva.definitionProviderPriority": [
+    "repl",
+    "lsp"
+  ],
+  "calva.depsEdnJackInExecutable": "clojure or deps.clj",
+  "calva.html2HiccupOptions": {
+    "mapify-style?": false,
+    "kebab-attrs?": false,
+    "add-classes-to-tag-keyword?": true
+  },
+  "calva.autoEvaluateCode": {
+    "onConnect": {
+      "clj": "(when-let [requires (resolve \u0027clojure.main/repl-requires)] (clojure.core/apply clojure.core/require @requires))",
+      "cljs": "(require \u0027[cljs.repl :refer [apropos dir doc find-doc print-doc pst source]])"
+    },
+    "onFileLoaded": {}
+  },
+  "calva.redirectServerOutputToRepl": true,
+  "calva.basilispPath": "basilisp",
+  "calva.paredit.defaultKeyMap": "strict",
+  "calva.paredit.hijackVSCodeDefaults": true,
+  "calva.paredit.killAlsoCutsToClipboard": false,
+  "calva.paredit.multicursor": false,
+  "calva.fmt.newIndentEngine": true,
+  "calva.fmt.keepCommentTrailParenOnOwnLine": true,
+  "calva.highlight.enableBracketColors": true,
+  "calva.highlight.rainbowIndentGuides": false,
+  "calva.highlight.highlightActiveIndent": true,
+  "calva.highlight.bracketColors": [
+    [
+      "#000",
+      "#ccc"
+    ],
+    "#0098e6",
+    "#e16d6d",
+    "#3fa455",
+    "#c968e6",
+    "#999",
+    "#ce7e00"
+  ],
+  "calva.highlight.cycleBracketColors": true
 }

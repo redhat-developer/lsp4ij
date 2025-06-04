@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplateJsonDeserializer;
 import org.jetbrains.annotations.NotNull;
@@ -44,6 +45,8 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
             Map<String, String> programArgsMap = gson.fromJson(programArgs, mapType);
             languageServerTemplate.setProgramArgs(programArgsMap);
         }
+        boolean expandConfiguration = JSONUtils.getBoolean(jsonObject, EXPAND_CONFIGURATION_JSON_PROPERTY);
+        languageServerTemplate.setExpandConfiguration(expandConfiguration);
     }
 
     @Override

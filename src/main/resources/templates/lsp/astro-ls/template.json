@@ -5,6 +5,7 @@
     "windows": "astro-ls.cmd --stdio",
     "default": "astro-ls --stdio"
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

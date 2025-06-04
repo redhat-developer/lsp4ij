@@ -192,10 +192,11 @@ public class NewLanguageServerDialog extends DialogWrapper {
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();
         mappingsPanel.refreshMappings(template);
 
-        // Update server configuration
+        // Update server configuration + expand
         var configuration = this.languageServerPanel.getConfiguration();
         configuration.setText(template.getConfiguration() != null ? template.getConfiguration() : "");
         configuration.setCaretPosition(0);
+        this.languageServerPanel.getExpandConfigurationCheckBox().setSelected(template.isExpandConfiguration());
 
         // Update server configuration JSON Schema
         this.languageServerPanel.setConfigurationSchemaContent(template.getConfigurationSchema() != null ? template.getConfigurationSchema() : "");
@@ -279,6 +280,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         Map<String, String> userEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().getEnvs();
         boolean includeSystemEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().isPassParentEnvs();
         String configuration = this.languageServerPanel.getConfiguration().getText();
+        boolean expandConfiguration = this.languageServerPanel.getExpandConfigurationCheckBox().isSelected();
         String configurationSchema = this.languageServerPanel.getConfigurationSchemaContent();
         String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
         String clientConfiguration = this.languageServerPanel.getClientConfigurationWidget() != null ?
@@ -294,6 +296,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
                 configuration,
+                expandConfiguration,
                 configurationSchema,
                 initializationOptions,
                 clientConfiguration,

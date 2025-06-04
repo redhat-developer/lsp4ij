@@ -1,1 +1,18 @@
-{}
+{
+  "clangd.path": "clangd",
+  "clangd.useScriptAsExecutable": false,
+  "clangd.arguments": [],
+  "clangd.semanticHighlighting": true,
+  "clangd.fallbackFlags": [],
+  "clangd.serverCompletionRanking": true,
+  "clangd.restartAfterCrash": true,
+  "clangd.checkUpdates": false,
+  "clangd.onConfigChanged": "prompt",
+  "clangd.onConfigChanged.forceEnable": false,
+  "clangd.detectExtensionConflicts": true,
+  "clangd.inactiveRegions.useBackgroundHighlight": false,
+  "clangd.inactiveRegions.opacity": 0.55,
+  "clangd.enableCodeCompletion": true,
+  "clangd.enableHover": true,
+  "clangd.enable": true
+}

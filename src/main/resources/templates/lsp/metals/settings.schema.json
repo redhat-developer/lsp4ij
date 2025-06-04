@@ -1,0 +1,266 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/metals/settings.schema.json",
+  "title": "LSP4IJ Metals language server settings JSON schema",
+  "description": "JSON schema for Metals language server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "metals.disableReleaseNotes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Do not show release notes when Metals was updated."
+    },
+    "metals.enableBestEffort": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable best effort mode for Metals in Scala 3. If enabled, Metals will try to provide most up to date information from the codebase even if it\u0027s not compiling."
+    },
+    "metals.defaultShell": {
+      "type": "string",
+      "description": "Optionally provide a default shell executable to use for build operations."
+    },
+    "metals.serverVersion": {
+      "type": "string",
+      "default": "1.5.3",
+      "description": "The version of the Metals server artifact. Requires reloading the window.  \n\n**VS Code extension version is guaranteed to work only with the default version, change if you know what you\u0027re doing**"
+    },
+    "metals.serverProperties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "-Xmx2G",
+        "-XX:+UseZGC",
+        "-XX:ZUncommitDelay\u003d30",
+        "-XX:ZCollectionInterval\u003d5",
+        "-XX:+IgnoreUnrecognizedVMOptions"
+      ],
+      "description": "Optional list of properties to pass along to the Metals server. By default, the environment variable `JAVA_OPTS` and `.jvmopts` file are respected. Each property needs to be a separate item.\n\nExample: `-Dhttps.proxyHost\u003d…`, `-Dhttps.proxyPort\u003d…` or `-Dmetals.statistics\u003dall`"
+    },
+    "metals.coursierMirror": {
+      "type": "string",
+      "description": "Optional alternative repository to maven central if maven central is not available. For example: `https://jcenter.bintray.com`, which will be used to set to property described [here](https://get-coursier.io/blog/#mirrors)"
+    },
+    "metals.excludedPackages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "List of packages you\u0027d like to be left out of completions, symbol searches, and code actions.\n\nEx. `akka.actor.typed.javadsl` will ensure nothing in the `javadsl` package gets recommended to you.\n\nYou can find the list of default exclusions [here on the Metals website](https://scalameta.org/metals/docs/editors/user-configuration/#excluded-packages).\n\nIf you need to remove one of the defaults, you can simply include it and preface it with `--`."
+    },
+    "metals.inlayHints.inferredTypes.enable": {
+      "type": "boolean",
+      "description": "Enable/disable inlay hints for inferred variable types and method return types.\n```scala \n\n val x/*: List[Int]*/ \u003d List(1)\n def foo(x: Int)/*: Option[Int]*/ \u003d Some(x)\n```"
+    },
+    "metals.inlayHints.implicitArguments.enable": {
+      "type": "boolean",
+      "description": "Enable/disable inlay hints for implicit arguments. \n```scala \n\n given bar: Int \u003d 123\n def foo(x: Int)(using Int) \u003d ??? \n foo(1)/*(using bar)*/\n```"
+    },
+    "metals.inlayHints.implicitConversions.enable": {
+      "type": "boolean",
+      "description": "Enable/disable inlay hints for implicit conversions. \n```scala \n\n implicit class MInt(i: Int) {\n   def incr: Int \u003d i + 1\n }\n val x \u003d /*MInt(*/1/*)*/.incr \n```"
+    },
+    "metals.inlayHints.typeParameters.enable": {
+      "type": "boolean",
+      "description": "Enable/disable inlay hints for type parameters. \n```scala \n\n val x \u003d List[Int](1)\n def foo[T](x: T) \u003d x\n foo/*[Int]*/(1)\n```"
+    },
+    "metals.inlayHints.hintsInPatternMatch.enable": {
+      "type": "boolean",
+      "description": "Enable/disable inlay hints in pattern matches. \n```scala \n\n case class Foo(a: Int, b: Int)\n val foo \u003d Foo(1, 2)\n foo match {\n   case Foo(a/*: Int*/, b/*: Int*/) \u003d\u003e\n }\n```"
+    },
+    "metals.inlayHints.byNameParameters.enable": {
+      "type": "boolean",
+      "description": "Enable/disable inlay hints for by-name parameters. \n```scala \n\n def foo(x: \u003d\u003e Int) \u003d ???\n foo(/*\u003d\u003e */1 + 2)\n foo {/*\u003d\u003e */\n   val x \u003d 1\n   x + 1\n }\n```"
+    },
+    "metals.inlayHints.namedParameters.enable": {
+      "type": "boolean",
+      "description": "Enable/disable inlay hints for named parameters. \n```scala \n\n def foo(number: Int) \u003d ???\n foo(/*number \u003d */1)\n```"
+    },
+    "metals.javaHome": {
+      "type": "string",
+      "description": "Optional path to the Java home directory that will be used for compiling the project.\n\nDefaults to JDK used by Metals\u0027s server (look: Java Version).\n\nThis Java version should be lower or equal to JDK version used by the Metals\u0027s server."
+    },
+    "metals.metalsJavaHome": {
+      "type": "string",
+      "description": "Optional path to the Java home directory that will be used for the running Metals server.\n\nBy default Metals will try to infer it using the version specified in metals.javaVersion.\n\nThis Java version should be higher or equal to 17."
+    },
+    "metals.javaVersion": {
+      "type": "string",
+      "default": "17",
+      "enum": [
+        "17",
+        "21"
+      ],
+      "description": "JDK version used for running the Metals\u0027s server.\n\nShould be greater or equal to the JDK version used for the project (look: Java Home)."
+    },
+    "metals.sbtScript": {
+      "type": "string",
+      "description": "Optional absolute path to an `sbt` executable to use for running `sbt bloopInstall`.\n\nBy default, Metals uses `java -jar sbt-launch.jar` with an embedded launcher while respecting `.jvmopts` and `.sbtopts`.\n\nUpdate this setting if your `sbt` script requires more customizations like using environment variables."
+    },
+    "metals.millScript": {
+      "type": "string",
+      "description": "Optional absolute path to a `mill` executable to use for running `mill mill.contrib.Bloop/install`.\n\nBy default, Metals uses an embedded `millw` script while respecting `.mill-version` file.\n\nUpdate this setting if your `mill` script requires more customizations."
+    },
+    "metals.mavenScript": {
+      "type": "string",
+      "description": "Optional absolute path to a `mvn` executable to use for running `mvn ch.epfl.scala:maven-bloop_2.10:\u003cbloop_version\u003e:bloopInstall`.\n\nBy default, Metals uses an embedded `mvnw` script.\n\nUpdate this setting if your `mvn` script requires more customizations."
+    },
+    "metals.gradleScript": {
+      "type": "string",
+      "description": "Optional absolute path to a `gradle` executable to use for running `gradle bloopInstall`.\n\nBy default, Metals uses an embedded `gradlew` script.\n\nUpdate this setting if your `gradle` script requires more customizations."
+    },
+    "metals.scalafmtConfigPath": {
+      "type": "string",
+      "description": "Optional custom path to the .scalafmt.conf file.\n\nShould be an absolute path and use forward slashes `/` for file separators (even on Windows)."
+    },
+    "metals.scalafixConfigPath": {
+      "type": "string",
+      "description": "Optional custom path to the .scalafix.conf file.\n\nShould be an absolute path and use forward slashes `/` for file separators (even on Windows)."
+    },
+    "metals.scalafixRulesDependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of Scalafix rules dependencies in case they are not available by default in Metals and running scalafix fails due to \u0027rule not found\u0027 exception. For example: `com.github.liancheng::organize-imports:0.6.0` which follows the [coursier](https://get-coursier.io/) convention."
+    },
+    "metals.bloopVersion": {
+      "type": "string",
+      "description": "This version will be used for the Bloop build tool plugin, for any supported build tool,while importing in Metals as well as for running the embedded server"
+    },
+    "metals.bloopJvmProperties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional list of JVM properties to pass along to the Bloop server. Each property needs to be a separate item.\n\nExample: `-Xmx1G` or `-Xms100M`"
+    },
+    "metals.bloopSbtAlreadyInstalled": {
+      "type": "boolean",
+      "description": "If true, Metals will not generate a `project/metals.sbt` file under the assumption that sbt-bloop is already manually installed in the sbt build. Build import will fail with a \u0027not valid command bloopInstall\u0027 error in case Bloop is not manually installed in the build when using this option."
+    },
+    "metals.customRepositories": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional list of custom resolvers passed to Coursier when fetching metals dependencies.\n\nFor documentation on accepted values see the [Coursier documentation](https://get-coursier.io/docs/other-repositories).\n\nThe extension will pass these to Coursier using the COURSIER_REPOSITORIES environment variable after joining the custom repositories with a pipe character (|)."
+    },
+    "metals.superMethodLensesEnabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable/disable goto super method code lens."
+    },
+    "metals.enableStripMarginOnTypeFormatting": {
+      "type": "boolean",
+      "default": true,
+      "description": "When enabled, if you press the return key from the first line of a multiline string containing a pipe, it will automatically add `.stripMargin`."
+    },
+    "metals.enableIndentOnPaste": {
+      "type": "boolean",
+      "default": false,
+      "description": "When this option is enabled, when user pastes any snippet into a Scala file, Metals will try to adjust the indentation to that of the current cursor."
+    },
+    "metals.verboseCompilation": {
+      "type": "boolean",
+      "default": false,
+      "description": "If a build server supports it (for example Bloop or Scala CLI), setting it to true will make the logs contain all the possible debugging information including that about incremental compilation in Zinc."
+    },
+    "metals.enableSemanticHighlighting": {
+      "type": "boolean",
+      "default": true,
+      "description": "When this option is enabled, Metals will provide semantic tokens for clients that support it. The feature is still experimental and does not work for all sources."
+    },
+    "metals.testUserInterface": {
+      "type": "string",
+      "default": "Test Explorer",
+      "enum": [
+        "Test Explorer",
+        "Code Lenses"
+      ],
+      "description": "Specifies which UI should be used for tests. `Code lenses` shows virtual text above test class, just like it was previously. `Test explorer` is a new option which shows gutter icons on the left of the file in a less intrusive way. Moreover, this option comes with a new panel called `Testing` which lists all test suites in your codebase and allows you to browse tests and navigate to the file which contains them."
+    },
+    "metals.testEnvironmentVariables": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Optional environment variables to pass to tests. Each key-value pair should be a separate item."
+    },
+    "metals.customProjectRoot": {
+      "type": "string",
+      "default": "",
+      "description": "Optional relative path to your project\u0027s root. If you want your project root to be the workspace/workspace root set it to \".\" ."
+    },
+    "metals.fallbackScalaVersion": {
+      "type": "string",
+      "default": "automatic",
+      "enum": [
+        "automatic",
+        "2.13.16",
+        "2.13.15",
+        "2.13.14",
+        "2.13.13",
+        "2.12.20",
+        "2.12.19",
+        "2.12.18",
+        "2.12.17",
+        "2.11.12",
+        "3.6.4",
+        "3.6.3",
+        "3.6.2",
+        "3.5.2",
+        "3.5.1",
+        "3.5.0",
+        "3.4.3",
+        "3.4.2",
+        "3.4.1",
+        "3.4.0",
+        "3.3.5",
+        "3.3.4",
+        "3.3.3"
+      ],
+      "description": "The Scala compiler version that is used as the default or fallback in case a file doesn\u0027t belong to any build target or the specified Scala version isn\u0027t supported by Metals.\n\nThis applies to standalone Scala files, worksheets, and Scala CLI scripts.\n\n The `automatic` value means that the Scala version for these files will be inferred from the highest supported Scala version in your projects build definition"
+    },
+    "metals.javaFormat.eclipseConfigPath": {
+      "type": "string",
+      "description": "Optional custom path to the eclipse-formatter.xml file.\n\nShould be an absolute path and use forward slashes `/` for file separators (even on Windows)."
+    },
+    "metals.javaFormat.eclipseProfile": {
+      "type": "string",
+      "description": "Optional Eclipse format profile to use."
+    },
+    "metals.scalaCliLauncher": {
+      "type": "string",
+      "description": "Optional path to Scala CLI launcher to use."
+    },
+    "metals.suggestLatestUpgrade": {
+      "type": "boolean",
+      "default": false,
+      "description": "Once in a day, notify if there are new server releases (including snapshots)"
+    },
+    "metals.defaultBspToBuildTool": {
+      "type": "boolean",
+      "default": false,
+      "description": "Default to using build tool as your build server."
+    },
+    "metals.autoImportBuilds": {
+      "type": "string",
+      "default": "off",
+      "enum": [
+        "off",
+        "initial",
+        "all"
+      ],
+      "description": "Automatically import builds rather than prompting the user to choose. `initial` will only automatically import a build when a project is first opened, `all` will automate build imports after subsequent changes as well."
+    },
+    "metals.startMcpServer": {
+      "type": "boolean",
+      "default": false,
+      "description": "If Metals should start an HTTP Model Context Protocol server, that can be used by AI tools to provide better context about the codebase. Needs to be enabled in the client as well."
+    }
+  }
+}

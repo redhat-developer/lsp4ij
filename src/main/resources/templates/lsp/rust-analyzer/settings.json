@@ -1,448 +1,218 @@
 {
-  "rust-analyzer": {
-    "restartServerOnConfigChange": false,
-    "showUnlinkedFileNotification": true,
-    "showRequestFailedErrorNotification": true,
-    "showDependenciesExplorer": true,
-    "testExplorer": false,
-    "initializeStopped": false,
-    "runnables": {
-      "extraEnv": null,
-      "problemMatcher": [
-        "$rustc"
-      ],
-      "command": null,
-      "extraArgs": [],
-      "extraTestBinaryArgs": [
-        "--show-output"
-      ]
+  "rust-analyzer.restartServerOnConfigChange": false,
+  "rust-analyzer.showUnlinkedFileNotification": true,
+  "rust-analyzer.showRequestFailedErrorNotification": true,
+  "rust-analyzer.showDependenciesExplorer": true,
+  "rust-analyzer.testExplorer": false,
+  "rust-analyzer.initializeStopped": false,
+  "rust-analyzer.runnables.problemMatcher": [
+    "$rustc"
+  ],
+  "rust-analyzer.statusBar.clickAction": "openLogs",
+  "rust-analyzer.statusBar.documentSelector": [
+    {
+      "language": "rust"
     },
-    "statusBar": {
-      "clickAction": "openLogs",
-      "documentSelector": [
-        {
-          "language": "rust"
-        },
-        {
-          "pattern": "**/Cargo.toml"
-        },
-        {
-          "pattern": "**/Cargo.lock"
-        }
-      ]
+    {
+      "pattern": "**/Cargo.toml"
     },
-    "server": {
-      "path": null,
-      "extraEnv": null
-    },
-    "trace": {
-      "server": "verbose",
-      "extension": false
-    },
-    "debug": {
-      "engine": "auto",
-      "sourceFileMap": {
-        "/rustc/<id>": "${env:USERPROFILE}/.rustup/toolchains/<toolchain-id>/lib/rustlib/src/rust"
-      },
-      "openDebugPane": false,
-      "buildBeforeRestart": false,
-      "engineSettings": {}
-    },
-    "typing": {
-      "continueCommentsOnNewline": true,
-      "excludeChars": "<"
-    },
-    "diagnostics": {
-      "previewRustcOutput": false,
-      "useRustcErrorCode": false,
-      "disabled": [],
-      "enable": true,
-      "experimental": {
-        "enable": false
-      },
-      "remapPrefix": {},
-      "styleLints": {
-        "enable": false
-      },
-      "warningsAsHint": [],
-      "warningsAsInfo": []
-    },
-    "assist": {
-      "emitMustUse": false,
-      "expressionFillDefault": "todo",
-      "termSearch": {
-        "borrowcheck": true,
-        "fuel": 1800
-      }
-    },
-    "cachePriming": {
-      "enable": true,
-      "numThreads": "physical"
-    },
-    "cargo": {
-      "allTargets": true,
-      "autoreload": true,
-      "buildScripts": {
-        "enable": true,
-        "invocationStrategy": "per_workspace",
-        "overrideCommand": null,
-        "rebuildOnSave": true,
-        "useRustcWrapper": true
-      },
-      "cfgs": {
-        "miri": null,
-        "debug_assertions": null
-      },
-      "extraArgs": [],
-      "extraEnv": {},
-      "features": [],
-      "noDefaultFeatures": false,
-      "sysroot": "discover",
-      "sysrootQueryMetadata": "cargo_metadata",
-      "sysrootSrc": null,
-      "target": null,
-      "targetDir": null
-    },
-    "cfg": {
-      "setTest": true
-    },
-    "checkOnSave": true,
-    "check": {
-      "allTargets": null,
-      "command": "check",
-      "extraArgs": [],
-      "extraEnv": {},
-      "features": null,
-      "ignore": [],
-      "invocationStrategy": "per_workspace",
-      "noDefaultFeatures": null,
-      "overrideCommand": null,
-      "targets": null,
-      "workspace": true
-    },
-    "completion": {
-      "addSemicolonToUnit": true,
-      "autoimport": {
-        "enable": true
-      },
-      "autoself": {
-        "enable": true
-      },
-      "callable": {
-        "snippets": "fill_arguments"
-      },
-      "fullFunctionSignatures": {
-        "enable": false
-      },
-      "hideDeprecated": false,
-      "limit": null,
-      "postfix": {
-        "enable": true
-      },
-      "privateEditable": {
-        "enable": false
-      },
-      "snippets": {
-        "custom": {
-          "Ok": {
-            "postfix": "ok",
-            "body": "Ok(${receiver})",
-            "description": "Wrap the expression in a `Result::Ok`",
-            "scope": "expr"
-          },
-          "Box::pin": {
-            "postfix": "pinbox",
-            "body": "Box::pin(${receiver})",
-            "requires": "std::boxed::Box",
-            "description": "Put the expression into a pinned `Box`",
-            "scope": "expr"
-          },
-          "Arc::new": {
-            "postfix": "arc",
-            "body": "Arc::new(${receiver})",
-            "requires": "std::sync::Arc",
-            "description": "Put the expression into an `Arc`",
-            "scope": "expr"
-          },
-          "Some": {
-            "postfix": "some",
-            "body": "Some(${receiver})",
-            "description": "Wrap the expression in an `Option::Some`",
-            "scope": "expr"
-          },
-          "Err": {
-            "postfix": "err",
-            "body": "Err(${receiver})",
-            "description": "Wrap the expression in a `Result::Err`",
-            "scope": "expr"
-          },
-          "Rc::new": {
-            "postfix": "rc",
-            "body": "Rc::new(${receiver})",
-            "requires": "std::rc::Rc",
-            "description": "Put the expression into an `Rc`",
-            "scope": "expr"
-          }
-        }
-      },
-      "termSearch": {
-        "enable": false,
-        "fuel": 1000
-      }
-    },
-    "files": {
-      "excludeDirs": [],
-      "watcher": "client"
-    },
-    "highlightRelated": {
-      "breakPoints": {
-        "enable": true
-      },
-      "closureCaptures": {
-        "enable": true
-      },
-      "exitPoints": {
-        "enable": true
-      },
-      "references": {
-        "enable": true
-      },
-      "yieldPoints": {
-        "enable": true
-      }
-    },
-    "hover": {
-      "actions": {
-        "debug": {
-          "enable": true
-        },
-        "enable": true,
-        "gotoTypeDef": {
-          "enable": true
-        },
-        "implementations": {
-          "enable": true
-        },
-        "references": {
-          "enable": false
-        },
-        "run": {
-          "enable": true
-        }
-      },
-      "documentation": {
-        "enable": true,
-        "keywords": {
-          "enable": true
-        }
-      },
-      "links": {
-        "enable": true
-      },
-      "memoryLayout": {
-        "alignment": "hexadecimal",
-        "enable": true,
-        "niches": false,
-        "offset": "hexadecimal",
-        "size": "both"
-      },
-      "show": {
-        "enumVariants": 5,
-        "fields": 5,
-        "traitAssocItems": null
-      }
-    },
-    "imports": {
-      "granularity": {
-        "enforce": false,
-        "group": "crate"
-      },
-      "group": {
-        "enable": true
-      },
-      "merge": {
-        "glob": true
-      },
-      "preferNoStd": false,
-      "preferPrelude": false,
-      "prefix": "plain",
-      "prefixExternPrelude": false
-    },
-    "inlayHints": {
-      "bindingModeHints": {
-        "enable": false
-      },
-      "chainingHints": {
-        "enable": true
-      },
-      "closingBraceHints": {
-        "enable": true,
-        "minLines": 25
-      },
-      "closureCaptureHints": {
-        "enable": false
-      },
-      "closureReturnTypeHints": {
-        "enable": "never"
-      },
-      "closureStyle": "impl_fn",
-      "discriminantHints": {
-        "enable": "never"
-      },
-      "expressionAdjustmentHints": {
-        "enable": "never",
-        "hideOutsideUnsafe": false,
-        "mode": "prefix"
-      },
-      "genericParameterHints": {
-        "const": {
-          "enable": true
-        },
-        "lifetime": {
-          "enable": false
-        },
-        "type": {
-          "enable": false
-        }
-      },
-      "implicitDrops": {
-        "enable": false
-      },
-      "lifetimeElisionHints": {
-        "enable": "never",
-        "useParameterNames": false
-      },
-      "maxLength": 25,
-      "parameterHints": {
-        "enable": true
-      },
-      "rangeExclusiveHints": {
-        "enable": false
-      },
-      "reborrowHints": {
-        "enable": "never"
-      },
-      "renderColons": true,
-      "typeHints": {
-        "enable": true,
-        "hideClosureInitialization": false,
-        "hideNamedConstructor": false
-      }
-    },
-    "interpret": {
-      "tests": false
-    },
-    "joinLines": {
-      "joinAssignments": true,
-      "joinElseIf": true,
-      "removeTrailingComma": true,
-      "unwrapTrivialBlock": true
-    },
-    "lens": {
-      "debug": {
-        "enable": false
-      },
-      "enable": true,
-      "implementations": {
-        "enable": true
-      },
-      "location": "above_name",
-      "references": {
-        "adt": {
-          "enable": false
-        },
-        "enumVariant": {
-          "enable": false
-        },
-        "method": {
-          "enable": false
-        },
-        "trait": {
-          "enable": false
-        }
-      },
-      "run": {
-        "enable": true
-      }
-    },
-    "linkedProjects": [],
-    "lru": {
-      "capacity": null,
-      "query": {
-        "capacities": {}
-      }
-    },
-    "notifications": {
-      "cargoTomlNotFound": true
-    },
-    "numThreads": null,
-    "procMacro": {
-      "attributes": {
-        "enable": true
-      },
-      "enable": true,
-      "ignored": {},
-      "server": null
-    },
-    "references": {
-      "excludeImports": false,
-      "excludeTests": false
-    },
-    "rustc": {
-      "source": null
-    },
-    "rustfmt": {
-      "extraArgs": [],
-      "overrideCommand": null,
-      "rangeFormatting": {
-        "enable": false
-      }
-    },
-    "semanticHighlighting": {
-      "doc": {
-        "comment": {
-          "inject": {
-            "enable": true
-          }
-        }
-      },
-      "nonStandardTokens": true,
-      "operator": {
-        "enable": true,
-        "specialization": {
-          "enable": false
-        }
-      },
-      "punctuation": {
-        "enable": false,
-        "separate": {
-          "macro": {
-            "bang": false
-          }
-        },
-        "specialization": {
-          "enable": false
-        }
-      },
-      "strings": {
-        "enable": true
-      }
-    },
-    "signatureInfo": {
-      "detail": "full",
-      "documentation": {
-        "enable": true
-      }
-    },
-    "workspace": {
-      "discoverConfig": null,
-      "symbol": {
-        "search": {
-          "kind": "only_types",
-          "limit": 128,
-          "scope": "workspace"
-        }
-      }
+    {
+      "pattern": "**/Cargo.lock"
     }
-  }
+  ],
+  "rust-analyzer.trace.server": "off",
+  "rust-analyzer.trace.extension": false,
+  "rust-analyzer.debug.engine": "auto",
+  "rust-analyzer.debug.sourceFileMap": {
+    "/rustc/\u003cid\u003e": "${env:USERPROFILE}/.rustup/toolchains/\u003ctoolchain-id\u003e/lib/rustlib/src/rust"
+  },
+  "rust-analyzer.debug.openDebugPane": false,
+  "rust-analyzer.debug.buildBeforeRestart": false,
+  "rust-analyzer.debug.engineSettings": {},
+  "rust-analyzer.typing.continueCommentsOnNewline": true,
+  "rust-analyzer.diagnostics.previewRustcOutput": false,
+  "rust-analyzer.diagnostics.useRustcErrorCode": false,
+  "rust-analyzer.assist.emitMustUse": false,
+  "rust-analyzer.assist.expressionFillDefault": "todo",
+  "rust-analyzer.assist.termSearch.borrowcheck": true,
+  "rust-analyzer.assist.termSearch.fuel": 1800,
+  "rust-analyzer.cachePriming.enable": true,
+  "rust-analyzer.cachePriming.numThreads": "physical",
+  "rust-analyzer.cargo.allTargets": true,
+  "rust-analyzer.cargo.autoreload": true,
+  "rust-analyzer.cargo.buildScripts.enable": true,
+  "rust-analyzer.cargo.buildScripts.invocationStrategy": "per_workspace",
+  "rust-analyzer.cargo.buildScripts.rebuildOnSave": true,
+  "rust-analyzer.cargo.buildScripts.useRustcWrapper": true,
+  "rust-analyzer.cargo.cfgs": {},
+  "rust-analyzer.cargo.extraArgs": [],
+  "rust-analyzer.cargo.extraEnv": {},
+  "rust-analyzer.cargo.features": [],
+  "rust-analyzer.cargo.noDefaultFeatures": false,
+  "rust-analyzer.cargo.sysroot": "discover",
+  "rust-analyzer.cargo.sysrootQueryMetadata": "cargo_metadata",
+  "rust-analyzer.cfg.setTest": true,
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "check",
+  "rust-analyzer.check.extraArgs": [],
+  "rust-analyzer.check.extraEnv": {},
+  "rust-analyzer.check.ignore": [],
+  "rust-analyzer.check.invocationStrategy": "per_workspace",
+  "rust-analyzer.check.workspace": true,
+  "rust-analyzer.completion.addSemicolonToUnit": true,
+  "rust-analyzer.completion.autoimport.enable": true,
+  "rust-analyzer.completion.autoself.enable": true,
+  "rust-analyzer.completion.callable.snippets": "fill_arguments",
+  "rust-analyzer.completion.fullFunctionSignatures.enable": false,
+  "rust-analyzer.completion.hideDeprecated": false,
+  "rust-analyzer.completion.postfix.enable": true,
+  "rust-analyzer.completion.privateEditable.enable": false,
+  "rust-analyzer.completion.snippets.custom": {
+    "Ok": {
+      "postfix": "ok",
+      "body": "Ok(${receiver})",
+      "description": "Wrap the expression in a `Result::Ok`",
+      "scope": "expr"
+    },
+    "Box::pin": {
+      "postfix": "pinbox",
+      "body": "Box::pin(${receiver})",
+      "requires": "std::boxed::Box",
+      "description": "Put the expression into a pinned `Box`",
+      "scope": "expr"
+    },
+    "Arc::new": {
+      "postfix": "arc",
+      "body": "Arc::new(${receiver})",
+      "requires": "std::sync::Arc",
+      "description": "Put the expression into an `Arc`",
+      "scope": "expr"
+    },
+    "Some": {
+      "postfix": "some",
+      "body": "Some(${receiver})",
+      "description": "Wrap the expression in an `Option::Some`",
+      "scope": "expr"
+    },
+    "Err": {
+      "postfix": "err",
+      "body": "Err(${receiver})",
+      "description": "Wrap the expression in a `Result::Err`",
+      "scope": "expr"
+    },
+    "Rc::new": {
+      "postfix": "rc",
+      "body": "Rc::new(${receiver})",
+      "requires": "std::rc::Rc",
+      "description": "Put the expression into an `Rc`",
+      "scope": "expr"
+    }
+  },
+  "rust-analyzer.completion.termSearch.enable": false,
+  "rust-analyzer.completion.termSearch.fuel": 1000,
+  "rust-analyzer.diagnostics.disabled": [],
+  "rust-analyzer.diagnostics.enable": true,
+  "rust-analyzer.diagnostics.experimental.enable": false,
+  "rust-analyzer.diagnostics.remapPrefix": {},
+  "rust-analyzer.diagnostics.styleLints.enable": false,
+  "rust-analyzer.diagnostics.warningsAsHint": [],
+  "rust-analyzer.diagnostics.warningsAsInfo": [],
+  "rust-analyzer.files.excludeDirs": [],
+  "rust-analyzer.files.watcher": "client",
+  "rust-analyzer.highlightRelated.breakPoints.enable": true,
+  "rust-analyzer.highlightRelated.closureCaptures.enable": true,
+  "rust-analyzer.highlightRelated.exitPoints.enable": true,
+  "rust-analyzer.highlightRelated.references.enable": true,
+  "rust-analyzer.highlightRelated.yieldPoints.enable": true,
+  "rust-analyzer.hover.actions.debug.enable": true,
+  "rust-analyzer.hover.actions.enable": true,
+  "rust-analyzer.hover.actions.gotoTypeDef.enable": true,
+  "rust-analyzer.hover.actions.implementations.enable": true,
+  "rust-analyzer.hover.actions.references.enable": false,
+  "rust-analyzer.hover.actions.run.enable": true,
+  "rust-analyzer.hover.documentation.enable": true,
+  "rust-analyzer.hover.documentation.keywords.enable": true,
+  "rust-analyzer.hover.links.enable": true,
+  "rust-analyzer.hover.memoryLayout.alignment": "hexadecimal",
+  "rust-analyzer.hover.memoryLayout.enable": true,
+  "rust-analyzer.hover.memoryLayout.niches": false,
+  "rust-analyzer.hover.memoryLayout.offset": "hexadecimal",
+  "rust-analyzer.hover.memoryLayout.size": "both",
+  "rust-analyzer.hover.show.enumVariants": 5,
+  "rust-analyzer.hover.show.fields": 5,
+  "rust-analyzer.imports.granularity.enforce": false,
+  "rust-analyzer.imports.granularity.group": "crate",
+  "rust-analyzer.imports.group.enable": true,
+  "rust-analyzer.imports.merge.glob": true,
+  "rust-analyzer.imports.preferNoStd": false,
+  "rust-analyzer.imports.preferPrelude": false,
+  "rust-analyzer.imports.prefix": "plain",
+  "rust-analyzer.imports.prefixExternPrelude": false,
+  "rust-analyzer.inlayHints.bindingModeHints.enable": false,
+  "rust-analyzer.inlayHints.chainingHints.enable": true,
+  "rust-analyzer.inlayHints.closingBraceHints.enable": true,
+  "rust-analyzer.inlayHints.closingBraceHints.minLines": 25,
+  "rust-analyzer.inlayHints.closureCaptureHints.enable": false,
+  "rust-analyzer.inlayHints.closureReturnTypeHints.enable": "never",
+  "rust-analyzer.inlayHints.closureStyle": "impl_fn",
+  "rust-analyzer.inlayHints.discriminantHints.enable": "never",
+  "rust-analyzer.inlayHints.expressionAdjustmentHints.enable": "never",
+  "rust-analyzer.inlayHints.expressionAdjustmentHints.hideOutsideUnsafe": false,
+  "rust-analyzer.inlayHints.expressionAdjustmentHints.mode": "prefix",
+  "rust-analyzer.inlayHints.genericParameterHints.const.enable": true,
+  "rust-analyzer.inlayHints.genericParameterHints.lifetime.enable": false,
+  "rust-analyzer.inlayHints.genericParameterHints.type.enable": false,
+  "rust-analyzer.inlayHints.implicitDrops.enable": false,
+  "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "never",
+  "rust-analyzer.inlayHints.lifetimeElisionHints.useParameterNames": false,
+  "rust-analyzer.inlayHints.maxLength": 25,
+  "rust-analyzer.inlayHints.parameterHints.enable": true,
+  "rust-analyzer.inlayHints.rangeExclusiveHints.enable": false,
+  "rust-analyzer.inlayHints.reborrowHints.enable": "never",
+  "rust-analyzer.inlayHints.renderColons": true,
+  "rust-analyzer.inlayHints.typeHints.enable": true,
+  "rust-analyzer.inlayHints.typeHints.hideClosureInitialization": false,
+  "rust-analyzer.inlayHints.typeHints.hideNamedConstructor": false,
+  "rust-analyzer.interpret.tests": false,
+  "rust-analyzer.joinLines.joinAssignments": true,
+  "rust-analyzer.joinLines.joinElseIf": true,
+  "rust-analyzer.joinLines.removeTrailingComma": true,
+  "rust-analyzer.joinLines.unwrapTrivialBlock": true,
+  "rust-analyzer.lens.debug.enable": true,
+  "rust-analyzer.lens.enable": true,
+  "rust-analyzer.lens.implementations.enable": true,
+  "rust-analyzer.lens.location": "above_name",
+  "rust-analyzer.lens.references.adt.enable": false,
+  "rust-analyzer.lens.references.enumVariant.enable": false,
+  "rust-analyzer.lens.references.method.enable": false,
+  "rust-analyzer.lens.references.trait.enable": false,
+  "rust-analyzer.lens.run.enable": true,
+  "rust-analyzer.linkedProjects": [],
+  "rust-analyzer.lru.query.capacities": {},
+  "rust-analyzer.notifications.cargoTomlNotFound": true,
+  "rust-analyzer.procMacro.attributes.enable": true,
+  "rust-analyzer.procMacro.enable": true,
+  "rust-analyzer.procMacro.ignored": {},
+  "rust-analyzer.references.excludeImports": false,
+  "rust-analyzer.references.excludeTests": false,
+  "rust-analyzer.runnables.extraArgs": [],
+  "rust-analyzer.runnables.extraTestBinaryArgs": [
+    "--show-output"
+  ],
+  "rust-analyzer.rustfmt.extraArgs": [],
+  "rust-analyzer.rustfmt.rangeFormatting.enable": false,
+  "rust-analyzer.semanticHighlighting.doc.comment.inject.enable": true,
+  "rust-analyzer.semanticHighlighting.nonStandardTokens": true,
+  "rust-analyzer.semanticHighlighting.operator.enable": true,
+  "rust-analyzer.semanticHighlighting.operator.specialization.enable": false,
+  "rust-analyzer.semanticHighlighting.punctuation.enable": false,
+  "rust-analyzer.semanticHighlighting.punctuation.separate.macro.bang": false,
+  "rust-analyzer.semanticHighlighting.punctuation.specialization.enable": false,
+  "rust-analyzer.semanticHighlighting.strings.enable": true,
+  "rust-analyzer.signatureInfo.detail": "full",
+  "rust-analyzer.signatureInfo.documentation.enable": true,
+  "rust-analyzer.typing.excludeChars": "|\u003c",
+  "rust-analyzer.workspace.symbol.search.kind": "only_types",
+  "rust-analyzer.workspace.symbol.search.limit": 128,
+  "rust-analyzer.workspace.symbol.search.scope": "workspace"
 }

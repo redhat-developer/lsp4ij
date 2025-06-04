@@ -4,6 +4,7 @@
   "programArgs": {
     "default": "julia -e \"using LanguageServer; runserver()\""
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

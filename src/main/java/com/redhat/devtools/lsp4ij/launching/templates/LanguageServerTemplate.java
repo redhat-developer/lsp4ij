@@ -32,10 +32,12 @@ public class LanguageServerTemplate extends ServerTemplate {
     public static final String README_FILE_NAME = "README.md";
 
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
+    public static final String EXPAND_CONFIGURATION_JSON_PROPERTY = "expandConfiguration";
 
     private String description;
 
     private String configuration;
+    private boolean expandConfiguration;
     private String configurationSchema;
     private String initializationOptions;
     private String clientConfiguration;
@@ -55,6 +57,14 @@ public class LanguageServerTemplate extends ServerTemplate {
 
     public void setConfiguration(String configuration) {
         this.configuration = configuration;
+    }
+
+    public boolean isExpandConfiguration() {
+        return expandConfiguration;
+    }
+
+    public void setExpandConfiguration(boolean expandConfiguration) {
+        this.expandConfiguration = expandConfiguration;
     }
 
     public String getConfigurationSchema() {

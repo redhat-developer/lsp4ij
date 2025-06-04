@@ -4,6 +4,7 @@
   "programArgs": {
     "default": "sourcekit-lsp"
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {
