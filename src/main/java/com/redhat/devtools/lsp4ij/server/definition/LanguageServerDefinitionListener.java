@@ -65,6 +65,7 @@ public interface LanguageServerDefinitionListener {
         public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean mappingsChanged;
         public final boolean configurationChanged;
+        public final boolean expandConfigurationChanged;
         public final boolean initializationOptionsContentChanged;
         public final boolean clientConfigurationContentChanged;
         public final boolean installerConfigurationContentChanged;
@@ -77,6 +78,7 @@ public interface LanguageServerDefinitionListener {
                                           boolean includeSystemEnvironmentVariablesChanged,
                                           boolean mappingsChanged,
                                           boolean configurationContentChanged,
+                                          boolean expandConfigurationChanged,
                                           boolean initializationOptionsContentChanged,
                                           boolean clientConfigurationContentChanged,
                                           boolean installerConfigurationContentChanged) {
@@ -88,6 +90,7 @@ public interface LanguageServerDefinitionListener {
             this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.mappingsChanged = mappingsChanged;
             this.configurationChanged = configurationContentChanged;
+            this.expandConfigurationChanged = expandConfigurationChanged;
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;
             this.clientConfigurationContentChanged = clientConfigurationContentChanged;
             this.installerConfigurationContentChanged = installerConfigurationContentChanged;

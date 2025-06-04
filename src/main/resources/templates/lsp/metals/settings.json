@@ -1,62 +1,26 @@
 {
-  "metals": {
-    "disableReleaseNotes": false,
-    "serverVersion": "1.5.2",
-    "serverProperties": [
-      "-Xmx2G",
-      "-XX:+UseZGC",
-      "-XX:ZUncommitDelay=30",
-      "-XX:ZCollectionInterval=5",
-      "-XX:+IgnoreUnrecognizedVMOptions"
-    ],
-    "coursierMirror": "",
-    "excludedPackages": [],
-    "inlayHints": {
-      "inferredTypes": {
-        "enable": true
-      },
-      "implicitArguments": {
-        "enable": true
-      },
-      "implicitConversions": {
-        "enable": true
-      },
-      "typeParameters": {
-        "enable": true
-      },
-      "hintsInPatternMatch": {
-        "enable": true
-      }
-    },
-    "javaHome": "",
-    "metalsJavaHome": "",
-    "javaVersion": "17",
-    "sbtScript": "",
-    "millScript": "",
-    "mavenScript": "",
-    "gradleScript": "",
-    "scalafmtConfigPath": "",
-    "scalafixConfigPath": "",
-    "scalafixRulesDependencies": [],
-    "bloopVersion": "",
-    "bloopJvmProperties": [],
-    "bloopSbtAlreadyInstalled": true,
-    "customRepositories": [],
-    "superMethodLensesEnabled": true,
-    "enableStripMarginOnTypeFormatting": true,
-    "enableIndentOnPaste": false,
-    "verboseCompilation": true,
-    "enableSemanticHighlighting": true,
-    "testUserInterface": "Test Explorer",
-    "customProjectRoot": "",
-    "fallbackScalaVersion": "automatic",
-    "javaFormat": {
-      "eclipseConfigPath": "",
-      "eclipseProfile": ""
-    },
-    "scalaCliLauncher": "",
-    "suggestLatestUpgrade": false,
-    "defaultBspToBuildTool": false,
-    "autoImportBuilds": "off"
-  }
+  "metals.disableReleaseNotes": false,
+  "metals.enableBestEffort": false,
+  "metals.serverVersion": "1.5.3",
+  "metals.serverProperties": [
+    "-Xmx2G",
+    "-XX:+UseZGC",
+    "-XX:ZUncommitDelay\u003d30",
+    "-XX:ZCollectionInterval\u003d5",
+    "-XX:+IgnoreUnrecognizedVMOptions"
+  ],
+  "metals.excludedPackages": [],
+  "metals.javaVersion": "17",
+  "metals.superMethodLensesEnabled": true,
+  "metals.enableStripMarginOnTypeFormatting": true,
+  "metals.enableIndentOnPaste": false,
+  "metals.verboseCompilation": false,
+  "metals.enableSemanticHighlighting": true,
+  "metals.testUserInterface": "Test Explorer",
+  "metals.customProjectRoot": "",
+  "metals.fallbackScalaVersion": "automatic",
+  "metals.suggestLatestUpgrade": false,
+  "metals.defaultBspToBuildTool": false,
+  "metals.autoImportBuilds": "off",
+  "metals.startMcpServer": false
 }

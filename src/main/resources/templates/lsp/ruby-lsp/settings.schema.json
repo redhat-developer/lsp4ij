@@ -1,1 +1,48 @@
-{}
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/ruby-lsp/settings.schema.json",
+  "title": "LSP4IJ Ruby language server settings JSON schema",
+  "description": "JSON schema for Ruby language server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "standardRuby.mode": {
+      "order": 1,
+      "type": "string",
+      "default": "enableViaGemfileOrMissingGemfile",
+      "enum": [
+        "enableUnconditionally",
+        "enableViaGemfileOrMissingGemfile",
+        "enableViaGemfile",
+        "onlyRunGlobally",
+        "disable"
+      ],
+      "enumItemLabels": [
+        "Always run—whether via Bundler or globally",
+        "Run unless the bundle excludes standard",
+        "Run only via Bundler, never globally",
+        "Run only globally, never via Bundler",
+        "Disable the extension"
+      ],
+      "markdownEnumDescriptions": [
+        "Enable Standard Ruby via the workspace\u0027s Gemfile or else fall back on a global installation",
+        "Enable Standard Ruby via the workspace\u0027s Gemfile or else fall back on a global installation **unless** a Gemfile is present and its bundle does not include `standard`",
+        "Enable Standard Ruby only if the workspace\u0027s Gemfile includes `standard` and _do not_ fall back on a global installation",
+        "Enable Standard Ruby and always run `standardrb` without Bundler",
+        "Disable the Standard Ruby extension entirely"
+      ]
+    },
+    "standardRuby.autofix": {
+      "order": 2,
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically format code and fix Standard Ruby errors"
+    },
+    "standardRuby.commandPath": {
+      "order": 3,
+      "type": "string",
+      "default": "",
+      "description": "Absolute path to standardrb executable. Overrides default search order and, if missing, will not run Standard via Bundler or a `standardrb` executable on your PATH.\n\nSupports variables `${userHome}`, `${pathSeparator}`, and `${cwd}`"
+    }
+  }
+}

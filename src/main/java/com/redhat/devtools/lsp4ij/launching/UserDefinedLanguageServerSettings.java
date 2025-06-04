@@ -122,6 +122,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String configurationContent;
 
+        private boolean expandConfiguration;
+
         private String configurationSchemaContent;
 
         private String initializationOptionsContent;
@@ -226,6 +228,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setConfigurationContent(String configurationContent) {
             this.configurationContent = configurationContent;
+        }
+
+        public boolean isExpandConfiguration() {
+            return expandConfiguration;
+        }
+
+        public void setExpandConfiguration(boolean expandConfiguration) {
+            this.expandConfiguration = expandConfiguration;
         }
 
         public String getConfigurationSchemaContent() {

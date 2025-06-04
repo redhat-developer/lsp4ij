@@ -1,1 +1,5 @@
-{}
+{
+  "standardRuby.mode": "enableViaGemfileOrMissingGemfile",
+  "standardRuby.autofix": true,
+  "standardRuby.commandPath": ""
+}

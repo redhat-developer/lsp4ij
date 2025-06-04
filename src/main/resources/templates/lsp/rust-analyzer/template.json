@@ -5,6 +5,7 @@
     "default": "sh -c ${BASE_DIR}/rust-analyzer",
     "windows": "${BASE_DIR}/rust-analyzer.exe"
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

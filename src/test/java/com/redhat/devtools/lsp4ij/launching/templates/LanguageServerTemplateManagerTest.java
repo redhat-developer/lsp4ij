@@ -111,6 +111,7 @@ public class LanguageServerTemplateManagerTest {
                 new HashMap<>(),
                 false,
                 null,
+                false,
                 null,
                 null,
                 null,

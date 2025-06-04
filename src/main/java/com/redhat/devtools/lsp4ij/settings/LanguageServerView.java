@@ -123,6 +123,7 @@ public class LanguageServerView implements Disposable {
                     && Objects.deepEquals(this.getMappings(), settings.getMappings())
                     && isEquals(this.getConfigurationContent(), settings.getConfigurationContent())
                     && isEquals(this.getConfigurationSchemaContent(), settings.getConfigurationSchemaContent())
+                    && this.isExpandConfiguration() == settings.isExpandConfiguration()
                     && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent())
                     && isEquals(this.getClientConfigurationContent(), settings.getClientConfigurationContent())
                     && isEquals(this.getInstallerConfigurationContent(), settings.getInstallerConfigurationContent()))) {
@@ -172,6 +173,7 @@ public class LanguageServerView implements Disposable {
                         userDefinedLanguageServerSettings.getUserEnvironmentVariables(),
                         userDefinedLanguageServerSettings.isIncludeSystemEnvironmentVariables()));
                 this.setConfigurationContent(userDefinedLanguageServerSettings.getConfigurationContent());
+                this.setExpandConfiguration(userDefinedLanguageServerSettings.isExpandConfiguration());
                 this.setConfigurationSchemaContent(userDefinedLanguageServerSettings.getConfigurationSchemaContent());
                 this.setInitializationOptionsContent(userDefinedLanguageServerSettings.getInitializationOptionsContent());
                 this.setClientConfigurationContent(userDefinedLanguageServerSettings.getClientConfigurationContent());
@@ -290,6 +292,7 @@ public class LanguageServerView implements Disposable {
                                     getEnvData().isPassParentEnvs(),
                                     getMappings(),
                                     getConfigurationContent(),
+                                    isExpandConfiguration(),
                                     getConfigurationSchemaContent(),
                                     getInitializationOptionsContent(),
                                     getClientConfigurationContent(),
@@ -456,6 +459,14 @@ public class LanguageServerView implements Disposable {
         var configuration = languageServerPanel.getConfiguration();
         configuration.setText(configurationContent);
         configuration.setCaretPosition(0);
+    }
+
+    public boolean isExpandConfiguration() {
+        return languageServerPanel.getExpandConfigurationCheckBox().isSelected();
+    }
+
+    public void setExpandConfiguration(boolean expandConfiguration) {
+        languageServerPanel.getExpandConfigurationCheckBox().setSelected(expandConfiguration);
     }
 
     public String getConfigurationSchemaContent() {

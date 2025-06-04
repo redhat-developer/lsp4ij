@@ -45,7 +45,7 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
     }
 
     @Override
-    public void handleServerStatusChanged(ServerStatus serverStatus) {
+    public void handleServerStatusChanged(@NotNull ServerStatus serverStatus) {
         if (serverStatus== ServerStatus.started) {
             // Case 1: Language server is started:
             // Try to get the user defined configuration and

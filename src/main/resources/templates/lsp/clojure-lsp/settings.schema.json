@@ -1,0 +1,966 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/clojure-lsp/settings.schema.json",
+  "title": "LSP4IJ clojure-lsp server settings JSON schema",
+  "description": "JSON schema for clojure-lsp server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "calva.useLegacyReplWindowPath": {
+      "type": "boolean",
+      "default": true,
+      "description": "For legacy reasons, the REPL window used to be located in `${projectRootPath}/.calva/output-window/output.calva-repl`. The default directory will change to `${projectRootPath}/.calva/repl.calva-repl`. Disable this setting to start using the new path. And then add `**/.calva/repl.calva-repl` to your `.gitignore`."
+    },
+    "calva.legacyPrintBareReplWindowOutput": {
+      "type": "boolean",
+      "default": false,
+      "description": "Non-result output risks breaking the structure of the Clojure document. Therefore `stdout` from the REPL process is prepended with `;` to make the output into line comments, which is non-structural. Enable this setting to print bare output, without the line comment protection. **NB: The REPL window may stop working, or work very strangely or slowly.** Also note that the REPL Window is being deprecated as a destination for output, so you may anyway instead want to use the `calva.outputDestinations` settings to direct `stdout` and `stderr` to the _Calva Output_ `terminal` destination instead."
+    },
+    "calva.outputDestinations": {
+      "type": "object",
+      "properties": {
+        "evalResults": {
+          "type": "string",
+          "enum": [
+            "repl-window",
+            "output-channel",
+            "terminal",
+            "output-view"
+          ],
+          "default": "repl-window",
+          "markdownDescription": "Destination for evaluation results. (Clojure data returned from an evaluation)."
+        },
+        "evalOutput": {
+          "type": "string",
+          "enum": [
+            "repl-window",
+            "output-channel",
+            "terminal",
+            "output-view"
+          ],
+          "default": "repl-window",
+          "markdownDescription": "Destination for evaluation output (stdout/stderr from an evaluation)."
+        },
+        "otherOutput": {
+          "type": "string",
+          "enum": [
+            "repl-window",
+            "output-channel",
+            "terminal",
+            "output-view"
+          ],
+          "default": "repl-window",
+          "markdownDescription": "Destination for other output (Calva messages, out-of-band stdout/stderr, etcetera)."
+        }
+      },
+      "default": {
+        "evalResults": "repl-window",
+        "evalOutput": "repl-window",
+        "otherOutput": "repl-window"
+      },
+      "description": "Where different types of Calva output should be printed.\nCalva categorizes output into three types:\n- **evaluation results**: Clojure data returned from an evaluation.\n- **evaluation output**: stdout/stderr from an evaluation\n- **other output**: Other messages, logs, etc\n\nYou can select where each category of output should go to: the REPL Window, the _Calva Says_ Output Channel, or the _Calva output_ (pseudo) terminal."
+    },
+    "calva.fiddleFilePaths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "markDownDescription": "The source files root path. An array of strings, used as path segments. E.g. `[\"src\"]`",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fiddle": {
+            "markDownDescription": "The fiddle files root path. An array of strings, used as path segments. E.g. `[\"env\", \"dev\", \"fiddles\"]`",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "source",
+          "fiddle"
+        ]
+      },
+      "description": "An array of `source` and `fiddle` root paths, relative to the project root. This is used by the commands **Calva: Open Fiddle File for Current File**, and **Calva: Evaluate Fiddle File for Current File**. Example:\n\n```json\n\"calva.fiddleFilePaths\": [\n  {\n    \"source\": [\"src\"],\n    \"fiddle\": [\"env\", \"dev\", \"fiddles\"]\n  }\n]\n```\n\nThe default is `null`, which will make Calva associate files with a `.fiddle` file extension as the fiddle file for a Clojure file. E.g. a file `src/foo/bar/baz_main.cljc`, will have an associated fiddle file named `src/foo/bar/baz_main.fiddle`. See [calva.io/fiddle](https://calva.io/fiddle-files/) for more info."
+    },
+    "calva.useLiveShare": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable support for LiveShare. Currently defaults to false, because of [ive-share/issues/4551](https://github.com/MicrosoftDocs/live-share/issues/4551). This issue makes Calva fail to connect to a REPL for some users."
+    },
+    "calva.useTestExplorer": {
+      "type": "boolean",
+      "description": "Enable experimental support for the VSCode Test Explorer",
+      "default": false
+    },
+    "calva.enableClojureLspOnStart": {
+      "type": "string",
+      "enum": [
+        "when-workspace-opened-use-workspace-root",
+        "when-file-opened-use-furthest-project",
+        "always-use-first-workspace-root",
+        "never"
+      ],
+      "enumDescriptions": [
+        "Start clojure-lsp automatically when a workspace containing a Clojure project is opened. The server will be started with its project root set to the workspace root. Best option for many single-Clojure-project workspaces and Polylith-like projects. It is recommended to configure your project so that you can use this option and have only one clojure-lsp server running.",
+        "Start clojure-lsp automatically when a Clojure file is opened. The server will be started with its project root set to the project found furthest from the opened file. Use this option if your monorepo has several Clojure projects, but lacks a governing project file at the workspace root.",
+        "Start clojure-lsp automatically in the first workspace root. Use this option to avoid starting multiple lsp servers when multiple independent clojure projects are added as workspace folders",
+        "Don\u0027t start clojure-lsp automatically. You can always start clojure-lsp at will via the command palette or from the statusbar. Good option in multi-project workspaces where you want to start a clojure-lsp for a particular project. Also useful if you are running on a machine with limited resources, like a Raspberry Pi."
+      ],
+      "default": "always-use-first-workspace-root",
+      "description": "Determines if clojure-lsp should start automatically, and what triggers it. See [calva.io/clojure-lsp](https://calva.io/clojure-lsp/) for info about how using clojure-lsp with Calva."
+    },
+    "calva.prettyPrintingOptions": {
+      "type": "object",
+      "description": "Settings for Calva\u0027s pretty printing",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Should evaluations be pretty printed?"
+        },
+        "printEngine": {
+          "type": "string",
+          "description": "The print engine to use. \u0027calva\u0027 means that the nREPL server will first plain print it and then Calva will prettify. The other options will make the server use the chosen printer-function to print the result, and Calva will not reformat it. To use some other function (on the server), configure `printFn` instead. To use the `nREPL` default (the equivalent of `clojure.core/pr`), set neither this nore `printFn`.",
+          "enum": [
+            "calva",
+            "pprint",
+            "fipp",
+            "puget",
+            "zprint"
+          ]
+        },
+        "printFn": {
+          "type": "object",
+          "markdownDescription": "A custom `nREPL` compatible `print-fn`. See https://nrepl.org/nrepl/usage/misc.html#pretty-printing",
+          "properties": {
+            "name": {
+              "type": "string",
+              "markdownDescription": "A symbol referencing a Clojure function to use for printing result values. E.g. `pr`. Or `foo.bar/baz`."
+            },
+            "maxWidthArgument": {
+              "type": "string",
+              "markdownDescription": "Argument that the function uses for setting the max-width of the lines printed. E.g. `width`."
+            },
+            "seqLimitArgument": {
+              "type": "string",
+              "markdownDescription": "Argument that the function uses for truncating the number of elements to print  for sequences. E.g. `length`."
+            },
+            "maxDepthArgument": {
+              "type": "string",
+              "markdownDescription": "Argument that the function uses for limiting the depth that collections are traversed. E.g. `levels`."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        "width": {
+          "type": "number",
+          "description": "The width of the printing. Or line length... Hmmm, you get it, I hope."
+        },
+        "maxLength": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The maximum number of forms to print of each collection. For no limit, do not include this in your setting. See https://clojuredocs.org/clojure.core/*print-length*"
+        },
+        "maxDepth": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "The maximum number of levels deep the printing will go in nested objects. For no limit, do not include this in your setting. Does not exist for `puget`. See also https://clojuredocs.org/clojure.core/*print-level*"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "default": {
+        "printEngine": "pprint",
+        "enabled": true,
+        "width": 120,
+        "maxLength": 50
+      }
+    },
+    "clojure.trace.server": {
+      "type": "string",
+      "default": "off",
+      "enum": [
+        "off",
+        "messages",
+        "verbose"
+      ],
+      "description": "Trace communication between Calva and the Clojure language server, clojure-lsp. Trace messages are displayed in the Clojure Language Client output channel."
+    },
+    "calva.referencesCodeLens.enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable/disable references CodeLens in Clojure(Script) files. "
+    },
+    "clojure.format.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable/disable calva-fmt as Clojure formatter"
+    },
+    "calva.evalOnSave": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run load-file when opening a new file and on file save"
+    },
+    "calva.evaluationSendCodeToOutputWindow": {
+      "type": "boolean",
+      "default": false,
+      "description": "Also send evaluated code to the REPL Window"
+    },
+    "calva.testOnSave": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run namespace tests on file save"
+    },
+    "calva.showDocstringInParameterHelp": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show the docstring in the parameter hints"
+    },
+    "calva.statusColor": {
+      "type": "object",
+      "description": "Configuration for custom coloring of the statusbar.",
+      "properties": {
+        "light": {
+          "type": "object",
+          "description": "Light theme colors",
+          "properties": {
+            "disconnectedColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the disconnected status"
+            },
+            "launchingColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the launching status"
+            },
+            "connectedStatusColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the connected status"
+            },
+            "typeStatusColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the type status"
+            }
+          }
+        },
+        "dark": {
+          "type": "object",
+          "description": "Dark theme colors",
+          "properties": {
+            "disconnectedColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the disconnected status"
+            },
+            "launchingColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the launching status"
+            },
+            "connectedStatusColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the connected status"
+            },
+            "typeStatusColor": {
+              "type": "string",
+              "pattern": "#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})",
+              "description": "Foreground color for the type status"
+            }
+          }
+        }
+      },
+      "default": {
+        "light": {
+          "disconnectedColor": "#777777",
+          "launchingColor": "#000000",
+          "connectedStatusColor": "#DB9550",
+          "typeStatusColor": "#91dc47"
+        },
+        "dark": {
+          "disconnectedColor": "#aaaaaa",
+          "launchingColor": "#ffffff",
+          "connectedStatusColor": "#DB9550",
+          "typeStatusColor": "#91dc47"
+        }
+      }
+    },
+    "calva.jackInEnv": {
+      "type": "object",
+      "default": {},
+      "description": "Specifies any environment variables your project needs. (Probably mostly for your Workspace Settings.)"
+    },
+    "calva.autoSelectNReplPortFromPortFile": {
+      "type": "boolean",
+      "default": true,
+      "description": "If true, Calva will auto-select a REPL connection from the nRepl port file, suppressing the `host:port` prompt if the file exists."
+    },
+    "calva.autoConnectRepl": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, Calva will auto-connect the REPL when a project is opened and there exists an nRepl port file."
+    },
+    "calva.autoStartRepl": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, Calva will auto-start and connect the REPL (a.k.a. Jack-in) when a Clojure project is opened. **NB:** To fully automate the jack-in process, you need to configure `calva.replConnectSequences` such that one sequence is marked with `autoSelectForJackIn`, has `projectRootPath` set, and has `menuSelections` configured."
+    },
+    "calva.jackInDependencyVersions": {
+      "type": "object",
+      "description": "Versions of the dependencies injected by Calva Jack-in",
+      "properties": {
+        "nrepl": {
+          "type": "string",
+          "description": "nREPL is the wonderful piece of software that gives Calva a structured and extensible connection to the REPL in your Clojure and ClojureScript projects."
+        },
+        "cider-nrepl": {
+          "type": "string",
+          "description": "cider-nrepl is middleware that extends the nREPL connection with all sorts of nice stuff that Calva uses to give you a delightful IDE experience."
+        },
+        "cider/piggieback": {
+          "type": "string",
+          "description": "Piggieback is used to create nREPL sessions in ClojureScript projects (not with shadow-cljs though, which provides its own middleware for this."
+        }
+      },
+      "default": {
+        "nrepl": "1.3.1",
+        "cider-nrepl": "0.55.4",
+        "cider/piggieback": "0.6.0"
+      }
+    },
+    "calva.clojureLspVersion": {
+      "type": "string",
+      "default": "latest",
+      "pattern": "^(latest|nightly|\\d{4}\\.\\d{2}\\.\\d{2}-\\d{2}\\.\\d{2}\\.\\d{2})$",
+      "description": "The version of `clojure-lsp` to download and use. This should be a release tag-name, or `latest` (default), or `nightly`. Will take effect after a restart of clojure-lsp. See [calva.io/clojure-lsp](https://calva.io/clojure-lsp) for information about how to manage the clojure-lsp process. NB: _This setting will be ignored if `calva.clojureLspPath` is set to something non-blank._"
+    },
+    "calva.clojureLspPath": {
+      "type": "string",
+      "default": "",
+      "description": "The absolute path to the `clojure-lsp` native binary you want Calva to use. When non-blank the `calva.clojureLspVersion` setting will be ignored, and the binary at the path set will be used instead. Will take effect after a restart of clojure-lsp. See [calva.io/clojure-lsp](https://calva.io/clojure-lsp) for information about how to manage the clojure-lsp process."
+    },
+    "calva.openBrowserWhenFigwheelStarted": {
+      "type": "boolean",
+      "default": true,
+      "description": "(lein-figwheel only) Should Calva open the Figwheel app for you when Figwheel has been started?"
+    },
+    "calva.customREPLCommandSnippets": {
+      "type": "array",
+      "default": [],
+      "$schema": "http://json-schema.org/draft-06/schema#",
+      "items": {
+        "title": "replCommand",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "markDownDescription": "The name of the command will show in the **Run Custom REPL Command** quick-pick menu."
+          },
+          "key": {
+            "type": "string",
+            "markdownDescription": "The key can be used to reference the snippet from **Run Custom REPL Command** keyboard shortcut arguments. This key will also be used in the quick-pick menu."
+          },
+          "snippet": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "markDownDescription": "Command to send to the REPL"
+          },
+          "ns": {
+            "type": "string",
+            "markDownDescription": "(optional) Namespace to evaluate the command in. If omitted the command will be executed in the namespace of the current file."
+          },
+          "repl": {
+            "type": "string",
+            "markDownDescription": "Choose which REPL should the code should be evaluated in. If omitted, the same REPL as for the current file will be used.",
+            "enum": [
+              "clj",
+              "cljs"
+            ]
+          },
+          "evaluationSendCodeToOutputWindow": {
+            "type": "boolean",
+            "markDownDescription": "Should the code snippet evaluated be echoed to the REPL Window?"
+          }
+        },
+        "required": [
+          "name",
+          "snippet"
+        ],
+        "default": {
+          "name": "",
+          "snippet": "",
+          "evaluationSendCodeToOutputWindow": true
+        }
+      },
+      "description": "Configuration for the command **Run Custom REPL Command**"
+    },
+    "calva.customREPLHoverSnippets": {
+      "type": "array",
+      "default": [],
+      "description": "Configuration for snippets that get called on hover",
+      "$schema": "http://json-schema.org/draft-06/schema#",
+      "items": {
+        "title": "replHover",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "markDownDescription": "The name of the snippet will show inside the hover text."
+          },
+          "snippet": {
+            "type": [
+              "string",
+              "array"
+            ],
+            "description": "Snippet to send to the REPL"
+          },
+          "ns": {
+            "type": "string",
+            "description": "(optional) Namespace to evaluate the snippet in. If omitted the snippet will be executed in the namespace of the current file."
+          },
+          "repl": {
+            "type": "string",
+            "description": "Choose which REPL should the code should be evaluated in. If omitted, the same REPL as for the current file will be used.",
+            "enum": [
+              "clj",
+              "cljs"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "snippet"
+        ]
+      }
+    },
+    "calva.myLeinProfiles": {
+      "type": "array",
+      "description": "At Jack in, any profiles listed here will be added to the profiles found in the `project.clj` file.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "calva.myCljAliases": {
+      "type": "array",
+      "description": "At Jack in, any aliases listed here will be added to the aliases found in the project\u0027s `deps.edn` file.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "calva.replConnectSequences": {
+      "type": "array",
+      "description": "For when your project needs a custom REPL connect sequence.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "projectType"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "markdownDescription": "This will show up in the Jack-in quick-pick menu when you start Jack-in if you have more than one sequence configured."
+          },
+          "projectType": {
+            "type": "string",
+            "markdownDescription": "Select one of the project types supported by Calva.",
+            "enum": [
+              "Leiningen",
+              "deps.edn",
+              "shadow-cljs",
+              "lein-shadow",
+              "generic",
+              "custom"
+            ]
+          },
+          "autoSelectForJackIn": {
+            "type": "boolean",
+            "markdownDescription": "If true, this sequence will be automatically selected at **Jack-in**, suppressing the Project Type. Use together with `projectRootPath` to also suppress the Project Root menu. Add usage of `menuSelections` to go for a prompt-less REPL Jack-in. If you have more than one sequence with `autoSelectForJackIn` set to true, Calva will use the sequence with its `projectRootPath` closest to the currently active editor file. And if there is no such closest file, the first sequence will be used."
+          },
+          "autoSelectForConnect": {
+            "type": "boolean",
+            "markdownDescription": "If true, this sequence will be automatically selected at **Connect**, suppressing the Project Type menu. Use together with `projectRootPath` to also suppress the Project Root menu. If you have more than one sequence with `autoSelectForConnect` set to true, Calva will use the sequence with its `projectRootPath` closest to the currently active editor file. And if there is no such closest file, the first sequence will be used."
+          },
+          "projectRootPath": {
+            "type": "array",
+            "markdownDescription": "An array of path segments leading to the root of the project to which this connect sequence corresponds. Use together with `autoSelectForJackIn`/`autoSelectForConnect` to suppress the Project Root menu. The path can be absolute or relative to the workspace root. If there are several Workspace Folders, the workspace root is the path of the first folder, so relative paths will only work for this first folder. If you can\u0027t be bothered splitting up the path in segments, put the whole path in the first segment, though please note that if you use Windows path separators, these will not work for users with Linux or macOS.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nReplPortFile": {
+            "type": "array",
+            "description": "An array of path segments for the relative path from the project root to the nREPL port file for this connect sequence. E.g. For shadow-cljs this would be [\".shadow-cljs\", \"nrepl.port\"]",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customJackInCommandLine": {
+            "type": "string",
+            "markdownDescription": "A custom command line, completely up to you.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "afterCLJReplJackInCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "markdownDescription": "Code to evaluate in the CLJ REPL once it has been created. You can use either a string or an array of strings. If you use an array, the strings will be joined with a newline character to form the resulting code.",
+            "required": false
+          },
+          "menuSelections": {
+            "type": "object",
+            "description": "Pre-selected menu options. If a selection is made here. Calva won\u0027t prompt for it.",
+            "properties": {
+              "leinProfiles": {
+                "type": "array",
+                "description": "At Jack-in to a Leiningen project, use these profiles to launch the repl.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "leinAlias": {
+                "description": "At Jack-in to a Leiningen project, launch with this alias. Set to null to launch with Calva\u0027s default task (a headless repl).",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cljAliases": {
+                "type": "array",
+                "description": "At Jack-in to a deps.edn project, use these aliases to launch the repl.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "cljsLaunchBuilds": {
+                "type": "array",
+                "description": "The cljs builds to start/watch at Jack-in/connect.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "cljsDefaultBuild": {
+                "type": "string",
+                "description": "Which cljs build to attach to at the initial connect."
+              }
+            }
+          },
+          "cljsType": {
+            "description": "Either a built in type, or an object configuring a custom type. If omitted Calva will show a menu with the built-in types.",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Figwheel Main",
+                  "lein-figwheel",
+                  "shadow-cljs",
+                  "ClojureScript built-in for browser",
+                  "ClojureScript built-in for node",
+                  "none"
+                ]
+              },
+              {
+                "type": "object",
+                "required": [
+                  "connectCode",
+                  "dependsOn"
+                ],
+                "properties": {
+                  "dependsOn": {
+                    "type": "string",
+                    "enum": [
+                      "Figwheel Main",
+                      "lein-figwheel",
+                      "shadow-cljs",
+                      "ClojureScript built-in for browser",
+                      "ClojureScript built-in for node",
+                      "User provided"
+                    ],
+                    "description": "The ClojureScript REPL dependencies this customization needs. NB: If it is `User provided`, then you need to provide the dependencies in the project, or launch with an alias (deps.edn), profile (Leiningen), or build (shadow-cljs) that provides the dependencies needed."
+                  },
+                  "buildsRequired": {
+                    "type": "boolean",
+                    "description": "If the repl type requires that builds are started in order to connect to them, set this to true."
+                  },
+                  "isStarted": {
+                    "type": "boolean",
+                    "description": "For cljs repls that Calva does not need to start, set this to true. (If you base your custom cljs repl on shadow-cljs workflow, for instance.)"
+                  },
+                  "startCode": {
+                    "type": "string",
+                    "description": "Clojure code to be evaluated to create and/or start your custom CLJS REPL."
+                  },
+                  "isReadyToStartRegExp": {
+                    "type": "string",
+                    "description": "A regular expression which, when matched in the stdout from the startCode evaluation, will make Calva continue with connecting the REPL, and to prompt the user to start the application. If omitted and there is startCode Calva will continue when that code is evaluated."
+                  },
+                  "openUrlRegExp": {
+                    "type": "string",
+                    "description": "A regular expression, matched against the stdout of cljsType evaluations, for extracting the URL with which the app can be started. The expression should have a capturing group named \u0027url\u0027. E.g. \\”Open URL: (?\u003curl\u003e\\S+)\\”",
+                    "default": "Open(ing)? URL (?\u003curl\u003e\\S+)"
+                  },
+                  "shouldOpenUrl": {
+                    "type": "boolean",
+                    "description": "Choose if Calva should automatically open the URL for you or not."
+                  },
+                  "connectCode": {
+                    "type": "string",
+                    "description": "Clojure code to be evaluated to convert the REPL to a CLJS REPL that Calva can use to connect to the application."
+                  },
+                  "isConnectedRegExp": {
+                    "type": "string",
+                    "description": "A regular expression which, when matched in the stdout of the connectCode evaluation, will tell Calva that the application is connected.",
+                    "default": "To quit, type: :cljs/quit"
+                  },
+                  "printThisLineRegExp": {
+                    "type": "string",
+                    "description": "A regular expression which, when matched in the stdout from any code evaluations in the cljsType, will make the matched text be printed to wherever Calva prints output."
+                  }
+                }
+              }
+            ]
+          },
+          "jackInEnv": {
+            "type": "object",
+            "default": {},
+            "markdownDescription": "Environment variables that will be merged with any global `calva.jackInEnv` and then applied to the Jack-in process. The merge is very similar to how Clojure\u0027s `merge` works. So for any common keys between the global setting and this one, the ones from this setting will win."
+          }
+        }
+      }
+    },
+    "calva.projectRootsSearchExclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "bower_components",
+        ".bzr",
+        ".cache",
+        ".ccls-cache",
+        ".clangd",
+        ".classpath",
+        "*.code-search",
+        ".cpcache",
+        "_darcs",
+        ".DS_Store",
+        ".ensime_cache",
+        ".eunit",
+        "flow-typed",
+        "_FOSSIL_",
+        ".fslckout",
+        ".git",
+        ".hg",
+        ".idea",
+        ".joyride",
+        "node_modules",
+        ".pijul",
+        ".project",
+        ".shadow-cljs",
+        ".stack-work",
+        ".svn",
+        "target",
+        ".tox",
+        ".vscode"
+      ],
+      "description": "Exclude these directories when searching for projects in the workspace during Jack-in/Connect. Each entry is a partial *glob* and will be part of a resulting *glob* of the form `**/{glob1,glob2,...,globN}`. This means that all directories in the workspace matching an entry will be excluded."
+    },
+    "calva.enableJSCompletions": {
+      "type": "boolean",
+      "description": "Should Calva use suitable and bring you JavaScript completions? This is an experimental cider-nrepl feature. Disable if completions start to throw errors.",
+      "default": true
+    },
+    "calva.autoOpenREPLWindow": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically open the REPL window on Jack-in or Connect."
+    },
+    "calva.autoOpenJackInTerminal": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically open the the Jack-in Terminal on Jack-in."
+    },
+    "calva.autoOpenResultOutputDestination": {
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically open the the result output destination on Jack-in or Connect."
+    },
+    "calva.autoOpenInspector": {
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically open/reveal the Calva Inspector on Jack-in or Connect."
+    },
+    "calva.enableInspectorRainbow": {
+      "type": "boolean",
+      "default": false,
+      "description": "Should the Calva Inspector items use rainbow colors? When enabled, the collection items will be colored with the same colors as VS Code uses for bracket pairs. See https://calva.io/inspector for info."
+    },
+    "calva.keybindingsEnabled": {
+      "type": "boolean",
+      "description": "Activate keybindings.",
+      "default": true
+    },
+    "calva.showCalvaSaysOnStart": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show the Calva Says output panel on start?"
+    },
+    "calva.definitionProviderPriority": {
+      "enum": [
+        [
+          "repl",
+          "lsp"
+        ],
+        [
+          "lsp",
+          "repl"
+        ]
+      ],
+      "markdownEnumDescriptions": [
+        "Use dynamic (REPL) definitions when available.",
+        "Use static (clojure-lsp) definitions when available."
+      ],
+      "default": [
+        "repl",
+        "lsp"
+      ],
+      "description": "Calva can provide definitions using both the REPL connection and via clojure-lsp. Which provider should Calva prioritize when both are available?"
+    },
+    "calva.depsEdnJackInExecutable": {
+      "enum": [
+        "clojure",
+        "deps.clj",
+        "clojure or deps.clj"
+      ],
+      "markdownEnumDescriptions": [
+        "Always use `clojure`",
+        "Always use `deps.clj`",
+        "Prefer `clojure`, but use `deps.clj` if `clojure` doesn\u0027t seem to work"
+      ],
+      "default": "clojure or deps.clj",
+      "type": "string",
+      "description": "Which executable should Calva Jack-in use for starting a deps.edn project? The default is to let Calva choose. It will choose `clojure` if that is installed and working. Otherwise `deps.clj`, which is bundled with Calva, will be used. (This settings has no effect on Windows, where `deps.clj` will always be used.)"
+    },
+    "calva.html2HiccupOptions": {
+      "type": "object",
+      "properties": {
+        "mapify-style?": {
+          "type": "boolean",
+          "markdownDescription": "Should the `style` attribute be converted to a map?",
+          "default": false
+        },
+        "kebab-attrs?": {
+          "type": "boolean",
+          "markdownDescription": "Should the attribute names be converted to a kebab-case?",
+          "default": false
+        },
+        "add-classes-to-tag-keyword?": {
+          "type": "boolean",
+          "markdownDescription": "Should all class names be added as CSS-like shortcuts to tag keyword?",
+          "default": true
+        }
+      },
+      "default": {
+        "mapify-style?": false,
+        "kebab-attrs?": false,
+        "add-classes-to-tag-keyword?": true
+      },
+      "description": "Options for the `html2hiccup` command. See [calva.io/hiccup](https://calva.io/hiccup/)"
+    },
+    "calva.autoEvaluateCode": {
+      "type": "object",
+      "properties": {
+        "onConnect": {
+          "type": "object",
+          "markdownDescription": "When a REPL has been connected.",
+          "properties": {
+            "clj": {
+              "type": "string",
+              "markdownDescription": "Code to evaluate when the **Clojure** REPL has been connected. The default is code that refer in the `repl-requires`/REPL utilities (like `source`, `doc`, etcetera). (Note that there is also a command to do this on demand.). The code will be evaluated *before* the `afterCLJReplJackInCode` in any [connect sequence](https://calva.io/connect-sequences/) used. Set to `null` to disable this feature."
+            },
+            "cljs": {
+              "type": "string",
+              "markdownDescription": "Code to evaluate when the **ClojureScript** REPL has been connected. The default is code that refer in the `repl-requires`/REPL utilities (like `source`, `doc`, etcetera). (Note that there is also a command to do this on demand.). Set to `null` to disable this feature."
+            }
+          }
+        },
+        "onFileLoaded": {
+          "type": "object",
+          "markdownDescription": "When a file/namespace has been loaded/evaluated.",
+          "properties": {
+            "clj": {
+              "type": "string",
+              "markdownDescription": "Code to evaluate when the current file/namespace has been loaded/evaluated (via the command for this), in the **Clojure** REPL. The same substitution variables as with [custom commands](https://calva.io/custom-commands/) can be used here."
+            },
+            "cljs": {
+              "type": "string",
+              "markdownDescription": "Code to evaluate when the current file/namespace has been loaded/evaluated (via the command for this), in the **ClojureScript** REPL. The same substitution variables as with [custom commands](https://calva.io/custom-commands/) can be used here."
+            }
+          }
+        }
+      },
+      "default": {
+        "onConnect": {
+          "clj": "(when-let [requires (resolve \u0027clojure.main/repl-requires)] (clojure.core/apply clojure.core/require @requires))",
+          "cljs": "(require \u0027[cljs.repl :refer [apropos dir doc find-doc print-doc pst source]])"
+        },
+        "onFileLoaded": {}
+      },
+      "description": "Code to automatically evaluate when a REPL has been connected, or a file/namespace has been loaded/evaluated. See https://calva.io/customizing-jack-in-and-connect/ for details."
+    },
+    "calva.redirectServerOutputToRepl": {
+      "type": "boolean",
+      "default": true,
+      "description": "Redirect the output from the REPL server process to the Output Destination. With this disabled, output from child threads of evaluations will not be shown in the output destination, but instead in the terminal where the REPL is started (the jack-in terminal if Calva started the REPL)."
+    },
+    "calva.basilispPath": {
+      "type": "string",
+      "default": "basilisp",
+      "description": "The path to the `basilisp` executable. If Basilisp is installed in a virtual environment, update this to the full path of the `basilisp` executable within that virtual environment."
+    },
+    "calva.paredit.defaultKeyMap": {
+      "type": "string",
+      "description": "The default keymap to use for bindings when there is no custom binding.",
+      "default": "strict",
+      "enum": [
+        "original",
+        "strict",
+        "none"
+      ]
+    },
+    "calva.paredit.hijackVSCodeDefaults": {
+      "type": "boolean",
+      "default": true,
+      "description": "When enabled, more VS Code built-in shortcuts are overridden with their ”corresponding” Paredit commands."
+    },
+    "calva.paredit.killAlsoCutsToClipboard": {
+      "type": "boolean",
+      "default": false,
+      "description": "When enabled, replaces the clipboard content with the deleted code."
+    },
+    "calva.paredit.multicursor": {
+      "type": "boolean",
+      "default": false,
+      "description": "Experimental: Support for multiple cursors in paredit commands.\nCurrently supported commands:\n- Cursor movement\n- Cursor selection\n- Rewrap"
+    },
+    "calva.fmt.configPath": {
+      "type": "string",
+      "description": "Path to [cljfmt](https://github.com/weavejester/cljfmt#configuration) configuration file. Absolute or relative to the project root directory. To provide the config via [clojure-lsp](https://clojure-lsp.io), set this to `CLOJURE-LSP` (case sensitive). If left blank and a config file with a [default name](https://github.com/weavejester/cljfmt#configuration) is used, the file will be automatically loaded."
+    },
+    "calva.fmt.newIndentEngine": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use the structural editor for indentation (instead of `cljfmt`)."
+    },
+    "calva.fmt.keepCommentTrailParenOnOwnLine": {
+      "type": "boolean",
+      "default": true,
+      "description": "Treat `(comment...)` forms special and keep its closing paren on a line of its own."
+    },
+    "calva.highlight.enableBracketColors": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable rainbow brackets"
+    },
+    "calva.highlight.rainbowIndentGuides": {
+      "type": "boolean",
+      "default": false,
+      "description": "Use rainbow indent guides. (To use built-in indent guides, disable this and enable built-in guides in `[\"clojure\"]` scope."
+    },
+    "calva.highlight.highlightActiveIndent": {
+      "type": "boolean",
+      "default": true,
+      "description": "Highlight active indent with a guideline. (Unlike the VS Code built-in setting, this works independently of the rainbowIndentGuides setting.)"
+    },
+    "calva.highlight.bracketColors": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string",
+            "markdownDescription": "CSS color, e.g. `\"#ccc\"`, or `\"#91dc47\"`"
+          },
+          {
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "markdownDescription": "Tuple of CSS colors, `[light, dark]`, e.g. `[\"#ccc\", \"#000\"]`"
+          }
+        ]
+      },
+      "default": [
+        [
+          "#000",
+          "#ccc"
+        ],
+        "#0098e6",
+        "#e16d6d",
+        "#3fa455",
+        "#c968e6",
+        "#999",
+        "#ce7e00"
+      ],
+      "description": "An array where each element can be either a CSS color string, or a tuple of two CSS color strings. Use tuples when you want a different color for light and dark themes, `[light, dark]`, e.g. `[\"#ccc\", \"#000\"]`"
+    },
+    "calva.highlight.cycleBracketColors": {
+      "type": "boolean",
+      "default": true,
+      "description": "If nesting level is greater than amount of colors, start counting over"
+    },
+    "calva.highlight.misplacedBracketStyle": {
+      "type": "object",
+      "description": "Style of misplaced bracket"
+    },
+    "calva.highlight.matchedBracketStyle": {
+      "type": "object",
+      "description": "Style of pair bracket highlight"
+    },
+    "calva.highlight.commentFormStyle": {
+      "type": "object",
+      "description": "Style of `(comment)` forms"
+    },
+    "calva.highlight.ignoredFormStyle": {
+      "type": "object",
+      "description": "Style of `#_` ignored forms"
+    },
+    "calva.highlight.ignoredTopLevelFormStyle": {
+      "type": "object",
+      "description": "Style of top level `#_` ignored forms. If not specified, it will be the same as what\u0027s set for `calva.highlight.ignoredFormStyle`"
+    }
+  }
+}

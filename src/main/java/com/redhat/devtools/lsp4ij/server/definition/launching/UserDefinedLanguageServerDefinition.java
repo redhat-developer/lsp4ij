@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.io.StringReader;
 import java.util.Map;
 
+import static com.redhat.devtools.lsp4ij.client.SettingsHelper.parseJson;
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
@@ -41,16 +42,17 @@ import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtil
  */
 public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition implements ClientConfigurableLanguageServerDefinition, CommandLineUpdater {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);//$NON-NLS-1$
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);
 
     @SerializedName("displayName")
     private String name;
     private String url;
-    private String templateId;
+    private final String templateId;
     private String commandLine;
     private Map<String, String> userEnvironmentVariables;
     private boolean includeSystemEnvironmentVariables;
     private String configurationContent;
+    private boolean expandConfiguration;
     private Object configuration;
     private String configurationSchemaContent;
     private String initializationOptionsContent;
@@ -69,6 +71,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
                                                @Nullable String configurationContent,
+                                               boolean expandConfiguration,
                                                @Nullable String configurationSchemaContent,
                                                @Nullable String initializationOptionsContent,
                                                @Nullable String clientConfigurationContent,
@@ -82,6 +85,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
         this.configurationContent = configurationContent;
         this.configurationSchemaContent = configurationSchemaContent;
+        this.expandConfiguration = expandConfiguration;
         this.initializationOptionsContent = initializationOptionsContent;
         this.clientConfigurationContent = clientConfigurationContent;
         this.installerConfigurationContent = installerConfigurationContent;
@@ -105,6 +109,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
                 configurationContent,
+                false,
                 null,
                 initializationOptionsContent,
                 null,
@@ -188,6 +193,14 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.configuration = null;
     }
 
+    public void setExpandConfiguration(boolean expandConfiguration) {
+        this.expandConfiguration = expandConfiguration;
+    }
+
+    public boolean isExpandConfiguration() {
+        return expandConfiguration;
+    }
+
     public String getConfigurationSchemaContent() {
         return configurationSchemaContent;
     }
@@ -229,13 +242,13 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 if (configurationContent.contains("$")) {
                     // Resolve magic variables like $PROJECT_DIR$
                     String projectConfigurationContent = CommandUtils.resolveCommandLine(configurationContent, project);
-                    return JsonParser.parseReader(new StringReader(projectConfigurationContent));
+                    return parseJson(projectConfigurationContent, isExpandConfiguration());
                 }
                 if (configuration == null) {
-                    configuration = JsonParser.parseReader(new StringReader(configurationContent));
+                    configuration = parseJson(configurationContent, isExpandConfiguration());
                 }
             } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON configuration for the language server '" + getId() + "'", e);
+                LOGGER.error("Error while parsing JSON configuration for the language server '{}'", getId(), e);
             }
         }
         return configuration;
@@ -253,7 +266,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                     initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
                 }
             } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON Initialization Options for the language server '" + getId() + "'", e);
+                LOGGER.error("Error while parsing JSON Initialization Options for the language server '{}'", getId(), e);
             }
         }
         return initializationOptions;
@@ -266,7 +279,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
             try {
                 clientConfiguration = JSONUtils.getLsp4jGson().fromJson(clientConfigurationContent, ClientConfigurationSettings.class);
             } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON client configuration for the language server '" + getId() + "'", e);
+                LOGGER.error("Error while parsing JSON client configuration for the language server '{}'", getId(), e);
             }
         }
         return clientConfiguration;

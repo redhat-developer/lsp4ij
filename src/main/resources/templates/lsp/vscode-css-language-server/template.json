@@ -7,6 +7,7 @@
     "unix": "sh -c \"node '/usr/share/code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\"",
     "default": "sh -c \"node 'resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\""
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

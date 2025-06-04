@@ -33,6 +33,7 @@ import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
@@ -78,6 +79,7 @@ public class LanguageServerPanel implements Disposable {
     private CommandLineWidget commandLine;
     private ServerMappingsPanel mappingsPanel;
     private SchemaBackedJsonTextField configurationWidget;
+    private final JBCheckBox expandConfigurationCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.configuration.expand"));
     private String configurationSchemaContent;
     private JsonTextField initializationOptionsWidget;
     private @Nullable JsonTextField clientConfigurationWidget;
@@ -319,12 +321,16 @@ public class LanguageServerPanel implements Disposable {
     private void createConfigurationField(@NotNull FormBuilder builder) {
         // Create the hyperlink "Edit JSON Schema" / "Associate with JSON Schema".
         editJsonSchemaAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.configuration.json.schema.associate"));
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), editJsonSchemaAction);
+        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        headerPanel.add(expandConfigurationCheckBox);
+        headerPanel.add(editJsonSchemaAction);
+
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), headerPanel);
         editJsonSchemaAction.addHyperlinkListener(e -> {
             var dialog = new EditJsonSchemaDialog(project, configurationSchemaContent);
             dialog.show();
             if (dialog.isOK()) {
-                // Associate the Server / Configuration editor with the new Json JSON content
+                // Associate the Server / Configuration editor with the new JSON content
                 this.setConfigurationSchemaContent(dialog.getJsonSchemaContent());
             }
         });
@@ -364,6 +370,10 @@ public class LanguageServerPanel implements Disposable {
     // TODO: Rename this to getConfigurationWidget()? getServerConfigurationWidget()?
     public SchemaBackedJsonTextField getConfiguration() {
         return configurationWidget;
+    }
+
+    public JBCheckBox getExpandConfigurationCheckBox() {
+        return expandConfigurationCheckBox;
     }
 
     public String getConfigurationSchemaContent() {

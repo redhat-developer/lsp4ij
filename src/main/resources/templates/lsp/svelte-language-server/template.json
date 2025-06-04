@@ -5,6 +5,7 @@
     "windows": "svelteserver.cmd --stdio",
     "default": "svelteserver --stdio"
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

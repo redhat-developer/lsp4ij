@@ -5,6 +5,7 @@
     "windows": "cmd /C ruby-lsp",
     "default": "sh -s ruby-lsp"
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {
