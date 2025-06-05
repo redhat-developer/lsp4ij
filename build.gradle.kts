@@ -72,6 +72,7 @@ dependencies {
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
         plugins(properties("platformPlugins").map { it.split(',') })
 
+        // use a fixed version for now, waiting for a fix from jetbrains. failing on 1.385+. see https://youtrack.jetbrains.com/issue/MP-7480/
         pluginVerifier(version="1.384")
         zipSigner()
         testFramework(TestFrameworkType.Platform)
