@@ -19,6 +19,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
@@ -340,8 +341,15 @@ public class LanguageServerView implements Disposable {
         }
         // Stop and disable the language server when installation is started
         languageServerPanel.addPreInstallAction(() -> {
-            LanguageServerManager.getInstance(project).stop(languageServerDefinition.getId());
-            languageServerDefinition.setEnabled(false, project);
+            // Stop all servers from all opened project
+            Project[] openProjects = ProjectManager.getInstance().getOpenProjects();
+            for (Project project : openProjects) {
+                if (!project.isDisposed()) {
+                    LanguageServerManager.getInstance(project)
+                            .stop(languageServerDefinition.getId());
+                    languageServerDefinition.setEnabled(false, project);
+                }
+            }
         });
         // Re-enable the language server when installation is terminated
         languageServerPanel.addPostInstallAction(() -> {
