@@ -83,7 +83,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     // offset where prefix completion starts
     // ex : string.|charA
-    private int prefixStartOffset;
+    private final int prefixStartOffset;
 
     private final Editor editor;
 
