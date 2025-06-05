@@ -70,6 +70,7 @@ public class UICommandLineUpdater implements CommandLineUpdater {
                 false,
                 false,
                 false,
+                false,
                 false);
         LanguageServersRegistry.getInstance().handleChangeEvent(event);
     }

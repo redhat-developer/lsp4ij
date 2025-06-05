@@ -67,6 +67,7 @@ public interface LanguageServerDefinitionListener {
         public final boolean configurationChanged;
         public final boolean expandConfigurationChanged;
         public final boolean initializationOptionsContentChanged;
+        public final boolean experimentalContentChanged;
         public final boolean clientConfigurationContentChanged;
         public final boolean installerConfigurationContentChanged;
 
@@ -80,6 +81,7 @@ public interface LanguageServerDefinitionListener {
                                           boolean configurationContentChanged,
                                           boolean expandConfigurationChanged,
                                           boolean initializationOptionsContentChanged,
+                                          boolean experimentalContentChanged,
                                           boolean clientConfigurationContentChanged,
                                           boolean installerConfigurationContentChanged) {
             super(project);
@@ -92,6 +94,7 @@ public interface LanguageServerDefinitionListener {
             this.configurationChanged = configurationContentChanged;
             this.expandConfigurationChanged = expandConfigurationChanged;
             this.initializationOptionsContentChanged = initializationOptionsContentChanged;
+            this.experimentalContentChanged = experimentalContentChanged;
             this.clientConfigurationContentChanged = clientConfigurationContentChanged;
             this.installerConfigurationContentChanged = installerConfigurationContentChanged;
         }

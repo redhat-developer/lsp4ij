@@ -57,6 +57,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private String configurationSchemaContent;
     private String initializationOptionsContent;
     private Object initializationOptions;
+    private String experimentalContent;
+    private Object experimental;
     private String clientConfigurationContent;
     private ClientConfigurationSettings clientConfiguration;
     private @Nullable ServerInstallerDescriptor serverInstallerDescriptor;
@@ -74,6 +76,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                boolean expandConfiguration,
                                                @Nullable String configurationSchemaContent,
                                                @Nullable String initializationOptionsContent,
+                                               @Nullable String experimentalContent,
                                                @Nullable String clientConfigurationContent,
                                                @Nullable String installerConfigurationContent) {
         super(id, name, description, true, null, false);
@@ -87,6 +90,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.configurationSchemaContent = configurationSchemaContent;
         this.expandConfiguration = expandConfiguration;
         this.initializationOptionsContent = initializationOptionsContent;
+        this.experimentalContent = experimentalContent;
         this.clientConfigurationContent = clientConfigurationContent;
         this.installerConfigurationContent = installerConfigurationContent;
     }
@@ -112,6 +116,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 false,
                 null,
                 initializationOptionsContent,
+                null,
                 null,
                 null);
     }
@@ -218,6 +223,15 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.initializationOptions = null;
     }
 
+    public String getExperimentalContent() {
+        return experimentalContent;
+    }
+
+    public void setExperimentalContent(String experimentalContent) {
+        this.experimentalContent = experimentalContent;
+        this.experimental = null;
+    }
+    
     public String getClientConfigurationContent() {
         return clientConfigurationContent;
     }
@@ -272,6 +286,24 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         return initializationOptions;
     }
 
+    public Object getLanguageServerExperimental(@NotNull Project project) {
+        if (experimentalContent != null && !experimentalContent.isEmpty()) {
+            try {
+                if (experimentalContent.contains("$")) {
+                    // Resolve magic variables like $PROJECT_DIR$
+                    String projectExperimentalContent = CommandUtils.resolveCommandLine(experimentalContent, project);
+                    return JsonParser.parseReader(new StringReader(projectExperimentalContent));
+                }
+                if (experimental == null) {
+                    experimental = JsonParser.parseReader(new StringReader(experimentalContent));
+                }
+            } catch (Exception e) {
+                LOGGER.error("Error while parsing JSON Initialization Options for the language server '{}'", getId(), e);
+            }
+        }
+        return experimental;
+    }
+    
     @Override
     @Nullable
     public ClientConfigurationSettings getLanguageServerClientConfiguration() {
@@ -301,4 +333,5 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     public @NotNull String getDisplayName() {
         return name;
     }
+    
 }

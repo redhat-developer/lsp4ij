@@ -170,6 +170,7 @@ public class LanguageServersRegistry {
                                 launch.isExpandConfiguration(),
                                 launch.getConfigurationSchemaContent(),
                                 launch.getInitializationOptionsContent(),
+                                launch.getExperimentalContent(),
                                 launch.getClientConfigurationContent(),
                                 launch.getInstallerConfigurationContent()),
                         mappings);
@@ -447,6 +448,7 @@ public class LanguageServersRegistry {
             settings.setExpandConfiguration(definitionFromSettings.isExpandConfiguration());
             settings.setConfigurationSchemaContent(definitionFromSettings.getConfigurationSchemaContent());
             settings.setInitializationOptionsContent(definitionFromSettings.getInitializationOptionsContent());
+            settings.setExperimentalContent(definitionFromSettings.getExperimentalContent());
             settings.setClientConfigurationContent(definitionFromSettings.getClientConfigurationContent());
             settings.setInstallerConfigurationContent(definitionFromSettings.getInstallerConfigurationContent());
             UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
@@ -522,6 +524,7 @@ public class LanguageServersRegistry {
         boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
         boolean expandConfigurationChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
         boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
+        boolean experimentalContentChanged = !Objects.equals(settings.getExperimentalContent(), request.experimentalContent());
         boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
         boolean installerConfigurationContentChanged = !Objects.equals(settings.getInstallerConfigurationContent(), request.installerConfigurationContent());
 
@@ -534,6 +537,7 @@ public class LanguageServersRegistry {
         settings.setExpandConfiguration(request.expandConfiguration());
         settings.setConfigurationSchemaContent(request.configurationSchemaContent());
         settings.setInitializationOptionsContent(request.initializationOptionsContent());
+        settings.setExperimentalContent(request.experimentalContent());
         settings.setClientConfigurationContent(request.clientConfigurationContent());
         settings.setInstallerConfigurationContent(request.installerConfigurationContent());
         settings.setMappings(request.mappings());
@@ -541,7 +545,7 @@ public class LanguageServersRegistry {
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged ||
                 includeSystemEnvironmentVariablesChanged ||
                 mappingsChanged || configurationContentChanged || expandConfigurationChanged || initializationOptionsContentChanged ||
-                clientConfigurationContentChanged || installerConfigurationContentChanged) {
+                experimentalContentChanged || clientConfigurationContentChanged || installerConfigurationContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     request.project(),
@@ -554,6 +558,7 @@ public class LanguageServersRegistry {
                     configurationContentChanged,
                     expandConfigurationChanged,
                     initializationOptionsContentChanged,
+                    experimentalContentChanged,
                     clientConfigurationContentChanged,
                     installerConfigurationContentChanged);
             if (notify) {
@@ -690,6 +695,7 @@ public class LanguageServersRegistry {
                                                 boolean expandConfiguration,
                                                 @Nullable String configurationSchemaContent,
                                                 @Nullable String initializationOptionsContent,
+                                                @Nullable String experimentalContent,
                                                 @Nullable String clientConfigurationContent,
                                                 @Nullable String installerConfigurationContent) {
     }

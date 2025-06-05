@@ -26,6 +26,7 @@ public class LanguageServerTemplate extends ServerTemplate {
     };
 
     public static final String INITIALIZATION_OPTIONS_FILE_NAME = "initializationOptions.json";
+    public static final String EXPERIMENTAL_FILE_NAME = "experimental.json";
     public static final String SETTINGS_FILE_NAME = "settings.json";
     public static final String SETTINGS_SCHEMA_FILE_NAME = "settings.schema.json";
     public static final String CLIENT_SETTINGS_FILE_NAME = "clientSettings.json";
@@ -40,6 +41,7 @@ public class LanguageServerTemplate extends ServerTemplate {
     private boolean expandConfiguration;
     private String configurationSchema;
     private String initializationOptions;
+    private String experimental;
     private String clientConfiguration;
 
 
@@ -81,6 +83,14 @@ public class LanguageServerTemplate extends ServerTemplate {
 
     public void setInitializationOptions(String initializationOptions) {
         this.initializationOptions = initializationOptions;
+    }
+
+    public String getExperimental() {
+        return experimental;
+    }
+
+    public void setExperimental(String experimental) {
+        this.experimental = experimental;
     }
 
     public String getClientConfiguration() {
