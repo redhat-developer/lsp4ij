@@ -804,6 +804,8 @@
                 class="com.redhat.devtools.lsp4ij.commands.editor.TriggerSuggestAction"/>
         <action id="editor.action.showReferences"
                 class="com.redhat.devtools.lsp4ij.commands.editor.ShowReferencesAction"/>
+        <action id="editor.action.triggerParameterHints"
+                class="com.redhat.devtools.lsp4ij.commands.editor.TriggerParameterHintsAction"/>
     </actions>
 
     <!-- LSP consoles -->

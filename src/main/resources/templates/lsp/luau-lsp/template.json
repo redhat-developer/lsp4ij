@@ -1,0 +1,22 @@
+{
+  "id": "luau-lsp",
+  "name": "Luau Language Server",
+  "url": null,
+  "programArgs": {
+    "windows": "path/to/your/luau-lsp.exe lsp --definitions=path/to/your/globalTypes.d.luau --docs=path/to/your/rb-docs.json",
+    "default": "path/to/your/luau-lsp lsp --definitions=path/to/your/globalTypes.d.luau --docs=path/to/your/rb-docs.json"
+  },
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Luau",
+        "patterns": [
+          "*.luau",
+          "*.lua"
+        ]
+      },
+      "languageId": "luau"
+    }
+  ]
+}

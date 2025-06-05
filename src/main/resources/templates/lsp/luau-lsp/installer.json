@@ -1,0 +1,48 @@
+{
+  "id": "luau-lsp",
+  "name": "Luau Language Server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download luau-lsp",
+      "github": {
+        "owner": "JohnnyMorganz",
+        "repository": "luau-lsp",
+        "prerelease": false,
+        "asset": {
+          "windows": "luau-lsp-win64.zip",
+          "unix": {
+            "amd64": "luau-lsp-linux.zip",
+            "arm64": "luau-lsp-linux-arm64.zip"
+          },
+          "mac": "luau-lsp-macos.zip"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/luau-lsp",
+        "file": {
+          "name": {
+            "windows": "luau-lsp.exe",
+            "unix": "luau-lsp",
+            "mac": "luau-lsp"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure luau-lsp server command",
+          "command": "${output.dir}/${output.file.name} lsp --definitions=path/to/your/globalTypes.d.luau --docs=path/to/your/rb-docs.json",
+          "update": true
+        }
+      }
+    }
+  }
+}
