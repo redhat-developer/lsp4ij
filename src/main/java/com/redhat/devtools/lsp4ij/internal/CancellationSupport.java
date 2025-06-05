@@ -40,6 +40,9 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.BiFunction;
 
+import static com.redhat.devtools.lsp4ij.internal.CancellationUtil.isContentModified;
+import static com.redhat.devtools.lsp4ij.internal.CancellationUtil.isRequestCancelled;
+
 /**
  * LSP cancellation support hosts the list of LSP requests to cancel when a
  * process is canceled (ex: when completion is re-triggered, when hover is give
@@ -123,17 +126,21 @@ public class CancellationSupport implements CancelChecker {
                                                                           @Nullable String featureName,
                                                                           boolean handleLanguageServerError) {
         return (result, error) -> {
-            if (error instanceof ResponseErrorException responseErrorException) {
-                if (isRequestCancelled(responseErrorException)) {
+            if (error instanceof ResponseErrorException responseError) {
+                if (isRequestCancelled(responseError)) {
                     // Don't show cancelled error
                     return null;
                 }
-            }
-            if (handleLanguageServerError && error instanceof ResponseErrorException responseError) {
-                handleLanguageServerError(languageServer, featureName, responseError);
-                // return null as response instead of throwing the ResponseErrorException error
-                // to avoid breaking the LSP request response of another language server (when file is associated to several language servers)
-                return null;
+                if (isContentModified(responseError)) {
+                    // Ignore the content modified error
+                    return null;
+                }
+                if (handleLanguageServerError) {
+                    handleLanguageServerError(languageServer, featureName, responseError);
+                    // return null as response instead of throwing the ResponseErrorException error
+                    // to avoid breaking the LSP request response of another language server (when file is associated to several language servers)
+                    return null;
+                }
             }
             if (error != null) {
                 if (error instanceof RuntimeException) {
@@ -203,12 +210,6 @@ public class CancellationSupport implements CancelChecker {
             errorReportingKind = settings.getErrorReportingKind();
         }
         return errorReportingKind != null ? errorReportingKind : ErrorReportingKind.getDefaultValue();
-    }
-
-    public static boolean isRequestCancelled(ResponseErrorException responseErrorException) {
-        ResponseError responseError = responseErrorException.getResponseError();
-        return responseError != null
-                && responseError.getCode() == ResponseErrorCode.RequestCancelled.getValue();
     }
 
     /**

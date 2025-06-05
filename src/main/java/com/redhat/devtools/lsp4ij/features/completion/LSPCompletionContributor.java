@@ -285,7 +285,7 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
     }
 
-    private static final String getCompletionChar(int offset, Document document) {
+    private static @Nullable String getCompletionChar(int offset, Document document) {
         if (offset > 0 && offset <= document.getTextLength()) {
             return String.valueOf(document.getCharsSequence().charAt(offset - 1));
         }
