@@ -487,7 +487,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             LanguageServerDefinition serverDefinition = key.getServerDefinition();
             Project project = LSPConsoleToolWindowPanel.this.project;
             // Create the language server panel with 'Server', 'Mappings', 'Configuration', 'Debug' tabs
-            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, false, project);
+            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, false, true, project);
             loadDetailPanel(languageServerView);
 
             // Track changes of definition + settings to reload the language server detail (command, mappings, etc):

@@ -73,6 +73,7 @@ public class LanguageServerPanel implements Disposable {
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
     private final boolean flushOnEachPrint;
+    private final boolean canExecuteInstaller;
     private HyperlinkLabel editJsonSchemaAction;
     private JBTextField serverName;
     private EnvironmentVariablesComponent environmentVariables;
@@ -92,8 +93,10 @@ public class LanguageServerPanel implements Disposable {
                                @Nullable JComponent description,
                                @NotNull EditionMode mode,
                                boolean flushOnEachPrint,
+                               boolean canExecuteInstaller,
                                @NotNull Project project) {
         this.flushOnEachPrint = flushOnEachPrint;
+        this.canExecuteInstaller = canExecuteInstaller;
         this.project = project;
         createUI(builder, description, mode);
     }
@@ -235,7 +238,7 @@ public class LanguageServerPanel implements Disposable {
 
     private void addInstallerTab(@NotNull JBTabbedPane tabbedPane) {
         FormBuilder installerTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.installer"), false);
-        this.installerPanel = new InstallerPanel(installerTab, getCommandLine(), flushOnEachPrint, project);
+        this.installerPanel = new InstallerPanel(installerTab, getCommandLine(), flushOnEachPrint, canExecuteInstaller, project);
     }
 
     public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {

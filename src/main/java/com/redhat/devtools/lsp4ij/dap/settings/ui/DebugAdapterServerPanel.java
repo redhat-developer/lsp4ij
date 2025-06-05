@@ -358,7 +358,7 @@ public class DebugAdapterServerPanel implements Disposable {
 
     private void addInstallerTab(@NotNull JBTabbedPane tabbedPane) {
         FormBuilder installerTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.installer"), false);
-        this.installerPanel = new InstallerPanel(installerTab, commandLine, true, project);
+        this.installerPanel = new InstallerPanel(installerTab, commandLine, true, true, project);
     }
 
     public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
