@@ -206,6 +206,11 @@ public class NewLanguageServerDialog extends DialogWrapper {
         initializationOptions.setText(template.getInitializationOptions() != null ? template.getInitializationOptions() : "");
         initializationOptions.setCaretPosition(0);
 
+        // Update experimental
+        var experimental = this.languageServerPanel.getExperimentalWidget();
+        experimental.setText(template.getExperimental() != null ? template.getExperimental() : "");
+        experimental.setCaretPosition(0);
+        
         // Update client configuration
         var clientConfiguration = this.languageServerPanel.getClientConfigurationWidget();
         if (clientConfiguration != null) {
@@ -283,6 +288,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         boolean expandConfiguration = this.languageServerPanel.getExpandConfigurationCheckBox().isSelected();
         String configurationSchema = this.languageServerPanel.getConfigurationSchemaContent();
         String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
+        String experimental = this.languageServerPanel.getExperimentalWidget().getText();
         String clientConfiguration = this.languageServerPanel.getClientConfigurationWidget() != null ?
                 this.languageServerPanel.getClientConfigurationWidget().getText() : null;
         String installerConfiguration = this.languageServerPanel.getInstallerConfigurationWidget() != null ?
@@ -299,6 +305,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 expandConfiguration,
                 configurationSchema,
                 initializationOptions,
+                experimental,
                 clientConfiguration,
                 installerConfiguration);
         definition.setUrl(this.languageServerPanel.getServerUrl());

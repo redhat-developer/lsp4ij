@@ -37,7 +37,7 @@ public class UserDefinedLanguageListener implements LanguageServerDefinitionList
     @Override
     public void handleChanged(@NotNull LanguageServerChangedEvent event) {
         if (event.serverDefinition == client.getServerDefinition()) {
-            if (event.initializationOptionsContentChanged) {
+            if (event.initializationOptionsContentChanged || event.experimentalContentChanged)  {
                 // initializationOption has changed:
                 // Try to get the user defined initializationOption and
                 // restart all started language servers

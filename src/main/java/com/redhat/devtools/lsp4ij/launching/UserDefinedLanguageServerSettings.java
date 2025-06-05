@@ -128,6 +128,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String initializationOptionsContent;
 
+        private String experimentalContent;
+
         private String clientConfigurationContent = "{}";
 
         private String installerConfigurationContent;
@@ -252,6 +254,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setInitializationOptionsContent(String initializationOptionsContent) {
             this.initializationOptionsContent = initializationOptionsContent;
+        }
+
+        public String getExperimentalContent() {
+            return experimentalContent;
+        }
+
+        public void setExperimentalContent(String experimentalContent) {
+            this.experimentalContent = experimentalContent;
         }
 
         public String getClientConfigurationContent() {

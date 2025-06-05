@@ -125,6 +125,7 @@ public class LanguageServerView implements Disposable {
                     && isEquals(this.getConfigurationSchemaContent(), settings.getConfigurationSchemaContent())
                     && this.isExpandConfiguration() == settings.isExpandConfiguration()
                     && isEquals(this.getInitializationOptionsContent(), settings.getInitializationOptionsContent())
+                    && isEquals(this.getExperimentalContent(), settings.getExperimentalContent())
                     && isEquals(this.getClientConfigurationContent(), settings.getClientConfigurationContent())
                     && isEquals(this.getInstallerConfigurationContent(), settings.getInstallerConfigurationContent()))) {
                 return true;
@@ -176,6 +177,7 @@ public class LanguageServerView implements Disposable {
                 this.setExpandConfiguration(userDefinedLanguageServerSettings.isExpandConfiguration());
                 this.setConfigurationSchemaContent(userDefinedLanguageServerSettings.getConfigurationSchemaContent());
                 this.setInitializationOptionsContent(userDefinedLanguageServerSettings.getInitializationOptionsContent());
+                this.setExperimentalContent(userDefinedLanguageServerSettings.getExperimentalContent());
                 this.setClientConfigurationContent(userDefinedLanguageServerSettings.getClientConfigurationContent());
                 this.setInstallerConfigurationContent(userDefinedLanguageServerSettings.getInstallerConfigurationContent());
 
@@ -295,6 +297,7 @@ public class LanguageServerView implements Disposable {
                                     isExpandConfiguration(),
                                     getConfigurationSchemaContent(),
                                     getInitializationOptionsContent(),
+                                    getExperimentalContent(),
                                     getClientConfigurationContent(),
                                     getInstallerConfigurationContent()),
                             false);
@@ -487,6 +490,16 @@ public class LanguageServerView implements Disposable {
         initializationOptions.setCaretPosition(0);
     }
 
+    public String getExperimentalContent() {
+        return languageServerPanel.getExperimentalWidget().getText();
+    }
+
+    public void setExperimentalContent(String ExperimentalContent) {
+        var experimental = languageServerPanel.getExperimentalWidget();
+        experimental.setText(ExperimentalContent);
+        experimental.setCaretPosition(0);
+    }
+    
     public String getClientConfigurationContent() {
         return languageServerPanel.getClientConfigurationWidget().getText();
     }

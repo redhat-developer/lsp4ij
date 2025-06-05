@@ -63,4 +63,5 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
     public UserDefinedLanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
+
 }

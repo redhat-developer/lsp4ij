@@ -82,6 +82,7 @@ public class LanguageServerPanel implements Disposable {
     private final JBCheckBox expandConfigurationCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.configuration.expand"));
     private String configurationSchemaContent;
     private JsonTextField initializationOptionsWidget;
+    private JsonTextField experimentalWidget;
     private @Nullable JsonTextField clientConfigurationWidget;
     private @Nullable InstallerPanel installerPanel;
     private @Nullable String serverUrl;
@@ -226,6 +227,7 @@ public class LanguageServerPanel implements Disposable {
         FormBuilder serverConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.server"), false);
         createConfigurationField(serverConfigurationTab);
         createInitializationOptionsTabField(serverConfigurationTab);
+        createExperimentalTabField(serverConfigurationTab);
 
         FormBuilder clientConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.client"), false);
         createClientConfigurationField(clientConfigurationTab);
@@ -345,6 +347,11 @@ public class LanguageServerPanel implements Disposable {
         builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.initializationOptions"), initializationOptionsWidget);
     }
 
+    private void createExperimentalTabField(@NotNull FormBuilder builder) {
+        experimentalWidget = new JsonTextField(project);
+        builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.experimental"), experimentalWidget);
+    }
+    
     private void createClientConfigurationField(@NotNull FormBuilder builder) {
         clientConfigurationWidget = new JsonTextField(project);
         clientConfigurationWidget.setJsonFilename(LSPClientConfigurationJsonSchemaFileProvider.CLIENT_SETTINGS_JSON_FILE_NAME);
@@ -393,6 +400,10 @@ public class LanguageServerPanel implements Disposable {
 
     public JsonTextField getInitializationOptionsWidget() {
         return initializationOptionsWidget;
+    }
+
+    public JsonTextField getExperimentalWidget() {
+        return experimentalWidget;
     }
 
     public @Nullable JsonTextField getClientConfigurationWidget() {

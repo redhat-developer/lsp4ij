@@ -84,6 +84,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
         String settingsJson = null;
         String settingsSchemaJson = null;
         String initializationOptionsJson = null;
+        String experimentalJson = null;
         String clientSettingsJson = null;
         String installerSettingsJson = null;
         String description = null;
@@ -104,6 +105,9 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
                     break;
                 case INITIALIZATION_OPTIONS_FILE_NAME:
                     initializationOptionsJson = VfsUtilCore.loadText(file);
+                    break;
+                case EXPERIMENTAL_FILE_NAME:
+                    experimentalJson = VfsUtilCore.loadText(file);
                     break;
                 case CLIENT_SETTINGS_FILE_NAME:
                     clientSettingsJson = VfsUtilCore.loadText(file);
@@ -129,6 +133,9 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
         if (initializationOptionsJson == null) {
             initializationOptionsJson = "{}";
         }
+        if (experimentalJson == null) {
+            experimentalJson = "{}";
+        }
         if (clientSettingsJson == null) {
             clientSettingsJson = "{}";
         }
@@ -141,6 +148,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
         template.setConfiguration(settingsJson);
         template.setConfigurationSchema(settingsSchemaJson);
         template.setInitializationOptions(initializationOptionsJson);
+        template.setExperimental(experimentalJson);
         template.setClientConfiguration(clientSettingsJson);
         template.setInstallerConfiguration(installerSettingsJson);
         if (StringUtils.isNotBlank(description)) {
@@ -187,6 +195,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
                     .create();
             String template = gson.toJson(lsDefinition);
             String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
+            String experimental = ((UserDefinedLanguageServerDefinition) lsDefinition).getExperimentalContent();
             String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
             String settingsSchema = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationSchemaContent();
             String clientSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getClientConfigurationContent();
@@ -195,6 +204,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
 
             writeToZip(TEMPLATE_FILE_NAME, template, zos);
             writeToZip(INITIALIZATION_OPTIONS_FILE_NAME, initializationOptions, zos);
+            writeToZip(EXPERIMENTAL_FILE_NAME, experimental, zos);
             writeToZip(SETTINGS_FILE_NAME, settings, zos);
             writeToZip(SETTINGS_SCHEMA_FILE_NAME, settingsSchema, zos);
             writeToZip(CLIENT_SETTINGS_FILE_NAME, clientSettings, zos);
