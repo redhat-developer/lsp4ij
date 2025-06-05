@@ -102,7 +102,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
             return installFuture;
         }
         CompletableFuture<ServerInstallationStatus> installFuture = new CompletableFuture<>();
-        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), getInstallationTaskTitle(), canBeCancelled()) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(null, getInstallationTaskTitle(), canBeCancelled()) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {

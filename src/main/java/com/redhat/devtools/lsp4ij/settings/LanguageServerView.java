@@ -57,6 +57,7 @@ public class LanguageServerView implements Disposable {
 
     private final LanguageServerNameProvider languageServerNameProvider;
     private final boolean flushOnEachPrint;
+    private final boolean canExecuteInstaller;
     private final JPanel myMainPanel;
     private final LanguageServerDefinition languageServerDefinition;
     private final Project project;
@@ -66,8 +67,10 @@ public class LanguageServerView implements Disposable {
     public LanguageServerView(@NotNull LanguageServerDefinition languageServerDefinition,
                               @Nullable LanguageServerNameProvider languageServerNameProvider,
                               boolean flushOnEachPrint,
+                              boolean canExecuteInstaller,
                               @NotNull Project project) {
         this.flushOnEachPrint = flushOnEachPrint;
+        this.canExecuteInstaller = canExecuteInstaller;
         this.languageServerDefinition = languageServerDefinition;
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
@@ -331,7 +334,7 @@ public class LanguageServerView implements Disposable {
         this.languageServerPanel = new LanguageServerPanel(builder,
                 description,
                 launchingServerDefinition ? LanguageServerPanel.EditionMode.EDIT_USER_DEFINED :
-                        LanguageServerPanel.EditionMode.EDIT_EXTENSION, flushOnEachPrint, project);
+                        LanguageServerPanel.EditionMode.EDIT_EXTENSION, flushOnEachPrint, canExecuteInstaller, project);
         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition def) {
             languageServerPanel.setCommandLineUpdater(new UICommandLineUpdater(def, project));
         }
