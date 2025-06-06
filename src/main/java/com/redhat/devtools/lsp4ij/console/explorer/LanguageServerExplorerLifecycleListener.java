@@ -13,7 +13,6 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
-import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
@@ -36,11 +35,8 @@ import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIf
 public class LanguageServerExplorerLifecycleListener implements LanguageServerLifecycleListener {
 
     private static final long TRACE_FLUSH_DELAY_MS = 500L; // Debounce delay before flushing LSP traces
-
-    private volatile Alarm traceFlushAlarm;
-    private boolean disposed;
-
     private final LanguageServerExplorer explorer;
+    private boolean disposed;
 
     public LanguageServerExplorerLifecycleListener(@NotNull LanguageServerExplorer explorer) {
         this.explorer = explorer;
@@ -62,16 +58,17 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         }
 
         // Update UI server status
-        LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
-        if (languageServer.addTrace(message, messageConsumer)) {
+        @Nullable LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
+        if (processTreeNode != null && languageServer.addTrace(message, messageConsumer)) {
             // Display traces in LSP console
             scheduleFlushLogs(languageServer, processTreeNode);
         }
     }
 
-    private void scheduleFlushLogs(@NotNull LanguageServerWrapper languageServer, LanguageServerProcessTreeNode processTreeNode) {
+    private void scheduleFlushLogs(@NotNull LanguageServerWrapper languageServer,
+                                   @NotNull LanguageServerProcessTreeNode processTreeNode) {
         var traceFlushAlarm = languageServer.getTraceFlushAlarm();
-        if(traceFlushAlarm == null) {
+        if (traceFlushAlarm == null) {
             return;
         }
         traceFlushAlarm.addRequest(() -> {
@@ -98,9 +95,9 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
 
 
     @Override
-    public void handleError(LanguageServerWrapper languageServer, Throwable exception) {
+    public void handleError(@NotNull LanguageServerWrapper languageServer, @Nullable Throwable exception) {
         LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
-        if (exception == null) {
+        if (exception == null || processTreeNode == null) {
             return;
         }
 

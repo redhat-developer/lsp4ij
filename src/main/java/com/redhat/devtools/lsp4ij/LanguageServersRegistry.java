@@ -503,6 +503,7 @@ public class LanguageServersRegistry {
         request.serverDefinition().setConfigurationContent(request.configurationContent());
         request.serverDefinition().setExpandConfiguration(request.expandConfiguration());
         request.serverDefinition().setInitializationOptionsContent(request.initializationOptionsContent());
+        request.serverDefinition().setExperimentalContent(request.experimentalContent());
         request.serverDefinition().setClientConfigurationContent(request.clientConfigurationContent());
         request.serverDefinition().setInstallerConfigurationContent(request.installerConfigurationContent());
 

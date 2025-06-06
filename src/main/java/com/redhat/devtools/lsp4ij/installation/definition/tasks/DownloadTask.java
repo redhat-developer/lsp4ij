@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
 import com.google.gson.JsonObject;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.system.CpuArch;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
@@ -108,7 +109,8 @@ public class DownloadTask extends InstallerTask {
 
             // Create output directory where downloaded file must be extracted
             String dir = getDir();
-            String resolvedDir = CommandUtils.resolveCommandLine(dir, context.getProject());
+            var project = context.getProject();
+            String resolvedDir = CommandUtils.resolveCommandLine(dir, project);
             Path outputDir = Paths.get(resolvedDir);
             Files.createDirectories(outputDir);
 

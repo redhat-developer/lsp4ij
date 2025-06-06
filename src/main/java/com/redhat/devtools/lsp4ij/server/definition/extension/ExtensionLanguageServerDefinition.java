@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -163,5 +164,10 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
     @Override
     public @NotNull SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
         return super.getSemanticTokensColorsProvider();
+    }
+
+    @Override
+    public @Nullable ServerInstaller createServerInstaller() {
+        return getFactory().createServerInstaller();
     }
 }

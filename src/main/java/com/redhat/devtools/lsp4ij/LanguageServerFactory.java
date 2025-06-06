@@ -12,10 +12,12 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Language server factory API.
@@ -53,5 +55,22 @@ public interface LanguageServerFactory {
 
     @NotNull default LSPClientFeatures createClientFeatures() {
         return new LSPClientFeatures();
+    }
+
+    /**
+     * Creates a server installer intended to install a server shared by all projects (global scope).
+     *
+     * <p>
+     * The server may be installed in the user's home directory, making it accessible to all projects.
+     * </p>
+     *
+     * <p>
+     * To install a server for a specific project only (project scope), use {@link LSPClientFeatures#setServerInstaller(ServerInstaller)} instead.
+     * </p>
+     *
+     * @return a {@link ServerInstaller} for global use, or {@code null} if no global installer is provided.
+     */
+    @Nullable default ServerInstaller createServerInstaller() {
+        return null;
     }
 }
