@@ -32,6 +32,8 @@ import static com.redhat.devtools.lsp4ij.features.selectionRange.LSPSelectionRan
  */
 public class LSPExtendWordSelectionHandler extends AbstractLSPExtendWordSelectionHandler {
 
+    private static final @NotNull LSPWordSelectioner LSP_WORD_SELECTIONER = new LSPWordSelectioner();
+
     @Override
     public boolean canSelect(@NotNull PsiElement element) {
         if (!super.canSelect(element)) {
@@ -80,7 +82,7 @@ public class LSPExtendWordSelectionHandler extends AbstractLSPExtendWordSelectio
         }
 
         // Get the selection ranges and extend them to whole lines
-        Set<TextRange> textRanges = new LinkedHashSet<>();
+        @NotNull Set<TextRange> textRanges = new LinkedHashSet<>();
         List<TextRange> selectionTextRanges = LSPSelectionRangeSupport.getSelectionTextRanges(file, editor, effectiveOffset);
         for (TextRange selectionTextRange : selectionTextRanges) {
             ContainerUtil.addAllNotNull(textRanges, expandToWholeLinesWithBlanks(editorText, selectionTextRange));
@@ -90,7 +92,18 @@ public class LSPExtendWordSelectionHandler extends AbstractLSPExtendWordSelectio
         if ((offset == lineStartOffset) && (offset != effectiveOffset)) {
             textRanges.removeIf(textRange -> textRange.getStartOffset() > lineStartOffset);
         }
-
+        
+        if (textRanges.isEmpty()) {
+            // Selection ranges are empty
+            // As LSP4IJ disable the standard WordSelectioner with LSPWordSelectioner
+            // this select method must return the ranges from the standard WordSelectioner (if applicable)
+            // to select a word instead of selecting a line or a block
+            // see issue https://github.com/redhat-developer/lsp4ij/issues/1097
+            if (LSP_WORD_SELECTIONER.canSelect(element)) {
+                return LSP_WORD_SELECTIONER.select(element, editorText, offset, editor);
+            }
+            return null;
+        }
         return new ArrayList<>(textRanges);
     }
 
