@@ -1433,7 +1433,7 @@ public class LanguageServerWrapper implements Disposable {
         if (traces == null || tracing == null) {
             synchronized (this) {
                 if (traces == null) {
-                    tracing = new TracingMessageConsumer();
+                    traces = new ConcurrentLinkedQueue<>();
                 }
                 if (tracing == null) {
                     tracing = new TracingMessageConsumer();
