@@ -33,11 +33,11 @@ import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
-import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
+import com.redhat.devtools.lsp4ij.dap.console.DAPDuplexConsoleView;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -340,7 +340,9 @@ public class DAPDebugProcess extends XDebugProcess {
             var consoleView = getSession().getConsoleView();
             if (consoleView == null) {
                 return;
-
+            }
+            if (consoleView instanceof DAPDuplexConsoleView) {
+                consoleView = ((DAPDuplexConsoleView) consoleView).getPrimaryConsoleView();
             }
             consoleView.print(text, type);
         });

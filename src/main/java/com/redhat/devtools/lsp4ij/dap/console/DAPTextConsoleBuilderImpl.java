@@ -27,6 +27,6 @@ public class DAPTextConsoleBuilderImpl extends TextConsoleBuilderImpl {
 
     @Override
     protected @NotNull ConsoleView createConsole() {
-        return new DAPConsoleView(getProject(), getScope(), isViewer(), isUsePredefinedMessageFilter());
+        return new DAPDuplexConsoleView(getProject(), getScope(), isViewer(), isUsePredefinedMessageFilter());
     }
 }
