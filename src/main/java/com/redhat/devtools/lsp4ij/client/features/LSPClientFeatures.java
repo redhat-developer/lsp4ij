@@ -145,13 +145,28 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Nullable
     public ServerInstaller getServerInstaller() {
-        return serverInstaller;
+        if (serverInstaller != null) {
+            // Server installer on Project scope
+            return serverInstaller;
+        }
+        // Server installer on Application scope
+        return getServerDefinition().getServerInstaller();
     }
 
     /**
-     * Set the server installer.
+     * Registers a {@link ServerInstaller} for installing a language server in the scope of a specific project.
      *
-     * @param serverInstaller server installer.
+     * <p>
+     * This installer will be used only for the current project and overrides any global installer
+     * returned by {@link com.redhat.devtools.lsp4ij.LanguageServerFactory#createServerInstaller()}.
+     * </p>
+     *
+     * <p>
+     * Use this method when you want to provide a project-specific installation logic,
+     * such as downloading the server into the project's directory or using project-specific configuration.
+     * </p>
+     *
+     * @param serverInstaller the {@link ServerInstaller} to use for this project; must not be {@code null}.
      */
     public void setServerInstaller(@NotNull ServerInstaller serverInstaller) {
         this.serverInstaller = serverInstaller;

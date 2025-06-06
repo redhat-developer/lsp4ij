@@ -39,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class ServerInstallerBase implements ServerInstaller {
 
-    private static final CompletableFuture<ServerInstallationStatus> INSTALLED_FUTURE = CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
+    protected static final CompletableFuture<ServerInstallationStatus> INSTALLED_FUTURE = CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
 
     /**
      * A {@link CompletableFuture} representing the installation process.
@@ -70,7 +70,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      * @return a {@link CompletableFuture} that will be completed once the installation is finished.
      */
     @Override
-    public CompletableFuture<ServerInstallationStatus> checkInstallation() {
+    public @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation() {
         if (status == ServerInstallationStatus.INSTALLED) {
             // Server is already installed, return completed future
             return INSTALLED_FUTURE;
@@ -102,7 +102,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
             return installFuture;
         }
         CompletableFuture<ServerInstallationStatus> installFuture = new CompletableFuture<>();
-        ProgressManager.getInstance().run(new Task.Backgroundable(null, getInstallationTaskTitle(), canBeCancelled()) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(getProject(), getInstallationTaskTitle(), canBeCancelled()) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
@@ -263,6 +263,6 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      *
      * @return the {@link Project} for the installation.
      */
-    protected abstract @NotNull Project getProject();
+    protected abstract @Nullable Project getProject();
 
 }

@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
@@ -333,5 +334,9 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     public @NotNull String getDisplayName() {
         return name;
     }
-    
+
+    @Override
+    public @Nullable ServerInstaller createServerInstaller() {
+        return new UserDefinedLanguageServerInstaller(this);
+    }
 }

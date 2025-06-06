@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.CompletableFuture;
 
@@ -23,6 +24,7 @@ public interface ServerInstaller {
      *
      * @return A {@link CompletableFuture} that completes when the installation is finished.
      */
+    @NotNull
     CompletableFuture<ServerInstallationStatus> checkInstallation();
 
     /**

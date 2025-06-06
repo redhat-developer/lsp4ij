@@ -36,7 +36,6 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         setBreadcrumbsFeature(new UserDefinedBreadcrumbsFeature());
         setEditorBehaviorFeature(new UserDefinedEditorBehaviorFeature(this));
         setFileUriSupport(new UserDefinedFileUriSupport(this));
-        setServerInstaller(new UserDefinedLanguageServerInstaller());
     }
 
     public boolean isCaseSensitive(@NotNull PsiFile file) {

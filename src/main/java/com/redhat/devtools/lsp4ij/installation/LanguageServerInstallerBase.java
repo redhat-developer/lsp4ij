@@ -12,11 +12,14 @@ package com.redhat.devtools.lsp4ij.installation;
 
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerManager;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatureAware;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -26,16 +29,62 @@ import org.jetbrains.annotations.Nullable;
  */
 public abstract class LanguageServerInstallerBase extends ServerInstallerBase implements LSPClientFeatureAware {
 
-    private @NotNull LSPClientFeatures clientFeatures;
+    private final @Nullable LanguageServerDefinition serverDefinition;
+    private @Nullable LSPClientFeatures clientFeatures;
+
+
+    public LanguageServerInstallerBase() {
+        this(null);
+    }
+
+    public LanguageServerInstallerBase(@Nullable LanguageServerDefinition serverDefinition) {
+        this.serverDefinition = serverDefinition;
+    }
+
+    private static @NotNull ServerStatus getServerStatus(@NotNull ServerInstallationStatus status) {
+        return switch (status) {
+            case CHECKING_INSTALLED -> ServerStatus.checking_installed;
+            case INSTALLING -> ServerStatus.installing;
+            case INSTALLED -> ServerStatus.installed;
+            case NOT_INSTALLED -> ServerStatus.not_installed;
+        };
+    }
 
     @Override
     public @Nullable Runnable getAfterCode() {
         if (isStartServerAfterInstallation()) {
             return () -> {
                 // The language server is installed, start the language server
-                LanguageServerManager.getInstance(getProject())
-                        .start(getClientFeatures().getServerDefinition());
+                var singleProject = getProject();
+                var serverDefinition = getServerDefinition();
+                if (serverDefinition == null) {
+                    return;
+                }
+                if (singleProject != null) {
+                    LanguageServerManager
+                            .getInstance(singleProject)
+                            .start(serverDefinition);
+                } else {
+                    for (var project : ProjectManager.getInstance().getOpenProjects()) {
+                        if (!project.isDisposed()) {
+                            LanguageServerManager
+                                    .getInstance(project)
+                                    .start(serverDefinition);
+                        }
+                    }
+                }
             };
+        }
+        return null;
+    }
+
+    protected @Nullable LanguageServerDefinition getServerDefinition() {
+        if (serverDefinition != null) {
+            return serverDefinition;
+        }
+        var clientFeatures = getClientFeatures();
+        if (clientFeatures != null) {
+            return clientFeatures.getServerDefinition();
         }
         return null;
     }
@@ -82,7 +131,8 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
      * @return the language server name.
      */
     protected @NotNull String getServerName() {
-        return getClientFeatures().getServerDefinition().getDisplayName();
+        var serverDefinition = getServerDefinition();
+        return serverDefinition != null ? serverDefinition.getDisplayName() : "";
     }
 
     /**
@@ -90,7 +140,7 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
      *
      * @return the LSP client features.
      */
-    public @NotNull LSPClientFeatures getClientFeatures() {
+    public @Nullable LSPClientFeatures getClientFeatures() {
         return clientFeatures;
     }
 
@@ -109,20 +159,26 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
     protected void updateStatus(@NotNull ServerInstallationStatus status) {
         super.updateStatus(status);
         var serverStatus = getServerStatus(status);
-        clientFeatures.getServerWrapper().updateStatus(serverStatus);
-    }
-
-    private static @NotNull ServerStatus getServerStatus(@NotNull ServerInstallationStatus status) {
-        return switch (status) {
-            case CHECKING_INSTALLED -> ServerStatus.checking_installed;
-            case INSTALLING -> ServerStatus.installing;
-            case INSTALLED -> ServerStatus.installed;
-            case NOT_INSTALLED -> ServerStatus.not_installed;
-        };
+        if (clientFeatures != null) {
+            clientFeatures.getServerWrapper().updateStatus(serverStatus);
+        } else {
+            var serverDefinition = getServerDefinition();
+            for (var project : ProjectManager.getInstance().getOpenProjects()) {
+                if (!project.isDisposed()) {
+                    LanguageServiceAccessor.getInstance(project)
+                            .getStartedServers()
+                            .forEach(serverWrapper -> {
+                                if (serverWrapper.getServerDefinition().equals(serverDefinition)) {
+                                    serverWrapper.updateStatus(serverStatus);
+                                }
+                            });
+                }
+            }
+        }
     }
 
     @Override
-    public @NotNull Project getProject() {
-        return clientFeatures.getProject();
+    public @Nullable Project getProject() {
+        return clientFeatures != null ? clientFeatures.getProject() : null;
     }
 }

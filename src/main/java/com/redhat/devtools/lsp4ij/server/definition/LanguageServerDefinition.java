@@ -28,6 +28,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.internal.capabilities.CodeLensOptionsAdapter;
 import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -65,6 +66,9 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
     private SemanticTokensColorsProvider semanticTokensColorsProvider;
+
+    private boolean serverInstallerCreated;
+    private @Nullable ServerInstaller serverInstaller;
 
     public LanguageServerDefinition(@NotNull String id,
                                     @NotNull String name,
@@ -361,4 +365,21 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         }
         return null;
     }
+
+    public @Nullable ServerInstaller getServerInstaller() {
+        if (serverInstallerCreated) {
+            return serverInstaller;
+        }
+        return getServerInstallerSync();
+    }
+
+    private synchronized @Nullable ServerInstaller getServerInstallerSync() {
+        if (serverInstallerCreated) {
+            return serverInstaller;
+        }
+        serverInstaller = createServerInstaller();
+        serverInstallerCreated = true;
+        return serverInstaller;
+    }
+
 }

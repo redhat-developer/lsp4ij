@@ -158,7 +158,7 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private @Nullable TracingMessageConsumer tracing;
-    private @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
+    private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
 
     /* Backwards compatible constructor */
@@ -262,7 +262,7 @@ public class LanguageServerWrapper implements Disposable {
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
-        if (serverStatus != ServerStatus.installed) {
+        if (serverStatus != ServerStatus.installed && serverStatus != ServerStatus.installing) {
             stop();
         }
         // start the language server
@@ -326,13 +326,11 @@ public class LanguageServerWrapper implements Disposable {
                         if (tracing != null) {
                             tracing = null;
                         }
-                        if (traces != null) {
-                            traces = null;
-                        }
 
-                        if (this.lspStreamProvider != null) {
+                        var oldProvider = this.lspStreamProvider;
+                        if (oldProvider != null) {
                             // Ensure process is stopped before starting a new process
-                            this.lspStreamProvider.stop();
+                            oldProvider.stop();
                         }
                         var provider = this.lspStreamProvider = serverDefinition.createConnectionProvider(initialProject);
                         initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
@@ -1423,7 +1421,7 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         initLSPTracesIfNeeded();
-        if (traces == null) {
+        if (traces == null || tracing == null) {
             // This case can occur when language server is restarted
             return false;
         }
@@ -1432,10 +1430,12 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void initLSPTracesIfNeeded() {
-        if (traces == null) {
+        if (traces == null || tracing == null) {
             synchronized (this) {
                 if (traces == null) {
-                    traces = new ConcurrentLinkedQueue<>();
+                    tracing = new TracingMessageConsumer();
+                }
+                if (tracing == null) {
                     tracing = new TracingMessageConsumer();
                 }
             }

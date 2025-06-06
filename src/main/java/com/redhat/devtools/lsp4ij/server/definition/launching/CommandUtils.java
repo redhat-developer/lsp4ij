@@ -13,8 +13,10 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -91,8 +93,9 @@ public class CommandUtils {
      * @return the resolved command line with expanded macros.
      * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
      */
-    public static String resolveCommandLine(@NotNull String commandLine, @NotNull Project project) {
-        return ProgramParametersUtil.expandPathAndMacros(commandLine, null, project);
+    public static String resolveCommandLine(@NotNull String commandLine, @Nullable Project project) {
+        var nonNullProject = project!= null ? project : ProjectManager.getInstance().getDefaultProject();
+        return ProgramParametersUtil.expandPathAndMacros(commandLine, null, nonNullProject);
     }
 
 }

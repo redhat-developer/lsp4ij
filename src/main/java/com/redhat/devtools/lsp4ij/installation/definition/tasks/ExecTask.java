@@ -13,18 +13,17 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.*;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -69,14 +68,26 @@ public class ExecTask extends InstallerTask {
 
     }
 
+    private static List<String> resolveServerCommand(@NotNull List<String> command,
+                                                     @NotNull InstallerContext context) {
+        if (command.size() == 1 && command.get(0).equals("${server.command}")) {
+            // Specific case: resolve "${server.command}"
+            // create an array string of the resolved command
+            String resolved = context.resolveValues(command.get(0));
+            return CommandUtils.createCommands(resolved);
+        }
+        return command;
+    }
+
     @Override
     public boolean run(@NotNull InstallerContext context) {
         CapturingProcessHandler handler = null;
         try {
+            @Nullable var project = context.getProject();
             List<String> command = resolveServerCommand(this.command, context);
             List<String> resolvedCommand = command
                     .stream()
-                    .map(args -> CommandUtils.resolveCommandLine(args, context.getProject()))
+                    .map(args -> CommandUtils.resolveCommandLine(args, project))
                     .toList();
             context.print("> " + String.join(" ", resolvedCommand));
 
@@ -92,13 +103,13 @@ public class ExecTask extends InstallerTask {
             }
             cmdLine.setCharset(java.nio.charset.StandardCharsets.UTF_8);
 
-            handler = new CapturingProcessHandler(cmdLine) ;
+            handler = new CapturingProcessHandler(cmdLine);
             handler.addProcessListener(new ProcessAdapter() {
                 @Override
                 public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
                     if (outputType == ProcessOutputType.STDERR) {
                         context.printError(event.getText());
-                    } else  {
+                    } else {
                         context.print(event.getText());
                     }
                 }
@@ -122,28 +133,20 @@ public class ExecTask extends InstallerTask {
         }
     }
 
-    private static List<String> resolveServerCommand(@NotNull List<String> command,
-                                              @NotNull InstallerContext context) {
-        if (command.size() == 1 && command.get(0).equals("${server.command}")) {
-            // Specific case: resolve "${server.command}"
-            // create an array string of the resolved command
-            String resolved = context.resolveValues(command.get(0));
-            return CommandUtils.createCommands(resolved);
-        }
-        return command;
-    }
-
     private Path getWorkingDir(@Nullable String workingDir,
                                @NotNull InstallerContext context) {
+        @Nullable var project = context.getProject();
         if (workingDir != null) {
-            String resolved = CommandUtils.resolveCommandLine(context.resolveValues(workingDir), context.getProject());
+            String resolved = CommandUtils.resolveCommandLine(context.resolveValues(workingDir), project);
             if (resolved != null) {
                 return Paths.get(resolved);
             }
         }
-        var projectDir = ProjectUtil.guessProjectDir(context.getProject());
-        if (projectDir != null) {
-            return projectDir.toNioPath();
+        if (project != null) {
+            var projectDir = ProjectUtil.guessProjectDir(project);
+            if (projectDir != null) {
+                return projectDir.toNioPath();
+            }
         }
         return null;
     }

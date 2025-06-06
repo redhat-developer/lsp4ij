@@ -58,7 +58,7 @@ public class InstallerContext implements Reporter {
      */
     public static record InstallationStatus(String message, Level level) {}
 
-    private final @NotNull Project project;
+    private final @Nullable Project project;
     private final @NotNull InstallerAction action;
     private @Nullable CommandLineUpdater commandLineUpdater;
     private final @NotNull Map<String, Object> properties;
@@ -78,7 +78,7 @@ public class InstallerContext implements Reporter {
      * @param project             the IntelliJ {@link Project} in which the installation is taking place.
      * @param action              the {@link InstallerAction} to be performed (e.g., CHECK, RUN).
      */
-    public InstallerContext(@NotNull Project project,
+    public InstallerContext(@Nullable Project project,
                             @NotNull InstallerAction action) {
         this.project = project;
         this.action = action;
@@ -97,7 +97,7 @@ public class InstallerContext implements Reporter {
         this.flushOnEachPrint = flushOnEachPrint;
     }
 
-    public @NotNull Project getProject() {
+    public @Nullable Project getProject() {
         return project;
     }
 
