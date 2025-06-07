@@ -52,17 +52,15 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
         myDurationWidth = 0;
         myDurationOffset = 0;
 
-        if (value instanceof LanguageServerTreeNode) {
+        if (value instanceof LanguageServerTreeNode languageServerTreeNode) {
             // Render of language server
-            LanguageServerTreeNode languageServerTreeNode = (LanguageServerTreeNode) value;
             setIcon(languageServerTreeNode.getIcon());
             append(languageServerTreeNode.getDisplayName());
             return;
         }
 
-        if (value instanceof LanguageServerProcessTreeNode) {
+        if (value instanceof LanguageServerProcessTreeNode languageProcessTreeNode) {
             // Render of language server process
-            LanguageServerProcessTreeNode languageProcessTreeNode = (LanguageServerProcessTreeNode) value;
             setIcon(languageProcessTreeNode.getIcon());
             append(languageProcessTreeNode.getDisplayName());
 

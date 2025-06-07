@@ -549,6 +549,7 @@ public class LanguageServersRegistry {
                 experimentalContentChanged || clientConfigurationContentChanged || installerConfigurationContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                    LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.USER,
                     request.project(),
                     request.serverDefinition(),
                     nameChanged,

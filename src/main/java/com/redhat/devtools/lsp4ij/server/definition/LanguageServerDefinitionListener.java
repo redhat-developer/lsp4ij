@@ -24,10 +24,23 @@ import java.util.Collection;
 public interface LanguageServerDefinitionListener {
 
     abstract class LanguageServerDefinitionEvent {
+
+        public static enum UpdatedBy {
+            USER,
+            INSTALLER;
+        }
+
+        private final @NotNull LanguageServerDefinitionListener.LanguageServerDefinitionEvent.@NotNull UpdatedBy updatedBy;
         protected final Project project;
 
-        LanguageServerDefinitionEvent(@NotNull Project project) {
+        LanguageServerDefinitionEvent(@NotNull UpdatedBy updatedBy,
+                                      @NotNull Project project) {
+            this.updatedBy = updatedBy;
             this.project = project;
+        }
+
+        public @NotNull UpdatedBy getUpdatedBy() {
+            return updatedBy;
         }
 
         public @NotNull Project getProject() {
@@ -39,8 +52,9 @@ public interface LanguageServerDefinitionListener {
 
         public final Collection<LanguageServerDefinition> serverDefinitions;
 
-        public LanguageServerAddedEvent(@NotNull Project project, @NotNull Collection<LanguageServerDefinition> serverDefinitions) {
-            super(project);
+        public LanguageServerAddedEvent(@NotNull Project project,
+                                        @NotNull Collection<LanguageServerDefinition> serverDefinitions) {
+            super(UpdatedBy.USER, project);
             this.serverDefinitions = serverDefinitions;
         }
     }
@@ -49,8 +63,9 @@ public interface LanguageServerDefinitionListener {
 
         public final Collection<LanguageServerDefinition> serverDefinitions;
 
-        public LanguageServerRemovedEvent(@NotNull Project project, @NotNull Collection<LanguageServerDefinition> serverDefinitions) {
-            super(project);
+        public LanguageServerRemovedEvent(@NotNull Project project,
+                                          @NotNull Collection<LanguageServerDefinition> serverDefinitions) {
+            super(UpdatedBy.USER, project);
             this.serverDefinitions = serverDefinitions;
         }
     }
@@ -71,7 +86,8 @@ public interface LanguageServerDefinitionListener {
         public final boolean clientConfigurationContentChanged;
         public final boolean installerConfigurationContentChanged;
 
-        public LanguageServerChangedEvent(@NotNull Project project,
+        public LanguageServerChangedEvent(@NotNull UpdatedBy updatedBy,
+                                          @NotNull Project project,
                                           @NotNull LanguageServerDefinition serverDefinition,
                                           boolean nameChanged,
                                           boolean commandChanged,
@@ -84,7 +100,7 @@ public interface LanguageServerDefinitionListener {
                                           boolean experimentalContentChanged,
                                           boolean clientConfigurationContentChanged,
                                           boolean installerConfigurationContentChanged) {
-            super(project);
+            super(updatedBy, project);
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;

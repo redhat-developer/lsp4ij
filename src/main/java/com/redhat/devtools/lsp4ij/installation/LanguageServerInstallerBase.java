@@ -13,10 +13,7 @@ package com.redhat.devtools.lsp4ij.installation;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
-import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.LanguageServerManager;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatureAware;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -60,16 +57,18 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
                 if (serverDefinition == null) {
                     return;
                 }
+                LanguageServerManager.StartOptions options = new LanguageServerManager.StartOptions()
+                        .setForceRestart(false);
                 if (singleProject != null) {
                     LanguageServerManager
                             .getInstance(singleProject)
-                            .start(serverDefinition);
+                            .start(serverDefinition, options);
                 } else {
                     for (var project : ProjectManager.getInstance().getOpenProjects()) {
                         if (!project.isDisposed()) {
                             LanguageServerManager
                                     .getInstance(project)
-                                    .start(serverDefinition);
+                                    .start(serverDefinition, options);
                         }
                     }
                 }
@@ -169,12 +168,22 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
                             .getStartedServers()
                             .forEach(serverWrapper -> {
                                 if (serverWrapper.getServerDefinition().equals(serverDefinition)) {
-                                    serverWrapper.updateStatus(serverStatus);
+                                    if (canUpdateServerStatus(status, serverWrapper)) {
+                                        serverWrapper.updateStatus(serverStatus);
+                                    }
                                 }
                             });
                 }
             }
         }
+    }
+
+    private static boolean canUpdateServerStatus(@NotNull ServerInstallationStatus status, LanguageServerWrapper serverWrapper) {
+        // When installer has installed status and language server is started or starting, we ignore
+        // the update language server status to avoid stopping the server
+        return !(status == ServerInstallationStatus.INSTALLED &&
+                (serverWrapper.getServerStatus() == ServerStatus.started ||
+                        serverWrapper.getServerStatus() == ServerStatus.starting));
     }
 
     @Override

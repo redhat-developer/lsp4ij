@@ -115,6 +115,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
                 }
                 yield AllIcons.Actions.Suspend;
             }
+            case installed -> AllIcons.Actions.Install;
             default -> RUNNING_ICON;
         };
     }

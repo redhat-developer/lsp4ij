@@ -72,6 +72,7 @@ public class UICommandLineUpdater implements CommandLineUpdater {
 
     private void sendNotification(@NotNull Project project) {
         LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.INSTALLER,
                 project,
                 definition,
                 false,
