@@ -75,7 +75,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
             // Server is already installed, return completed future
             return INSTALLED_FUTURE;
         }
-        if (!isInstallFutureInitialized()) {
+        if (installFuture == null || !isInstallFutureInitialized()) {
             installFuture = createInstallFuture();
         }
         return installFuture;

@@ -30,13 +30,16 @@ public class LanguageServerManager {
 
         public static final StartOptions DEFAULT = new StartOptions();
 
+        private boolean forceRestart;
+
         private boolean forceStart;
 
         private boolean willEnable;
 
         public StartOptions() {
             setWillEnable(true)
-                    .setForceStart(false);
+                    .setForceStart(false)
+                    .setForceRestart(true);
         }
 
         /**
@@ -84,6 +87,15 @@ public class LanguageServerManager {
          */
         public StartOptions setWillEnable(boolean willEnable) {
             this.willEnable = willEnable;
+            return this;
+        }
+
+        public boolean isForceRestart() {
+            return forceRestart;
+        }
+
+        public StartOptions setForceRestart(boolean forceRestart) {
+            this.forceRestart = forceRestart;
             return this;
         }
     }
@@ -217,7 +229,9 @@ public class LanguageServerManager {
         boolean started = false;
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
-                ls.restart();
+                if (options.isForceRestart() || ls.getServerStatus() != ServerStatus.started) {
+                    ls.restart();
+                }
                 started = true;
             }
         }
