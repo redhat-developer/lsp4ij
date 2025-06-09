@@ -21,7 +21,7 @@
             "showMessage": {
               "name": "Scala Language Server install problem",
               "content": [
-                "<ahref=\"https://get-coursier.io/docs/cli-overview\">Coursier</a> is required to install Scala Language Server (Metals).",
+                "<a href=\"https://get-coursier.io/docs/cli-overview\">Coursier</a> is required to install Scala Language Server (Metals).",
                 "Please <a href=\"https://get-coursier.io/docs/cli-installation\" >install it </a> and ensure <code>coursier</code> is in your system PATH. Restart your IDE if needed."
               ]
             }
