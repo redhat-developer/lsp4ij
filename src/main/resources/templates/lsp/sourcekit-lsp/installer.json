@@ -1,0 +1,37 @@
+{
+  "id": "sourcekit-lsp",
+  "name": "SourceKit-LSP",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onFail": {
+        "exec": {
+          "name": "Checking swift",
+          "command": {
+            "windows": "where swift",
+            "default": "which swift"
+          },
+          "onFail": {
+            "showMessage": {
+              "name": "Swift install problem",
+              "content": [
+                "Install <a href=\"https://www.swift.org/getting-started/\">Swift</a> which will also install the <a href=\"https://github.com/swiftlang/sourcekit-lsp\">SourceKit-LSP</a> language server.",
+                "After the installation, ensure <code>swift</code> is in your system PATH. Restart your IDE if needed."
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "run": {
+    "configureServer": {
+      "name": "Configure SourceKit-LSP command",
+      "command": "sourcekit-lsp",
+      "update": true
+    }
+  }
+}
