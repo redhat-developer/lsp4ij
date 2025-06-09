@@ -1,0 +1,51 @@
+{
+  "id": "metals",
+  "name": "Scala Language Server (Metals)",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/metals"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onFail": {
+        "exec": {
+          "name": "Checking coursier",
+          "command": {
+            "windows": "where coursier",
+            "default": "which coursier"
+          },
+          "onFail": {
+            "showMessage": {
+              "name": "Scala Language Server install problem",
+              "content": [
+                "<ahref=\"https://get-coursier.io/docs/cli-overview\">Coursier</a> is required to install Scala Language Server (Metals).",
+                "Please <a href=\"https://get-coursier.io/docs/cli-installation\" >install it </a> and ensure <code>coursier</code> is in your system PATH. Restart your IDE if needed."
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Scala Language Server",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
+      "command": "cs install metals --install-dir .",
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Scala Language Server command",
+          "command": {
+            "windows": "${workingDir}/metals.bat",
+            "default": "${workingDir}/metal"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}
