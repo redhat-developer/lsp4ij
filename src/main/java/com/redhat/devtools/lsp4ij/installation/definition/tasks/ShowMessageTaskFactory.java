@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryBase;
@@ -27,6 +28,9 @@ import java.util.List;
  */
 public class ShowMessageTaskFactory extends InstallerTaskFactoryBase {
 
+    private static final String CONTENT_JSON_PROPERTY = "content";
+    private static final String ACTIONS_JSON_PROPERTY = "actions";
+
     @Override
     protected @NotNull InstallerTask create(@Nullable String id,
                                             @Nullable String name,
@@ -35,12 +39,30 @@ public class ShowMessageTaskFactory extends InstallerTaskFactoryBase {
                                             @NotNull JsonObject json,
                                             @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
         @NotNull List<InstallerTask> actions = loadActions(json, serverInstallerDeclaration);
-        return new ShowMessageTask(id, name, onFail, onSuccess, actions, serverInstallerDeclaration);
+        return new ShowMessageTask(id, name, getContent(json), onFail, onSuccess, actions, serverInstallerDeclaration);
+    }
+
+    private @NotNull String getContent(@NotNull JsonObject json) {
+        JsonElement content = json.get(CONTENT_JSON_PROPERTY);
+        if (content == null) {
+            return "";
+        }
+        if (content.isJsonArray()) {
+            var array = content.getAsJsonArray();
+            StringBuilder result = new StringBuilder();
+            for (int i = 0; i <array.size(); i++) {
+                result.append("<p>");
+                result.append(array.get(i).getAsString());
+                result.append("</p>");
+            }
+            return result.toString();
+        }
+        return content.getAsString();
     }
 
     private static @NotNull List<InstallerTask> loadActions(@NotNull JsonObject json,
                                                             @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
-        var actions = JSONUtils.getJsonArray(json, "actions");
+        var actions = JSONUtils.getJsonArray(json, ACTIONS_JSON_PROPERTY);
         if (actions == null) {
             return Collections.emptyList();
         }

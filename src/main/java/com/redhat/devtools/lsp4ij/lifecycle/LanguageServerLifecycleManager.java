@@ -63,7 +63,7 @@ public class LanguageServerLifecycleManager {
             try {
                 listener.handleStatusChanged(languageServer);
             } catch (Exception e) {
-                LOGGER.error("Error while status changed of the language server '" + languageServer.getServerDefinition().getId() + "'", e);
+                LOGGER.error("Error while status changed of the language server '{}'", languageServer.getServerDefinition().getId(), e);
             }
         }
     }
@@ -76,7 +76,7 @@ public class LanguageServerLifecycleManager {
             try {
                 listener.handleLSPMessage(message, consumer, languageServer);
             } catch (Exception e) {
-                LOGGER.error("Error while handling LSP message of the language server '" + languageServer.getServerDefinition().getId() + "'", e);
+                LOGGER.error("Error while handling LSP message of the language server '{}'", languageServer.getServerDefinition().getId(), e);
             }
         }
     }
@@ -89,7 +89,7 @@ public class LanguageServerLifecycleManager {
             try {
                 listener.handleError(languageServer, exception);
             } catch (Exception e) {
-                LOGGER.error("Error while handling error of the language server '" + languageServer.getServerDefinition().getId() + "'", e);
+                LOGGER.error("Error while handling error of the language server '{}'", languageServer.getServerDefinition().getId(), e);
             }
         }
     }

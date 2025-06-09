@@ -165,7 +165,7 @@ public class LanguageServiceAccessor implements Disposable {
                 try {
                     findAndStartLanguageServerIfNeeded(definition, false, p);
                 } catch (Exception e) {
-                    LOGGER.error("Error while starting language server for the language server '" + definition.getDisplayName() + "'.", e);
+                    LOGGER.error("Error while starting language server for the language server '{}'.", definition.getDisplayName(), e);
                 }
             }
         }
@@ -204,7 +204,9 @@ public class LanguageServiceAccessor implements Disposable {
         for (VirtualFile file : files) {
             // TODO : revisit that
             PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-            sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition);
+            if (psiFile != null) {
+                sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition);
+            }
         }
     }
 
@@ -500,9 +502,7 @@ public class LanguageServiceAccessor implements Disposable {
         Queue<Object> languages = new LinkedList<>();
         Set<Object> processedContentTypes = new HashSet<>();
         Language language = LSPIJUtils.getFileLanguage(psiFile);
-        if (language != null) {
-            languages.add(language);
-        }
+        languages.add(language);
         FileType fileType = psiFile.getFileType();
         languages.add(fileType);
 

@@ -67,7 +67,7 @@ public class LanguageServersRegistry {
 
     private final Map<String, List<InlayProviderInfo>> declarativeInlayHintsProviders = new HashMap<>();
 
-    private final List<ProviderInfo<? extends Object>> inlayHintsProviders = new ArrayList<>();
+    private final List<ProviderInfo<?>> inlayHintsProviders = new ArrayList<>();
 
     private final Set<Language> customLanguageFindUsages = new HashSet<>();
 
@@ -125,7 +125,7 @@ public class LanguageServersRegistry {
             try {
                 semanticTokensColorsProviders.put(serverId, extension.getSemanticTokensColorsProvider());
             } catch (Exception e) {
-                LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='" + serverId + "'.", e);
+                LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='{}'.", serverId, e);
             }
         }
 
@@ -375,17 +375,13 @@ public class LanguageServersRegistry {
             if (!StringUtils.isEmpty(languageId)) {
                 serverDefinition.registerAssociation(matchers, languageId);
                 // Update the mapping languageId -> file extensions
-                var fileExtensions = languageIdFileExtensionsCache.get(languageId);
-                if (fileExtensions == null) {
-                    fileExtensions = new ArrayList<>();
-                    languageIdFileExtensionsCache.put(languageId, fileExtensions);
-                }
+                var fileExtensions = languageIdFileExtensionsCache.computeIfAbsent(languageId, k -> new ArrayList<>());
                 fileExtensions.addAll(fileNamePatternMapping
                         .getFileNamePatterns()
                         .stream()
                         .map(fileExtension -> {
                             int index = fileExtension.indexOf('.');
-                            return index != -1 ? fileExtension.substring(index + 1, fileExtension.length()) : fileExtension;
+                            return index != -1 ? fileExtension.substring(index + 1) : fileExtension;
                         })
                         .toList());
 
@@ -422,7 +418,7 @@ public class LanguageServersRegistry {
             try {
                 listener.handleAdded(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition is added of the language server '" + languageServerId + "'", e);
+                LOGGER.error("Error while server definition is added of the language server '{}'", languageServerId, e);
             }
         }
     }
@@ -478,7 +474,7 @@ public class LanguageServersRegistry {
             try {
                 listener.handleRemoved(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition is removed of the language server '" + languageServerId + "'", e);
+                LOGGER.error("Error while server definition is removed of the language server '{}'", languageServerId, e);
             }
         }
     }
@@ -576,7 +572,7 @@ public class LanguageServersRegistry {
             try {
                 listener.handleChanged(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition has changed of the language server '" + event.serverDefinition.getId() + "'", e);
+                LOGGER.error("Error while server definition has changed of the language server '{}'", event.serverDefinition.getId(), e);
             }
         }
     }
@@ -635,9 +631,7 @@ public class LanguageServersRegistry {
                     return false;
                 }
                 @Nullable PsiFile pf = psiFile != null ? psiFile : LSPIJUtils.getPsiFile(file, project);
-                if (pf != null && !pf.isPhysical()) {
-                    return false;
-                }
+                return pf == null || pf.isPhysical();
             }
             return true;
         }
@@ -674,7 +668,7 @@ public class LanguageServersRegistry {
     /**
      * @return the LSP codeLens / color inlay hint providers for all languages which are associated with a language server.
      */
-    public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos() {
+    public List<ProviderInfo<?>> getInlayHintProviderInfos() {
         return inlayHintsProviders;
     }
 
