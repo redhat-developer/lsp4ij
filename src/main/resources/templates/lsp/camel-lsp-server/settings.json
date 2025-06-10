@@ -1,4 +1,3 @@
 {
-  "camel.Kafka Connection URL": "localhost:9092",
-  "camel.languageSupport.JBangVersion": "4.11.0"
+  "camel.Kafka Connection URL": "localhost:9092"
 }
