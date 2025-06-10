@@ -1,0 +1,20 @@
+{
+  "id": "omnisharp-roslyn",
+  "name": "Omnisharp Roslyn",
+  "programArgs": {
+    "windows": "\"OmniSharp --languageserver\"",
+    "default": "\"OmniSharp --languageserver\""
+  },
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "CSharp",
+        "patterns": [
+          "*.cs"
+        ]
+      },
+      "languageId": "clojure"
+    }
+  ]
+}
