@@ -255,6 +255,8 @@
         <applicationService
             serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherManager"/>
         <applicationService
+                serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.MavenArtifactFetcherManager"/>
+        <applicationService
             serviceImplementation="com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager"/>
     </extensions>
 

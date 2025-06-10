@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * <p>This class queries the GitHub API to retrieve the list of releases and selects an asset
  * based on customizable filtering criteria using {@link Function} filters.</p>
  */
-public class GitHubAssetFetcher {
+public class GitHubAssetFetcher implements AssetFetcher {
 
     /**
      * Default filter that matches only non-prerelease releases.
@@ -168,6 +168,7 @@ public class GitHubAssetFetcher {
      * @param reporter an object to report progress or status messages
      * @return the download URL of the matching asset, or null if none found
      */
+    @Override
     public @Nullable String getDownloadUrl(@NotNull Function<JsonObject, Boolean> releaseMatcher,
                                            @NotNull Function<JsonObject, Boolean> assetMatcher,
                                            @NotNull Reporter reporter) {

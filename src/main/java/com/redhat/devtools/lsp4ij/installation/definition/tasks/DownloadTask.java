@@ -12,12 +12,12 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
 import com.google.gson.JsonObject;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.system.CpuArch;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
+import com.redhat.devtools.lsp4ij.installation.download.AssetFetcher;
 import com.redhat.devtools.lsp4ij.installation.download.DownloadUtils;
 import com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcher;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
@@ -53,7 +53,7 @@ import java.util.function.Function;
 public class DownloadTask extends InstallerTask {
 
     private final @Nullable String downloadUrl;
-    private final @Nullable GithubAssetFetcherInfo assetFetcherInfo;
+    private final @Nullable DownloadTask.AssetFetcherInfo assetFetcherInfo;
     private final @Nullable DownloadTask.@Nullable OutputInfo outputInfo;
 
     public DownloadTask(@Nullable String id,
@@ -61,7 +61,7 @@ public class DownloadTask extends InstallerTask {
                         @Nullable InstallerTask onFail,
                         @Nullable InstallerTask onSuccess,
                         @Nullable String downloadUrl,
-                        @Nullable GithubAssetFetcherInfo assetFetcherInfo,
+                        @Nullable DownloadTask.AssetFetcherInfo assetFetcherInfo,
                         @Nullable OutputInfo outputInfo,
                         @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
         super(id, name, onFail, onSuccess, serverInstallerDeclaration);
@@ -207,15 +207,15 @@ public class DownloadTask extends InstallerTask {
                     assetFetcherInfo.assetMatcher(),
                     context);
             if (downloadUrl == null) {
-                context.print("Cannot retrieve url from 'github/asset', fallback to the 'url' JSON property");
+                context.print("Cannot retrieve url from 'github/asset', 'maven', fallback to the 'url' JSON property");
             }
         }
         return downloadUrl != null ? downloadUrl : this.downloadUrl;
     }
 
-    public record GithubAssetFetcherInfo(@NotNull GitHubAssetFetcher assetFetcher,
-                                         @NotNull Function<JsonObject, Boolean> releaseMatcher,
-                                         @NotNull Function<JsonObject, Boolean> assetMatcher) {
+    public record AssetFetcherInfo(@NotNull AssetFetcher assetFetcher,
+                                   @NotNull Function<JsonObject, Boolean> releaseMatcher,
+                                   @NotNull Function<JsonObject, Boolean> assetMatcher) {
     }
 
     public record OutputInfo(@Nullable String dir,

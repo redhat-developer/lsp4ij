@@ -12,6 +12,10 @@
   "run": {
     "download": {
       "name": "Download Camel Language Server",
+      "maven": {
+        "groupId": "com.github.camel-tooling",
+        "artifactId": "camel-lsp-server"
+      },
       "url": "https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.31.0/camel-lsp-server-1.31.0.jar",
       "output": {
         "dir": "$USER_HOME$/.lsp4ij/lsp/camel-lsp-server"
