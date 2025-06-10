@@ -27,25 +27,6 @@
       "type": "string",
       "description": "Kafka Connection URl used by the Camel language Server to provide dynamic completion.",
       "default": "localhost:9092"
-    },
-    "redhat.telemetry.enabled": {
-      "type": "boolean",
-      "tags": [
-        "telemetry"
-      ],
-      "description": "Enable usage data and errors to be sent to Red Hat servers. Read our [privacy statement](https://developers.redhat.com/article/tool-data-collection)."
-    },
-    "camel.languageSupport.JBangVersion": {
-      "type": "string",
-      "default": "4.11.0",
-      "description": "Apache Camel JBang version used for internal VS Code JBang commands execution. Camel JBang requirements can differ between versions, it is recommended to use `default` version to ensure all extension features work properly.\n\n**Note**: This change will affect only commands provided by Language Support for Apache Camel extension."
-    },
-    "camel.ls.java.home": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "description": "Specifies the folder path to the JDK (17 or more recent) used to launch the Camel Language Server.\n\nOn Windows, backslashes must be escaped, i.e.\n\"camel.ls.java.home\":\"C:\\\\Program Files\\\\Java\\\\jdk17.0_3\""
     }
   }
 }
