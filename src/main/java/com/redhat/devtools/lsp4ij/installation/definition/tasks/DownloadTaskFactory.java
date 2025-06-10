@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescrip
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcher;
 import com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherManager;
+import com.redhat.devtools.lsp4ij.installation.download.MavenArtifactFetcherManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,11 +41,17 @@ import org.jetbrains.annotations.Nullable;
 public class DownloadTaskFactory extends InstallerTaskFactoryBase {
 
     private static final String URL_JSON_PROPERTY = "url";
+
     private static final String GITHUB_JSON_PROPERTY = "github";
     private static final String GITHUB_OWNER_JSON_PROPERTY = "owner";
     private static final String GITHUB_REPOSITORY_JSON_PROPERTY = "repository";
     private static final String GITHUB_ASSET_JSON_PROPERTY = "asset";
     private static final String GITHUB_PRERELEASE_JSON_PROPERTY = "prerelease";
+
+    private static final String MAVEN_JSON_PROPERTY = "maven";
+    private static final String MAVEN_GROUP_ID_JSON_PROPERTY = "groupId";
+    private static final String MAVEN_ARTIFACT_ID_JSON_PROPERTY = "artifactId";
+
     private static final String OUTPUT_JSON_PROPERTY = "output";
     private static final String OUTPUT_DIR_JSON_PROPERTY = "dir";
     private static final String OUTPUT_FILE_JSON_PROPERTY = "file";
@@ -65,7 +72,15 @@ public class DownloadTaskFactory extends InstallerTaskFactoryBase {
         return getStringFromOs(json, URL_JSON_PROPERTY);
     }
 
-    private static @Nullable DownloadTask.GithubAssetFetcherInfo getAssetFetcher(@NotNull JsonObject json) {
+    private static @Nullable DownloadTask.AssetFetcherInfo getAssetFetcher(@NotNull JsonObject json) {
+        DownloadTask.AssetFetcherInfo assetFetcher = getGithubAssetFetcher(json);
+        if (assetFetcher != null) {
+            return assetFetcher;
+        }
+        return getMavenArtifactFetcher(json);
+    }
+
+    private static DownloadTask.@Nullable AssetFetcherInfo getGithubAssetFetcher(@NotNull JsonObject json) {
         if (!json.has(GITHUB_JSON_PROPERTY)) {
             return null;
         }
@@ -85,9 +100,30 @@ public class DownloadTaskFactory extends InstallerTaskFactoryBase {
         }
         boolean prerelease = JSONUtils.getBoolean(githubObj, GITHUB_PRERELEASE_JSON_PROPERTY);
         var assetFetcher = GitHubAssetFetcherManager.getInstance().getAssetFetcher(owner, repository);
-        return new DownloadTask.GithubAssetFetcherInfo(assetFetcher,
+        return new DownloadTask.AssetFetcherInfo(assetFetcher,
                 new GitHubAssetFetcher.ReleaseMatcher(prerelease),
                 new GitHubAssetFetcher.AssetMatcher(assertPattern));
+    }
+
+    private static DownloadTask.@Nullable AssetFetcherInfo getMavenArtifactFetcher(@NotNull JsonObject json) {
+        if (!json.has(MAVEN_JSON_PROPERTY)) {
+            return null;
+        }
+        var mavenElement = json.get(MAVEN_JSON_PROPERTY);
+        if (!mavenElement.isJsonObject()) {
+            return null;
+        }
+        var mavenObj = mavenElement.getAsJsonObject();
+        if (!mavenObj.has(MAVEN_GROUP_ID_JSON_PROPERTY) || !mavenObj.has(MAVEN_ARTIFACT_ID_JSON_PROPERTY)) {
+            return null;
+        }
+        String groupId = JSONUtils.getString(mavenObj, MAVEN_GROUP_ID_JSON_PROPERTY);
+        String artifactId = JSONUtils.getString(mavenObj, MAVEN_ARTIFACT_ID_JSON_PROPERTY);
+        var assetFetcher = MavenArtifactFetcherManager.getInstance().getArtifactFetcher(groupId, artifactId);
+        return new DownloadTask.AssetFetcherInfo(assetFetcher,
+                obj  -> true,
+                obj  -> true);
+
     }
 
     private static @Nullable String getAssertPattern(JsonObject githubObj) {

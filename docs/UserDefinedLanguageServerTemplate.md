@@ -357,6 +357,48 @@ Samples:
 * [clojure-lsp installer](../src/main/resources/templates/lsp/clojure-lsp/installer.json)
 * [rust-analyzer installer](../src/main/resources/templates/lsp/rust-analyzer/installer.json)
 
+#### Maven artifact download
+
+If the DAP/LSP server is published on [Maven Central](https://search.maven.org), you can use the `maven` object in your installer JSON to download the corresponding artifact:
+
+```json
+{
+  "download": {
+    "name": "Download Camel Language Server",
+    "maven": {
+      "groupId": "com.github.camel-tooling",
+      "artifactId": "camel-lsp-server"
+    }
+  }
+}
+```
+
+When the download occurs:
+
+1. A request is made to the following Maven Central API endpoint to find the latest artifact:
+   ```
+   https://search.maven.org/solrsearch/select?q=g:%22com.github.camel-tooling%22%20AND%20a:%22camel-lsp-server%22&rows=20&wt=json
+   ```
+2. The first result from the response is used to determine the latest available version.
+3. The download URL is then computed as:
+   ```
+   https://repo1.maven.org/maven2/{groupId with slashes}/{artifactId}/{version}/{artifactId}-{version}.jar
+   ```
+
+For example, if the groupId is `com.github.camel-tooling` and the artifactId is `camel-lsp-server`, the computed download URL might be:
+```
+https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.5.0/camel-lsp-server-1.5.0.jar
+```
+
+**Fields:**
+
+- `groupId` (required): Maven group ID.
+- `artifactId` (required): Maven artifact ID.
+
+**Sample:**
+
+- [Camel Language Server installer](../src/main/resources/templates/lsp/camel-lsp-server/installer.json)
+
 ##### Output customization
 
 You can customize the output directory and executable name:
