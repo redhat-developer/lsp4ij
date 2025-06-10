@@ -1,0 +1,37 @@
+{
+  "id": "dart-lsp",
+  "name": "Dart LSP server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onFail": {
+        "exec": {
+          "name": "Checking dart",
+          "command": {
+            "windows": "where dart",
+            "default": "which dart"
+          },
+          "onFail": {
+            "showMessage": {
+              "name": "Dart SDK not found",
+              "content": [
+                "Install the <a href=\"https://dart.dev/get-dart#install/\">Dart SDK</a> (includes the <a href=\"https://github.com/dart-lang/sdk/blob/master/pkg/analysis_server/tool/lsp_spec/README.md#language-server-protocol\">Dart LSP</a>).",
+                "Make sure <code>dart</code> is in your PATH and restart your IDE."
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "run": {
+    "configureServer": {
+      "name": "Configure Dart-LSP server command",
+      "command": "dart language-server",
+      "update": true
+    }
+  }
+}

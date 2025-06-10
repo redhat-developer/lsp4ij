@@ -1,0 +1,1241 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/dart/settings.schema.json",
+  "title": "LSP4IJ dart server settings JSON schema",
+  "description": "JSON schema for dart server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "dart.analysisExcludedFolders": {
+      "type": "array",
+      "default": [],
+      "description": "An array of paths to be excluded from Dart analysis. This option should usually be set at the Workspace level. Excluded folders will also be ignored when detecting project types.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dart.analyzerAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "description": "Additional arguments to pass to the Dart Analysis Server. This setting is can be useful for troubleshooting issues with the Dart Analysis Server.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dart.analyzerVmAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "description": "Additional arguments to pass to the VM running the Dart Analysis Server. This setting is can be useful for troubleshooting issues with the Dart Analysis Server.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dart.analyzerDiagnosticsPort": {
+      "type": [
+        "null",
+        "number"
+      ],
+      "description": "The port number to be used for the Dart analyzer diagnostic server. This setting is can be useful for troubleshooting issues with the Dart Analysis Server."
+    },
+    "dart.analyzerPath": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a custom Dart Analysis Server. This setting is intended for use by Dart Analysis Server developers. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows)."
+    },
+    "dart.analyzerSshHost": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "An SSH host to run the Analysis Server.\nThis can be useful when modifying code on a remote machine using SSHFS."
+    },
+    "dart.analyzerVmServicePort": {
+      "type": [
+        "null",
+        "number"
+      ],
+      "description": "The port number to be used for the Dart Analysis Server VM service. This setting is intended for use by Dart Analysis Server developers."
+    },
+    "dart.includeDependenciesInWorkspaceSymbols": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to include symbols from the SDK and package dependencies in the \"Go to Symbol in Workspace\" (`cmd/ctrl`+`T`) list. This can only be disabled when using Dart 3.0 / Flutter 3.10 or later."
+    },
+    "dart.notifyAnalyzerErrors": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show a notification the first few times an Analysis Server exception occurs."
+    },
+    "dart.onlyAnalyzeProjectsWithOpenFiles": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to ignore workspace folders and perform analysis based on the open files, as if no workspace was open at all. This allows opening large folders without causing them to be completely analyzed."
+    },
+    "dart.showTodos": {
+      "type": [
+        "boolean",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "default": true,
+      "description": "Whether to show TODOs in the Problems list. Can be a boolean to enable all TODO comments (TODO, FIXME, HACK, UNDONE) or an array of which types to enable. Older Dart SDKs may not support some TODO kinds."
+    },
+    "dart.showExtensionRecommendations": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show recommendations for other VS Code extensions based on the packages you\u0027re using."
+    },
+    "dart.devToolsBrowser": {
+      "enum": [
+        "chrome",
+        "default"
+      ],
+      "enumDescriptions": [
+        "Locate and launch Google Chrome from your system",
+        "Use your systems default web browser"
+      ],
+      "default": "chrome",
+      "description": "Whether to launch external DevTools windows using Chrome or the system default browser. This setting is ignored for remote workspaces (including Docker, SSH, WSL)."
+    },
+    "dart.devToolsPort": {
+      "type": [
+        "null",
+        "number"
+      ],
+      "description": "The port number to be used for the Dart DevTools (requires restart)."
+    },
+    "dart.devToolsReuseWindows": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to try to reuse existing DevTools windows instead of launching new ones. Only works for instances of DevTools launched by the DevTools server on the local machine."
+    },
+    "dart.devToolsTheme": {
+      "enum": [
+        "dark",
+        "light"
+      ],
+      "default": "dark",
+      "description": "The theme to use for Dart DevTools."
+    },
+    "dart.devToolsLocation": {
+      "type": "object",
+      "properties": {
+        "inspector": {
+          "enum": [
+            "beside",
+            "active",
+            "external",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open DevTools in beside the active editor",
+            "Open DevTools over the top of the active editor",
+            "Open DevTools externally in its own browser window",
+            "Open DevTools in the sidebar (applies only to supported pages)"
+          ]
+        },
+        "cpu-profiler": {
+          "enum": [
+            "beside",
+            "active",
+            "external",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open DevTools in beside the active editor",
+            "Open DevTools over the top of the active editor",
+            "Open DevTools externally in its own browser window",
+            "Open DevTools in the sidebar (applies only to supported pages)"
+          ]
+        },
+        "memory": {
+          "enum": [
+            "beside",
+            "active",
+            "external",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open DevTools in beside the active editor",
+            "Open DevTools over the top of the active editor",
+            "Open DevTools externally in its own browser window",
+            "Open DevTools in the sidebar (applies only to supported pages)"
+          ]
+        },
+        "performance": {
+          "enum": [
+            "beside",
+            "active",
+            "external",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open DevTools in beside the active editor",
+            "Open DevTools over the top of the active editor",
+            "Open DevTools externally in its own browser window",
+            "Open DevTools in the sidebar (applies only to supported pages)"
+          ]
+        },
+        "network": {
+          "enum": [
+            "beside",
+            "active",
+            "external",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open DevTools in beside the active editor",
+            "Open DevTools over the top of the active editor",
+            "Open DevTools externally in its own browser window",
+            "Open DevTools in the sidebar (applies only to supported pages)"
+          ]
+        },
+        "logging": {
+          "enum": [
+            "beside",
+            "active",
+            "external",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open DevTools in beside the active editor",
+            "Open DevTools over the top of the active editor",
+            "Open DevTools externally in its own browser window",
+            "Open DevTools in the sidebar (applies only to supported pages)"
+          ]
+        },
+        "default": {
+          "enum": [
+            "beside",
+            "active",
+            "external",
+            "sidebar"
+          ],
+          "enumDescriptions": [
+            "Open DevTools in beside the active editor",
+            "Open DevTools over the top of the active editor",
+            "Open DevTools externally in its own browser window",
+            "Open DevTools in the sidebar (applies only to supported pages)"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "enum": [
+          "beside",
+          "active",
+          "external",
+          "sidebar"
+        ],
+        "enumDescriptions": [
+          "Open DevTools in beside the active editor",
+          "Open DevTools over the top of the active editor",
+          "Open DevTools externally in its own browser window",
+          "Open DevTools in the sidebar (applies only to supported pages)"
+        ]
+      },
+      "default": {
+        "default": "beside",
+        "inspector": "sidebar"
+      },
+      "description": "Where to open [Dart DevTools](https://dart.dev/tools/dart-devtools) pages."
+    },
+    "dart.openDevTools": {
+      "enum": [
+        "never",
+        "flutter",
+        "always"
+      ],
+      "enumDescriptions": [
+        "Do not automatically launch DevTools when starting a debug session",
+        "Automatically launch DevTools when starting a Flutter debug session",
+        "Automatically launch DevTools when starting any debug session"
+      ],
+      "default": "never",
+      "description": "Whether to automatically open DevTools at the start of a debug session. If embedded DevTools is enabled, this will launch the Widget Inspector embedded for Flutter projects, or launch DevTools externally in a browser for Dart projects."
+    },
+    "dart.closeDevTools": {
+      "enum": [
+        "never",
+        "ifOpened",
+        "always"
+      ],
+      "enumDescriptions": [
+        "Do not automatically close embedded DevTools when the debug session ends",
+        "Automatically close embedded DevTools the debug session ends if it was automatically opened when the session started",
+        "Always automatically close embedded DevTools when the debug session ends"
+      ],
+      "default": "never",
+      "description": "Whether to automatically close embedded DevTools tabs when a debug session ends."
+    },
+    "dart.shareDevToolsWithFlutter": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to eagerly run DevTools for Flutter workspaces and share the spawned server with `flutter run`."
+    },
+    "dart.showInspectorNotificationsForWidgetErrors": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show notifications for widget errors that offer Inspect Widget links. This requires that the `#dart.shareDevToolsWithFlutter#` setting is also enabled."
+    },
+    "dart.customDevTools": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "default": "/path/to/devtools",
+          "description": "The root directory containing a clone of the flutter/devtools repository."
+        },
+        "args": {
+          "type": "array",
+          "default": [],
+          "description": "Extra arguments to pass when running the `devtools_tool serve` command.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "object",
+          "default": {
+            "LOCAL_DART_SDK": "/path/to/dart-sdk",
+            "FLUTTER_ROOT": "/path/to/devtools/tool/flutter-sdk"
+          },
+          "description": "Any environment variables to set when spawning the command. \u0027LOCAL_DART_SDK\u0027 should usually be set to your Dart SDK checkout and \u0027FLUTTER_ROOT\u0027 to the version of Flutter that DevTools is pinned to."
+        }
+      },
+      "description": "Custom settings for launching DevTools. This setting is intended for use by Dart DevTools developers."
+    },
+    "dart.autoImportCompletions": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to include symbols that have not been imported in the code completion list and automatically insert the required import when selecting them (requires restart)."
+    },
+    "dart.automaticCommentSlashes": {
+      "enum": [
+        "none",
+        "tripleSlash",
+        "all"
+      ],
+      "default": "tripleSlash",
+      "enumDescriptions": [
+        "Never insert slashes automatically",
+        "Insert `///` when pressing `\u003center\u003e` at the end of a triple-slash comment",
+        "Insert `///` when pressing `\u003center\u003e` at the end of a triple-slash comment and also `//` when pressing `\u003center\u003e` at the end of a double-slash comment"
+      ],
+      "description": "Determines when to insert comment slashes when pressing `\u003center\u003e` in the editor (requires restart).\n\nWhen using `tripleSlash`, double-slashes will still be included when breaking existing double-slash comments across additional lines."
+    },
+    "dart.closingLabels": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show annotations against constructor, method invocations and lists that span multiple lines."
+    },
+    "dart.closingLabelsPrefix": {
+      "type": "string",
+      "default": " // ",
+      "description": "The prefix to use in closing labels."
+    },
+    "dart.closingLabelsTextStyle": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "italic"
+      ],
+      "enumItemLabels": [
+        "Normal",
+        "Italic"
+      ],
+      "default": "normal",
+      "description": "The text style to use in closing labels. Using _Italic_ requires a font that supports italic text."
+    },
+    "dart.completeFunctionCalls": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to insert parentheses and placeholders for positional and required arguments during code completions when using LSP. This feature is automatically disabled if commit characters are enabled."
+    },
+    "dart.documentation": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "enum": [
+        "full",
+        "summary",
+        "none"
+      ],
+      "enumDescriptions": [
+        "Show full documentation",
+        "Show short documentatin summary",
+        "Do not show documentation"
+      ],
+      "description": "What level of documentation to show in Hovers and Code Completion details. When `null`, defaults to \u0027full\u0027 when running locally and \u0027none\u0027 in remote workspaces. This setting is only supported for Dart SDKs after v2.18."
+    },
+    "dart.dtdEditorActiveLocationDelay": {
+      "type": "integer",
+      "default": 200,
+      "description": "How long (in ms) to delay sending editor location change events over the Dart Tooling Daemon. Increasing this results in less events which may improve performance, at the expensive of tools that use these events not updating as quickly after your location/editor changes (requires restart)."
+    },
+    "dart.enableServerSnippets": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to use code snippets from the Dart Analysis Server instead of those included in the extension. Server snippets are context and language-version aware and should be preferred."
+    },
+    "dart.hotReloadPatterns": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "An array of glob patterns that should trigger Hot Reload when saved. The pattern is matched against the absolute path of the file. Use `**/assets/**` to trigger reloading for everything in the assets directory. Must always start with \"**/\" and use forward slashes (even on Windows) as backslashes are used for escaping."
+    },
+    "dart.enableCompletionCommitCharacters": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to automatically commit the selected completion item when pressing certain keys such as . , ( and \\[. This setting does not currently apply to LSP, see `#dart.previewCommitCharacters#`."
+    },
+    "dart.enableSdkFormatter": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to enable the [dart_style](https://pub.dev/packages/dart_style) formatter for Dart code."
+    },
+    "dart.enableSnippets": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to include Dart and Flutter snippets in code completion."
+    },
+    "dart.insertArgumentPlaceholders": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to insert argument placeholders during code completions. This feature is automatically disabled when `enableCompletionCommitCharacters` is enabled."
+    },
+    "dart.lineLength": {
+      "type": "integer",
+      "default": 80,
+      "description": "The maximum length of a line of code. This is used by the document formatter. If you change this value, you may wish to update `editor.rulers` (which draws vertical lines in the editor) in the `[\"dart\"]` section of your settings to match."
+    },
+    "dart.lspSnippetTextEdits": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to enable [Snippet support in LSP TextEdits](https://github.com/rust-analyzer/rust-analyzer/blob/979e788957ced1957ee9ac1da70fb97abf9fe2b1/docs/dev/lsp-extensions.md#snippet-textedit)."
+    },
+    "dart.renameFilesWithClasses": {
+      "default": "never",
+      "enum": [
+        "never",
+        "prompt",
+        "always"
+      ],
+      "description": "Whether to rename files when renaming classes with matching names (for example renaming \u0027class Person\u0027 inside \u0027person.dart\u0027). If set to \u0027prompt\u0027, will ask each time before renaming. If set to \u0027always\u0027, the file will automatically be renamed. This setting requires using LSP and a Dart SDK of at least v2.15."
+    },
+    "dart.showDartPadSampleCodeLens": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show CodeLens actions in the editor for opening online DartPad samples."
+    },
+    "dart.showMainCodeLens": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show CodeLens actions in the editor for quick running / debugging scripts with main functions."
+    },
+    "dart.showTestCodeLens": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show CodeLens actions in the editor for quick running / debugging tests."
+    },
+    "dart.updateImportsOnRename": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to automatically update imports when moving or renaming files. Currently only supports single file moves / renames."
+    },
+    "dart.warnWhenEditingFilesOutsideWorkspace": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show a warning when modifying files outside of the workspace."
+    },
+    "dart.warnWhenEditingFilesInPubCache": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show a warning when modifying files in the [system package cache](https://dart.dev/tools/pub/glossary#system-cache) directory."
+    },
+    "dart.flutterAdbConnectOnChromeOs": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to automatically run `adb connect 100.115.92.2:5555` when spawning the Flutter daemon when running on Chrome OS."
+    },
+    "dart.flutterAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to all `flutter` commands including `flutter daemon`. Do not use this to pass arguments to your Flutter app, use the `args` field in a `launch.json` or the `#dart.flutterRunAdditionalArgs#` setting."
+    },
+    "dart.flutterAttachAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to the `flutter attach` command. Using the `args`/`toolArgs` fields in `launch.json` is usually better than this setting as this setting will apply to _all_ projects."
+    },
+    "dart.flutterCreateAndroidLanguage": {
+      "enum": [
+        "java",
+        "kotlin"
+      ],
+      "default": "kotlin",
+      "description": "The programming language to use for Android apps when creating new projects using the \u0027Flutter: New Project\u0027 command."
+    },
+    "dart.flutterCreateIOSLanguage": {
+      "enum": [
+        "objc",
+        "swift"
+      ],
+      "default": "swift",
+      "description": "The programming language to use for iOS apps when creating new projects using the \u0027Flutter: New Project\u0027 command. This is only supported up until Flutter 3.22 after which it will be ignored."
+    },
+    "dart.flutterCreatePlatforms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The platforms to enable for new projects created using the \u0027Flutter: New Project\u0027 command. If unset, all platforms will be enabled."
+    },
+    "dart.offline": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to use the --offline switch for commands like \u0027pub get\u0027 and \u0027Flutter: New Project\u0027."
+    },
+    "dart.flutterCreateOrganization": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The organization responsible for your new Flutter project, in reverse domain name notation (e.g. `com.google`). This string is used in Java package names and as prefix in the iOS bundle identifier when creating new projects using the \u0027Flutter: New Project\u0027 command."
+    },
+    "dart.flutterCustomEmulators": {
+      "type": "array",
+      "default": [],
+      "description": "Custom emulators to show in the emulator list for easier launching. If IDs match existing emulators returned by Flutter, the custom emulators will override them.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "executable": {
+            "type": "string"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "env": {}
+        }
+      }
+    },
+    "dart.flutterGutterIcons": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show Flutter icons and colors in the editor gutter."
+    },
+    "dart.flutterHotReloadOnSave": {
+      "enum": [
+        "never",
+        "manual",
+        "manualIfDirty",
+        "all",
+        "allIfDirty"
+      ],
+      "enumDescriptions": [
+        "Do not reload when saving",
+        "Reload for explicit manual saves (requires pressing Save explicitly if using autosave)",
+        "Reload for explicit manual saves (requires pressing Save explicitly if using autosave) only if the saved file had changes",
+        "Reload for all saves, manual or automatic",
+        "Reload for all saves, manual or automatic only if the saved file had changes"
+      ],
+      "default": "manual",
+      "description": "Whether to automatically send a Hot Reload request to Flutter apps during a debug session when saving files. Dart apps are controlled by the hotReloadOnSave setting."
+    },
+    "dart.hotReloadOnSave": {
+      "enum": [
+        "never",
+        "manual",
+        "manualIfDirty",
+        "all",
+        "allIfDirty"
+      ],
+      "enumDescriptions": [
+        "Do not reload when saving",
+        "Reload for explicit manual saves (requires pressing Save explicitly if using autosave)",
+        "Reload for explicit manual saves (requires pressing Save explicitly if using autosave) only if the saved file had changes",
+        "Reload for all saves, manual or automatic",
+        "Reload for all saves, manual or automatic only if the saved file had changes"
+      ],
+      "default": "never",
+      "description": "Whether to automatically send a Hot Reload request to Dart apps during a debug session when saving files. Flutter apps are controlled by the flutterHotReloadOnSave setting."
+    },
+    "dart.flutterGenerateLocalizationsOnSave": {
+      "enum": [
+        "never",
+        "manual",
+        "manualIfDirty",
+        "all",
+        "allIfDirty"
+      ],
+      "enumDescriptions": [
+        "Do not generate localizations when saving",
+        "Generate localizations for explicit manual saves (requires pressing Save explicitly if using autosave)",
+        "Generate localizations for explicit manual saves (requires pressing Save explicitly if using autosave) only if the saved file had changes",
+        "Generate localizations for all saves, manual or automatic",
+        "Generate localizations for all saves, manual or automatic only if the saved file had changes"
+      ],
+      "default": "never",
+      "description": "Whether to automatically run the Generate Localizations command for Flutter apps when saving .arb files."
+    },
+    "dart.flutterOutline": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show the Flutter Outline tree in the sidebar."
+    },
+    "dart.flutterRunAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to the `flutter run` command. Using the `args`/`toolArgs` fields in `launch.json` is usually better than this setting as this setting will apply to _all_ projects."
+    },
+    "dart.flutterScreenshotPath": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a directory to save Flutter screenshots. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows)."
+    },
+    "dart.flutterRememberSelectedDevice": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to remember which device was last (explicitly) selected for each project. When the remembered device is selected, it will prevent newly-connected mobile devices from being automatically selected (regardless of the `#dart.flutterSelectDeviceWhenConnected#` setting)."
+    },
+    "dart.flutterSelectDeviceWhenConnected": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to set newly connected devices as the current device in Flutter projects."
+    },
+    "dart.flutterShowEmulators": {
+      "enum": [
+        "local",
+        "always",
+        "never"
+      ],
+      "enumDescriptions": [
+        "Only show for local workspaces",
+        "Always show, even for remote sessions",
+        "Never show emulators"
+      ],
+      "default": "local",
+      "description": "When to show the Flutter emulators. These are usually hidden for remote workspaces because it is usually not possible to see or interact with emulators in a remote session. If you are using remoting/containers in a way that you can interact with launched emulator processes, you may wish to set this to \u0027always\u0027."
+    },
+    "dart.flutterShowWebServerDevice": {
+      "enum": [
+        "remote",
+        "always"
+      ],
+      "enumDescriptions": [
+        "Only show for remote workspaces (includes browser-based workspaces)",
+        "Always show, even for local sessions"
+      ],
+      "default": "remote",
+      "description": "When to show the Flutter headless web-server device. This requires using the Dart Debug extension for Chrome and is usually only used for remote environments where Chrome is not available such as browser/cloud-based IDEs (requires restart)."
+    },
+    "dart.flutterTestAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to the `flutter test` command. Using the `args`/`toolArgs` fields in `launch.json` is usually better than this setting as this setting will apply to _all_ projects."
+    },
+    "dart.flutterWebRenderer": {
+      "enum": [
+        "flutter-default",
+        "canvaskit",
+        "html",
+        "auto"
+      ],
+      "enumDescriptions": [
+        "Use the default renderer for Flutter Web apps",
+        "Always use the CanvasKit renderer",
+        "Always use the HTML renderer",
+        "Use Flutter\u0027s \"auto\" renderer option to pick the best renderer based on the users device"
+      ],
+      "default": "flutter-default",
+      "description": "Sets the [Web renderer](https://flutter.dev/to/web-renderers) used for Flutter web apps."
+    },
+    "dart.analyzerInstrumentationLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a log file for very detailed logging in the Dart Analysis Server that may be useful when trying to diagnose Analysis Server issues. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.analyzerLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a log file for communication between Dart Code and the Analysis Server. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.toolingDaemonLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a log file for the `dart tooling-daemon` service, which coordinates between various Dart and Flutter tools and extensions. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.dapLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a log file for communication with the DAP debug adapters. This is useful when trying to diagnose issues with debugging such as missed breakpoints. Use `${name}` in the log file name to insert the Debug Session name to prevent concurrent debug sessions overwriting each others logs. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `${kind}` to insert a description of the kind of debug session (\u0027dart\u0027, \u0027dart_test\u0027, \u0027flutter\u0027 etc.). Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.devToolsLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a low-traffic log file for the Dart DevTools service. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.extensionLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a low-traffic log file for basic extension and editor issues. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.flutterDaemonLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a log file for the `flutter daemon` service, which provides information about connected devices accessible from the status bar. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.maxLogLineLength": {
+      "type": "number",
+      "default": 2000,
+      "description": "The maximum length of a line in the log file. Lines longer than this will be truncated and suffixed with an ellipsis."
+    },
+    "dart.maxCompletionItems": {
+      "type": [
+        "null",
+        "number"
+      ],
+      "description": "The maximum number of completion items to return from a code completion request. Updated results will be fetched as additional characters are typed. Lower numbers may improved performance. Defaults to a lower value in remote workspaces. Only affects LSP for \u003e Dart SDK 2.17."
+    },
+    "dart.enablePub": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to enable functionality for using Pub. Turning this setting off will prevent the extension from ever running pub and hide all commands relating to this. Use this if you are using an alternative package manager."
+    },
+    "dart.promptToGetPackages": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to prompt to get/upgrade packages when opening a project with missing/out of date packages."
+    },
+    "dart.pubAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to all `pub` commands."
+    },
+    "dart.runPubGetOnPubspecChanges": {
+      "enum": [
+        "always",
+        "prompt",
+        "never"
+      ],
+      "enumDescriptions": [
+        "Always run when pubspec is changed",
+        "Prompt to run when pubspec is changed",
+        "Never run when pubspec is changed"
+      ],
+      "default": "always",
+      "description": "Whether to run `pub get` whenever `pubspec.yaml` is saved."
+    },
+    "dart.runPubGetOnNestedProjects": {
+      "enum": [
+        "none",
+        "both",
+        "above",
+        "below"
+      ],
+      "enumDescriptions": [
+        "Only run `pub get` for the project whose pubspec was changed",
+        "Run `pub get` also in parent or child projects of the one whose pubspec was changed",
+        "Run `pub get` also in parent projects of the one whose pubspec was changed",
+        "Run `pub get` also in child projects of the one whose pubspec was changed"
+      ],
+      "default": "none",
+      "description": "Whether to automatically run `pub get` on nested projects above or below the one where the pubspec was changed."
+    },
+    "dart.buildRunnerAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to the `build_runner` when building/watching/serving."
+    },
+    "dart.cliConsole": {
+      "enum": [
+        "debugConsole",
+        "terminal",
+        "externalTerminal"
+      ],
+      "default": "debugConsole",
+      "description": "Whether to run Dart CLI apps in the Debug Console or a terminal. The Debug Console has more functionality because the process is controlled by the debug adapter, but is unable to accept input from the user via stdin.",
+      "enumDescriptions": [
+        "Run in the Debug Console pane, using the input as a REPL to evaluate expressions",
+        "Run in the VS Code integrated terminal where input will be sent to stdin",
+        "Run in an external terminal where input will be sent to stdin"
+      ]
+    },
+    "dart.debugExtensionBackendProtocol": {
+      "enum": [
+        "sse",
+        "ws"
+      ],
+      "enumDescriptions": [
+        "Server-Sent Events",
+        "WebSockets"
+      ],
+      "default": "ws",
+      "description": "The protocol to use for the Dart Debug Extension backend service and injected client. Using WebSockets can improve performance but may fail when connecting through some proxy servers."
+    },
+    "dart.debugSdkLibraries": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to mark Dart SDK libraries (`dart:*`) as debuggable, enabling stepping into them while debugging."
+    },
+    "dart.debugExternalPackageLibraries": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to mark external pub package libraries (including `package:flutter`) as debuggable, enabling stepping into them while debugging."
+    },
+    "dart.evaluateGettersInDebugViews": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to evaluate getters in order to display them in debug views (such as the Variables, Watch and Hovers views)."
+    },
+    "dart.showGettersInDebugViews": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show getters in order to display them in debug views (such as the Variables, Watch and Hovers views). If `evaluateGettersInDebugViews` is `true` getters will be eagerly evaluated, otherwise they will require clicking to evaluate."
+    },
+    "dart.evaluateToStringInDebugViews": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to call toString() on objects when rendering them in debug views (such as the Variables, Watch and Hovers views). Only applies to views of 100 or fewer values for performance reasons."
+    },
+    "dart.hotReloadProgress": {
+      "enum": [
+        "notification",
+        "statusBar"
+      ],
+      "enumDescriptions": [
+        "Hot reload progress will be shown in a toast notification",
+        "Hot reload progress will be shown only in the status bar"
+      ],
+      "default": "notification",
+      "description": "Determines how to display Hot Restart and Hot Reload progress."
+    },
+    "dart.promptToRunIfErrors": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to prompt before running if there are errors in your project. Test scripts will be excluded from the check unless they\u0027re the script being run."
+    },
+    "dart.showDartDeveloperLogs": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show logs from the `dart:developer` `log()` function in the debug console."
+    },
+    "dart.showDebuggerNumbersAsHex": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show integers formatted as Hex in Variables, Watch, Debug Consoles."
+    },
+    "dart.showDevToolsDebugToolBarButtons": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show DevTools buttons in the floating Debug toolbar."
+    },
+    "dart.suppressTestTimeouts": {
+      "enum": [
+        "never",
+        "debug",
+        "always"
+      ],
+      "enumDescriptions": [
+        "Do not suppress test timeouts",
+        "Suppress test timeouts when Debugging",
+        "Suppress test timeouts both when Running and Debugging"
+      ],
+      "default": "never",
+      "description": "Whether to suppress test timeouts when running/debugging tests. To work properly this requires package:test version 1.20.1 or newer. For older versions, the default timeout will be increased to 1d but this will not affect tests that have explicit (non-factor) timeouts set with @timeout."
+    },
+    "dart.cliAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to the `dart` command when running CLI scripts. Using the `args`/`toolArgs` fields in `launch.json` is usually better than this setting as this setting will apply to _all_ projects."
+    },
+    "dart.testAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to the `dart test` command. Using the `args`/`toolArgs` fields in `launch.json` is usually better than this setting as this setting will apply to _all_ projects."
+    },
+    "dart.vmAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Arguments to be passed to the Dart VM when running Dart CLI scripts/tests.\n\nThese arguments appear after \"dart\" but before subcommands like \"test\":\n\n`dart (vmAdditionalArgs) test (toolArgs) test/my_test.dart (args)`"
+    },
+    "dart.customDartDapPath": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a custom Dart Debug Adapter. This setting is intended for use by Dart Debug Adapter developers. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows)."
+    },
+    "dart.customFlutterDapPath": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The path to a custom Flutter Debug Adapter. This setting is intended for use by Dart Debug Adapter developers. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows)."
+    },
+    "dart.checkForSdkUpdates": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to check you are using the latest version of the Dart SDK at startup."
+    },
+    "dart.sdkPath": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The location of the Dart SDK to use for analyzing and executing code. If blank (or not a valid SDK), Dart Code will attempt to find it from the `PATH` environment variable. When editing a Flutter project, the version of Dart included in the Flutter SDK is used in preference. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows)."
+    },
+    "dart.sdkPaths": {
+      "type": "array",
+      "default": [],
+      "description": "An array of paths that either directly point to a Dart SDK or the parent directory of multiple Dart SDKs that can be used for fast SDK switching. These paths are not used directly when searching for an SDK. When this setting is populated, the SDK version number in the status bar can be used to quickly switch between SDKs. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows).",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dart.flutterSdkPath": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The location of the Flutter SDK to use. If blank (or not a valid SDK), Dart Code will attempt to find it from the project directory, `FLUTTER_ROOT` environment variable and the `PATH` environment variable. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows)."
+    },
+    "dart.flutterSdkPaths": {
+      "type": "array",
+      "default": [],
+      "description": "An array of paths that either directly point to a Flutter SDK or the parent directory of multiple Flutter SDKs that can be used for fast SDK switching. These paths are not used directly when searching for an SDK. When this setting is populated, the version number in the status bar can be used to quickly switch between SDKs. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows).",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dart.sdkSwitchingTarget": {
+      "enum": [
+        "workspace",
+        "global"
+      ],
+      "default": "workspace",
+      "enumDescriptions": [
+        "Save the SDK path in the current workspace settings",
+        "Save the SDK path in your global user settings and clear any workspace setting"
+      ],
+      "description": "Where to save SDK selections when using fast SDK switching from the language status entry."
+    },
+    "dart.addSdkToTerminalPath": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to add your selected Dart/Flutter SDK path to the `PATH` environment variable for the embedded terminal. This is useful when switching SDKs via `#dart.sdkPaths#` / `#dart.flutterSdkPaths#` to ensure commands run from the terminal are the same version as being used by the editor/debugger (requires restart)."
+    },
+    "dart.getFlutterSdkCommand": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "required": [
+        "executable"
+      ],
+      "additionalProperties": false,
+      "description": "Get the Flutter SDK path from a command. Useful when using tools such as direnv, asdf, mise... The command should exit with a 0 status code and it should print to the standard output just the path to the SDK. If the command fails (non zero exit or bad path), the extension will keep looking for other SDK paths. Some configuration examples can be found in: https://github.com/Dart-Code/Dart-Code/pull/5377",
+      "properties": {
+        "executable": {
+          "type": "string"
+        },
+        "args": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The working directory of the command relative to the workspace file directory if any, or relative to the workspace folder."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": "Environment variables to use when running the command. Keys are variable names, and values are strings or null."
+        }
+      }
+    },
+    "dart.getDartSdkCommand": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "required": [
+        "executable"
+      ],
+      "additionalProperties": false,
+      "description": "Get the Dart SDK path from a command. Useful when using tools such as direnv, asdf, mise... The command should exit with a 0 status code and it should print to the standard output just the path to the SDK. If the command fails (non zero exit or bad path), the extension will keep looking for other SDK paths. Some configuration examples can be found in: https://github.com/Dart-Code/Dart-Code/pull/5377",
+      "properties": {
+        "executable": {
+          "type": "string"
+        },
+        "args": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The working directory of the command relative to the workspace file directory if any, or relative to the workspace folder."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": "Environment variables to use when running the command. Keys are variable names, and values are strings or null."
+        }
+      }
+    },
+    "dart.allowTestsOutsideTestFolder": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to consider files ending `_test.dart` that are outside of the test directory as tests. This should be enabled if you put tests inside the `lib` directory of your Flutter app so they will be run with `flutter test` and not `flutter run`."
+    },
+    "dart.openTestView": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "testRunStart",
+          "testFailure"
+        ]
+      },
+      "default": [
+        "testRunStart"
+      ],
+      "description": "When to automatically switch focus to the test list (array to support multiple values)."
+    },
+    "dart.showSkippedTests": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show skipped tests in the test tree."
+    },
+    "dart.testInvocationMode": {
+      "enum": [
+        "name",
+        "line"
+      ],
+      "default": "name",
+      "description": "How to identify tests when running/debugging. `name` is compatible with older versions of `package:test` but cannot handle some complex/dynamic test names. `line` will prefer to run tests by their line numbers (when available) and fall back to `name` only if the line number is unavailable."
+    },
+    "dart.projectSearchDepth": {
+      "type": "number",
+      "default": 5,
+      "description": "How many levels (including the workspace roots) down the workspace to search for Dart/Flutter projects. Increasing this number may help detect Flutter projects that are deeply nested in your workspace but slow down all operations that search for projects, including extension activation."
+    },
+    "dart.env": {
+      "type": "object",
+      "default": {},
+      "description": "Additional environment variables to be added to all Dart/Flutter processes spawned by the Dart and Flutter extensions."
+    },
+    "dart.toolingDaemonAdditionalArgs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "Additional args to pass to the `dart tooling-daemon` command that runs as a background service (requires restart)."
+    },
+    "dart.normalizeFileCasing": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to normalize file casings before sending them to the LSP server. This may fix issues with file_names lints not disappearing after renaming a file if the VS Code API continues to use the original casing."
+    },
+    "dart.daemonPort": {
+      "type": [
+        "null",
+        "number"
+      ],
+      "description": "EXPERIMENTAL: The port where flutter daemon can be accessed if daemon is run remotely. This setting is intended for use by Google developers."
+    },
+    "dart.previewCommitCharacters": {
+      "type": "boolean",
+      "default": false,
+      "description": "EXPERIMENTAL: Whether to enable commit characters for the LSP server. In a future release, the dart.enableCompletionCommitCharacters setting will also apply to LSP."
+    },
+    "dart.previewFlutterUiGuides": {
+      "type": "boolean",
+      "default": false,
+      "description": "EXPERIMENTAL: Whether to enable the [Flutter UI Guides preview](https://dartcode.org/releases/v3-1/#preview-flutter-ui-guides)."
+    },
+    "dart.previewFlutterUiGuidesCustomTracking": {
+      "type": "boolean",
+      "default": false,
+      "description": "EXPERIMENTAL: Whether to enable custom tracking of Flutter UI guidelines (to hide some latency of waiting for the next Flutter Outline)."
+    },
+    "dart.previewHotReloadOnSaveWatcher": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to perform hot reload on save based on a filesystem watcher for Dart files rather than using VS Code\u0027s `onDidSave` event. This allows reloads to trigger when external tools modify Dart source files."
+    },
+    "dart.experimentalRefactors": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to enable experimental (possibly unfinished or unstable) refactors on the lightbulb menu. This setting is intended for use by Dart Analysis Server developers or users that want to try out and provide feedback on in-progress refactors."
+    },
+    "dart.experimentalDtdHandlers": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to enable experimental (possibly unfinished or unstable) LSP handlers through DTD. This setting is passed to the analysis server in the connectToDtd request and therefore relies on DTD being supported and enabled for the analysis server (requires restart)."
+    },
+    "dart.analyzeAngularTemplates": {
+      "type": "boolean",
+      "default": true,
+      "description": "**LEGACY SETTING: The angular plugin is no longer supported.**\n\nWhether to enable analysis for AngularDart templates (requires the Angular analyzer plugin to be enabled in `analysis_options.yaml`)."
+    },
+    "dart.additionalAnalyzerFileExtensions": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "**LEGACY SETTING: Only applies to legacy analysis server protocol.**\n\nAdditional file extensions that should be analyzed (usually used in combination with analyzer plugins)."
+    },
+    "dart.analysisServerFolding": {
+      "type": "boolean",
+      "default": true,
+      "description": "**LEGACY SETTING: Only applies to legacy analysis server protocol.**\n\nWhether to use folding data from the Dart Analysis Server instead of the built-in VS Code indent-based folding."
+    },
+    "dart.doNotFormat": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "**LEGACY SETTING: Only applies to legacy analysis server protocol.**\n\nAn array of glob patterns that should be excluded for formatting. The pattern is matched against the absolute path of the file. Use `**/test/**` to skip formatting for all test directories. Must always use forward slashes (even on Windows) as backslashes are used for escaping."
+    },
+    "dart.useLegacyDebugAdapters": {
+      "type": [
+        "null",
+        "boolean"
+      ],
+      "description": "**LEGACY SETTING: Legacy debug adapters are not recommended since Dart v3.4.**\n\nWhether to use the legacy debug adapters even if the new debug adapters are available in the current Dart/Flutter SDKs contain. Setting the value to `true` will force use of the legacay adapters. Setting to `false` will force use of the SDK adapters. Leaving as `null` will allow the extension to decide which debug adapters to use depending on the SDK version and rollout progress."
+    },
+    "dart.updateDevTools": {
+      "type": "boolean",
+      "default": true,
+      "description": "**LEGACY SETTING: Only applies to Dart SDKs before v2.15 since DevTools now ships in the SDK.**\n\nWhether to update DevTools if you are not using the latest version."
+    },
+    "dart.flutterTrackWidgetCreation": {
+      "type": "boolean",
+      "default": true,
+      "description": "**LEGACY SETTING: Disabling this may break functionality on modern SDKs.**\n\nWhether to pass `--track-widget-creation` to Flutter apps (required to support \u0027Inspect Widget\u0027). This setting is always ignored when running in Profile or Release mode."
+    },
+    "dart.dartTestLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "**LEGACY SETTING: Only applies when using the legacy debug adapters.**\n\nThe path to a log file for Dart test runs. This is useful when trying to diagnose issues with unit test executions. Use `${name}` in the log file name to insert the Debug Session name to prevent concurrent debug sessions overwriting each others logs. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.flutterRunLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "**LEGACY SETTING: Only applies when using the legacy debug adapters.**\n\nThe path to a log file for `flutter run`, which is used to launch Flutter apps from VS Code. This is useful when trying to diagnose issues with apps launching (or failing to) on simulators and devices. Use `${name}` in the log file name to insert the Debug Session name to prevent concurrent debug sessions overwriting each others logs. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.flutterTestLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "**LEGACY SETTING: Only applies when using the legacy debug adapters.**\n\nThe path to a log file for `flutter test`, which is used to run unit tests from VS Code. This is useful when trying to diagnose issues with unit test executions. Use `${name}` in the log file name to insert the Debug Session name to prevent concurrent debug sessions overwriting each others logs. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.vmServiceLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "**LEGACY SETTING: Only applies when using the legacy debug adapters.**\n\nThe path to a log file for communication between Dart Code and the VM service. This is useful when trying to diagnose issues with debugging such as missed breakpoints. Use `${name}` in the log file name to insert the Debug Session name to prevent concurrent debug sessions overwriting each others logs. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    },
+    "dart.webDaemonLogFile": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "**LEGACY SETTING: Only applies when using the legacy debug adapters.**\n\nThe path to a log file for communication between Dart Code and the webdev daemon. This is useful when trying to diagnose issues with launching web apps. Use `${name}` in the log file name to insert the Debug Session name to prevent concurrent debug sessions overwriting each others logs. Use `${workspaceName}` to insert the name of the current workspace in the file path. Use `~` to insert the user\u0027s home directory (the path should then use `/` separators even on Windows). Only the noted substitutions are supported, others will stay as-is."
+    }
+  }
+}

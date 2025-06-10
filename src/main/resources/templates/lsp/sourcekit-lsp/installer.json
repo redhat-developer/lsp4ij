@@ -16,10 +16,10 @@
           },
           "onFail": {
             "showMessage": {
-              "name": "Swift install problem",
+              "name": "Swift SDK not found",
               "content": [
-                "Install <a href=\"https://www.swift.org/getting-started/\">Swift</a> which will also install the <a href=\"https://github.com/swiftlang/sourcekit-lsp\">SourceKit-LSP</a> language server.",
-                "After the installation, ensure <code>swift</code> is in your system PATH. Restart your IDE if needed."
+                "Install the <a href=\"https://www.swift.org/getting-started/\">Swift toolchain</a> (includes the <a href=\"https://github.com/apple/sourcekit-lsp\">SourceKit-LSP</a> language server).",
+                "Make sure <code>swift</code> is in your system PATH and restart your IDE."
               ]
             }
           }

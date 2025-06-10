@@ -148,6 +148,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Clangd](./user-defined-ls/clangd.md) 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
+* [Dart LSP](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
 * [Erlang Language Server](./user-defined-ls/erlang-ls.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
