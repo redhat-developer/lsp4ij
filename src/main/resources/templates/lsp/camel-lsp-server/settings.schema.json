@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/camel/settings.schema.json",
+  "title": "LSP4IJ camel server settings JSON schema",
+  "description": "JSON schema for camel server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "camel.Camel catalog version": {
+      "type": "string",
+      "description": "The Camel catalog version used for providing Language Support for Apache Camel.\n\nYou can check available Camel catalogs at the following links: [the Maven Central repository](https://repo1.maven.org/maven2/org/apache/camel/camel-catalog/) and [the Maven Red Hat GA repository](https://maven.repository.redhat.com/ga/org/apache/camel/camel-catalog/).\n\ne.g. `3.20.5` or `3.20.1.redhat-00026`\n\n**Note:** Depending on the connection speed, it can take several minutes to have it applied."
+    },
+    "camel.Camel catalog runtime provider": {
+      "type": "string",
+      "description": "The Camel catalog runtime provider used for providing Language support for Apache Camel.",
+      "enum": [
+        "DEFAULT",
+        "SPRINGBOOT",
+        "QUARKUS"
+      ]
+    },
+    "camel.extra-components": {
+      "type": "array",
+      "description": "(Experimental)List of additional components to include in the Camel Catalog described with a Json list respecting Camel catalog syntax."
+    },
+    "camel.Kafka Connection URL": {
+      "type": "string",
+      "description": "Kafka Connection URl used by the Camel language Server to provide dynamic completion.",
+      "default": "localhost:9092"
+    },
+    "redhat.telemetry.enabled": {
+      "type": "boolean",
+      "tags": [
+        "telemetry"
+      ],
+      "description": "Enable usage data and errors to be sent to Red Hat servers. Read our [privacy statement](https://developers.redhat.com/article/tool-data-collection)."
+    },
+    "camel.languageSupport.JBangVersion": {
+      "type": "string",
+      "default": "4.11.0",
+      "description": "Apache Camel JBang version used for internal VS Code JBang commands execution. Camel JBang requirements can differ between versions, it is recommended to use `default` version to ensure all extension features work properly.\n\n**Note**: This change will affect only commands provided by Language Support for Apache Camel extension."
+    },
+    "camel.ls.java.home": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Specifies the folder path to the JDK (17 or more recent) used to launch the Camel Language Server.\n\nOn Windows, backslashes must be escaped, i.e.\n\"camel.ls.java.home\":\"C:\\\\Program Files\\\\Java\\\\jdk17.0_3\""
+    }
+  }
+}
