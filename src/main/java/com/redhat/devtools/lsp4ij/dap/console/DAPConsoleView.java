@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.console;
 
 import com.intellij.execution.impl.ConsoleViewImpl;
 import com.intellij.execution.impl.EditorHyperlinkSupport;
+import com.intellij.execution.process.ProcessHandler;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
@@ -99,6 +100,11 @@ public class DAPConsoleView extends ConsoleViewImpl {
                 }
             }
         });
+    }
+
+    @Override
+    public void attachToProcess(@NotNull ProcessHandler processHandler) {
+        // In order to print DAP messages only, and not its log from stdout, we don't attach this console to the process
     }
 
     /**
