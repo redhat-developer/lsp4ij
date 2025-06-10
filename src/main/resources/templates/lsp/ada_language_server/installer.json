@@ -1,0 +1,57 @@
+{
+  "id": "ada_language_server",
+  "name": "Ada Language Server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download Ada Language Server",
+      "github": {
+        "owner": "AdaCore",
+        "repository": "ada_language_server",
+        "prerelease": false,
+        "asset": {
+          "windows": "als-*-win32-x64.tar.gz",
+          "unix": {
+            "amd64": "als-*-linux-x64.tar.gz",
+            "arm64": "als-*-linux-arm64.tar.gz"
+          },
+          "mac": {
+            "aarch64": "als-*-darwin-x64.tar.gz",
+            "arm64": "als-*-darwin-arm64.tar.gz"
+          }
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/ada_language_server",
+        "file": {
+          "name": {
+            "windows": "vscode/ada/x64/win32/ada_language_server.exe",
+            "unix": {
+              "amd64": "vscode/ada/x64/linux/ada_language_server",
+              "arm64": "vscode/ada/arm64/linux/ada_language_server"
+            },
+            "mac": {
+              "aarch64": "vscode/ada/x64/darwin/ada_language_server",
+              "arm64": "vscode/ada/arm64/darwin/ada_language_server"
+            }
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Ada Language Server command",
+          "command": "${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}

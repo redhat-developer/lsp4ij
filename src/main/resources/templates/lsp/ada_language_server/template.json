@@ -1,0 +1,41 @@
+{
+  "id": "ada_language_server",
+  "name": "Ada Language Server",
+  "programArgs": {
+    "windows": "\"${BASE_DIR}/ada_language_server.exe\"",
+    "default": "\"${BASE_DIR}/ada_language_server\""
+  },
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Ada",
+        "patterns": [
+          "*.ada",
+          "*.adb",
+          "*.adc",
+          "*.ads"
+        ]
+      },
+      "languageId": "ada"
+    },
+    {
+      "fileType": {
+        "name": "Ada Library Information",
+        "patterns": [
+          "*.ali"
+        ]
+      },
+      "languageId": "ali"
+    },
+    {
+      "fileType": {
+        "name": "GNAT Project",
+        "patterns": [
+          "*.gpr"
+        ]
+      },
+      "languageId": "gpr"
+    }
+  ]
+}

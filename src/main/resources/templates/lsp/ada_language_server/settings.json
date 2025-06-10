@@ -1,0 +1,7 @@
+{
+  "ada.showNotificationsOnErrors": false,
+  "ada.namedNotationThreshold": 3,
+  "ada.trace.server": "off",
+  "gpr.trace.server": "off",
+  "ada.logThreshold": 10
+}
