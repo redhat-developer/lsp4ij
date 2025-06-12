@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation;
 
+import com.intellij.execution.ui.ConsoleView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.CompletableFuture;
@@ -26,6 +27,15 @@ public interface ServerInstaller {
      */
     @NotNull
     CompletableFuture<ServerInstallationStatus> checkInstallation();
+
+
+    /**
+     * Returns the current server installer status.
+     *
+     * @return the current server installer status.
+     */
+    @NotNull
+    ServerInstallationStatus getStatus();
 
     /**
      * Code to be executed before installation (optional).
@@ -51,4 +61,8 @@ public interface ServerInstaller {
      * Resets the installation state, allowing the process to be restarted if necessary.
      */
     void reset();
+
+    void registerConsoleProvider(@NotNull ConsoleProvider consoleProvider);
+
+    void unregisterConsoleProvider(@NotNull ConsoleProvider consoleProvider);
 }

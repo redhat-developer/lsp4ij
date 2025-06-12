@@ -94,7 +94,8 @@ public class DebugAdapterServerView implements Disposable {
                     && isEquals(this.getDebugServerReadyPattern(), settings.getDebugServerReadyPattern())
                     && isEquals(this.getAttachAddress(), settings.getAttachAddress())
                     && isEquals(this.getAttachPort(), settings.getAttachPort())
-                    && Objects.equals(this.getMappings(), settings.getMappings()));
+                    && Objects.equals(this.getMappings(), settings.getMappings())
+                    && isEquals(this.getInstallerConfiguration(), settings.getInstallerConfiguration()));
         }
         return false;
     }
@@ -143,6 +144,8 @@ public class DebugAdapterServerView implements Disposable {
                         .filter(mapping -> mapping.getFileNamePatterns() != null)
                         .collect(Collectors.toList());
                 this.setFileNamePatternMappings(fileNamePatternMappings);
+
+                this.setInstallerConfiguration(settings.getInstallerConfiguration());
             }
         } else {
             // TODO : extension point
@@ -213,7 +216,8 @@ public class DebugAdapterServerView implements Disposable {
                                     getFileTypeMappings(),
                                     getLaunchConfigurations(),
                                     getAttachAddress(),
-                                    getAttachPort()),
+                                    getAttachPort(),
+                                    getInstallerConfiguration()),
                             false);
             if (settingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -343,11 +347,6 @@ public class DebugAdapterServerView implements Disposable {
         mappingPanel.setFileNamePatternMappings(mappings);
     }
 
-    @Override
-    public void dispose() {
-        debugAdapterServerPanel.dispose();
-    }
-
     public List<ServerMappingSettings> getLanguageMappings() {
         return mappingPanel.getLanguageMappings();
     }
@@ -365,8 +364,18 @@ public class DebugAdapterServerView implements Disposable {
                 .toList();
     }
 
-    public void refreshLaunchConfigurations(List<LaunchConfiguration> launchConfigurations) {
-        debugAdapterServerPanel.refreshLaunchConfigurations(launchConfigurations);
+
+    public String getInstallerConfiguration() {
+        return debugAdapterServerPanel.getInstallerConfiguration();
+    }
+
+    public void setInstallerConfiguration(String installerConfiguration) {
+        debugAdapterServerPanel.setInstallerConfiguration(installerConfiguration);
+    }
+
+    @Override
+    public void dispose() {
+        debugAdapterServerPanel.dispose();
     }
 
     public @Nullable List<LaunchConfiguration> getLaunchConfigurations() {

@@ -20,7 +20,6 @@ import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.OnePixelSplitter;
@@ -28,6 +27,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.settings.jsonSchema.ServerInstallerJsonSchemaFileProvider;
@@ -36,10 +36,8 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Set;
 
 /**
  * UI panel which display in a tabbed pane the server installer:
@@ -54,17 +52,13 @@ public class InstallerPanel implements Disposable {
     private final @NotNull Project project;
     private final @NotNull JsonTextField installerConfigurationWidget;
     private final @Nullable ConsoleView console;
-    private final boolean flushOnEachPrint;
     private @Nullable CommandLineUpdater commandLineUpdater;
     private @Nullable Set<Runnable> onPreInstall;
     private @Nullable Set<Runnable> onPostInstall;
 
     public InstallerPanel(@NotNull FormBuilder builder,
-                          @NotNull CommandLineWidget commandLine,
-                          boolean flushOnEachPrint,
                           boolean canExecuteInstaller,
                           @NotNull Project project) {
-        this.flushOnEachPrint = flushOnEachPrint;
         this.project = project;
 
         if (canExecuteInstaller) {
@@ -131,9 +125,10 @@ public class InstallerPanel implements Disposable {
     }
 
     private @NotNull InstallerContext createInstallerContext(InstallerContext.@NotNull InstallerAction action) {
-        var context = new InstallerContext(project, action)
-                .setConsole(console);
-        context.setFlushOnEachPrint(flushOnEachPrint);
+        var context = new InstallerContext(project, action);
+        if (console != null) {
+            context.setConsoleProviders(() -> List.of(new ConsoleProvider(console, project)));
+        }
         context.setCommandLineUpdater(commandLineUpdater);
         if (action == InstallerContext.InstallerAction.RUN || action == InstallerContext.InstallerAction.CHECK_AND_RUN) {
             context.setOnPreInstall(onPreInstall);

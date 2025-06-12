@@ -10,21 +10,30 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation;
 
+import com.intellij.execution.ui.ConsoleView;
+import com.intellij.ide.util.DelegatingProgressIndicator;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.NlsContexts;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatureAware;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import com.vladsch.flexmark.ast.util.TextNodeMergingList;
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Abstract class for handling server installation tasks.
@@ -57,8 +66,11 @@ public abstract class ServerInstallerBase implements ServerInstaller {
     @NotNull
     private ServerInstallationStatus status;
 
+    private final List<ConsoleProvider> consoleProviders;
+
     public ServerInstallerBase() {
         reset();
+        this.consoleProviders = new CopyOnWriteArrayList<>();
     }
 
     /**
@@ -79,6 +91,11 @@ public abstract class ServerInstallerBase implements ServerInstaller {
             installFuture = createInstallFuture();
         }
         return installFuture;
+    }
+
+    @Override
+    public @NotNull ServerInstallationStatus getStatus() {
+        return status;
     }
 
     /**
@@ -106,6 +123,13 @@ public abstract class ServerInstallerBase implements ServerInstaller {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
+                    indicator = new PrintableProgressIndicator(indicator) {
+                        @Override
+                        protected void printProgress(@NotNull String progressMessage) {
+                            getConsoleProviders()
+                                    .forEach(provider -> provider.printProgress(progressMessage));
+                        }
+                    };
                     indicator.setIndeterminate(false);
                     if (status == ServerInstallationStatus.NOT_INSTALLED) {
                         progressCheckingServerInstalled(indicator);
@@ -265,4 +289,19 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      */
     protected abstract @Nullable Project getProject();
 
+    @Override
+    public void registerConsoleProvider(@NotNull ConsoleProvider consoleProvider) {
+        this.consoleProviders.add(consoleProvider);
+        // Unregister the console provider when the console is disposed.
+        Disposer.register(consoleProvider.getConsole(), () -> unregisterConsoleProvider(consoleProvider));
+    }
+
+    @Override
+    public void unregisterConsoleProvider(@NotNull ConsoleProvider consoleProvider) {
+        this.consoleProviders.remove(consoleProvider);
+    }
+
+    public @NotNull List<ConsoleProvider> getConsoleProviders() {
+        return consoleProviders;
+    }
 }

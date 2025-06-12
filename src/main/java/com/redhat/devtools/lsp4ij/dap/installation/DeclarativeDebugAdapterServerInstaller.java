@@ -11,9 +11,12 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-package com.redhat.devtools.lsp4ij.installation;
+package com.redhat.devtools.lsp4ij.dap.installation;
 
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.installation.LanguageServerInstallerBase;
+import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
@@ -24,9 +27,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Abstract base class for declarative language server installers in IntelliJ.
+ * Abstract base class for declarative DAP server installers in IntelliJ.
  * <p>
- * This class provides a framework for installing language servers based on
+ * This class provides a framework for installing DAP servers based on
  * a {@code serverInstallerDescriptor}, typically declared in a {@code installer.json}
  * file associated with a {@link LanguageServerDefinition}.
  * </p>
@@ -39,33 +42,33 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p>
  * If no installer descriptor is available, or if the descriptor is not meant to be executed,
- * the language server is considered already installed.
+ * the DAP server is considered already installed.
  * </p>
  *
- * @see LanguageServerInstallerBase
+ * @see DebugAdapterServerInstallerBase
  * @see ServerInstallerDescriptor
  * @see ServerInstallerManager
  */
-public abstract class DeclarativeLanguageServerInstaller extends LanguageServerInstallerBase {
+public abstract class DeclarativeDebugAdapterServerInstaller extends DebugAdapterServerInstallerBase {
 
     /**
-     * Constructs a new declarative language server installer with no initial definition.
+     * Constructs a new declarative DAP server installer with no initial definition.
      */
-    public DeclarativeLanguageServerInstaller() {
+    public DeclarativeDebugAdapterServerInstaller() {
         this(null);
     }
 
     /**
-     * Constructs a new declarative language server installer for the given definition.
+     * Constructs a new declarative DAP server installer for the given definition.
      *
-     * @param serverDefinition the language server definition
+     * @param serverDefinition the DAP server definition
      */
-    public DeclarativeLanguageServerInstaller(@Nullable LanguageServerDefinition serverDefinition) {
+    public DeclarativeDebugAdapterServerInstaller(@Nullable DebugAdapterServerDefinition serverDefinition) {
         super(serverDefinition);
     }
 
     /**
-     * Checks whether the language server installation is needed or already completed.
+     * Checks whether the DAP server installation is needed or already completed.
      * <p>
      * If a {@link ServerInstallerDescriptor} is provided and marked as executable,
      * defers to {@link #execute(CompletableFuture)} to proceed with installation checks.
@@ -77,7 +80,7 @@ public abstract class DeclarativeLanguageServerInstaller extends LanguageServerI
     public @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation() {
         ServerInstallerDescriptor serverInstallerDescriptor = getServerInstallerDescriptor();
         if (serverInstallerDescriptor == null) {
-            // The user defined language server doesn't define an installer.json
+            // The user defined DAP server doesn't define an installer.json
             // we consider that installation is done
             return INSTALLED_FUTURE;
         }
@@ -101,7 +104,7 @@ public abstract class DeclarativeLanguageServerInstaller extends LanguageServerI
     }
 
     /**
-     * Executes a declarative check for whether the language server is already installed.
+     * Executes a declarative check for whether the DAP server is already installed.
      * <p>
      * This uses the {@link ServerInstallerManager} in CHECK mode and disables user notifications.
      * </p>
@@ -122,7 +125,7 @@ public abstract class DeclarativeLanguageServerInstaller extends LanguageServerI
     }
 
     /**
-     * Determines whether the installer should be executed on language server startup.
+     * Determines whether the installer should be executed on DAP server startup.
      *
      * @param serverInstallerDescriptor the installer descriptor to inspect
      * @return {@code true} if executable; {@code false} otherwise

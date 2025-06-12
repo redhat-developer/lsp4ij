@@ -23,6 +23,7 @@ import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigura
 import com.redhat.devtools.lsp4ij.dap.console.DAPTextConsoleBuilderImpl;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.ServerReadyConfig;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +33,7 @@ import java.util.Map;
 /**
  * Debug Adapter Protocol (DAP) command line state.
  */
-public class DAPCommandLineState extends CommandLineState {
+public class DAPCommandLineState extends CommandLineState implements CommandLineUpdater {
 
     private final @NotNull RunConfigurationOptions options;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
@@ -99,4 +100,26 @@ public class DAPCommandLineState extends CommandLineState {
         }
         return null;
     }
+
+    @Override
+    public @Nullable String getCommandLine() {
+        if (options instanceof CommandLineUpdater commandLineUpdater) {
+            return commandLineUpdater.getCommandLine();
+        }
+        return null;
+    }
+
+    @Override
+    public void setCommandLine(String commandLine) {
+        if (options instanceof CommandLineUpdater commandLineUpdater) {
+            commandLineUpdater.setCommandLine(commandLine);
+        }
+    }
+    public @Nullable String getInstallerConfiguration() {
+        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            return dapOptions.getInstallerConfiguration();
+        }
+        return null;
+    }
+
 }

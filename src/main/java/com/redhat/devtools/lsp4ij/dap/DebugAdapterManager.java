@@ -189,7 +189,8 @@ public class DebugAdapterManager implements DebuggableFile {
             @NotNull List<ServerMappingSettings> fileTypeMappings,
             @Nullable List<LaunchConfiguration> launchConfigurations,
             @Nullable String attachAddress,
-            @Nullable String attachPort) {
+            @Nullable String attachPort,
+            @Nullable String installerConfiguration) {
     }
 
     /**
@@ -216,6 +217,7 @@ public class DebugAdapterManager implements DebuggableFile {
         serverDefinition.setFileTypeMappings(request.fileTypeMappings());
 
         serverDefinition.setLaunchConfigurations(request.launchConfigurations());
+        serverDefinition.setInstallerConfiguration(request.installerConfiguration());
 
         List<ServerMappingSettings> mappings = Stream.concat(request.languageMappings().stream(), request.fileTypeMappings().stream()).toList();
         UserDefinedDebugAdapterServerSettings.ItemSettings settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(serverId);
@@ -229,6 +231,7 @@ public class DebugAdapterManager implements DebuggableFile {
         boolean launchConfigurationChanged = !Objects.equals(settings.getLaunchConfigurations(), request.launchConfigurations());
         boolean attachAddressChanged = !Objects.equals(settings.getAttachAddress(), request.attachAddress());
         boolean attachPortChanged = !Objects.equals(settings.getAttachAddress(), request.attachPort());
+        boolean installerConfigurationChanged = !Objects.equals(settings.getInstallerConfiguration(), request.installerConfiguration());
 
         // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
 
@@ -241,11 +244,12 @@ public class DebugAdapterManager implements DebuggableFile {
         settings.setDebugServerReadyPattern(request.debugServerReadyPattern);
         settings.setMappings(mappings);
         settings.setLaunchConfigurations(request.launchConfigurations());
+        settings.setInstallerConfiguration(request.installerConfiguration());
 
         if (nameChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
                 commandChanged || connectTimeoutChanged || debugServerReadyPatternChanged ||
                 mappingsChanged || launchConfigurationChanged ||
-        attachAddressChanged || attachPortChanged) {
+        attachAddressChanged || attachPortChanged || installerConfigurationChanged) {
             // Notifications
             DebugAdapterServerListener.ChangedEvent event = new DebugAdapterServerListener.ChangedEvent(
                     serverDefinition,
@@ -258,7 +262,8 @@ public class DebugAdapterManager implements DebuggableFile {
                     mappingsChanged,
                     launchConfigurationChanged,
                     attachAddressChanged,
-                    attachPortChanged);
+                    attachPortChanged,
+                    installerConfigurationChanged);
             if (notify) {
                 handleChangeEvent(event);
             }

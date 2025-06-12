@@ -23,6 +23,7 @@ import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressEx
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -35,7 +36,7 @@ import java.util.List;
 /**
  * Debug Adapter Protocol (DAP) run configuration options.
  */
-public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile {
+public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile, CommandLineUpdater {
 
     @Nullable
     private NetworkAddressExtractor networkAddressExtractor;
@@ -208,6 +209,16 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
 
     public void setServerUrl(String serverUrl) {
         this.serverUrl.setValue(this, serverUrl);
+    }
+
+    @Override
+    public String getCommandLine() {
+        return getCommand();
+    }
+
+    @Override
+    public void setCommandLine(String commandLine) {
+        setCommand(commandLine);
     }
 
     /**

@@ -37,6 +37,7 @@ import com.redhat.devtools.lsp4ij.console.actions.ResetLanguageServerSettingsAct
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
+import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
@@ -331,7 +332,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         };
     }
 
-    public void showTrace(@NotNull LanguageServerProcessTreeNode processTreeNode, String message) {
+    public void showTrace(@NotNull LanguageServerProcessTreeNode processTreeNode,
+                          @NotNull String message) {
         if (isDisposed()) {
             return;
         }
@@ -470,12 +472,21 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 tabbedPane = new JBTabbedPane();
                 add(tabbedPane, NAME_VIEW_CONSOLE);
 
-                tracesConsoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
+                var serverDefinition = ((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition();
+                tracesConsoleView = createConsoleView(serverDefinition, project);
                 Disposer.register(LSPConsoleToolWindowPanel.this, tracesConsoleView);
                 tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.traces.title"), tracesConsoleView.getComponent());
                 configureConsoleToolbar(tracesConsoleView);
 
-                logsConsoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
+                var serverInstaller = serverDefinition.getServerInstaller();
+                if (serverInstaller != null) {
+                    // The language server defines an installer
+                    // register the LSP traces consoles as console provider
+                    // to show traces from installation
+                    serverInstaller.registerConsoleProvider(new ConsoleProvider(tracesConsoleView, project));
+                }
+
+                logsConsoleView = createConsoleView(serverDefinition, project);
                 Disposer.register(LSPConsoleToolWindowPanel.this, logsConsoleView);
                 tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.logs.title"), logsConsoleView.getComponent());
 
@@ -487,7 +498,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             LanguageServerDefinition serverDefinition = key.getServerDefinition();
             Project project = LSPConsoleToolWindowPanel.this.project;
             // Create the language server panel with 'Server', 'Mappings', 'Configuration', 'Debug' tabs
-            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, false, true, project);
+            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, true, project);
             loadDetailPanel(languageServerView);
 
             // Track changes of definition + settings to reload the language server detail (command, mappings, etc):
