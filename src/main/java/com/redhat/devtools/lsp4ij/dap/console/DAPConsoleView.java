@@ -10,8 +10,12 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.console;
 
+import com.intellij.execution.impl.ConsoleState;
 import com.intellij.execution.impl.ConsoleViewImpl;
+import com.intellij.execution.impl.ConsoleViewRunningState;
 import com.intellij.execution.impl.EditorHyperlinkSupport;
+import com.intellij.execution.process.ProcessHandler;
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
@@ -20,6 +24,8 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.redhat.devtools.lsp4ij.console.actions.AutoFoldingAction;
 import com.redhat.devtools.lsp4ij.console.actions.ClearThisConsoleAction;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,15 +39,96 @@ public class DAPConsoleView extends ConsoleViewImpl {
                           @NotNull GlobalSearchScope searchScope,
                           boolean viewer,
                           boolean usePredefinedMessageFilter) {
-        super(project, searchScope, viewer, usePredefinedMessageFilter);
+        super(project, searchScope, viewer, new DAPConsoleState(), usePredefinedMessageFilter);
+    }
+    
+    private static class DAPConsoleState extends ConsoleState.NotStartedStated {
+
+        @Override
+        public @NotNull ConsoleState attachTo(@NotNull ConsoleViewImpl console, @NotNull ProcessHandler processHandler) {
+            return new ConsoleViewRunningState(console, processHandler, this, true, false);
+        }
+    }
+
+    @Override
+    public void print(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
+        String applicableText = getApplicableText(text, contentType);
+        if (applicableText != null) {
+            super.print(applicableText, contentType);
+        }
+    }
+
+    @TestOnly
+    public static @Nullable String getApplicableText(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
+        if (contentType != ConsoleViewContentType.NORMAL_OUTPUT) {
+            // 1) SYSTEM_OUTPUT:
+            //    -> node C:/Users/XXXX/.lsp4ij/dap/vscode-js-debug/js-debug/src/dapDebugServer.js 55125 127.0.0.1
+            //    -> [Trace - 14:15:26] Received notification 'output'
+
+            // 2) LOG_DEBUG_OUTPUT -> js-debug/launch
+
+            // 3) LOG_INFO_OUTPUT -> C:\Program Files\nodejs\node.exe --experimental-network-inspection .\foo.js
+
+            // 4) LOG_ERROR_OUTPUT -> "Uncaught SyntaxError foo.js:1...
+
+            // returns the original text.
+            return text;
+        }
+        // NORMAL_OUTPUT
+        // ex: Debug server listening at 127.0.0.1:55125 (must be displayed)
+        // At this
+        if (isContentLengthDapTrace(text)) {
+            // DAP traces from stdio (Content-Length)
+            return null;
+        }
+        if (text.startsWith("{")) {
+            // DAP traces from stdio (Json)
+            int offset = findLastCompleteJsonBlockEnd(text);
+            if (offset == -1) {
+                return text;
+            }
+            offset++;
+            String s =  text.length() > offset ? text.substring(offset) : null;
+            if (s != null && isContentLengthDapTrace(s)) {
+                return null;
+            }
+            return s;
+        }
+        return null;
+    }
+
+    private static boolean isContentLengthDapTrace(@NotNull String text) {
+        return text.startsWith("Content-Length:") || text.equals("\n");
+    }
+
+    private static int findLastCompleteJsonBlockEnd(@NotNull String text) {
+        int depth = 0;
+        int lastValidEnd = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    lastValidEnd = i;
+                } else if (depth < 0) {
+                    depth = 0;
+                }
+            }
+        }
+        return lastValidEnd;
     }
 
     @Override
     public AnAction @NotNull [] createConsoleActions() {
         // Don't call super.createConsoleActions() to avoid having some action like previous occurrence that we don't need.
         List<AnAction> consoleActions = new ArrayList<>();
-        consoleActions.add(new AutoFoldingAction(getEditor()));
-        consoleActions.add(new ScrollToTheEndToolbarAction(getEditor()));
+        var editor = getEditor();
+        if (editor != null) {
+            consoleActions.add(new AutoFoldingAction(editor));
+            consoleActions.add(new ScrollToTheEndToolbarAction(editor));
+        }
         consoleActions.add(ActionManager.getInstance().getAction("Print"));
         consoleActions.add(new ClearThisConsoleAction(this));
         return consoleActions.toArray(AnAction.EMPTY_ARRAY);
