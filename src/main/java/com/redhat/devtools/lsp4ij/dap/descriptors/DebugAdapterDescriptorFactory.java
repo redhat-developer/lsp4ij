@@ -18,6 +18,7 @@ import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
@@ -26,9 +27,11 @@ import com.redhat.devtools.lsp4ij.dap.configurations.DAPSettingsEditor;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -160,5 +163,23 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
         assert pluginPath != null;
         pluginPath = pluginPath.toAbsolutePath();
         return pluginPath.resolve(serverPath);
+    }
+
+    /**
+     * Creates a server installer intended to install a server shared by all projects (global scope).
+     *
+     * <p>
+     * The server may be installed in the user's home directory, making it accessible to all projects.
+     * </p>
+     *
+     * <p>
+     * To install a server for a specific project only (project scope), use {@link LSPClientFeatures#setServerInstaller(ServerInstaller)} instead.
+     * </p>
+     *
+     * @return a {@link ServerInstaller} for global use, or {@code null} if no global installer is provided.
+     */
+    @Nullable
+    public ServerInstaller createServerInstaller() {
+        return null;
     }
 }

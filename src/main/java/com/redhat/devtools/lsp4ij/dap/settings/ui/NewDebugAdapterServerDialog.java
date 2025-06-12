@@ -11,25 +11,16 @@
 package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
 import com.google.common.collect.Streams;
-import com.intellij.notification.Notification;
-import com.intellij.notification.NotificationType;
-import com.intellij.notification.Notifications;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.util.ui.FormBuilder;
-import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate;
-import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
-import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
-import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -208,31 +199,6 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         createdServer.setAttachPort(attachPort);
         createdServer.setInstallerConfiguration(installerConfiguration);
         DebugAdapterManager.getInstance().addDebugAdapterServer(createdServer);
-
-        if (installerConfiguration != null && StringUtils.isNotBlank(installerConfiguration) && !installerConfiguration.equals("{}")) {
-            if (MessageDialogBuilder.yesNo(DAPBundle.message("new.debug.adapter.dialog.install.title"),
-                            DAPBundle.message("new.debug.adapter.dialog.install.content"))
-                    .ask(project)) {
-                try {
-                    var context = createInstallerContext();
-                    ServerInstallerManager
-                            .getInstance()
-                            .install(installerConfiguration, context);
-                } catch (Exception s) {
-                    Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
-                            "Install error",
-                            s.getMessage(),
-                            NotificationType.ERROR);
-                    Notifications.Bus.notify(notification, project);
-                }
-            }
-        }
-    }
-
-    private @NotNull InstallerContext createInstallerContext() {
-        var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN);
-        context.setCommandLineUpdater(new UICommandLineUpdater(createdServer));
-        return context;
     }
 
     private void addValidator(JTextComponent textComponent) {

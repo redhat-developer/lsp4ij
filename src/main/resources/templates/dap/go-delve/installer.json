@@ -2,6 +2,11 @@
   "id": "go-delve",
   "name": "Install and verify go-delve DAP Server",
   "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
   },
   "run": {
     "exec": {

@@ -21,6 +21,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.NlsContexts;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
+import com.redhat.devtools.lsp4ij.installation.PrintableProgressIndicator;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 
@@ -113,15 +114,11 @@ public class ServerInstallerManager extends InstallerTaskRegistry {
         ProgressManager.getInstance().run(new Task.Backgroundable(context.getProject(), title.toString(), true) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                context.setProgressIndicator(new DelegatingProgressIndicator(indicator) {
+                context.setProgressIndicator(new PrintableProgressIndicator(indicator) {
 
                     @Override
-                    public void setText2(@Nls @NlsContexts.ProgressDetails String text) {
-                        super.setText2(text);
-                        if (text.startsWith("<html><code>")) {
-                            String s = text.substring("<html><code>".length(), text.length() - "</code></html>".length());
-                            context.printProgress(s);
-                        }
+                    protected void printProgress(@NotNull String progressMessage) {
+                        context.printProgress(progressMessage);
                     }
                 });
                 install(serverInstallerDescriptor, context);

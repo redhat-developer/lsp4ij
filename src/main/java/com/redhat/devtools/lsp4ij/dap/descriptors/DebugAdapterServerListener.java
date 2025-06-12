@@ -61,6 +61,7 @@ public interface DebugAdapterServerListener {
         public final boolean launchConfigurationsContentChanged;
         private final boolean attachAddressChanged;
         private final boolean attachPortChanged;
+        private final boolean installerConfigurationChanged;
 
         public ChangedEvent(@NotNull DebugAdapterServerDefinition serverDefinition,
                             boolean nameChanged,
@@ -72,7 +73,8 @@ public interface DebugAdapterServerListener {
                             boolean mappingsChanged,
                             boolean launchConfigurationsContentChanged,
                             boolean attachAddressChanged,
-                            boolean attachPortChanged) {
+                            boolean attachPortChanged,
+                            boolean installerConfigurationChanged) {
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
@@ -84,6 +86,7 @@ public interface DebugAdapterServerListener {
             this.launchConfigurationsContentChanged = launchConfigurationsContentChanged;
             this.attachAddressChanged = attachAddressChanged;
             this.attachPortChanged = attachPortChanged;
+            this.installerConfigurationChanged = installerConfigurationChanged;
         }
     }
 

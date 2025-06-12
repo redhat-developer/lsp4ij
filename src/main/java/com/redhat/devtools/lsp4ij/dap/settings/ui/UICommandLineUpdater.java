@@ -57,6 +57,7 @@ public class UICommandLineUpdater implements CommandLineUpdater {
                 false,
                 false,
                 false,
+                false,
                 false);
         DebugAdapterManager.getInstance().handleChangeEvent(event);
     }

@@ -16,14 +16,17 @@ import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.ExecutionConsole;
 import com.intellij.execution.ui.RunnerLayoutUi;
 import com.intellij.execution.ui.layout.PlaceInGrid;
+import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.AppUIUtil;
 import com.intellij.ui.content.Content;
+import com.intellij.util.ui.FormBuilder;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
@@ -33,7 +36,6 @@ import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
-import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
@@ -43,9 +45,11 @@ import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.*;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.HashMap;
@@ -67,12 +71,12 @@ public class DAPDebugProcess extends XDebugProcess {
         STOPPED
     }
 
+    private final @NotNull DAPCommandLineState dapState;
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
     private final @NotNull DAPBreakpointHandler breakpointHandler;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
-    private final boolean isDebug;
     private @Nullable CompletableFuture<Void> connectToServerFuture;
 
     private Status status;
@@ -85,9 +89,9 @@ public class DAPDebugProcess extends XDebugProcess {
                            @NotNull ExecutionResult executionResult,
                            boolean isDebug) {
         super(session);
+        this.dapState = dapState;
         var project = getSession().getProject();
         this.executionResult = executionResult;
-        this.isDebug = isDebug;
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
         this.serverDescriptor = dapState.getServerDescriptor();
         this.breakpointHandler = new DAPBreakpointHandler(session, serverDescriptor, project);
@@ -151,10 +155,11 @@ public class DAPDebugProcess extends XDebugProcess {
                     // Ignore error
                     stop();
                 } catch (Throwable e) {
-                    if (e instanceof ExecutionException && e.getCause() != null) {
-                        e = e.getCause();
+                    Throwable throwable = e;
+                    if (throwable instanceof ExecutionException && throwable.getCause() != null) {
+                        throwable = throwable.getCause();
                     }
-                    print(e.getMessage(), ConsoleViewContentType.LOG_ERROR_OUTPUT);
+                    print(throwable.getMessage(), ConsoleViewContentType.LOG_ERROR_OUTPUT);
                     stop();
                 }
             }
@@ -329,7 +334,7 @@ public class DAPDebugProcess extends XDebugProcess {
     }
 
     public void print(@Nullable String message, @NotNull ConsoleViewContentType type) {
-        if (StringUtils.isBlank(message)) {
+        if (message == null || StringUtils.isBlank(message)) {
             return;
         }
         if (message.charAt(message.length() - 1) != '\n') {
@@ -387,6 +392,11 @@ public class DAPDebugProcess extends XDebugProcess {
             public void registerAdditionalContent(@NotNull RunnerLayoutUi ui) {
                 // Register "Exception Breakpoints" panel
                 registerBreakpointsPanel(ui);
+
+                // Register the "Installer" tab
+                String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
+                var project = DAPDebugProcess.this.getSession().getProject();
+                resisterInstallerTab(ui, installerConfiguration, project);
             }
 
             private void registerBreakpointsPanel(@NotNull RunnerLayoutUi ui) {
@@ -395,6 +405,31 @@ public class DAPDebugProcess extends XDebugProcess {
                         "dap-breakpoints-panel", breakpointsPanel, "Exception Breakpoints",  null, breakpointsPanel.getDefaultFocusedComponent());
                 breakpointsContent.setCloseable(false);
                 ui.addContent(breakpointsContent, 0, PlaceInGrid.left, false);
+            }
+
+
+            private static void resisterInstallerTab(@NotNull RunnerLayoutUi ui,
+                                                     @Nullable String installerConfiguration,
+                                                     @NotNull Project project) {
+                Content customTab = ui.createContent(
+                        "dap-installer-tab",
+                        createInstallerPanel(installerConfiguration, project),
+                        DAPBundle.message("dap.settings.editor.installer.tab"),
+                        AllIcons.Actions.Install,
+                        null
+                );
+                ui.addContent(customTab);
+            }
+
+            private static JComponent createInstallerPanel(@Nullable String installerConfiguration,
+                                                           @NotNull Project project) {
+                FormBuilder builder = FormBuilder.createFormBuilder();
+                var installerPanel = new InstallerPanel(builder, true, project);
+                if (installerConfiguration != null) {
+                    ApplicationManager.getApplication()
+                            .invokeLater(() -> installerPanel.getInstallerConfigurationWidget().setText(installerConfiguration));
+                }
+                return builder.getPanel();
             }
         };
     }

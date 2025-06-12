@@ -43,9 +43,9 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     }
 
     @Override
-    public void handleStatusChanged(LanguageServerWrapper languageServer) {
+    public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
         ServerStatus serverStatus = languageServer.getServerStatus();
-        boolean selectProcess = serverStatus == ServerStatus.starting;
+        boolean selectProcess = (serverStatus == ServerStatus.starting || serverStatus ==  ServerStatus.installing);
         updateServerStatus(languageServer, serverStatus, selectProcess);
     }
 
@@ -105,7 +105,8 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     }
 
     private @Nullable LanguageServerProcessTreeNode updateServerStatus(@NotNull LanguageServerWrapper languageServer,
-                                                                       @Nullable ServerStatus serverStatus, boolean selectProcess) {
+                                                                       @Nullable ServerStatus serverStatus,
+                                                                       boolean selectProcess) {
         LanguageServerTreeNode serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
         if (serverNode == null) {
             // Should never occur.

@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.ApiStatus;
@@ -80,7 +81,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
             String command = dapOptions.getCommand();
             if (StringUtils.isBlank(command)) {
                 var server = dapOptions.getDebugAdapterServer();
-                if (server instanceof UserDefinedDebugAdapterServerDefinition userDefinedServer) {
+                if (server instanceof CommandLineUpdater userDefinedServer) {
                     command = userDefinedServer.getCommandLine();
                 }
             }
