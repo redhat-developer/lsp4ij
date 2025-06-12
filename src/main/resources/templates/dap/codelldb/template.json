@@ -1,11 +1,10 @@
 {
-  "id": "rust-analyzer",
-  "name": "Rust Language Server",
-  "programArgs": {
-    "default": "sh -c ${BASE_DIR}/rust-analyzer",
-    "windows": "${BASE_DIR}/rust-analyzer.exe"
+  "id": "codelldb",
+  "name": "CodeLLDB",
+  "launch": {
+    "windows": "<<insert base directory>>/extension/adapter/codelldb.exe",
+    "default": "<<insert base directory>>/extension/adapter/codelldb"
   },
-  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

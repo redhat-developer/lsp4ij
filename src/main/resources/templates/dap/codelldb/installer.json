@@ -1,0 +1,45 @@
+{
+  "id": "codelldb",
+  "name": "CodeLLDB",
+  "check": {
+  },
+  "run": {
+    "download": {
+      "name": "Download CodeLLDB",
+      "github": {
+        "owner": "vadimcn",
+        "repository": "codelldb",
+        "prerelease": false,
+        "asset": {
+          "windows": "codelldb-win32-x64.vsix",
+          "unix": {
+            "x86_64": "codelldb-linux-x64.vsix",
+            "arm64": "codelldb-linux-arm64.vsix"
+          },
+          "mac": {
+            "x86_64": "codelldb-darwin-x64.vsix",
+            "arm64": "codelldb-darwin-arm64.vsix"
+          }
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/dap/codelldb",
+        "file": {
+          "name": {
+            "windows": "extension/adapter/codelldb.exe",
+            "unix": "extension/adapter/codelldb",
+            "mac": "extension/adapter/codelldb"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure CodeLLDB server command",
+          "command": "${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}

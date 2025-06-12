@@ -85,7 +85,7 @@ public class DownloadUtils {
      */
     public static @Nullable DecompressSupport getDecompressor(@NotNull Path filePath) throws IOException {
         String fileName = filePath.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (fileName.endsWith(".zip")) {
+        if (fileName.endsWith(".zip") || fileName.endsWith(".vsix")) {
             return ZIP;
         } else if (fileName.endsWith(".tar")) {
             return TAR;
