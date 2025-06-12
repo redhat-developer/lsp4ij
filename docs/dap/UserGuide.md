@@ -153,6 +153,7 @@ You can `create/remove/update` DAP servers with `Debug Adapter Protocol` entry:
 
 LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:
 
+- [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
 - [Go Delve DAP server](./user-defined-dap/go-delve.md) which allows you to debug `Go` files.
 - [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files. 
 - [Python Debugpy DAP server](./user-defined-dap/python-debugpy.md) which allows you to debug `Python` files.
