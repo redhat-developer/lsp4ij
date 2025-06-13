@@ -174,7 +174,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         };
     }
 
-    private void loadFromTemplate(@NotNull LanguageServerTemplate template) {
+    public void loadFromTemplate(@NotNull LanguageServerTemplate template) {
         this.currentTemplate = template;
         // Update name
         var serverName = this.languageServerPanel.getServerName();

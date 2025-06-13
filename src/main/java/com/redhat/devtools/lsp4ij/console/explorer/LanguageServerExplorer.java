@@ -335,7 +335,9 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
      * Initialize language server process with the started language servers.
      */
     public void load() {
-        LanguageServiceAccessor.getInstance(getProject()).getStartedServers()
+        LanguageServiceAccessor
+                .getInstance(getProject())
+                .getStartedServers()
                 .forEach(ls -> {
                     Throwable serverError = ls.getServerError();
                     listener.handleStatusChanged(ls);

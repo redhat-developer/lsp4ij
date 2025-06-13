@@ -10,7 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.templates;
 
+import com.intellij.lang.Language;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileTypeMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
+import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -60,6 +68,7 @@ public abstract class ServerTemplate {
     private List<ServerMappingSettings> languageMappings;
 
     private String installerConfiguration;
+    private List<ServerMapping> serverMappings;
 
     // ---------- Commons for id, name, command
 
@@ -146,4 +155,53 @@ public abstract class ServerTemplate {
         this.installerConfiguration = installerConfiguration;
     }
 
+    public String getMatchedMapping(@NotNull VirtualFile file,
+                                   @NotNull Project project) {
+        Language language = null;
+        for (var mapping : getServerMappings()) {
+            if (mapping instanceof ServerFileTypeMapping s) {
+                if (file.getFileType().equals(s.getFileType())) {
+                    return s.getFileType().getName();
+                }
+            } else if (mapping instanceof ServerFileNamePatternMapping s) {
+                String filename = file.getName();
+                for (var matcher : s.getFileNameMatchers()) {
+                    if (matcher.acceptsCharSequence(filename)) {
+                        return matcher.getPresentableString();
+                    }
+                }
+            } else if (mapping instanceof ServerLanguageMapping s) {
+                if (language == null) {
+                    language = LSPIJUtils.getFileLanguage(file, project);
+                }
+                if (s.getLanguage().equals(language)) {
+                    return language.getDisplayName();
+                }
+            }
+        }
+        return null;
+    }
+
+    private@NotNull List<ServerMapping> getServerMappings() {
+        if (serverMappings == null) {
+            serverMappings = getServerMappingsSync();
+        }
+        return serverMappings;
+    }
+
+    private synchronized @NotNull List<ServerMapping> getServerMappingsSync() {
+        if (serverMappings != null) {
+            return serverMappings;
+        }
+        List<ServerMappingSettings> allMappings = getAllMappings();
+        String serverId = getId() != null ? getId() : "dummy";
+        return ServerMappingSettings.toServerMappings(serverId, allMappings);
+    }
+
+    public @NotNull List<ServerMappingSettings> getAllMappings() {
+        List<ServerMappingSettings> allMappings = new ArrayList<>();
+        allMappings.addAll(getLanguageMappings());
+        allMappings.addAll(getFileTypeMappings());
+        return allMappings;
+    }
 }

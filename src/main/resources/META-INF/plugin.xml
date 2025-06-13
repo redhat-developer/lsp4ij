@@ -299,7 +299,13 @@
 
     <!-- Language Server support -->
     <extensions defaultExtensionNs="com.intellij">
-        <backgroundPostStartupActivity implementation="com.redhat.devtools.lsp4ij.internal.LSPPostStartupActivity"/>
+        <backgroundPostStartupActivity
+                implementation="com.redhat.devtools.lsp4ij.internal.LSPPostStartupActivity"/>
+
+        <!-- LSP Editor notification used to suggest installation of some language servers according the editing file -->
+        <editorNotificationProvider
+                implementation="com.redhat.devtools.lsp4ij.ui.LanguageServerSuggestionEditorNotificationProvider" />
+
         <!-- LSP application services -->
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingDumbAndScanningStrategy"/>
