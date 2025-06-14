@@ -610,6 +610,39 @@ CompletableFuture<List<Application>> applications =
     );
 ```
 
+### Install language server
+
+Installs the language server using the given [`ServerInstallationContext`](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/installation/ServerInstallationContext.java).  
+
+#### Behavior
+
+When invoked, this method:
+
+1. Checks whether a [`Language server installer`](./LSPApi.md#language-server-installer) is configured for the current language server.
+2. If a `ServerInstaller` is present:
+  - Stops the language server if it is currently starting or already started.
+  - Resets the installer's internal state.
+  - Executes the installation via `checkInstallation(context)`.
+  - If the server was previously running, it restarts it once the installation completes.
+3. If no `ServerInstaller` is configured:
+  - The server is assumed to be already installed, and the method completes immediately with `ServerInstallationStatus.INSTALLED`.
+
+#### Example
+
+```java
+ServerInstallationContext context = new ServerInstallationContext()
+        .setForceInstall(true); 
+LanguageServerManager.getInstance(project)
+    .install("myLanguageServerId", context)
+    .thenAccept(status -> {
+        if (status == ServerInstallationStatus.INSTALLED) {
+        // installation succeeded
+        } else {
+        // handle other status (e.g., FAILED or CANCELLED)
+        }
+    });
+```
+
 ## Keep a Language Server alive with a Lease
 
 If you need a reference to your language server and need to execute operations with it, 

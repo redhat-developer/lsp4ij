@@ -70,6 +70,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     private boolean serverInstallerCreated;
     private @Nullable ServerInstaller serverInstaller;
 
+    private @Nullable Boolean hasInstaller;
+
     public LanguageServerDefinition(@NotNull String id,
                                     @NotNull String name,
                                     String description,
@@ -366,6 +368,11 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         return null;
     }
 
+    /**
+     * Returns the global installer and null otherwise.
+     *
+     * @return the global installer and null otherwise.
+     */
     public @Nullable ServerInstaller getServerInstaller() {
         if (serverInstallerCreated) {
             return serverInstaller;
@@ -382,4 +389,31 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         return serverInstaller;
     }
 
+    /**
+     * Returns true if the server definition has an installer and false otherwise.
+     *
+     * @return  true if the server definition has an installer and false otherwise.
+     */
+    public boolean hasInstaller() {
+        if (getServerInstaller() != null) {
+            // Global installer
+            return true;
+        }
+        if (hasInstaller != null) {
+            return hasInstaller;
+        }
+        // We cache the installer to avoid creating client features on each call of this method.
+        hasInstaller = hasInstallerSync();
+        return hasInstaller;
+    }
+
+    synchronized boolean hasInstallerSync() {
+        try {
+            return createClientFeatures().getServerInstaller() != null;
+        }
+        catch(Throwable e) {
+            // Ignore error
+            return false;
+        }
+    }
 }

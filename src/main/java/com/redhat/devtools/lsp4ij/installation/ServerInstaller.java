@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation;
 
-import com.intellij.execution.ui.ConsoleView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +27,12 @@ public interface ServerInstaller {
     @NotNull
     CompletableFuture<ServerInstallationStatus> checkInstallation();
 
+    /**
+     * Starts the server installation process.
+     *
+     * @return A {@link CompletableFuture} that completes when the installation is finished.
+     */
+    @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation(@NotNull ServerInstallationContext context);
 
     /**
      * Returns the current server installer status.
@@ -43,7 +48,7 @@ public interface ServerInstaller {
      * @return A {@link Runnable} task to execute before installation, or {@code null} if no task is defined.
      */
     @Nullable
-    default Runnable getBeforeCode() {
+    default Runnable getBeforeCode(@NotNull ServerInstallationContext context) {
         return null;
     }
 
@@ -53,7 +58,7 @@ public interface ServerInstaller {
      * @return A {@link Runnable} task to execute after installation, or {@code null} if no task is defined.
      */
     @Nullable
-    default Runnable getAfterCode() {
+    default Runnable getAfterCode(@NotNull ServerInstallationContext context) {
         return null;
     }
 

@@ -165,4 +165,14 @@ public class UserDefinedLanguageServerInstaller extends DeclarativeLanguageServe
         String languageServerId = serverDefinition.getId();
         return UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
     }
+
+
+    @Override
+    public void reset() {
+        super.reset();
+        var settings = getSettings();
+        if (settings != null) {
+            settings.setInstallAlreadyDone(false);
+        }
+    }
 }

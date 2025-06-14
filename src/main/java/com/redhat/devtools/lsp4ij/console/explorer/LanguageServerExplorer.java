@@ -224,6 +224,11 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                     group.addSeparator();
                     group.add(new OpenLanguageServerDialogAction(getProject()));
                 }
+                if (languageServerDefinition.hasInstaller()) {
+                    group.addSeparator();
+                    group.add(new InstallServerAction(languageServerDefinition, getProject()));
+                    group.add(new ReinstallServerAction(languageServerDefinition, getProject()));
+                }
             } else if (node instanceof LanguageServerProcessTreeNode processTreeNode) {
                 // Compute popup menu actions for Language Server process node
                 switch (processTreeNode.getServerStatus()) {
