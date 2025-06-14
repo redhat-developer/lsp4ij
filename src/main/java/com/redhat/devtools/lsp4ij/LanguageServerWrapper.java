@@ -35,6 +35,7 @@ import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.capabilities.ClientCapabilitiesFactory;
@@ -577,15 +578,15 @@ public class LanguageServerWrapper implements Disposable {
         return this.stopping.get();
     }
 
-    public synchronized void stop() {
+    public synchronized CompletableFuture<Void> stop() {
         final boolean alreadyStopping = this.stopping.getAndSet(true);
-        stop(alreadyStopping);
+        return stop(alreadyStopping);
     }
 
-    public synchronized void stop(boolean alreadyStopping) {
+    public synchronized CompletableFuture<Void> stop(boolean alreadyStopping) {
         try {
             if (alreadyStopping) {
-                return;
+                return CompletableFuture.completedFuture(null);
             }
             updateStatus(ServerStatus.stopping);
 
@@ -605,6 +606,7 @@ public class LanguageServerWrapper implements Disposable {
             if (isDisposed()) {
                 // When project is closing we shutdown everything in synch mode
                 shutdownAll(languageServer, lspStreamProvider, launcherFuture);
+                return CompletableFuture.completedFuture(null);
             } else {
                 // We need to shutdown, kill and stop the process in a thread to avoid for instance
                 // stopping the new process created with a new start.
@@ -617,7 +619,7 @@ public class LanguageServerWrapper implements Disposable {
                     this.stopping.set(false);
                     updateStatus(ServerStatus.stopped);
                 };
-                CompletableFuture.runAsync(shutdownKillAndStopFutureAndProvider);
+                return CompletableFuture.runAsync(shutdownKillAndStopFutureAndProvider);
             }
         } finally {
             this.launcherFuture = null;
@@ -1476,24 +1478,26 @@ public class LanguageServerWrapper implements Disposable {
             boolean wasStarted = getServerStatus() == ServerStatus.starting || getServerStatus() == ServerStatus.started;
 
             // Stop the current language server if it's running
-            stop();
+            return stop()
+                    .thenCompose((unused) -> {
+                        // Reset the installer internal state before reinstallation
+                        serverInstaller.reset();
 
-            // Reset the installer internal state before reinstallation
-            serverInstaller.reset();
+                        // Perform the installation asynchronously
+                        var checkInstallation = serverInstaller.checkInstallation(context);
 
-            // Perform the installation asynchronously
-            var checkInstallation = serverInstaller.checkInstallation(context);
+                        // If the server wasn't started before, no need to restart it afterwards
+                        if (!wasStarted) {
+                            return checkInstallation;
+                        }
 
-            // If the server wasn't started before, no need to restart it afterwards
-            if (!wasStarted) {
-                return checkInstallation;
-            }
+                        // If the server was running, restart it after installation completes
+                        return checkInstallation.thenApply(status -> {
+                            start(); // Restart the server
+                            return status;
+                        });
+                    });
 
-            // If the server was running, restart it after installation completes
-            return checkInstallation.thenApply(status -> {
-                start(); // Restart the server
-                return status;
-            });
         }
 
         // If no installer is available, assume the server is already installed

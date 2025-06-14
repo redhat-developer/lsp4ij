@@ -247,6 +247,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                         break;
                     case stopping:
                     case stopped:
+                    case installed:
                         // Restart language server action
                         AnAction restartServerAction = ActionManager.getInstance().getAction(RestartServerAction.ACTION_ID);
                         group.add(restartServerAction);
