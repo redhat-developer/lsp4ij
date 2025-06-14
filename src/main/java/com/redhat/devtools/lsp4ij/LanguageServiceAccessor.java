@@ -484,6 +484,12 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
+    public LanguageServerWrapper forceCreateServer(@NotNull LanguageServerDefinition serverDefinition) {
+        LanguageServerWrapper wrapper = new LanguageServerWrapper(project, serverDefinition);
+        startedServers.add(wrapper);
+        return wrapper;
+    }
+
     /**
      * Returns the matched language server definitions for the given file.
      *

@@ -848,7 +848,28 @@ public class MyLanguageServerInstaller extends LanguageServerInstallerBase {
 }
 ```
 
-and register your language server installer like this:
+ * If the installation is global (e.g., the language server will be stored in the HOME directory and shared across all projects), 
+you need to register it like this:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    @Nullable public ServerInstaller createServerInstaller() {
+        return new MyLanguageServerInstaller(); // customize language server installer         
+    }
+}
+```
+
+
+* If the installation is per project, you need to register it like this:
 
 ```java
 package my.language.server;

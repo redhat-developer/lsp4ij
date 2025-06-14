@@ -48,8 +48,8 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
     }
 
     @Override
-    public @Nullable Runnable getAfterCode() {
-        if (isStartServerAfterInstallation()) {
+    public @Nullable Runnable getAfterCode(@NotNull ServerInstallationContext context) {
+        if (context.isStartServerAfterInstallation()) {
             return () -> {
                 // The language server is installed, start the language server
                 var singleProject = getProject();
@@ -86,15 +86,6 @@ public abstract class LanguageServerInstallerBase extends ServerInstallerBase im
             return clientFeatures.getServerDefinition();
         }
         return null;
-    }
-
-    /**
-     * Returns true if the language server must be started after the installation and false otherwise.
-     *
-     * @return true if the language server must be started after the installation and false otherwise.
-     */
-    protected boolean isStartServerAfterInstallation() {
-        return true;
     }
 
     /**

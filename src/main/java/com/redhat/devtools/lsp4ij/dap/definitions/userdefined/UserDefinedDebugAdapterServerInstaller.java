@@ -167,5 +167,4 @@ public class UserDefinedDebugAdapterServerInstaller extends DeclarativeDebugAdap
         String languageServerId = serverDefinition.getId();
         return UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
     }
-
 }

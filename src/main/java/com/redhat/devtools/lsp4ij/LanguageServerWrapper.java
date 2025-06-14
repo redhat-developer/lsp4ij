@@ -20,7 +20,6 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
-import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -34,6 +33,8 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
+import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
+import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.capabilities.ClientCapabilitiesFactory;
@@ -87,14 +88,6 @@ public class LanguageServerWrapper implements Disposable {
         DEFAULT_SYNC_OPTIONS.setSave(true);
     }
 
-    record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
-                                 @Nullable String languageId, boolean waitForDidOpen) {
-    }
-
-    private MessageBusConnection messageBusConnection;
-
-    @NotNull
-    private final LanguageServerDefinition serverDefinition;
     @NotNull
     protected final Project initialProject;
     @NotNull
@@ -104,59 +97,39 @@ public class LanguageServerWrapper implements Disposable {
     @Nullable
     protected final URI initialPath;
     protected final InitializeParams initParams = new InitializeParams();
-
+    @NotNull
+    private final LanguageServerDefinition serverDefinition;
+    private final AtomicBoolean stopping = new AtomicBoolean(false);
+    private final ExecutorService dispatcher;
+    private final ExecutorService listener;
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
+    /**
+     * Map containing unregistration handlers for dynamic capability registrations.
+     */
+    private final @NotNull
+    Map<String, Runnable> dynamicRegistrations = new HashMap<>();
+    private final LSPFileListener fileListener = new LSPFileListener(this);
+    private final AtomicInteger keepAliveCounter = new AtomicInteger();
     protected StreamConnectionProvider lspStreamProvider;
+    private MessageBusConnection messageBusConnection;
     private Future<?> launcherFuture;
-
     private int numberOfRestartAttempts;
     private @Nullable CompletableFuture<Void> initializeFuture;
     private LanguageServer languageServer;
     private LanguageClientImpl languageClient;
     private ServerCapabilities serverCapabilities;
     private Timer timer;
-    private final AtomicBoolean stopping = new AtomicBoolean(false);
-
     private ServerStatus serverStatus;
-
     private boolean disposed;
-
     private LanguageServerException serverError;
-
     private Long currentProcessId;
-
     private List<String> currentProcessCommandLines;
-
-    private final ExecutorService dispatcher;
-
-    private final ExecutorService listener;
-
-    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
-
-    /**
-     * Map containing unregistration handlers for dynamic capability registrations.
-     */
-    private final @NotNull
-    Map<String, Runnable> dynamicRegistrations = new HashMap<>();
     private boolean initiallySupportsWorkspaceFolders = false;
-    private final LSPFileListener fileListener = new LSPFileListener(this);
-
     private FileOperationsManager fileOperationsManager;
 
     private LSPClientFeatures clientFeatures;
-    private final AtomicInteger keepAliveCounter = new AtomicInteger();
     // error notification displayed when server start fails.
     private @Nullable Notification errorNotification;
-
-    // LSP traces
-    public record LSPTrace(@NotNull Message message,
-                           @NotNull MessageConsumer messageConsumer,
-                           @NotNull ServerTrace serverTrace,
-                           @NotNull TracingMessageConsumer tracing) {
-        public String toMessage() {
-            return tracing.log(message, messageConsumer, serverTrace);
-        }
-    }
-
     private @Nullable TracingMessageConsumer tracing;
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
@@ -201,6 +174,21 @@ public class LanguageServerWrapper implements Disposable {
      */
     private static String sanitize(String name) {
         return name.replace("%", "");
+    }
+
+    private static boolean supportsWorkspaceFolders(ServerCapabilities serverCapabilities) {
+        return serverCapabilities != null && serverCapabilities.getWorkspace() != null
+                && serverCapabilities.getWorkspace().getWorkspaceFolders() != null
+                && Boolean.TRUE.equals(serverCapabilities.getWorkspace().getWorkspaceFolders().getSupported());
+    }
+
+    /**
+     * Returns the parent process id (process id of Intellij).
+     *
+     * @return the parent process id (process id of Intellij).
+     */
+    private static int getParentProcessId() {
+        return (int) ProcessHandle.current().pid();
     }
 
     @NotNull
@@ -278,12 +266,12 @@ public class LanguageServerWrapper implements Disposable {
                 });
     }
 
-    private void setEnabled(boolean enabled) {
-        this.serverDefinition.setEnabled(enabled, initialProject);
-    }
-
     public boolean isEnabled() {
         return !isDisposed() && serverDefinition.isEnabled(initialProject);
+    }
+
+    private void setEnabled(boolean enabled) {
+        this.serverDefinition.setEnabled(enabled, initialProject);
     }
 
     /**
@@ -503,12 +491,6 @@ public class LanguageServerWrapper implements Disposable {
             return roots.iterator().next();
         }
         return null;
-    }
-
-    private static boolean supportsWorkspaceFolders(ServerCapabilities serverCapabilities) {
-        return serverCapabilities != null && serverCapabilities.getWorkspace() != null
-                && serverCapabilities.getWorkspace().getWorkspaceFolders() != null
-                && Boolean.TRUE.equals(serverCapabilities.getWorkspace().getWorkspaceFolders().getSupported());
     }
 
     private void logMessage(Message message, MessageConsumer consumer) {
@@ -734,7 +716,6 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-
     /**
      * Check whether this LS is suitable for provided project. Starts the LS if not
      * already started.
@@ -884,7 +865,7 @@ public class LanguageServerWrapper implements Disposable {
                 newSyncOptions.setSave(true);
                 return newSyncOptions;
             } else if (syncOptions.isRight()) {
-                TextDocumentSyncOptions newSyncOptions =  syncOptions.getRight();
+                TextDocumentSyncOptions newSyncOptions = syncOptions.getRight();
                 if (newSyncOptions.getSave() == null) {
                     newSyncOptions.setSave(true);
                 }
@@ -1211,17 +1192,6 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Returns the parent process id (process id of Intellij).
-     *
-     * @return the parent process id (process id of Intellij).
-     */
-    private static int getParentProcessId() {
-        return (int) ProcessHandle.current().pid();
-    }
-
-// ------------------ Current Process information.
-
-    /**
      * Returns the current process id and null otherwise.
      *
      * @return the current process id and null otherwise.
@@ -1234,7 +1204,7 @@ public class LanguageServerWrapper implements Disposable {
         return currentProcessCommandLines;
     }
 
-// ------------------ Server status information .
+// ------------------ Current Process information.
 
     /**
      * Returns the server status.
@@ -1248,6 +1218,8 @@ public class LanguageServerWrapper implements Disposable {
     public LanguageServerException getServerError() {
         return serverError;
     }
+
+// ------------------ Server status information .
 
     public int getNumberOfRestartAttempts() {
         return numberOfRestartAttempts;
@@ -1405,8 +1377,6 @@ public class LanguageServerWrapper implements Disposable {
         modificationTracker.incModificationCount();
     }
 
-    // ------------- LSP Traces
-
     /**
      * Add LSP trace in the cached LSP traces.
      *
@@ -1441,6 +1411,8 @@ public class LanguageServerWrapper implements Disposable {
             }
         }
     }
+
+    // ------------- LSP Traces
 
     /**
      * Returns the LSP cached traces.
@@ -1477,5 +1449,70 @@ public class LanguageServerWrapper implements Disposable {
         }
         return traceFlushAlarm.isDisposed() ? null : traceFlushAlarm;
     }
+
+    /**
+     * Installs the language server using the provided {@link ServerInstallationContext}.
+     * <p>
+     * If a {@link ServerInstaller} is available, this method will:
+     * <ul>
+     *     <li>Stop the language server if it is currently starting or started,</li>
+     *     <li>Reset the installer state,</li>
+     *     <li>Execute the installation asynchronously,</li>
+     *     <li>Restart the language server after installation if it was running beforehand.</li>
+     * </ul>
+     * If no installer is configured, the method assumes the server is already installed and
+     * immediately returns {@link ServerInstallationStatus#INSTALLED}.
+     * </p>
+     *
+     * @param context the context used to control or customize the installation.
+     * @return a {@link CompletableFuture} that completes with the {@link ServerInstallationStatus}
+     *         once the installation process is done.
+     */
+    public @NotNull CompletableFuture<ServerInstallationStatus> install(@NotNull ServerInstallationContext context) {
+        // Get the configured server installer, if any
+        var serverInstaller = getClientFeatures().getServerInstaller();
+        if (serverInstaller != null) {
+            // Determine whether the server was already running before installation
+            boolean wasStarted = getServerStatus() == ServerStatus.starting || getServerStatus() == ServerStatus.started;
+
+            // Stop the current language server if it's running
+            stop();
+
+            // Reset the installer internal state before reinstallation
+            serverInstaller.reset();
+
+            // Perform the installation asynchronously
+            var checkInstallation = serverInstaller.checkInstallation(context);
+
+            // If the server wasn't started before, no need to restart it afterwards
+            if (!wasStarted) {
+                return checkInstallation;
+            }
+
+            // If the server was running, restart it after installation completes
+            return checkInstallation.thenApply(status -> {
+                start(); // Restart the server
+                return status;
+            });
+        }
+
+        // If no installer is available, assume the server is already installed
+        return CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
+    }
+
+    record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
+                                 @Nullable String languageId, boolean waitForDidOpen) {
+    }
+
+    // LSP traces
+    public record LSPTrace(@NotNull Message message,
+                           @NotNull MessageConsumer messageConsumer,
+                           @NotNull ServerTrace serverTrace,
+                           @NotNull TracingMessageConsumer tracing) {
+        public String toMessage() {
+            return tracing.log(message, messageConsumer, serverTrace);
+        }
+    }
+
 
 }
