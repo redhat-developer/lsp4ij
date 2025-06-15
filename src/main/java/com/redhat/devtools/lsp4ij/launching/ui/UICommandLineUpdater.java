@@ -54,10 +54,10 @@ public class UICommandLineUpdater implements CommandLineUpdater {
 
         // Update command line settings
         String languageServerId = definition.getId();
-        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
         if (settings != null) {
             settings.setCommandLine(commandLine);
-            UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
+            UserDefinedLanguageServerSettings.getInstance().setUserDefinedLanguageServerSettings(languageServerId, settings);
         }
 
         if (project != null) {
@@ -77,10 +77,6 @@ public class UICommandLineUpdater implements CommandLineUpdater {
                 definition,
                 false,
                 true,
-                false,
-                false,
-                false,
-                false,
                 false,
                 false,
                 false,

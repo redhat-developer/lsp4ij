@@ -146,11 +146,6 @@ public class UserDefinedDebugAdapterServerInstaller extends DeclarativeDebugAdap
         if (super.canExecute(serverInstallerDescriptor)) {
             return true;
         }
-        /*UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = getSettings();
-        if (settings != null) {
-            return !settings.isInstallAlreadyDone();
-        }
-        return false;*/
         return true;
     }
 
@@ -165,6 +160,6 @@ public class UserDefinedDebugAdapterServerInstaller extends DeclarativeDebugAdap
             return null;
         }
         String languageServerId = serverDefinition.getId();
-        return UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+        return UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
     }
 }

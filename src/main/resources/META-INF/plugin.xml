@@ -827,8 +827,11 @@
                 key="language.servers"
                 instance="com.redhat.devtools.lsp4ij.settings.LanguageServerListConfigurable"/>
         <projectService
-                id="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"
-                serviceImplementation="com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings"/>
+                id="com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings"
+                serviceImplementation="com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings"/>
+        <applicationService
+                id="com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings"
+                serviceImplementation="com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings"/>
         <toolWindow
                 id="Language Servers"
                 anchor="bottom"

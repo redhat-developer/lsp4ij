@@ -15,8 +15,8 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.client.SettingsHelper;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import org.jetbrains.annotations.NotNull;
@@ -47,11 +47,15 @@ public class UserDefinedStreamConnectionProvider extends OSProcessStreamConnecti
 
     @Override
     public Object getInitializationOptions(@Nullable VirtualFile rootUri) {
-        return serverDefinition.getLanguageServerInitializationOptions(project);
+        var settings = GlobalLanguageServerSettings.getInstance()
+                .getLanguageServerSettings(serverDefinition.getId());
+        return settings != null ? settings.getLanguageServerInitializationOptions(project) : null;
     }
 
     @Override
     public Object getExperimentalFeaturesPOJO() {
-        return serverDefinition.getLanguageServerExperimental(project);
+        var settings = GlobalLanguageServerSettings.getInstance()
+                .getLanguageServerSettings(serverDefinition.getId());
+        return settings != null ? settings.getLanguageServerExperimental(project) : null;
     }
 }

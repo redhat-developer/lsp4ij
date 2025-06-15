@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensC
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.internal.capabilities.CodeLensOptionsAdapter;
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -69,8 +70,10 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     private boolean serverInstallerCreated;
     private @Nullable ServerInstaller serverInstaller;
-
     private @Nullable Boolean hasInstaller;
+
+    private boolean languageServerSettingsContributorCreated;
+    private @Nullable LanguageServerSettingsContributor languageServerSettingsContributor;
 
     public LanguageServerDefinition(@NotNull String id,
                                     @NotNull String name,
@@ -416,4 +419,21 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
             return false;
         }
     }
+
+    public @Nullable LanguageServerSettingsContributor getLanguageServerSettingsContributor() {
+        if (languageServerSettingsContributorCreated) {
+            return languageServerSettingsContributor;
+        }
+        return getLanguageServerSettingsContributorSync();
+    }
+
+    private synchronized @Nullable LanguageServerSettingsContributor getLanguageServerSettingsContributorSync() {
+        if (languageServerSettingsContributorCreated) {
+            return languageServerSettingsContributor;
+        }
+        languageServerSettingsContributor = createLanguageServerSettingsContributor();
+        languageServerSettingsContributorCreated = true;
+        return languageServerSettingsContributor;
+    }
+
 }

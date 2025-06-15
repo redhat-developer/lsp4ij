@@ -15,6 +15,7 @@ import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -73,4 +74,9 @@ public interface LanguageServerFactory {
     @Nullable default ServerInstaller createServerInstaller() {
         return null;
     }
+
+    @Nullable default LanguageServerSettingsContributor createLanguageServerSettingsContributor() {
+        return null;
+    }
+
 }

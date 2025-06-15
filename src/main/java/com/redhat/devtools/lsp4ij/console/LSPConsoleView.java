@@ -24,7 +24,7 @@ import com.redhat.devtools.lsp4ij.console.actions.AutoFoldingAction;
 import com.redhat.devtools.lsp4ij.console.actions.ClearThisConsoleAction;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -108,7 +108,7 @@ public class LSPConsoleView extends ConsoleViewImpl {
      * @return true if language server settings is configured with "verbose" level trace for the language server and false otherwise.
      */
     private boolean canApplyFolding() {
-        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(serverDefinition.getId());
+        ProjectLanguageServerSettings.LanguageServerDefinitionSettings settings = ProjectLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(serverDefinition.getId());
         if (settings == null) {
             return false;
         }

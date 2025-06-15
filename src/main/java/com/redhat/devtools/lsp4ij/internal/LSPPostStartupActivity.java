@@ -18,7 +18,6 @@ import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.ProjectActivity;
 import com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
 import org.jetbrains.annotations.NotNull;

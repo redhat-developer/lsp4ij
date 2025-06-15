@@ -79,10 +79,6 @@ public interface LanguageServerDefinitionListener {
         public final boolean userEnvironmentVariablesChanged;
         public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean mappingsChanged;
-        public final boolean configurationChanged;
-        public final boolean expandConfigurationChanged;
-        public final boolean initializationOptionsContentChanged;
-        public final boolean experimentalContentChanged;
         public final boolean clientConfigurationContentChanged;
         public final boolean installerConfigurationContentChanged;
 
@@ -94,10 +90,6 @@ public interface LanguageServerDefinitionListener {
                                           boolean userEnvironmentVariablesChanged,
                                           boolean includeSystemEnvironmentVariablesChanged,
                                           boolean mappingsChanged,
-                                          boolean configurationContentChanged,
-                                          boolean expandConfigurationChanged,
-                                          boolean initializationOptionsContentChanged,
-                                          boolean experimentalContentChanged,
                                           boolean clientConfigurationContentChanged,
                                           boolean installerConfigurationContentChanged) {
             super(updatedBy, project);
@@ -107,10 +99,6 @@ public interface LanguageServerDefinitionListener {
             this.userEnvironmentVariablesChanged = userEnvironmentVariablesChanged;
             this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.mappingsChanged = mappingsChanged;
-            this.configurationChanged = configurationContentChanged;
-            this.expandConfigurationChanged = expandConfigurationChanged;
-            this.initializationOptionsContentChanged = initializationOptionsContentChanged;
-            this.experimentalContentChanged = experimentalContentChanged;
             this.clientConfigurationContentChanged = clientConfigurationContentChanged;
             this.installerConfigurationContentChanged = installerConfigurationContentChanged;
         }

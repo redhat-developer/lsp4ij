@@ -99,6 +99,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
+    private LSPConfigurationFeature configurationFeature;
+    
     private EditorBehaviorFeature editorBehaviorFeature;
 
     public LSPClientFeatures() {
@@ -1254,6 +1256,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public final LSPClientFeatures setWorkspaceSymbolFeature(@NotNull LSPWorkspaceSymbolFeature workspaceSymbolFeature) {
         workspaceSymbolFeature.setClientFeatures(this);
         this.workspaceSymbolFeature = workspaceSymbolFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP configuration feature.
+     *
+     * @return the LSP configuration feature.
+     */
+    @NotNull
+    public final LSPConfigurationFeature getConfigurationFeature() {
+        if (configurationFeature == null) {
+            initConfigurationFeature();
+        }
+        return configurationFeature;
+    }
+
+    private synchronized void initConfigurationFeature() {
+        if (configurationFeature != null) {
+            return;
+        }
+        setConfigurationFeature(new LSPConfigurationFeature());
+    }
+
+    /**
+     * Initialize the LSP configuration feature.
+     *
+     * @param configurationFeature the LSP configuration feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setConfigurationFeature(@NotNull LSPConfigurationFeature configurationFeature) {
+        configurationFeature.setClientFeatures(this);
+        this.configurationFeature = configurationFeature;
         return this;
     }
 

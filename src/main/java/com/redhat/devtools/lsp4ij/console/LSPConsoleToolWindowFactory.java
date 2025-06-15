@@ -21,7 +21,7 @@ import com.intellij.ui.content.Content;
 import com.intellij.ui.content.ContentManager;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.OpenLanguageServerDialogAction;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -45,7 +45,7 @@ public class LSPConsoleToolWindowFactory implements ToolWindowFactory, DumbAware
         try {
             // Force the load of the user defined language server settings for the given project
             // to avoid initializing it when LSP message are logged (which could block the IJ startup or crash the language server)
-            UserDefinedLanguageServerSettings.getInstance(project);
+            ProjectLanguageServerSettings.getInstance(project);
         }
         catch (Throwable e) {
             // Ignore the error

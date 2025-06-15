@@ -26,6 +26,8 @@ import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -43,6 +45,7 @@ import java.util.function.Consumer;
  * LSP {@link LanguageClient} implementation for IntelliJ.
  */
 public class LanguageClientImpl implements LanguageClient, Disposable {
+
     private final @NotNull Project project;
     private Consumer<PublishDiagnosticsParams> diagnosticHandler;
 
@@ -56,9 +59,14 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     @NotNull
     private final LSPProgressManager progressManager;
 
+    private final SettingsLanguageListener languageServerStartedListener;
+
     public LanguageClientImpl(@NotNull Project project) {
         this.project = project;
-        progressManager = new LSPProgressManager();
+        this.progressManager = new LSPProgressManager();
+        this.languageServerStartedListener = new SettingsLanguageListener(this, project);
+        GlobalLanguageServerSettings.getInstance().addSettingsListener(languageServerStartedListener);
+        ProjectLanguageServerSettings.getInstance(getProject()).addSettingsListener(languageServerStartedListener);
     }
 
     public @NotNull Project getProject() {
@@ -284,7 +292,15 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      */
     @Nullable
     protected Object createSettings() {
-        return null;
+        if (wrapper == null) {
+            return null;
+        }
+
+        String languageServerId = wrapper.getServerDefinition().getId();
+        var project = getProject();
+        var settings = GlobalLanguageServerSettings.getInstance()
+                .getLanguageServerSettings(languageServerId);
+        return settings != null ? settings.getLanguageServerConfiguration(project) : null;
     }
 
     protected synchronized Runnable getDidChangeConfigurationListener() {
@@ -295,7 +311,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return didChangeConfigurationListener;
     }
 
-    protected void triggerChangeConfiguration() {
+    public void triggerChangeConfiguration() {
         LanguageServer languageServer = getLanguageServer();
         if (languageServer == null) {
             return;
@@ -339,6 +355,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     public void dispose() {
         this.disposed = true;
         this.progressManager.dispose();
+        GlobalLanguageServerSettings.getInstance().removeSettingsListener(languageServerStartedListener);
+        ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(languageServerStartedListener);
     }
 
     public boolean isDisposed() {

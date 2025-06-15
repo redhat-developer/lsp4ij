@@ -194,10 +194,10 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
                     .setPrettyPrinting()
                     .create();
             String template = gson.toJson(lsDefinition);
-            String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getInitializationOptionsContent();
-            String experimental = ((UserDefinedLanguageServerDefinition) lsDefinition).getExperimentalContent();
-            String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationContent();
-            String settingsSchema = ((UserDefinedLanguageServerDefinition) lsDefinition).getConfigurationSchemaContent();
+            String initializationOptions = ((UserDefinedLanguageServerDefinition) lsDefinition).getDefaultInitializationOptionsContent();
+            String experimental = ((UserDefinedLanguageServerDefinition) lsDefinition).getDefaultExperimentalContent();
+            String settings = ((UserDefinedLanguageServerDefinition) lsDefinition).getDefaultConfigurationContent();
+            String settingsSchema = ((UserDefinedLanguageServerDefinition) lsDefinition).getDefaultConfigurationSchemaContent();
             String clientSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getClientConfigurationContent();
             String installerSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getInstallerConfigurationContent();
             lsName = lsDefinition.getDisplayName();

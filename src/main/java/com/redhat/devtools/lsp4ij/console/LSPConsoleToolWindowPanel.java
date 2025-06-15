@@ -40,8 +40,10 @@ import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
 import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettingsListener;
+import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
 import org.jetbrains.annotations.NotNull;
@@ -293,8 +295,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     // ---------------- Methods used by the Console view -----------
     // -------------------------------------------------------------
 
-    private UserDefinedLanguageServerSettingsListener createSettingsChangeListener(@NotNull LanguageServerDefinition serverDefinition,
-                                                                                   @NotNull LanguageServerView languageServerView) {
+    private LanguageServerSettingsListener createSettingsChangeListener(@NotNull LanguageServerDefinition serverDefinition,
+                                                                        @NotNull LanguageServerView languageServerView) {
         return (event) -> {
             if (isDisposed()) {
                 return;
@@ -452,7 +454,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         private static final String NAME_VIEW_DETAIL = "detail";
         private static final String NAME_VIEW_CONSOLE = "console";
-        private final Set<UserDefinedLanguageServerSettingsListener> settingsChangeListeners = new HashSet<UserDefinedLanguageServerSettingsListener>();
+        private final Set<LanguageServerSettingsListener> settingsChangeListeners = new HashSet<LanguageServerSettingsListener>();
         private final Set<LanguageServerDefinitionListener> serverDefinitionListeners = new HashSet<>();
         private JBTabbedPane tabbedPane;
         private LanguageServerView detailView;
@@ -509,8 +511,9 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             serverDefinitionListeners.add(serverDefinitionListener);
 
             // - 2. track changes of associated settings (trace, error reporting kind)
-            UserDefinedLanguageServerSettingsListener settingsChangeListener = createSettingsChangeListener(serverDefinition, languageServerView);
-            com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(getProject()).addSettingsListener(settingsChangeListener);
+            LanguageServerSettingsListener settingsChangeListener = createSettingsChangeListener(serverDefinition, languageServerView);
+            ProjectLanguageServerSettings.getInstance(getProject()).addSettingsListener(settingsChangeListener);
+            GlobalLanguageServerSettings.getInstance().addSettingsListener(settingsChangeListener);
             settingsChangeListeners.add(settingsChangeListener);
 
             return languageServerView;
@@ -558,8 +561,9 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         @Override
         public void dispose() {
-            for (UserDefinedLanguageServerSettingsListener settingsChangeListener : settingsChangeListeners) {
-                com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(getProject()).removeChangeHandler(settingsChangeListener);
+            for (LanguageServerSettingsListener settingsChangeListener : settingsChangeListeners) {
+                ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(settingsChangeListener);
+                GlobalLanguageServerSettings.getInstance().removeSettingsListener(settingsChangeListener);
             }
             settingsChangeListeners.clear();
             for (var serverDefinitionListener : serverDefinitionListeners) {
