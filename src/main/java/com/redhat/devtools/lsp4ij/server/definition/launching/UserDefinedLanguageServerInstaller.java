@@ -163,7 +163,7 @@ public class UserDefinedLanguageServerInstaller extends DeclarativeLanguageServe
             return null;
         }
         String languageServerId = serverDefinition.getId();
-        return UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+        return UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
     }
 
 

@@ -334,9 +334,12 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             }
             var ls = didOpenFuture.getNow(null);
             if (ls == null) {
-                // The didOpen is not finished, ignore the pull diagnostic
+                // The didOpen is not finished, refresh the pull diagnostic when server is ready
                 didOpenFuture.
                         thenAccept(readyLs -> refreshPullDiagnostic(version, readyLs));
+            } else {
+                // The server is ready, refresh the pull diagnostics
+                refreshPullDiagnostic(version, ls);
             }
             return;
         }

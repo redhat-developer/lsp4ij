@@ -47,7 +47,7 @@ import com.redhat.devtools.lsp4ij.server.*;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
@@ -1433,8 +1433,8 @@ public class LanguageServerWrapper implements Disposable {
      */
     public @NotNull ServerTrace getServerTrace() {
         ServerTrace serverTrace = null;
-        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings =
-                UserDefinedLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(getServerDefinition().getId());
+        ProjectLanguageServerSettings.LanguageServerDefinitionSettings settings =
+                ProjectLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(getServerDefinition().getId());
         if (settings != null) {
             serverTrace = settings.getServerTrace();
         }

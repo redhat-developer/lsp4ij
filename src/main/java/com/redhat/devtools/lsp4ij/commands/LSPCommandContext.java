@@ -15,7 +15,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -77,7 +77,7 @@ public class LSPCommandContext {
                              @NotNull ExecutedBy executedBy) {
         this.command = command;
         this.project = project;
-        this.showNotificationError = UserDefinedLanguageServerSettings.getInstance(project).isShowNotificationErrorForCommand(executedBy);
+        this.showNotificationError = ProjectLanguageServerSettings.getInstance(project).isShowNotificationErrorForCommand(executedBy);
     }
 
     @NotNull

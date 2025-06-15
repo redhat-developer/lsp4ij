@@ -14,6 +14,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -23,25 +24,11 @@ import org.jetbrains.annotations.NotNull;
 public class UserDefinedLanguageClient extends LanguageClientImpl {
     private final UserDefinedLanguageServerDefinition serverDefinition;
 
-    private final UserDefinedLanguageListener languageServerStartedListener;
 
     public UserDefinedLanguageClient(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
                                      @NotNull Project project) {
         super(project);
         this.serverDefinition = serverDefinition;
-        this.languageServerStartedListener = new UserDefinedLanguageListener(this, project);
-        LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(languageServerStartedListener);
-    }
-
-    @Override
-    public void dispose() {
-        super.dispose();
-        LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(languageServerStartedListener);
-    }
-
-    @Override
-    protected Object createSettings() {
-        return serverDefinition.getLanguageServerConfiguration(getProject());
     }
 
     @Override
@@ -52,11 +39,6 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
             // push it with 'workspaceService/didChangeConfiguration' to the language server.
             triggerChangeConfiguration();
         }
-    }
-
-    @Override
-    public void triggerChangeConfiguration() {
-        super.triggerChangeConfiguration();
     }
 
     @Override

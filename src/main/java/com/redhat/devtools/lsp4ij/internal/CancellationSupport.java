@@ -21,15 +21,13 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.actions.DisableLanguageServerErrorAction;
 import com.redhat.devtools.lsp4ij.settings.actions.OpenUrlAction;
 import com.redhat.devtools.lsp4ij.settings.actions.ReportErrorInLogAction;
 import com.redhat.devtools.lsp4ij.settings.actions.ShowErrorLogAction;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
-import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
-import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -204,7 +202,7 @@ public class CancellationSupport implements CancelChecker {
         String languageServerId = languageServer.getServerDefinition().getId();
         ErrorReportingKind errorReportingKind = null;
         Project project = languageServer.getProject();
-        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project)
+        ProjectLanguageServerSettings.LanguageServerDefinitionSettings settings = ProjectLanguageServerSettings.getInstance(project)
                 .getLanguageServerSettings(languageServerId);
         if (settings != null) {
             errorReportingKind = settings.getErrorReportingKind();

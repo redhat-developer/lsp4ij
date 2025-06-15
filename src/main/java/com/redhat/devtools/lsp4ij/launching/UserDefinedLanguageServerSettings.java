@@ -23,6 +23,8 @@ import com.intellij.util.xmlb.annotations.XCollection;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -59,11 +61,11 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         myState = state;
     }
 
-    public UserDefinedLanguageServerItemSettings getLaunchConfigSettings(String languageServerId) {
+    public UserDefinedLanguageServerItemSettings getUserDefinedLanguageServerSettings(String languageServerId) {
         return myState.myState.get(languageServerId);
     }
 
-    public void setLaunchConfigSettings(String languageServerId, UserDefinedLanguageServerItemSettings settings) {
+    public void setUserDefinedLanguageServerSettings(String languageServerId, UserDefinedLanguageServerItemSettings settings) {
         myState.myState.put(languageServerId, settings);
         fireStateChanged();
     }
@@ -106,6 +108,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
     public static class UserDefinedLanguageServerItemSettings {
 
+        private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerItemSettings.class);
+
         private String serverId;
 
         private String templateId;
@@ -119,16 +123,6 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         private Map<String, String> userEnvironmentVariables;
 
         private boolean includeSystemEnvironmentVariables = true;
-
-        private String configurationContent;
-
-        private boolean expandConfiguration;
-
-        private String configurationSchemaContent;
-
-        private String initializationOptionsContent;
-
-        private String experimentalContent;
 
         private String clientConfigurationContent = "{}";
 
@@ -222,46 +216,6 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setMappings(List<ServerMappingSettings> mappings) {
             this.mappings = mappings;
-        }
-
-        public String getConfigurationContent() {
-            return configurationContent;
-        }
-
-        public void setConfigurationContent(String configurationContent) {
-            this.configurationContent = configurationContent;
-        }
-
-        public boolean isExpandConfiguration() {
-            return expandConfiguration;
-        }
-
-        public void setExpandConfiguration(boolean expandConfiguration) {
-            this.expandConfiguration = expandConfiguration;
-        }
-
-        public String getConfigurationSchemaContent() {
-            return configurationSchemaContent;
-        }
-
-        public void setConfigurationSchemaContent(String configurationSchemaContent) {
-            this.configurationSchemaContent = configurationSchemaContent;
-        }
-
-        public String getInitializationOptionsContent() {
-            return initializationOptionsContent;
-        }
-
-        public void setInitializationOptionsContent(String initializationOptionsContent) {
-            this.initializationOptionsContent = initializationOptionsContent;
-        }
-
-        public String getExperimentalContent() {
-            return experimentalContent;
-        }
-
-        public void setExperimentalContent(String experimentalContent) {
-            this.experimentalContent = experimentalContent;
         }
 
         public String getClientConfigurationContent() {
