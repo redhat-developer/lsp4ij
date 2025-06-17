@@ -108,6 +108,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(builder.getPanel(), BorderLayout.CENTER);
+        panel.setPreferredSize(new Dimension(300, 500));
         return panel;
     }
 
