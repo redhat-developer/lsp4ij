@@ -39,11 +39,16 @@ public class DeleteServerAction extends AnAction {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
+        var project = e.getProject();
+        if (project == null) {
+            return;
+        }
         int result = Messages.showYesNoDialog(LanguageServerBundle.message("action.lsp.console.explorer.delete.server.confirm.dialog.message",
                         languageServerDefinition.getDisplayName()),
                 LanguageServerBundle.message("action.lsp.console.explorer.delete.server.confirm.dialog.title"), Messages.getQuestionIcon());
         if (result == Messages.YES) {
-            LanguageServersRegistry.getInstance().removeServerDefinition(Objects.requireNonNull(e.getProject()), languageServerDefinition);
+            LanguageServersRegistry.getInstance()
+                    .removeServerDefinition(project, languageServerDefinition);
         }
     }
 

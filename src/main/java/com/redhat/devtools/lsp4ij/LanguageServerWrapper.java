@@ -647,9 +647,6 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void clearProblem(@NotNull URI fileUri) {
-        if (isDisposed()) {
-            return;
-        }
         VirtualFile file = FileUriSupport.findFileByUri(fileUri.toASCIIString(), getClientFeatures());
         if (file != null && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
             LSPDiagnosticUtils.clearProblem(file, getProject());
