@@ -65,7 +65,9 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
             append(languageProcessTreeNode.getDisplayName());
 
             if (languageProcessTreeNode.getServerStatus() == ServerStatus.starting
-                    || languageProcessTreeNode.getServerStatus() == ServerStatus.stopping) {
+                    || languageProcessTreeNode.getServerStatus() == ServerStatus.stopping
+                    || languageProcessTreeNode.getServerStatus() == ServerStatus.checking_installed
+                    || languageProcessTreeNode.getServerStatus() == ServerStatus.installing) {
                 // Display elapsed time when language server is starting/stopping
                 myDurationText = languageProcessTreeNode.getElapsedTime();
                 final var durationText = myDurationText;
