@@ -18,6 +18,7 @@ import com.intellij.openapi.util.text.Formats;
 import com.intellij.ui.AnimatedIcon;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -52,10 +53,13 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
         switch (serverStatus) {
             case starting:
             case stopping:
+            case checking_installed:
+            case installing:
                 startTime = System.currentTimeMillis();
                 break;
             case stopped:
             case started:
+            case installed:
                 startTime = -1;
                 break;
         }
@@ -63,7 +67,10 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
         treeModel.nodeChanged(this);
     }
 
-    private String getDisplayName(ServerStatus serverStatus) {
+    private String getDisplayName(@NotNull ServerStatus serverStatus) {
+        if (isInstallStatus(serverStatus)) {
+            return serverStatus.name();
+        }
         if (!languageServer.isEnabled()) {
             return "disabled";
         }
@@ -98,7 +105,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     public Icon getIcon() {
-        if (!languageServer.isEnabled()) {
+        if (!languageServer.isEnabled() && !isInstallStatus(serverStatus)) {
             return AllIcons.Actions.Cancel;
         }
         boolean hasError = languageServer.getServerError() != null;
@@ -118,6 +125,12 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
             case installed -> AllIcons.Actions.Install;
             default -> RUNNING_ICON;
         };
+    }
+
+    private static boolean isInstallStatus(@NotNull ServerStatus serverStatus) {
+        return serverStatus == ServerStatus.checking_installed ||
+                serverStatus == ServerStatus.installing ||
+                serverStatus == ServerStatus.installed;
     }
 
     public String getDisplayName() {

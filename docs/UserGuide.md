@@ -22,6 +22,15 @@ When a language server is started, several actions are available, like stopping 
 
 ![LSP console actions](./images/LSPConsoleActions.png)
 
+### Language Server Installation
+
+If the language server defines an [installation procedure](./DeveloperGuide.md#install-language-server), you can use the following actions:
+
+![Install actions](./images/InstallActions.png)
+
+ * `Install if Needed`: Checks if the server can start. Installs it only if necessary.
+ * `Reinstall`: Forces a full reinstall, even if the server is already working.
+
 ## Settings
 
 ### Language Servers preferences
