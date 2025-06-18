@@ -29,22 +29,19 @@ To enable [Astro](https://astro.build/) language support in your IDE, you can in
 
 Since IntelliJ does not provide native Astro TextMate support, and the language server does not handle syntax highlighting, you need to set up a TextMate bundle manually.
 
- * Clone the Astro language tools repository:
+* Clone the Astro language tools repository:
 
-   ```bash
-   git clone https://github.com/withastro/language-tools.git
+  ```bash
+  git clone https://github.com/withastro/language-tools.git
 
-Once done, IntelliJ will apply syntax highlighting, bracket matching, and other basic editor features for .astro files.
+* Remove this [snippets section](https://github.com/withastro/language-tools/blob/main/packages/vscode/package.json#L45-L49) from the package.json
+  Otherwise, IntelliJ will fail to import the TextMate bundle.
 
- * Remove this [snippets section](https://github.com/withastro/language-tools/blob/main/packages/vscode/package.json#L45-L49) from the package.json
-   Otherwise, IntelliJ will fail to import the TextMate bundle.
-
- * Open TextMate Bundles settings
+* Open TextMate Bundles settings
 
 ![TextMate Bundles Settings](../images/user-defined-ls/textmate_bundles_settings.png)
 
- * Click the `+` button and select the folder [language-tools/packages/vscode](https://github.com/withastro/language-tools/tree/main/packages/vscode) folder.
-This folder contains the modified package.json and the TextMate grammar.
+* Click the `+` button and select the folder [language-tools/packages/vscode](https://github.com/withastro/language-tools/tree/main/packages/vscode) folder.
+  This folder contains the modified package.json and the TextMate grammar.
 
-After this, IntelliJ will provide syntax highlighting, bracket matching, 
-and basic language configuration for .astro files.
+Once done, IntelliJ will apply syntax highlighting, bracket matching, and other basic editor features for .astro files.
