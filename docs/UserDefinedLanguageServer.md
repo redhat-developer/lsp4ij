@@ -28,11 +28,14 @@ Once you clicked on either of them, the dialog will appear:
 
 ![New Language Server Dialog](./images/user-defined-ls/NewLanguageServerDialogEmpty.png)
 
-When you click the `OK` button, it will create the language server.  
-If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)  
-in the [Installer tab](#installer-tab), you will be prompted to confirm whether you want to execute the installer:
+When you click the `OK` button, the language server will be created.
 
-![Installation dialog](./images/user-defined-ls/rust-analyzer/installation_dialog.png)
+If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)  
+in the [Installer tab](#installer-tab), the installer will run once when the language server starts.
+
+You can reinstall the server at any time (e.g. to fetch the latest version) using the `Reinstall` action:
+
+![Install actions](./images/InstallActions.png)
 
 ### Server tab
 
@@ -66,7 +69,7 @@ That command might look like this:
 
 `$PROJECT_DIR$/path/to/your/start/command`
 
-Here are some useful standard [built-in macros](https://www.jetbrains.com/help/idea/built-in-macros.html that you can use:
+Here are some useful standard [built-in macros](https://www.jetbrains.com/help/idea/built-in-macros.html) that you can use:
 
  * `$WORKSPACE_DIR$`: The path to the workspace where the current project belongs. The workspace is the root of the open file hierarchy and can include multiple projects.
  * `$PROJECT_DIR$`: The root of the project where run.json is located. A project is typically a collection of files for developing and building an application such as a Maven or Node.js project.
