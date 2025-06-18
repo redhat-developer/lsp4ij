@@ -1,26 +1,50 @@
 # Astro Language Server
 
-To enable [Astro](https://astro.build/) language support in your IDE, you can integrate [Astro Language Server](https://www.npmjs.com/package/@astrojs/language-server) by following these steps:
+To enable [Astro](https://astro.build/) language support in your IDE, you can integrate the [Astro Language Server](https://www.npmjs.com/package/@astrojs/language-server) by following these steps:
 
 ![Astro LS demo](../images/user-defined-ls/astro-ls/demo_ls.gif)
 
-## Install the language server
+---
 
-1. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
+## Step 1: Install the Language Server
 
-2. **Select `Astro LanguageServer` as the template** from the available options. 
-This will populate the command field with a default command. When an astro file will be opened it should install the astro-ls and astro support shoudl be available.
+1. Open an `.astro` file in your project.
+2. Click on **Install Astro Language Server**:
 
-   ![Astro LS template](../images/user-defined-ls/astro-ls/select_template.png)
+   ![Open file](../images/user-defined-ls/astro-ls/open_file.png)
 
-## Install TextMate
+3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `Astro Language Server` pre-selected:
 
-![Astro TextMate Bundles](../images/user-defined-ls/astro/TextMate.png)
+   ![New Language Server Dialog](../images/user-defined-ls/astro-ls/new_language_server_dialog.png)
 
-You need to clone https://github.com/withastro/language-tools/tree/main/packages/vscode 
+4. Click **OK**. This will create the `Astro Language Server` definition and start the installation:
 
-Remove this [snippets section](https://github.com/withastro/language-tools/blob/main/packages/vscode/package.json#L45-L49) from the package.json JSON otherwise IntelliJ will fail to import textmate. 
+   ![Installing Language Server](../images/user-defined-ls/astro-ls/language_server_installing.png)
 
-and reference this folder
-(which contains the [package.json](https://github.com/withastro/language-tools/tree/main/packages/vscode/package.json))
-to benefit from syntax coloration and language configuration (matching brackets, etc).
+5. Once the installation completes, the server should start automatically and provide Astro language support (autocomplete, diagnostics, etc.).
+
+---
+
+## Step 2: Install TextMate Bundle
+
+Since IntelliJ does not provide native Astro TextMate support, and the language server does not handle syntax highlighting, you need to set up a TextMate bundle manually.
+
+ * Clone the Astro language tools repository:
+
+   ```bash
+   git clone https://github.com/withastro/language-tools.git
+
+Once done, IntelliJ will apply syntax highlighting, bracket matching, and other basic editor features for .astro files.
+
+ * Remove this [snippets section](https://github.com/withastro/language-tools/blob/main/packages/vscode/package.json#L45-L49) from the package.json
+   Otherwise, IntelliJ will fail to import the TextMate bundle.
+
+ * Open TextMate Bundles settings
+
+![TextMate Bundles Settings](../images/user-defined-ls/textmate_bundles_settings.png)
+
+ * Click the `+` button and select the folder [language-tools/packages/vscode](https://github.com/withastro/language-tools/tree/main/packages/vscode) folder.
+This folder contains the modified package.json and the TextMate grammar.
+
+After this, IntelliJ will provide syntax highlighting, bracket matching, 
+and basic language configuration for .astro files.
