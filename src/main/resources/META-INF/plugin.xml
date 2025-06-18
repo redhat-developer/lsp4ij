@@ -5,6 +5,18 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.14.0</h3>
+    <ul>
+      <li>Support for declarative installers for Language Servers and Debug Adapters — <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#installer-descriptor">Learn more</a></li>
+      <li>Display installation status and provide install actions directly in the LSP Explorer</li>
+      <li>New API: <code>LanguageServerSettingsContributor</code> to allow IntelliJ plugins to contribute custom UI settings — <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#contribute-to-ui-settings">See usage</a></li>
+      <li>New language server templates: Ada, Astro, Camel, Clangd, Dart, Luau, Ruby, SDL, and Svelte</li>
+      <li>New debug adapter template: CodeLLDB</li>
+      <li>Performance improvements for workspace symbol resolution</li>
+      <li>Various bug fixes and stability enhancements</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/15?closed=1">changelog</a>.
+
     <h3>0.13.0</h3>
     <ul>
       <li>Report problem in the project view</li>
