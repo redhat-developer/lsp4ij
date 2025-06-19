@@ -42,7 +42,7 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
     }
 
     @Override
-    public UserDefinedLanguageServerDefinition getServerDefinition() {
+    public @NotNull UserDefinedLanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
 

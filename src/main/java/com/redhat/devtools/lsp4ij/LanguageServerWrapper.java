@@ -358,6 +358,7 @@ public class LanguageServerWrapper implements Disposable {
                         return null;
                     }).thenRun(() -> {
                         languageClient = serverDefinition.createLanguageClient(initialProject);
+                        languageClient.setServerWrapper(this);
                         initParams.setProcessId(getParentProcessId());
 
                         if (rootURI != null) {
@@ -399,7 +400,7 @@ public class LanguageServerWrapper implements Disposable {
                                 .wrapMessages(wrapper)//
                                 .create();
                         this.languageServer = launcher.getRemoteProxy();
-                        languageClient.connect(languageServer, this);
+                        languageClient.connect(languageServer);
                         this.launcherFuture = launcher.startListening();
                     })
                     .thenCompose(unused -> initServer(rootURI))
