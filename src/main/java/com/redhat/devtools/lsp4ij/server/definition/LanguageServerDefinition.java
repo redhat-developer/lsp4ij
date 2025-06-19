@@ -26,6 +26,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;

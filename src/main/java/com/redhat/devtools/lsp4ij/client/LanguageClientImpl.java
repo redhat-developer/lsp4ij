@@ -32,6 +32,7 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,9 +50,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     private final @NotNull Project project;
     private Consumer<PublishDiagnosticsParams> diagnosticHandler;
 
-    private LanguageServer server;
-    private LanguageServerWrapper wrapper;
-
+    private @Nullable LanguageServer server;
+    private @NotNull LanguageServerWrapper wrapper;
     private boolean disposed;
 
     private Runnable didChangeConfigurationListener;
@@ -73,23 +73,28 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return project;
     }
 
-    public final void connect(@NotNull LanguageServer server, @NotNull LanguageServerWrapper wrapper) {
-        this.server = server;
+    @ApiStatus.Internal
+    public void setServerWrapper(@NotNull LanguageServerWrapper wrapper) {
         this.wrapper = wrapper;
+    }
+
+    public @NotNull LanguageServerDefinition getServerDefinition() {
+        return wrapper.getServerDefinition();
+    }
+
+    @NotNull
+    public LSPClientFeatures getClientFeatures() {
+        return wrapper.getClientFeatures();
+    }
+
+    public final void connect(@NotNull LanguageServer server) {
+        this.server = server;
         this.diagnosticHandler = new LSPDiagnosticHandler(wrapper);
         this.progressManager.connect(server, wrapper);
     }
 
-    protected final LanguageServer getLanguageServer() {
+    protected final @Nullable LanguageServer getLanguageServer() {
         return server;
-    }
-
-    public LanguageServerDefinition getServerDefinition() {
-        return wrapper.getServerDefinition();
-    }
-
-    public LSPClientFeatures getClientFeatures() {
-        return wrapper.getClientFeatures();
     }
 
     @Override
@@ -150,12 +155,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshCodeLenses() {
-        return CompletableFuture.runAsync(() -> {
-            if (wrapper == null) {
-                return;
-            }
-            refreshCodeLensForAllOpenedFiles();
-        });
+        return CompletableFuture.runAsync(this::refreshCodeLensForAllOpenedFiles);
     }
 
     private void refreshCodeLensForAllOpenedFiles() {
@@ -186,12 +186,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshSemanticTokens() {
-        return CompletableFuture.runAsync(() -> {
-            if (wrapper == null) {
-                return;
-            }
-            refreshSemanticTokensForAllOpenedFiles();
-        });
+        return CompletableFuture.runAsync(this::refreshSemanticTokensForAllOpenedFiles);
     }
 
     private void refreshSemanticTokensForAllOpenedFiles() {
@@ -215,12 +210,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshDiagnostics() {
-        return CompletableFuture.runAsync(() -> {
-            if (wrapper == null) {
-                return;
-            }
-            refreshDiagnosticsForAllOpenedFiles();
-        });
+        return CompletableFuture.runAsync(this::refreshDiagnosticsForAllOpenedFiles);
     }
 
     private void refreshDiagnosticsForAllOpenedFiles() {
@@ -292,11 +282,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      */
     @Nullable
     protected Object createSettings() {
-        if (wrapper == null) {
-            return null;
-        }
-
-        String languageServerId = wrapper.getServerDefinition().getId();
+        String languageServerId = getServerDefinition().getId();
         var project = getProject();
         var settings = GlobalLanguageServerSettings.getInstance()
                 .getLanguageServerSettings(languageServerId);
@@ -324,6 +310,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         DidChangeConfigurationParams params = new DidChangeConfigurationParams(settings);
         languageServer.getWorkspaceService().didChangeConfiguration(params);
     }
+
 
     /**
      * Callback invoked when language server status changed.
