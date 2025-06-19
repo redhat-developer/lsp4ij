@@ -23,6 +23,15 @@ To enable [Ada](https://ada-lang.io/) language support in your IDE, you can inte
 
 5. Once the installation completes, the server should start automatically and provide Ada language support (autocomplete, diagnostics, etc.).
 
+### Troubleshooting Installation
+
+If the installation fails, you can customize the installation settings in the **Installer** tab,  
+then click on the **Run Installation** hyperlink to reinstall the server:
+
+   ![Installer tab](../images/user-defined-ls/ada_language_server/installer_tab.png)
+
+See [Installer descriptor](../UserDefinedLanguageServerTemplate.md#installer-descriptor) for more information.
+
 ---
 
 ## Step 2: Install TextMate Bundle
