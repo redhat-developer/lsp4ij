@@ -142,8 +142,10 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         languageServerView.reset();
     }
 
-    private static ConsoleView createConsoleView(@NotNull LanguageServerDefinition serverDefinition, @NotNull Project project) {
-        var builder = new LSPTextConsoleBuilderImpl(serverDefinition, project);
+    private static ConsoleView createConsoleView(boolean withFolding,
+                                                 @NotNull LanguageServerDefinition serverDefinition,
+                                                 @NotNull Project project) {
+        var builder = new LSPTextConsoleBuilderImpl(withFolding, serverDefinition, project);
         builder.setViewer(true);
         return builder.getConsole();
     }
@@ -475,7 +477,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 add(tabbedPane, NAME_VIEW_CONSOLE);
 
                 var serverDefinition = ((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition();
-                tracesConsoleView = createConsoleView(serverDefinition, project);
+                tracesConsoleView = createConsoleView(true, serverDefinition, project);
                 Disposer.register(LSPConsoleToolWindowPanel.this, tracesConsoleView);
                 tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.traces.title"), tracesConsoleView.getComponent());
                 configureConsoleToolbar(tracesConsoleView);
@@ -488,9 +490,10 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                     serverInstaller.registerConsoleProvider(new ConsoleProvider(tracesConsoleView, project));
                 }
 
-                logsConsoleView = createConsoleView(serverDefinition, project);
+                logsConsoleView = createConsoleView(false, serverDefinition, project);
                 Disposer.register(LSPConsoleToolWindowPanel.this, logsConsoleView);
                 tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.logs.title"), logsConsoleView.getComponent());
+                configureConsoleToolbar(logsConsoleView);
 
                 showConsole();
             }

@@ -15,25 +15,21 @@ package com.redhat.devtools.lsp4ij.console;
 
 import com.intellij.execution.impl.ConsoleViewImpl;
 import com.intellij.execution.impl.EditorHyperlinkSupport;
-import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.redhat.devtools.lsp4ij.console.actions.AutoFoldingAction;
-import com.redhat.devtools.lsp4ij.console.actions.ClearThisConsoleAction;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Extends {@link ConsoleViewImpl} to support custom LSP folding by using [Trace
  */
-public class LSPConsoleView extends ConsoleViewImpl {
+public class LSPConsoleView extends LSPConsoleViewBase {
 
     private final LanguageServerDefinition serverDefinition;
 
@@ -47,14 +43,9 @@ public class LSPConsoleView extends ConsoleViewImpl {
     }
 
     @Override
-    public AnAction @NotNull [] createConsoleActions() {
-        // Don't call super.createConsoleActions() to avoid having some action like previous occurrence that we don't need.
-        List<AnAction> consoleActions = new ArrayList<>();
+    protected void fillConsoleActions(List<AnAction> consoleActions) {
         consoleActions.add(new AutoFoldingAction(getEditor()));
-        consoleActions.add(new ScrollToTheEndToolbarAction(getEditor()));
-        consoleActions.add(ActionManager.getInstance().getAction("Print"));
-        consoleActions.add(new ClearThisConsoleAction(this));
-        return consoleActions.toArray(AnAction.EMPTY_ARRAY);
+        super.fillConsoleActions(consoleActions);
     }
 
     @Override
