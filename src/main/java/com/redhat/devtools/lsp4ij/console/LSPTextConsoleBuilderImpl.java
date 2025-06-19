@@ -25,14 +25,21 @@ import org.jetbrains.annotations.NotNull;
 public class LSPTextConsoleBuilderImpl extends TextConsoleBuilderImpl {
 
     private final LanguageServerDefinition serverDefinition;
+    private final boolean withFolding;
 
-    public LSPTextConsoleBuilderImpl(@NotNull LanguageServerDefinition serverDefinition, @NotNull Project project) {
+    public LSPTextConsoleBuilderImpl(boolean withFolding,
+                                     @NotNull LanguageServerDefinition serverDefinition,
+                                     @NotNull Project project) {
         super(project);
+        this.withFolding = withFolding;
         this.serverDefinition = serverDefinition;
     }
 
     @Override
     protected @NotNull ConsoleView createConsole() {
+        if (!withFolding) {
+            return new LSPConsoleViewBase(getProject(), getScope(), isViewer(), isUsePredefinedMessageFilter());
+        }
         return new LSPConsoleView(serverDefinition, getProject(), getScope(), isViewer(), isUsePredefinedMessageFilter());
     }
 }
