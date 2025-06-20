@@ -3,7 +3,7 @@
   "name": "TypeScript Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/typescript-language-server"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/typescript-language-server/node_modules"
   },
   "check": {
     "exec": {
@@ -25,8 +25,8 @@
         "configureServer": {
           "name": "Configure TypeScript Language Server command",
           "command": {
-            "windows": "${workingDir}/node_modules/.bin/typescript-language-server.cmd --stdio",
-            "default": "${workingDir}/node_modules/.bin/typescript-language-server --stdio"
+            "windows": "${workingDir}/.bin/typescript-language-server.cmd --stdio",
+            "default": "${workingDir}/.bin/typescript-language-server --stdio"
           },
           "update": true
         }

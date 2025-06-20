@@ -3,7 +3,7 @@
   "name": "Astro Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/astro-ls"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/astro-ls/node_modules"
   },
   "check": {
     "exec": {
@@ -25,8 +25,8 @@
         "configureServer": {
           "name": "Configure Astro Language Server command",
           "command": {
-            "windows": "${workingDir}/node_modules/.bin/astro-ls.cmd --stdio",
-            "default": "${workingDir}/node_modules/.bin/astro-ls --stdio"
+            "windows": "${workingDir}/.bin/astro-ls.cmd --stdio",
+            "default": "${workingDir}/.bin/astro-ls --stdio"
           },
           "update": true
         }
