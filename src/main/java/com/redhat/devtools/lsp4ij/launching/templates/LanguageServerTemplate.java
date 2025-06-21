@@ -10,8 +10,12 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.templates;
 
+import com.intellij.ide.plugins.PluginManagerCore;
+import com.intellij.openapi.extensions.PluginId;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
+
+import java.util.Set;
 
 /**
  * A language server template.
@@ -44,6 +48,8 @@ public class LanguageServerTemplate extends ServerTemplate {
     private String experimental;
     private String clientConfiguration;
 
+    private Set<String> disablePromotionFor;
+    private Boolean promotable;
 
     public String getDescription() {
         return description;
@@ -101,4 +107,45 @@ public class LanguageServerTemplate extends ServerTemplate {
         this.clientConfiguration = clientConfiguration;
     }
 
+    public void setDisablePromotionFor(Set<String> disablePromotionFor) {
+        this.disablePromotionFor = disablePromotionFor;
+    }
+
+    public Set<String> getDisablePromotionFor() {
+        return disablePromotionFor;
+    }
+
+    /**
+     * Determines whether this language server template is eligible for promotion.
+     * <p>
+     * Promotion is disabled if any of the plugins listed in {@code disablePromotionFor}
+     * are currently installed in the IDE. This prevents redundant or conflicting LSP suggestions
+     * when native IntelliJ plugins are present.
+     * </p>
+     *
+     * @return {@code true} if the template should be promoted; {@code false} otherwise.
+     */
+    public boolean isPromotable() {
+        if (disablePromotionFor == null || disablePromotionFor.isEmpty()) {
+            return true;
+        }
+        if (promotable == null) {
+            promotable = computePromotable();
+        }
+        return promotable;
+    }
+
+    private boolean computePromotable() {
+        for (var pluginId : disablePromotionFor) {
+            if (isPluginInstalled(pluginId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isPluginInstalled(String pluginIdString) {
+        PluginId pluginId = PluginId.getId(pluginIdString);
+        return PluginManagerCore.getPlugin(pluginId) != null;
+    }
 }
