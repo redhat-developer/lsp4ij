@@ -22,6 +22,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
@@ -45,8 +46,19 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
             Map<String, String> programArgsMap = gson.fromJson(programArgs, mapType);
             languageServerTemplate.setProgramArgs(programArgsMap);
         }
+
         boolean expandConfiguration = JSONUtils.getBoolean(jsonObject, EXPAND_CONFIGURATION_JSON_PROPERTY);
         languageServerTemplate.setExpandConfiguration(expandConfiguration);
+
+        var jsonDisablePromotionFor = JSONUtils.getJsonArray(jsonObject, DISABLE_PROMOTION_FOR);
+        if (jsonDisablePromotionFor != null) {
+            var disablePromotionFor =
+                    jsonDisablePromotionFor
+                    .asList()
+                            .stream().map(JsonElement::getAsString)
+                            .collect(Collectors.toSet());
+            languageServerTemplate.setDisablePromotionFor(disablePromotionFor);
+        }
     }
 
     @Override
