@@ -23,12 +23,16 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.launching.ui.NewLanguageServerDialog;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -66,17 +70,12 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
             return null;
         }
 
-        // File is already supported by an existing language server, don't show the LSP4IJ editor notification
-        if (LanguageServersRegistry.getInstance().isFileSupported(virtualFile, project)) {
-            return null;
-        }
-
         // Collect language server templates which match the file.
         List<LanguageServerTemplate> matchedTemplates = new ArrayList<>();
         Set<String> patterns = new HashSet<>();
         for (var template : LanguageServerTemplateManager.getInstance().getTemplates()) {
             String filePattern = template.getMatchedMapping(virtualFile, project);
-            if (filePattern != null) {
+            if (filePattern != null && template.isPromotable() && !isServerExists(template.getId())) {
                 matchedTemplates.add(template);
                 patterns.add(filePattern);
             }
@@ -91,13 +90,27 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
         return fileEditor -> buildPanel(String.join(", ", patterns), matchedTemplates, fileEditor, project);
     }
 
+    private boolean isServerExists(@Nullable String templateId) {
+        if (templateId == null) {
+            return false;
+        }
+        for(var serverDefinition : LanguageServersRegistry.getInstance().getServerDefinitions()) {
+            if (serverDefinition instanceof UserDefinedLanguageServerDefinition userDefinedLanguageServerDefinition) {
+                if (templateId.equals(userDefinedLanguageServerDefinition.getTemplateId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /**
      * Builds an editor notification panel suggesting installation of one or more
      * Language Server templates that match the current file type or pattern.
      *
      * @param filePattern      textual description of matched patterns (e.g., file extensions)
      * @param matchedTemplates list of {@link LanguageServerTemplate} matching the current file
-     * @param fileEditor the file editor
+     * @param fileEditor       the file editor
      * @param project          the current project
      * @return an {@link EditorNotificationPanel} to be displayed in the editor
      */
@@ -132,4 +145,5 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
 
         return panel;
     }
+
 }
