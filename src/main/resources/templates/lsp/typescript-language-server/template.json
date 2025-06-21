@@ -8,7 +8,10 @@
   "fileTypeMappings": [
     {
       "fileType": {
-        "name": "JavaScript"
+        "name": "JavaScript",
+        "patterns": [
+          "*.js"
+        ]
       },
       "languageId": "javascript"
     },

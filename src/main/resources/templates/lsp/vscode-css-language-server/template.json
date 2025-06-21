@@ -11,7 +11,10 @@
   "fileTypeMappings": [
     {
       "fileType": {
-        "name": "CSS"
+        "name": "CSS",
+        "patterns": [
+          "*.css"
+        ]
       },
       "languageId": "css"
     },
