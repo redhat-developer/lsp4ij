@@ -36,6 +36,7 @@ public class LanguageServerTemplate extends ServerTemplate {
     public static final String CLIENT_SETTINGS_FILE_NAME = "clientSettings.json";
     public static final String README_FILE_NAME = "README.md";
 
+    public static final String DISABLE_PROMOTION_FOR = "disablePromotionFor";
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
     public static final String EXPAND_CONFIGURATION_JSON_PROPERTY = "expandConfiguration";
 
