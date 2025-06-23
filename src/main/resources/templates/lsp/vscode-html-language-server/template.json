@@ -1,6 +1,7 @@
 {
   "id": "vscode-html-language-server",
   "name": "HTML Language Server",
+  "dev": true,
   "url": null,
   "programArgs": {
     "windows": "node \"$USER_HOME$/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js\" --stdio",
