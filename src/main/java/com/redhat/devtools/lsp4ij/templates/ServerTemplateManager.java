@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.templates;
 
 import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -48,7 +49,9 @@ public abstract class ServerTemplateManager<T extends ServerTemplate> {
                     try {
                         T template = importServerTemplate(templateDir);
                         if (template != null) {
-                            templates.add(template);
+                            if (IntelliJPlatformUtils.isDevMode() || !template.isDev()) {
+                                templates.add(template);
+                            }
                         } else {
                             LOGGER.warn("No template found in {}", templateDir);
                         }

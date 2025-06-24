@@ -48,6 +48,7 @@ public abstract class ServerTemplate {
     // id, name, url
     public static final String ID_JSON_PROPERTY = "id";
     public static final String NAME_JSON_PROPERTY = "name";
+    public static final String DEV_JSON_PROPERTY = "dev";
     public static final String URL_JSON_PROPERTY = "url";
     public static final String DEFAULT_JSON_PROPERTY = "default";
 
@@ -69,6 +70,7 @@ public abstract class ServerTemplate {
 
     private String installerConfiguration;
     private List<ServerMapping> serverMappings;
+    private boolean dev;
 
     // ---------- Commons for id, name, command
 
@@ -86,6 +88,14 @@ public abstract class ServerTemplate {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public boolean isDev() {
+        return dev;
+    }
+
+    public void setDev(boolean dev) {
+        this.dev = dev;
     }
 
     public @Nullable String getUrl() {

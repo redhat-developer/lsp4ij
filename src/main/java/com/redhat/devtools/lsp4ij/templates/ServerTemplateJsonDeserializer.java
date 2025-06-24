@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.templates;
 
 import com.google.gson.*;
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -54,8 +55,10 @@ public abstract class ServerTemplateJsonDeserializer<T extends ServerTemplate>  
     private void fillServerIdentifier(@NotNull JsonObject jsonObject, @NotNull T serverTemplate) {
         var id = jsonObject.get(ID_JSON_PROPERTY);
         serverTemplate.setId(id != null ? id.getAsString() : null);
-        serverTemplate.setName(jsonObject.get(NAME_JSON_PROPERTY).getAsString());
+        var name = jsonObject.get(NAME_JSON_PROPERTY);
+        serverTemplate.setName(name != null ? name.getAsString() : null);
         serverTemplate.setUrl(getUrl(jsonObject, serverTemplate.getId()));
+        serverTemplate.setDev(JSONUtils.getBoolean(jsonObject, DEV_JSON_PROPERTY));
     }
 
     private void fillServerMappings(@NotNull JsonObject jsonObject, @NotNull T serverTemplate) {
