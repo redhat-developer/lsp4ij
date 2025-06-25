@@ -49,6 +49,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
 public final class LSPIJEditorUtils {
 
     private static final String TEXT_MATE_LANGUAGE_ID = "textmate";
+    private static final String PLAIN_TEXT_LANGUAGE_ID = "TEXT";
 
     private LSPIJEditorUtils() {
         // Pure utility class
@@ -103,6 +104,10 @@ public final class LSPIJEditorUtils {
     public static boolean isTextMateFile(@NotNull PsiFile file) {
         // Compare language IDs to avoid a static reference to anything in the TextMate Bundles plugin
         return TEXT_MATE_LANGUAGE_ID.equals(file.getLanguage().getID());
+    }
+
+    public static boolean isPlainTextFile(@NotNull PsiFile file) {
+        return PLAIN_TEXT_LANGUAGE_ID.equals(file.getLanguage().getID());
     }
 
     /**
