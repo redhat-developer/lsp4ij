@@ -2,10 +2,7 @@
   "id": "vscode-css-language-server",
   "name": "CSS Language Server",
   "programArgs": {
-    "windows": "node \"$USER_HOME$/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js\" --stdio",
-    "mac": "sh -c \"node '/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\"",
-    "unix": "sh -c \"node '/usr/share/code/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\"",
-    "default": "sh -c \"node 'resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js' --stdio\""
+    "default": "node $USER_HOME$/.lsp4ij/lsp/vscode-css-language-server/node_modules/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js --stdio"
   },
   "expandConfiguration": true,
   "fileTypeMappings": [
