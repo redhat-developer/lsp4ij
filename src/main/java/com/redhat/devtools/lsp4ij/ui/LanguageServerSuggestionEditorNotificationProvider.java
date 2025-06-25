@@ -14,10 +14,13 @@ import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.intellij.ui.EditorNotificationPanel;
 import com.intellij.ui.EditorNotificationProvider;
 import com.intellij.ui.EditorNotifications;
 import com.intellij.util.ui.UIUtil;
+import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
@@ -67,6 +70,13 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
 
         // Do not show notification if user dismissed it
         if (PropertiesComponent.getInstance().isTrueValue(DISABLE_KEY)) {
+            return null;
+        }
+
+        // If the registered file type for the given file is not AbstractFileType, PlainTextFileType, or TextMateFileType,
+        // LSP4IJ should assume that the file is already handled in a first-class manner and the user should not be prompted.
+        PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
+        if (file == null || !(LSPIJEditorUtils.isPlainTextFile(file) || LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file))) {
             return null;
         }
 
