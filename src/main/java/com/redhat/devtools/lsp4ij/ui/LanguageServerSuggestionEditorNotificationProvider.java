@@ -140,7 +140,7 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
                 dialog.show();
                 // Refresh notifications to hide it
                 EditorNotifications.getInstance(project)
-                        .updateNotifications(fileEditor.getFile());
+                        .updateAllNotifications();
             });
         });
 
