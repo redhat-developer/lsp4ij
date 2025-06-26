@@ -1,0 +1,18 @@
+{
+  "id": "jq-lsp",
+  "name": "JQ Language Server",
+  "programArgs": {
+    "default": "jq-lsp"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "JQ",
+        "patterns": [
+          "*.jq"
+        ]
+      },
+      "languageId": "jq"
+    }
+  ]
+}

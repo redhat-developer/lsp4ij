@@ -1,6 +1,6 @@
 {
-  "id": "gopls",
-  "name": "Install and verify Go Language Server",
+  "id": "jq-lsp",
+  "name": "JQ Language Server",
   "executeOnStartServer": false,
   "check": {
     "exec": {
@@ -36,13 +36,13 @@
   },
   "run": {
     "exec": {
-      "name": "Install Go Language Server Globally",
-      "command": "go install golang.org/x/tools/gopls@latest"
+      "name": "Install JQ Language Server Globally",
+      "command": "go install github.com/wader/jq-lsp@latest"
     },
     "onSuccess": {
       "configureServer": {
-        "name": "Configure Go Language Server command",
-        "command": "gopls -mode=stdio",
+        "name": "Configure JQ Language Server command",
+        "command": "jq-lsp -mode=stdio",
         "update": true
       }
     }
