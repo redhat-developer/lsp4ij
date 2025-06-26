@@ -163,6 +163,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
 * [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md)
 * [Svelte Language Server](./user-defined-ls/svelte-language-server.md) 
+* [Terraform Language Server](./user-defined-ls/terraform-ls.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 * [Vue Language Server](./user-defined-ls/vue-js-language-server.md)
 

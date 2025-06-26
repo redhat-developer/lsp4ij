@@ -1,0 +1,51 @@
+{
+  "id": "terraform-ls",
+  "name": "Terraform Language Server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download Terraform Language Server",
+      "url": {
+        "windows": {
+          "386": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_windows_386.zip",
+          "amd64": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_windows_amd64.zip",
+          "arm64": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_windows_arm64.zip"
+        },
+        "unix": {
+          "386": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_linux_386.zip",
+          "amd64": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_linux_amd64.zip",
+          "arm": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_linux_arm.zip",
+          "arm64": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_linux_arm64.zip"
+        },
+        "mac": {
+          "amd64": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_darwin_amd64.zip",
+          "arm64": "https://releases.hashicorp.com/terraform-ls/0.36.5/terraform-ls_0.36.5_darwin_arm64.zip"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/terraform-ls",
+        "file": {
+          "name": {
+            "windows": "terraform-ls.exe",
+            "default": "terraform-ls"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Terraform Language server command",
+          "command": "${output.dir}/${output.file.name} serve",
+          "update": true
+        }
+      }
+    }
+  }
+}
