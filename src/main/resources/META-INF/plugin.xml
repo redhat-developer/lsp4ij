@@ -5,6 +5,14 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.14.2</h3>
+    <ul>
+      <li>Fix bug to show the “Install Server” notification only for <code>TextMate</code> and <code>PlainText</code> files.</li>
+      <li>Add <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/user-defined-ls/jq-lsp.md">jq-lsp</a> user defined language server.</li>
+      <li>Add <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/user-defined-ls/terraform-ls.md">terraform-ls</a> user defined language server.</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/17?closed=1">changelog</a>.
+
     <h3>0.14.1</h3>
     <ul>
       <li>Show the “Install Server” notification only for <code>TextMate</code> and <code>PlainText</code> files.</li>
