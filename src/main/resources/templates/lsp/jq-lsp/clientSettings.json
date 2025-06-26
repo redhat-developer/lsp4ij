@@ -1,0 +1,6 @@
+{
+  "completion": {
+    "useContextAwareSorting": true,
+    "useTemplateForInvocationOnlySnippet": true
+  }
+}

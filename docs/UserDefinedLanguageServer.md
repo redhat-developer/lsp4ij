@@ -156,7 +156,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
 * [Erlang Language Server](./user-defined-ls/erlang-ls.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
-* [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
+* [JQ Language Server](./user-defined-ls/jq-lsp.md)
 * [Julia Language Server](./user-defined-ls/julia.md)
 * [Ruby LSP](./user-defined-ls/ruby-lsp.md)
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
