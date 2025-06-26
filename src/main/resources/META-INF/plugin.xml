@@ -5,6 +5,13 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.14.1</h3>
+    <ul>
+      <li>Show the “Install Server” notification only for <code>TextMate</code> and <code>PlainText</code> files.</li>
+      <li>Install language servers via <code>npm</code> in <code>node_modules</code>.</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/16?closed=1">changelog</a>.
+
     <h3>0.14.0</h3>
     <ul>
       <li>Support for declarative installers for Language Servers and Debug Adapters — <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#installer-descriptor">Learn more</a></li>
