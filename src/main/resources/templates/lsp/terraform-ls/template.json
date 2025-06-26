@@ -1,0 +1,75 @@
+{
+  "id": "terraform-ls",
+  "name": "Terraform Language Server",
+  "expandConfiguration": true,
+  "programArgs": {
+    "windows": "terraform-ls.exe serve",
+    "default": "terraform-ls serve"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Terraform",
+        "patterns": [
+          "*.tf"
+        ]
+      },
+      "languageId": "terraform"
+    },
+    {
+      "fileType": {
+        "name": "Terraform Vars",
+        "patterns": [
+          "*.tfvars"
+        ]
+      },
+      "languageId": "terraform-vars"
+    },
+    {
+      "fileType": {
+        "name": "Terraform Stack",
+        "patterns": [
+          "*.tfstack.hcl",
+          "*.tfcomponent.hcl"
+        ]
+      },
+      "languageId": "terraform-stack"
+    },
+    {
+      "fileType": {
+        "name": "Terraform Deploy",
+        "patterns": [
+          "*.tfdeploy.hcl"
+        ]
+      },
+      "languageId": "terraform-deploy"
+    },
+    {
+      "fileType": {
+        "name": "Terraform Version",
+        "patterns": [
+          "*.terraform-version"
+        ]
+      },
+      "languageId": "terraform-version"
+    },
+    {
+      "fileType": {
+        "name": "Terraform Test",
+        "patterns": [
+          "*.tftest.hcl"
+        ]
+      },
+      "languageId": "terraform-test"
+    },
+    {
+      "fileType": {
+        "name": "Terraform Mock",
+        "patterns": [
+          "*.tfmock.hcl"
+        ]
+      },
+      "languageId": "terraform-mock"
+    }
+  ]
+}
