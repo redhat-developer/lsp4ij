@@ -76,7 +76,7 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
         // If the registered file type for the given file is not AbstractFileType, PlainTextFileType, or TextMateFileType,
         // LSP4IJ should assume that the file is already handled in a first-class manner and the user should not be prompted.
         PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
-        if (file == null || !(LSPIJEditorUtils.isPlainTextFile(file) || LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file))) {
+        if (file == null || !(LSPIJEditorUtils.isPlainTextFile(file) || LSPIJEditorUtils.isAbstractFileTypeFile(file) || LSPIJEditorUtils.isTextMateFile(file))) {
             return null;
         }
 

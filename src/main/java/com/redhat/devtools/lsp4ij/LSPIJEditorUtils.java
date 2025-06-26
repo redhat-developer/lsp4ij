@@ -97,7 +97,7 @@ public final class LSPIJEditorUtils {
         return isSupportedAbstractFileTypeFile(file) || isSupportedTextMateFile(file);
     }
 
-    private static boolean isAbstractFileTypeFile(@NotNull PsiFile file) {
+    public static boolean isAbstractFileTypeFile(@NotNull PsiFile file) {
         return file.getFileType() instanceof AbstractFileType;
     }
 
