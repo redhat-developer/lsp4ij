@@ -263,7 +263,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     protected Object findSettings(@Nullable String section) {
         var config = createSettings();
         if (config instanceof JsonObject json) {
-            if (section == null) {
+            if (section == null || section.isEmpty()) {
                 return config;
             }
             return findSettings(section, json);
