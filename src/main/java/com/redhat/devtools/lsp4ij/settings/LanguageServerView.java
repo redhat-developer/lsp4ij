@@ -203,12 +203,6 @@ public class LanguageServerView implements Disposable {
         final ServerTrace serverTrace = projectSettings != null && projectSettings.getServerTrace() != null ? projectSettings.getServerTrace() : ServerTrace.off;
         this.setReportErrorKind(errorReportingKind);
         this.setServerTrace(serverTrace);
-        
-        // Load project-specific settings for all language servers
-        if (projectSettings != null) {
-            this.setDebugPort(projectSettings.getDebugPort());
-            this.setDebugSuspend(projectSettings.isDebugSuspend());
-        }
 
         GlobalLanguageServerSettings.LanguageServerDefinitionSettings globalSettings = GlobalLanguageServerSettings.getInstance()
                 .getLanguageServerSettings(languageServerId);
@@ -224,7 +218,6 @@ public class LanguageServerView implements Disposable {
             UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings userSettings = UserDefinedLanguageServerSettings.getInstance()
                     .getUserDefinedLanguageServerSettings(languageServerId);
             this.setServerUrl(getUrl(userDef));
-            
             // User defined language server
             if (userSettings != null) {
                 this.setCommandLine(userSettings.getCommandLine());
@@ -263,6 +256,10 @@ public class LanguageServerView implements Disposable {
             }
         } else {
             // Language server from extension point
+            if (projectSettings != null) {
+                this.setDebugPort(projectSettings.getDebugPort());
+                this.setDebugSuspend(projectSettings.isDebugSuspend());
+            }
             List<LanguageServerFileAssociation> mappings = LanguageServersRegistry.getInstance().findLanguageServerDefinitionFor(languageServerId);
             List<ServerMappingSettings> languageMappings = mappings
                     .stream()
@@ -496,7 +493,6 @@ public class LanguageServerView implements Disposable {
     public void setDebugSuspend(boolean debugSuspend) {
         languageServerPanel.getDebugSuspendCheckBox().setSelected(debugSuspend);
     }
-
 
     public ServerTrace getServerTrace() {
         return (ServerTrace) languageServerPanel.getServerTraceComboBox().getSelectedItem();
