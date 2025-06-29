@@ -412,7 +412,7 @@ public class LanguageServerWrapper implements Disposable {
                             }
                         });
 
-                        Launcher<LanguageServer> launcher = serverDefinition.createLauncherBuilder(false) //
+                        Launcher<LanguageServer> launcher = serverDefinition.createLauncherBuilder() //
                                 .setLocalService(languageClient)//
                                 .setRemoteInterface(serverDefinition.getServerInterface())//
                                 .setInput(lspStreamProvider.getInputStream())//

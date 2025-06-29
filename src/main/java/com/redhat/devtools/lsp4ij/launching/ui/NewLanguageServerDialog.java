@@ -29,7 +29,6 @@ import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
@@ -232,7 +231,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update experimental
         this.languageServerPanel.setExperimentalContent(template.getExperimental());
-
+        
         // Update client configuration
         this.languageServerPanel.setClientConfigurationContent(template.getClientConfiguration());
 
@@ -286,8 +285,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     protected void doOKAction() {
-        String serverId = UUID.randomUUID().toString();
+        super.doOKAction();
 
+        String serverId = UUID.randomUUID().toString();
         List<ServerMappingSettings> mappingSettings = this.languageServerPanel.getMappingsPanel().getAllMappings();
 
         // Register language server and mappings definition
@@ -320,33 +320,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 clientConfiguration,
                 installerConfiguration);
         definition.setUrl(this.languageServerPanel.getServerUrl());
-        // Save the server-specific settings (trace, debug, use integer IDs, etc.) BEFORE registering the server
-        // This ensures the settings are available immediately when the server is first accessed
-        saveServerSettings(serverId);
-
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
-
-        // Close the dialog after everything is saved
-        super.doOKAction();
-    }
-
-    /**
-     * Saves the server-specific settings (trace, debug, use integer IDs, etc.) from the UI to the project settings.
-     */
-    private void saveServerSettings(String serverId) {
-        // Save project-scope settings (trace, debug, use integer IDs)
-        var projectSettings = new ProjectLanguageServerSettings.LanguageServerDefinitionSettings();
-        projectSettings.setServerTrace(languageServerPanel.getServerTraceComboBox().getItem());
-        projectSettings.setErrorReportingKind(languageServerPanel.getErrorReportingKindCombo().getItem());
-        projectSettings.setDebugPort(String.valueOf(languageServerPanel.getDebugPortField().getNumber()));
-        projectSettings.setDebugSuspend(languageServerPanel.getDebugSuspendCheckBox().isSelected());
-
-
-        // Save the settings to the project
-        ProjectLanguageServerSettings
-            .getInstance(project)
-            .updateSettings(serverId, projectSettings, false);
-
     }
 
     private void addValidator(JTextComponent textComponent) {
