@@ -45,6 +45,7 @@ import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
+import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -371,10 +372,11 @@ public class LanguageServerWrapper implements Disposable {
 
                         // Get the useIntegerIds setting for this language server
                         boolean useIntegerIds = false;
-                        var settings = ProjectLanguageServerSettings.getInstance(initialProject)
-                                .getLanguageServerSettings(serverDefinition.getId());
-                        if (settings != null) {
-                            useIntegerIds = settings.isUseIntegerIds();
+                        if (serverDefinition instanceof ClientConfigurableLanguageServerDefinition clientConfigurableDefinition) {
+                            var clientConfiguration = clientConfigurableDefinition.getLanguageServerClientConfiguration();
+                            if (clientConfiguration != null) {
+                                useIntegerIds = clientConfiguration.jsonRpc.useIntegerIds;
+                            }
                         }
 
 
