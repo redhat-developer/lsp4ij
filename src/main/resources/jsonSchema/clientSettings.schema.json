@@ -230,6 +230,19 @@
           "default": false
         }
       }
+    },
+    "jsonRpc": {
+      "type": "object",
+      "title": "JSON-RPC communication configuration",
+      "additionalProperties": false,
+      "properties": {
+        "useIntegerIds": {
+          "type": "boolean",
+          "title": "Use integer IDs for JSON-RPC messages",
+          "description": "Whether or not to use integer IDs instead of string IDs for JSON-RPC messages.",
+          "default": false
+        }
+      }
     }
   }
 }

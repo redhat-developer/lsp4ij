@@ -422,6 +422,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             return this;
         }
 
+
     }
 
     public static class MyState {

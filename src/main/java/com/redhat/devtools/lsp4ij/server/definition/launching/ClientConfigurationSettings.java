@@ -197,6 +197,16 @@ public class ClientConfigurationSettings {
     }
 
     /**
+     * JSON-RPC communication settings.
+     */
+    public static class ClientConfigurationJsonRpcSettings {
+        /**
+         * Whether or not to use integer IDs instead of string IDs for JSON-RPC messages. Defaults to false.
+         */
+        public boolean useIntegerIds = false;
+    }
+
+    /**
      * Whether or not the language grammar is case-sensitive. Defaults to false.
      */
     public boolean caseSensitive = false;
@@ -255,4 +265,9 @@ public class ClientConfigurationSettings {
      * Client-side workspace symbol settings.
      */
     public @NotNull ClientConfigurationWorkspaceSymbolSettings workspaceSymbol = new ClientConfigurationWorkspaceSymbolSettings();
+
+    /**
+     * JSON-RPC communication settings.
+     */
+    public @NotNull ClientConfigurationJsonRpcSettings jsonRpc = new ClientConfigurationJsonRpcSettings();
 }
