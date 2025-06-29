@@ -1,0 +1,64 @@
+{
+  "id": "vscode-eslint-language-server",
+  "name": "ESLint Language Server",
+  "programArgs": {
+    "default": "node $USER_HOME$/.lsp4ij/lsp/vscode-eslint-language-server/node_modules/vscode-langservers-extracted/lib/eslint-language-server/eslintServer.js --stdio"
+  },
+ "expandConfiguration": false,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "ESLint ignore",
+        "patterns": [
+          ".eslintignore"
+        ]
+      },
+      "languageId": "ignore"
+    },
+    {
+      "fileType": {
+        "name": "ESLint Jsonc",
+        "patterns": [
+          "eslintrc.json"
+        ]
+      },
+      "languageId": "jsonc"
+    },
+    {
+      "fileType": {
+        "name": "JavaScript",
+        "patterns": [
+          "*.js"
+        ]
+      },
+      "languageId": "javascript"
+    },
+    {
+      "fileType": {
+        "name": "JavaScript-React",
+        "patterns": [
+          "*.jsx"
+        ]
+      },
+      "languageId": "javascriptreact"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript",
+        "patterns": [
+          "*.ts"
+        ]
+      },
+      "languageId": "typescript"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript-React",
+        "patterns": [
+          "*.tsx"
+        ]
+      },
+      "languageId": "typescriptreact"
+    }
+  ]
+}

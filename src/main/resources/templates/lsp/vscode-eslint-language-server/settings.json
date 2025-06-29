@@ -1,0 +1,31 @@
+{
+  "validate": "on",
+  "packageManager": "npm",
+  "useESLintClass": false,
+  "experimental": {
+    "useFlatConfig": false
+  },
+  "codeActionOnSave": {
+    "mode": "all"
+  },
+  "format": false,
+  "quiet": false,
+  "onIgnoredFiles": "off",
+  "options": {},
+  "rulesCustomizations": [],
+  "run": "onType",
+  "problems": {
+    "shortenToSingleLine": false
+  },
+  "nodePath": "",
+  "codeAction": {
+    "disableRuleComment": {
+      "enable": true,
+      "location": "separateLine",
+      "commentStyle": "line"
+    },
+    "showDocumentation": {
+      "enable": true
+    }
+  }
+}
