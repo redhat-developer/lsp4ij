@@ -167,7 +167,6 @@ public class LanguageServerView implements Disposable {
                     && StringUtils.isEmpty(this.getDebugPort())
                     && isEquals(this.getServerTrace(), ServerTrace.getDefaultValue())
                     && isEquals(this.getReportErrorKind(), ErrorReportingKind.getDefaultValue())
-                    && !this.isUseIntegerIds()
             );
         }
 
@@ -175,8 +174,7 @@ public class LanguageServerView implements Disposable {
         return (!(isEquals(this.getServerTrace(), settings.getServerTrace()) &&
                 isEquals(this.getReportErrorKind(), settings.getErrorReportingKind())
                 && isEquals(this.getDebugPort(), settings.getDebugPort())
-                && this.isDebugSuspend() == settings.isDebugSuspend()
-                && this.isUseIntegerIds() == settings.isUseIntegerIds()));
+                && this.isDebugSuspend() == settings.isDebugSuspend()));
     }
 
     private boolean isGlobalScopeModified(LanguageServerSettings.LanguageServerDefinitionSettings settings) {
@@ -210,7 +208,6 @@ public class LanguageServerView implements Disposable {
         if (projectSettings != null) {
             this.setDebugPort(projectSettings.getDebugPort());
             this.setDebugSuspend(projectSettings.isDebugSuspend());
-            this.setUseIntegerIds(projectSettings.isUseIntegerIds());
         }
 
         GlobalLanguageServerSettings.LanguageServerDefinitionSettings globalSettings = GlobalLanguageServerSettings.getInstance()
@@ -317,7 +314,6 @@ public class LanguageServerView implements Disposable {
         projectSettings.setErrorReportingKind(getReportErrorKind());
         projectSettings.setDebugPort(getDebugPort());
         projectSettings.setDebugSuspend(isDebugSuspend());
-        projectSettings.setUseIntegerIds(isUseIntegerIds());
 
         // Update contribute settings
         GlobalLanguageServerSettings.LanguageServerDefinitionSettings globalSettings = new GlobalLanguageServerSettings.LanguageServerDefinitionSettings();
@@ -501,13 +497,6 @@ public class LanguageServerView implements Disposable {
         languageServerPanel.getDebugSuspendCheckBox().setSelected(debugSuspend);
     }
 
-    public boolean isUseIntegerIds() {
-        return languageServerPanel.getUseIntegerIdsCheckBox().isSelected();
-    }
-
-    public void setUseIntegerIds(boolean useIntegerIds) {
-        languageServerPanel.getUseIntegerIdsCheckBox().setSelected(useIntegerIds);
-    }
 
     public ServerTrace getServerTrace() {
         return (ServerTrace) languageServerPanel.getServerTraceComboBox().getSelectedItem();

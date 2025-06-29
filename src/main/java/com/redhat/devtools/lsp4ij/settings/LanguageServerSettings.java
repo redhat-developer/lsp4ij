@@ -139,17 +139,13 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             if (serverTraceChanged) {
                 existingSettings.setServerTrace(newSettings.getServerTrace());
             }
-            boolean useIntegerIdsChanged = newSettings.isUseIntegerIds() != existingSettings.isUseIntegerIds();
-            if (useIntegerIdsChanged) {
-                existingSettings.setUseIntegerIds(newSettings.isUseIntegerIds());
-            }
 
             if (configurationContentChanged || expandConfigurationChanged || configurationSchemaContentChanged || experimentalContentChanged ||
-                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged || useIntegerIdsChanged){
+                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged){
                 // There are some changes, fire the changed event.
                 return handleChanged(languageServerId, existingSettings, notify,
                         configurationContentChanged, expandConfigurationChanged, configurationSchemaContentChanged, initializationOptionsContentChanged, experimentalContentChanged,
-                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged, useIntegerIdsChanged);
+                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged);
             }
         } else {
             // The settings don't exist
@@ -164,12 +160,11 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             boolean debugSuspendChanged = newSettings.isDebugSuspend();
             boolean errorReportingKindChanged = newSettings.getErrorReportingKind() != null && !(isEquals(ErrorReportingKind.getDefaultValue(), newSettings.getErrorReportingKind()));
             boolean serverTraceChanged = newSettings.getServerTrace() != null && !(isEquals(ServerTrace.getDefaultValue(), newSettings.getServerTrace()));
-            boolean useIntegerIdsChanged = newSettings.isUseIntegerIds();
             if  (configurationContentChanged || expandConfigurationChanged || configurationSchemaContentChanged || experimentalContentChanged ||
-                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged || useIntegerIdsChanged) {
+                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged) {
                 return handleChanged(languageServerId, newSettings, notify,
                         configurationContentChanged, expandConfigurationChanged, configurationSchemaContentChanged, initializationOptionsContentChanged, experimentalContentChanged,
-                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged, useIntegerIdsChanged);
+                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged);
             }
         }
         return null;
@@ -188,8 +183,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             boolean debugPortChanged,
             boolean debugSuspendChanged,
             boolean errorReportingKindChanged,
-            boolean serverTraceChanged,
-            boolean useIntegerIdsChanged) {
+            boolean serverTraceChanged) {
         if (listeners.isEmpty()) {
             return null;
         }
@@ -204,8 +198,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                 debugPortChanged,
                 debugSuspendChanged,
                 errorReportingKindChanged,
-                serverTraceChanged,
-                useIntegerIdsChanged);
+                serverTraceChanged);
         if (notify) {
             handleChanged(event);
         }
@@ -296,7 +289,6 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
         private boolean debugSuspend;
         private ServerTrace serverTrace;
         private ErrorReportingKind errorReportingKind;
-        private boolean useIntegerIds = false;
 
         public String getConfigurationContent() {
             return configurationContent;
@@ -430,14 +422,6 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             return this;
         }
 
-        public boolean isUseIntegerIds() {
-            return useIntegerIds;
-        }
-
-        public LanguageServerDefinitionSettings setUseIntegerIds(boolean useIntegerIds) {
-            this.useIntegerIds = useIntegerIds;
-            return this;
-        }
 
     }
 

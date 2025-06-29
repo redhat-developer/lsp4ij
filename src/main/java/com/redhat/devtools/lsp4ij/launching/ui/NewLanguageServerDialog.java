@@ -340,8 +340,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
         projectSettings.setErrorReportingKind(languageServerPanel.getErrorReportingKindCombo().getItem());
         projectSettings.setDebugPort(String.valueOf(languageServerPanel.getDebugPortField().getNumber()));
         projectSettings.setDebugSuspend(languageServerPanel.getDebugSuspendCheckBox().isSelected());
-        boolean useIntegerIds = languageServerPanel.getUseIntegerIdsCheckBox().isSelected();
-        projectSettings.setUseIntegerIds(useIntegerIds);
 
 
         // Save the settings to the project

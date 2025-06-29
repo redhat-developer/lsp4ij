@@ -31,8 +31,7 @@ public interface LanguageServerSettingsListener {
                                               boolean debugPortChanged,
                                               boolean debugSuspendChanged,
                                               boolean errorReportingKindChanged,
-                                              boolean serverTraceChanged,
-                                              boolean useIntegerIdsChanged) {
+                                              boolean serverTraceChanged) {
         }
 
     void handleChanged(@NotNull LanguageServerSettingsListener.LanguageServerSettingsChangedEvent event);
