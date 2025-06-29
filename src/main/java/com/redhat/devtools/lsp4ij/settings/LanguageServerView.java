@@ -167,6 +167,7 @@ public class LanguageServerView implements Disposable {
                     && StringUtils.isEmpty(this.getDebugPort())
                     && isEquals(this.getServerTrace(), ServerTrace.getDefaultValue())
                     && isEquals(this.getReportErrorKind(), ErrorReportingKind.getDefaultValue())
+                    && !this.isUseIntegerIds()
             );
         }
 
@@ -174,7 +175,8 @@ public class LanguageServerView implements Disposable {
         return (!(isEquals(this.getServerTrace(), settings.getServerTrace()) &&
                 isEquals(this.getReportErrorKind(), settings.getErrorReportingKind())
                 && isEquals(this.getDebugPort(), settings.getDebugPort())
-                && this.isDebugSuspend() == settings.isDebugSuspend()));
+                && this.isDebugSuspend() == settings.isDebugSuspend()
+                && this.isUseIntegerIds() == settings.isUseIntegerIds()));
     }
 
     private boolean isGlobalScopeModified(LanguageServerSettings.LanguageServerDefinitionSettings settings) {
@@ -203,6 +205,13 @@ public class LanguageServerView implements Disposable {
         final ServerTrace serverTrace = projectSettings != null && projectSettings.getServerTrace() != null ? projectSettings.getServerTrace() : ServerTrace.off;
         this.setReportErrorKind(errorReportingKind);
         this.setServerTrace(serverTrace);
+        
+        // Load project-specific settings for all language servers
+        if (projectSettings != null) {
+            this.setDebugPort(projectSettings.getDebugPort());
+            this.setDebugSuspend(projectSettings.isDebugSuspend());
+            this.setUseIntegerIds(projectSettings.isUseIntegerIds());
+        }
 
         GlobalLanguageServerSettings.LanguageServerDefinitionSettings globalSettings = GlobalLanguageServerSettings.getInstance()
                 .getLanguageServerSettings(languageServerId);
@@ -218,6 +227,7 @@ public class LanguageServerView implements Disposable {
             UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings userSettings = UserDefinedLanguageServerSettings.getInstance()
                     .getUserDefinedLanguageServerSettings(languageServerId);
             this.setServerUrl(getUrl(userDef));
+            
             // User defined language server
             if (userSettings != null) {
                 this.setCommandLine(userSettings.getCommandLine());
@@ -256,10 +266,6 @@ public class LanguageServerView implements Disposable {
             }
         } else {
             // Language server from extension point
-            if (projectSettings != null) {
-                this.setDebugPort(projectSettings.getDebugPort());
-                this.setDebugSuspend(projectSettings.isDebugSuspend());
-            }
             List<LanguageServerFileAssociation> mappings = LanguageServersRegistry.getInstance().findLanguageServerDefinitionFor(languageServerId);
             List<ServerMappingSettings> languageMappings = mappings
                     .stream()
@@ -311,6 +317,7 @@ public class LanguageServerView implements Disposable {
         projectSettings.setErrorReportingKind(getReportErrorKind());
         projectSettings.setDebugPort(getDebugPort());
         projectSettings.setDebugSuspend(isDebugSuspend());
+        projectSettings.setUseIntegerIds(isUseIntegerIds());
 
         // Update contribute settings
         GlobalLanguageServerSettings.LanguageServerDefinitionSettings globalSettings = new GlobalLanguageServerSettings.LanguageServerDefinitionSettings();
@@ -492,6 +499,14 @@ public class LanguageServerView implements Disposable {
 
     public void setDebugSuspend(boolean debugSuspend) {
         languageServerPanel.getDebugSuspendCheckBox().setSelected(debugSuspend);
+    }
+
+    public boolean isUseIntegerIds() {
+        return languageServerPanel.getUseIntegerIdsCheckBox().isSelected();
+    }
+
+    public void setUseIntegerIds(boolean useIntegerIds) {
+        languageServerPanel.getUseIntegerIdsCheckBox().setSelected(useIntegerIds);
     }
 
     public ServerTrace getServerTrace() {

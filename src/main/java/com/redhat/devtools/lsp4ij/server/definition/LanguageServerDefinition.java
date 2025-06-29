@@ -203,6 +203,10 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     }
 
     public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
+        return createLauncherBuilder(false);
+    }
+
+    public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder(boolean useIntegerIds) {
         return new Launcher.Builder<S>()
                 .configureGson(builder -> {
                     // Add a custom CodeLensOptionsAdapter to support old language server

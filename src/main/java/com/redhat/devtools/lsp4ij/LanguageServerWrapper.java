@@ -46,13 +46,16 @@ import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.jsonrpc.messages.IdentifiableMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -366,16 +369,31 @@ public class LanguageServerWrapper implements Disposable {
                             initParams.setRootPath(rootURI.getPath());
                         }
 
+                        // Get the useIntegerIds setting for this language server
+                        boolean useIntegerIds = false;
+                        var settings = ProjectLanguageServerSettings.getInstance(initialProject)
+                                .getLanguageServerSettings(serverDefinition.getId());
+                        if (settings != null) {
+                            useIntegerIds = settings.isUseIntegerIds();
+                        }
+
+
+                        final boolean finalUseIntegerIds = useIntegerIds;
                         UnaryOperator<MessageConsumer> wrapper = consumer -> (message -> {
                             if (isDisposed()) {
                                 return;
                             }
-                            logMessage(message, consumer);
+
+                            // Create a copy of the message with integer ID if enabled
+                            final Message processedMessage = createProcessedMessage(message, finalUseIntegerIds);
+
+
+                            logMessage(processedMessage, consumer);
                             try {
                                 // To avoid having some lock problem when message is written in the stream output
                                 // (when there are a lot of messages to write it)
                                 // we consume the message in async mode
-                                CompletableFuture.runAsync(() -> consumer.consume(message))
+                                CompletableFuture.runAsync(() -> consumer.consume(processedMessage))
                                         .exceptionally(e -> {
                                             // Log in the LSP console the error
                                             getLanguageServerLifecycleManager().onError(this, e);
@@ -388,10 +406,11 @@ public class LanguageServerWrapper implements Disposable {
                             }
                             final StreamConnectionProvider currentConnectionProvider = this.lspStreamProvider;
                             if (currentConnectionProvider != null && isActive()) {
-                                currentConnectionProvider.handleMessage(message, this.languageServer, rootURI);
+                                currentConnectionProvider.handleMessage(processedMessage, this.languageServer, rootURI);
                             }
                         });
-                        Launcher<LanguageServer> launcher = serverDefinition.createLauncherBuilder() //
+
+                        Launcher<LanguageServer> launcher = serverDefinition.createLauncherBuilder(false) //
                                 .setLocalService(languageClient)//
                                 .setRemoteInterface(serverDefinition.getServerInterface())//
                                 .setInput(lspStreamProvider.getInputStream())//
@@ -1466,7 +1485,7 @@ public class LanguageServerWrapper implements Disposable {
      *
      * @param context the context used to control or customize the installation.
      * @return a {@link CompletableFuture} that completes with the {@link ServerInstallationStatus}
-     *         once the installation process is done.
+     * once the installation process is done.
      */
     public @NotNull CompletableFuture<ServerInstallationStatus> install(@NotNull ServerInstallationContext context) {
         // Get the configured server installer, if any
@@ -1516,5 +1535,41 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
+    /**
+     * Creates a processed message with integer ID if useIntegerIds is enabled.
+     * Returns a copy of the message with converted ID, or the original message if no conversion is needed.
+     */
+    private Message createProcessedMessage(Message message, boolean useIntegerIds) {
+        if (!useIntegerIds || !(message instanceof IdentifiableMessage identifiableMessage)) {
+            return message;
+        }
+
+        String id = identifiableMessage.getId();
+        if (id == null) {
+            return message;
+        }
+
+        try {
+            int intId = Integer.parseInt(id);
+            // Create a new message with integer ID instead of modifying the original
+            if (message instanceof RequestMessage original) {
+                RequestMessage copy = new RequestMessage();
+                copy.setMethod(original.getMethod());
+                copy.setParams(original.getParams());
+                copy.setId(intId);
+                return copy;
+            } else if (message instanceof ResponseMessage original) {
+                ResponseMessage copy = new ResponseMessage();
+                copy.setResult(original.getResult());
+                copy.setError(original.getError());
+                copy.setId(intId);
+                return copy;
+            }
+        } catch (NumberFormatException e) {
+            // Keep original message if conversion fails
+        }
+
+        return message;
+    }
 
 }
