@@ -66,6 +66,7 @@ public class LanguageServerPanel implements Disposable {
     private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
+    private final JBCheckBox useIntegerIdsCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.use.integer.ids"));
     private final boolean canExecuteInstaller;
     private final JBCheckBox expandConfigurationCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.configuration.expand"));
     private HyperlinkLabel editJsonSchemaAction;
@@ -197,6 +198,9 @@ public class LanguageServerPanel implements Disposable {
             // Command line
             createCommandLineField(serverTab);
         }
+        
+        // Use Integer IDs
+        serverTab.addComponent(useIntegerIdsCheckBox);
     }
 
     private void createServerUrl(@NotNull FormBuilder serverTab) {
@@ -296,6 +300,7 @@ public class LanguageServerPanel implements Disposable {
                     .addLabeledComponent(LanguageServerBundle.message("language.server.debug.port"), debugPortField)
                     .addComponent(debugSuspendCheckBox);
         }
+
     }
 
     private void createErrorReportingCombo(@NotNull FormBuilder builder) {
@@ -509,6 +514,10 @@ public class LanguageServerPanel implements Disposable {
 
     public JBCheckBox getDebugSuspendCheckBox() {
         return debugSuspendCheckBox;
+    }
+
+    public JBCheckBox getUseIntegerIdsCheckBox() {
+        return useIntegerIdsCheckBox;
     }
 
     public PortField getDebugPortField() {
