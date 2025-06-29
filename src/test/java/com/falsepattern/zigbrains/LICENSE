@@ -1,0 +1,32 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Zigbrains is Copyright (C) 2023-2025 FalsePattern, All Rights Reserved
+ZigBrains is licensed under the LGPLv3 license.
+
+The generated zig parser, lexer, and the following classes:
+com.falsepattern.zigbrains.zig.ZigFileType
+com.falsepattern.zigbrains.zig.ZigLanguage
+com.falsepattern.zigbrains.zig.psi.ZigFile
+com.falsepattern.zigbrains.zig.parser.ZigElementType
+com.falsepattern.zigbrains.zig.parser.ZigParserDefinition
+com.falsepattern.zigbrains.zig.parser.ZigTokenSets
+com.falsepattern.zigbrains.zig.parser.ZigTokenType
+com.falsepattern.zigbrains.zig.lexer.ZigLexerAdapter
+
+have been dual-licensed under the EPL2.0 license for use in testing
+of the LSP4IJ plugin.
+This message, along with the attached signature, signed by
+FalsePattern's PGP key, shall serve as proof of this.
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAEBCgAdFiEE4S1HwWvKg24eRaEg6TDN7FDFDiMFAmerq5QACgkQ6TDN7FDF
+DiN7WAgAvWjmAwupQUup/B9m2vkGBdGXpu600XnWm3vGc8krwhcZXvTY33M9nNis
+t2sNbrugBiCqQtkvM3cPXcRaf765ahSBuzmVUfshyDC5HTpaAKSYavq2iT4CE4Xb
+4hPGJ6GT25n+BkTGwYr73leYEQYsWfL9uEGZL+bf1sMNRQAGUROmBCYCXYRvwQye
+/vSrvGymhHkDvwZMs+p5hzID1Z6Sc9LLQJyyViJf3lZresS1KbxPHz63ACjJaNu/
++SNNXS+zI05HrJoR01q9ma7BQPMn/elqPinapC3nHAbqYYBjqv8N+9oDQk+RjNdC
+PQAkfdgRJkfrGlTHX047mOSoC15VXw==
+=S7Yw
+-----END PGP SIGNATURE-----
