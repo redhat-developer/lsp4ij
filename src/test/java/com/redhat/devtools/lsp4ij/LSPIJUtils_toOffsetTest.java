@@ -74,6 +74,11 @@ public class LSPIJUtils_toOffsetTest extends BasePlatformTestCase {
         assertOffset("foo\nbar", 999999, 999999, 7, null);
     }
 
+    public void testIntegerMaxValueAsLineEnding() {
+        assertOffset("foo\nbar", 0, Integer.MAX_VALUE, 3, null);
+        assertOffset("foo\nbar", 1, Integer.MAX_VALUE, 7, null);
+    }
+    
     public void test_vscode_EmptyContent() {
         // See https://github.com/microsoft/vscode-languageserver-node/blob/8e625564b531da607859b8cb982abb7cdb2fbe2e/textDocument/src/test/textdocument.test.ts#L18
         String str = "";
