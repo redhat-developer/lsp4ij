@@ -148,6 +148,7 @@ pre-filled with server name, command, mappings and potential configuration.
 ![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
 * [Ada Language Server](./user-defined-ls/ada_language_server.md)
+* [Apache Camel Language Server](./user-defined-ls/camel-lsp-server.md)
 * [Astro Language Server](./user-defined-ls/astro-ls.md)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Clangd](./user-defined-ls/clangd.md) 
