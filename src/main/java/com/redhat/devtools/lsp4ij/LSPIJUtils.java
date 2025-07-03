@@ -658,6 +658,10 @@ public class LSPIJUtils {
         int lineOffset = document.getLineStartOffset(line);
         int nextLineOffset = document.getLineEndOffset(line);
         // If the character value is greater than the line length it defaults back to the line length
+        // Handle the common LSP pattern where Integer.MAX_VALUE indicates "end of line" as a special case.
+        if (character == Integer.MAX_VALUE) {
+            return nextLineOffset;
+        }
         return Math.max(Math.min(lineOffset + character, nextLineOffset), lineOffset);
     }
 
