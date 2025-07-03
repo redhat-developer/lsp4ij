@@ -1,7 +1,6 @@
 {
   "id": "camel-lsp-server",
   "name": "Camel Language Server",
-  "dev": true,
   "url": null,
   "programArgs": {
     "default": "java -jar camel-lsp-server-XXX.jar"
