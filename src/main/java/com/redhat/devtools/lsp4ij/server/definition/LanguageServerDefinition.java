@@ -241,16 +241,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         }
     }
 
-    public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
-        return new Launcher.Builder<S>()
-                .configureGson(builder -> {
-                    // Add a custom CodeLensOptionsAdapter to support old language server
-                    // which declares codeLenProvider with a boolean instead of Json object.
-                    builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
-                });
-    }
-
-    public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder(LSPClientFeatures clientFeatures) {
+    public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder(@NotNull LSPClientFeatures clientFeatures) {
 
         return new Launcher.Builder<S>() {
             @Override
