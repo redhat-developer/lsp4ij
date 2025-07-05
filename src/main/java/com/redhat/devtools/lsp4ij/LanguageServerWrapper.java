@@ -46,8 +46,8 @@ import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
@@ -370,7 +370,6 @@ public class LanguageServerWrapper implements Disposable {
                             if (isDisposed()) {
                                 return;
                             }
-
                             logMessage(message, consumer);
                             try {
                                 // To avoid having some lock problem when message is written in the stream output
@@ -392,7 +391,6 @@ public class LanguageServerWrapper implements Disposable {
                                 currentConnectionProvider.handleMessage(message, this.languageServer, rootURI);
                             }
                         });
-
                         Launcher<LanguageServer> launcher = serverDefinition.createLauncherBuilder(getClientFeatures()) //
                                 .setLocalService(languageClient)//
                                 .setRemoteInterface(serverDefinition.getServerInterface())//
@@ -1468,7 +1466,7 @@ public class LanguageServerWrapper implements Disposable {
      *
      * @param context the context used to control or customize the installation.
      * @return a {@link CompletableFuture} that completes with the {@link ServerInstallationStatus}
-     * once the installation process is done.
+     *         once the installation process is done.
      */
     public @NotNull CompletableFuture<ServerInstallationStatus> install(@NotNull ServerInstallationContext context) {
         // Get the configured server installer, if any
