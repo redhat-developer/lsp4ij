@@ -26,25 +26,35 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
-import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.internal.capabilities.CodeLensOptionsAdapter;
 import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.eclipse.lsp4j.CodeLensOptions;
+import org.eclipse.lsp4j.jsonrpc.Endpoint;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
+import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.Icon;
+import javax.swing.*;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 /**
  * Base class for Language server definition.
@@ -202,6 +212,35 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         return languageIdFileNameMatcherMappings;
     }
 
+    /**
+     * Custom RemoteEndpoint that uses integer IDs instead of string IDs for JSON-RPC messages.
+     */
+    private static class RemoteEndpointWithIdAsInt extends RemoteEndpoint {
+
+        private final AtomicInteger nextRequestId = new AtomicInteger();
+
+        public RemoteEndpointWithIdAsInt(MessageConsumer out,
+                                         Endpoint localEndpoint,
+                                         Function<Throwable, ResponseError> exceptionHandler) {
+            super(out, localEndpoint, exceptionHandler);
+        }
+
+        public RemoteEndpointWithIdAsInt(MessageConsumer out,
+                                         Endpoint localEndpoint) {
+            super(out, localEndpoint);
+        }
+
+        @Override
+        protected RequestMessage createRequestMessage(String method, Object parameter) {
+            RequestMessage requestMessage = new RequestMessage();
+            // Use int as JSON-RPC id instead of String (by default from LSP4J)
+            requestMessage.setId(nextRequestId.incrementAndGet());
+            requestMessage.setMethod(method);
+            requestMessage.setParams(parameter);
+            return requestMessage;
+        }
+    }
+
     public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
         return new Launcher.Builder<S>()
                 .configureGson(builder -> {
@@ -209,6 +248,37 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
                     // which declares codeLenProvider with a boolean instead of Json object.
                     builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
                 });
+    }
+
+    public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder(LSPClientFeatures clientFeatures) {
+
+        return new Launcher.Builder<S>() {
+            @Override
+            protected RemoteEndpoint createRemoteEndpoint(MessageJsonHandler jsonHandler) {
+
+                boolean useIntAsId = clientFeatures != null && clientFeatures.isUseIntAsJsonRpcId();
+                if (!useIntAsId) {
+                    // Use JSON-RPC as String (default behavior of LSP4J)
+                    return super.createRemoteEndpoint(jsonHandler);
+                }
+
+                // Override the remote endpoint to use JSON-RPC id as int
+                MessageConsumer outgoingMessageStream = new StreamMessageConsumer(output, jsonHandler);
+                outgoingMessageStream = wrapMessageConsumer(outgoingMessageStream);
+                Endpoint localEndpoint = ServiceEndpoints.toEndpoint(localServices);
+                RemoteEndpoint remoteEndpoint;
+                if (exceptionHandler == null)
+                    remoteEndpoint = new RemoteEndpointWithIdAsInt(outgoingMessageStream, localEndpoint);
+                else
+                    remoteEndpoint = new RemoteEndpointWithIdAsInt(outgoingMessageStream, localEndpoint, exceptionHandler);
+                jsonHandler.setMethodProvider(remoteEndpoint);
+                return remoteEndpoint;
+            }
+        }.configureGson(builder -> {
+            // Add a custom CodeLensOptionsAdapter to support old language server
+            // which declares codeLenProvider with a boolean instead of Json object.
+            builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
+        });
     }
 
     public boolean supportsCurrentEditMode(@NotNull Project project) {
@@ -254,7 +324,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     /**
      * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
      *
-     * @param file the virtual file.
+     * @param file    the virtual file.
      * @param project the project.
      * @return the LSP language id.
      */
@@ -282,12 +352,13 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
                                 @NotNull String fileName) {
         return getLanguageId(language, fileType, fileName, false);
     }
+
     /**
      * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
      *
-     * @param language the language.
-     * @param fileType the file type.
-     * @param fileName the file name.
+     * @param language       the language.
+     * @param fileType       the file type.
+     * @param fileName       the file name.
      * @param nullIfNotFound returns null if not found.
      * @return the LSP language id.
      */
@@ -337,7 +408,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     @Nullable
     public String getLanguageId(@Nullable Language language) {
         while (language != null) {
-            String languageId =  languageIdLanguageMappings.get(language);
+            String languageId = languageIdLanguageMappings.get(language);
             if (languageId != null) {
                 return languageId;
             }
@@ -357,6 +428,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         }
         return languageIdFileTypeMappings.get(fileType);
     }
+
     /**
      * @return The language ID that this wrapper is dealing with if defined in the
      * file type mapping for the language server
@@ -396,7 +468,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     /**
      * Returns true if the server definition has an installer and false otherwise.
      *
-     * @return  true if the server definition has an installer and false otherwise.
+     * @return true if the server definition has an installer and false otherwise.
      */
     public boolean hasInstaller() {
         if (getServerInstaller() != null) {
@@ -414,8 +486,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     synchronized boolean hasInstallerSync() {
         try {
             return createClientFeatures().getServerInstaller() != null;
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
             // Ignore error
             return false;
         }
