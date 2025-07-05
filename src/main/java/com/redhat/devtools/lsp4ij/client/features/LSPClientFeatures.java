@@ -302,6 +302,15 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     }
 
     /**
+     * Returns true if the JSON-RPC id should be sent as integer instead of string and false otherwise.
+     *
+     * @return true if the JSON-RPC id should be sent as integer instead of string and false otherwise.
+     */
+    public boolean isUseIntAsJsonRpcId() {
+        return false;
+    }
+
+    /**
      * Returns true if the user can stop the language server in LSP console from the context menu and false otherwise.
      * <p>
      * By default, user can stop the server.

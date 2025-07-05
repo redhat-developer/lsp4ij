@@ -71,6 +71,12 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         return clientConfiguration != null ? clientConfiguration.statementTerminatorCharacters : super.getStatementTerminatorCharacters(file);
     }
 
+    @Override
+    public boolean isUseIntAsJsonRpcId() {
+        ClientConfigurationSettings clientConfiguration = getClientConfigurationSettings();
+        return clientConfiguration != null ? clientConfiguration.jsonRpc.useIntegerIds : super.isUseIntAsJsonRpcId();
+    }
+
     public @Nullable ClientConfigurationSettings getClientConfigurationSettings() {
         ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getServerDefinition();
         return serverDefinition.getLanguageServerClientConfiguration();
