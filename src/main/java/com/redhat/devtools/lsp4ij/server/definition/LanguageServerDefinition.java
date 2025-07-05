@@ -47,7 +47,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
+import javax.swing.Icon;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -315,7 +315,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     /**
      * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
      *
-     * @param file    the virtual file.
+     * @param file the virtual file.
      * @param project the project.
      * @return the LSP language id.
      */
@@ -343,13 +343,12 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
                                 @NotNull String fileName) {
         return getLanguageId(language, fileType, fileName, false);
     }
-
     /**
      * Returns the LSP language id defined in mapping otherwise the {@link Language#getID()} otherwise the {@link FileType#getName()} otherwise 'unknown'.
      *
-     * @param language       the language.
-     * @param fileType       the file type.
-     * @param fileName       the file name.
+     * @param language the language.
+     * @param fileType the file type.
+     * @param fileName the file name.
      * @param nullIfNotFound returns null if not found.
      * @return the LSP language id.
      */
@@ -399,7 +398,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     @Nullable
     public String getLanguageId(@Nullable Language language) {
         while (language != null) {
-            String languageId = languageIdLanguageMappings.get(language);
+            String languageId =  languageIdLanguageMappings.get(language);
             if (languageId != null) {
                 return languageId;
             }
@@ -419,7 +418,6 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         }
         return languageIdFileTypeMappings.get(fileType);
     }
-
     /**
      * @return The language ID that this wrapper is dealing with if defined in the
      * file type mapping for the language server
@@ -459,7 +457,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     /**
      * Returns true if the server definition has an installer and false otherwise.
      *
-     * @return true if the server definition has an installer and false otherwise.
+     * @return  true if the server definition has an installer and false otherwise.
      */
     public boolean hasInstaller() {
         if (getServerInstaller() != null) {
@@ -477,7 +475,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     synchronized boolean hasInstallerSync() {
         try {
             return createClientFeatures().getServerInstaller() != null;
-        } catch (Throwable e) {
+        }
+        catch(Throwable e) {
             // Ignore error
             return false;
         }

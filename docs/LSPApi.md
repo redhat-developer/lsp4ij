@@ -29,6 +29,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
 - [LSP breadcrumbs feature](#lsp-breadcrumbs-feature)
 - [LSP editor behavior feature](#lsp-editor-behavior-feature)
+- [JSON-RPC communication feature](#json-rpc-communication-feature)
 - [Language server installer](#language-server-installer)
 
 You can extend these default features by:
@@ -775,6 +776,16 @@ Unlike most features above, `LSPEditorFeature` does **not** correspond to an LSP
 | boolean isEnableTextMateNestedBracesImprovements(PsiFile file) | Returns `true` if editor improvements for nested braces/brackets/parentheses in TextMate files are enabled and `false` otherwise. | `true` for user-defined language server definitions; otherwise `false`                               |
 | boolean isEnableSemanticTokensFileViewProvider(PsiFile file)   | Returns `true` if the semantic tokens-based file view provider is enabled and `false` otherwise.                                  | `true`, but a file view provider must be registered for non-user-defined language server definitions |
 =======
+
+## JSON-RPC communication feature
+
+You can customize JSON-RPC communication behavior by overriding the `isUseIntAsJsonRpcId()` method:
+
+| Method signature              | Description                                                                                      | Default value |
+|-------------------------------|--------------------------------------------------------------------------------------------------|---------------|
+| boolean isUseIntAsJsonRpcId() | Returns `true` if JSON-RPC id should be sent as integer instead of string and `false` otherwise. | `false`       |
+
+This feature is useful when working with language servers that require integer IDs for JSON-RPC messages instead of the default string IDs used by LSP4J.
 
 ## Language server installer
 

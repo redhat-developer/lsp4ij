@@ -197,7 +197,6 @@ public class LanguageServerPanel implements Disposable {
             // Command line
             createCommandLineField(serverTab);
         }
-        
     }
 
     private void createServerUrl(@NotNull FormBuilder serverTab) {
@@ -297,7 +296,6 @@ public class LanguageServerPanel implements Disposable {
                     .addLabeledComponent(LanguageServerBundle.message("language.server.debug.port"), debugPortField)
                     .addComponent(debugSuspendCheckBox);
         }
-
     }
 
     private void createErrorReportingCombo(@NotNull FormBuilder builder) {
@@ -512,7 +510,6 @@ public class LanguageServerPanel implements Disposable {
     public JBCheckBox getDebugSuspendCheckBox() {
         return debugSuspendCheckBox;
     }
-
 
     public PortField getDebugPortField() {
         return debugPortField;
