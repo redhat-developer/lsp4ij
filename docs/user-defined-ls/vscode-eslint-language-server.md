@@ -13,15 +13,15 @@ To enable [ESLint](https://eslint.org/) language support in your IDE, you can in
 
    ![Open file](../images/user-defined-ls/vscode-eslint-language-server/open_file.png)
 
-3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `Ada Language Server` pre-selected:
+3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `ESLint Language Server` pre-selected:
 
    ![New Language Server Dialog](../images/user-defined-ls/vscode-eslint-language-server/new_language_server_dialog.png)
 
-4. Click **OK**. This will create the `Ada Language Server` definition and start the installation:
+4. Click **OK**. This will create the `ESLint Language Server` definition and start the installation:
 
    ![Installing Language Server](../images/user-defined-ls/vscode-eslint-language-server/language_server_installing.png)
 
-5. Once the installation completes, the server should start automatically and provide Ada language support (autocomplete, diagnostics, etc.).
+5. Once the installation completes, the server should start automatically and provide ESLint language support (autocomplete, diagnostics, etc.).
 
 ## Step 2: Configure ESLint
 

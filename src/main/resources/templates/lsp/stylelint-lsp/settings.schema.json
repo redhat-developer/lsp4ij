@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/stylelint-lsp/settings.schema.json",
+  "title": "LSP4IJ StyleLint language server settings JSON schema",
+  "description": "JSON schema for StyleLint language server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "autoFixOnFormat": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically apply fixes in response to format requests."
+    },
+    "autoFixOnSave": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically apply fixes on save."
+    },
+    "config": {
+      "type": "object",
+      "default": null,
+      "description": "Stylelint config to use."
+    },
+    "configFile": {
+      "type": "string",
+      "default": null,
+      "description": "Path to stylelint config file."
+    },
+    "enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "If false, disable linting and auto-formatting."
+    },
+    "validateOnSave": {
+      "type": "boolean",
+      "default": false,
+      "description": "Lint on save."
+    },
+    "validateOnType": {
+      "type": "boolean",
+      "default": true,
+      "description": "Lint after changes."
+    }
+  }
+}
