@@ -1,0 +1,7 @@
+{
+  "autoFixOnFormat": false,
+  "autoFixOnSave": false,
+  "enable": true,
+  "validateOnSave": false,
+  "validateOnType": true
+}

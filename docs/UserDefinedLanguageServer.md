@@ -164,6 +164,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
 * [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md)
+* [StyleLint-LSP](./user-defined-ls/stylelint-lsp.md)
 * [Svelte Language Server](./user-defined-ls/svelte-language-server.md) 
 * [Terraform Language Server](./user-defined-ls/terraform-ls.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
