@@ -25,8 +25,8 @@
         "configureServer": {
           "name": "Configure StyleLint Language Server command",
           "command": {
-            "windows": "npx.cmd stylelint-lsp --stdio",
-            "default": "npx stylelint-lsp --stdio"
+            "windows": "${workingDir}/.bin/stylelint-lsp.cmd --stdio",
+            "default": "${workingDir}/.bin/stylelint-lsp --stdio"
           },
           "update": true
         }

@@ -2,8 +2,8 @@
   "id": "stylelint-lsp",
   "name": "StyleLint Language Server",
   "programArgs": {
-    "windows": "npx.cmd stylelint-lsp --stdio",
-    "default": "npx stylelint-lsp --stdio"
+    "windows": "cmd /C stylelint-lsp.cmd --stdio",
+    "default": "sh -c stylelint-lsp --stdio"
   },
  "expandConfiguration": false,
   "fileTypeMappings": [
