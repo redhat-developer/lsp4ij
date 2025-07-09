@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "LSP4IJ/stylelint-lsp/settings.schema.json",
-  "title": "LSP4IJ StyleLint language server settings JSON schema",
-  "description": "JSON schema for StyleLint language server settings.",
+  "title": "LSP4IJ Stylelint language server settings JSON schema",
+  "description": "JSON schema for Stylelint language server settings.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

@@ -1,6 +1,6 @@
 {
   "id": "stylelint-lsp",
-  "name": "StyleLint Language Server",
+  "name": "Stylelint Language Server",
   "programArgs": {
     "windows": "cmd /C stylelint-lsp.cmd --stdio",
     "default": "sh -c stylelint-lsp --stdio"

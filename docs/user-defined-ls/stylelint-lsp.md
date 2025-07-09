@@ -1,25 +1,25 @@
-# StyleLint Language Server
+# Stylelint Language Server
 
-To enable [StyleLint](https://stylelint.io/) language support in your IDE, you can integrate the [StyleLint-LSP](https://github.com/bmatcuk/stylelint-lsp) by following these steps:
+To enable [Stylelint](https://stylelint.io/) language support in your IDE, you can integrate the [Stylelint-LSP](https://github.com/bmatcuk/stylelint-lsp) by following these steps:
 
 ## Step 1: Install the Language Server
 
 1. Open a `.css` file in your project.
-2. Click on **Install StyleLint Language Server**:
+2. Click on **Install Stylelint Language Server**:
 
    ![Open file](../images/user-defined-ls/stylelint-lsp/open_file.png)
 
-3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `StyleLint Language Server` pre-selected:
+3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `Stylelint Language Server` pre-selected:
 
    ![New Language Server Dialog](../images/user-defined-ls/stylelint-lsp/new_language_server_dialog.png)
 
-4. Click **OK**. This will create the `StyleLint Language Server` definition and start the installation:
+4. Click **OK**. This will create the `Stylelint Language Server` definition and start the installation:
 
    ![Installing Language Server](../images/user-defined-ls/stylelint-lsp/language_server_installing.png)
 
-5. Once the installation completes, the server should start automatically and provide StyleLint language diagnostics directly within the IDE.
+5. Once the installation completes, the server should start automatically and provide Stylelint language diagnostics directly within the IDE.
 
-## Step 2: Configure StyleLint
+## Step 2: Configure Stylelint
 
 * If necessary, execute `npm install stylelint` in your project root.
 * Create a [configuration file](https://stylelint.io/user-guide/configure).
