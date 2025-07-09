@@ -1,6 +1,6 @@
 {
   "id": "stylelint-lsp",
-  "name": "StyleLint Language Server",
+  "name": "Stylelint Language Server",
   "executeOnStartServer": false,
   "properties": {
     "workingDir" : "$USER_HOME$/.lsp4ij/lsp/stylelint-lsp/node_modules"
@@ -14,7 +14,7 @@
   },
   "run": {
     "exec": {
-      "name": "Install StyleLint Language Server",
+      "name": "Install Stylelint Language Server",
       "workingDir": "${workingDir}",
       "ignoreStderr": true,
       "command": {
@@ -23,7 +23,7 @@
       },
       "onSuccess": {
         "configureServer": {
-          "name": "Configure StyleLint Language Server command",
+          "name": "Configure Stylelint Language Server command",
           "command": {
             "windows": "${workingDir}/.bin/stylelint-lsp.cmd --stdio",
             "default": "${workingDir}/.bin/stylelint-lsp --stdio"
