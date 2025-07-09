@@ -247,7 +247,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
             @Override
             protected RemoteEndpoint createRemoteEndpoint(MessageJsonHandler jsonHandler) {
 
-                boolean useIntAsId = clientFeatures != null && clientFeatures.isUseIntAsJsonRpcId();
+                boolean useIntAsId = clientFeatures.isUseIntAsJsonRpcId();
                 if (!useIntAsId) {
                     // Use JSON-RPC as String (default behavior of LSP4J)
                     return super.createRemoteEndpoint(jsonHandler);
