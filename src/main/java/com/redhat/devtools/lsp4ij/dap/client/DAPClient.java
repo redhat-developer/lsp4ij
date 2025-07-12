@@ -67,6 +67,7 @@ import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
  */
 public class DAPClient implements IDebugProtocolClient, Disposable {
 
+    public static final org.eclipse.lsp4j.debug.Thread[] EMPTY_THREADS = new org.eclipse.lsp4j.debug.Thread[0];
     /**
      * Any events we receive from the adapter that require further contact with the
      * adapter needs to be farmed off to another thread as the events arrive at the
@@ -328,10 +329,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (threadId == null) {
             return;
         }
-        server
-                .threads()
-                .thenAcceptAsync(threadsResponse -> {
-                    var threadResult = Arrays.stream(threadsResponse.getThreads())
+        getThreads(true)
+                .thenAcceptAsync(threads -> {
+                    var threadResult = Arrays.stream(threads)
                             .filter(t -> threadId.equals(t.getId()))
                             .findFirst();
                     if (threadResult.isEmpty()) {
@@ -585,6 +585,33 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         args.setValue(value);
         args.setFormat(new ValueFormat());
         return debugProtocolServer.setVariable(args);
+    }
+
+    // Threads
+
+    @Override
+    public void thread(ThreadEventArguments args) {
+        debugProcess.refreshThread(args);
+    }
+
+    public CompletableFuture<org.eclipse.lsp4j.debug.Thread[]> getThreads(boolean refreshThreads) {
+        if (debugProtocolServer == null) {
+            return CompletableFuture.completedFuture(EMPTY_THREADS);
+        }
+        var result= debugProtocolServer
+                .threads()
+                .thenApply(response -> {
+                    if (response == null) {
+                        return EMPTY_THREADS;
+                    }
+                   return response.getThreads();
+                });
+        if (refreshThreads) {
+            result.thenAccept(threads -> {
+                debugProcess.refreshThreads(threads);
+            });
+        }
+        return result;
     }
 
     // Capabilities
