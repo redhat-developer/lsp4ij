@@ -36,16 +36,20 @@ import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
+import org.eclipse.lsp4j.debug.Thread;
+import org.eclipse.lsp4j.debug.ThreadEventArguments;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -84,6 +88,8 @@ public class DAPDebugProcess extends XDebugProcess {
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
 
+    private final ThreadsPanel threadsPanel;
+
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
                            @NotNull ExecutionResult executionResult,
@@ -95,6 +101,7 @@ public class DAPDebugProcess extends XDebugProcess {
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
         this.serverDescriptor = dapState.getServerDescriptor();
         this.breakpointHandler = new DAPBreakpointHandler(session, serverDescriptor, project);
+        this.threadsPanel = new ThreadsPanel(this);
         this.status = Status.NONE;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
@@ -147,6 +154,10 @@ public class DAPDebugProcess extends XDebugProcess {
                         // Wait for DAP client is connecting to the DAP server...
                         CompletableFutures.waitUntilDone(connectToServerFuture);
                         DAPDebugProcess.this.status = Status.STARTED;
+
+                        // Refresh Threads panel
+                        parentClient
+                                .getThreads(true);
                     }
                 } catch (ProcessCanceledException e) {
                     // Ignore error
@@ -393,6 +404,9 @@ public class DAPDebugProcess extends XDebugProcess {
                 // Register "Exception Breakpoints" panel
                 registerBreakpointsPanel(ui);
 
+                // Register "Threads" panel
+                registerThreadsPanel(ui);
+
                 // Register the "Installer" tab
                 String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
                 var project = DAPDebugProcess.this.getSession().getProject();
@@ -402,9 +416,16 @@ public class DAPDebugProcess extends XDebugProcess {
             private void registerBreakpointsPanel(@NotNull RunnerLayoutUi ui) {
                 var breakpointsPanel = breakpointHandler.getExceptionBreakpointsPanel();
                 final Content breakpointsContent = ui.createContent(
-                        "dap-breakpoints-panel", breakpointsPanel, "Exception Breakpoints",  null, breakpointsPanel.getDefaultFocusedComponent());
+                        DAPExceptionBreakpointsPanel.ID, breakpointsPanel, DAPBundle.message("dap.panels.exception.breakpoints"),  null, breakpointsPanel.getDefaultFocusedComponent());
                 breakpointsContent.setCloseable(false);
                 ui.addContent(breakpointsContent, 0, PlaceInGrid.left, false);
+            }
+
+            private void registerThreadsPanel(@NotNull RunnerLayoutUi ui) {
+                final Content threadsContent = ui.createContent(
+                        "dap-threads-panel", threadsPanel, DAPBundle.message("dap.panels.threads"),  null, threadsPanel.getDefaultFocusedComponent());
+                threadsContent.setCloseable(false);
+                ui.addContent(threadsContent, 0, PlaceInGrid.left, false);
             }
 
 
@@ -434,4 +455,19 @@ public class DAPDebugProcess extends XDebugProcess {
         };
     }
 
+    public CompletableFuture<@Nullable Thread[]> getThreads() {
+        if (parentClient != null) {
+           return  parentClient
+                    .getThreads(false);
+        }
+        return CompletableFuture.completedFuture(null);
+    }
+
+    public void refreshThreads(Thread[] threads) {
+        threadsPanel.refreshThreads(threads);
+    }
+
+    public void refreshThread(ThreadEventArguments args) {
+        threadsPanel.refreshThread(args);
+    }
 }

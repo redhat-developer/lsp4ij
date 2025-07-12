@@ -57,7 +57,7 @@ public class DAPSuspendContext extends XSuspendContext  {
 
     @NotNull
     @Override
-    public XExecutionStack[] getExecutionStacks() {
+    public XExecutionStack @NotNull [] getExecutionStacks() {
         return myExecutionStacks.toArray(new DAPExecutionStack[0]);
     }
 
