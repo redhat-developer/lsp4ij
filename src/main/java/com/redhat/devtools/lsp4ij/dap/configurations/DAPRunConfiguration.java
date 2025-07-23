@@ -11,10 +11,12 @@
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.execution.Executor;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.execution.configurations.*;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.InvalidDataException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
@@ -25,8 +27,9 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DefaultDebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,6 +41,8 @@ import java.util.List;
 public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfigurationOptions> implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile {
 
     public static final String DEBUG_ADAPTER_CONFIGURATION = "Debug Adapter Configuration";
+
+    private @NotNull EnvironmentVariablesData envData = EnvironmentVariablesData.DEFAULT;
 
     protected DAPRunConfiguration(@NotNull Project project,
                                   @NotNull ConfigurationFactory factory,
@@ -85,6 +90,14 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setCommand(command);
     }
 
+    public @NotNull EnvironmentVariablesData getEnvData() {
+        return envData;
+    }
+
+    public void setEnvData(@NotNull EnvironmentVariablesData envData) {
+        this.envData = envData;
+    }
+
     /**
      * Retrieves the current strategy used to wait for the debug server.
      *
@@ -120,7 +133,6 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
     }
 
     /**
-     *
      * @return
      */
     public String getDebugServerReadyPattern() {
@@ -146,7 +158,7 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
     public void setAttachPort(String attachPort) {
         getOptions().setAttachPort(attachPort);
     }
-    
+
     public ServerTrace getServerTrace() {
         return getOptions().getServerTrace();
     }
@@ -187,7 +199,7 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
     public void setFile(@Nullable String file) {
         getOptions().setFile(file);
     }
-    
+
     public DebugMode getDebugMode() {
         return getOptions().getDebugMode();
     }
@@ -269,7 +281,7 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
      */
     public boolean canRun(@NotNull String executorId) {
         var serverFactory = getServerFactory();
-        return serverFactory != null ? serverFactory.canRun(executorId) : true;
+        return serverFactory == null || serverFactory.canRun(executorId);
     }
 
     @Override
@@ -323,4 +335,15 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         configuration.setServerTrace(getServerTrace());
     }
 
+    @Override
+    public void writeExternal(@NotNull Element element) {
+        super.writeExternal(element);
+        envData.writeExternal(element);
+    }
+
+    @Override
+    public void readExternal(@NotNull Element element) throws InvalidDataException {
+        super.readExternal(element);
+        envData = EnvironmentVariablesData.readExternal(element);
+    }
 }

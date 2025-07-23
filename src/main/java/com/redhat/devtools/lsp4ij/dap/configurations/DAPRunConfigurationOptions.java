@@ -25,8 +25,8 @@ import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryCon
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
@@ -259,7 +259,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     /**
      * Set the current strategy used to wait for the debug server.
      */
-    public void setDebugServerWaitStrategy(DebugServerWaitStrategy debugServerWaitStrategy) {
+    public void setDebugServerWaitStrategy(@NotNull DebugServerWaitStrategy debugServerWaitStrategy) {
         this.debugServerWaitStrategy.setValue(this, debugServerWaitStrategy.name());
     }
 
@@ -289,11 +289,11 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         this.debugServerReadyPattern.setValue(this, debugServerReadyPattern);
         this.networkAddressExtractor = null;
     }
-    
+
     public String getAttachAddress() {
         return attachAddress.getValue(this);
     }
-    
+
     public void setAttachAddress(String attachAddress) {
         this.attachAddress.setValue(this, attachAddress);
     }
@@ -305,7 +305,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     public void setAttachPort(String attachPort) {
         this.attachPort.setValue(this, attachPort);
     }
-    
+
     public ServerTrace getServerTrace() {
         return ServerTrace.get(serverTrace.getValue(this));
     }
@@ -323,7 +323,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     public void setInstallerConfiguration(String installerConfiguration) {
         this.installerConfiguration.setValue(this, installerConfiguration);
     }
-    
+
     public @Nullable NetworkAddressExtractor getNetworkAddressExtractor() {
         if (networkAddressExtractor != null) {
             return networkAddressExtractor;
@@ -379,4 +379,5 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         }
         return false;
     }
+
 }
