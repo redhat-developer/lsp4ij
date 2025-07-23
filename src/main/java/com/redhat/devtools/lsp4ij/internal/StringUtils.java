@@ -13,8 +13,8 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
-import java.io.InputStream;
-import java.util.Scanner;
+
+import org.jetbrains.annotations.Nullable;
 
 public class StringUtils {
 
@@ -24,8 +24,8 @@ public class StringUtils {
      * @param cs
      * @return
      */
-    public static boolean isEmpty(final CharSequence cs) {
-        return cs == null || cs.length() == 0;
+    public static boolean isEmpty(@Nullable final CharSequence cs) {
+        return cs == null || cs.isEmpty();
     }
 
     /**
@@ -33,7 +33,7 @@ public class StringUtils {
      * @param cs
      * @return
      */
-    public static boolean isNotBlank(final CharSequence cs) {
+    public static boolean isNotBlank(@Nullable final CharSequence cs) {
         return !isBlank(cs);
     }
 
@@ -42,7 +42,7 @@ public class StringUtils {
      * @param cs
      * @return
      */
-    public static boolean isBlank(final CharSequence cs) {
+    public static boolean isBlank(@Nullable final CharSequence cs) {
         final int strLen = length(cs);
         if (strLen == 0) {
             return true;
@@ -60,7 +60,7 @@ public class StringUtils {
      * @param cs
      * @return
      */
-    public static int length(final CharSequence cs) {
+    public static int length(@Nullable final CharSequence cs) {
         return cs == null ? 0 : cs.length();
     }
 
