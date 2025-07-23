@@ -172,8 +172,8 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         // Register language server and mappings definition
         String serverName = this.debugAdapterServerPanel.getServerName();
         String serverUrl = this.debugAdapterServerPanel.getServerUrl();
-        Map<String, String> userEnvironmentVariables = this.debugAdapterServerPanel.getEnvironmentVariables().getEnvs();
-        boolean includeSystemEnvironmentVariables = this.debugAdapterServerPanel.getEnvironmentVariables().isPassParentEnvs();
+        Map<String, String> userEnvironmentVariables = this.debugAdapterServerPanel.getEnvData().getEnvs();
+        boolean includeSystemEnvironmentVariables = this.debugAdapterServerPanel.getEnvData().isPassParentEnvs();
         String commandLine = this.debugAdapterServerPanel.getCommandLine();
         int connectTimeout = this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getConnectTimeout();
         String trackTrace = this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel().getTrace();

@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.settings.ui;
 
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
@@ -50,6 +51,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory.DEFAULT_ATTACH_CONFIGURATION_ARRAY;
@@ -77,7 +79,7 @@ public class DebugAdapterServerPanel implements Disposable {
     private @Nullable String serverUrl;
     private HyperlinkLabel serverUrlHyperlink;
     // Server / Launch settings
-    private EnvironmentVariablesComponent environmentVariables;
+    private @Nullable EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private DAPDebugServerWaitStrategyPanel debugServerWaitStrategyPanel;
     // Server trace
@@ -503,6 +505,7 @@ public class DebugAdapterServerPanel implements Disposable {
         // Update command
         String command = getCommandLine(serverDefinition);
         this.setCommandLine(command);
+        setEnvData(EnvironmentVariablesData.create(serverDefinition.getUserEnvironmentVariables(), serverDefinition.isIncludeSystemEnvironmentVariables()));
 
         // Update mappings
         mappingsPanel.refreshMappings(serverDefinition.getLanguageMappings(), serverDefinition.getFileTypeMappings());
@@ -583,7 +586,7 @@ public class DebugAdapterServerPanel implements Disposable {
         debugServerWaitStrategyPanel.update(debugServerWaitStrategy, waitForTimeout, debugServerReadyPattern);
     }
 
-    public EnvironmentVariablesComponent getEnvironmentVariables() {
+    private @Nullable EnvironmentVariablesComponent getEnvironmentVariables() {
         return environmentVariables;
     }
 
@@ -601,6 +604,19 @@ public class DebugAdapterServerPanel implements Disposable {
 
     public CommandLineWidget getCommandLineWidget() {
         return commandLine;
+    }
+
+    public void setEnvData(@Nullable EnvironmentVariablesData envData) {
+        if (environmentVariables != null) {
+            environmentVariables.setEnvData(envData != null ? envData : EnvironmentVariablesData.DEFAULT);
+        }
+    }
+
+    public @NotNull EnvironmentVariablesData getEnvData() {
+        if (environmentVariables != null) {
+            return environmentVariables.getEnvData();
+        }
+        return EnvironmentVariablesData.DEFAULT;
     }
 
     public DAPDebugServerWaitStrategyPanel getDebugServerWaitStrategyPanel() {

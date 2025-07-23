@@ -273,14 +273,12 @@ public class DebugAdapterServerView implements Disposable {
         return titledComponent;
     }
 
-    public void setEnvData(EnvironmentVariablesData envData) {
-        if (envData != null) {
-            debugAdapterServerPanel.getEnvironmentVariables().setEnvData(envData);
-        }
+    public void setEnvData(@Nullable EnvironmentVariablesData envData) {
+        debugAdapterServerPanel.setEnvData(envData);
     }
 
     public @NotNull EnvironmentVariablesData getEnvData() {
-        return debugAdapterServerPanel.getEnvironmentVariables().getEnvData();
+        return debugAdapterServerPanel.getEnvData();
     }
 
     public JComponent getComponent() {

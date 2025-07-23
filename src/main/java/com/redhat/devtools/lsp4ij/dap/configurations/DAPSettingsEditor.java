@@ -81,6 +81,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         dapPanel.setServerName(runConfiguration.getServerName());
         dapPanel.setServerUrl(runConfiguration.getServerUrl());
         dapPanel.setCommandLine(runConfiguration.getCommand());
+        dapPanel.setEnvData(runConfiguration.getEnvData());
         dapPanel.setServerTrace(runConfiguration.getServerTrace());
 
         // Mappings settings
@@ -115,6 +116,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         runConfiguration.setServerName(dapPanel.getServerName());
         runConfiguration.setServerUrl(dapPanel.getServerUrl());
         runConfiguration.setCommand(dapPanel.getCommandLine());
+        runConfiguration.setEnvData(dapPanel.getEnvData());
         runConfiguration.setDebugServerWaitStrategy(dapPanel.getDebugServerWaitStrategyPanel().getDebugServerWaitStrategy());
         runConfiguration.setConnectTimeout(dapPanel.getDebugServerWaitStrategyPanel().getConnectTimeout());
         runConfiguration.setDebugServerReadyPattern(dapPanel.getDebugServerWaitStrategyPanel().getTrace());
