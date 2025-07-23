@@ -546,14 +546,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         debugProtocolServer.stepIn(args);
     }
 
-    public CompletableFuture<EvaluateResponse> evaluate(String expression, int frameId) {
+    public CompletableFuture<EvaluateResponse> evaluate(@NotNull String expression,
+                                                        @Nullable Integer frameId,
+                                                        @NotNull String context) {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
         }
         EvaluateArguments args = new EvaluateArguments();
         args.setExpression(expression);
         args.setFrameId(frameId);
-        args.setContext(EvaluateArgumentsContext.WATCH);
+        args.setContext(context);
         return debugProtocolServer.evaluate(args);
     }
 

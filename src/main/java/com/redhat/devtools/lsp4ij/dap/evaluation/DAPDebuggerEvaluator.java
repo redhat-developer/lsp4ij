@@ -17,17 +17,24 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValue;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import org.eclipse.lsp4j.debug.EvaluateArgumentsContext;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.CompletionException;
 
 /**
  * Debug Adapter Protocol (DAP) debugger evaluator.
  */
 public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
+
+    private static final String ORIGIN_INTERFACE_NAME = "com.intellij.xdebugger.impl.ui.tree.nodes.XEvaluationCallbackWithOrigin";
+    private static volatile boolean reflectionUnsupported = false;
+    private static volatile Method getOriginMethod;
+    private static volatile Class<?> originInterface;
 
     private final @NotNull DAPStackFrame stackFrame;
 
@@ -40,8 +47,9 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
                          @NotNull XEvaluationCallback callback,
                          @Nullable XSourcePosition expressionPosition) {
         DAPClient client = stackFrame.getClient();
+        String context = getEvaluationContext(callback);
         int frameId = stackFrame.getFrameId();
-        client.evaluate(expression, frameId)
+        client.evaluate(expression, frameId, context)
                 .thenAccept(evaluateResponse -> {
                     Variable variable = new Variable();
                     variable.setName(expression); // DAPValue which extends XNamedValue requires a non-null name
@@ -56,6 +64,42 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
                     return null;
                 });
     }
+
+    public static @NotNull String getEvaluationContext(@NotNull XEvaluationCallback callback) {
+        // As XEvaluationCallbackWithOrigin is not available on old IntelliJ version  (<=2023.3), we need to use Java reflection.
+        if (reflectionUnsupported) {
+            return EvaluateArgumentsContext.WATCH;
+        }
+
+        try {
+            // Initialisation lazy
+            if (originInterface == null || getOriginMethod == null) {
+                synchronized (DAPDebuggerEvaluator.class) {
+                    if (originInterface == null || getOriginMethod == null) {
+                        originInterface = Class.forName(ORIGIN_INTERFACE_NAME);
+                        getOriginMethod = originInterface.getMethod("getOrigin");
+                    }
+                }
+            }
+
+            if (originInterface.isInstance(callback)) {
+                Object origin = getOriginMethod.invoke(callback);
+                if (origin != null) {
+                    String originName = origin.toString();
+                    if ("INLINE".equals(originName) || "CONSOLE".equals(originName)) {
+                        return EvaluateArgumentsContext.REPL;
+                    }
+                }
+            }
+        } catch (ClassNotFoundException e) {
+            reflectionUnsupported = true;
+        } catch (Exception e) {
+            // Do nothing
+        }
+
+        return EvaluateArgumentsContext.WATCH;
+    }
+
 
     public static void errorOccurred(@NotNull Throwable error,
                                      @NotNull XValueCallback callback) {
