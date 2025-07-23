@@ -86,7 +86,8 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
                 Object origin = getOriginMethod.invoke(callback);
                 if (origin != null) {
                     String originName = origin.toString();
-                    if ("INLINE".equals(originName) || "CONSOLE".equals(originName)) {
+                    // REPL for XEvaluationOrigin.INLINE, XEvaluationOrigin.CONSOLE, XEvaluationOrigin.DIALOG
+                    if ("INLINE".equals(originName) || "CONSOLE".equals(originName) || "DIALOG".equals(originName)) {
                         return EvaluateArgumentsContext.REPL;
                     }
                 }
