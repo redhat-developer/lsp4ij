@@ -63,6 +63,7 @@ import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentation
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletionUtils.computePrefixStartFromInsertText;
 
 /**
  * LSP completion lookup element.
@@ -539,11 +540,8 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
         // case 2: text edit is undefined, try to compute the prefix start offset by using insertText
         String insertText = getInsertText();
-        Integer prefixStartOffset = computePrefixStartFromInsertText(document, completionOffset, insertText);
-        if (prefixStartOffset != null) {
-            return prefixStartOffset;
-        }
-        return completionOffset;
+        Integer prefixStartOffset = computePrefixStartFromInsertText(document, file, completionOffset, insertText);
+        return Objects.requireNonNullElse(prefixStartOffset, completionOffset);
     }
 
 
@@ -560,53 +558,6 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             return LSPIJUtils.toOffset(textEdit.getLeft().getRange().getStart(), document);
         }
         return LSPIJUtils.toOffset(textEdit.getRight().getInsert().getStart(), document);
-    }
-
-    @Nullable
-    private Integer computePrefixStartFromInsertText(@NotNull Document document,
-                                                     int completionOffset,
-                                                     String insertText) {
-
-        // case 2.1: first strategy, we collect word range at
-        // ex :
-        // insertText= '(let [${1:binding} ${2:value}])'
-        // document= le
-        // we have to return |le as prefix start offset
-
-        TextRange wordRange = LSPIJUtils.getWordRangeAt(document, file, completionOffset);
-        if (wordRange != null) {
-            return wordRange.getStartOffset();
-        }
-
-        // case 2.2: second strategy, we check if the left content of the completion offset
-        // matches the full insertText left content
-        // ex :
-        // insertText= 'foo.bar'
-        // document= {foo.b|}
-        // we have to return {| as prefix start offset
-
-        Integer prefixStartOffset = getPrefixStartOffsetWhichMatchesLeftContent(document, completionOffset, insertText);
-        if (prefixStartOffset != null) {
-            return prefixStartOffset;
-        }
-
-        return null;
-    }
-
-    @Nullable
-    private static Integer getPrefixStartOffsetWhichMatchesLeftContent(@NotNull Document document,
-                                                                       int completionOffset,
-                                                                       @NotNull String insertText) {
-        int startOffset = Math.max(0, completionOffset - insertText.length());
-        int endOffset = startOffset + Math.min(insertText.length(), completionOffset);
-        String subDoc = document.getText(new TextRange(startOffset, endOffset)); // "".ch
-        for (int i = 0; i < insertText.length() && i < completionOffset; i++) {
-            String tentativeCommonString = subDoc.substring(i);
-            if (insertText.startsWith(tentativeCommonString)) {
-                return completionOffset - tentativeCommonString.length();
-            }
-        }
-        return null;
     }
 
 

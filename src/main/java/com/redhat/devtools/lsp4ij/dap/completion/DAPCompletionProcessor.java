@@ -108,6 +108,7 @@ public class DAPCompletionProcessor extends CompletionContributor {
                         Arrays.sort(items, new DAPCompletionItemComparator(prefixMatcher, currentWord, caseSensitive));
                         int size = items.length;
 
+                        int completionOffset = parameters.getOffset();
                         // Items now sorted by priority, low index == high priority
                         for (int i = 0; i < size; i++) {
                             var item = items[i];
@@ -115,8 +116,9 @@ public class DAPCompletionProcessor extends CompletionContributor {
 
                             LookupElement lookupElement = createLookupElement(parameters, item);
                             if (lookupElement != null) {
+                                lookupElement.putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
                                 int priority = size - i;
-                                var prioritizedLookupItem = PrioritizedLookupElement.withPriority(new DAPLookupElementDecorator(lookupElement, item), priority);
+                                var prioritizedLookupItem = PrioritizedLookupElement.withPriority(new DAPLookupElementDecorator(lookupElement, item, completionOffset), priority);
                                 result.addElement(prioritizedLookupItem);
                             }
                         }
@@ -130,6 +132,9 @@ public class DAPCompletionProcessor extends CompletionContributor {
     private LookupElement createLookupElement(@NotNull CompletionParameters parameters,
                                               @NotNull CompletionItem item) {
         String label = item.getLabel();
+        if (StringUtils.isBlank(label)) {
+            return null;
+        }
         String insertText = label;
         if (StringUtils.isNotBlank(item.getText())) {
             insertText = item.getText();
