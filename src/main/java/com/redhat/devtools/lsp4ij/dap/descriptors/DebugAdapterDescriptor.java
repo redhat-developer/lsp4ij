@@ -163,6 +163,7 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         args.setLinesStartAt1(true);
         args.setColumnsStartAt1(true);
         args.setSupportsStartDebuggingRequest(true);
+        args.setSupportsRunInTerminalRequest(true);
         return args;
     }
 

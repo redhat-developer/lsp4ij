@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointProperties;
+import com.redhat.devtools.lsp4ij.dap.client.runInterminal.RunInTerminalManager;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -304,6 +305,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             }
         }
         return ConsoleViewContentType.LOG_INFO_OUTPUT;
+    }
+
+    @Override
+    public CompletableFuture<RunInTerminalResponse> runInTerminal(RunInTerminalRequestArguments args) {
+        return RunInTerminalManager.getInstance(getProject()).runInTerminal(args);
     }
 
     @Override
@@ -600,13 +606,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(EMPTY_THREADS);
         }
-        var result= debugProtocolServer
+        var result = debugProtocolServer
                 .threads()
                 .thenApply(response -> {
                     if (response == null) {
                         return EMPTY_THREADS;
                     }
-                   return response.getThreads();
+                    return response.getThreads();
                 });
         if (refreshThreads) {
             result.thenAccept(threads -> {
