@@ -13,6 +13,11 @@ package com.redhat.devtools.lsp4ij.dap.client;
 import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.codeInsight.hint.HintManagerImpl;
 import com.intellij.codeInsight.hint.HintUtil;
+import com.intellij.execution.configurations.PtyCommandLine;
+import com.intellij.execution.process.BaseProcessHandler;
+import com.intellij.execution.process.ProcessEvent;
+import com.intellij.execution.process.ProcessListener;
+import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
@@ -21,6 +26,7 @@ import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.ui.LightweightHint;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
@@ -49,15 +55,15 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.Thread;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.function.UnaryOperator;
 
 import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
@@ -104,6 +110,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private @NotNull
     final List<DAPClient> childrenClient;
     private boolean sentTerminateRequest;
+
+    // Run in terminal
+    private volatile BaseProcessHandler<?> childProcess;
+    private volatile OutputStream processInput;
+    private volatile ByteArrayOutputStream dummyOutput = new ByteArrayOutputStream();
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -304,6 +315,59 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             }
         }
         return ConsoleViewContentType.LOG_INFO_OUTPUT;
+    }
+
+    @Override
+    public CompletableFuture<RunInTerminalResponse> runInTerminal(RunInTerminalRequestArguments args) {
+        CompletableFuture<RunInTerminalResponse> result = new CompletableFuture<>();
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            PtyCommandLine cli = new PtyCommandLine(List.of(args.getArgs()));
+            cli.setCharset(StandardCharsets.UTF_8);
+            String cwd = args.getCwd();
+            if (cwd != null && !cwd.isBlank()) {
+                cli.withWorkDirectory(cwd);
+            }
+            try {
+                childProcess = new DAPProcessHandler(cli);
+                childProcess.addProcessListener(new ProcessListener() {
+                    @Override
+                    public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
+                        if (ProcessOutputType.isStdout(outputType)) {
+                            debugProcess.print(event.getText(), ConsoleViewContentType.SYSTEM_OUTPUT);
+                     //       handleTargetOutput(event.getText(), ProcessOutputType.STDOUT);
+                        } else if (ProcessOutputType.isStderr(outputType)) {
+                            debugProcess.print(event.getText(), ConsoleViewContentType.ERROR_OUTPUT);
+                       //     handleTargetOutput(event.getText(), ProcessOutputType.STDERR);
+                        } else {
+                            debugProcess.print(event.getText(), ConsoleViewContentType.SYSTEM_OUTPUT);
+                         //   handleTargetOutput(event.getText(), ProcessOutputType.SYSTEM);
+                        }
+                    }
+
+                    @Override
+                    public void processTerminated(@NotNull ProcessEvent event) {
+                       // handleExited(event.getExitCode());
+                    }
+                });
+                childProcess.startNotify();
+                processInput = childProcess.getProcessInput();
+                RunInTerminalResponse resp = new RunInTerminalResponse();
+                resp.setShellProcessId((int) childProcess.getProcess().pid());
+                result.complete(resp);
+                ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                    try {
+                        processInput.write(dummyOutput.toByteArray());
+                    } catch (IOException e) {
+                        //LOG.error(e);
+                    }
+                    dummyOutput = null;
+                });
+            } catch (com.intellij.execution.ExecutionException e) {
+                result.completeExceptionally(e);
+                debugProcess.print(e.getMessage(), ConsoleViewContentType.SYSTEM_OUTPUT);
+            }
+        });
+        return result;
     }
 
     @Override
