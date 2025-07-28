@@ -76,5 +76,5 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 
 Current state of [Reverse Requests](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests) support:
 
-* ❌ [RunInTerminal](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_RunInTerminal).
+* ✅ [RunInTerminal](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_RunInTerminal).
 * ✅ [StartDebugging](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_StartDebugging).
