@@ -67,8 +67,7 @@ public class DAPLookupElementDecorator extends LookupElementDecorator<LookupElem
         var document = context.getDocument();
 
         int startOffset = getStartOffset(document);
-        int length = getLength(context);
-        int endOffset = length + startOffset;
+        int endOffset = getEndOffset(startOffset, context);
         String newText = getNewtText();
 
         // Update document with the new completion item text to insert
@@ -94,7 +93,7 @@ public class DAPLookupElementDecorator extends LookupElementDecorator<LookupElem
 
         } else {
             // No selection, update caret offset only
-            int newCaretOffset = editor.getCaretModel().getOffset() + newText.length() - length;
+            int newCaretOffset = editor.getCaretModel().getOffset() + newText.length() - (endOffset - startOffset);
             if (oldCaretOffset != newCaretOffset) {
                 editor.getCaretModel().moveToOffset(newCaretOffset);
             }
@@ -110,14 +109,13 @@ public class DAPLookupElementDecorator extends LookupElementDecorator<LookupElem
         return Objects.requireNonNullElse(prefixStartOffset, completionOffset);
     }
 
-    private int getLength(@NotNull InsertionContext context) {
+    private int getEndOffset(int startOffset, @NotNull InsertionContext context) {
         int selectionEndOffset = context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET);
-        int endOffset = selectionEndOffset - completionOffset;
         Integer length = item.getLength();
-        if (length != null) {
-            endOffset += length;
+        if (length == null) {
+            return selectionEndOffset;
         }
-        return endOffset;
+        return startOffset + (selectionEndOffset - completionOffset + length);
     }
 
     private @NotNull String getNewtText() {
