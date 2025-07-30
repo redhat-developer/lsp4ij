@@ -8,15 +8,19 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.client.runInterminal.external;
+package com.redhat.devtools.lsp4ij.dap.runInTerminal.external;
 
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.dap.client.runInterminal.RunInTerminalService;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * Base class for external terminal services that handle Debug Adapter Protocol
@@ -49,17 +53,14 @@ public abstract class ExternalTerminalService implements RunInTerminalService {
      *                working directory, environment variables, and terminal kind
      * @param project the IntelliJ {@link Project} in which this terminal is being launched
      * @return a {@link CompletableFuture} that resolves to a {@link RunInTerminalResponse}
-     *         containing the process ID of the spawned terminal process.
+     * containing the process ID of the spawned terminal process.
      */
     @Override
     public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args,
                                                                   @NotNull Project project) {
+
         return doRunInTerminal(args, project)
-                .thenApply(pid -> {
-                    RunInTerminalResponse response = new RunInTerminalResponse();
-                    response.setProcessId(pid);
-                    return response;
-                });
+                .thenApply(unused -> new RunInTerminalResponse());
     }
 
     /**
@@ -72,8 +73,35 @@ public abstract class ExternalTerminalService implements RunInTerminalService {
      *
      * @param args    the {@link RunInTerminalRequestArguments} with the command and environment settings
      * @param project the IntelliJ {@link Project} context
-     * @return a {@link CompletableFuture} resolving to the process ID of the spawned terminal
+     * @return a {@link CompletableFuture} resolving the spawned terminal
      */
-    protected abstract CompletableFuture<Integer> doRunInTerminal(@NotNull RunInTerminalRequestArguments args,
-                                                                  @NotNull Project project);
+    protected abstract CompletableFuture<Void> doRunInTerminal(@NotNull RunInTerminalRequestArguments args,
+                                                               @NotNull Project project);
+
+    protected @NotNull ProcessBuilder createProcessBuilder(@NotNull RunInTerminalRequestArguments args,
+                                                           @NotNull Function<@NotNull RunInTerminalRequestArguments, @NotNull List<String>> commandBuilder) {
+
+        // Configure the process builder with working directory and environment variables.
+        ProcessBuilder pb = new ProcessBuilder(commandBuilder.apply(args));
+        if (args.getCwd() != null) {
+            pb.directory(new File(args.getCwd()));
+        }
+        if (args.getEnv() != null) {
+            pb.environment().putAll(args.getEnv());
+        }
+        return pb;
+    }
+
+    protected static Process startProcess(ProcessBuilder pb, long timeout) {
+        try {
+            var p = pb.start();
+            if (timeout > 0) {
+                p.waitFor(timeout, TimeUnit.MILLISECONDS);
+            }
+            return p;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

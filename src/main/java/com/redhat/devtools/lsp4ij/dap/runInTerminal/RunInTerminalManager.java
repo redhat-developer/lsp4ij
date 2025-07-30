@@ -8,31 +8,20 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.client.runInterminal;
+package com.redhat.devtools.lsp4ij.dap.runInTerminal;
 
-import com.intellij.ide.plugins.PluginManagerCore;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
-import com.intellij.util.Alarm;
-import com.redhat.devtools.lsp4ij.dap.client.runInterminal.external.LinuxExternalTerminalService;
-import com.redhat.devtools.lsp4ij.dap.client.runInterminal.external.MacExternalTerminalService;
-import com.redhat.devtools.lsp4ij.dap.client.runInterminal.external.WindowsExternalTerminalService;
-import com.redhat.devtools.lsp4ij.dap.client.runInterminal.integrated.RunInIntegratedTerminalService;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.external.LinuxExternalTerminalService;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.external.MacExternalTerminalService;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.external.WindowsExternalTerminalService;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.integrated.RunInIntegratedTerminalService;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArgumentsKind;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
-import org.eclipse.sisu.Nullable;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.plugins.terminal.ShellTerminalWidget;
-import org.jetbrains.plugins.terminal.TerminalToolWindowManager;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 /**
  * Manages Debug Adapter Protocol (DAP) {@code RunInTerminal} requests,

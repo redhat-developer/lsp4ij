@@ -31,7 +31,7 @@ import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointProperties;
-import com.redhat.devtools.lsp4ij.dap.client.runInterminal.RunInTerminalManager;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalManager;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;

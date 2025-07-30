@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.client.runInterminal.integrated;
+package com.redhat.devtools.lsp4ij.dap.runInTerminal.integrated;
 
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.application.ApplicationManager;
@@ -16,7 +16,7 @@ import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.util.Alarm;
-import com.redhat.devtools.lsp4ij.dap.client.runInterminal.RunInTerminalService;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
 import org.jetbrains.annotations.NotNull;
@@ -75,7 +75,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
      *                environment variables, and title
      * @param project the IntelliJ {@link Project} in which to open the integrated terminal
      * @return a {@link CompletableFuture} resolving to a {@link RunInTerminalResponse}
-     *         containing the process ID of the spawned terminal process
+     * containing the process ID of the spawned terminal process
      */
     @Override
     public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args,

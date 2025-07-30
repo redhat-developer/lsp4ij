@@ -972,7 +972,7 @@
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.dap.DebugAdapterManager"/>
         <projectService
-                serviceImplementation="com.redhat.devtools.lsp4ij.dap.client.runInterminal.RunInTerminalManager"/>
+                serviceImplementation="com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalManager"/>
         <programRunner id="DAPDebugRunner"
                        implementation="com.redhat.devtools.lsp4ij.dap.DAPDebugRunner"/>
         <configurationType
