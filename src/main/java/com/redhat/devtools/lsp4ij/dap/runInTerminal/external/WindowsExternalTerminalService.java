@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.client.runInterminal.external;
+package com.redhat.devtools.lsp4ij.dap.runInTerminal.external;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
@@ -16,8 +16,9 @@ import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -34,10 +35,14 @@ import java.util.concurrent.CompletableFuture;
  */
 public class WindowsExternalTerminalService extends ExternalTerminalService {
 
-    /** Default Windows command-line interpreter. */
+    /**
+     * Default Windows command-line interpreter.
+     */
     private static final String CMD = "cmd.exe";
 
-    /** Cached default terminal path to avoid recomputing. */
+    /**
+     * Cached default terminal path to avoid recomputing.
+     */
     private static String DEFAULT_TERMINAL_WINDOWS;
 
     /**
@@ -55,22 +60,27 @@ public class WindowsExternalTerminalService extends ExternalTerminalService {
      *
      * @param args    the DAP {@link RunInTerminalRequestArguments} containing command, environment and working directory.
      * @param project the current IntelliJ project context.
-     * @return a {@link CompletableFuture} that completes with the exit code of the spawned process.
+     * @return a {@link CompletableFuture} that completes with the spawned process.
      */
     @Override
-    protected CompletableFuture<Integer> doRunInTerminal(@NotNull RunInTerminalRequestArguments args,
-                                                         @NotNull Project project) {
+    protected CompletableFuture<Void> doRunInTerminal(@NotNull RunInTerminalRequestArguments args,
+                                                      @NotNull Project project) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Configure the process builder with working directory and environment variables.
+            ProcessBuilder pb = createProcessBuilder(args, WindowsExternalTerminalService::createCommands);
+            startProcess(pb, 1000);
+            return null;
+        });
+    }
+
+    private static @NotNull List<String> createCommands(@NotNull RunInTerminalRequestArguments args) {
         // Resolve the terminal executable. Fallback to default Windows terminal if not configured.
         String exec = /* settings.getWindowsExec() != null ?
-                settings.getWindowsExec() : */ getDefaultTerminalWindows();
+            settings.getWindowsExec() : */ getDefaultTerminalWindows();
 
         // Prepare the title and the command to be executed.
         String fullTitle = "\"" + args.getTitle() + "\"";
         String command = "\"" + String.join("\" \"", args.getArgs()) + "\" & pause";
-
-        // Prepare environment variables, removing null entries.
-        Map<String, String> env = args.getEnv() != null ? args.getEnv() : new HashMap<>();
-        env.entrySet().removeIf(e -> e.getValue() == null);
 
         List<String> cmdArgs = new ArrayList<>();
         String spawnExec;
@@ -85,32 +95,8 @@ public class WindowsExternalTerminalService extends ExternalTerminalService {
             // Use classic cmd.exe and spawn the configured terminal as a subprocess.
             cmdArgs.addAll(Arrays.asList("/c", "start", fullTitle, "/wait", exec, "/c", "\"" + command + "\""));
         }
-
-        // Configure the process builder with working directory and environment variables.
-        ProcessBuilder pb = new ProcessBuilder(spawnExec);
-        pb.command().addAll(cmdArgs);
-        pb.directory(new File(args.getCwd()));
-        pb.environment().putAll(env);
-
-        return runProcessAsyncWithExitCode(pb);
-    }
-
-    /**
-     * Starts the process asynchronously and completes with its exit code when finished.
-     *
-     * @param pb the configured {@link ProcessBuilder} to launch.
-     * @return a {@link CompletableFuture} of the process exit code.
-     */
-    private CompletableFuture<Integer> runProcessAsyncWithExitCode(ProcessBuilder pb) {
-        CompletableFuture<Integer> future = new CompletableFuture<>();
-        try {
-            Process p = pb.start();
-            p.onExit()
-                    .thenAccept(pr -> future.complete(pr.exitValue()));
-        } catch (IOException e) {
-            future.completeExceptionally(e);
-        }
-        return future;
+        cmdArgs.add(0, spawnExec);
+        return cmdArgs;
     }
 
     /**

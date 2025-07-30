@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.dap.client.runInterminal;
+package com.redhat.devtools.lsp4ij.dap.runInTerminal;
 
 import com.intellij.openapi.project.Project;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
@@ -48,7 +48,7 @@ public interface RunInTerminalService {
      * </p>
      *
      * @return {@code true} if this service can handle {@code runInTerminal} requests
-     *         on the current platform, {@code false} otherwise.
+     * on the current platform, {@code false} otherwise.
      */
     boolean isApplicable();
 
@@ -68,7 +68,7 @@ public interface RunInTerminalService {
      *                working directory, environment variables, and terminal type
      * @param project the IntelliJ {@link Project} in which this terminal is being launched
      * @return a {@link CompletableFuture} resolving to a {@link RunInTerminalResponse}
-     *         containing the process ID or {@code null} if not supported.
+     * containing the process ID or {@code null} if not supported.
      */
     CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args,
                                                            @NotNull Project project);
