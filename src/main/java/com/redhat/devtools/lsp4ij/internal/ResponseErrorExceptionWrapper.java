@@ -14,6 +14,7 @@ import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
@@ -21,28 +22,34 @@ import java.io.PrintWriter;
 /**
  * LSP4J Response error wrapper.
  */
-public class ResponseErrorExceptionWrapper extends ResponseErrorException  {
+public class ResponseErrorExceptionWrapper extends ResponseErrorException {
 
     public ResponseErrorExceptionWrapper(@NotNull Throwable throwable) {
         super(toResponseError(throwable.getMessage(), throwable));
     }
 
+    public ResponseErrorExceptionWrapper(@NotNull String message) {
+        this(message, null);
+    }
+
     public ResponseErrorExceptionWrapper(@NotNull String message,
-                                         @NotNull Throwable throwable) {
+                                         @Nullable Throwable throwable) {
         super(toResponseError(message, throwable));
     }
 
     @NotNull
     private static ResponseError toResponseError(@NotNull String message,
-                                                @NotNull Throwable throwable) {
+                                                 @Nullable Throwable throwable) {
         ResponseError error = new ResponseError();
         error.setMessage(message);
         error.setCode(ResponseErrorCode.InternalError);
-        ByteArrayOutputStream stackTrace = new ByteArrayOutputStream();
-        PrintWriter stackTraceWriter = new PrintWriter(stackTrace);
-        throwable.printStackTrace(stackTraceWriter);
-        stackTraceWriter.flush();
-        error.setData(stackTrace.toString());
+        if (throwable != null) {
+            ByteArrayOutputStream stackTrace = new ByteArrayOutputStream();
+            PrintWriter stackTraceWriter = new PrintWriter(stackTrace);
+            throwable.printStackTrace(stackTraceWriter);
+            stackTraceWriter.flush();
+            error.setData(stackTrace.toString());
+        }
         return error;
     }
 }

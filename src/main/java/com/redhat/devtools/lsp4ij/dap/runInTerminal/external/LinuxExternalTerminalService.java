@@ -12,7 +12,9 @@ package com.redhat.devtools.lsp4ij.dap.runInTerminal.external;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
+import com.redhat.devtools.lsp4ij.internal.ResponseErrorExceptionWrapper;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -63,13 +65,17 @@ public class LinuxExternalTerminalService extends ExternalTerminalService {
             return startProcess(pb, 0);
         }).handle((process, error) -> {
             if (process == null || error != null) {
-                result.completeExceptionally(error);
+                if (error instanceof ResponseErrorException) {
+                    result.completeExceptionally(error);
+                } else {
+                    result.completeExceptionally(new ResponseErrorExceptionWrapper(error));
+                }
             } else {
                 process.onExit().thenRun(() -> {
                     if (process.exitValue() == 0) {
                         result.complete(null);
                     } else {
-                        result.completeExceptionally(new RuntimeException("Linux terminal failed with exit code " + process.exitValue()));
+                        result.completeExceptionally(new ResponseErrorExceptionWrapper("Linux terminal failed with exit code " + process.exitValue()));
                     }
                 });
             }
@@ -81,7 +87,7 @@ public class LinuxExternalTerminalService extends ExternalTerminalService {
     private static @NotNull List<String> createCommands(@NotNull RunInTerminalRequestArguments args) {
         String terminal = findAvailableTerminal();
         if (terminal == null) {
-            throw new RuntimeException("No supported Linux terminal found in PATH");
+            throw new ResponseErrorExceptionWrapper("No supported Linux terminal found in PATH");
         }
 
         List<String> termArgs = new ArrayList<>();
@@ -98,6 +104,7 @@ public class LinuxExternalTerminalService extends ExternalTerminalService {
                 + "Press any key to continue..." + "\" -n1;";
         // wrapping argument in two sets of ' because node is so "friendly" that it removes one set...
         termArgs.add("''" + bashCommand + "''");
+        termArgs.add(0, terminal);
         return termArgs;
     }
 

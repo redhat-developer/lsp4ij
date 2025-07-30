@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.runInTerminal.external;
 
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
+import com.redhat.devtools.lsp4ij.internal.ResponseErrorExceptionWrapper;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
 import org.jetbrains.annotations.NotNull;
@@ -100,7 +101,7 @@ public abstract class ExternalTerminalService implements RunInTerminalService {
             }
             return p;
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new ResponseErrorExceptionWrapper(e);
         }
     }
 
