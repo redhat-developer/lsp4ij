@@ -41,11 +41,11 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
     static final EnabledColumnInfo ENABLED_COLUMN = new EnabledColumnInfo();
     static final NameColumnInfo NAME_COLUMN = new NameColumnInfo();
 
-    private final @NotNull DAPBreakpointHandler breakpointHandler;
+    private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
     private final @NotNull ListTableModel<ExceptionBreakpointsFilter> myModel;
     private final @NotNull TableView<ExceptionBreakpointsFilter> myTable;
 
-    public DAPExceptionBreakpointsPanel(@NotNull DAPBreakpointHandler breakpointHandler) {
+    public DAPExceptionBreakpointsPanel(@NotNull DAPBreakpointHandlerBase<?> breakpointHandler) {
         this.breakpointHandler = breakpointHandler;
 
         // Create Table view

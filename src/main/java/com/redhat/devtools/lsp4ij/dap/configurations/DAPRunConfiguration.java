@@ -20,6 +20,7 @@ import com.intellij.openapi.util.InvalidDataException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
@@ -36,9 +37,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Debug Adapter Protocol (DAP) run configuration.
+ * Default Debug Adapter Protocol (DAP) run configuration.
  */
-public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfigurationOptions> implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile {
+public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigurationOptions> implements FileOptionConfigurable, WorkingDirectoryConfigurable, AttachConfigurable, DebuggableFile {
 
     public static final String DEBUG_ADAPTER_CONFIGURATION = "Debug Adapter Configuration";
 
@@ -143,19 +144,23 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         getOptions().setDebugServerReadyPattern(debugServerReadyPattern);
     }
 
-    public String getAttachAddress() {
+    @Override
+    public @Nullable String getAttachAddress() {
         return getOptions().getAttachAddress();
     }
 
-    public void setAttachAddress(String attachAddress) {
+    @Override
+    public void setAttachAddress(@Nullable String attachAddress) {
         getOptions().setAttachAddress(attachAddress);
     }
 
-    public String getAttachPort() {
+    @Override
+    public @Nullable String getAttachPort() {
         return getOptions().getAttachPort();
     }
 
-    public void setAttachPort(String attachPort) {
+    @Override
+    public void setAttachPort(@Nullable String attachPort) {
         getOptions().setAttachPort(attachPort);
     }
 
@@ -257,31 +262,9 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
                 new DAPSettingsEditor(getProject());
     }
 
-    @Nullable
-    @Override
-    public RunProfileState getState(@NotNull Executor executor,
-                                    @NotNull ExecutionEnvironment environment) {
-        var debugAdapterServer = getDebugAdapterServer();
-        DebugAdapterDescriptor serverDescriptor = debugAdapterServer != null ?
-                debugAdapterServer.getFactory().createDebugAdapterDescriptor(getOptions(), environment) :
-                new DefaultDebugAdapterDescriptor(getOptions(), environment, getName());
-        return new DAPCommandLineState(serverDescriptor, getOptions(), environment);
-    }
-
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
         return getOptions().isDebuggableFile(file, project);
-    }
-
-    /**
-     * Returns true if the given executor id (ex: 'Debug') can be executed and false otherwise.
-     *
-     * @param executorId the executor id (ex: 'Debug').
-     * @return true if the given executor id (ex: 'Debug') can be executed and false otherwise.
-     */
-    public boolean canRun(@NotNull String executorId) {
-        var serverFactory = getServerFactory();
-        return serverFactory == null || serverFactory.canRun(executorId);
     }
 
     @Override
@@ -291,19 +274,8 @@ public class DAPRunConfiguration extends RunConfigurationBase<DAPRunConfiguratio
         }
     }
 
-    /**
-     * Returns the server DAP factory descriptor and null otherwise.
-     *
-     * @return the server DAP factory descriptor and null otherwise.
-     */
-    @Nullable
-    private DebugAdapterDescriptorFactory getServerFactory() {
-        var server = getDebugAdapterServer();
-        return server != null ? server.getFactory() : null;
-    }
-
-    @Nullable
-    private DebugAdapterServerDefinition getDebugAdapterServer() {
+    @Override
+    protected @Nullable DebugAdapterServerDefinition getDebugAdapterServer() {
         return getOptions().getDebugAdapterServer();
     }
 

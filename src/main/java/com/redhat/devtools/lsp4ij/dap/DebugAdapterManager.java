@@ -18,6 +18,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
@@ -285,13 +286,40 @@ public class DebugAdapterManager implements DebuggableFile {
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file,
                                     @NotNull Project project) {
+        return isDebuggableFile(file, null, project);
+    }
+
+    public boolean isDebuggableFile(@NotNull VirtualFile file,
+                                    @Nullable XBreakpointType breakpointType,
+                                    @NotNull Project project) {
         // Search canDebug inside the factories
-        if (findDebugAdapterServerFor(file, project) != null) {
+        if (findDebugAdapterServerFor(file, breakpointType, project) != null) {
             return true;
         }
 
         // Search canDebug in existing DAP run configuration
         return findExistingConfigurationFor(file, project, false) != null;
+    }
+
+    /**
+     * Returns the DAP descriptor factory for the given file and null otherwise.
+     *
+     * @param file    the file.
+     * @param breakpointType the breakpoint toe and null otherwise.
+     * @param project the project.
+     * @return the DAP descriptor factory for the given file and null otherwise.
+     */
+    @Nullable
+    private DebugAdapterServerDefinition findDebugAdapterServerFor(@NotNull VirtualFile file,
+                                                                   @Nullable XBreakpointType breakpointType,
+                                                                   @NotNull Project project) {
+        for (var serverDefinition : serverDefinitions.values()) {
+            var factory = serverDefinition.getFactory();
+            if (factory.isDebuggableFile(file, project) && (breakpointType == null || factory.supportsBreakpointType(breakpointType))) {
+                return serverDefinition;
+            }
+        }
+        return null;
     }
 
     /**

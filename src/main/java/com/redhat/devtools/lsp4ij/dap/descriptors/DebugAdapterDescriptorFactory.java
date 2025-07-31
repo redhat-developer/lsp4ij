@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.execution.configurations.RunConfiguration;
+import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManagerCore;
@@ -18,11 +19,12 @@ import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
-import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPSettingsEditor;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
@@ -81,7 +83,7 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
 
     private ServerTrace serverTrace;
 
-    public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull DAPRunConfigurationOptions options,
+    public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
                                                                @NotNull ExecutionEnvironment environment) {
         return new DefaultDebugAdapterDescriptor(options, environment, getServerDefinition());
     }
@@ -181,5 +183,19 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
     @Nullable
     public ServerInstaller createServerInstaller() {
         return null;
+    }
+
+    /**
+     * Determines whether the given breakpoint type is supported by this debugger.
+     * <p>
+     * The default implementation returns {@code true} if the given {@code breakpointType}
+     * is exactly of type {@link DAPBreakpointType} (i.e., {@code breakpointType.getClass() == DAPBreakpointType.class}).
+     * </p>
+     *
+     * @param breakpointType the breakpoint type to check
+     * @return {@code true} if the breakpoint type is supported, {@code false} otherwise
+     */
+    public boolean supportsBreakpointType(@NotNull XBreakpointType breakpointType) {
+        return breakpointType.getClass() == DAPBreakpointType.class;
     }
 }
