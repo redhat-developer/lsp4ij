@@ -354,7 +354,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 StackFrame[] stackFrames = stackTraceResponse.getStackFrames();
                                 if (stackFrames != null && stackFrames.length > 0) {
                                     var stackFrame = stackFrames[0];
-                                    XBreakpoint<DAPBreakpointProperties> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrame);
+                                    XBreakpoint<?> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrame);
                                     XSuspendContext context = getSession().getSuspendContext();
                                     if (context == null) {
                                         context = new DAPSuspendContext(this);

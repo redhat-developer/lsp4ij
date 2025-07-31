@@ -31,11 +31,14 @@ import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
+import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
-import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointProperties;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
@@ -78,7 +81,7 @@ public class DAPDebugProcess extends XDebugProcess {
     private final @NotNull DAPCommandLineState dapState;
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
-    private final @NotNull DAPBreakpointHandler breakpointHandler;
+    private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
     private @Nullable CompletableFuture<Void> connectToServerFuture;
@@ -100,7 +103,7 @@ public class DAPDebugProcess extends XDebugProcess {
         this.executionResult = executionResult;
         this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
         this.serverDescriptor = dapState.getServerDescriptor();
-        this.breakpointHandler = new DAPBreakpointHandler(session, serverDescriptor, project);
+        this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
         this.threadsPanel = new ThreadsPanel(this);
         this.status = Status.NONE;
 
@@ -367,7 +370,7 @@ public class DAPDebugProcess extends XDebugProcess {
         return new XBreakpointHandler[]{breakpointHandler};
     }
 
-    public @NotNull DAPBreakpointHandler getBreakpointHandler() {
+    public @NotNull DAPBreakpointHandlerBase<?> getBreakpointHandler() {
         return breakpointHandler;
     }
 

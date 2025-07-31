@@ -976,7 +976,7 @@
         <programRunner id="DAPDebugRunner"
                        implementation="com.redhat.devtools.lsp4ij.dap.DAPDebugRunner"/>
         <configurationType
-                implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationType"/>
+                implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPConfigurationType"/>
         <xdebugger.breakpointType
                 implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointType"/>
         <completion.contributor id="DAPCompletionProcessor"
