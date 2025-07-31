@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.execution.configurations.RunConfiguration;
+import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManagerCore;
@@ -81,7 +82,7 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
 
     private ServerTrace serverTrace;
 
-    public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull DAPRunConfigurationOptions options,
+    public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
                                                                @NotNull ExecutionEnvironment environment) {
         return new DefaultDebugAdapterDescriptor(options, environment, getServerDefinition());
     }
