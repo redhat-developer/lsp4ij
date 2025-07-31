@@ -22,6 +22,8 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
@@ -52,7 +54,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         this.id = serverDefinition.getId();
     }
 
-    public DefaultDebugAdapterDescriptor(@NotNull DAPRunConfigurationOptions options,
+    public DefaultDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
                                          @NotNull ExecutionEnvironment environment,
                                          @NotNull String runConfigurationName) {
         super(options, environment, null);
@@ -94,38 +96,12 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         return null;
     }
 
-    /**
-     * Returns the strategy to use to know when DAP server is started and DAP client can connect to it.
-     *
-     * @return the strategy to use to know when DAP server is started and DAP client can connect to it.
-     */
-    @NotNull
-    public ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
-        if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            if (debugMode == DebugMode.ATTACH) {
-                String address = LaunchUtils.resolveAttachAddress(dapOptions.getAttachAddress(), getDapParameters());
-                int port = LaunchUtils.resolveAttachPort(dapOptions.getAttachPort(), getDapParameters());
-                return new ServerReadyConfig(address, port);
-            }
-            var strategy = dapOptions.getDebugServerWaitStrategy();
-            switch (strategy) {
-                case TIMEOUT:
-                    return new ServerReadyConfig(dapOptions.getConnectTimeout());
-                case TRACE:
-                    return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor());
-                default:
-                    return new ServerReadyConfig(0);
-            }
-        }
-        return new ServerReadyConfig(500);
-    }
-
     public @Nullable FileType getFileType() {
-        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+        if (options instanceof FileOptionConfigurable dapOptions) {
             String file = dapOptions.getFile();
             int index = file != null ? file.lastIndexOf('.') : -1;
             if (index != -1) {
-                String fileExtension = file.substring(index + 1, file.length());
+                String fileExtension = file.substring(index + 1);
                 return FileTypeManager.getInstance().getFileTypeByExtension(fileExtension);
             }
         }

@@ -25,7 +25,7 @@ public class DAPRunConfigurationProvider extends LazyRunConfigurationProducer<DA
 
     @Override
     public @NotNull ConfigurationFactory getConfigurationFactory() {
-        return DAPRunConfigurationType.getInstance().getConfigurationFactories()[0];
+        return DAPConfigurationType.getInstance().getConfigurationFactories()[0];
     }
 
     @Override

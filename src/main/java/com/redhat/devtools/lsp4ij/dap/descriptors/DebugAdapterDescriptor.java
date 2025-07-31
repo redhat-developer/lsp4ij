@@ -26,7 +26,10 @@ import com.intellij.util.net.NetUtils;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
+import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
+import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -223,7 +226,24 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
      * @return the strategy to use to know when DAP server is started and DAP client can connect to it.
      */
     @NotNull
-    public abstract ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode);
+    public ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
+        if (options instanceof AttachConfigurable dapOptions) {
+            if (debugMode == DebugMode.ATTACH) {
+                String address = LaunchUtils.resolveAttachAddress(dapOptions.getAttachAddress(), getDapParameters());
+                int port = LaunchUtils.resolveAttachPort(dapOptions.getAttachPort(), getDapParameters());
+                return new ServerReadyConfig(address, port);
+            }
+        }
+        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            var strategy = dapOptions.getDebugServerWaitStrategy();
+            return switch (strategy) {
+                case TIMEOUT -> new ServerReadyConfig(dapOptions.getConnectTimeout());
+                case TRACE -> new ServerReadyConfig(dapOptions.getNetworkAddressExtractor());
+                default -> new ServerReadyConfig(0);
+            };
+        }
+        return new ServerReadyConfig(500);
+    }
 
     public abstract @Nullable FileType getFileType();
 

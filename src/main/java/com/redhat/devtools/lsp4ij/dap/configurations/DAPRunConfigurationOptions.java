@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
@@ -36,7 +37,7 @@ import java.util.List;
 /**
  * Debug Adapter Protocol (DAP) run configuration options.
  */
-public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile, CommandLineUpdater {
+public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable, AttachConfigurable, DebuggableFile, CommandLineUpdater {
 
     @Nullable
     private NetworkAddressExtractor networkAddressExtractor;
@@ -290,19 +291,23 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         this.networkAddressExtractor = null;
     }
 
-    public String getAttachAddress() {
+    @Override
+    public @Nullable String getAttachAddress() {
         return attachAddress.getValue(this);
     }
 
-    public void setAttachAddress(String attachAddress) {
+    @Override
+    public void setAttachAddress(@Nullable String attachAddress) {
         this.attachAddress.setValue(this, attachAddress);
     }
 
-    public String getAttachPort() {
+    @Override
+    public @Nullable String getAttachPort() {
         return attachPort.getValue(this);
     }
 
-    public void setAttachPort(String attachPort) {
+    @Override
+    public void setAttachPort(@Nullable String attachPort) {
         this.attachPort.setValue(this, attachPort);
     }
 
