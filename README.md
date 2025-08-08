@@ -89,6 +89,7 @@ Here are some projects that use LSP4IJ:
  * [SDLB LSP](https://github.com/smart-data-lake/sdl-lsp)
  * [Bloc Linter Support for IntelliJ](https://github.com/felangel/bloc)
  * [Vala JetBrains Plugin](https://github.com/Tbusk/vala-jetbrains-plugin)
+ * [BAML JetBrains Plugin](http://github.com/BoundaryML/baml/tree/canary/jetbrains)
 
 ## Requirements
 
