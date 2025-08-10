@@ -226,7 +226,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     public void documentSaved() {
         var saveOptions = syncOptions.getSave();
-        if ((saveOptions.isLeft() && !saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() == null)) {
+        if (saveOptions == null || (saveOptions.isLeft() && !saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() == null)) {
             // Don't send textDocument/didSave
             return;
         }
