@@ -12,14 +12,18 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.execution.Executor;
 import com.intellij.execution.configurations.ConfigurationFactory;
+import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.execution.configurations.RunConfigurationBase;
 import com.intellij.execution.configurations.RunProfileState;
 import com.intellij.execution.runners.ExecutionEnvironment;
+import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.ServerTraceConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DefaultDebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,7 +32,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param <T> the run configuration options.
  */
-public abstract class DAPRunConfigurationBase<T> extends RunConfigurationBase<T> {
+public abstract class DAPRunConfigurationBase<T> extends RunConfigurationBase<T> implements ServerTraceConfigurable {
 
     protected DAPRunConfigurationBase(@NotNull Project project,
                                       @Nullable ConfigurationFactory factory,
@@ -70,4 +74,28 @@ public abstract class DAPRunConfigurationBase<T> extends RunConfigurationBase<T>
     }
 
     protected abstract @Nullable DebugAdapterServerDefinition getDebugAdapterServer();
+
+    @NotNull
+    @Override
+    public SettingsEditor<? extends RunConfiguration> getConfigurationEditor() {
+        var serverFactory = getServerFactory();
+        return serverFactory != null ?
+                serverFactory.getConfigurationEditor(getProject()) :
+                new DAPSettingsEditor(getProject());
+    }
+
+    @Override
+    public void setServerTrace(ServerTrace serverTrace) {
+        if (getOptions() instanceof ServerTraceConfigurable serverTraceConfigurable) {
+            serverTraceConfigurable.setServerTrace(serverTrace);
+        }
+    }
+
+    @Override
+    public ServerTrace getServerTrace() {
+        if (getOptions() instanceof ServerTraceConfigurable serverTraceConfigurable) {
+            return serverTraceConfigurable.getServerTrace();
+        }
+        return null;
+    }
 }

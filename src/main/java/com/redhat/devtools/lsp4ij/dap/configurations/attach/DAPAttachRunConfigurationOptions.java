@@ -12,13 +12,15 @@ package com.redhat.devtools.lsp4ij.dap.configurations.attach;
 
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.openapi.components.StoredProperty;
+import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptionsBase;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.ServerTraceConfigurable;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * DAP run configuration options for "attach" mode.
  */
-public class DAPAttachRunConfigurationOptions extends RunConfigurationOptions implements AttachConfigurable {
+public class DAPAttachRunConfigurationOptions extends DAPRunConfigurationOptionsBase implements AttachConfigurable {
 
     private final StoredProperty<String> attachAddress = string("")
             .provideDelegate(this, "attachAddress");
