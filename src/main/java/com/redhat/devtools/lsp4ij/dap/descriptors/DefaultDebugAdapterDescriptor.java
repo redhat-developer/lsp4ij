@@ -22,13 +22,10 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
-import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
-import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -129,14 +126,6 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         return super.getDebugMode();
     }
 
-    @NotNull
-    public ServerTrace getServerTrace() {
-        if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            return dapOptions.getServerTrace();
-        }
-        return super.getServerTrace();
-    }
-
     /**
      * Returns the DAP server name.
      *
@@ -148,7 +137,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             serverName = dapOptions.getServerName();
         }
-        if (StringUtils.isBlank(serverName) ) {
+        if (StringUtils.isBlank(serverName)) {
             return super.getServerName();
         }
         return serverName;
@@ -156,7 +145,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
 
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
-        if(getServerDefinition() != null &&
+        if (getServerDefinition() != null &&
                 super.isDebuggableFile(file, project)) {
             return true;
         }

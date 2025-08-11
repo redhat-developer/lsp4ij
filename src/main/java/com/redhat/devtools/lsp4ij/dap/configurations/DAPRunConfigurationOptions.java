@@ -37,7 +37,7 @@ import java.util.List;
 /**
  * Debug Adapter Protocol (DAP) run configuration options.
  */
-public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable, AttachConfigurable, DebuggableFile, CommandLineUpdater {
+public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase implements FileOptionConfigurable, WorkingDirectoryConfigurable, AttachConfigurable, DebuggableFile, CommandLineUpdater {
 
     @Nullable
     private NetworkAddressExtractor networkAddressExtractor;
@@ -95,9 +95,6 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
 
     private final StoredProperty<String> attachPort = string("")
             .provideDelegate(this, "attachPort");
-
-    private final StoredProperty<String> serverTrace = string(ServerTrace.getDefaultValue().name())
-            .provideDelegate(this, "serverTrace");
 
     // Installer settings
     private final StoredProperty<String> installerConfiguration = string("")
@@ -309,14 +306,6 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     @Override
     public void setAttachPort(@Nullable String attachPort) {
         this.attachPort.setValue(this, attachPort);
-    }
-
-    public ServerTrace getServerTrace() {
-        return ServerTrace.get(serverTrace.getValue(this));
-    }
-
-    public void setServerTrace(ServerTrace serverTrace) {
-        this.serverTrace.setValue(this, serverTrace.name());
     }
 
     // Installer settings

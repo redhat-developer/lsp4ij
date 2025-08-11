@@ -20,6 +20,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.redhat.devtools.lsp4ij.dap.DAPServerReadyTracker;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.ServerTraceConfigurable;
 import com.redhat.devtools.lsp4ij.dap.console.DAPTextConsoleBuilderImpl;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.ServerReadyConfig;
@@ -86,6 +87,12 @@ public class DAPCommandLineState extends CommandLineState implements CommandLine
     }
 
     public ServerTrace getServerTrace() {
+        if (options instanceof ServerTraceConfigurable serverTraceConfigurable) {
+            ServerTrace serverTrace = serverTraceConfigurable.getServerTrace();
+            if (serverTrace != null) {
+                return serverTrace;
+            }
+        }
         return serverDescriptor.getServerTrace();
     }
 
@@ -115,6 +122,7 @@ public class DAPCommandLineState extends CommandLineState implements CommandLine
             commandLineUpdater.setCommandLine(commandLine);
         }
     }
+
     public @Nullable String getInstallerConfiguration() {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             return dapOptions.getInstallerConfiguration();
