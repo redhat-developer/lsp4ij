@@ -46,8 +46,8 @@ import com.redhat.devtools.lsp4ij.lifecycle.NullLanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.server.*;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
@@ -68,6 +68,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
+import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.clearProblem;
 import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.showNotificationError;
 import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClientInfo;
 
@@ -633,10 +634,10 @@ public class LanguageServerWrapper implements Disposable {
             while (!this.openedDocuments.isEmpty()) {
                 disconnect(this.openedDocuments.keySet().iterator().next(), false);
             }
-            while (!this.closedDocuments.isEmpty()) {
-                URI fileUri = closedDocuments.keySet().iterator().next();
-                closedDocuments.remove(fileUri);
-                clearProblem(fileUri);
+            if (!closedDocuments.isEmpty()) {
+                Set<URI> fileUris = new HashSet<>(closedDocuments.keySet());
+                closedDocuments.clear();
+                clearProblem(fileUris, getClientFeatures(), getProject());
             }
             this.languageServer = null;
             this.languageClient = null;
@@ -644,13 +645,6 @@ public class LanguageServerWrapper implements Disposable {
             if (messageBusConnection != null) {
                 messageBusConnection.disconnect();
             }
-        }
-    }
-
-    private void clearProblem(@NotNull URI fileUri) {
-        VirtualFile file = FileUriSupport.findFileByUri(fileUri.toASCIIString(), getClientFeatures());
-        if (file != null && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
-            LSPDiagnosticUtils.clearProblem(file, getProject());
         }
     }
 
@@ -886,7 +880,7 @@ public class LanguageServerWrapper implements Disposable {
             DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
             synchronizer.getDocument().removeDocumentListener(synchronizer);
             synchronizer.dispose();
-            clearProblem(fileUri);
+            clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
         }
         if (stopIfNoOpenedFiles) {
             maybeShutdown();
@@ -1462,7 +1456,7 @@ public class LanguageServerWrapper implements Disposable {
      *
      * @param context the context used to control or customize the installation.
      * @return a {@link CompletableFuture} that completes with the {@link ServerInstallationStatus}
-     *         once the installation process is done.
+     * once the installation process is done.
      */
     public @NotNull CompletableFuture<ServerInstallationStatus> install(@NotNull ServerInstallationContext context) {
         // Get the configured server installer, if any

@@ -18,17 +18,16 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.problems.WolfTheProblemSolver;
 import com.intellij.util.concurrency.AppExecutorUtil;
-import com.redhat.devtools.lsp4ij.ClosedDocument;
-import com.redhat.devtools.lsp4ij.LSPDocumentBase;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
-import com.redhat.devtools.lsp4ij.OpenedDocument;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Collection;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -150,14 +149,20 @@ public class LSPDiagnosticUtils {
         return false;
     }
 
-    public static void clearProblem(@NotNull VirtualFile file,
+    public static void clearProblem(@NotNull Set<URI> fileUris,
+                                    @NotNull LSPClientFeatures clientFeatures,
                                     @NotNull Project project) {
         WolfTheProblemSolver wolf = WolfTheProblemSolver.getInstance(project);
         ReadAction.nonBlocking((Callable<Void>) () -> {
-                    wolf.clearProblemsFromExternalSource(file, LSP4IJ_REPORT_PROBLEM_SOURCE);
+                    for (URI fileUri : fileUris) {
+                        VirtualFile file = FileUriSupport.findFileByUri(fileUri.toASCIIString(), clientFeatures);
+                        if (file != null && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
+                            wolf.clearProblemsFromExternalSource(file, LSP4IJ_REPORT_PROBLEM_SOURCE);
+                        }
+                    }
                     return null;
                 })
-                .coalesceBy(file, project)
+                .coalesceBy(clientFeatures, project)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 }
