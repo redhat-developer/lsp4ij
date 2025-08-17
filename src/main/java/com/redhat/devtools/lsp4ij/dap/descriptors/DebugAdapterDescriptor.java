@@ -24,7 +24,9 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.net.NetUtils;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
+import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
@@ -277,5 +279,10 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
 
     public @NotNull DAPBreakpointHandlerBase<?> createBreakpointHandler(@NotNull XDebugSession session, Project project) {
         return new DAPBreakpointHandler(session, this, project);
+    }
+
+    public @NotNull XDebuggerEditorsProvider createDebuggerEditorsProvider(@Nullable FileType fileType,
+                                                                           @NotNull DAPDebugProcess debugProcess) {
+        return new DAPDebuggerEditorsProvider(fileType, debugProcess);
     }
 }

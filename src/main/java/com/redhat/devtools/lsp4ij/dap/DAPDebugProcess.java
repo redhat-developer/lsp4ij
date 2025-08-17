@@ -101,8 +101,8 @@ public class DAPDebugProcess extends XDebugProcess {
         this.dapState = dapState;
         var project = getSession().getProject();
         this.executionResult = executionResult;
-        this.editorsProvider = new DAPDebuggerEditorsProvider(dapState.getFileType(), this);
         this.serverDescriptor = dapState.getServerDescriptor();
+        this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
         this.threadsPanel = new ThreadsPanel(this);
         this.status = Status.NONE;
