@@ -41,9 +41,13 @@ import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * LSP {@link RenamePsiElementProcessor} implementation to consume
@@ -66,17 +70,15 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                                 @NotNull SearchScope scope) {
         PsiFile file = element.getContainingFile();
         var project = file.getProject();
-
-        // Create LSP rename files parameters.
-        Map<LanguageServerWrapper, RenameFilesParams> paramsPerServer = new HashMap<>();
-
+        Map<LanguageServerItem, RenameFilesParams> didRenameParameters= new HashMap<>();
         // Prepare future of LSP 'workspace/willRenameFiles' request
         CancellationSupport cancellationSupport = new CancellationSupport();
         var willRenameFilesFuture =
                 LanguageServiceAccessor.getInstance(project)
                         .getLanguageServers(file,
                                 null,
-                                f -> f.getRenameFeature().isWillRenameFilesSupported(file))
+                                f -> f.getRenameFeature().isWillRenameFilesSupported(file) ||
+                            f.getRenameFeature().isDidRenameFilesSupported(file))
                         .thenComposeAsync(languageServerItems -> {
 
                             if (languageServerItems.isEmpty()) {
@@ -88,7 +90,6 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                                     .filter(ls -> ls.isWillRenameFilesSupported(file))
                                     .map(ls -> {
                                         var params = createtRenameFilesParams(file, newName, ls.getClientFeatures());
-                                        paramsPerServer.put(ls.getServerWrapper(), params);
                                         return cancellationSupport
                                                 .execute(ls.getWorkspaceService().willRenameFiles(params),
                                                         ls,
@@ -96,6 +97,12 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
                                                 .thenApplyAsync(we -> new WorkspaceEditData(we, ls));
                                     })
                                     .toList();
+
+                            languageServerItems.stream()
+                                .filter(ls -> ls.getServerWrapper().isDidRenameFilesSupported(file))
+                                .forEach(ls -> didRenameParameters.put(ls,
+                                    createtRenameFilesParams(file, newName, ls.getClientFeatures())));
+
 
                             // TODO: we return the WorkspaceEdit of the first language server, what about when there are several
                             // language servers which returns WorkspaceEdit?
@@ -114,13 +121,12 @@ public class LSPRenamePsiElementProcessor extends RenamePsiElementProcessor {
             LOGGER.error("Error while consuming LSP 'workspace/willRenameFiles' request", e);
         }
 
+        LSPRenameFilesContextHolder.set(new LSPRenameFilesContext(file, didRenameParameters));
+
         if (isDoneNormally(willRenameFilesFuture)) {
             // Future has been done correctly, create a fake PsiElement which stores the WorkspaceEdit
             WorkspaceEditData editData = willRenameFilesFuture.getNow(null);
             if (editData != null && editData.edit() != null) {
-                var params = paramsPerServer.get(editData.languageServer().getServerWrapper());
-                LSPRenameFilesContextHolder.set(new LSPRenameFilesContext(params, Collections.singletonList(editData.languageServer()), file));
-
                 var edit = editData.edit();
                 var fileUriSupport = editData.languageServer().getClientFeatures();
                 var documentChanges = edit.getDocumentChanges();

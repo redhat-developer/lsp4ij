@@ -12,7 +12,7 @@ package com.redhat.devtools.lsp4ij.features.refactoring;
 
 import com.intellij.refactoring.listeners.RefactoringEventData;
 import com.intellij.refactoring.listeners.RefactoringEventListener;
-import org.eclipse.lsp4j.RenameFilesParams;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,24 +30,14 @@ public class LSPRefactoringListener implements RefactoringEventListener {
     @Override
     public void refactoringDone(@NotNull String refactoringId, @Nullable RefactoringEventData afterData) {
         LSPRenameFilesContext context = LSPRenameFilesContextHolder.get();
-        if (context != null) {
-            var file = context.file();
-            // A rename file has been done and some language servers have consumed their
-            // LSP 'workspace/willRenameFiles' request to collect and apply WorkspaceEdit, notify
-            // Send for those language servers an LSP 'workspace/didRenameFiles' notifications.
-            context.servers()
-                            .forEach(languageServerItem ->  {
-                                var serverWrapper = languageServerItem.getServerWrapper();
-                                if (languageServerItem.getClientFeatures().getRenameFeature().isDidRenameFilesSupported(file)) {
-                                    serverWrapper.sendNotification(ls -> {
-                                        RenameFilesParams params = context.params();
-                                        ls.getWorkspaceService()
-                                                .didRenameFiles(params);
-                                        return ls;
-                                    });
-                                }
-                            });
+
+        if (context == null) {
+            return;
         }
+
+        context.renameFilesParams()
+            .forEach((ls, params) -> ls.getWorkspaceService().didRenameFiles(params));
+
         LSPRenameFilesContextHolder.set(null);
     }
 

@@ -10,18 +10,20 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.refactoring;
 
+import java.util.Map;
+
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import org.eclipse.lsp4j.RenameFilesParams;
 
-import java.util.List;
+import org.eclipse.lsp4j.RenameFilesParams;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * LSP rename files context.
  *
- * @param params
- * @param servers
- * @param file
+ * @param file              the PSI file being renamed
+ * @param renameFilesParams map of language server items to their corresponding rename file parameters
  */
-public record LSPRenameFilesContext(RenameFilesParams params, List<LanguageServerItem> servers, PsiFile file) {
+public record LSPRenameFilesContext(@NotNull PsiFile file,
+                                    @NotNull Map<LanguageServerItem, RenameFilesParams> renameFilesParams) {
 }
