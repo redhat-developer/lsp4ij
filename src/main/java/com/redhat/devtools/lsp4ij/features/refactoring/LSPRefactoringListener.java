@@ -35,8 +35,11 @@ public class LSPRefactoringListener implements RefactoringEventListener {
             return;
         }
 
-        context.renameFilesParams()
-            .forEach((ls, params) -> ls.getWorkspaceService().didRenameFiles(params));
+        context.renameFilesParams().forEach((languageServerItem, params) ->
+                languageServerItem.getServerWrapper().sendNotification(ls -> {
+                    ls.getWorkspaceService().didRenameFiles(params);
+                    return ls;
+                }));
 
         LSPRenameFilesContextHolder.set(null);
     }
