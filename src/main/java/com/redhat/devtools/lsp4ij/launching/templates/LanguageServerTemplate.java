@@ -127,22 +127,23 @@ public class LanguageServerTemplate extends ServerTemplate {
      * @return {@code true} if the template should be promoted; {@code false} otherwise.
      */
     public boolean isPromotable() {
+        if (promotable != null) {
+            return promotable;
+        }
         if (disablePromotionFor == null || disablePromotionFor.isEmpty()) {
             return true;
         }
-        if (promotable == null) {
-            promotable = computePromotable();
-        }
+        promotable = computePromotable();
         return promotable;
     }
 
     private boolean computePromotable() {
         for (var pluginId : disablePromotionFor) {
             if (isPluginInstalled(pluginId)) {
-                return true;
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     private static boolean isPluginInstalled(String pluginIdString) {
