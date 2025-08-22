@@ -1,0 +1,19 @@
+{
+  "id": "eo-lsp-serverr",
+  "name": "LSP Server for EOLANG",
+  "programArgs": {
+    "windows": "cmd /C eo-lsp-server.cmd --stdio",
+    "default": "sh -c eo-lsp-server --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "EO",
+        "patterns": [
+          "*.eo"
+        ]
+      },
+      "languageId": "eo"
+    }
+  ]
+}
