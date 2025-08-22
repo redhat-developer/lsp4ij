@@ -1,5 +1,5 @@
 {
-  "id": "eo-lsp-serverr",
+  "id": "eo-lsp-server",
   "name": "LSP Server for EOLANG",
   "programArgs": {
     "windows": "cmd /C eo-lsp-server.cmd --stdio",
