@@ -1,0 +1,50 @@
+{
+  "id": "ocaml-lsp",
+  "name": "OCaml-LSP",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onFail": {
+        "exec": {
+          "name": "Check Opam runtime",
+          "command": {
+            "windows": "where opam",
+            "default": "which opam"
+          },
+          "onSuccess": {
+            "exec": {
+              "name": "Trying current command",
+              "command": "${server.command}",
+              "timeout": 2000
+            }
+          },
+          "onFail": {
+            "showMessage": {
+              "name": "Ocaml Language Server install problem",
+              "content": [
+                "<a href=\"https://opam.ocaml.org/doc/Install.html\">Install Opam</a> to install the (<code>OCaml-LSP</code>) using <code>opam install ocaml-lsp-server</code>.",
+                "Make sure <code>opam</code> is in your PATH, then restart your IDE."
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install OCaml-LSP Language Server Globally",
+      "command": "opam install ocaml-lsp-server"
+    },
+    "onSuccess": {
+      "configureServer": {
+        "name": "Configure Ocaml Language Server command",
+        "command": "ocamllsp",
+        "update": true
+      }
+    }
+  }
+}

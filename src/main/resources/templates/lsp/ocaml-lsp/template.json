@@ -1,0 +1,21 @@
+{
+  "id": "ocaml-lsp",
+  "name": "OCaml-LSP",
+  "programArgs": {
+    "windows": "cmd /C eo-lsp-server.cmd --stdio",
+    "default": "sh -c eo-lsp-server --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "OCaml",
+        "patterns": [
+          "*.ml",
+          "*.eliom",
+          "*.ocamlinit"
+        ]
+      },
+      "languageId": "ocaml"
+    }
+  ]
+}
