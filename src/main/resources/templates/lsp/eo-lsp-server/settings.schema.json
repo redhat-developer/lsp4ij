@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/eo-lsp-server/settings.schema.json",
+  "title": "LSP4IJ EOLANG LSP server settings JSON schema",
+  "description": "JSON schema for EOLANG LSP server server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "languageServerExample.maxNumberOfProblems": {
+      "type": "number",
+      "default": 100,
+      "description": "Controls the maximum number of problems produced by the server."
+    }
+  }
+}

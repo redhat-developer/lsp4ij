@@ -155,6 +155,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
 * [Dart LSP](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
+* [EO LSP Server](./user-defined-ls/eo-lsp-server.md) 
 * [Erlang Language Server](./user-defined-ls/erlang-ls.md)
 * [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
