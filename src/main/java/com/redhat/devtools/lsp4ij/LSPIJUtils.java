@@ -1212,6 +1212,8 @@ public class LSPIJUtils {
         if (newCaretOffset > -1 && oldCaretOffset != newCaretOffset) {
             editor.getCaretModel().moveToOffset(newCaretOffset);
         }
+
+        FileDocumentManager.getInstance().saveDocument(document);
     }
 
     /**
