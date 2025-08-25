@@ -36,6 +36,8 @@ import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -279,6 +281,10 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
 
     public @NotNull DAPBreakpointHandlerBase<?> createBreakpointHandler(@NotNull XDebugSession session, Project project) {
         return new DAPBreakpointHandler(session, this, project);
+    }
+
+    public @NotNull DisassemblyBreakpointHandlerBase<?> createDisassemblyBreakpointHandler(@NotNull XDebugSession session, Project project) {
+        return new DisassemblyBreakpointHandler(session, this, project);
     }
 
     public @NotNull XDebuggerEditorsProvider createDebuggerEditorsProvider(@Nullable FileType fileType,

@@ -17,6 +17,7 @@ import com.intellij.execution.ui.ExecutionConsole;
 import com.intellij.execution.ui.RunnerLayoutUi;
 import com.intellij.execution.ui.layout.PlaceInGrid;
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
@@ -27,30 +28,33 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.AppUIUtil;
 import com.intellij.ui.content.Content;
 import com.intellij.util.ui.FormBuilder;
+import com.intellij.xdebugger.XAlternativeSourceHandler;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
-import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
-import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
-import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointProperties;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
+import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
+import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileRegistry;
+import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
+import org.eclipse.lsp4j.debug.SteppingGranularity;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadEventArguments;
 import org.jetbrains.annotations.NotNull;
@@ -68,15 +72,7 @@ import java.util.function.Supplier;
 /**
  * Debug Adapter Protocol (DAP) debug process.
  */
-public class DAPDebugProcess extends XDebugProcess {
-
-    private enum Status {
-        NONE,
-        STARTING,
-        STARTED,
-        STOPPING,
-        STOPPED
-    }
+public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     private final @NotNull DAPCommandLineState dapState;
     private final @NotNull ExecutionResult executionResult;
@@ -84,14 +80,16 @@ public class DAPDebugProcess extends XDebugProcess {
     private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
+    private final ThreadsPanel threadsPanel;
     private @Nullable CompletableFuture<Void> connectToServerFuture;
 
     private Status status;
-
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
 
-    private final ThreadsPanel threadsPanel;
+    // Disassembly
+    private final @NotNull DisassemblyBreakpointHandlerBase<?> disassemblyBreakpointHandler;
+    private final @NotNull  DAPAlternativeSourceHandler allternativeSourceHandler;
 
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
@@ -104,6 +102,8 @@ public class DAPDebugProcess extends XDebugProcess {
         this.serverDescriptor = dapState.getServerDescriptor();
         this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
+        this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
+        this.allternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);
         this.status = Status.NONE;
 
@@ -113,11 +113,10 @@ public class DAPDebugProcess extends XDebugProcess {
         String address = serverReadyFuture.getAddress();
         String taskTitle = getStartingServerTaskTitle(dapState.getFile(), dapState.getServerName(), address, port, dapState.getDebugMode());
 
-        ProgressManager.getInstance().run(new Task.Backgroundable(project,taskTitle, true) {
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, taskTitle, true) {
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-
                 DAPDebugProcess.this.status = Status.STARTING;
                 print(taskTitle, ConsoleViewContentType.SYSTEM_OUTPUT);
 
@@ -163,8 +162,8 @@ public class DAPDebugProcess extends XDebugProcess {
                                 .getThreads(true);
                     }
                 } catch (ProcessCanceledException e) {
-                    // Ignore error
                     stop();
+                    throw e;
                 } catch (CancellationException e) {
                     // Ignore error
                     stop();
@@ -213,7 +212,7 @@ public class DAPDebugProcess extends XDebugProcess {
         // Add port info
         if (address != null || port != null) {
             title.append(" at ");
-            if(address != null) {
+            if (address != null) {
                 title.append(address);
                 if (port != null) {
                     title.append(":");
@@ -225,6 +224,18 @@ public class DAPDebugProcess extends XDebugProcess {
         }
 
         return title.toString();
+    }
+
+    private static TransportStreams getTransportStreams(@NotNull ExecutionResult executionResult,
+                                                        @Nullable String address,
+                                                        @Nullable Integer port) throws IOException {
+        if (port != null) {
+            return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
+        }
+        var processHandler = executionResult.getProcessHandler();
+        DAPProcessListener processListener = new DAPProcessListener();
+        processHandler.addProcessListener(processListener);
+        return new TransportStreams.DefaultTransportStreams(processListener.getInputStream(), processHandler.getProcessInput());
     }
 
     @Override
@@ -247,17 +258,12 @@ public class DAPDebugProcess extends XDebugProcess {
 
     @Override
     public void stop() {
-        if (status !=Status.STOPPED && status != Status.STOPPING) {
+        if (status != Status.STOPPED && status != Status.STOPPING) {
             ApplicationManager.getApplication()
                     .executeOnPooledThread(() -> {
                         try {
                             status = Status.STOPPING;
-                            CancellationSupport.cancel(serverReadyFuture);
-                            CancellationSupport.cancel(connectToServerFuture);
-                            if (parentClient != null) {
-                                parentClient.terminate();
-                            }
-                            breakpointHandler.dispose();
+                            dispose();
                             print("Disconnected successfully from the debug server.",
                                     ConsoleViewContentType.SYSTEM_OUTPUT);
                         } catch (Exception e) {
@@ -280,7 +286,8 @@ public class DAPDebugProcess extends XDebugProcess {
             Integer threadId = dapContext.getThreadId();
             if (threadId != null) {
                 DAPClient client = dapContext.getClient();
-                client.next(threadId);
+                var granularity = getSteppingGranularity(client);
+                client.next(threadId, granularity);
             }
         }
     }
@@ -291,7 +298,8 @@ public class DAPDebugProcess extends XDebugProcess {
             Integer threadId = dapContext.getThreadId();
             if (threadId != null) {
                 DAPClient client = dapContext.getClient();
-                client.stepOut(threadId);
+                var granularity = getSteppingGranularity(client);
+                client.stepOut(threadId, granularity);
             }
         }
     }
@@ -302,9 +310,15 @@ public class DAPDebugProcess extends XDebugProcess {
             Integer threadId = dapContext.getThreadId();
             if (threadId != null) {
                 DAPClient client = dapContext.getClient();
-                client.stepIn(threadId);
+                var granularity = getSteppingGranularity(client);
+                client.stepIn(threadId, granularity);
             }
         }
+    }
+
+    private @Nullable SteppingGranularity getSteppingGranularity(@NotNull DAPClient client) {
+        return client.canDisassemble() && getAlternativeSourceHandler()
+                .getAlternativeSourceKindState().getValue() ? SteppingGranularity.INSTRUCTION : null;
     }
 
     @Override
@@ -331,18 +345,6 @@ public class DAPDebugProcess extends XDebugProcess {
         }
     }
 
-    private static TransportStreams getTransportStreams(@NotNull ExecutionResult executionResult,
-                                                        @Nullable String address,
-                                                        @Nullable Integer port) throws IOException {
-        if (port != null) {
-            return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
-        }
-        var processHandler = executionResult.getProcessHandler();
-        DAPProcessListener processListener = new DAPProcessListener();
-        processHandler.addProcessListener(processListener);
-        return new TransportStreams.DefaultTransportStreams(processListener.getInputStream(), processHandler.getProcessInput());
-    }
-
     public Supplier<TransportStreams> getStreamsSupplier() {
         return streamsSupplier;
     }
@@ -367,11 +369,15 @@ public class DAPDebugProcess extends XDebugProcess {
 
     @Override
     public XBreakpointHandler<?> @NotNull [] getBreakpointHandlers() {
-        return new XBreakpointHandler[]{breakpointHandler};
+        return new XBreakpointHandler[]{breakpointHandler, disassemblyBreakpointHandler};
     }
 
     public @NotNull DAPBreakpointHandlerBase<?> getBreakpointHandler() {
         return breakpointHandler;
+    }
+
+    public @NotNull DisassemblyBreakpointHandlerBase<?> getDisassemblyBreakpointHandler() {
+        return disassemblyBreakpointHandler;
     }
 
     @NotNull
@@ -402,36 +408,6 @@ public class DAPDebugProcess extends XDebugProcess {
     public @NotNull XDebugTabLayouter createTabLayouter() {
         return new XDebugTabLayouter() {
 
-            @Override
-            public void registerAdditionalContent(@NotNull RunnerLayoutUi ui) {
-                // Register "Exception Breakpoints" panel
-                registerBreakpointsPanel(ui);
-
-                // Register "Threads" panel
-                registerThreadsPanel(ui);
-
-                // Register the "Installer" tab
-                String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
-                var project = DAPDebugProcess.this.getSession().getProject();
-                resisterInstallerTab(ui, installerConfiguration, project);
-            }
-
-            private void registerBreakpointsPanel(@NotNull RunnerLayoutUi ui) {
-                var breakpointsPanel = breakpointHandler.getExceptionBreakpointsPanel();
-                final Content breakpointsContent = ui.createContent(
-                        DAPExceptionBreakpointsPanel.ID, breakpointsPanel, DAPBundle.message("dap.panels.exception.breakpoints"),  null, breakpointsPanel.getDefaultFocusedComponent());
-                breakpointsContent.setCloseable(false);
-                ui.addContent(breakpointsContent, 0, PlaceInGrid.left, false);
-            }
-
-            private void registerThreadsPanel(@NotNull RunnerLayoutUi ui) {
-                final Content threadsContent = ui.createContent(
-                        "dap-threads-panel", threadsPanel, DAPBundle.message("dap.panels.threads"),  null, threadsPanel.getDefaultFocusedComponent());
-                threadsContent.setCloseable(false);
-                ui.addContent(threadsContent, 0, PlaceInGrid.left, false);
-            }
-
-
             private static void resisterInstallerTab(@NotNull RunnerLayoutUi ui,
                                                      @Nullable String installerConfiguration,
                                                      @NotNull Project project) {
@@ -455,12 +431,41 @@ public class DAPDebugProcess extends XDebugProcess {
                 }
                 return builder.getPanel();
             }
+
+            @Override
+            public void registerAdditionalContent(@NotNull RunnerLayoutUi ui) {
+                // Register "Exception Breakpoints" panel
+                registerBreakpointsPanel(ui);
+
+                // Register "Threads" panel
+                registerThreadsPanel(ui);
+
+                // Register the "Installer" tab
+                String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
+                var project = DAPDebugProcess.this.getProject();
+                resisterInstallerTab(ui, installerConfiguration, project);
+            }
+
+            private void registerBreakpointsPanel(@NotNull RunnerLayoutUi ui) {
+                var breakpointsPanel = breakpointHandler.getExceptionBreakpointsPanel();
+                final Content breakpointsContent = ui.createContent(
+                        DAPExceptionBreakpointsPanel.ID, breakpointsPanel, DAPBundle.message("dap.panels.exception.breakpoints"), null, breakpointsPanel.getDefaultFocusedComponent());
+                breakpointsContent.setCloseable(false);
+                ui.addContent(breakpointsContent, 0, PlaceInGrid.left, false);
+            }
+
+            private void registerThreadsPanel(@NotNull RunnerLayoutUi ui) {
+                final Content threadsContent = ui.createContent(
+                        "dap-threads-panel", threadsPanel, DAPBundle.message("dap.panels.threads"), null, threadsPanel.getDefaultFocusedComponent());
+                threadsContent.setCloseable(false);
+                ui.addContent(threadsContent, 0, PlaceInGrid.left, false);
+            }
         };
     }
 
     public CompletableFuture<@Nullable Thread[]> getThreads() {
         if (parentClient != null) {
-           return  parentClient
+            return parentClient
                     .getThreads(false);
         }
         return CompletableFuture.completedFuture(null);
@@ -472,5 +477,47 @@ public class DAPDebugProcess extends XDebugProcess {
 
     public void refreshThread(ThreadEventArguments args) {
         threadsPanel.refreshThread(args);
+    }
+
+    @Override
+    public @Nullable DAPAlternativeSourceHandler getAlternativeSourceHandler() {
+        return allternativeSourceHandler;
+    }
+
+    public @Nullable DisassemblyFile getDisassemblyFile() {
+        if (parentClient == null || !parentClient.canDisassemble()) {
+            return null;
+        }
+        String configName = dapState.getEnvironment().getRunProfile().getName();
+        return DisassemblyFileRegistry.getInstance()
+                .getOrCreateDisassemblyFile(configName, getProject());
+    }
+
+    public @NotNull Project getProject() {
+        return getSession().getProject();
+    }
+
+    @Override
+    public void dispose() {
+        CancellationSupport.cancel(serverReadyFuture);
+        CancellationSupport.cancel(connectToServerFuture);
+        if (parentClient != null) {
+            parentClient.terminate();
+        }
+        breakpointHandler.dispose();
+        disassemblyBreakpointHandler.dispose();
+        getAlternativeSourceHandler().dispose();
+        var disassemblyFile = getDisassemblyFile();
+        if (disassemblyFile != null) {
+            disassemblyFile.dispose();
+        }
+    }
+
+    private enum Status {
+        NONE,
+        STARTING,
+        STARTED,
+        STOPPING,
+        STOPPED
     }
 }

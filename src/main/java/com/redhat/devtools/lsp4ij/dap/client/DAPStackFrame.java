@@ -23,7 +23,6 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XValueChildrenList;
-import com.redhat.devtools.lsp4ij.dap.DAPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
@@ -32,9 +31,13 @@ import org.eclipse.lsp4j.debug.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.Thread;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
 
@@ -97,9 +100,7 @@ public class DAPStackFrame extends XStackFrame {
             return CompletableFuture.completedFuture(null);
         }
         return getVariablesContext()
-                .thenApply(context -> {
-                    return context.getSourcePositionFor(variable);
-                });
+                .thenApply(context -> context.getSourcePositionFor(variable));
     }
 
     private CompletableFuture<DebugVariableContext> getVariablesContext() {
@@ -164,6 +165,10 @@ public class DAPStackFrame extends XStackFrame {
         return stackFrame.getId();
     }
 
+    public String getInstructionPointerReference() {
+        return stackFrame.getInstructionPointerReference();
+    }
+
     @Override
     public @Nullable XDebuggerEvaluator getEvaluator() {
         if (evaluator == null) {
@@ -171,4 +176,29 @@ public class DAPStackFrame extends XStackFrame {
         }
         return evaluator;
     }
+
+    public @Nullable XSourcePosition getAlternativePosition() {
+        String instructionPointerReference = getInstructionPointerReference();
+        if (StringUtils.isEmpty(instructionPointerReference)) {
+            return null;
+        }
+        var disassemblyFile = getClient().getDisassemblyFile();
+        if (disassemblyFile == null) {
+            return null;
+        }
+
+        try {
+            int line = disassemblyFile.getInstructionIndex(instructionPointerReference, 0, client)
+                    .get(2000, TimeUnit.MILLISECONDS);
+            return XDebuggerUtil.getInstance().createPosition(disassemblyFile, line);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (TimeoutException e) {
+            throw new RuntimeException(e);
+        }
+        return null;
+    }
+
 }

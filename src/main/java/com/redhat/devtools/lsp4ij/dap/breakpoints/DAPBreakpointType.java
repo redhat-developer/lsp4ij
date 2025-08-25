@@ -18,6 +18,7 @@ import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import org.jetbrains.annotations.NotNull;
@@ -31,7 +32,7 @@ public class DAPBreakpointType extends DAPBreakpointTypeBase<DAPBreakpointProper
     private static final String BREAKPOINT_ID = "dap-breakpoint";
 
     public DAPBreakpointType() {
-        super(BREAKPOINT_ID, "DAP Breakpoint");
+        super(BREAKPOINT_ID, DAPBundle.message("dap.breakpoints.title"));
     }
 
     @Override

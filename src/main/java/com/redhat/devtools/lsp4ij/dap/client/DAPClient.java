@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -123,6 +124,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @NotNull
     public CompletableFuture<Void> connectToServer(@NotNull ProgressIndicator indicator) {
+        indicator.setIndeterminate(false);
         TracingMessageConsumer tracing = serverTrace != ServerTrace.off ? new TracingMessageConsumer() : null;
 
         UnaryOperator<MessageConsumer> wrapper = consumer -> {
@@ -201,7 +203,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     .thenCompose(v -> {
                         // client sends zero or more setBreakpoints requests
                         monitor.checkCanceled();
-                        monitor.setFraction(60d / 100d);
+                        monitor.setFraction(50d / 100d);
                         monitor.setText2("Sending breakpoints");
                         return debugProcess
                                 .getBreakpointHandler()
@@ -212,7 +214,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         // if one or more exceptionBreakpointFilters have been defined
                         // (or if supportsConfigurationDoneRequest is not true)
                         monitor.checkCanceled();
-                        monitor.setFraction(70d / 100d);
+                        monitor.setFraction(60d / 100d);
                         monitor.setText2("Sending exception breakpoints filters");
 
                         var filters = getCapabilities().getExceptionBreakpointFilters();
@@ -222,6 +224,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                     .sendExceptionBreakpointFilters(filters, getDebugProtocolServer());
                         }
                         return CompletableFuture.completedFuture(null);
+                    })
+                    .thenCompose(v -> {
+                        monitor.checkCanceled();
+                        monitor.setFraction(70d / 100d);
+                        // client sends a setInstructionsBreakpoints request
+                        // if supportsDisassembleRequest returns true
+                        if (!canDisassemble()) {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                        monitor.setText2("Sending instruction breakpoints");
+                        return debugProcess
+                                .getDisassemblyBreakpointHandler()
+                                .initialize(getDebugProtocolServer(), getCapabilities());
                     });
         }
         configurationDoneFuture = configurationDoneFuture
@@ -524,30 +539,33 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 .continue_(args);
     }
 
-    public void next(int threadId) {
+    public void next(int threadId, @Nullable SteppingGranularity granularity) {
         if (debugProtocolServer == null) {
             return;
         }
         NextArguments args = new NextArguments();
         args.setThreadId(threadId);
+        args.setGranularity(granularity);
         debugProtocolServer.next(args);
     }
 
-    public void stepOut(int threadId) {
+    public void stepOut(int threadId, SteppingGranularity granularity) {
         if (debugProtocolServer == null) {
             return;
         }
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(threadId);
+        args.setGranularity(granularity);
         debugProtocolServer.stepOut(args);
     }
 
-    public void stepIn(int threadId) {
+    public void stepIn(int threadId, SteppingGranularity granularity) {
         if (debugProtocolServer == null) {
             return;
         }
         StepInArguments args = new StepInArguments();
         args.setThreadId(threadId);
+        args.setGranularity(granularity);
         debugProtocolServer.stepIn(args);
     }
 
@@ -654,9 +672,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsSetVariable());
     }
 
+    public boolean canDisassemble() {
+        var capabilities = getCapabilities();
+        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsDisassembleRequest());
+    }
+
     @NotNull
     public DebugAdapterDescriptor getServerDescriptor() {
         return debugProcess.getServerDescriptor();
+    }
+
+    @Nullable
+    public DisassemblyFile getDisassemblyFile() {
+        return debugProcess.getDisassemblyFile();
     }
 
     @NotNull
