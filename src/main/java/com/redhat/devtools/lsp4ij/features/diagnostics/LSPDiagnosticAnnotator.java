@@ -51,21 +51,23 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
     @Nullable
     @Override
     public Boolean collectInformation(@NotNull PsiFile file, @NotNull Editor editor, boolean hasErrors) {
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file)) {
-            return Boolean.FALSE;
-        }
         // Loop for language server which report diagnostics for the given file
         // and mark all opened documents as 'displaying diagnostics'
         var servers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getStartedServers();
+        if (servers.isEmpty()) {
+            return Boolean.FALSE;
+        }
+        boolean hasOpenedDocument = false;
         for (var ls : servers) {
             URI fileUri = FileUriSupport.getFileUri(file.getVirtualFile(), ls.getClientFeatures());
             OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
             if (openedDocument != null) {
+                hasOpenedDocument = true;
                 openedDocument.markAsDisplayingDiagnostics();
             }
         }
-        return Boolean.TRUE;
+        return hasOpenedDocument;
     }
 
     @Override
@@ -78,6 +80,11 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
         if (!applyAnnotator) {
             return;
         }
+        var servers = LanguageServiceAccessor.getInstance(psiFile.getProject())
+                .getStartedServers();
+        if (servers.isEmpty()) {
+            return;
+        }
         VirtualFile file = psiFile.getVirtualFile();
         if (file == null) {
             return;
@@ -88,8 +95,6 @@ public class LSPDiagnosticAnnotator extends AbstractLSPExternalAnnotator<Boolean
             return;
         }
         // Loop for language server which report diagnostics for the given file
-        var servers = LanguageServiceAccessor.getInstance(psiFile.getProject())
-                .getStartedServers();
         for (var ls : servers) {
             URI fileUri = FileUriSupport.getFileUri(file, ls.getClientFeatures());
             OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
