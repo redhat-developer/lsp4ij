@@ -5,6 +5,14 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.15.0</h3>
+    <ul>
+      <li>Improved DAP support: added <code>runInTerminal</code> and thread panels</li>
+      <li>DAP API enhancements: customize breakpoint types and settings editors</li>
+      <li>Various bug fixes and stability improvements</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/18?closed=1">changelog</a>.
+
     <h3>0.14.2</h3>
     <ul>
       <li>Fix bug to show the “Install Server” notification only for <code>TextMate</code> and <code>PlainText</code> files.</li>
