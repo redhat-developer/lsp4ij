@@ -220,9 +220,9 @@ public class LanguageServerWrapper implements Disposable {
      */
     private synchronized void stopAndRefreshEditorFeature(boolean refreshEditorFeature, boolean disable) {
         // Collect opened files before stopping the language server
-        List<VirtualFile> openedFiles = refreshEditorFeature ? openedDocuments.entrySet()
+        List<VirtualFile> openedFiles = refreshEditorFeature ? openedDocuments.values()
                 .stream()
-                .map(c -> c.getValue().getFile())
+                .map(OpenedDocument::getFile)
                 .toList() : Collections.emptyList();
 
         // Disable the language server
@@ -536,7 +536,7 @@ public class LanguageServerWrapper implements Disposable {
                     stop();
                 } catch (Throwable t) {
                     //Need to catch time task exceptions, or it will cancel the timer
-                    LOGGER.error("Failed to stop language server " + LanguageServerWrapper.this.serverDefinition.getId(), t);
+                    LOGGER.error("Failed to stop language server {}", LanguageServerWrapper.this.serverDefinition.getId(), t);
                 }
             }
         }, TimeUnit.SECONDS.toMillis(this.serverDefinition.getLastDocumentDisconnectedTimeout()));
@@ -1073,7 +1073,7 @@ public class LanguageServerWrapper implements Disposable {
                             addRegistration(reg, () -> registry.unregisterCapability(options));
                         }
                     } catch (Exception e) {
-                        LOGGER.error("Error while getting '" + method + "' capability", e);
+                        LOGGER.error("Error while getting '{}' capability", method, e);
                     }
                 }
             });
@@ -1275,29 +1275,34 @@ public class LanguageServerWrapper implements Disposable {
                                   @NotNull List<Diagnostic> diagnostics) {
         var clientFeatures = getClientFeatures();
         var fileUri = FileUriSupport.getFileUri(file, clientFeatures);
-        LSPDocumentBase openedOrClosedDocument = null;
-        openedOrClosedDocument = getOpenedDocument(fileUri);
-        if (openedOrClosedDocument != null) {
-            // Update diagnostics for opened file
-            synchronized (openedOrClosedDocument) {
-                openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
-            }
-        } else {
-            // Update diagnostics for closed file
-            openedOrClosedDocument = getClosedDocument(fileUri, true);
-            synchronized (openedOrClosedDocument) {
-                openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
-            }
+        if (fileUri == null) {
+            return;
         }
+        LSPDocumentBase openedOrClosedDocument = getOpenedOrClosedDocument(fileUri);
         if (openedOrClosedDocument == null) {
             return;
         }
+        boolean hasErrors = false;
+        synchronized (openedOrClosedDocument) {
+            hasErrors = openedOrClosedDocument.hasErrors();
+            openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
+        }
 
-        if (clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
+        if ((hasErrors != openedOrClosedDocument.hasErrors()) && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
             // Report problem in the Project View if the opened/closed document
             // has at least one diagnosis with a severity of error
             LSPDiagnosticUtils.reportProblem(file, openedOrClosedDocument, getProject());
         }
+    }
+
+    private @Nullable LSPDocumentBase getOpenedOrClosedDocument(URI fileUri) {
+        var openedDocument = getOpenedDocument(fileUri);
+        if (openedDocument != null) {
+            // Document is opened
+            return openedDocument;
+        }
+        // Document is closed
+        return getClosedDocument(fileUri, true);
     }
 
     @NotNull

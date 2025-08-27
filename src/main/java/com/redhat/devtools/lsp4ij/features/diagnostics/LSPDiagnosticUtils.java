@@ -77,7 +77,7 @@ public class LSPDiagnosticUtils {
                     reportProblem(file, project, hasErrors);
                     return null;
                 })
-                .coalesceBy(file, project)
+                .coalesceBy(LSP4IJ_REPORT_PROBLEM_SOURCE, file, project)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 
@@ -162,7 +162,7 @@ public class LSPDiagnosticUtils {
                     }
                     return null;
                 })
-                .coalesceBy(clientFeatures, project)
+                .coalesceBy(fileUris, clientFeatures, project)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 }
