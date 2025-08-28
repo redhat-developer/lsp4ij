@@ -1212,6 +1212,11 @@ public class LSPIJUtils {
         if (newCaretOffset > -1 && oldCaretOffset != newCaretOffset) {
             editor.getCaretModel().moveToOffset(newCaretOffset);
         }
+
+        // Explicit document save is required to trigger LSPFileListener#contentsChanged immediately for files
+        // that are not open in the editor, which will send didChangeWatchedFiles notification to the language server.
+        // By default, for such files, IDEA's auto-save logic is used which causes a delay until auto-save happens.
+        FileDocumentManager.getInstance().saveDocument(document);
     }
 
     /**
