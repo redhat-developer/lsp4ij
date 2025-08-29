@@ -626,7 +626,7 @@ public class LanguageServiceAccessor implements Disposable {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
             Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
-            Set<LanguageServerWrapper> languageServerWrappers = getStartedServers()
+            Set<LanguageServerWrapper> languageServerWrappers = new HashSet<>(getStartedServers())
                     .stream()
                     .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
                     .collect(Collectors.toSet());
