@@ -26,6 +26,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.JBPopupListener;
 import com.intellij.openapi.ui.popup.LightweightWindowEvent;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
@@ -120,21 +121,23 @@ public class ServerMessageHandler {
                             content,
                             messageTypeToNotificationType(params.getType()));
                     notification.setIcon(messageTypeToIcon(params.getType()));
-                    for (var action : params.getActions()) {
-                        notification.addAction(new AnAction(action.getTitle()) {
-                            @Override
-                            public void actionPerformed(@NotNull AnActionEvent e) {
-                                MessageActionItem result = new MessageActionItem();
-                                result.setTitle(action.getTitle());
-                                future.complete(result);
-                                notification.expire();
-                            }
+                    if (!ContainerUtil.isEmpty(params.getActions())) {
+                        for (var action : params.getActions()) {
+                            notification.addAction(new AnAction(action.getTitle()) {
+                                @Override
+                                public void actionPerformed(@NotNull AnActionEvent e) {
+                                    MessageActionItem result = new MessageActionItem();
+                                    result.setTitle(action.getTitle());
+                                    future.complete(result);
+                                    notification.expire();
+                                }
 
-                            @Override
-                            public @NotNull ActionUpdateThread getActionUpdateThread() {
-                                return ActionUpdateThread.BGT;
-                            }
-                        });
+                                @Override
+                                public @NotNull ActionUpdateThread getActionUpdateThread() {
+                                    return ActionUpdateThread.BGT;
+                                }
+                            });
+                        }
                     }
                     notification.whenExpired(() -> {
                         CancellationSupport.cancel(future);
