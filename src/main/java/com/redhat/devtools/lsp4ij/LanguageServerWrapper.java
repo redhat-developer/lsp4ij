@@ -16,6 +16,7 @@ import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
@@ -813,7 +814,7 @@ public class LanguageServerWrapper implements Disposable {
             return null;
         }
         var openedDocument = openedDocuments.get(fileUri);
-        if (openedDocument != null) {
+        if (openedDocument != null && openedDocument.getSynchronizer() != null) {
             if (!waitForDidOpen) {
                 return CompletableFuture.completedFuture(languageServer);
             }
@@ -878,8 +879,10 @@ public class LanguageServerWrapper implements Disposable {
         if (openedDocument != null) {
             // Remove the listener from the old document stored in synchronizer
             DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
-            synchronizer.getDocument().removeDocumentListener(synchronizer);
-            synchronizer.dispose();
+            if (synchronizer != null) {
+                synchronizer.getDocument().removeDocumentListener(synchronizer);
+                synchronizer.dispose();
+            }
             clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
         }
         if (stopIfNoOpenedFiles) {
@@ -919,14 +922,46 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Returns the LSP file data coming from this language server for the given file uri.
-     *
-     * @param fileUri the file Uri.
-     * @return the LSP file data coming from this language server for the given file uri.
+     * Returns the document opened in the editor for the given file URI.
+     * <p>
+     * If the document is already open, it is returned immediately otherwise it returns null
+     * @param fileUri the file URI
+     * @return the {@link OpenedDocument} representing the opened editor document, or {@code null} if not found
      */
     public @Nullable OpenedDocument getOpenedDocument(URI fileUri) {
-        return openedDocuments.get(fileUri);
+        return getOpenedDocument(fileUri, false);
     }
+
+    /**
+     * Returns the document opened in the editor for the given file URI.
+     * <p>
+     * If the document is already open, it is returned immediately. If not, and {@code force} is
+     * {@code true}, this method will try to locate the file and open it in the context of the language server.
+     *
+     * @param fileUri the file URI
+     * @param force if {@code true}, attempt to open the document if it is not already opened
+     * @return the {@link OpenedDocument} representing the opened editor document, or {@code null} if not found
+     */
+    public @Nullable OpenedDocument getOpenedDocument(URI fileUri, boolean force) {
+        var openedDocument = openedDocuments.get(fileUri);
+        if (openedDocument != null) {
+            // Document is already opened (with or without synchronization with the LSP server when content changes)
+            return openedDocument;
+        }
+        if (!force) {
+            return null;
+        }
+        String uri = getClientFeatures().toString(fileUri, false);
+        if (uri != null) {
+            VirtualFile file = getClientFeatures().findFileByUri(uri);
+            if (file != null) {
+                openedDocument = new OpenedDocument(new LanguageServerItem(languageServer, this), file, null);
+                openedDocuments.put(fileUri, openedDocument);
+            }
+        }
+        return openedDocument;
+    }
+
 
     /**
      * Returns all LSP files connected to this language server.
@@ -1146,19 +1181,6 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
-    int getVersion(VirtualFile file) {
-        if (file != null) {
-            OpenedDocument data = openedDocuments.get(LSPIJUtils.toUri(file));
-            if (data != null) {
-                var synchronizer = data.getSynchronizer();
-                if (synchronizer != null) {
-                    return synchronizer.getVersion();
-                }
-            }
-        }
-        return -1;
-    }
-
     public boolean canOperate(@NotNull VirtualFile file) {
         if (this.isConnectedTo(toUri(file))) {
             return true;
@@ -1278,7 +1300,8 @@ public class LanguageServerWrapper implements Disposable {
         if (fileUri == null) {
             return;
         }
-        LSPDocumentBase openedOrClosedDocument = getOpenedOrClosedDocument(fileUri);
+        boolean isOpen = FileEditorManager.getInstance(getProject()).isFileOpen(file);
+        final LSPDocumentBase openedOrClosedDocument = isOpen ? getOpenedDocument(fileUri, true) : getClosedDocument(fileUri, true);
         if (openedOrClosedDocument == null) {
             return;
         }
@@ -1293,16 +1316,6 @@ public class LanguageServerWrapper implements Disposable {
             // has at least one diagnosis with a severity of error
             LSPDiagnosticUtils.reportProblem(file, openedOrClosedDocument, getProject());
         }
-    }
-
-    private @Nullable LSPDocumentBase getOpenedOrClosedDocument(URI fileUri) {
-        var openedDocument = getOpenedDocument(fileUri);
-        if (openedDocument != null) {
-            // Document is opened
-            return openedDocument;
-        }
-        // Document is closed
-        return getClosedDocument(fileUri, true);
     }
 
     @NotNull

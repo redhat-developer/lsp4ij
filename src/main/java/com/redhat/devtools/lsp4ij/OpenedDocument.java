@@ -18,6 +18,7 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsForServer;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
@@ -34,13 +35,13 @@ public class OpenedDocument extends LSPDocumentBase {
 
     private final LSPDiagnosticsForServer diagnosticsForServer;
 
-    private final DocumentContentSynchronizer synchronizer;
+    private final @Nullable DocumentContentSynchronizer synchronizer;
     private long updatedDiagnosticsTime; // time when diagnostics has been updated
     private long displayingDiagnosticsTime; // time when diagnostics has been displayed with the LSPDiagnosticAnnotator.
 
     public OpenedDocument(@NotNull LanguageServerItem languageServer,
                           @NotNull VirtualFile file,
-                          @NotNull DocumentContentSynchronizer synchronizer) {
+                          @Nullable DocumentContentSynchronizer synchronizer) {
         this.file = file;
         this.synchronizer = synchronizer;
         this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer,file);
@@ -56,7 +57,7 @@ public class OpenedDocument extends LSPDocumentBase {
         return file;
     }
 
-    public DocumentContentSynchronizer getSynchronizer() {
+    public @Nullable DocumentContentSynchronizer getSynchronizer() {
         return synchronizer;
     }
 

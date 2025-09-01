@@ -216,8 +216,10 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     private void refreshDiagnosticsForAllOpenedFiles() {
         // Received request 'workspace/diagnostic/refresh
         for (var openedDocument : wrapper.getOpenedDocuments()) {
-            openedDocument.getSynchronizer()
-                    .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
+            if (openedDocument.getSynchronizer() != null) {
+                openedDocument.getSynchronizer()
+                        .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
+            }
         }
     }
 

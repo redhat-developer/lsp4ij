@@ -42,7 +42,6 @@ public class ClosedDocument extends LSPDocumentBase {
                 .stream()
                 .anyMatch(diagnostic -> diagnostic.getSeverity() != null && diagnostic.getSeverity() == DiagnosticSeverity.Error);
         return changed;
-
     }
 
     @Override
