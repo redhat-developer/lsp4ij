@@ -28,6 +28,8 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Custom link resolver used to resolve relative path by using the {@link com.intellij.psi.PsiFile}
@@ -36,11 +38,16 @@ import java.util.Set;
 public class LSPLinkResolver implements LinkResolver {
 
     private final Path fileBaseDir;
+    //supports both file:/ and file:///
+    private static final String fileRegex = "^file:/{1,3}";
+    private static final Pattern pattern = Pattern.compile(fileRegex);
+    public static final String FILE_PROTOCOL_RFC = "file:///";
 
     private enum FileUrlKind {
         RELATIVE,
         ABSOLUTE,
-        NONE;
+        NONE,
+        FILE;
     }
 
     public LSPLinkResolver(LinkResolverBasicContext context) {
@@ -69,6 +76,15 @@ public class LSPLinkResolver implements LinkResolver {
 
                 }
             }
+            else if(fileUrlKind == FileUrlKind.FILE){
+                if(url.contains(FILE_PROTOCOL_RFC)){
+                    return link.withStatus(LinkStatus.VALID)
+                            .withUrl(url);
+                }
+                // convert to RFC 8089 standard
+                return link.withStatus(LinkStatus.VALID)
+                        .withUrl(url.replace("file:/", FILE_PROTOCOL_RFC));
+            }
         }
         return link;
     }
@@ -89,12 +105,18 @@ public class LSPLinkResolver implements LinkResolver {
             // ex : /path/to/file.txt
             return FileUrlKind.ABSOLUTE;
         }
+        Matcher matcher = pattern.matcher(url);
+        if (matcher.find()) {
+            // ex : file:///C:/path/to/file.txt -> RFC 8089 standard
+            // ex : file:/path/to/file.txt -> standard format for local file system without authority specified
+            return FileUrlKind.FILE;
+        }
         int index = url.indexOf("://");
         if (index == -1) {
             // ex : path/to/file.txt
             return FileUrlKind.RELATIVE;
         }
-        // ex : file:///C:/path/to/file.txt
+
         // ex : https://github.com/redhat-developer/lsp4ij
         return FileUrlKind.NONE;
     }
