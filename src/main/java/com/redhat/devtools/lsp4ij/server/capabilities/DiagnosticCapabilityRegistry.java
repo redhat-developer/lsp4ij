@@ -84,8 +84,10 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
         // - didOpen have not processed pull diagnostic
         // - and if language server support it for now if textDocument/diagnostic has been dynamically registered.
         for (var openedDocument : getClientFeatures().getServerWrapper().getOpenedDocuments()) {
-            openedDocument.getSynchronizer()
-                    .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_REGISTER_CAPABILITY);
+            if (openedDocument.getSynchronizer() != null) {
+                openedDocument.getSynchronizer()
+                        .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_REGISTER_CAPABILITY);
+            }
         }
         return options;
     }
