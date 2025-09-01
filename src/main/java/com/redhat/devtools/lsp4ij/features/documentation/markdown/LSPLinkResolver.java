@@ -82,6 +82,8 @@ public class LSPLinkResolver implements LinkResolver {
                             .withUrl(url);
                 }
                 // convert to RFC 8089 standard
+                // sometimes URL will contain only file:/
+                // this needs to be converted so that markdown will be resolved properly
                 return link.withStatus(LinkStatus.VALID)
                         .withUrl(url.replace("file:/", FILE_PROTOCOL_RFC));
             }
