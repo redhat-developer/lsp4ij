@@ -76,7 +76,7 @@ public class LSPLinkResolver implements LinkResolver {
 
                 }
             }
-            else if(fileUrlKind == FileUrlKind.FILE){
+            else if(FileUrlKind.FILE.equals(fileUrlKind)){
                 if(url.contains(FILE_PROTOCOL_RFC)){
                     return link.withStatus(LinkStatus.VALID)
                             .withUrl(url);
