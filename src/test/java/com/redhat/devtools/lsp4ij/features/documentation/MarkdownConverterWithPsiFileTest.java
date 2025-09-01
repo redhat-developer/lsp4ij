@@ -87,8 +87,8 @@ public class MarkdownConverterWithPsiFileTest extends LSPCodeInsightFixtureTestC
     }
 
     public void testAbsoluteFileLink() {
-        String markdown = "[foo](file://" + USER_HOME + "/lsp/foo.txt)";
-        assertMarkdownConverter("bar.txt", markdown, "<p><a href=\"file://" + USER_HOME + "/lsp/foo.txt\">foo</a></p>\n");
+        String markdown = "[foo](file:///" + USER_HOME + "/lsp/foo.txt)";
+        assertMarkdownConverter("bar.txt", markdown, "<p><a href=\"file:///" + USER_HOME + "/lsp/foo.txt\">foo</a></p>\n");
     }
 
     public void testAbsoluteFileLinkWithSlash() {
