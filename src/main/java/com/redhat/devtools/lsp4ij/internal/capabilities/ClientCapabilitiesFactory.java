@@ -101,6 +101,9 @@ public class ClientCapabilitiesFactory {
         // Refresh support for SemanticTokens
         workspaceClientCapabilities.setSemanticTokens(new SemanticTokensWorkspaceCapabilities(Boolean.TRUE));
 
+        // Refresh support for Diagnostic
+        workspaceClientCapabilities.setDiagnostics(new DiagnosticWorkspaceCapabilities(Boolean.TRUE));
+
         return workspaceClientCapabilities;
     }
 
