@@ -31,13 +31,13 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 
 * ✅ [Attach](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Attach).
 * ❌ [BreakpointLocations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_BreakpointLocations).
-* ✅ [Completions](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions).
+* ✅ [Completions](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions) (see [user guide](./UserGuide.md#completion)).
 * ✅ [ConfigurationDone](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ConfigurationDone).
 * ✅ [Continue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Continue).
 * ❌ [DataBreakpointInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_DataBreakpointInfo).
-* ❌ [Disassemble](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disassemble). 
+* ✅ [Disassemble](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disassemble) (see [user guide](./UserGuide.md#disassemble)). 
 * ✅ [Disconnect](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disconnect).
-* ✅ [Evaluate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate).
+* ✅ [Evaluate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) (see [user guide](./UserGuide.md#evaluate-expression)).
 * ❌ [ExceptionInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ExceptionInfo).
 * ❌ [Goto](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Goto).
 * ❌ [GotoTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_GotoTargets).
@@ -53,9 +53,9 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ❌ [RestartFrame](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_RestartFrame).
 * ❌ [ReverseContinue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReverseContinue).
 * ✅ [Scopes](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Scopes).
-* ✅ [SetBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetBreakpoints).
+* ✅ [SetBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetBreakpoints) (see [user guide](./UserGuide.md#adding-breakpoint)).
 * ❌ [SetDataBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetDataBreakpoints).
-* ❌ [SetExceptionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExceptionBreakpoints).
+* ✅ [SetExceptionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExceptionBreakpoints) (see [user guide](./UserGuide.md#exception-breakpoint))
 * ❌ [SetExpression](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExpression).
 * ❌ [SetFunctionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints).
 * ❌ [SetInstructionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetInstructionBreakpoints).
@@ -76,5 +76,5 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 
 Current state of [Reverse Requests](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests) support:
 
-* ✅ [RunInTerminal](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_RunInTerminal).
+* ✅ [RunInTerminal](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_RunInTerminal) (see [user guide](./UserGuide.md#run-in-terminal)).
 * ✅ [StartDebugging](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_StartDebugging).

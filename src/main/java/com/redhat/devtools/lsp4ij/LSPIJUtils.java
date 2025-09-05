@@ -434,8 +434,8 @@ public class LSPIJUtils {
             return FileEditorManager.getInstance(project).openFile(file, true).length > 0;
         } else {
             if (document != null) {
-                OpenFileDescriptor desc = new OpenFileDescriptor(project, file, LSPIJUtils.toOffset(startPosition, document));
-                var startOffset = LSPIJUtils.toOffset(startPosition, document);
+                int startOffset = LSPIJUtils.toOffset(startPosition, document);
+                OpenFileDescriptor desc = new OpenFileDescriptor(project, file, startOffset);
                 var editor = FileEditorManager.getInstance(project).openTextEditor(desc, focusEditor);
                 if (editor != null && endPosition != null && !startPosition.equals(endPosition)) {
                     var endOffset = LSPIJUtils.toOffset(endPosition, document);

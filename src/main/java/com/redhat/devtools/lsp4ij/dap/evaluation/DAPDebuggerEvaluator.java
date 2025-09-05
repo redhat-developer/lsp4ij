@@ -19,6 +19,7 @@ import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.evaluation.ExpressionInfo;
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XValueCallback;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValue;
@@ -49,30 +50,7 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
         this.stackFrame = stackFrame;
     }
 
-    @Override
-    public void evaluate(@NotNull String expression,
-                         @NotNull XEvaluationCallback callback,
-                         @Nullable XSourcePosition expressionPosition) {
-        DAPClient client = stackFrame.getClient();
-        String context = getEvaluationContext(callback);
-        int frameId = stackFrame.getFrameId();
-        client.evaluate(expression, frameId, context)
-                .thenAccept(evaluateResponse -> {
-                    Variable variable = new Variable();
-                    variable.setName(expression); // DAPValue which extends XNamedValue requires a non-null name
-                    variable.setValue(evaluateResponse.getResult());
-                    variable.setType(evaluateResponse.getType());
-                    variable.setVariablesReference(evaluateResponse.getVariablesReference());
-                    variable.setNamedVariables(evaluateResponse.getNamedVariables());
-                    variable.setIndexedVariables(evaluateResponse.getIndexedVariables());
-                    callback.evaluated(new DAPValue(stackFrame, variable, null));
-                }).exceptionally(error -> {
-                    errorOccurred(error, callback);
-                    return null;
-                });
-    }
-
-    public static @NotNull String getEvaluationContext(@NotNull XEvaluationCallback callback) {
+    private static @NotNull String getEvaluationContext(@NotNull XEvaluationCallback callback) {
         // As XEvaluationCallbackWithOrigin is not available on old IntelliJ version  (<=2023.3), we need to use Java reflection.
         if (reflectionUnsupported) {
             return EvaluateArgumentsContext.WATCH;
@@ -112,7 +90,6 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
         return EvaluateArgumentsContext.WATCH;
     }
 
-
     public static void errorOccurred(@NotNull Throwable error,
                                      @NotNull XValueCallback callback) {
         if (error instanceof CompletionException && error.getCause() != null) {
@@ -135,6 +112,29 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
     }
 
     @Override
+    public void evaluate(@NotNull String expression,
+                         @NotNull XEvaluationCallback callback,
+                         @Nullable XSourcePosition expressionPosition) {
+        DAPClient client = stackFrame.getClient();
+        String context = getEvaluationContext(callback);
+        int frameId = stackFrame.getFrameId();
+        client.evaluate(expression, frameId, context)
+                .thenAccept(evaluateResponse -> {
+                    Variable variable = new Variable();
+                    variable.setName(expression); // DAPValue which extends XNamedValue requires a non-null name
+                    variable.setValue(evaluateResponse.getResult());
+                    variable.setType(evaluateResponse.getType());
+                    variable.setVariablesReference(evaluateResponse.getVariablesReference());
+                    variable.setNamedVariables(evaluateResponse.getNamedVariables());
+                    variable.setIndexedVariables(evaluateResponse.getIndexedVariables());
+                    callback.evaluated(new DAPValue(stackFrame, variable, null));
+                }).exceptionally(error -> {
+                    errorOccurred(error, callback);
+                    return null;
+                });
+    }
+
+    @Override
     public @NotNull Promise<ExpressionInfo> getExpressionInfoAtOffsetAsync(
             @NotNull Project project,
             @NotNull Document document,
@@ -142,6 +142,13 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
             boolean sideEffectsAllowed
     ) {
         return ReadAction.nonBlocking(() -> {
+
+                    var file = LSPIJUtils.getFile(document);
+                    if (file == null || !stackFrame.getClient().getServerDescriptor().isDebuggableFile(file, project)) {
+                        // The current document which is hovered is not managed by the DAP server from the current stack frame
+                        return null;
+                    }
+
                     TextRange textRange = getTextRange(document, offset);
                     if (textRange == null) {
                         return null;

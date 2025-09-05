@@ -267,7 +267,8 @@
         <extensionPoint
                 name="installerTaskFactory"
                 beanClass="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryPointBean">
-            <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactory"/>
+            <with attribute="factoryClass"
+                  implements="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactory"/>
         </extensionPoint>
 
     </extensionPoints>
@@ -275,25 +276,25 @@
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
         <installerTaskFactory
                 type="exec"
-                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ExecTaskFactory" />
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ExecTaskFactory"/>
         <installerTaskFactory
                 type="showMessage"
-                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ShowMessageTaskFactory" />
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ShowMessageTaskFactory"/>
         <installerTaskFactory
                 type="download"
-                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.DownloadTaskFactory" />
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.DownloadTaskFactory"/>
         <installerTaskFactory
                 type="configureServer"
-                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ConfigureServerTaskFactory" />
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ConfigureServerTaskFactory"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService
-            serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherManager"/>
+                serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherManager"/>
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.MavenArtifactFetcherManager"/>
         <applicationService
-            serviceImplementation="com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager"/>
+                serviceImplementation="com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager"/>
     </extensions>
 
     <!-- LSP extension points -->
@@ -340,7 +341,7 @@
 
         <!-- LSP Editor notification used to suggest installation of some language servers according the editing file -->
         <editorNotificationProvider
-                implementation="com.redhat.devtools.lsp4ij.ui.LanguageServerSuggestionEditorNotificationProvider" />
+                implementation="com.redhat.devtools.lsp4ij.ui.LanguageServerSuggestionEditorNotificationProvider"/>
 
         <!-- LSP application services -->
         <applicationService
@@ -383,7 +384,7 @@
                          groupName="Language Servers"
                          displayName="Diagnostics"
                          implementationClass="com.redhat.devtools.lsp4ij.inspections.LSPLocalInspectionTool"/>
-        <problemFileHighlightFilter id ="LSPProblemFileHighlightFilter"
+        <problemFileHighlightFilter id="LSPProblemFileHighlightFilter"
                                     implementation="com.redhat.devtools.lsp4ij.features.diagnostics.LSPProblemFileHighlightFilter"/>
 
         <!-- LSP textDocument/completion request support -->
@@ -455,7 +456,7 @@
                 implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensProvider"/>
         <editorFactoryListener
                 id="LSPCodeLensEditorFactoryListener"
-                implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensEditorFactoryListener" />
+                implementation="com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensEditorFactoryListener"/>
 
         <!-- LSP textDocument/inlayHint requests support -->
         <codeInsight.declarativeInlayProviderFactory
@@ -604,18 +605,18 @@
         <!-- LSP textDocument/prepareTypeHierarchy request support -->
         <typeHierarchyProvider
                 language="TEXT"
-                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider" />
+                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider"/>
         <typeHierarchyProvider
                 language="textmate"
-                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider" />
+                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider"/>
 
         <!-- LSP textDocument/callHierarchy request support -->
         <callHierarchyProvider
                 language="TEXT"
-                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" />
+                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
         <callHierarchyProvider
                 language="textmate"
-                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" />
+                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
 
         <!-- LSP Find Usages (LSP) support shows:
              - textDocument/declaration
@@ -950,7 +951,7 @@
                 topic="com.intellij.openapi.project.ProjectManagerListener"
                 class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
         <listener topic="com.intellij.ide.AppLifecycleListener"
-                  class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingAppLifecycleListener" />
+                  class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingAppLifecycleListener"/>
     </applicationListeners>
 
     <projectListeners>
@@ -970,7 +971,8 @@
         <extensionPoint
                 name="debugAdapterServer"
                 beanClass="com.redhat.devtools.lsp4ij.dap.definitions.extension.DebugAdapterServerExtensionPointBean">
-            <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory"/>
+            <with attribute="factoryClass"
+                  implements="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory"/>
         </extensionPoint>
 
     </extensionPoints>
@@ -991,7 +993,7 @@
                                 language="any"
                                 implementationClass="com.redhat.devtools.lsp4ij.dap.completion.DAPCompletionProcessor"/>
         <runConfigurationProducer id="DAPRunConfigurationProvider"
-                                  implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationProvider" />
+                                  implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationProvider"/>
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager"/>
         <projectConfigurable
@@ -1003,6 +1005,36 @@
                 instance="com.redhat.devtools.lsp4ij.dap.settings.DebugAdapterServerListConfigurable"/>
         <applicationService id="UserDefinedDAPServerSettings"
                             serviceImplementation="com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings"/>
+
     </extensions>
+
+    <!-- Disassembly View -->
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+                id="DisassemblyFileRegistry"
+                serviceImplementation="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileRegistry"/>
+        <virtualFileSystem
+                key="dap-disassembly"
+                implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileSystem"/>
+        <fileType
+                name="Disassembly"
+                implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileType"/>
+        <fileEditorProvider
+                id="lsp.disassembly"
+                implementation="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileEditorProvider"/>
+        <xdebugger.breakpointType
+                implementation="com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointType"/>
+    </extensions>
+
+
+    <actions>
+        <action id="OpenDisassembly"
+                class="com.redhat.devtools.lsp4ij.dap.disassembly.OpenDisassemblyAction"
+                text="Open Disassembly View"
+                description="Show disassembly for this frame">
+            <add-to-group group-id="DebuggingActionsGroup"/>
+            <add-to-group group-id="XDebugger.Frames.Tree.Popup" anchor="last"/>
+        </action>
+    </actions>
 
 </idea-plugin>
