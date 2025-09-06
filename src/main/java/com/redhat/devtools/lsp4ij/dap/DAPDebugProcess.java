@@ -440,10 +440,12 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 // Register "Threads" panel
                 registerThreadsPanel(ui);
 
-                // Register the "Installer" tab
-                String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
-                var project = DAPDebugProcess.this.getProject();
-                resisterInstallerTab(ui, installerConfiguration, project);
+                if (serverDescriptor.isShowInstallerTab()) {
+                    // Register the "Installer" tab
+                    String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
+                    var project = DAPDebugProcess.this.getProject();
+                    resisterInstallerTab(ui, installerConfiguration, project);
+                }
             }
 
             private void registerBreakpointsPanel(@NotNull RunnerLayoutUi ui) {

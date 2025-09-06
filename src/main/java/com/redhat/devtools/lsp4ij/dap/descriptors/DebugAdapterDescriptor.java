@@ -291,4 +291,13 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
                                                                            @NotNull DAPDebugProcess debugProcess) {
         return new DAPDebuggerEditorsProvider(fileType, debugProcess);
     }
+
+    /**
+     * Returns true if "Installer" tab must be shown and false otherwise.
+     *
+     * @return true if "Installer" tab must be shown and false otherwise.
+     */
+    public boolean isShowInstallerTab() {
+        return false;
+    }
 }

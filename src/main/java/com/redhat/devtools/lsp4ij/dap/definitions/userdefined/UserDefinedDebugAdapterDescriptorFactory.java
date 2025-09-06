@@ -11,11 +11,15 @@
 package com.redhat.devtools.lsp4ij.dap.definitions.userdefined;
 
 import com.intellij.execution.configurations.RunConfiguration;
+import com.intellij.execution.configurations.RunConfigurationOptions;
+import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DefaultDebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -30,6 +34,11 @@ import static com.redhat.devtools.lsp4ij.dap.LaunchConfiguration.findLaunchConfi
  * User defined {@link DebugAdapterDescriptorFactory}.
  */
 public class UserDefinedDebugAdapterDescriptorFactory extends DebugAdapterDescriptorFactory {
+
+    @Override
+    public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull RunConfigurationOptions options, @NotNull ExecutionEnvironment environment) {
+        return new UserDefinedDebugAdapterDescriptor(options, environment, getServerDefinition());
+    }
 
     @Override
     public boolean prepareConfiguration(@NotNull RunConfiguration configuration,
