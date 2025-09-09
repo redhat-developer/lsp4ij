@@ -1015,14 +1015,18 @@
 
     </extensions>
 
-    <!-- Disassembly View -->
+    <!-- DAP Source reference / Disassembly support -->
     <extensions defaultExtensionNs="com.intellij">
+
+        <!-- DAP files support for DAP Source reference / Disassembly-->
         <applicationService
-                id="DisassemblyFileRegistry"
-                serviceImplementation="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileRegistry"/>
+                id="DAPFileRegistry"
+                serviceImplementation="com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry"/>
         <virtualFileSystem
-                key="dap-disassembly"
-                implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileSystem"/>
+                key="dap-file"
+                implementationClass="com.redhat.devtools.lsp4ij.dap.client.files.DAPFileSystem"/>
+
+        <!-- Disassembly support-->
         <fileType
                 name="Disassembly"
                 implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileType"/>
@@ -1032,7 +1036,6 @@
         <xdebugger.breakpointType
                 implementation="com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointType"/>
     </extensions>
-
 
     <actions>
         <action id="OpenDisassembly"

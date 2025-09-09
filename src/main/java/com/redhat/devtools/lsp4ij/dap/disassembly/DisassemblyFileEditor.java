@@ -23,6 +23,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.pom.Navigatable;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.dap.client.files.DeferredSourcePosition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -145,9 +146,7 @@ public class DisassemblyFileEditor implements TextEditor {
 
     @Override
     public boolean canNavigateTo(@NotNull Navigatable navigatable) {
-        return navigatable instanceof OpenFileDescriptor &&
-                (((OpenFileDescriptor) navigatable).getLine() >= 0 ||
-                        ((OpenFileDescriptor) navigatable).getOffset() >= 0);
+        return navigatable instanceof DeferredSourcePosition<?,?>.DeferredNavigatable;
     }
 
     @Override

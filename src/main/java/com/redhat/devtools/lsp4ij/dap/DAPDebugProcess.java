@@ -28,7 +28,6 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.AppUIUtil;
 import com.intellij.ui.content.Content;
 import com.intellij.util.ui.FormBuilder;
-import com.intellij.xdebugger.XAlternativeSourceHandler;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
@@ -42,11 +41,11 @@ import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
-import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -81,21 +80,23 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
     private final ThreadsPanel threadsPanel;
-    private @Nullable CompletableFuture<Void> connectToServerFuture;
-
-    private Status status;
-    private Supplier<TransportStreams> streamsSupplier;
-    private DAPClient parentClient;
 
     // Disassembly
     private final @NotNull DisassemblyBreakpointHandlerBase<?> disassemblyBreakpointHandler;
-    private final @NotNull  DAPAlternativeSourceHandler allternativeSourceHandler;
+    private final @NotNull DAPAlternativeSourceHandler alternativeSourceHandler;
+    private final long sessionId;
+
+    private @Nullable CompletableFuture<Void> connectToServerFuture;
+    private Status status;
+    private Supplier<TransportStreams> streamsSupplier;
+    private DAPClient parentClient;
 
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
                            @NotNull ExecutionResult executionResult,
                            boolean isDebug) {
         super(session);
+        this.sessionId = System.currentTimeMillis();
         this.dapState = dapState;
         var project = getSession().getProject();
         this.executionResult = executionResult;
@@ -103,7 +104,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
-        this.allternativeSourceHandler = new DAPAlternativeSourceHandler(this);
+        this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);
         this.status = Status.NONE;
 
@@ -483,16 +484,20 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     @Override
     public @Nullable DAPAlternativeSourceHandler getAlternativeSourceHandler() {
-        return allternativeSourceHandler;
+        return alternativeSourceHandler;
     }
 
     public @Nullable DisassemblyFile getDisassemblyFile() {
         if (parentClient == null || !parentClient.canDisassemble()) {
             return null;
         }
-        String configName = dapState.getEnvironment().getRunProfile().getName();
-        return DisassemblyFileRegistry.getInstance()
-                .getOrCreateDisassemblyFile(configName, getProject());
+        String configName = getConfigName();
+        return (DisassemblyFile) DAPFileRegistry.getInstance()
+                .getOrCreateDAPFile(configName, DisassemblyFile.FILE_NAME, getProject());
+    }
+
+    public @NotNull String getConfigName() {
+        return dapState.getEnvironment().getRunProfile().getName();
     }
 
     public @NotNull Project getProject() {
@@ -513,6 +518,10 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         if (disassemblyFile != null) {
             disassemblyFile.dispose();
         }
+    }
+
+    public long getSessionId() {
+        return sessionId;
     }
 
     private enum Status {

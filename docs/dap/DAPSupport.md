@@ -60,7 +60,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ❌ [SetFunctionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints).
 * ❌ [SetInstructionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetInstructionBreakpoints).
 * ✅ [SetVariable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable).
-* ❌ [Source](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Source).
+* ✅ [Source](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Source).
 * ✅ [StackTrace](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StackTrace).
 * ❌ [StepBack](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepBack).
 * ✅ [StepIn](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepIn).

@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.client;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
@@ -23,22 +24,20 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XValueChildrenList;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
+import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyDeferredSourcePosition;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.Thread;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
 
@@ -50,6 +49,7 @@ public class DAPStackFrame extends XStackFrame {
     private final @NotNull StackFrame stackFrame;
     private final @NotNull DAPClient client;
     private @Nullable XSourcePosition sourcePosition;
+    private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
     private CompletableFuture<DebugVariableContext> variablesContext;
 
@@ -79,20 +79,37 @@ public class DAPStackFrame extends XStackFrame {
 
     @Override
     public @Nullable XSourcePosition getSourcePosition() {
-        if (sourcePosition == null && stackFrame.getSource() != null) {
-            Path filePath = getValidFilePath(stackFrame.getSource());
-            if (filePath == null) {
-                return null;
-            }
-            try {
-                VirtualFile file = VfsUtil.findFile(filePath, true);
-                sourcePosition = XDebuggerUtil.getInstance().createPosition(file, stackFrame.getLine() - 1);
-            } catch (Exception e) {
-                // Invalid path...
-                // ex: <node_internals>/internal/modules/cjs/loader
-            }
+        var source = stackFrame.getSource();
+        if (sourcePosition == null && source != null) {
+            sourcePosition = doGetSourcePosition(source, stackFrame.getLine() - 1);
         }
         return sourcePosition;
+    }
+
+    private @Nullable XSourcePosition doGetSourcePosition(@NotNull Source source, int line) {
+        int sourceReference = source.getSourceReference() != null ? source.getSourceReference() : 0;
+        if (sourceReference > 0) {
+            // If the value &gt; 0 the contents of the source must be retrieved through
+            // the SourceRequest (even if a path is specified).
+            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), source.getName(), client.getProject());
+            if (file.shouldReload(getClient().getSessionId())) {
+                return new DAPSourceReferencePosition(file, sourceReference, line, client);
+            }
+            return XDebuggerUtil.getInstance().createPosition(file, line);
+        }
+
+        Path filePath = getValidFilePath(source);
+        if (filePath == null) {
+            return null;
+        }
+        try {
+            VirtualFile file = VfsUtil.findFile(filePath, true);
+            return XDebuggerUtil.getInstance().createPosition(file, line);
+        } catch (Exception e) {
+            // Invalid path...
+            // ex: <node_internals>/internal/modules/cjs/loader
+        }
+        return null;
     }
 
     public CompletableFuture<XSourcePosition> getSourcePositionFor(@NotNull Variable variable) {
@@ -184,23 +201,17 @@ public class DAPStackFrame extends XStackFrame {
             return null;
         }
         var disassemblyFile = getClient().getDisassemblyFile();
-        if (disassemblyFile == null) {
-            // The DAP server doesn't support Disassembly
+        if (disassemblyFile == null  || !FileEditorManager.getInstance(client.getProject()).isFileOpen(disassemblyFile)) {
+            // Don't load the disassembly instruction source position when:
+            // - the DAP server doesn't support Disassembly
+            // - the disassembly view is not opened
             return null;
         }
-
-        try {
-            int line = disassemblyFile.getInstructionIndex(instructionPointerReference, 0, client)
-                    .get(2000, TimeUnit.MILLISECONDS);
-            return XDebuggerUtil.getInstance().createPosition(disassemblyFile, line);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        } catch (TimeoutException e) {
-            throw new RuntimeException(e);
+        if (disassemblyInstructionSourcePosition != null && disassemblyInstructionSourcePosition.getModificationCount() == disassemblyFile.getModificationCount()) {
+            return disassemblyInstructionSourcePosition;
         }
-        return null;
+        disassemblyInstructionSourcePosition =  new DisassemblyDeferredSourcePosition(instructionPointerReference, disassemblyFile, client);
+        return disassemblyInstructionSourcePosition;
     }
 
 }
