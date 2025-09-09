@@ -141,6 +141,16 @@ public class CancellationSupport implements CancelChecker {
                 }
             }
             if (error != null) {
+                if (error instanceof CancellationException) {
+                    // This case occurs when an LSP request is cancelled and call https://github.com/eclipse-lsp4j/lsp4j/blob/783b6e788c1e374b6de63f69804c7d0f96be4da2/org.eclipse.lsp4j.jsonrpc/src/main/java/org/eclipse/lsp4j/jsonrpc/RemoteEndpoint.java#L161
+                    // if CancellationException is rethrown, the call of super.cancel(...) throws again CancellationException
+                    // and logs strange error like
+                    // - https://github.com/redhat-developer/lsp4ij/issues/1204
+                    // - Caused by: java.util.concurrent.CancellationException
+                    //	at java.base/java.util.concurrent.CompletableFuture.cancel(CompletableFuture.java:2478)
+                    // To fix those issues, we ignore CancellationException in this case.
+                    return null;
+                }
                 if (error instanceof RuntimeException) {
                     throw (RuntimeException) error;
                 }
