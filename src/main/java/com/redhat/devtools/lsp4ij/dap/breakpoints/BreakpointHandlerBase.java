@@ -92,7 +92,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
                                                                 @Nullable TemporaryBreakpoint temporaryBreakpoint) {
-        if (debugProtocolServers.isEmpty()) {
+        if (debugProtocolServers.isEmpty() || breakpoints.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
         return doSendBreakpoints(debugProtocolServer, temporaryBreakpoint);

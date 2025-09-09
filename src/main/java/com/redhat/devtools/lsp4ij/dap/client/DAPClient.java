@@ -695,4 +695,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     public Project getProject() {
         return debugProcess.getSession().getProject();
     }
+
+    public @NotNull String getConfigName() {
+        return debugProcess.getConfigName();
+    }
+
+    public long getSessionId() {
+        return debugProcess.getSessionId();
+    }
 }

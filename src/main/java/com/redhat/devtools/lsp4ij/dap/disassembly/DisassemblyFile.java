@@ -11,13 +11,12 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.disassembly;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.testFramework.LightVirtualFileBase;
-import com.intellij.util.LocalTimeCounter;
+import com.intellij.openapi.util.SimpleModificationTracker;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPFile;
 import org.eclipse.lsp4j.debug.DisassembleArguments;
 import org.eclipse.lsp4j.debug.DisassembleResponse;
 import org.eclipse.lsp4j.debug.DisassembledInstruction;
@@ -28,11 +27,11 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyUtils.binarySearch2;
@@ -46,29 +45,23 @@ import static com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyUtils.splice
  * The file dynamically fetches disassembly instructions from the server
  * and caches them for display in the disassembly editor.
  */
-public class DisassemblyFile extends LightVirtualFileBase {
+public class DisassemblyFile extends DAPFile {
 
+    public static final String FILE_NAME = "disassembly";
     private static final Logger LOGGER = LoggerFactory.getLogger(DisassemblyFile.class);
-
-    /** Number of instructions to load initially or per batch. */
+    /**
+     * Number of instructions to load initially or per batch.
+     */
     private static final int NUM_INSTRUCTIONS_TO_LOAD = 50;
-
-    /** Virtual file path identifier. */
-    private final @NotNull String path;
-
-    /** URL used for IntelliJ VirtualFile API. */
-    private final @NotNull String url;
-
-    /** Registry managing all DisassemblyFile instances. */
-    private final @NotNull DisassemblyFileRegistry registry;
-
-    /** IntelliJ project associated with this disassembly file. */
-    private final @NotNull Project project;
-
-    /** Maps instruction references to memory addresses. */
+    private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
+    /**
+     * Maps instruction references to memory addresses.
+     */
     private final Map<String, BigInteger> referenceToMemoryAddress = new HashMap<>();
 
-    /** All disassembled instructions loaded so far. */
+    /**
+     * All disassembled instructions loaded so far.
+     */
     private final List<DisassembledInstructionEntry> disassembledInstructions = new ArrayList<>();
 
     /**
@@ -76,28 +69,22 @@ public class DisassemblyFile extends LightVirtualFileBase {
      *
      * @param configName the run configuration name
      * @param path       the unique path for this file (project hash + config)
-     * @param registry   the registry managing this file
      * @param project    the associated IntelliJ project
      */
     public DisassemblyFile(@NotNull String configName,
                            @NotNull String path,
-                           @NotNull DisassemblyFileRegistry registry,
                            @NotNull Project project) {
-        super("Disassembly (" + configName + ")", DisassemblyFileType.INSTANCE, LocalTimeCounter.currentTime());
-        this.project = project;
-        this.registry = registry;
-        this.path = path;
-        this.url = DisassemblyFileSystem.PROTOCOL + ":///" + getPath();
+        super("Disassembly (" + configName + ")", path, project);
     }
 
     /**
      * Sends a disassemble request to the DAP server.
      *
      * @param instructionReference memory reference to disassemble
-     * @param offset memory offset from reference
-     * @param instructionOffset instruction offset for batch loading
-     * @param instructionCount number of instructions to request
-     * @param server the DAP server instance
+     * @param offset               memory offset from reference
+     * @param instructionOffset    instruction offset for batch loading
+     * @param instructionCount     number of instructions to request
+     * @param server               the DAP server instance
      * @return a future containing the disassembly response
      */
     private static CompletableFuture<DisassembleResponse> disassemble(String instructionReference,
@@ -114,43 +101,13 @@ public class DisassemblyFile extends LightVirtualFileBase {
         return server.disassemble(args);
     }
 
-    @Override
-    public boolean isWritable() {
-        return true;
-    }
-
-    @Override
-    public @NotNull OutputStream getOutputStream(Object o, long l, long l1) throws IOException {
-        return null;
-    }
-
-    @Override
-    public byte @NotNull [] contentsToByteArray() throws IOException {
-        return new byte[0];
-    }
-
-    @Override
-    public @NotNull InputStream getInputStream() throws IOException {
-        return null;
-    }
-
-    @Override
-    public @NotNull String getUrl() {
-        return url;
-    }
-
-    @Override
-    public @NotNull String getPath() {
-        return path;
-    }
-
     /**
      * Returns the index of the instruction corresponding to a memory reference
      * and offset, loading instructions from the server if necessary.
      *
      * @param instructionReference the instruction reference identifier
-     * @param offset offset in memory from the reference
-     * @param client the DAP client to fetch instructions
+     * @param offset               offset in memory from the reference
+     * @param client               the DAP client to fetch instructions
      * @return a CompletableFuture with the index of the instruction in the list
      */
     public CompletableFuture<Integer> getInstructionIndex(String instructionReference, int offset, DAPClient client) {
@@ -174,10 +131,10 @@ public class DisassemblyFile extends LightVirtualFileBase {
      * the existing list, and updates the document text in the editor.
      *
      * @param instructionReference the instruction reference identifier
-     * @param offset memory offset
-     * @param instructionOffset instruction offset within batch
-     * @param instructionCount number of instructions to fetch
-     * @param client DAP client to use for fetching
+     * @param offset               memory offset
+     * @param instructionOffset    instruction offset within batch
+     * @param instructionCount     number of instructions to fetch
+     * @param client               DAP client to use for fetching
      * @return a future with the number of instructions loaded
      */
     private CompletableFuture<Integer> loadDisassembledInstructions(String instructionReference,
@@ -204,11 +161,15 @@ public class DisassemblyFile extends LightVirtualFileBase {
                 ensureBaseLineInstructions.thenCompose(index -> resultEntriesFuture) :
                 resultEntriesFuture;
 
-        return result.thenApply(disassembleResponse -> {
-            if (disassembleResponse == null) return 0;
+        return result.thenCompose(disassembleResponse -> {
+            if (disassembleResponse == null) {
+                return CompletableFuture.completedFuture(0);
+            }
 
             var resultEntries = disassembleResponse.getInstructions();
-            if (resultEntries == null || resultEntries.length == 0) return 0;
+            if (resultEntries == null || resultEntries.length == 0) {
+                return CompletableFuture.completedFuture(0);
+            }
 
             List<DisassembledInstructionEntry> newEntries = new ArrayList<>();
             Source lastLocation = null;
@@ -238,7 +199,9 @@ public class DisassemblyFile extends LightVirtualFileBase {
                 }
             }
 
-            if (newEntries.isEmpty()) return 0;
+            if (newEntries.isEmpty()) {
+                return CompletableFuture.completedFuture(0);
+            }
 
             BigInteger firstAddr = newEntries.get(0).address();
             BigInteger lastAddr = newEntries.get(newEntries.size() - 1).address();
@@ -254,21 +217,21 @@ public class DisassemblyFile extends LightVirtualFileBase {
             splice(disassembledInstructions, start, toDelete, newEntries);
 
             // Update the editor document asynchronously
-            ApplicationManager.getApplication().executeOnPooledThread(() ->
-                    WriteCommandAction.runWriteCommandAction(project, () -> {
-                        var doc = FileDocumentManager.getInstance().getDocument(this);
-                        StringBuilder sb = new StringBuilder();
-                        for (var instr : disassembledInstructions) {
-                            sb.append(String.format("%s: %s %s\n",
-                                    instr.instr().getAddress(),
-                                    instr.instr().getInstructionBytes(),
-                                    instr.instr().getInstruction()));
-                        }
-                        doc.setText(sb.toString());
-                    })
-            );
-
-            return newEntries.size() - toDelete;
+            CompletableFuture<Integer> updatedDoc = new CompletableFuture<>();
+            WriteCommandAction.runWriteCommandAction(getProject(), () -> {
+                var doc = FileDocumentManager.getInstance().getDocument(this);
+                StringBuilder sb = new StringBuilder();
+                for (var instr : new ArrayList<>(disassembledInstructions)) {
+                    sb.append(String.format("%s: %s %s\n",
+                            instr.instr().getAddress(),
+                            instr.instr().getInstructionBytes(),
+                            instr.instr().getInstruction()));
+                }
+                doc.setText(sb.toString());
+                DisassemblyFile.this.modificationTracker.incModificationCount();
+                updatedDoc.complete(newEntries.size() - toDelete);
+            });
+            return updatedDoc;
         });
     }
 
@@ -305,14 +268,8 @@ public class DisassemblyFile extends LightVirtualFileBase {
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
-        DisassemblyFile that = (DisassemblyFile) o;
-        return Objects.equals(url, that.url);
+    public long getModificationCount() {
+        return modificationTracker.getModificationCount();
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(url);
-    }
 }
