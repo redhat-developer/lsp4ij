@@ -17,32 +17,29 @@ import org.eclipse.lsp4j.debug.Thread;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
  * Debug Adapter Protocol (DAP) suspend context.
  */
-public class DAPSuspendContext extends XSuspendContext  {
+public class DAPSuspendContext extends XSuspendContext {
 
     private final @NotNull DAPClient client;
     private final List<DAPExecutionStack> myExecutionStacks = new LinkedList<>();
-    private DAPExecutionStack myActiveStack;
+    private @Nullable DAPExecutionStack myActiveStack;
 
     public DAPSuspendContext(@NotNull DAPClient client) {
         this.client = client;
     }
 
-    public void addToExecutionStack(Thread thread, StackFrame[] stackFrames) {
+    public void addToExecutionStack(@NotNull Thread thread, @Nullable StackFrame[] stackFrames) {
         // Convert DAP stack frames to IJ stack frames
-        List<DAPStackFrame> dapStackFrames = Arrays.stream(stackFrames)
-                .map(stackFrame -> new DAPStackFrame(client, stackFrame))
-                .toList();
-        DAPExecutionStack stack = new DAPExecutionStack(client, this, thread,
-                dapStackFrames);
+        DAPExecutionStack stack = new DAPExecutionStack(client, this, thread, stackFrames);
         myExecutionStacks.add(stack);
-        myActiveStack = stack;
+        if (stackFrames != null) {
+            setActiveExecutionStack(stack);
+        }
     }
 
     @Nullable
@@ -66,6 +63,6 @@ public class DAPSuspendContext extends XSuspendContext  {
     }
 
     public Integer getThreadId() {
-        return myActiveStack != null ? myActiveStack.getThreadId() :  null;
+        return myActiveStack != null ? myActiveStack.getThreadId() : null;
     }
 }
