@@ -358,7 +358,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         // The Thread doesn't exist
                         return;
                     }
-                    var thread = threadResult.get();
+                    var activeThread = threadResult.get();
                     // get the stack trace
                     StackTraceArguments stackTraceArgs = new StackTraceArguments();
                     stackTraceArgs.setThreadId(args.getThreadId());
@@ -373,7 +373,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                     if (context == null) {
                                         context = new DAPSuspendContext(this);
                                     }
-                                    ((DAPSuspendContext) context).addToExecutionStack(thread, stackFrames);
+                                    // Create an execution stack per thread and
+                                    // initialize the stack with current DAP stack frames for the active thread
+                                    for(var thread : threads) {
+                                        ((DAPSuspendContext) context).addToExecutionStack(thread, thread.equals(activeThread) ? stackFrames : null);
+                                    }
                                     XDebugSession session = getSession();
                                     if (breakpoint == null) {
                                         session.positionReached(context);

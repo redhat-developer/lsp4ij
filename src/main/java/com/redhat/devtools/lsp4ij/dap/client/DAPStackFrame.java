@@ -34,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.Thread;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -165,7 +166,7 @@ public class DAPStackFrame extends XStackFrame {
         return stackFrame.getId();
     }
 
-    public String getInstructionPointerReference() {
+    public @Nullable String getInstructionPointerReference() {
         return stackFrame.getInstructionPointerReference();
     }
 
@@ -184,6 +185,7 @@ public class DAPStackFrame extends XStackFrame {
         }
         var disassemblyFile = getClient().getDisassemblyFile();
         if (disassemblyFile == null) {
+            // The DAP server doesn't support Disassembly
             return null;
         }
 
