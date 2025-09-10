@@ -5,6 +5,13 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+    <h3>0.16.0</h3>
+    <ul>
+      <li>DAP support for <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md#disassemble">Disassembly</a></li>
+      <li>Various bug fixes and stability improvements for LSP and DAP</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/19?closed=1">changelog</a>.
+
     <h3>0.15.0</h3>
     <ul>
       <li>Improved DAP support: added <code>runInTerminal</code> and thread panels</li>
