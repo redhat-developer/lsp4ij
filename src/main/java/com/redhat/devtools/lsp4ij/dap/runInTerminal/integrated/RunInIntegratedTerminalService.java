@@ -17,6 +17,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
 import org.jetbrains.annotations.NotNull;
@@ -87,7 +88,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
                 TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
 
                 String title = args.getTitle();
-                String workingDirectory = args.getCwd();
+                String workingDirectory = StringUtils.isBlank(args.getCwd()) ? null : args.getCwd();
                 ShellTerminalWidget shellWidget = tm.createLocalShellWidget(workingDirectory, title);
 
                 String command = prepareCommandWithEnv(args);
