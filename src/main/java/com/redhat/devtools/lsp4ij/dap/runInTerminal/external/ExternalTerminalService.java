@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.runInTerminal.external;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
 import com.redhat.devtools.lsp4ij.internal.ResponseErrorExceptionWrapper;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
 import org.jetbrains.annotations.NotNull;
@@ -84,7 +85,7 @@ public abstract class ExternalTerminalService implements RunInTerminalService {
 
         // Configure the process builder with working directory and environment variables.
         ProcessBuilder pb = new ProcessBuilder(commandBuilder.apply(args));
-        if (args.getCwd() != null) {
+        if (StringUtils.isNotBlank(args.getCwd())) {
             pb.directory(new File(args.getCwd()));
         }
         if (args.getEnv() != null) {
