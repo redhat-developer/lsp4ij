@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.runInTerminal.external;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.internal.ResponseErrorExceptionWrapper;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
@@ -52,7 +53,7 @@ public class LinuxExternalTerminalService extends ExternalTerminalService {
      * Executes the {@code runInTerminal} request in an external Windows terminal.
      *
      * @param args    the DAP {@link RunInTerminalRequestArguments} containing command, environment and working directory.
-     * @param project the current IntelliJ project context.
+     * @param project the IntelliJ {@link Project} in which this terminal is being launched
      * @return a {@link CompletableFuture} that completes with the spawned process.
      */
     @Override

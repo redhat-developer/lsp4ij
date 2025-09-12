@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.runInTerminal;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.external.LinuxExternalTerminalService;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.external.MacExternalTerminalService;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.external.WindowsExternalTerminalService;
@@ -59,13 +60,22 @@ public class RunInTerminalManager {
      * @param args DAP {@link RunInTerminalRequestArguments}
      * @return a {@link CompletableFuture} resolving to the {@link RunInTerminalResponse}
      */
-    public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args) {
+    public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args,
+                                                                  @NotNull DAPClient client) {
         if (args.getKind() == RunInTerminalRequestArgumentsKind.INTEGRATED) {
             if (runInIntegratedTerminalService.isApplicable()) {
-                return runInIntegratedTerminalService.runInTerminal(args, project);
+                return runInIntegratedTerminalService.runInTerminal(args, client);
             }
         }
-        return runInExternalTerminalService.runInTerminal(args, project);
+        return runInExternalTerminalService.runInTerminal(args, client);
     }
 
+    /**
+     * Releases all terminals currently assigned to the given client.
+     *
+     * @param client the DAP client whose terminals should be released
+     */
+    public void releaseClientTerminals(@NotNull DAPClient client) {
+        runInIntegratedTerminalService.releaseClientTerminals(client);
+    }
 }

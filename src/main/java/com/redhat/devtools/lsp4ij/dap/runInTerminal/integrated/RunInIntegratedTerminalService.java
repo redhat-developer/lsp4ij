@@ -13,88 +13,146 @@ package com.redhat.devtools.lsp4ij.dap.runInTerminal.integrated;
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.extensions.PluginId;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
+import com.intellij.terminal.JBTerminalWidget;
+import com.intellij.terminal.ui.TerminalWidget;
 import com.intellij.util.Alarm;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.terminal.ShellTerminalWidget;
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager;
 
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
  * Integrated terminal implementation of {@link RunInTerminalService} for Debug Adapter Protocol (DAP).
  * <p>
- * This service opens a new IntelliJ integrated terminal tab and executes the command specified
- * by a {@link RunInTerminalRequestArguments} request. It supports injecting environment variables
- * and formatting commands based on the underlying OS and shell.
+ * This service allows running commands inside IntelliJ integrated terminals, supports injecting
+ * environment variables, and formats commands depending on the OS and shell.
  * </p>
  *
  * <p><b>Features:</b></p>
  * <ul>
- *   <li>Creates a local shell widget in the integrated terminal window.</li>
- *   <li>Supports PowerShell, cmd.exe, and Unix-style shells.</li>
- *   <li>Injects environment variables with syntax adapted to the active shell.</li>
- *   <li>Returns the process ID of the spawned shell through {@link RunInTerminalResponse}.</li>
+ *     <li>Creates a local shell widget in the integrated terminal window.</li>
+ *     <li>Supports PowerShell, cmd.exe, and Unix-style shells.</li>
+ *     <li>Injects environment variables with proper shell syntax.</li>
+ *     <li>Returns the process ID of the spawned terminal via {@link RunInTerminalResponse}.</li>
+ *     <li>Ensures that terminals with the same title are not shared between clients.</li>
  * </ul>
  *
  * <p>
- * This service requires the IntelliJ Terminal plugin to be installed. If the plugin is missing,
- * {@link #isApplicable()} returns {@code false}.
+ * This service requires the IntelliJ Terminal plugin to be installed. {@link #isApplicable()} returns
+ * {@code false} if the plugin is missing.
  * </p>
  */
 public class RunInIntegratedTerminalService implements RunInTerminalService {
 
     /**
-     * Checks if the IntelliJ terminal plugin is installed and available.
-     *
-     * @return {@code true} if the terminal plugin is installed, {@code false} otherwise
+     * Map of terminals currently assigned to clients, keyed by terminal title.
      */
-    @Override
-    public boolean isApplicable() {
-        return isTerminalPluginInstalled();
+    private static final Map<String, ClientTerminal> clientTerminals = new ConcurrentHashMap<>();
+
+    /**
+     * Acquires a terminal for the given client.
+     * <p>
+     * If a terminal with the requested title is already assigned to this client, it is reused.
+     * Otherwise, it searches for an existing unassigned terminal with the same title in IntelliJ.
+     * If none is found, a new terminal is created.
+     *
+     * @param workingDirectory the working directory for the terminal, or null for default
+     * @param title            the terminal title, may be null
+     * @param client           the DAP client requesting the terminal
+     * @return a {@link ShellTerminalWidget} ready for command execution
+     */
+    private static @NotNull ShellTerminalWidget acquireTerminal(@Nullable String workingDirectory,
+                                                                @Nullable String title,
+                                                                @NotNull DAPClient client) {
+        var project = client.getProject();
+        TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
+
+        // 1) Terminal with same title used by another client
+        ClientTerminal assigned = clientTerminals.get(title);
+        if (assigned != null && !assigned.client.equals(client)) {
+            return createNewTerminal(workingDirectory, title, client);
+        }
+
+        // 2) Look for existing unassigned terminal in IntelliJ
+        for (TerminalWidget terminalWidget : tm.getTerminalWidgets()) {
+            if (title != null && title.equals(terminalWidget.getTerminalTitle().getDefaultTitle())) {
+                boolean used = clientTerminals.values().stream()
+                        .anyMatch(ct -> ct.terminalWidget == terminalWidget);
+                if (!used) {
+                    JBTerminalWidget jbTerminalWidget = JBTerminalWidget.asJediTermWidget(terminalWidget);
+                    if (jbTerminalWidget instanceof ShellTerminalWidget shellTerminalWidget) {
+                        clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
+                        return shellTerminalWidget;
+                    }
+                }
+            }
+        }
+
+        // 3) Create a new terminal if nothing found
+        return createNewTerminal(workingDirectory, title, client);
     }
 
     /**
-     * Executes the given DAP {@code runInTerminal} request in an integrated terminal tab.
+     * Helper method to create a new terminal and register it for the client.
+     */
+    private static @NotNull ShellTerminalWidget createNewTerminal(@Nullable String workingDirectory,
+                                                                  @Nullable String title,
+                                                                  @NotNull DAPClient client) {
+        var project = client.getProject();
+        TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
+        ShellTerminalWidget shellTerminalWidget = tm.createLocalShellWidget(workingDirectory, title);
+        clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
+        return shellTerminalWidget;
+    }
+
+
+    /**
+     * Checks if the IntelliJ Terminal plugin is installed.
      *
-     * <p>The method:</p>
-     * <ol>
-     *   <li>Creates a new {@link ShellTerminalWidget} for the project.</li>
-     *   <li>Prepares the command line with proper argument quoting and environment variable injection.</li>
-     *   <li>Executes the command inside the terminal.</li>
-     *   <li>Polls the terminal widget until a process ID is available, then completes the future.</li>
-     * </ol>
+     * @return true if the terminal plugin is installed, false otherwise
+     */
+    @Override
+    public boolean isApplicable() {
+        PluginId pluginId = PluginId.getId("org.jetbrains.plugins.terminal");
+        return PluginManagerCore.getPlugin(pluginId) != null;
+    }
+
+    /**
+     * Executes a command in an integrated terminal for the given client.
      *
-     * @param args    the {@link RunInTerminalRequestArguments} containing command, working directory,
-     *                environment variables, and title
-     * @param project the IntelliJ {@link Project} in which to open the integrated terminal
-     * @return a {@link CompletableFuture} resolving to a {@link RunInTerminalResponse}
-     * containing the process ID of the spawned terminal process
+     * @param args   the request arguments containing command, working directory, environment, and title
+     * @param client the DAP client executing the command
+     * @return a {@link CompletableFuture} resolving to {@link RunInTerminalResponse} with the process ID
      */
     @Override
     public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args,
-                                                                  @NotNull Project project) {
+                                                                  @NotNull DAPClient client) {
         CompletableFuture<RunInTerminalResponse> future = new CompletableFuture<>();
 
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
-                TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
-
+                var project = client.getProject();
                 String title = args.getTitle();
                 String workingDirectory = StringUtils.isBlank(args.getCwd()) ? null : args.getCwd();
-                ShellTerminalWidget shellWidget = tm.createLocalShellWidget(workingDirectory, title);
+
+                ShellTerminalWidget shellWidget = acquireTerminal(workingDirectory, title, client);
 
                 String command = prepareCommandWithEnv(args);
                 shellWidget.executeCommand(command);
 
-                // Poll until the process PID becomes available
+                // Poll until the terminal process PID becomes available
                 Alarm alarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, project);
                 Runnable checkProcess = new Runnable() {
                     @Override
@@ -120,15 +178,9 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
     }
 
     /**
-     * Builds a full command line with environment variable injection adapted
-     * to the current OS and shell syntax.
-     * <p>
-     * - PowerShell: {@code ${env:VAR}='value'; command}<br>
-     * - cmd.exe: {@code set VAR=value && set VAR2=value && command}<br>
-     * - Unix shells: {@code VAR='value' VAR2='value' command}
-     * </p>
+     * Prepares the full command line with environment variable injection according to the current OS and shell.
      *
-     * @param args the {@link RunInTerminalRequestArguments} containing the command and environment
+     * @param args the request arguments containing command and environment variables
      * @return the formatted command string
      */
     private String prepareCommandWithEnv(@NotNull RunInTerminalRequestArguments args) {
@@ -166,30 +218,19 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
 
     /**
      * Formats command-line arguments for the active OS and shell.
-     * <p>
-     * - PowerShell: adds call operator {@code &} and quotes paths with spaces<br>
-     * - cmd.exe: escapes spaces with {@code ^ }<br>
-     * - Unix: wraps arguments with spaces in single quotes
-     * </p>
      *
-     * @param args the array of command arguments
-     * @return a properly quoted and escaped command string
+     * @param args array of command arguments
+     * @return properly quoted and escaped command string
      */
     private String formatCommandArguments(String[] args) {
         boolean isWindows = SystemInfo.isWindows;
         boolean isPowerShell = isWindows && isPowerShellEnvironment();
 
-        if (args.length == 0) {
-            return "";
-        }
+        if (args.length == 0) return "";
 
         if (isPowerShell) {
             String first = args[0];
-            if (first.contains(" ")) {
-                first = "& \"" + first + "\"";
-            } else {
-                first = "& " + first;
-            }
+            first = first.contains(" ") ? "& \"" + first + "\"" : "& " + first;
 
             String rest = Arrays.stream(args, 1, args.length)
                     .map(arg -> arg.contains(" ") ? "\"" + arg + "\"" : arg)
@@ -208,22 +249,27 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
     }
 
     /**
-     * Detects whether the current environment is running under PowerShell on Windows.
+     * Detects whether the current environment is running PowerShell on Windows.
      *
-     * @return {@code true} if the environment suggests PowerShell, {@code false} otherwise
+     * @return true if PowerShell is detected, false otherwise
      */
     private boolean isPowerShellEnvironment() {
         String psModule = System.getenv("PSModulePath");
         return psModule != null && psModule.contains("PowerShell");
     }
 
+    @Override
+    public void releaseClientTerminals(@NotNull DAPClient client) {
+        clientTerminals.values().stream()
+                .filter(ct -> ct.client.equals(client))
+                .toList()
+                .forEach(ct -> clientTerminals.remove(ct.title, ct));
+    }
+
     /**
-     * Checks if the IntelliJ terminal plugin is installed and available.
-     *
-     * @return {@code true} if the terminal plugin is present, {@code false} otherwise
+     * Represents a terminal currently assigned to a DAP client.
      */
-    private static boolean isTerminalPluginInstalled() {
-        PluginId pluginId = PluginId.getId("org.jetbrains.plugins.terminal");
-        return PluginManagerCore.getPlugin(pluginId) != null;
+    private record ClientTerminal(String title, ShellTerminalWidget terminalWidget, DAPClient client) {
     }
 }
+

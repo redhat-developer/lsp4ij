@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.runInTerminal.external;
 
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
 import com.redhat.devtools.lsp4ij.internal.ResponseErrorExceptionWrapper;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -53,15 +54,15 @@ public abstract class ExternalTerminalService implements RunInTerminalService {
      *
      * @param args    the {@link RunInTerminalRequestArguments} containing the command,
      *                working directory, environment variables, and terminal kind
-     * @param project the IntelliJ {@link Project} in which this terminal is being launched
+     * @param client the DAP client {@link DAPClient} in which this terminal is being launched
      * @return a {@link CompletableFuture} that resolves to a {@link RunInTerminalResponse}
      * containing the process ID of the spawned terminal process.
      */
     @Override
     public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args,
-                                                                  @NotNull Project project) {
+                                                                  @NotNull DAPClient client) {
 
-        return doRunInTerminal(args, project)
+        return doRunInTerminal(args, client.getProject())
                 .thenApply(unused -> new RunInTerminalResponse());
     }
 
@@ -106,4 +107,8 @@ public abstract class ExternalTerminalService implements RunInTerminalService {
         }
     }
 
+    @Override
+    public void releaseClientTerminals(@NotNull DAPClient client) {
+        // Do nothing
+    }
 }

@@ -322,8 +322,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     @Override
-    public CompletableFuture<RunInTerminalResponse> runInTerminal(RunInTerminalRequestArguments args) {
-        return RunInTerminalManager.getInstance(getProject()).runInTerminal(args);
+    public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args) {
+        return RunInTerminalManager.getInstance(getProject()).runInTerminal(args, this);
     }
 
     @Override
@@ -468,6 +468,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (transportStreams != null) {
             transportStreams.close();
         }
+        RunInTerminalManager.getInstance(getProject()).releaseClientTerminals(this);
         threadPool.shutdown();
         for (DAPClient child : childrenClient) {
             child.dispose();
