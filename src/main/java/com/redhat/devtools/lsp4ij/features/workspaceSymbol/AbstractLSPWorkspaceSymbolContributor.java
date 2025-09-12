@@ -21,21 +21,25 @@ import com.intellij.util.Processor;
 import com.intellij.util.indexing.FindSymbolParameters;
 import com.intellij.util.indexing.IdFilter;
 import com.redhat.devtools.lsp4ij.LSPWorkspaceSupport;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * Abstract base class for LSP goto symbol contributors
  */
 abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameContributorEx {
 
-    private final static Logger LOGGER = LoggerFactory.getLogger(AbstractLSPWorkspaceSymbolContributor.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPWorkspaceSymbolContributor.class);
 
     @Override
     public void processNames(@NotNull Processor<? super String> processor,
@@ -69,11 +73,11 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
                                         @NotNull FindSymbolParameters parameters) {
         var workspaceSymbolsFuture = getWorkspaceSymbols(name, false, parameters.getProject());
         ProgressIndicatorUtils.awaitWithCheckCanceled(workspaceSymbolsFuture);
+
         if (CompletableFutures.isDoneNormally(workspaceSymbolsFuture)) {
             var items = workspaceSymbolsFuture.getNow(null);
             if (items != null) {
-                items
-                        .stream()
+                items.stream()
                         .filter(data -> data.getFile() != null && ReadAction.compute(() -> parameters.getSearchScope().accept(data.getFile())))
                         .forEach(processor::process);
             }
@@ -81,13 +85,29 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
     }
 
     private CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbols(@NotNull String name, boolean cancel, Project project) {
-        // Consume LSP 'workspace/symbol' request
         LSPWorkspaceSymbolSupport workspaceSymbolSupport = LSPWorkspaceSupport.getSupport(project).getWorkspaceSymbolSupport();
         if (cancel) {
             workspaceSymbolSupport.cancel();
         }
         LSPWorkspaceSymbolParams params = createWorkspaceSymbolParams(name);
-        return workspaceSymbolSupport.getWorkspaceSymbol(params);
+
+        CancellationSupport cancellationSupport = new CancellationSupport();
+        return cancellationSupport.execute(
+                workspaceSymbolSupport.getWorkspaceSymbol(params),
+                null,
+                "workspace/symbol"
+        ).exceptionally(throwable -> {
+            Throwable cause = throwable instanceof CompletionException ? throwable.getCause() : throwable;
+
+            if (cause instanceof CancellationException) {
+                throw (CancellationException) cause;
+            }
+
+            // Log other types of exceptions
+            LOGGER.debug("Workspace symbol request failed for query: {}", name, throwable);
+            return Collections.emptyList();
+        });
+
     }
 
     /**
