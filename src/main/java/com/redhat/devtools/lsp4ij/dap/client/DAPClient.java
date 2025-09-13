@@ -101,7 +101,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private boolean isConnected;
     private Future<Void> debugProtocolFuture;
     private IDebugProtocolServer debugProtocolServer;
-    private @Nullable Capabilities capabilities;
     private @NotNull
     final List<DAPClient> childrenClient;
     private boolean sentTerminateRequest;
@@ -266,11 +265,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * initialized.
      *
      * @return the current capabilities if they have been retrieved, or else
-     * return @{code null}
+     * return a default capabilities
      */
-    @Nullable
+    @NotNull
     Capabilities getCapabilities() {
-        return capabilitiesFuture.getNow(null);
+        return capabilitiesFuture.getNow(new Capabilities());
     }
 
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
@@ -646,15 +645,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     // Capabilities
 
-
     /**
      * Returns true if the debug adapter supports the 'terminate' request and false otherwise.
      *
      * @return true if the debug adapter supports the 'terminate' request and false otherwise.
      */
     public boolean isSupportsTerminateRequest() {
-        var capabilities = getCapabilities();
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsTerminateRequest());
     }
 
     /**
@@ -663,8 +660,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports the 'completions' request and false otherwise.
      */
     public boolean isSupportsCompletionsRequest() {
-        var capabilities = getCapabilities();
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsCompletionsRequest());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsCompletionsRequest());
     }
 
     /**
@@ -673,13 +669,20 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports setting a variable to a value and false otherwise.
      */
     public boolean isSupportsSetVariable() {
-        var capabilities = getCapabilities();
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsSetVariable());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsSetVariable());
+    }
+
+    /**
+     * Returns true if the debug adapter supports evaluate request for data hovers and false otherwise.
+     *
+     * @return true if the debug adapter supports evaluate request for data hovers and false otherwise.
+     */
+    public boolean isSupportsEvaluateForHovers() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsEvaluateForHovers());
     }
 
     public boolean canDisassemble() {
-        var capabilities = getCapabilities();
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsDisassembleRequest());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsDisassembleRequest());
     }
 
     @NotNull

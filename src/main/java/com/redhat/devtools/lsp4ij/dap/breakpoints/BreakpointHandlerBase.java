@@ -57,7 +57,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
-                                                        @Nullable Capabilities capabilities) {
+                                                        @NotNull Capabilities capabilities) {
         this.debugProtocolServers.add(debugProtocolServer);
         return sendBreakpoints(debugProtocolServer, null);
     }
