@@ -35,7 +35,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [ConfigurationDone](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ConfigurationDone).
 * ✅ [Continue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Continue).
 * ❌ [DataBreakpointInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_DataBreakpointInfo).
-* ✅ [Disassemble](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disassemble) (see [user guide](./UserGuide.md#disassemble)). 
+* ✅ [Disassemble](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disassemble) (see [user guide](./UserGuide.md#disassemble)).
 * ✅ [Disconnect](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disconnect).
 * ✅ [Evaluate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) (see [user guide](./UserGuide.md#evaluate-expression)).
 * ❌ [ExceptionInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ExceptionInfo).
@@ -58,7 +58,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [SetExceptionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExceptionBreakpoints) (see [user guide](./UserGuide.md#exception-breakpoint))
 * ❌ [SetExpression](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExpression).
 * ❌ [SetFunctionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints).
-* ❌ [SetInstructionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetInstructionBreakpoints).
+* ✅ [SetInstructionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetInstructionBreakpoints) (see [user guide](./UserGuide.md#disassemble)).
 * ✅ [SetVariable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable).
 * ✅ [Source](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Source).
 * ✅ [StackTrace](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StackTrace).

@@ -141,10 +141,15 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
             int offset,
             boolean sideEffectsAllowed
     ) {
+        var client = stackFrame.getClient();
+        if (!client.isSupportsEvaluateForHovers()) {
+            // DAP server doesn't support evaluate for hovers
+            return null;
+        }
         return ReadAction.nonBlocking(() -> {
 
                     var file = LSPIJUtils.getFile(document);
-                    if (file == null || !stackFrame.getClient().getServerDescriptor().isDebuggableFile(file, project)) {
+                    if (file == null || !client.getServerDescriptor().isDebuggableFile(file, project)) {
                         // The current document which is hovered is not managed by the DAP server from the current stack frame
                         return null;
                     }
@@ -158,7 +163,7 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
 
                     // Build ExpressionInfo with the text range and expression string
                     return new ExpressionInfo(textRange, expression);
-                }).inSmartMode(project)
+                })
                 .withDocumentsCommitted(project)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
