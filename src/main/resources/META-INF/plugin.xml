@@ -5,6 +5,13 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
+     <h3>0.16.1</h3>
+    <ul>
+      <li>fix Hit CancellationException when using "Shift+Shift" (Search Everywhere)</li>
+      <li>fix DAPDebuggerEvaluator.getExpressionInfoAtOffsetAsync must not return null</li>
+    </ul>
+    Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/20?closed=1">changelog</a>.
+
     <h3>0.16.0</h3>
     <ul>
       <li>DAP support for <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md#disassemble">Disassembly</a></li>
