@@ -15,7 +15,11 @@ import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.util.ConcurrencyUtil;
+import com.intellij.util.ExceptionUtil;
 import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
@@ -38,8 +42,10 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.BiFunction;
 
+import static com.intellij.openapi.progress.util.ProgressIndicatorUtils.checkCancelledEvenWithPCEDisabled;
 import static com.redhat.devtools.lsp4ij.internal.CancellationUtil.isContentModified;
 import static com.redhat.devtools.lsp4ij.internal.CancellationUtil.isRequestCancelled;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  * LSP cancellation support hosts the list of LSP requests to cancel when a
@@ -52,6 +58,8 @@ import static com.redhat.devtools.lsp4ij.internal.CancellationUtil.isRequestCanc
 public class CancellationSupport implements CancelChecker {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CancellationSupport.class);
+
+    private static final int MAX_REJECTED_EXECUTIONS_BEFORE_CANCELLATION = 16;
 
     private final List<CompletableFuture<?>> futuresToCancel;
 
@@ -277,4 +285,56 @@ public class CancellationSupport implements CancelChecker {
         }
     }
 
+    public static <T> T awaitWithCheckCanceled(@NotNull Future<T> future) {
+        ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
+        return (T)awaitWithCheckCanceled(future, indicator);
+    }
+
+    public static <T> T awaitWithCheckCanceled(@NotNull Future<T> future, @Nullable ProgressIndicator indicator) {
+        int rejectedExecutions = 0;
+        while (true) {
+            checkCancelledEvenWithPCEDisabled(indicator);
+            try {
+                return future.get(ConcurrencyUtil.DEFAULT_TIMEOUT_MS, MILLISECONDS);
+            }
+            catch (TimeoutException ignore) {
+            }
+            //TODO RC: in a non-cancellable section we could still (re-)throw a (P)CE if the _awaited_ code gets cancelled
+            //         (nowadays it is mistakenly considered an error) -- [Daniil et all, private conversation]
+            catch (CancellationException e) {
+                // In LSP4IJ context, the future can be cancelled, we need to catch this exception
+                // to avoid logging CancellationException as an error
+                // See https://github.com/JetBrains/intellij-community/blob/b764e70363e0c967a536256d0e057ea1f9053ff7/platform/ide-core-impl/src/com/intellij/openapi/progress/util/ProgressIndicatorUtils.java#L373
+                throw new ProcessCanceledException(e);
+            }
+            catch (RejectedExecutionException ree) {
+                //EA-225412: FJP throws REE (which propagates through futures) e.g. when FJP reaches max
+                // threads while compensating for too many managedBlockers -- or when it is shutdown.
+
+                //This branch creates a risk of infinite loop -- i.e. if the current thread itself is somehow
+                // responsible for FJP resource exhaustion, hence can't release anything, each consequent
+                // future.get() will throw the same REE again and again. So let's limit retries:
+                rejectedExecutions++;
+                if (rejectedExecutions > MAX_REJECTED_EXECUTIONS_BEFORE_CANCELLATION) {
+                    //RC: It would be clearer to rethrow ree itself -- but I doubt many callers are ready for it,
+                    //    while all callers are ready for PCE, hence...
+                    throw new ProcessCanceledException(ree);
+                }
+            }
+            catch (InterruptedException e) {
+                throw new ProcessCanceledException(e);
+            }
+            catch (Throwable e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof ProcessCanceledException) {
+                    throw (ProcessCanceledException)cause;
+                }
+                if (cause instanceof CancellationException) {
+                    throw new ProcessCanceledException(cause);
+                }
+                ExceptionUtil.rethrow(e);
+            }
+        }
+
+    }
 }
