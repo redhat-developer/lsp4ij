@@ -30,6 +30,7 @@ import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.concurrency.Promise;
+import org.jetbrains.concurrency.Promises;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.CompletionException;
@@ -144,7 +145,7 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
         var client = stackFrame.getClient();
         if (!client.isSupportsEvaluateForHovers()) {
             // DAP server doesn't support evaluate for hovers
-            return null;
+            return Promises.resolvedPromise(null);
         }
         return ReadAction.nonBlocking(() -> {
 
