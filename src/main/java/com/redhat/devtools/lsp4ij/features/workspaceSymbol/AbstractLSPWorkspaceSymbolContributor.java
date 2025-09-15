@@ -21,6 +21,7 @@ import com.intellij.util.Processor;
 import com.intellij.util.indexing.FindSymbolParameters;
 import com.intellij.util.indexing.IdFilter;
 import com.redhat.devtools.lsp4ij.LSPWorkspaceSupport;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,12 +31,12 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.awaitWithCheckCanceled;
+
 /**
  * Abstract base class for LSP goto symbol contributors
  */
 abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameContributorEx {
-
-    private final static Logger LOGGER = LoggerFactory.getLogger(AbstractLSPWorkspaceSymbolContributor.class);
 
     @Override
     public void processNames(@NotNull Processor<? super String> processor,
@@ -51,7 +52,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
         }
 
         var workspaceSymbolsFuture = getWorkspaceSymbols(queryString, true, project);
-        ProgressIndicatorUtils.awaitWithCheckCanceled(workspaceSymbolsFuture);
+        awaitWithCheckCanceled(workspaceSymbolsFuture);
         if (CompletableFutures.isDoneNormally(workspaceSymbolsFuture)) {
             var items = workspaceSymbolsFuture.getNow(null);
             if (items != null) {
@@ -68,7 +69,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
                                         @NotNull Processor<? super NavigationItem> processor,
                                         @NotNull FindSymbolParameters parameters) {
         var workspaceSymbolsFuture = getWorkspaceSymbols(name, false, parameters.getProject());
-        ProgressIndicatorUtils.awaitWithCheckCanceled(workspaceSymbolsFuture);
+        awaitWithCheckCanceled(workspaceSymbolsFuture);
         if (CompletableFutures.isDoneNormally(workspaceSymbolsFuture)) {
             var items = workspaceSymbolsFuture.getNow(null);
             if (items != null) {
