@@ -244,7 +244,7 @@ public abstract class DeferredSourcePosition<T, F extends VirtualFile> implement
 
         private void doNavigateIn(@NotNull Editor e) {
             OpenFileDescriptor descriptor = new OpenFileDescriptor(getProject(), getFile(), position.getOffset());
-            navigateInEditor(descriptor, e);
+            descriptor.navigateIn(e);
         }
 
         /**
