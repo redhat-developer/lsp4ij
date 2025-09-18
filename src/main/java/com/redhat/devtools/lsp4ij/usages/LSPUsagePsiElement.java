@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.usages;
 
+import com.intellij.lang.Language;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
@@ -45,5 +46,10 @@ public class LSPUsagePsiElement extends LSPPsiElement {
 
     public void setKind(UsageKind kind) {
         this.kind = kind;
+    }
+
+    @Override
+    public @NotNull Language getLanguage() {
+        return getContainingFile().getLanguage();
     }
 }
