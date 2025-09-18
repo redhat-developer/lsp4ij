@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileEditor.FileNavigator;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NotNullLazyValue;
@@ -216,10 +217,15 @@ public abstract class DeferredSourcePosition<T, F extends VirtualFile> implement
         @Override
         public void navigate(boolean requestFocus) {
             if (isResolved()) {
-                super.navigate(requestFocus);
+                doNavigate(requestFocus);
             } else {
-                loadFuture.thenAccept(unused -> super.navigate(requestFocus));
+                loadFuture.thenAccept(unused -> doNavigate(requestFocus));
             }
+        }
+
+        private void doNavigate(boolean requestFocus) {
+            OpenFileDescriptor descriptor = new OpenFileDescriptor(getProject(), getFile(), position.getOffset());
+            FileNavigator.getInstance().navigate(descriptor, requestFocus);
         }
 
         /**
@@ -230,26 +236,15 @@ public abstract class DeferredSourcePosition<T, F extends VirtualFile> implement
         @Override
         public void navigateIn(@NotNull Editor e) {
             if (isResolved()) {
-                super.navigateIn(e);
+                doNavigateIn(e);
             } else {
-                loadFuture.thenAccept(unused -> super.navigateIn(e));
+                loadFuture.thenAccept(unused -> doNavigateIn(e));
             }
         }
 
-        /**
-         * @return the resolved line number, or -1 if not yet resolved
-         */
-        @Override
-        public int getLine() {
-            return position.getLine();
-        }
-
-        /**
-         * @return the resolved offset, or -1 if not yet resolved
-         */
-        @Override
-        public int getOffset() {
-            return position.getOffset();
+        private void doNavigateIn(@NotNull Editor e) {
+            OpenFileDescriptor descriptor = new OpenFileDescriptor(getProject(), getFile(), position.getOffset());
+            navigateInEditor(descriptor, e);
         }
 
         /**

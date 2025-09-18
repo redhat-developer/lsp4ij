@@ -191,11 +191,13 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getPrepareTypeHierarchySupport().cancel();
         getTypeHierarchySubtypesSupport().cancel();
         getTypeHierarchySupertypesSupport().cancel();
-        var map = getUserMap();
-        for (var key : map.getKeys()) {
-            var value = map.get(key);
-            if (value instanceof Disposable disposable) {
-                disposable.dispose();
+        var map = super.get();
+        if (map != null) {
+            for (var key : map.getKeys()) {
+                var value = map.get(key);
+                if (value instanceof Disposable disposable) {
+                    disposable.dispose();
+                }
             }
         }
     }
