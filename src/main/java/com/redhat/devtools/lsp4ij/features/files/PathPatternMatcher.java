@@ -11,6 +11,8 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.files;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.net.URI;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
@@ -26,20 +28,22 @@ import java.util.Objects;
  */
 public class PathPatternMatcher {
 
-    record Parts(List<String> parts, List<Integer> cols) {}
+    record Parts(@NotNull List<String> parts, @NotNull List<Integer> cols) {}
 
     private List<PathMatcher> pathMatchers;
     private final String pattern;
 
-    public PathPatternMatcher(String pattern) {
-        this.pattern = pattern;
+    public PathPatternMatcher(@NotNull String pattern) {
+        // Java Glob IO works only when there is a '/' defined in the pattern
+        // add **/ if pattern doesn't define a '/'
+        this.pattern = pattern.contains("/") ? pattern : "**/" + pattern;
     }
 
     public String getPattern() {
         return pattern;
     }
 
-    public boolean matches(String uri) {
+    public boolean matches(@NotNull String uri) {
         try {
             return matches(new URI(uri));
         } catch (Exception e) {
@@ -47,7 +51,7 @@ public class PathPatternMatcher {
         }
     }
 
-    public boolean matches(URI uri) {
+    public boolean matches(@NotNull URI uri) {
         if (pattern.isEmpty()) {
             return false;
         }
