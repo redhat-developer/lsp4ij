@@ -45,10 +45,81 @@ public class FileSystemWatcherManagerTest {
     final private FileSystemWatcherManager manager = new FileSystemWatcherManager();
 
     @Test
+    public void sap_cds_ls() {
+        // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
+        String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
+        registerWatchers( // language=json
+                """
+                        {"watchers": [
+                            {
+                               "kind": 7,
+                               "globPattern": "package.json"
+                             },
+                             {
+                               "kind": 7,
+                               "globPattern": "{.git,.cds}ignore"
+                             },
+                             {
+                               "kind": 7,
+                               "globPattern": ".cdsrc.json"
+                             },
+                             {
+                               "kind": 7,
+                               "globPattern": "**/{_i18n,i18n}/i18n{*.properties,*.json,*.csv}"
+                             }
+                        ]
+                      }
+                        """.formatted(baseDir));
+
+        // Match package.json
+        assertNoMatchFile(getBaseUri() + "/package.jso"); // file:///C:/package.jso
+        assertMatchFile(getBaseUri() + "/package.json"); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "/package.json", WatchKind.Create); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "/package.json", WatchKind.Change); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "/package.json", WatchKind.Delete); // file:///C:/package.json
+
+        // Match {.git,.cds}ignore
+        assertNoMatchFile(getBaseUri() + "/gitignore"); // file:///C:/gitignore
+        assertMatchFile(getBaseUri() + "/.gitignore"); // file:///C:/.gitignore
+        assertMatchFile(getBaseUri() + "/.gitignore", WatchKind.Create); // file:///C:/.gitignore
+        assertMatchFile(getBaseUri() + "/.gitignore", WatchKind.Change); // file:///C:/.gitignore
+        assertMatchFile(getBaseUri() + "/.gitignore", WatchKind.Delete); // file:///C:/.gitignore
+
+        assertNoMatchFile(getBaseUri() + "/cdsignore"); // file:///C:/cdsignore
+        assertMatchFile(getBaseUri() + "/.cdsignore"); // file:///C:/.cdsignore
+        assertMatchFile(getBaseUri() + "/.cdsignore", WatchKind.Create); // file:///C:/.cdsignore
+        assertMatchFile(getBaseUri() + "/.cdsignore", WatchKind.Change); // file:///C:/.cdsignore
+        assertMatchFile(getBaseUri() + "/.cdsignore", WatchKind.Delete); // file:///C:/.cdsignore
+
+        // Match .cdsrc.json
+        assertNoMatchFile(getBaseUri() + "/cdsrc.json"); // file:///C:/cdsrc.json
+        assertMatchFile(getBaseUri() + "/.cdsrc.json"); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "/.cdsrc.json", WatchKind.Create); // file:///C:/.cdsrc.json
+        assertMatchFile(getBaseUri() + "/.cdsrc.json", WatchKind.Change); // file:///C:/.cdsrc.json
+        assertMatchFile(getBaseUri() + "/.cdsrc.json", WatchKind.Delete); // file:///C:/.cdsrc.json
+
+        // Match **/{_i18n,i18n}/i18n{*.properties,*.json,*.csv}
+        assertNoMatchFile(getBaseUri() + "/_i18n/i19n.properties"); // file:///C:/_i18n/i19n.properties
+        assertMatchFile(getBaseUri() + "/_i18n/i18n.properties"); // file:///C:/_i18n/i18n.properties
+        assertMatchFile(getBaseUri() + "/_i18n/i18nFoo.properties"); // file:///C:/_i18n/i18nFoo.properties
+
+        assertNoMatchFile(getBaseUri() + "/_i18n/i19n.json"); // file:///C:/_i18n/i19n.json
+        assertMatchFile(getBaseUri() + "/_i18n/i18n.json"); // file:///C:/_i18n/i18n.json
+        assertMatchFile(getBaseUri() + "/_i18n/i18nFoo.json"); // file:///C:/_i18n/i18nFoo.json
+
+        assertNoMatchFile(getBaseUri() + "/_i18n/i19n.csv"); // file:///C:/_i18n/i19n.csv
+        assertMatchFile(getBaseUri() + "/_i18n/i18n.csv"); // file:///C:/_i18n/i18n.csv
+        assertMatchFile(getBaseUri() + "/_i18n/i18nFoo.csv"); // file:///C:/_i18n/i18nFoo.csv
+
+        assertNoMatchFile(getBaseUri() + "/_i18n/i18n.xml"); // file:///C:/_i18n/i18n.xml
+    }
+
+    @Test
     public void jdt_ls() {
         // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
         String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
-        registerWatchers("""
+        registerWatchers(// language=json
+                """
                 {"watchers": [
                           {
                             "globPattern": "**/*.java"
@@ -107,14 +178,14 @@ public class FileSystemWatcherManagerTest {
         assertNoMatchFile(getBaseUri() + ".settings/foo.pref"); // file:///C:/.settings/foo.pref
         assertNoMatchFile(getBaseUri() + ".settings/bar/foo.prefs"); // file:///C:/.settings/bar/foo.prefs
         assertMatchFile(getBaseUri() + ".settings/foo.prefs"); // file:///C:/.settings/foo.prefs
-
     }
 
     @Test
     public void register_unregister_watchers() {
         // Register Java watcher
         String id_java = "watcher-java";
-        registerWatchers(id_java, """
+        registerWatchers(id_java, // language=json
+                """
                 {"watchers": [
                           {
                             "globPattern": "**/*.java"
@@ -127,7 +198,8 @@ public class FileSystemWatcherManagerTest {
 
         // Register TypeScript watcher
         String id_ts = "watcher-ts";
-        registerWatchers(id_ts, """
+        registerWatchers(id_ts,// language=json
+                """
                 {"watchers": [
                           {
                             "globPattern": "**/*.ts"
@@ -152,7 +224,8 @@ public class FileSystemWatcherManagerTest {
     @Test
     public void watcherKind() {
         // Register Java watcher
-        registerWatchers("watcher-kind", """
+        registerWatchers("watcher-kind", // language=json
+                """
                 {"watchers": [
                           {
                             "globPattern": "**/*.kind_null"
