@@ -80,7 +80,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
         TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
 
         // 1) Terminal with same title used by another client
-        ClientTerminal assigned = clientTerminals.get(title);
+        ClientTerminal assigned = StringUtils.isNotBlank(title) ? clientTerminals.get(title) : null;
         if (assigned != null && !assigned.client.equals(client)) {
             return createNewTerminal(workingDirectory, title, client);
         }
