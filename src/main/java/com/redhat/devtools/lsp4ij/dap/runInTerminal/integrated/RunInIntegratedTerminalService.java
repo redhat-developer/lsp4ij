@@ -113,7 +113,10 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
         var project = client.getProject();
         TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
         ShellTerminalWidget shellTerminalWidget = tm.createLocalShellWidget(workingDirectory, title);
-        clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
+        if (StringUtils.isNotBlank(title)) {
+            // Cache the terminal widget to reuse if title is filled
+            clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
+        }
         return shellTerminalWidget;
     }
 
