@@ -2,7 +2,7 @@
 
 To debug [Julia](https://julialang.org/) files, you can use the [Julia](https://github.com/julia-vscode/DebugAdapter.jl) DAP server.
 
-Let’s debugging the following `test.julia` file:
+Let’s debug the following `test.julia` file:
 
 ```julia
 function main()

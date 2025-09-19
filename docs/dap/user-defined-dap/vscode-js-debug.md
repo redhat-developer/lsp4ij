@@ -2,7 +2,7 @@
 
 To debug JavaScript or TypeScript files, you can use the [VSCode JS Debug](https://github.com/microsoft/vscode-js-debug) DAP server.
 
-Let’s debugging the following `test.js` file:
+Let’s debug the following `test.js` file:
 
 ```js
 const s = "foo";
@@ -203,6 +203,6 @@ TypeScript debugging should be available:
 
 ## Language Support
 
-If you need language support for TypeScript/JavaScript (completion, validation, etc) you can [configure the TypeScript Language Server](../../user-defined-ls/typescript-language-server.md)
+If you need language support for TypeScript/JavaScript (completion, validation, etc.), you can [configure the TypeScript Language Server](../../user-defined-ls/typescript-language-server.md).
 
 ![TypeScript demo](../../images/user-defined-ls/typescript-language-server/demo_ls.gif)
