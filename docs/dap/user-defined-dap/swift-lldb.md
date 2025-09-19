@@ -2,7 +2,7 @@
 
 To debug `Swift` files, you can use the [lldb-dap](https://github.com/llvm/llvm-project/blob/main/lldb/tools/lldb-dap/README.md) DAP server.
 
-Let’s debugging the following `Sources/main.swift` file:
+Let’s debug the following `Sources/main.swift` file:
 
 ```swift
 // The Swift Programming Language

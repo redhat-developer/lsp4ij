@@ -2,7 +2,7 @@
 
 To debug `Go` files, you can use the [Delve](https://github.com/go-delve/delve) DAP server.
 
-Let’s debugging the following `test.go` file:
+Let’s debug the following `test.go` file:
 
 ```go
 package main

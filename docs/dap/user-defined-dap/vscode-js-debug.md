@@ -2,7 +2,7 @@
 
 To debug JavaScript or TypeScript files, you can use the [VSCode JS Debug](https://github.com/microsoft/vscode-js-debug) DAP server.
 
-Let’s debugging the following `test.js` file:
+Let’s debug the following `test.js` file:
 
 ```js
 const s = "foo";
