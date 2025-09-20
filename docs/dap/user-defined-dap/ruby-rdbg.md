@@ -2,7 +2,7 @@
 
 To debug [Ruby](https://www.ruby-lang.org/) files, you can use the [Ruby rdbg](https://github.com/ruby/debug) DAP server.
 
-Let’s debugging the following `hello.rb` file:
+Let’s debug the following `hello.rb` file:
 
 ```ruby
 def main
