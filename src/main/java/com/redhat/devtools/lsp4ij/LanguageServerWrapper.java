@@ -253,10 +253,18 @@ public class LanguageServerWrapper implements Disposable {
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
-        if (serverStatus != ServerStatus.installed && serverStatus != ServerStatus.installing) {
-            stop();
-        }
-        // start the language server
+        if (serverStatus != ServerStatus.installed && serverStatus != ServerStatus.installing && serverStatus != ServerStatus.stopped) {
+            stop().thenRun(this::restartImpl);
+        } else
+            restartImpl();
+    }
+
+    /**
+     * Shared implementation of restart, which only starts the server.
+     * Should have been stopped beforehand (if needed) by restart.
+     */
+    private synchronized void restartImpl() {
+        // Start the server
         getInitializedServer()
                 .thenAccept(unused -> {
                     // The language server is started.
@@ -265,7 +273,7 @@ public class LanguageServerWrapper implements Disposable {
                     // 2. refresh code vision, inlay hints, folding for all opened editors
                     // which edit the files associated to the language server.
                     LanguageServiceAccessor.getInstance(getProject()).
-                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, getProject());
+                                           sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, getProject());
                 });
     }
 
