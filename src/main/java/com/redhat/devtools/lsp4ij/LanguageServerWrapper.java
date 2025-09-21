@@ -273,7 +273,7 @@ public class LanguageServerWrapper implements Disposable {
                     // 2. refresh code vision, inlay hints, folding for all opened editors
                     // which edit the files associated to the language server.
                     LanguageServiceAccessor.getInstance(getProject()).
-                                           sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, getProject());
+                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, getProject());
                 });
     }
 
