@@ -255,8 +255,9 @@ public class LanguageServerWrapper implements Disposable {
         setEnabled(true);
         if (serverStatus != ServerStatus.installed && serverStatus != ServerStatus.installing && serverStatus != ServerStatus.stopped) {
             stop().thenRun(this::restartImpl);
-        } else
+        } else {
             restartImpl();
+        }
     }
 
     /**
