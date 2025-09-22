@@ -10,7 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.CodeLens;
 import org.jetbrains.annotations.NotNull;
 
@@ -21,8 +23,8 @@ import java.util.concurrent.CompletableFuture;
  */
 public class CodeLensData {
 
-    private @NotNull CodeLens codeLens;
     private final @NotNull LanguageServerItem languageServer;
+    private @NotNull CodeLens codeLens;
     private boolean toResolve;
     private CompletableFuture<CodeLens> resolveCodeLensFuture;
     private CodeLensDataResult result;
@@ -51,12 +53,18 @@ public class CodeLensData {
         if (resolveCodeLensFuture != null) {
             return resolveCodeLensFuture;
         }
-        resolveCodeLensFuture = languageServer
-                .getTextDocumentService()
-                .resolveCodeLens(codeLens);
+        // Use a CancellationSupport to catch errors like ResponseErrorException
+        // and ignore theme
+        CancellationSupport cancellationSupport = new CancellationSupport();
+        resolveCodeLensFuture = cancellationSupport.execute(languageServer
+                        .getTextDocumentService()
+                        .resolveCodeLens(codeLens),
+                languageServer,
+                LSPRequestConstants.CODE_LENS_RESOLVE);
         resolveCodeLensFuture
                 .thenAccept(cl -> {
-                    if(cl != null) {
+                    // mark codelens as resolved
+                    if (cl != null) {
                         codeLens = cl;
                         toResolve = false;
                         result.decrementResolve();
