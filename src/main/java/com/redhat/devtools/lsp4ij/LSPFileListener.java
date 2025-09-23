@@ -38,7 +38,7 @@ class LSPFileListener implements FileEditorManagerListener, VirtualFileListener 
 
     public LSPFileListener(@NotNull LanguageServerWrapper languageServerWrapper) {
         this.languageServerWrapper = languageServerWrapper;
-        this.fileSystemWatcherManager = new FileSystemWatcherManager();
+        this.fileSystemWatcherManager = new FileSystemWatcherManager(languageServerWrapper.getProject());
     }
 
     @Override
