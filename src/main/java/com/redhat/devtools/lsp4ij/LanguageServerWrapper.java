@@ -111,7 +111,7 @@ public class LanguageServerWrapper implements Disposable {
      */
     private final @NotNull
     Map<String, Runnable> dynamicRegistrations = new HashMap<>();
-    private final LSPFileListener fileListener = new LSPFileListener(this);
+    private final LSPFileListener fileListener;
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
     protected StreamConnectionProvider lspStreamProvider;
     private MessageBusConnection messageBusConnection;
@@ -153,6 +153,7 @@ public class LanguageServerWrapper implements Disposable {
         this.serverDefinition = serverDefinition;
         this.openedDocuments = new HashMap<>();
         this.closedDocuments = new HashMap<>();
+        this.fileListener = new LSPFileListener(this);
         String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
         String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
         this.dispatcher = Executors

@@ -58,7 +58,7 @@ public class FileOperationFilterMatcher {
     @Nullable
     private PathPatternMatcher toPathPattern(@NotNull FileOperationPattern pattern) {
         String glob = pattern.getGlob() != null && !pattern.getGlob().isEmpty() ? pattern.getGlob() : null;
-        return glob != null ? new PathPatternMatcher(glob) : null;
+        return glob != null ? new PathPatternMatcher(glob, null) : null;
     }
 
     public boolean isMatch(URI fileUri, boolean isFolder) {

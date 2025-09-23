@@ -16,8 +16,11 @@ import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManage
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.WatchKind;
 import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.net.URI;
+import java.nio.file.Paths;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -42,61 +45,78 @@ import static org.junit.Assert.assertTrue;
  */
 public class FileSystemWatcherManagerTest {
 
-    final private FileSystemWatcherManager manager = new FileSystemWatcherManager();
+    public static final String DEFAULT_WATCHER = "default";
+    final private FileSystemWatcherManager manager = new FileSystemWatcherManager(Paths.get(getProjectDir()));
+
+    @BeforeEach
+    void setUp() {
+        unregisterWatchers(DEFAULT_WATCHER);
+    }
+
+    @AfterEach
+    void tearDown() {
+        unregisterWatchers(DEFAULT_WATCHER);
+    }
 
     @Test
     public void sap_cds_ls() {
         // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
-        String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
+        String baseDir = SystemInfo.isWindows ? getProjectDir().toLowerCase() : getProjectDir();
         registerWatchers( // language=json
                 """
-                        {"watchers": [
-                            {
-                               "kind": 7,
-                               "globPattern": "package.json"
-                             },
-                             {
-                               "kind": 7,
-                               "globPattern": "{.git,.cds}ignore"
-                             },
-                             {
-                               "kind": 7,
-                               "globPattern": ".cdsrc.json"
-                             },
-                             {
-                               "kind": 7,
-                               "globPattern": "**/{_i18n,i18n}/i18n{*.properties,*.json,*.csv}"
-                             }
-                        ]
-                      }
+                          {"watchers": [
+                              {
+                                 "kind": 7,
+                                 "globPattern": "package.json"
+                               },
+                               {
+                                 "kind": 7,
+                                 "globPattern": "{.git,.cds}ignore"
+                               },
+                               {
+                                 "kind": 7,
+                                 "globPattern": ".cdsrc.json"
+                               },
+                               {
+                                 "kind": 7,
+                                 "globPattern": "**/{_i18n,i18n}/i18n{*.properties,*.json,*.csv}"
+                               }
+                          ]
+                        }
                         """.formatted(baseDir));
 
         // Match package.json
-        assertNoMatchFile(getBaseUri() + "/package.jso"); // file:///C:/package.jso
-        assertMatchFile(getBaseUri() + "/package.json"); // file:///C:/package.json
-        assertMatchFile(getBaseUri() + "/package.json", WatchKind.Create); // file:///C:/package.json
-        assertMatchFile(getBaseUri() + "/package.json", WatchKind.Change); // file:///C:/package.json
-        assertMatchFile(getBaseUri() + "/package.json", WatchKind.Delete); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "package.json"); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "package.json", WatchKind.Create); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "package.json", WatchKind.Change); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "package.json", WatchKind.Delete); // file:///C:/package.json
+
+        assertNoMatchFile(getBaseUri() + "package.jso"); // file:///C:/package.jso
+        assertNoMatchFile(getBaseUri() + "foo/package.json"); // file:///C:/foo/package.json
+        assertNoMatchFile(getExternalDir() + "package.json"); // file:///D:/package.json
+        assertNoMatchFile(getExternalDir() + "package.json", WatchKind.Create); // file:///D:/package.json
+        assertNoMatchFile(getExternalDir() + "package.json", WatchKind.Change); // file:///D:/package.json
+        assertNoMatchFile(getExternalDir() + "package.json", WatchKind.Delete); // file:///D:/package.json
 
         // Match {.git,.cds}ignore
-        assertNoMatchFile(getBaseUri() + "/gitignore"); // file:///C:/gitignore
-        assertMatchFile(getBaseUri() + "/.gitignore"); // file:///C:/.gitignore
-        assertMatchFile(getBaseUri() + "/.gitignore", WatchKind.Create); // file:///C:/.gitignore
-        assertMatchFile(getBaseUri() + "/.gitignore", WatchKind.Change); // file:///C:/.gitignore
-        assertMatchFile(getBaseUri() + "/.gitignore", WatchKind.Delete); // file:///C:/.gitignore
+        assertNoMatchFile(getBaseUri() + "gitignore"); // file:///C:/gitignore
+        assertMatchFile(getBaseUri() + ".gitignore"); // file:///C:/.gitignore
+        assertMatchFile(getBaseUri() + ".gitignore", WatchKind.Create); // file:///C:/.gitignore
+        assertMatchFile(getBaseUri() + ".gitignore", WatchKind.Change); // file:///C:/.gitignore
+        assertMatchFile(getBaseUri() + ".gitignore", WatchKind.Delete); // file:///C:/.gitignore
 
-        assertNoMatchFile(getBaseUri() + "/cdsignore"); // file:///C:/cdsignore
-        assertMatchFile(getBaseUri() + "/.cdsignore"); // file:///C:/.cdsignore
-        assertMatchFile(getBaseUri() + "/.cdsignore", WatchKind.Create); // file:///C:/.cdsignore
-        assertMatchFile(getBaseUri() + "/.cdsignore", WatchKind.Change); // file:///C:/.cdsignore
-        assertMatchFile(getBaseUri() + "/.cdsignore", WatchKind.Delete); // file:///C:/.cdsignore
+        assertNoMatchFile(getBaseUri() + "cdsignore"); // file:///C:/cdsignore
+        assertMatchFile(getBaseUri() + ".cdsignore"); // file:///C:/.cdsignore
+        assertMatchFile(getBaseUri() + ".cdsignore", WatchKind.Create); // file:///C:/.cdsignore
+        assertMatchFile(getBaseUri() + ".cdsignore", WatchKind.Change); // file:///C:/.cdsignore
+        assertMatchFile(getBaseUri() + ".cdsignore", WatchKind.Delete); // file:///C:/.cdsignore
 
         // Match .cdsrc.json
-        assertNoMatchFile(getBaseUri() + "/cdsrc.json"); // file:///C:/cdsrc.json
-        assertMatchFile(getBaseUri() + "/.cdsrc.json"); // file:///C:/package.json
-        assertMatchFile(getBaseUri() + "/.cdsrc.json", WatchKind.Create); // file:///C:/.cdsrc.json
-        assertMatchFile(getBaseUri() + "/.cdsrc.json", WatchKind.Change); // file:///C:/.cdsrc.json
-        assertMatchFile(getBaseUri() + "/.cdsrc.json", WatchKind.Delete); // file:///C:/.cdsrc.json
+        assertNoMatchFile(getBaseUri() + "cdsrc.json"); // file:///C:/cdsrc.json
+        assertMatchFile(getBaseUri() + ".cdsrc.json"); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + ".cdsrc.json", WatchKind.Create); // file:///C:/.cdsrc.json
+        assertMatchFile(getBaseUri() + ".cdsrc.json", WatchKind.Change); // file:///C:/.cdsrc.json
+        assertMatchFile(getBaseUri() + ".cdsrc.json", WatchKind.Delete); // file:///C:/.cdsrc.json
 
         // Match **/{_i18n,i18n}/i18n{*.properties,*.json,*.csv}
         assertNoMatchFile(getBaseUri() + "/_i18n/i19n.properties"); // file:///C:/_i18n/i19n.properties
@@ -115,48 +135,79 @@ public class FileSystemWatcherManagerTest {
     }
 
     @Test
+    public void relativePattern() {
+        // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
+        String externalBaseDir = SystemInfo.isWindows ? getExternalDir().toLowerCase() : getExternalDir();
+        registerWatchers( // language=json
+                """
+                          {"watchers": [
+                              {
+                                 "kind": 7,
+                                 "globPattern": {
+                                   "baseUri": "%s",
+                                   "pattern": "package.json"
+                                 }
+                               },
+                               {
+                                 "kind": 7,
+                                 "globPattern": "*/package.json"
+                               }
+                          ]
+                        }
+                        """.formatted(externalBaseDir));
+
+        // Match **/package.json
+        assertNoMatchFile(getBaseUri() + "package.json"); // file:///C:/package.json
+        assertMatchFile(getBaseUri() + "/foo/package.json"); // file:///C:/package.json
+
+        // Match package.json
+        assertMatchFile(getExternalDir() + "package.json"); // file:///C:/package.json
+        assertNoMatchFile(getExternalDir() + "/foo/package.json"); // file:///C:/package.json
+    }
+
+    @Test
     public void jdt_ls() {
         // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
-        String baseDir = SystemInfo.isWindows ? getBaseDir().toLowerCase() : getBaseDir();
+        String baseDir = SystemInfo.isWindows ? getProjectDir().toLowerCase() : getProjectDir();
         registerWatchers(// language=json
                 """
-                {"watchers": [
-                          {
-                            "globPattern": "**/*.java"
-                          },
-                          {
-                            "globPattern": "**/.project"
-                          },
-                          {
-                            "globPattern": "**/.classpath"
-                          },
-                          {
-                            "globPattern": "**/.settings/*.prefs"
-                          },
-                          {
-                            "globPattern": "**/src/**"
-                          },
-                          {
-                            "globPattern": "**/*.gradle"
-                          },
-                          {
-                            "globPattern": "**/*.gradle.kts"
-                          },
-                          {
-                            "globPattern": "**/gradle.properties"
-                          },
-                          {
-                            "globPattern": "**/pom.xml"
-                          },
-                          {
-                            "globPattern": "%sUsers/X/foo/lib/**"
-                          },
-                          {
-                            "globPattern": "**/.settings"
-                          }
-                        ]
-                      }
-                """.formatted(baseDir));
+                        {"watchers": [
+                                  {
+                                    "globPattern": "**/*.java"
+                                  },
+                                  {
+                                    "globPattern": "**/.project"
+                                  },
+                                  {
+                                    "globPattern": "**/.classpath"
+                                  },
+                                  {
+                                    "globPattern": "**/.settings/*.prefs"
+                                  },
+                                  {
+                                    "globPattern": "**/src/**"
+                                  },
+                                  {
+                                    "globPattern": "**/*.gradle"
+                                  },
+                                  {
+                                    "globPattern": "**/*.gradle.kts"
+                                  },
+                                  {
+                                    "globPattern": "**/gradle.properties"
+                                  },
+                                  {
+                                    "globPattern": "**/pom.xml"
+                                  },
+                                  {
+                                    "globPattern": "Users/X/foo/lib/**"
+                                  },
+                                  {
+                                    "globPattern": "**/.settings"
+                                  }
+                                ]
+                              }
+                        """);
 
         // Match "**/*.java"
         assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java
@@ -186,13 +237,13 @@ public class FileSystemWatcherManagerTest {
         String id_java = "watcher-java";
         registerWatchers(id_java, // language=json
                 """
-                {"watchers": [
-                          {
-                            "globPattern": "**/*.java"
-                          }
-                        ]
-                      }
-                """);
+                        {"watchers": [
+                                  {
+                                    "globPattern": "**/*.java"
+                                  }
+                                ]
+                              }
+                        """);
         assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java// Match "**/*.java"
         assertNoMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.ts
 
@@ -200,13 +251,13 @@ public class FileSystemWatcherManagerTest {
         String id_ts = "watcher-ts";
         registerWatchers(id_ts,// language=json
                 """
-                {"watchers": [
-                          {
-                            "globPattern": "**/*.ts"
-                          }
-                        ]
-                      }
-                """);
+                        {"watchers": [
+                                  {
+                                    "globPattern": "**/*.ts"
+                                  }
+                                ]
+                              }
+                        """);
         assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java// Match "**/*.java"
         assertMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.java// Match "**/*.ts"
 
@@ -226,29 +277,29 @@ public class FileSystemWatcherManagerTest {
         // Register Java watcher
         registerWatchers("watcher-kind", // language=json
                 """
-                {"watchers": [
-                          {
-                            "globPattern": "**/*.kind_null"
-                          },
-                          {
-                            "globPattern": "**/*.kind_7",
-                            "kind": 7
-                          },
-                          {
-                            "globPattern": "**/*.kind_Create",
-                            "kind": 1
-                          },
-                          {
-                            "globPattern": "**/*.kind_Change",
-                            "kind": 2
-                          },
-                          {
-                            "globPattern": "**/*.kind_Delete",
-                            "kind": 4
-                          }
-                        ]
-                      }
-                """);
+                        {"watchers": [
+                                  {
+                                    "globPattern": "**/*.kind_null"
+                                  },
+                                  {
+                                    "globPattern": "**/*.kind_7",
+                                    "kind": 7
+                                  },
+                                  {
+                                    "globPattern": "**/*.kind_Create",
+                                    "kind": 1
+                                  },
+                                  {
+                                    "globPattern": "**/*.kind_Change",
+                                    "kind": 2
+                                  },
+                                  {
+                                    "globPattern": "**/*.kind_Delete",
+                                    "kind": 4
+                                  }
+                                ]
+                              }
+                        """);
 
         assertMatchFile(getBaseUri() + "foo.kind_null", WatchKind.Create); // file:///C:/foo.king_null// Match "**/*.kind_null"
         assertMatchFile(getBaseUri() + "foo.kind_null", WatchKind.Change); // file:///C:/foo.king_null// Match "**/*.kind_null"
@@ -765,11 +816,12 @@ public class FileSystemWatcherManagerTest {
 
         // Tests must be adapted to use file uri
 
-        String baseDir = getBaseDir();
-        pattern = baseDir + pattern;
-
         String baseUri = getBaseUri();
-        uri = baseUri + uri;
+        if (uri.startsWith("/")) {
+            uri = baseUri + uri.substring(1);
+        } else {
+            uri = baseUri + uri;
+        }
 
         registerWatchers("""
                 {"watchers": [
@@ -784,7 +836,6 @@ public class FileSystemWatcherManagerTest {
             assertNoMatchFile(uri);
         }
     }
-
 
     private void assertMatchFile(String fileUri) {
         assertMatchFile(fileUri, WatchKind.Create);
@@ -809,7 +860,7 @@ public class FileSystemWatcherManagerTest {
     }
 
     private void registerWatchers(String watchers) {
-        registerWatchers("foo", watchers);
+        registerWatchers(DEFAULT_WATCHER, watchers);
     }
 
     private void registerWatchers(String id, String watchers) {
@@ -818,15 +869,21 @@ public class FileSystemWatcherManagerTest {
     }
 
     private static String getBaseUri() {
-        return (SystemInfo.isWindows ? "file:///" : "file://") + getBaseDir();
+        return (SystemInfo.isWindows ? "file:///" : "file://") + getProjectDir();
     }
 
-    private static String getBaseDir() {
-        String baseDir = System.getProperty("user.home")
-                .replace('\\', '/');
-        if (!baseDir.endsWith("/")) {
-            return baseDir + "/";
+    private static String getExternalDir() {
+        if (SystemInfo.isWindows) {
+            return "file:///C://Users/user/a-project/";
         }
-        return baseDir;
+        return "file:///home/user/a-project/";
+
+    }
+
+    private static String getProjectDir() {
+        if (SystemInfo.isWindows) {
+            return "C:/Users/user/current-project/";
+        }
+        return "/home/user/current-project/";
     }
 }

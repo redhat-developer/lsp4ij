@@ -12,6 +12,7 @@
 package com.redhat.devtools.lsp4ij.features.files;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.nio.file.FileSystems;
@@ -31,27 +32,33 @@ public class PathPatternMatcher {
     record Parts(@NotNull List<String> parts, @NotNull List<Integer> cols) {}
 
     private List<PathMatcher> pathMatchers;
-    private final String pattern;
+    private final @NotNull String pattern;
+    private final @Nullable Path basePath;
 
-    public PathPatternMatcher(@NotNull String pattern) {
-        // Java Glob IO works only when there is a '/' defined in the pattern
-        // add **/ if pattern doesn't define a '/'
-        this.pattern = pattern.contains("/") ? pattern : "**/" + pattern;
+    public PathPatternMatcher(@NotNull String pattern,
+                              @Nullable Path basePath) {
+        this.pattern = pattern;
+        this.basePath = basePath;
     }
 
-    public String getPattern() {
+    public @NotNull String getPattern() {
         return pattern;
     }
 
-    public boolean matches(@NotNull String uri) {
-        try {
-            return matches(new URI(uri));
-        } catch (Exception e) {
-            return false;
-        }
+    public @Nullable Path getBasePath() {
+        return basePath;
     }
 
     public boolean matches(@NotNull URI uri) {
+        return internalMatches(uri, null);
+    }
+
+    public boolean matches(@NotNull Path path) {
+        return internalMatches(null, path);
+    }
+
+    private boolean internalMatches(@Nullable URI uri,
+                                    @Nullable Path path) {
         if (pattern.isEmpty()) {
             return false;
         }
@@ -59,7 +66,7 @@ public class PathPatternMatcher {
             createPathMatchers();
         }
         try {
-            Path path = Paths.get(uri);
+            path = path == null ? Paths.get(uri) : path;
             for (PathMatcher pathMatcher : pathMatchers) {
                 try {
                     if (pathMatcher.matches(path)) {

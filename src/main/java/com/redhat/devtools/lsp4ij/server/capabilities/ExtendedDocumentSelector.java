@@ -50,7 +50,7 @@ public class ExtendedDocumentSelector {
             if (StringUtils.isEmpty(pattern)) {
                 return null;
             }
-            patternMatcher = new PathPatternMatcher(pattern);
+            patternMatcher = new PathPatternMatcher(pattern, null);
             return patternMatcher;
         }
     }
