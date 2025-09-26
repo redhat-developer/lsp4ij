@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.files.operations;
 
-import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.eclipse.lsp4j.FileOperationOptions;
 import org.eclipse.lsp4j.FileOperationsServerCapabilities;
@@ -158,10 +157,6 @@ public class FileOperationsManager {
 
     public LanguageServerWrapper getLanguageServerWrapper() {
         return languageServerWrapper;
-    }
-
-    private Project getProject() {
-        return languageServerWrapper.getProject();
     }
 
 }

@@ -10,11 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints;
 
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
-import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

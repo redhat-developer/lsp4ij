@@ -10,11 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.configurations.attach;
 
-import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.openapi.components.StoredProperty;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptionsBase;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
-import com.redhat.devtools.lsp4ij.dap.configurations.options.ServerTraceConfigurable;
 import org.jetbrains.annotations.Nullable;
 
 /**

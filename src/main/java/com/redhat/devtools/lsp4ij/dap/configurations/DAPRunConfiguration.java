@@ -10,10 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
-import com.intellij.execution.Executor;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.execution.configurations.*;
-import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.InvalidDataException;
@@ -24,9 +22,6 @@ import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
-import com.redhat.devtools.lsp4ij.dap.descriptors.DefaultDebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;

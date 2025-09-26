@@ -23,8 +23,6 @@ import com.intellij.util.xmlb.annotations.XCollection;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -107,8 +105,6 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
     }
 
     public static class UserDefinedLanguageServerItemSettings {
-
-        private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerItemSettings.class);
 
         private String serverId;
 

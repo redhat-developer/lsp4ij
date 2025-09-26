@@ -16,7 +16,6 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 import org.jetbrains.annotations.NotNull;

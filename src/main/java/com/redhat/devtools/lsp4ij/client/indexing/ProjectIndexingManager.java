@@ -34,10 +34,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
  */
 public class ProjectIndexingManager implements Disposable {
 
-
-    private record RefreshFeatures(Set<String> features, CompletableFuture<?> indexingFinished) {
-    }
-
     final @NotNull Project project;
     boolean dumbIndexing;
     boolean scanning;
@@ -143,7 +139,7 @@ public class ProjectIndexingManager implements Disposable {
     private static @NotNull ExecuteLSPFeatureStatus doCanExecuteLSPFeature(@Nullable VirtualFile file,
                                                                            @NotNull Project project) {
         ProjectIndexingManager manager = getInstance(project);
-        if (manager.isIndexingAll()) {
+        if (ProjectIndexingManager.isIndexingAll()) {
             // The file is associated to a language server, but the project is indexing
             // Execute the LSP feature when the project indexing process is finished.
             manager.filesToRefresh.add(file);

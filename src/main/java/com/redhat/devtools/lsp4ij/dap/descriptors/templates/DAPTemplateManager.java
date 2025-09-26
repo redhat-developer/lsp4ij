@@ -10,29 +10,32 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
-import com.google.gson.*;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.vfs.JarFileSystem;
-import com.intellij.openapi.vfs.VfsUtilCore;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.dap.DebugMode;
-import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
-import com.redhat.devtools.lsp4ij.templates.ServerTemplateManager;
+import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.ATTACH_FILE_START_NAME;
+import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.LAUNCH_FILE_START_NAME;
+import static com.redhat.devtools.lsp4ij.templates.ServerTemplate.INSTALLER_FILE_NAME;
+import static com.redhat.devtools.lsp4ij.templates.ServerTemplate.TEMPLATE_FILE_NAME;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-
-import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.vfs.VfsUtilCore;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
+import com.redhat.devtools.lsp4ij.templates.ServerTemplateManager;
 
 /**
  * DAP (Debug Adapter Protocol) template manager.

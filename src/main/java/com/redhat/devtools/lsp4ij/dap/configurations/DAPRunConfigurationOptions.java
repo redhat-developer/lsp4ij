@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
-import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.lang.Language;
 import com.intellij.openapi.components.StoredProperty;
 import com.intellij.openapi.project.Project;
@@ -26,7 +25,6 @@ import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryCon
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

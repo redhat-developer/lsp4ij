@@ -16,10 +16,7 @@ package com.redhat.devtools.lsp4ij.settings;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.project.Project;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
-
-import static com.redhat.devtools.lsp4ij.settings.LanguageServerView.isEquals;
 
 /**
  * Language server settings for a given Language server definition stored in Project scope.

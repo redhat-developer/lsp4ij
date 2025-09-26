@@ -43,24 +43,22 @@ public class MockWorkspaceService implements WorkspaceService {
 	private <U> CompletableFuture<U> futureFactory(U value) {
 		return ((Function<U, CompletableFuture<U>>)this._futureFactory).apply(value);
 	}
-	
+
 	@Override
 	public CompletableFuture<Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> symbol(
 			WorkspaceSymbolParams params) {
-		// TODO Auto-generated method stub
+		// No-op
 		return null;
 	}
 
 	@Override
 	public void didChangeConfiguration(DidChangeConfigurationParams params) {
-		// TODO Auto-generated method stub
-
+		// No-op
 	}
 
 	@Override
 	public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-		// TODO Auto-generated method stub
-
+		// No-op
 	}
 
 	@Override

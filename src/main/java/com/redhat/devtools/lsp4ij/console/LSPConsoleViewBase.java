@@ -14,17 +14,12 @@
 package com.redhat.devtools.lsp4ij.console;
 
 import com.intellij.execution.impl.ConsoleViewImpl;
-import com.intellij.execution.impl.EditorHyperlinkSupport;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.redhat.devtools.lsp4ij.console.actions.AutoFoldingAction;
 import com.redhat.devtools.lsp4ij.console.actions.ClearThisConsoleAction;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

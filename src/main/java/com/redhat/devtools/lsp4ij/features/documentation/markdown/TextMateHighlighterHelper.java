@@ -18,7 +18,6 @@ import com.intellij.openapi.editor.richcopy.HtmlSyntaxInfoUtil;
 import com.intellij.openapi.fileTypes.SyntaxHighlighter;
 import com.intellij.openapi.util.registry.Registry;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.features.documentation.markdown.SyntaxColorationCodeBlockRenderer;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.vladsch.flexmark.html.HtmlWriter;
 import org.jetbrains.annotations.NotNull;

@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.*;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.EnvironmentUtil;
@@ -43,8 +42,6 @@ import java.util.List;
  * </pre>
  */
 public class ExecTask extends InstallerTask {
-
-    private static final int DEFAULT_TIMEOUT = 2000;
 
     private final @NotNull List<String> command;
     private final @Nullable Integer timeout;

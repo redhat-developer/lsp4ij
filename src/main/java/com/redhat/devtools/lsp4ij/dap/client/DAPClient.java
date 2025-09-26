@@ -98,7 +98,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private final boolean isDebug;
     private final @NotNull DebugMode debugMode;
     private final @NotNull ServerTrace serverTrace;
-    private boolean isConnected;
     private Future<Void> debugProtocolFuture;
     private IDebugProtocolServer debugProtocolServer;
     private @NotNull

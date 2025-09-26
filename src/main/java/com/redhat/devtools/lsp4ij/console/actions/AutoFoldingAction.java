@@ -28,8 +28,6 @@ import org.jetbrains.annotations.NotNull;
  */
 public class AutoFoldingAction extends ToggleAction implements DumbAware {
 
-    private boolean initialExpanded;
-
     private final Editor myEditor;
 
     public AutoFoldingAction(@NotNull final Editor editor) {
@@ -62,7 +60,6 @@ public class AutoFoldingAction extends ToggleAction implements DumbAware {
     @Override
     public void setSelected(@NotNull AnActionEvent e, boolean state) {
         boolean expanded = state;
-        initialExpanded = expanded;
         myEditor.getFoldingModel().runBatchFoldingOperation(() -> {
             FoldRegion[] allRegions = myEditor.getFoldingModel().getAllFoldRegions();
             for (FoldRegion region : allRegions) {
