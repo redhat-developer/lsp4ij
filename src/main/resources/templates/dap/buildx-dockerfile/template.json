@@ -1,5 +1,5 @@
 {
-  "id": "docker-buildx-dockerfile",
+  "id": "buildx-dockerfile",
   "name": "Docker: Dockerfile Build Debugging",
   "launch": {
     "default": "docker buildx dap build"
