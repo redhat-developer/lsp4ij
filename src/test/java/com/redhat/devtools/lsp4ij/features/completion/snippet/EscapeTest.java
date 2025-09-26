@@ -50,7 +50,7 @@ public class EscapeTest {
 
     @Test(expected = ParseException.class)
     public void escapedMismatchEscapedClosingCurlyBracket() {
-        LspSnippetNode[] actual = LspSnippetAssert.parse("func foo() {${0\\}");
+        LspSnippetAssert.parse("func foo() {${0\\}");
     }
 
     @Test

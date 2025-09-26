@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.dap.console;
 
 import com.intellij.execution.ui.ConsoleViewContentType;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

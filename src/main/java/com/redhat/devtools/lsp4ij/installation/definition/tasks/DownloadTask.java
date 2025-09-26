@@ -19,7 +19,6 @@ import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.download.AssetFetcher;
 import com.redhat.devtools.lsp4ij.installation.download.DownloadUtils;
-import com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcher;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
@@ -84,8 +83,8 @@ public class DownloadTask extends InstallerTask {
                 // language=html
                 String htmlError = """
                         <p>Unable to retrieve the download URL for your platform <code>%s</code> and architecture <code>%s</code>.</p>
-                        <p>You must define a valid <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#unique-url">url</a> 
-                        or <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#github-asset-download">github.asset</a> 
+                        <p>You must define a valid <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#unique-url">url</a>
+                        or <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#github-asset-download">github.asset</a>
                         in your <code>installer.json</code>, matching your OS and architecture.</p>
                         """.formatted(LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase());
                 context.printError(htmlError, true);
@@ -166,7 +165,7 @@ public class DownloadTask extends InstallerTask {
                     // language=HTML
                     String htmlError = """
                             <p>The file name <code>%s</code> specified in <a href='https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#output-customization'><code>output.file.name</code></a>
-                             for your platform <code>%s</code> and architecture <code>%s</code> 
+                             for your platform <code>%s</code> and architecture <code>%s</code>
                             was not found in the downloaded archive at <code>%s</code>.</p>
                             <p>Please update the <code>output.file.name</code> section of your <code>installer.json</code> to correctly match your OS and architecture.</p>
                             """.formatted(outputFileName, LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase(), outputDir.toString());

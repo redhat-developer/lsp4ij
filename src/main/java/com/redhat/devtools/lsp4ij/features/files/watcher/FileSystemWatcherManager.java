@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.features.files.watcher;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.files.PathPatternMatcher;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.FileSystemWatcher;

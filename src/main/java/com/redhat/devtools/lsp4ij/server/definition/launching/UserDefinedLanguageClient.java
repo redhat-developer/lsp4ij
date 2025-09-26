@@ -11,10 +11,8 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
-import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**

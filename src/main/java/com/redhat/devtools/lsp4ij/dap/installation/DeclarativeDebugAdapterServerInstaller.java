@@ -15,7 +15,6 @@ package com.redhat.devtools.lsp4ij.dap.installation;
 
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
-import com.redhat.devtools.lsp4ij.installation.LanguageServerInstallerBase;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;

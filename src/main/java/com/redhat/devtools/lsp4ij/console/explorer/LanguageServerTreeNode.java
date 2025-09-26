@@ -13,7 +13,6 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 
 import javax.swing.*;
@@ -35,10 +34,7 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
     }
 
     public LanguageServerProcessTreeNode getActiveProcessTreeNode() {
-        for (int i = 0; i < super.getChildCount(); i++) {
-            return (LanguageServerProcessTreeNode) super.getChildAt(i);
-        }
-        return null;
+        return super.getChildCount() > 0 ? (LanguageServerProcessTreeNode) super.getChildAt(0) : null;
     }
 
     public Icon getIcon() {

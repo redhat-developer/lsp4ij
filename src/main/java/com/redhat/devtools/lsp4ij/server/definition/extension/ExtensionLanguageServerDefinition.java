@@ -89,7 +89,6 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
         return clientFeatures;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public @NotNull Class<? extends LanguageServer> getServerInterface() {
         Class<? extends LanguageServer> serverInterface = null;

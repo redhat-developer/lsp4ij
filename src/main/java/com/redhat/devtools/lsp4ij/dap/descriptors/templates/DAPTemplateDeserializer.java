@@ -12,15 +12,9 @@ package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
-import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplateJsonDeserializer;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*;

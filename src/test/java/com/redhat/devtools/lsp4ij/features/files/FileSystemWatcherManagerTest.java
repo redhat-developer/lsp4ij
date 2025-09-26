@@ -167,8 +167,6 @@ public class FileSystemWatcherManagerTest {
 
     @Test
     public void jdt_ls() {
-        // On Windows OS, we generate a base dir with lower case because JDT LS generate this base dir.
-        String baseDir = SystemInfo.isWindows ? getProjectDir().toLowerCase() : getProjectDir();
         registerWatchers(// language=json
                 """
                         {"watchers": [

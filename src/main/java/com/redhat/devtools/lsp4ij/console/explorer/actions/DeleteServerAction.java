@@ -20,8 +20,6 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Objects;
-
 /**
  * Delete (only) user defined language server action.
  */

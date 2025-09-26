@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.dap.configurations.options;
 
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Server trace configurable.

@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentation;
 
-import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.LSPHoverFeature;
@@ -129,7 +128,6 @@ public class LSPDocumentationHelper {
     public static String convertToHtml(@NotNull List<MarkupContent> contents,
                                        @Nullable LanguageServerItem languageServer,
                                        @NotNull PsiFile file) {
-        Project project = file.getProject();
         StringBuilder htmlBody = new StringBuilder();
         for (int i = 0; i < contents.size(); i++) {
             if (i > 0) {

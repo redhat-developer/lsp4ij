@@ -12,15 +12,9 @@ package com.redhat.devtools.lsp4ij.dap.installation;
 
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectManager;
 import com.redhat.devtools.lsp4ij.*;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatureAware;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
-import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallerBase;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

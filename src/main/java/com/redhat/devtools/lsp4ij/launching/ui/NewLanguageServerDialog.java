@@ -27,7 +27,6 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
-import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
@@ -231,7 +230,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update experimental
         this.languageServerPanel.setExperimentalContent(template.getExperimental());
-        
+
         // Update client configuration
         this.languageServerPanel.setClientConfigurationContent(template.getClientConfiguration());
 
