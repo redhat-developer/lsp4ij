@@ -68,8 +68,8 @@ public class DAPStackFrame extends XStackFrame {
         }
         component.append(", ", SimpleTextAttributes.REGULAR_ATTRIBUTES);
         Source source = stackFrame.getSource();
-        String sourceName = source != null ? source.getName() : null;
-        if (sourceName != null && StringUtils.isNotBlank(sourceName)) {
+        String sourceName = getSourceNameFromNameOrPath(source);
+        if (sourceName != null) {
             component.append(sourceName, SimpleTextAttributes.REGULAR_ATTRIBUTES);
         } else {
             component.append(XDebuggerBundle.message("invalid.frame"), SimpleTextAttributes.ERROR_ATTRIBUTES);
@@ -110,16 +110,6 @@ public class DAPStackFrame extends XStackFrame {
             // ex: <node_internals>/internal/modules/cjs/loader
         }
         return null;
-    }
-
-    private @NotNull String getValidSourceName(@NotNull Source source) {
-        if (StringUtils.isNotBlank(source.getName())) {
-            return source.getName();
-        }
-        if (StringUtils.isNotBlank(source.getPath())) {
-            return source.getPath();
-        }
-        return source.getSourceReference() + "";
     }
 
     public CompletableFuture<XSourcePosition> getSourcePositionFor(@NotNull Variable variable) {
@@ -211,7 +201,7 @@ public class DAPStackFrame extends XStackFrame {
             return null;
         }
         var disassemblyFile = getClient().getDisassemblyFile();
-        if (disassemblyFile == null  || !FileEditorManager.getInstance(client.getProject()).isFileOpen(disassemblyFile)) {
+        if (disassemblyFile == null || !FileEditorManager.getInstance(client.getProject()).isFileOpen(disassemblyFile)) {
             // Don't load the disassembly instruction source position when:
             // - the DAP server doesn't support Disassembly
             // - the disassembly view is not opened
@@ -220,8 +210,33 @@ public class DAPStackFrame extends XStackFrame {
         if (disassemblyInstructionSourcePosition != null && disassemblyInstructionSourcePosition.getModificationCount() == disassemblyFile.getModificationCount()) {
             return disassemblyInstructionSourcePosition;
         }
-        disassemblyInstructionSourcePosition =  new DisassemblyDeferredSourcePosition(instructionPointerReference, disassemblyFile, client);
+        disassemblyInstructionSourcePosition = new DisassemblyDeferredSourcePosition(instructionPointerReference, disassemblyFile, client);
         return disassemblyInstructionSourcePosition;
+    }
+
+
+    private static @NotNull String getValidSourceName(@NotNull Source source) {
+        String sourceName = getSourceNameFromNameOrPath(source);
+        if (sourceName != null) {
+            return sourceName;
+        }
+        return source.getSourceReference() + "";
+    }
+
+    private static @Nullable String getSourceNameFromNameOrPath(@Nullable Source source) {
+        if (StringUtils.isNotBlank(source.getName())) {
+            return source.getName();
+        }
+        if (StringUtils.isNotBlank(source.getPath())) {
+            // Get the file source name from the path
+            String path = source.getPath();
+            int slashIndex = path.lastIndexOf('/');
+            if (slashIndex == -1) {
+                slashIndex = path.lastIndexOf('\\');
+            }
+            return slashIndex != -1 ? path.substring(slashIndex + 1) : path;
+        }
+        return null;
     }
 
 }
