@@ -91,7 +91,7 @@ public class DAPStackFrame extends XStackFrame {
         if (sourceReference > 0) {
             // If the value &gt; 0 the contents of the source must be retrieved through
             // the SourceRequest (even if a path is specified).
-            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), source.getName(), client.getProject());
+            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), getValidSourceName(source), client.getProject());
             if (file.shouldReload(getClient().getSessionId())) {
                 return new DAPSourceReferencePosition(file, sourceReference, line, client);
             }
@@ -110,6 +110,16 @@ public class DAPStackFrame extends XStackFrame {
             // ex: <node_internals>/internal/modules/cjs/loader
         }
         return null;
+    }
+
+    private @NotNull String getValidSourceName(@NotNull Source source) {
+        if (StringUtils.isNotBlank(source.getName())) {
+            return source.getName();
+        }
+        if (StringUtils.isNotBlank(source.getPath())) {
+            return source.getPath();
+        }
+        return source.getSourceReference() + "";
     }
 
     public CompletableFuture<XSourcePosition> getSourcePositionFor(@NotNull Variable variable) {
