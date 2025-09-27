@@ -255,9 +255,18 @@ public class LanguageServerWrapper implements Disposable {
         serverError = null;
         setEnabled(true);
         if (serverStatus != ServerStatus.installed && serverStatus != ServerStatus.installing) {
-            stop();
+            stop().thenRun(this::restartImpl);
+        } else {
+            restartImpl();
         }
-        // start the language server
+    }
+
+    /**
+     * Shared implementation of restart, which only starts the server.
+     * Should have been stopped beforehand (if needed) by restart.
+     */
+    private synchronized void restartImpl() {
+        // Start the server
         getInitializedServer()
                 .thenAccept(unused -> {
                     // The language server is started.
