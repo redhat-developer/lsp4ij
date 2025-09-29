@@ -16,6 +16,8 @@ import com.intellij.execution.process.ProcessListener;
 import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.openapi.util.Key;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +26,8 @@ import java.nio.charset.StandardCharsets;
  * IntelliJ process listener used to read the process of the started DAP server in an InputStream.
  */
 class DAPProcessListener implements ProcessListener {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DAPProcessListener.class);
 
     private final PipedOutputStream outputStream;
     private final OutputStreamWriter outputStreamWriter;
@@ -49,11 +53,14 @@ class DAPProcessListener implements ProcessListener {
         if (ProcessOutputType.isStdout(outputType)) {
             // Flush the output
             try {
-                this.outputStreamWriter.write(event.getText());
-                this.outputStreamWriter.flush();
+                synchronized (this.outputStreamWriter) {
+                    this.outputStreamWriter.write(event.getText());
+                    this.outputStreamWriter.flush();
+                }
             } catch (IOException e) {
                 // Some IO error exception, stop the process
                 ExecutionManagerImpl.stopProcess(event.getProcessHandler());
+                LOGGER.warn("DAP process listener crashes.", e);
             }
         }
     }
@@ -61,8 +68,10 @@ class DAPProcessListener implements ProcessListener {
     @Override
     public void processTerminated(@NotNull ProcessEvent event) {
         try {
-            outputStreamWriter.close();
-            outputStream.close();
+            synchronized (this.outputStreamWriter) {
+                this.outputStreamWriter.close();
+                this.outputStream.close();
+            }
         } catch (IOException e) {
             // Do nothing
         }
