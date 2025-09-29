@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.settings.actions.OpenUrlAction;
 import com.redhat.devtools.lsp4ij.settings.actions.ReportErrorInLogAction;
 import com.redhat.devtools.lsp4ij.settings.actions.ShowErrorLogAction;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
+import org.eclipse.lsp4j.jsonrpc.MessageIssueException;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -157,6 +158,9 @@ public class CancellationSupport implements CancelChecker {
                     // - Caused by: java.util.concurrent.CancellationException
                     //	at java.base/java.util.concurrent.CompletableFuture.cancel(CompletableFuture.java:2478)
                     // To fix those issues, we ignore CancellationException in this case.
+                    return null;
+                }
+                if (error instanceof MessageIssueException) {
                     return null;
                 }
                 if (error instanceof RuntimeException) {

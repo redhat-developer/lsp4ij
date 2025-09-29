@@ -19,6 +19,7 @@ import com.intellij.ui.AnimatedIcon;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -50,18 +51,22 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     public void setServerStatus(ServerStatus serverStatus) {
         this.serverStatus = serverStatus;
         displayName = getDisplayName(serverStatus);
-        switch (serverStatus) {
-            case starting:
-            case stopping:
-            case checking_installed:
-            case installing:
-                startTime = System.currentTimeMillis();
-                break;
-            case stopped:
-            case started:
-            case installed:
-                startTime = -1;
-                break;
+        if (languageServer.isEnabled()) {
+            switch (serverStatus) {
+                case starting:
+                case stopping:
+                case checking_installed:
+                case installing:
+                    startTime = System.currentTimeMillis();
+                    break;
+                case stopped:
+                case started:
+                case installed:
+                    startTime = -1;
+                    break;
+            }
+        } else {
+            startTime = -1;
         }
         this.setUserObject(displayName);
         treeModel.nodeChanged(this);
@@ -137,7 +142,10 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
         return displayName;
     }
 
-    public String getElapsedTime() {
+    public @Nullable String getElapsedTime() {
+        if (!languageServer.isEnabled()) {
+            return null;
+        }
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
         return Formats.formatDuration(duration, "\u2009");
