@@ -12,8 +12,11 @@ package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplateJsonDeserializer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.lang.reflect.Type;
 import java.util.Map;
 
@@ -45,6 +48,7 @@ public class DAPTemplateDeserializer extends ServerTemplateJsonDeserializer<DAPT
                 Map<String, String> programArgsMap = gson.fromJson(programArgs, mapType);
                 dapTemplate.setProgramArgs(programArgsMap);
             }
+            dapTemplate.setEnvData(deserializeEnvData(jsonObject));
         }
 
         JsonElement connectTimeout = jsonObject.get(CONNECT_TIMEOUT_JSON_PROPERTY);

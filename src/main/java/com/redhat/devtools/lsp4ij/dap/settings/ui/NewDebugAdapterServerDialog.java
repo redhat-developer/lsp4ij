@@ -108,6 +108,7 @@ public class NewDebugAdapterServerDialog extends DialogWrapper {
         // Update command
         String command = getCommandLine(template);
         this.debugAdapterServerPanel.setCommandLine(command);
+        this.debugAdapterServerPanel.setEnvData(template.getEnvData());
 
         // Update wait for trace
         this.debugAdapterServerPanel.getDebugServerWaitStrategyPanel().update(null,

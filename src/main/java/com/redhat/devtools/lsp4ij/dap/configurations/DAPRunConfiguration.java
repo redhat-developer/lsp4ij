@@ -19,6 +19,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.EnvironmentVariablesDataConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
@@ -34,7 +35,7 @@ import java.util.List;
 /**
  * Default Debug Adapter Protocol (DAP) run configuration.
  */
-public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigurationOptions> implements FileOptionConfigurable, WorkingDirectoryConfigurable, AttachConfigurable, DebuggableFile {
+public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigurationOptions> implements FileOptionConfigurable, WorkingDirectoryConfigurable, AttachConfigurable, EnvironmentVariablesDataConfigurable, DebuggableFile {
 
     public static final String DEBUG_ADAPTER_CONFIGURATION = "Debug Adapter Configuration";
 
@@ -86,10 +87,12 @@ public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigura
         getOptions().setCommand(command);
     }
 
+    @Override
     public @NotNull EnvironmentVariablesData getEnvData() {
         return envData;
     }
 
+    @Override
     public void setEnvData(@NotNull EnvironmentVariablesData envData) {
         this.envData = envData;
     }
@@ -294,6 +297,7 @@ public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigura
         configuration.setServerId(getServerId());
         configuration.setServerName(getServerName());
         configuration.setCommand(getCommand());
+        configuration.setEnvData(getEnvData());
         configuration.setDebugServerWaitStrategy(getDebugServerWaitStrategy());
         configuration.setConnectTimeout(getConnectTimeout());
         configuration.setDebugServerReadyPattern(getDebugServerReadyPattern());

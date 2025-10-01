@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.templates;
 
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.lang.Language;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
@@ -52,6 +53,11 @@ public abstract class ServerTemplate {
     public static final String URL_JSON_PROPERTY = "url";
     public static final String DEFAULT_JSON_PROPERTY = "default";
 
+    // Env
+    public static final String ENV_JSON_PROPERTY = "env";
+    public static final String ENV_INCLUDE_SYSTEM_JSON_PROPERTY = "includeSystemEnvironmentVariables";
+    public static final String ENV_VARIABLES_JSON_PROPERTY = "variables";
+
     // File mappings
     public static final String LANGUAGE_ID_JSON_PROPERTY = "languageId";
     public static final String FILE_TYPE_JSON_PROPERTY = "fileType";
@@ -64,6 +70,7 @@ public abstract class ServerTemplate {
     private String name;
     private @Nullable String url;
     private Map<String /* OS */, String /* program args */> programArgs;
+    private @Nullable EnvironmentVariablesData envData;
 
     private List<ServerMappingSettings> fileTypeMappings;
     private List<ServerMappingSettings> languageMappings;
@@ -123,6 +130,14 @@ public abstract class ServerTemplate {
 
     public void setProgramArgs(Map<String, String> programArgs) {
         this.programArgs = programArgs;
+    }
+
+    public @Nullable EnvironmentVariablesData getEnvData() {
+        return envData;
+    }
+
+    public void setEnvData(@Nullable EnvironmentVariablesData envData) {
+        this.envData = envData;
     }
 
     // ---------- Commons Methods for file mappings
