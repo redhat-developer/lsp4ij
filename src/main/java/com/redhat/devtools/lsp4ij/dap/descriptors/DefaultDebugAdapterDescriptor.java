@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.execution.ExecutionException;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.process.ProcessHandler;
@@ -22,6 +23,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.EnvironmentVariablesDataConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
@@ -84,11 +86,24 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
                     command = userDefinedServer.getCommandLine();
                 }
             }
-            // TODO : store env configuration in the options
+            // Environment variables
             Map<String, String> userEnvironmentVariables = new HashMap<>();
             boolean includeSystemEnvironmentVariables = true;
+            var envData = getEnvData();
+            if (envData != null) {
+                userEnvironmentVariables.putAll(envData.getEnvs());
+                includeSystemEnvironmentVariables = envData.isPassParentEnvs();
+            }
+
             String resolvedCommandLine = resolveCommandLine(command, environment.getProject());
             return createStartServerCommandLine(resolvedCommandLine, userEnvironmentVariables, includeSystemEnvironmentVariables);
+        }
+        return null;
+    }
+
+    protected @Nullable EnvironmentVariablesData getEnvData() {
+        if (environment.getRunProfile() instanceof EnvironmentVariablesDataConfigurable runConfiguration) {
+            return runConfiguration.getEnvData();
         }
         return null;
     }

@@ -213,6 +213,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Update command
         String command = getCommandLine(template);
         languageServerPanel.setCommandLine(command);
+        languageServerPanel.setEnvData(template.getEnvData());
 
         // Update mappings
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();

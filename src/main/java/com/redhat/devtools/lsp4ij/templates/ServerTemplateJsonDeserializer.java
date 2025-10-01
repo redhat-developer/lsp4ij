@@ -10,15 +10,20 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.templates;
 
+import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.EnvironmentVariablesDataConfigurable;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.templates.ServerTemplate.*;
 
@@ -116,6 +121,30 @@ public abstract class ServerTemplateJsonDeserializer<T extends ServerTemplate>  
         }
         if (id != null && StringUtils.isNotBlank(id)) {
             return baseUrl + id + ".md";
+        }
+        return null;
+    }
+
+    protected @Nullable EnvironmentVariablesData deserializeEnvData(@NotNull JsonObject jsonObject) {
+        JsonElement env = jsonObject.get(ENV_JSON_PROPERTY);
+        if (env != null && env.isJsonObject()) {
+            JsonObject envObject = env.getAsJsonObject();
+            // includeSystemEnvironmentVariables
+            boolean includeSystemEnvironmentVariables = false;
+            JsonElement includeSystem = envObject.get(ENV_INCLUDE_SYSTEM_JSON_PROPERTY);
+            if (includeSystem != null && includeSystem.isJsonPrimitive() && includeSystem.getAsJsonPrimitive().isBoolean()) {
+                includeSystemEnvironmentVariables = includeSystem.getAsJsonPrimitive().getAsBoolean();
+            }
+            // variables
+            Map<String, String> envs = Collections.emptyMap();
+            JsonElement variables = envObject.get(ENV_VARIABLES_JSON_PROPERTY);
+            if (variables != null && variables.isJsonObject()) {
+                Gson gson = new Gson();
+                Type mapType = new TypeToken<Map<String, String>>() {
+                }.getType();
+                envs = gson.fromJson(variables, mapType);
+            }
+            return EnvironmentVariablesData.create(envs , includeSystemEnvironmentVariables);
         }
         return null;
     }
