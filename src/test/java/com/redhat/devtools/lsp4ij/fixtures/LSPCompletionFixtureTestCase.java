@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.fixtures;
 
+import com.intellij.codeInsight.completion.BaseCompletionService;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -119,6 +120,8 @@ public abstract class LSPCompletionFixtureTestCase extends LSPCodeInsightFixture
         MockLanguageServer.INSTANCE.setCompletionList(JSONUtils.getLsp4jGson().fromJson(jsonCompletionList, CompletionList.class));
         // Open editor for a given file name and content (which declares <caret> to know where the completion is triggered).
         myFixture.configureByText(fileName, editorContentText);
+        // Forbid word completion (required for 2023.3 version)
+        myFixture.getFile().putUserData(BaseCompletionService.FORBID_WORD_COMPLETION, true);
         // Process completion
         assertNull(myFixture.completeBasic());
         String expected = expectedEditorContentText;

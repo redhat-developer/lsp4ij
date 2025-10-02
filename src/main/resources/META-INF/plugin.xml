@@ -5,7 +5,14 @@
     <vendor email="developers@redhat.com" url="https://github.com/redhat-developer/lsp4ij/issues">Red-Hat</vendor>
 
     <change-notes><![CDATA[
-     <h3>0.16.1</h3>
+    <h3>0.17.0</h3>
+    <ul>
+      <li>Improved language server lifecycle management (start/stop/restart) to prevent unexpected errors</li>
+      <li>Fixed various bugs and improved stability for LSP and DAP</li>
+    </ul>
+    See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/21?closed=1">changelog</a>.
+
+    <h3>0.16.1</h3>
     <ul>
       <li>fix Hit CancellationException when using "Shift+Shift" (Search Everywhere)</li>
       <li>fix DAPDebuggerEvaluator.getExpressionInfoAtOffsetAsync must not return null</li>
