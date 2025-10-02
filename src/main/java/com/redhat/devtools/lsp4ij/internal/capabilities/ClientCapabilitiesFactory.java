@@ -302,13 +302,19 @@ public class ClientCapabilitiesFactory {
 
     private static WindowClientCapabilities getWindowClientCapabilities() {
         final var windowClientCapabilities = new WindowClientCapabilities();
-        windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
         /**
          * LSP4IJ supports server initiated progress using the
          * `window/workDoneProgress/create` request.
          */
         windowClientCapabilities.setWorkDoneProgress(true);
-        windowClientCapabilities.setShowMessage(new WindowShowMessageRequestCapabilities());
+
+        // Support for window/showDocument
+        windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
+
+        // Support for window/showMessage and window/showMessageRequest both
+        var showMessageRequestCapabilities = new WindowShowMessageRequestCapabilities();
+        showMessageRequestCapabilities.setMessageActionItem(new WindowShowMessageRequestActionItemCapabilities(Boolean.FALSE));
+        windowClientCapabilities.setShowMessage(showMessageRequestCapabilities);
         return windowClientCapabilities;
 
     }
