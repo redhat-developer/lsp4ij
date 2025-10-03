@@ -942,7 +942,7 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyEdits(null, document, textDocumentEdit.getEdits());
+                            applyEdits(null, document, textDocumentEdit.getEdits(), true);
                         }
                     }
                 } else if (change.isRight()) {
@@ -970,7 +970,7 @@ public class LSPIJUtils {
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
-                        applyEdits(null, document, change.getValue());
+                        applyEdits(null, document, change.getValue(), true);
                     }
                 }
             }
@@ -984,7 +984,7 @@ public class LSPIJUtils {
                 Document document = getDocument(targetFile);
                 if (document != null) {
                     TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
-                    applyEdits(null, document, Collections.singletonList(textEdit));
+                    applyEdits(null, document, Collections.singletonList(textEdit), true);
                 }
             }
         } else {
@@ -1144,7 +1144,8 @@ public class LSPIJUtils {
     }
 
     /**
-     * Apply text edits to the given document and move the caret offset of the given editor if needed.
+     * Apply text edits to the given document and move the caret offset of the given editor if needed
+     * without saving the document.
      *
      * @param editor   the editor used to update the caret offset after the apply edits and null otherwise.
      * @param document the document to update.
@@ -1153,10 +1154,24 @@ public class LSPIJUtils {
     public static void applyEdits(@Nullable Editor editor,
                                   @NotNull Document document,
                                   @NotNull List<TextEdit> edits) {
+        applyEdits(editor, document, edits, false);
+    }
+    /**
+     * Apply text edits to the given document and move the caret offset of the given editor if needed.
+     *
+     * @param editor   the editor used to update the caret offset after the apply edits and null otherwise.
+     * @param document the document to update.
+     * @param edits    the text edit list to apply to the given document.
+     * @param saveDocument true if document must be saved after the update of the document and false otherwise.
+     */
+    public static void applyEdits(@Nullable Editor editor,
+                                  @NotNull Document document,
+                                  @NotNull List<TextEdit> edits,
+                                  boolean saveDocument) {
         if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
-            doApplyEdits(editor, document, edits);
+            doApplyEdits(editor, document, edits, saveDocument);
         } else {
-            WriteAction.run(() -> doApplyEdits(editor, document, edits));
+            WriteAction.run(() -> doApplyEdits(editor, document, edits, saveDocument));
         }
     }
 
@@ -1167,13 +1182,15 @@ public class LSPIJUtils {
      * This method is called in Write Action.
      * </p>
      *
-     * @param editor   the editor used to update the caret offset after the apply edits and null otherwise.
-     * @param document the document to update.
-     * @param edits    the text edit list to apply to the given document.
+     * @param editor       the editor used to update the caret offset after the apply edits and null otherwise.
+     * @param document     the document to update.
+     * @param edits        the text edit list to apply to the given document.
+     * @param saveDocument true if document must be saved after the update of the document and false otherwise.
      */
     private static void doApplyEdits(@Nullable Editor editor,
                                      @NotNull Document document,
-                                     @NotNull List<TextEdit> edits) {
+                                     @NotNull List<TextEdit> edits,
+                                     boolean saveDocument) {
         // Create an owned copy to insulate against modification of the provided list while processing it
         List<TextEdit> ownedEdits = new ArrayList<>(edits);
 
@@ -1213,10 +1230,12 @@ public class LSPIJUtils {
             editor.getCaretModel().moveToOffset(newCaretOffset);
         }
 
-        // Explicit document save is required to trigger LSPFileListener#contentsChanged immediately for files
-        // that are not open in the editor, which will send didChangeWatchedFiles notification to the language server.
-        // By default, for such files, IDEA's auto-save logic is used which causes a delay until auto-save happens.
-        FileDocumentManager.getInstance().saveDocument(document);
+        if (saveDocument) {
+            // Explicit document save is required to trigger LSPFileListener#contentsChanged immediately for files
+            // that are not open in the editor, which will send didChangeWatchedFiles notification to the language server.
+            // By default, for such files, IDEA's auto-save logic is used which causes a delay until auto-save happens.
+            FileDocumentManager.getInstance().saveDocument(document);
+        }
     }
 
     /**
