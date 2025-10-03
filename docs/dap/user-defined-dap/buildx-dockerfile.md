@@ -11,30 +11,32 @@ You will need Buildx v0.28.0. You can get Buildx by [installing Docker Desktop](
 
 ## Setup
 
-1. Create a Debug Adapter Protocol launch configuration.
+1. Set `BUILDX_EXPERIMENTAL` to `1` in your system's environment variables so that your JetBrains IDE will pick it up.
+
+2. Create a Debug Adapter Protocol launch configuration.
 
 ![Use the plus button to create a new Debug Adapter Protocol configuration](../images/buildx-dockerfile/setup-01-create-config.png)
 
-2. Click on the 'Create a new server' hyperlink.
+3. Click on the 'Create a new server' hyperlink.
 
 ![Create a new server instead of using an existing Debug Adapter Server](../images/buildx-dockerfile/setup-02-create-server.png)
 
-3. Click 'Choose template...' and select the 'Docker: Dockerfile Build Debugging' template.
+4. Click 'Choose template...' and select the 'Docker: Dockerfile Build Debugging' template.
 
 ![Select the Dockerfile Build Debugging template](../images/buildx-dockerfile/setup-03-template-selection.png)
 
-4. In 'Environment variables:', enter in `BUILDX_EXPERIMENTAL=1`.
+5. In 'Environment variables:', enter in `BUILDX_EXPERIMENTAL=1`.
 
 ![Set the environment variable in the dialog](../images/buildx-dockerfile/setup-04-env-var.png)
 
-5. Click the 'OK' button to save the server configuration.
-6. Now go to the 'Configuration' tab and find select a Dockerfile in the 'File:' field.
+6. Click the 'OK' button to save the server configuration.
+7. Now go to the 'Configuration' tab and find select a Dockerfile in the 'File:' field.
 
 ![Set the Dockerfile to debug](../images/buildx-dockerfile/setup-05-file-selection.png)
 
-7. Click the 'OK' button to save the launch configuration.
-8. Open your Dockerfile and place a breakpoint.
-9. Launch your configuration in debug mode to pause the Dockerfile build!
+8. Click the 'OK' button to save the launch configuration.
+9. Open your Dockerfile and place a breakpoint.
+10. Launch your configuration in debug mode to pause the Dockerfile build!
 
 ![Debug Dockerfiles with LSP4IJ](../images/buildx-dockerfile/setup-06-start-debug.png)
 
