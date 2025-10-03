@@ -435,6 +435,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
      * @return the response of the resolved LSP variable and null otherwise.
      */
     private @Nullable String getVariableValue(String variableName) {
+        if (!variableName.isEmpty() && variableName.charAt(0) == '$') {
+            // Remove $
+            variableName = variableName.substring(1);
+        }
         Document document = editor.getDocument();
         switch (variableName) {
             case TM_FILENAME_BASE:
