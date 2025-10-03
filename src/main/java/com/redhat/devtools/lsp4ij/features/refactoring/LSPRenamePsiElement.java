@@ -32,6 +32,6 @@ public class LSPRenamePsiElement extends LSPPsiElement {
     public void rename() {
         Document document = LSPIJUtils.getDocument(getContainingFile().getVirtualFile());
         Editor[] editors = LSPIJUtils.editorsForFile(getContainingFile().getVirtualFile(), getContainingFile().getProject());
-        LSPIJUtils.applyEdits(editors.length > 0 ? editors[0] : null, document, Arrays.asList(textEdit));
+        LSPIJUtils.applyEdits(editors.length > 0 ? editors[0] : null, document, Arrays.asList(textEdit), true);
     }
 }
