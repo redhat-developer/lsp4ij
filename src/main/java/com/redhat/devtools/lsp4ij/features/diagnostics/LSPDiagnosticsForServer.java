@@ -162,16 +162,16 @@ public class LSPDiagnosticsForServer {
 
         // Associate each diagnostic with the list of code actions to load for a given range
         for (DiagnosticData data : diagnosticsGroupByCoveredRange) {
-            var action = new LSPLazyCodeActions(data.diagnostics(), file, languageServer);
+            var newCodeActions = new LSPLazyCodeActions(data.diagnostics(), file, languageServer);
             data.diagnostics()
                     .forEach(d -> {
                         // Get the existing LSP lazy code actions for the current diagnostic
-                        LSPLazyCodeActions actions = existingDiagnostics != null ? existingDiagnostics.get(d) : null;
-                        if (actions != null) {
+                        LSPLazyCodeActions oldCodeActions = existingDiagnostics != null ? existingDiagnostics.get(d) : null;
+                        if (oldCodeActions != null) {
                             // cancel the LSP textDocument/codeAction request if needed
-                            actions.cancel();
+                            oldCodeActions.cancel();
                         }
-                        map.put(d, action);
+                        map.put(d, newCodeActions);
                     });
 
         }

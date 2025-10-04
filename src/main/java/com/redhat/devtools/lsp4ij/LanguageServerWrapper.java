@@ -102,7 +102,6 @@ public class LanguageServerWrapper implements Disposable {
     protected final InitializeParams initParams = new InitializeParams();
     @NotNull
     private final LanguageServerDefinition serverDefinition;
-    private final AtomicBoolean stopping = new AtomicBoolean(false);
     private final ExecutorService dispatcher;
     private final ExecutorService listener;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
@@ -1379,12 +1378,11 @@ public class LanguageServerWrapper implements Disposable {
      * @return true if the language server is stopping and false otherwise.
      */
     public boolean isStopping() {
-        return this.stopping.get();
+        return getServerStatus() == ServerStatus.stopping;
     }
 
     public synchronized CompletableFuture<Void> stop() {
-        final boolean alreadyStopping = this.stopping.getAndSet(true);
-        return stop(alreadyStopping);
+        return stop(isStopping());
     }
 
     private synchronized CompletableFuture<Void> stop(boolean alreadyStopping) {
@@ -1427,7 +1425,6 @@ public class LanguageServerWrapper implements Disposable {
                     shutdownAll(languageServer, lspStreamProvider, launcherFuture);
                     boolean delayedCurrent = currentInitializingContext == null || initializingContext.equals(currentInitializingContext);
                     if (delayedCurrent) {
-                        this.stopping.set(false);
                         updateStatus(ServerStatus.stopped);
                     }
                 });

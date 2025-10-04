@@ -31,14 +31,14 @@ import java.util.function.Consumer;
  */
 public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> {
 
-    private final LanguageServerWrapper languageServerWrapper;
+    private final @NotNull LanguageServerWrapper languageServerWrapper;
 
-    public LSPDiagnosticHandler(LanguageServerWrapper languageServerWrapper) {
+    public LSPDiagnosticHandler(@NotNull LanguageServerWrapper languageServerWrapper) {
         this.languageServerWrapper = languageServerWrapper;
     }
 
     @Override
-    public void accept(PublishDiagnosticsParams params) {
+    public void accept(@NotNull PublishDiagnosticsParams params) {
         Project project = languageServerWrapper.getProject();
         if (project.isDisposed()) {
             return;
