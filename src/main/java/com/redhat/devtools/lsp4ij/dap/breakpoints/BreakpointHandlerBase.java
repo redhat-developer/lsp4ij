@@ -82,7 +82,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         }
         breakpoints.remove(breakpoint);
         sendBreakpoints(null,
-                new TemporaryBreakpoint(sourcePosition, false));
+                breakpoints.isEmpty() ? new TemporaryBreakpoint(sourcePosition, false) : null);
     }
 
     @Override
@@ -92,7 +92,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
                                                                 @Nullable TemporaryBreakpoint temporaryBreakpoint) {
-        if (debugProtocolServers.isEmpty() || breakpoints.isEmpty()) {
+        if (debugProtocolServers.isEmpty() || (breakpoints.isEmpty() && temporaryBreakpoint == null)) {
+            // DAP servers are not started or there are no breakpoints to send
             return CompletableFuture.completedFuture(null);
         }
         return doSendBreakpoints(debugProtocolServer, temporaryBreakpoint);
