@@ -31,7 +31,6 @@ import com.intellij.refactoring.ui.RefactoringDialog;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.features.refactoring.WorkspaceEditData;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.usages.LSPExternalReferencesFinder;

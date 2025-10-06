@@ -69,6 +69,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
+import static com.redhat.devtools.lsp4ij.LSPIJUtils.findResourceFor;
 import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.clearProblem;
 import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.showNotificationError;
 import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClientInfo;
@@ -430,7 +431,7 @@ public class LanguageServerWrapper implements Disposable {
                     .thenApply(initializingContext -> {
                         messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
                         messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
-                        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, new BulkVirtualFileListenerAdapter(fileListener));
+                        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileListener);
 
                         fileOperationsManager = new FileOperationsManager(this);
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
@@ -1114,12 +1115,80 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Returns true if the given file support the 'workspace/willCreateFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/willCreateFiles' and false otherwise.
+     */
+    public boolean isWillCreateFilesSupported(@NotNull VirtualFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canWillCreateFiles(uri, file.isDirectory());
+    }
+    
+    /**
+     * Returns true if the given file support the 'workspace/didCreateFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/didCreateFiles' and false otherwise.
+     */
+    public boolean isDidCreateFilesSupported(@NotNull VirtualFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canDidCreateFiles(uri, file.isDirectory());
+    }
+
+    /**
+     * Returns true if the given file support the 'workspace/willDeleteFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/willDeleteFiles' and false otherwise.
+     */
+    public boolean isWillDeleteFilesSupported(@NotNull VirtualFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canWillDeleteFiles(uri, file.isDirectory());
+    }
+    
+    /**
+     * Returns true if the given file support the 'workspace/didDeleteFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/didDeleteFiles' and false otherwise.
+     */
+    public boolean isDidDeleteFilesSupported(@NotNull VirtualFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canDidDeleteFiles(uri, file.isDirectory());
+    }
+
+    /**
      * Returns true if the given file support the 'workspace/willRenameFiles' and false otherwise.
      *
      * @param file the file.
      * @return true if the given file support the 'workspace/willRenameFiles' and false otherwise.
      */
-    public boolean isWillRenameFilesSupported(PsiFile file) {
+    public boolean isWillRenameFilesSupported(@NotNull VirtualFile file) {
         if (fileOperationsManager == null) {
             return false;
         }
@@ -1128,6 +1197,40 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         return fileOperationsManager.canWillRenameFiles(uri, file.isDirectory());
+    }
+
+    /**
+     * Returns true if the given file support the 'workspace/willRenameFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/willRenameFiles' and false otherwise.
+     */
+    public boolean isWillRenameFilesSupported(@NotNull PsiFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canWillRenameFiles(uri, file.isDirectory());
+    }
+
+    /**
+     * Returns true if the given file support the 'workspace/didRenameFiles' and false otherwise.
+     *
+     * @param file the file.
+     * @return true if the given file support the 'workspace/didRenameFiles' and false otherwise.
+     */
+    public boolean isDidRenameFilesSupported(@NotNull VirtualFile file) {
+        if (fileOperationsManager == null) {
+            return false;
+        }
+        var uri = LSPIJUtils.toUri(file);
+        if (uri == null) {
+            return false;
+        }
+        return fileOperationsManager.canDidRenameFiles(uri, file.isDirectory());
     }
 
     /**
@@ -1537,6 +1640,14 @@ public class LanguageServerWrapper implements Disposable {
 
     record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
                                  @Nullable String languageId, boolean waitForDidOpen) {
+    }
+
+    public LanguageServerWrapper.@NotNull LSPFileConnectionInfo createFileConnectionInfo(@NotNull VirtualFile file,
+                                                                                         @NotNull Document document,
+                                                                                         boolean waitForDidOpen) {
+        String text = document.getText();
+        String languageId = getServerDefinition().getLanguageId(file, getProject());
+        return new LanguageServerWrapper.LSPFileConnectionInfo(document, text, languageId, waitForDidOpen);
     }
 
     // LSP traces

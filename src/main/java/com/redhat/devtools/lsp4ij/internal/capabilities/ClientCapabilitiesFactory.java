@@ -80,9 +80,9 @@ public class ClientCapabilitiesFactory {
         FileOperationsWorkspaceCapabilities fileOperationsWorkspaceCapabilities = new FileOperationsWorkspaceCapabilities();
         fileOperationsWorkspaceCapabilities.setDynamicRegistration(Boolean.TRUE);
         //fileOperationsWorkspaceCapabilities.setWillCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
-        //fileOperationsWorkspaceCapabilities.setDidCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles
+        fileOperationsWorkspaceCapabilities.setDidCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles
         //fileOperationsWorkspaceCapabilities.setWillDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
-        //fileOperationsWorkspaceCapabilities.setDidDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles
+        fileOperationsWorkspaceCapabilities.setDidDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles
         fileOperationsWorkspaceCapabilities.setWillRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
         fileOperationsWorkspaceCapabilities.setDidRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles
         workspaceClientCapabilities.setFileOperations(fileOperationsWorkspaceCapabilities);

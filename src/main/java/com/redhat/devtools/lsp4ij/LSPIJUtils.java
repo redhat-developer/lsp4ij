@@ -942,7 +942,7 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyEdits(null, document, textDocumentEdit.getEdits(), true);
+                            applyEdits(null, document, textDocumentEdit.getEdits(), false);
                         }
                     }
                 } else if (change.isRight()) {
@@ -970,7 +970,7 @@ public class LSPIJUtils {
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
-                        applyEdits(null, document, change.getValue(), true);
+                        applyEdits(null, document, change.getValue(), false);
                     }
                 }
             }
@@ -984,7 +984,7 @@ public class LSPIJUtils {
                 Document document = getDocument(targetFile);
                 if (document != null) {
                     TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
-                    applyEdits(null, document, Collections.singletonList(textEdit), true);
+                    applyEdits(null, document, Collections.singletonList(textEdit), false);
                 }
             }
         } else {
