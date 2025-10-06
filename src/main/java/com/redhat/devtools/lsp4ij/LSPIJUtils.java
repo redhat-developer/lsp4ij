@@ -929,11 +929,26 @@ public class LSPIJUtils {
     }
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit) {
-        applyWorkspaceEdit(edit, null);
+        applyWorkspaceEdit(edit, (LanguageServerItem) null);
+    }
+
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                          @Nullable LanguageServerItem languageServerItem) {
+        applyWorkspaceEdit(edit, null, languageServerItem);
     }
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
                                           @Nullable String label) {
+        applyWorkspaceEdit(edit, label, null);
+    }
+
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                          @Nullable String label,
+                                          @Nullable LanguageServerItem languageServerItem) {
+        @Nullable var serverWrapper = languageServerItem != null ? languageServerItem.getServerWrapper() : null;
+        @Nullable List<FileCreate> fileCreates = null;
+        @Nullable List<FileDelete> fileDeletes = null;
+        @Nullable List<FileRename> fileRenames = null;
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -948,11 +963,32 @@ public class LSPIJUtils {
                 } else if (change.isRight()) {
                     ResourceOperation resourceOperation = change.getRight();
                     if (resourceOperation instanceof CreateFile createFile) {
-                        applyCreateFile(createFile);
+                        var fileCreate = applyCreateFile(createFile, serverWrapper != null);
+                        if (fileCreate != null) {
+                            // Add FileCreate to notify workspace/didCreateFiles
+                            if (fileCreates == null) {
+                                fileCreates = new ArrayList<>();
+                            }
+                            fileCreates.add(fileCreate);
+                        }
                     } else if (resourceOperation instanceof DeleteFile deleteFile) {
-                        applyDeleteFile(deleteFile);
+                        var fileDelete = applyDeleteFile(deleteFile, serverWrapper != null);
+                        if (fileDelete != null) {
+                            // Add FileDelete to notify workspace/didDeleteFiles
+                            if (fileDeletes == null) {
+                                fileDeletes = new ArrayList<>();
+                            }
+                            fileDeletes.add(fileDelete);
+                        }
                     } else if (resourceOperation instanceof RenameFile renameFile) {
-                        applyRenameFile(renameFile);
+                        var fileRename = applyRenameFile(renameFile, serverWrapper != null);
+                        if (fileRename != null) {
+                            // Add FileRename to notify workspace/didRenameFiles
+                            if (fileRenames == null) {
+                                fileRenames = new ArrayList<>();
+                            }
+                            fileRenames.add(fileRename);
+                        }
                     }
                 }
             }
@@ -975,9 +1011,37 @@ public class LSPIJUtils {
                 }
             }
         }
+
+        if (fileCreates != null) {
+            // Send workspace/didCreateFiles notification
+            var params = new CreateFilesParams(fileCreates);
+            serverWrapper.sendNotification(ls -> {
+                ls.getWorkspaceService().didCreateFiles(params);
+                return ls;
+            });
+        }
+
+        if (fileDeletes != null) {
+            // Send workspace/didDeleteFiles notification
+            var params = new DeleteFilesParams(fileDeletes);
+            serverWrapper.sendNotification(ls -> {
+                ls.getWorkspaceService().didDeleteFiles(params);
+                return ls;
+            });
+        }
+
+        if (fileRenames != null) {
+            // Send workspace/didRenameFiles notification
+            var params = new RenameFilesParams(fileRenames);
+            serverWrapper.sendNotification(ls -> {
+                ls.getWorkspaceService().didRenameFiles(params);
+                return ls;
+            });
+        }
     }
 
-    private static void applyCreateFile(CreateFile createFile) {
+    private static @Nullable FileCreate applyCreateFile(@NotNull CreateFile createFile,
+                                                        boolean returnFileCreate) {
         VirtualFile targetFile = findResourceFor(createFile.getUri());
         if (targetFile != null && createFile.getOptions() != null) {
             if (!createFile.getOptions().getIgnoreIfExists()) {
@@ -985,31 +1049,44 @@ public class LSPIJUtils {
                 if (document != null) {
                     TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
                     applyEdits(null, document, Collections.singletonList(textEdit), true);
+                    if (returnFileCreate) {
+                        return new FileCreate(createFile.getUri());
+                    }
                 }
             }
         } else {
             try {
                 String fileUri = createFile.getUri();
                 createFile(fileUri);
+                if (returnFileCreate) {
+                    return new FileCreate(createFile.getUri());
+                }
             } catch (IOException e) {
                 LOGGER.warn(e.getLocalizedMessage(), e);
             }
         }
+        return null;
     }
 
-    private static void applyDeleteFile(DeleteFile deleteFile) {
+    private static @Nullable FileDelete applyDeleteFile(@NotNull DeleteFile deleteFile,
+                                                        boolean returnFileDelete) {
         try {
             VirtualFile resource = findResourceFor(deleteFile.getUri());
             if (resource != null) {
                 // TODO: use deleteFile.getOptions()
                 resource.delete(null);
+                if (returnFileDelete) {
+                    return new FileDelete(deleteFile.getUri());
+                }
             }
         } catch (IOException e) {
             LOGGER.warn(e.getLocalizedMessage(), e);
         }
+        return null;
     }
 
-    private static void applyRenameFile(RenameFile renameFile) {
+    private static @Nullable FileRename applyRenameFile(@NotNull RenameFile renameFile,
+                                                        boolean returnFileRename) {
         // "documentChanges": [
         //  {
         //    "oldUri": "file://.../foo.clj",
@@ -1027,10 +1104,14 @@ public class LSPIJUtils {
                 var path = Paths.get(URI.create(renameFile.getNewUri()));
                 String newFileName = path.toFile().getName();
                 resource.rename(null, newFileName);
+                if (returnFileRename) {
+                    return new FileRename(renameFile.getOldUri(), renameFile.getNewUri());
+                }
             }
         } catch (IOException e) {
             LOGGER.warn(e.getLocalizedMessage(), e);
         }
+        return null;
     }
 
     /**

@@ -115,10 +115,10 @@ public class CommandExecutor {
             WorkspaceEdit edit = createWorkspaceEdit(command.getArguments(), file, fileUriSupport);
             if (edit != null) {
                 if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
-                    LSPIJUtils.applyWorkspaceEdit(edit);
+                    LSPIJUtils.applyWorkspaceEdit(edit, languageServer);
                 } else {
                     return WriteCommandAction.runWriteCommandAction(context.getProject(), (Computable<LSPCommandResponse>) () -> {
-                        LSPIJUtils.applyWorkspaceEdit(edit);
+                        LSPIJUtils.applyWorkspaceEdit(edit, languageServer);
                         return LSPCommandResponse.FOUND;
                     });
                 }

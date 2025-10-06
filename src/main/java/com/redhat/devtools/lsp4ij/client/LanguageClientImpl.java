@@ -131,7 +131,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     public CompletableFuture<ApplyWorkspaceEditResponse> applyEdit(ApplyWorkspaceEditParams params) {
         CompletableFuture<ApplyWorkspaceEditResponse> future = new CompletableFuture<>();
         WriteCommandAction.runWriteCommandAction(getProject(), () -> {
-            LSPIJUtils.applyWorkspaceEdit(params.getEdit());
+            LSPIJUtils.applyWorkspaceEdit(params.getEdit(), new LanguageServerItem(wrapper.getLanguageServer(), wrapper));
             future.complete(new ApplyWorkspaceEditResponse(true));
         });
         return future;

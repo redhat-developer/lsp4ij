@@ -135,7 +135,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
                        @NotNull LanguageServerItem languageServerItem) {
         if (codeaction != null) {
             if (codeaction.getEdit() != null) {
-                LSPIJUtils.applyWorkspaceEdit(codeaction.getEdit(), codeaction.getTitle());
+                LSPIJUtils.applyWorkspaceEdit(codeaction.getEdit(), codeaction.getTitle(), languageServerItem);
             }
             if (codeaction.getCommand() != null) {
                 executeCommand(codeaction.getCommand(), file, editor, languageServerItem);
