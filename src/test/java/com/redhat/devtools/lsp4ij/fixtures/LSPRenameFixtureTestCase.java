@@ -11,6 +11,8 @@
 package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.intellij.openapi.actionSystem.IdeActions;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -26,6 +28,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.Assert;
 
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -242,6 +246,11 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
     }
 
     private static void updateRenameCapabilities(@Nullable String jsonPrepareRenameResult) {
+        updateRenameCapabilities(jsonPrepareRenameResult, null);
+    }
+
+    private static void updateRenameCapabilities(@Nullable String jsonPrepareRenameResult,
+                                                 @Nullable WorkspaceServerCapabilities workspaceServerCapabilities) {
         Either<Boolean, RenameOptions> renameProvider;
         if (jsonPrepareRenameResult != null) {
             RenameOptions prepareRenameProvider = new RenameOptions();
@@ -252,7 +261,219 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
         }
         ServerCapabilities serverCapabilities = MockLanguageServer.defaultServerCapabilities();
         serverCapabilities.setRenameProvider(renameProvider);
+        serverCapabilities.setWorkspace(workspaceServerCapabilities);
         MockLanguageServer.reset(() -> serverCapabilities);
+    }
+
+    /**
+     * Test LSP rename.
+     *
+     * @param fileName                  the file name used to match registered language servers.
+     * @param text                      the editor content text.
+     * @param jsonPrepareRenameResponse the emulated JSON prepare rename response and null otherwise.
+     * @param expectedPlaceholder       the expected placeholder and null otherwise.
+     * @param jsonRenameResponse        the emulated rename JSON rename response WorkspaceEdit and null otherwise.
+     * @param expectedRenamedText       the expected renamed text.
+     */
+    protected void assertWillRename(@NotNull String fileName,
+                                    @NotNull String text,
+                                    @Nullable String jsonPrepareRenameResponse,
+                                    @NotNull String expectedPlaceholder,
+                                    @NotNull String jsonRenameResponse,
+                                    @Nullable String jsonWillRenameResponse,
+                                    @NotNull String newFileName,
+                                    @NotNull String expectedRenamedText) {
+        assertWillRename(fileName,
+                text,
+                jsonPrepareRenameResponse,
+                expectedPlaceholder,
+                jsonRenameResponse,
+                jsonWillRenameResponse,
+                newFileName,
+                expectedRenamedText,
+                null,
+                true);
+    }
+
+    /**
+     * Test LSP rename.
+     *
+     * @param fileName                  the file name used to match registered language servers.
+     * @param text                      the editor content text.
+     * @param jsonPrepareRenameResponse the emulated JSON prepare rename response and null otherwise.
+     * @param expectedPlaceholder       the expected placeholder and null otherwise.
+     * @param jsonRenameResponse        the emulated rename JSON rename response WorkspaceEdit and null otherwise.
+     * @param expectedRenamedText       the expected renamed text and null otherwise.
+     * @param expectedError             the expected error and null otherwise.
+     * @param waitFor                   wait for some ms to take some times to start the language server.
+     */
+    private void assertWillRename(@NotNull String fileName,
+                                  @NotNull String text,
+                                  @Nullable String jsonPrepareRenameResponse,
+                                  @Nullable String expectedPlaceholder,
+                                  @Nullable String jsonRenameResponse,
+                                  @Nullable String jsonWillRenameResponse,
+                                  @NotNull String newFileName,
+                                  @Nullable String expectedRenamedText,
+                                  @Nullable String expectedError,
+                                  boolean waitFor) {
+        var workspace = new WorkspaceServerCapabilities();
+        var fileOperations = new FileOperationsServerCapabilities();
+        var willRename = new FileOperationOptions();
+        willRename.setFilters(List.of(new FileOperationFilter(new FileOperationPattern("**/**"))));
+        fileOperations.setWillRename(willRename);
+        workspace.setFileOperations(fileOperations);
+        updateRenameCapabilities(jsonPrepareRenameResponse, workspace);
+        int delay = waitFor ? 100 : 750; // if not waiting for the server, make sure the server is "slow"
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(delay);
+        PsiFile file = myFixture.configureByText(fileName, text);
+        var baseDir = file.getVirtualFile().getParent();
+
+        // Prepare rename response
+        if (jsonPrepareRenameResponse != null) {
+            if (PREPARE_RENAME_NO_RESULT.equals(jsonPrepareRenameResponse)) {
+                // Prepare rename should return null.
+                MockLanguageServer.INSTANCE.setPrepareRenameProcessor(params -> null);
+            } else if (jsonPrepareRenameResponse.contains("code")) {
+                // prepare rename with error
+                // {
+                //  "code": -32602,
+                //  "message": "no identifier found"
+                // }
+                ResponseError error = JSONUtils.getLsp4jGson().fromJson(jsonPrepareRenameResponse, ResponseError.class);
+                MockLanguageServer.INSTANCE.setPrepareRenameProcessor(params -> {
+                    throw new ResponseErrorException(error);
+                });
+            } else {
+                // Prepare rename response
+                Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior> prepareRenameResponse = getPrepareRenameResponse(jsonPrepareRenameResponse);
+                MockLanguageServer.INSTANCE.setPrepareRenameProcessor(params -> prepareRenameResponse);
+            }
+        }
+
+        // Rename response
+        if (jsonRenameResponse != null) {
+            if (jsonRenameResponse.contains("code")) {
+                // rename with error
+                // {
+                //  "code": -32602,
+                //  "message": "no identifier found"
+                // }
+                ResponseError error = JSONUtils.getLsp4jGson().fromJson(jsonRenameResponse, ResponseError.class);
+                MockLanguageServer.INSTANCE.setRenameProcessor(params -> {
+                    throw new ResponseErrorException(error);
+                });
+            } else {
+                // WorkspaceEdit
+                jsonRenameResponse = jsonRenameResponse.formatted(LSPIJUtils.toUri(baseDir), LSPIJUtils.toUri(baseDir));
+                WorkspaceEdit workspaceEdit = JSONUtils.getLsp4jGson().fromJson(jsonRenameResponse, WorkspaceEdit.class);
+                MockLanguageServer.INSTANCE.setRenameProcessor(params -> workspaceEdit);
+            }
+        }
+
+        // WillRename response
+        if (jsonWillRenameResponse != null) {
+            jsonWillRenameResponse = jsonWillRenameResponse.formatted(LSPIJUtils.toUri(baseDir));
+            WorkspaceEdit workspaceEdit = JSONUtils.getLsp4jGson().fromJson(jsonWillRenameResponse, WorkspaceEdit.class);
+            MockLanguageServer.INSTANCE.setWillRename(workspaceEdit);
+        }
+
+        if (waitFor) {
+            // As rename support works only when language server is started
+            // to avoid having the error "Rename... is not available during language servers starting."
+            // we wait for some ms.
+            try {
+                LanguageServiceAccessor.getInstance(file.getProject())
+                        .getLanguageServers(file, null, null)
+                        .get(5000, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        final AtomicReference<String> actualError = new AtomicReference<>();
+
+        var handler = new LSPRenameUnitTestMode.LSPRenameUnitTestModeHandler() {
+
+            @Override
+            public void showErrorHint(String errorHintText) {
+                if (expectedError == null) {
+                    Assert.assertNull("Should not have error while renaming", errorHintText);
+                }
+                actualError.set(errorHintText);
+            }
+
+            @Override
+            public void showRenameRefactoringDialog(RenameParams renameParams) {
+                Assert.assertEquals("Placeholder should be equals", expectedPlaceholder, renameParams.getNewName());
+            }
+        };
+        LSPRenameUnitTestMode.set(handler);
+
+        // Do Rename...
+        myFixture.performEditorAction(IdeActions.ACTION_RENAME);
+
+        if (expectedError != null) {
+            assertEquals(expectedError, actualError.get());
+        } else {
+            VirtualFile newFile = baseDir.findChild(newFileName);
+            var newDocument = LSPIJUtils.getDocument(newFile);
+            assertEquals(expectedRenamedText, newDocument.getText());
+        }
+    }
+
+    /**
+     * Test LSP rename.
+     *
+     * @param fileName               the file name used to match registered language servers.
+     * @param text                   the editor content text.
+     * @param newFileName            the new file name.
+     * @param jsonWillRenameResponse the emulated rename JSON will rename response WorkspaceEdit and null otherwise.
+     * @param expectedRenamedText    the expected renamed text.
+     */
+    protected void assertRenameFile(@NotNull String fileName,
+                                    @NotNull String text,
+                                    @Nullable String newFileName,
+                                    @Nullable String jsonWillRenameResponse,
+                                    @NotNull String expectedRenamedText) throws IOException {
+        var workspace = new WorkspaceServerCapabilities();
+        var fileOperations = new FileOperationsServerCapabilities();
+        var willRename = new FileOperationOptions();
+        willRename.setFilters(List.of(new FileOperationFilter(new FileOperationPattern("**/**"))));
+        fileOperations.setWillRename(willRename);
+        workspace.setFileOperations(fileOperations);
+        updateRenameCapabilities(null, workspace);
+
+        int delay = 750; // if not waiting for the server, make sure the server is "slow"
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(delay);
+        PsiFile file = myFixture.configureByText(fileName, text);
+        var baseDir = file.getVirtualFile().getParent();
+
+        // WillRename response
+        if (jsonWillRenameResponse != null) {
+            jsonWillRenameResponse = jsonWillRenameResponse.formatted(LSPIJUtils.toUri(baseDir));
+            WorkspaceEdit workspaceEdit = JSONUtils.getLsp4jGson().fromJson(jsonWillRenameResponse, WorkspaceEdit.class);
+            MockLanguageServer.INSTANCE.setWillRename(workspaceEdit);
+        }
+
+        try {
+            LanguageServiceAccessor.getInstance(file.getProject())
+                    .getLanguageServers(file, null, null)
+                    .get(5000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        WriteCommandAction.runWriteCommandAction(file.getProject(), () -> {
+            try {
+                file.getVirtualFile().rename(this, newFileName);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        VirtualFile newFile = baseDir.findChild(newFileName);
+        var newDocument = LSPIJUtils.getDocument(newFile);
+        assertEquals(expectedRenamedText, newDocument.getText());
     }
 
 }

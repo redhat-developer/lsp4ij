@@ -29,12 +29,22 @@ public class MockWorkspaceService implements WorkspaceService {
 	private Function<?, ?> _futureFactory;
 	private CompletableFuture<ExecuteCommandParams> executedCommand = new CompletableFuture<>();
 	private List<DidChangeWorkspaceFoldersParams> workspaceFoldersEvents = new ArrayList<>();
+    private WorkspaceEdit willRename;
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
 	}
 
-	/**
+    public void setWillRename(WorkspaceEdit willRename) {
+        this.willRename = willRename;
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceEdit> willRenameFiles(RenameFilesParams params) {
+        return CompletableFuture.supplyAsync(() -> this.willRename);
+    }
+
+    /**
 	 * Use this method to get a future that will wait specified delay before returning
 	 * value
 	 * @param value the value that will be returned by the future

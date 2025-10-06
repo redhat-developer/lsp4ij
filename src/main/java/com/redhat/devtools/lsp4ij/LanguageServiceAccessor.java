@@ -133,9 +133,7 @@ public class LanguageServiceAccessor implements Disposable {
                     if (connectionFileInfo == null) {
                         connectionFileInfo = new HashMap<>();
                     }
-                    String text = document.getText();
-                    String languageId = ls.getServerDefinition().getLanguageId(file, project);
-                    var info = new LanguageServerWrapper.LSPFileConnectionInfo(document, text, languageId, true);
+                    var info = ls.createFileConnectionInfo(file, document, true);
                     connectionFileInfo.put(ls, info);
                 }
             }

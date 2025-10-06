@@ -683,11 +683,6 @@
                 implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
                 order="first"/>
 
-        <!-- willRenameFiles support -->
-        <renamePsiElementProcessor
-                implementation="com.redhat.devtools.lsp4ij.features.refactoring.LSPRenamePsiElementProcessor"
-                order="last"/>
-
         <!-- Code Action support-->
         <intentionAction>
             <bundleName>messages.LanguageServerBundle</bundleName>
@@ -976,8 +971,6 @@
     </applicationListeners>
 
     <projectListeners>
-        <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"
-                  class="com.redhat.devtools.lsp4ij.features.refactoring.LSPRefactoringListener"/>
         <listener topic="com.intellij.codeInsight.lookup.LookupManagerListener"
                   class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener"/>
         <listener class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingOnlyDumbStrategy"

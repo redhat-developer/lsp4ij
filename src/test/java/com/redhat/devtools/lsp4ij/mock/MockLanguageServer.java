@@ -338,6 +338,10 @@ public final class MockLanguageServer implements LanguageServer {
 		this.textDocumentService.setFoldingRanges(foldingRanges);
 	}
 
+    public void setWillRename(WorkspaceEdit willRename) {
+        this.workspaceService.setWillRename(willRename);
+    }
+
 	@Override
 	public String toString() {
 		return "MockLanguageServer [started=" + started + ", delay=" + delay + ", remoteProxies=" + remoteProxies.size()
