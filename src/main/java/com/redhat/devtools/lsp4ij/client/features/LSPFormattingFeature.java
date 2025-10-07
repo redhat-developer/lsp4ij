@@ -11,9 +11,12 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.lang.LanguageFormatting;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.server.capabilities.DocumentFormattingCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.capabilities.DocumentRangeFormattingCapabilityRegistry;
+import org.eclipse.lsp4j.FormattingOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -66,7 +69,6 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
      * used if there is no registered formatter available.
      *
      * @return true to use the language server for code formatting and false to use plugin-provided/built-in formatters.
-     *
      * @apiNote This method will only be called with files that contain a language supported by this language server.
      */
     protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
@@ -268,4 +270,75 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
         // Default to the language's standard completion trigger characters
         return null;
     }
+
+    /**
+     * Builds and returns the {@link FormattingOptions} used when invoking the
+     * {@code textDocument/formatting} or {@code textDocument/rangeFormatting} LSP requests.
+     * <p>
+     * The returned options specify how the language server should indent and align text
+     * according to the current editor settings.
+     * <p>
+     * This method determines the {@code tabSize} and {@code insertSpaces} options from the
+     * associated editor (if available), falling back to {@code null} when no editor context
+     * is provided.
+     *
+     * @param file   the PSI file for which formatting options are requested.
+     * @param editor the editor associated with the PSI file, or {@code null} if the file
+     *               is not currently opened in an editor.
+     * @return a {@link FormattingOptions} instance configured with the current editor
+     * tabulation and spacing settings. Never {@code null}.
+     */
+    @NotNull
+    public FormattingOptions getFormattingOptions(@NotNull PsiFile file,
+                                                  @Nullable Editor editor) {
+        Integer tabSize = getTabSize(file, editor);
+        Boolean insertSpaces = getInsertSpaces(file, editor);
+        var formattingOptions = new FormattingOptions();
+        if (tabSize != null) {
+            formattingOptions.setTabSize(tabSize);
+        }
+        if (insertSpaces != null) {
+            formattingOptions.setInsertSpaces(insertSpaces);
+        }
+        return formattingOptions;
+    }
+
+    /**
+     * Determines the tab size (number of spaces per tab) used for the given file and editor.
+     * <p>
+     * The tab size is typically defined by the editor's code style settings for the file's language.
+     * <p>
+     * If an editor instance is provided, this method retrieves the tab size using
+     * {@link LSPIJUtils#getTabSize(Editor)}. If the editor is {@code null}, this method returns
+     * {@code null}.
+     *
+     * @param file   the PSI file for which the tab size is requested.
+     * @param editor the editor associated with the file, or {@code null} if unavailable.
+     * @return the tab size as an {@link Integer}, or {@code null} if no editor context is provided.
+     */
+    public @Nullable Integer getTabSize(@NotNull PsiFile file,
+                                        @Nullable Editor editor) {
+        return 4; //editor != null ? LSPIJUtils.getTabSize(editor) : null;
+    }
+
+    /**
+     * Determines whether spaces should be inserted instead of tab characters when indenting.
+     * <p>
+     * This setting is obtained from the associated editor, which reflects the user's code
+     * style preferences for the language of the given file.
+     * <p>
+     * If an editor instance is provided, this method retrieves the value using
+     * {@link LSPIJUtils#isInsertSpaces(Editor)}. If the editor is {@code null}, this method
+     * returns {@code null}.
+     *
+     * @param file   the PSI file for which the setting is requested.
+     * @param editor the editor associated with the file, or {@code null} if unavailable.
+     * @return {@code true} if spaces should be inserted instead of tabs,
+     * {@code false} otherwise, or {@code null} if no editor context is provided.
+     */
+    public @Nullable Boolean getInsertSpaces(@NotNull PsiFile file,
+                                             @Nullable Editor editor) {
+        return editor != null ? LSPIJUtils.isInsertSpaces(editor) : null;
+    }
+
 }

@@ -14,11 +14,10 @@ import com.intellij.formatting.service.AsyncFormattingRequest;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LSPRequestConstants;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
@@ -27,19 +26,16 @@ import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Predicate;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.applyEdits;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
- * Abstract class for LSP formatting and range formatting.
+ * LSP formatting and range formatting support.
  */
 public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPFormattingParams, List<? extends TextEdit>> {
 
@@ -48,20 +44,25 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
     }
 
     public void format(@NotNull Document document,
+                       @NotNull PsiFile file,
                        @Nullable Editor editor,
                        @Nullable TextRange textRange,
                        @NotNull AsyncFormattingRequest formattingRequest) {
-        Integer tabSize = editor != null ? LSPIJUtils.getTabSize(editor) : null;
-        Boolean insertSpaces = editor != null ? LSPIJUtils.isInsertSpaces(editor) : null;
-        LSPFormattingParams params = new LSPFormattingParams(tabSize, insertSpaces, textRange, document);
+        LanguageServerItem formattingServer = findFormattingServer(file, textRange);
+        if (formattingServer == null)  {
+            return;
+        }
+        // We are currently in a ReadAction; this call must occur here because it may access PSI or CodeStyleSettings.
+        var formattingOptions = formattingServer.getClientFeatures().getFormattingFeature().getFormattingOptions(file, editor);
+        LSPFormattingParams params = new LSPFormattingParams(textRange, document, formattingServer, formattingOptions);
         CompletableFuture<List<? extends TextEdit>> formatFuture = this.getFeatureData(params);
         try {
             waitUntilDone(formatFuture, getFile());
         } catch (
                 ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
-            handleError(formattingRequest, e);
-            return;
+            //handleError(formattingRequest, e);
+            throw e;
         } catch (CancellationException e) {
             // cancel the LSP requests textDocument/formatting / textDocument/rangeFormatting
             handleError(formattingRequest, e);
@@ -93,93 +94,83 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
     @Override
     protected CompletableFuture<List<? extends TextEdit>> doLoad(LSPFormattingParams params, CancellationSupport cancellationSupport) {
         PsiFile file = super.getFile();
-        return getFormatting(file, params, cancellationSupport);
+        return getFormatting(params, cancellationSupport);
     }
 
-    protected @NotNull CompletableFuture<List<? extends TextEdit>> getFormatting(@NotNull PsiFile file,
-                                                                                 @NotNull LSPFormattingParams params,
+    protected @NotNull CompletableFuture<List<? extends TextEdit>> getFormatting(@NotNull LSPFormattingParams params,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
         boolean isRangeFormatting = params.textRange() != null;
-        Predicate<LSPClientFeatures> filter = !isRangeFormatting ?
-                f -> f.getFormattingFeature().isFormattingSupported(file) :
-                f -> f.getFormattingFeature().isFormattingSupported(file) ||
-                        f.getFormattingFeature().isRangeFormattingSupported(file);
-        return getLanguageServers(file,
-                f -> f.getFormattingFeature().isEnabled(file),
-                filter)
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have formatting capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
-
-                    // Get the first language server which supports range formatting (if it requires) or formatting
-                    LanguageServerItem languageServer = getFormattingLanguageServer(languageServers, isRangeFormatting);
-
-                    cancellationSupport.checkCanceled();
-
-                    if (isRangeFormatting && languageServer.isDocumentRangeFormattingSupported()) {
-                        // Range formatting
-                        DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.tabSize(), params.insertSpaces(), params.textRange(), params.document(), languageServer);
-                        return cancellationSupport.execute(languageServer
-                                .getTextDocumentService()
-                                .rangeFormatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING);
-                    }
-
-                    // Full document formatting
-                    DocumentFormattingParams lspParams = createDocumentFormattingParams(params.tabSize(), params.insertSpaces(), languageServer);
-                    return cancellationSupport.execute(languageServer
-                            .getTextDocumentService()
-                            .formatting(lspParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_FORMATTING);
-                });
-    }
-
-    private static LanguageServerItem getFormattingLanguageServer(List<LanguageServerItem> languageServers, boolean isRangeFormatting) {
-        if (isRangeFormatting) {
-            // Range formatting, try to get the first language server which have the range formatting capability
-            Optional<LanguageServerItem> result = languageServers
-                    .stream()
-                    .filter(LanguageServerItem::isDocumentRangeFormattingSupported)
-                    .findFirst();
-            if (result.isPresent()) {
-                return result.get();
-            }
+        var formattingServer = params.formattingServer();
+        if (isRangeFormatting && formattingServer.isDocumentRangeFormattingSupported()) {
+            // Range formatting
+            DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.formattingOptions(), params.textRange(), params.document(), formattingServer);
+            return cancellationSupport.execute(formattingServer
+                    .getTextDocumentService()
+                    .rangeFormatting(lspParams), formattingServer, LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING);
         }
-        // Get the first language server
-        return languageServers.get(0);
+
+        // Full document formatting
+        DocumentFormattingParams lspParams = createDocumentFormattingParams(params.formattingOptions(), formattingServer);
+        return cancellationSupport.execute(formattingServer
+                .getTextDocumentService()
+                .formatting(lspParams), formattingServer, LSPRequestConstants.TEXT_DOCUMENT_FORMATTING);
     }
 
-    private @NotNull DocumentFormattingParams createDocumentFormattingParams(@Nullable Integer tabSize,
-                                                                             @Nullable Boolean insertSpaces,
+
+    /**
+     * Finds a {@link LanguageServerItem} that supports document formatting for the given PSI file.
+     * <p>
+     * Depending on whether a {@link TextRange} is provided, this method looks for a language server
+     * that supports either:
+     * <ul>
+     *   <li>{@code textDocument/formatting} – when {@code textRange} is {@code null},</li>
+     *   <li>{@code textDocument/rangeFormatting} or {@code textDocument/formatting} – when a range is provided.</li>
+     * </ul>
+     * <p>
+     * The method iterates over all language servers registered for the file's project and returns the
+     * first server that declares formatting support through its {@link LSPClientFeatures}.
+     * If no suitable server is found, {@code null} is returned.
+     *
+     * @param file      the PSI file for which formatting is requested.
+     * @param textRange the range to format, or {@code null} to format the entire document.
+     * @return a {@link LanguageServerItem} supporting formatting, or {@code null} if none is available.
+     */
+    private static @Nullable LanguageServerItem findFormattingServer(@NotNull PsiFile file,
+                                                                     @Nullable TextRange textRange) {
+        // Get the first language server which supports range formatting (if it requires) or formatting
+        boolean isRangeFormatting = textRange != null;
+        Ref<LanguageServerItem> server = Ref.create(null);
+        LanguageServiceAccessor.getInstance(file.getProject()).processLanguageServers(file, ls -> {
+            if (!isRangeFormatting) {
+                if (server.isNull() && ls.getClientFeatures().getFormattingFeature().isFormattingSupported(file)) {
+                    server.set(new LanguageServerItem(ls.getLanguageServer(), ls));
+                }
+            } else {
+                if  (ls.getClientFeatures().getFormattingFeature().isFormattingSupported(file) ||
+                        ls.getClientFeatures().getFormattingFeature().isRangeFormattingSupported(file)) {
+                    if (server.isNull() || !server.get().isDocumentRangeFormattingSupported()) {
+                        server.set(new LanguageServerItem(ls.getLanguageServer(), ls));
+                    }
+                }
+            }
+        });
+        return server.isNull() ? null : server.get();
+    }
+
+    private @NotNull DocumentFormattingParams createDocumentFormattingParams(@NotNull FormattingOptions options,
                                                                              @NotNull LanguageServerItem languageServer) {
         DocumentFormattingParams params = new DocumentFormattingParams();
         params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.toString(getFile().getVirtualFile(), languageServer.getClientFeatures())));
-        FormattingOptions options = new FormattingOptions();
-        if (tabSize != null) {
-            options.setTabSize(tabSize);
-        }
-        if (insertSpaces != null) {
-            options.setInsertSpaces(insertSpaces);
-        }
         params.setOptions(options);
         return params;
     }
 
-    private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(@Nullable Integer tabSize,
-                                                                                       @Nullable Boolean insertSpaces,
+    private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(@NotNull FormattingOptions options,
                                                                                        @NotNull TextRange textRange,
                                                                                        @NotNull Document document,
                                                                                        @NotNull LanguageServerItem languageServer) {
         DocumentRangeFormattingParams params = new DocumentRangeFormattingParams();
         params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.toString(getFile().getVirtualFile(), languageServer.getClientFeatures())));
-        FormattingOptions options = new FormattingOptions();
-        if (tabSize != null) {
-            options.setTabSize(tabSize);
-        }
-        if (insertSpaces != null) {
-            options.setInsertSpaces(insertSpaces);
-        }
         params.setOptions(options);
         Range range = LSPIJUtils.toRange(textRange, document);
         params.setRange(range);
