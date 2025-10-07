@@ -80,7 +80,7 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
             Editor editor = editors.length > 0 ? editors[0] : null;
             Document document = editor != null ? editor.getDocument() : LSPIJUtils.getDocument(psiFile.getVirtualFile());
             if (document != null) {
-                formattingSupport.format(document, editor, formattingRange, formattingRequest);
+                formattingSupport.format(document, psiFile, editor, formattingRange, formattingRequest);
             }
         }
 
@@ -120,7 +120,8 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
                 .hasAny(file, ls -> canSupportFormatting(ls, file));
     }
 
-    private boolean canSupportFormatting(LanguageServerWrapper ls, PsiFile file) {
+    private boolean canSupportFormatting(@NotNull LanguageServerWrapper ls,
+                                         @NotNull PsiFile file) {
         var formattingFeature= ls.getClientFeatures().getFormattingFeature();
         if (!formattingFeature.isEnabled(file)) {
             return false;
@@ -128,9 +129,10 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
         return canSupportFormatting(formattingFeature, file);
     }
 
-    protected abstract boolean canSupportFormatting(LSPFormattingFeature formattingFeature, PsiFile file);
+    protected abstract boolean canSupportFormatting(@NotNull LSPFormattingFeature formattingFeature,
+                                                    @NotNull PsiFile file);
 
-    private static TextRange getFormattingRange(AsyncFormattingRequest formattingRequest) {
+    private static @Nullable TextRange getFormattingRange(@NotNull AsyncFormattingRequest formattingRequest) {
         List<TextRange> ranges = formattingRequest.getFormattingRanges();
         if (ranges.isEmpty()) {
             return null;

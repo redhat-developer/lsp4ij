@@ -12,17 +12,22 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.TextRange;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import org.eclipse.lsp4j.FormattingOptions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP formatting parameters.
  *
- * @param tabSize    the tab size and null otherwise.
- * @param insertSpaces the insert spaces and null otherwise.
- * @param textRange the text range and null otherwise.
- * @param document the document.
+ * @param textRange             the text range and null otherwise.
+ * @param document              the document.
+ * @param formattingServer
+ * @param formattingOptions
  */
-public record LSPFormattingParams(@Nullable Integer tabSize, @Nullable Boolean insertSpaces, @Nullable TextRange textRange, @NotNull Document document) {
+public record LSPFormattingParams(@Nullable TextRange textRange,
+                                  @NotNull Document document,
+                                  @NotNull LanguageServerItem formattingServer,
+                                  @NotNull FormattingOptions formattingOptions) {
 
 }
