@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.client.files;
 
+import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -59,8 +60,9 @@ public abstract class DAPFile extends LightVirtualFile {
 
     public DAPFile(@NlsSafe String name,
                    @NotNull String path,
+                   @NotNull FileType fileType,
                    @NotNull Project project) {
-        super(name, DisassemblyFileType.INSTANCE, "", LocalTimeCounter.currentTime());
+        super(name, fileType, "", LocalTimeCounter.currentTime());
         this.project = project;
         this.path = path;
         this.url = DAPFileSystem.PROTOCOL + ":///" + getPath();

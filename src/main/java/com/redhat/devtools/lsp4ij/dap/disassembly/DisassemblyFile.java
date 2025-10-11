@@ -74,7 +74,7 @@ public class DisassemblyFile extends DAPFile {
     public DisassemblyFile(@NotNull String configName,
                            @NotNull String path,
                            @NotNull Project project) {
-        super("Disassembly (" + configName + ")", path, project);
+        super("Disassembly (" + configName + ")", path, DisassemblyFileType.INSTANCE, project);
     }
 
     /**

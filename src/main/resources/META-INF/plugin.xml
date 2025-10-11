@@ -1036,10 +1036,21 @@
         <!-- Disassembly support-->
         <fileType
                 name="Disassembly"
+                language="Disassembly"
+                fieldName="INSTANCE"
                 implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileType"/>
         <fileEditorProvider
                 id="lsp.disassembly"
                 implementation="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileEditorProvider"/>
+        <lang.fileViewProviderFactory
+                language="Disassembly"
+                implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.psi.DisassemblyFileViewProviderFactory"/>
+        <lang.parserDefinition
+                language="Disassembly"
+                implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.psi.DisassemblyParserDefinition"/>
+        <spellchecker.support
+                language="Disassembly"
+                implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblySpellcheckingStrategy"/>
         <xdebugger.breakpointType
                 implementation="com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointType"/>
     </extensions>
