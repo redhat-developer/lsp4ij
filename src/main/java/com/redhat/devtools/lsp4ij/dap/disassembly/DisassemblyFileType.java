@@ -11,10 +11,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.disassembly;
 
-import com.intellij.openapi.fileTypes.ex.FakeFileType;
+import com.intellij.icons.AllIcons;
+import com.intellij.openapi.fileTypes.LanguageFileType;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import javax.swing.*;
 
 /**
  * A special IntelliJ file type used to represent a disassembly view
@@ -28,12 +33,16 @@ import org.jetbrains.annotations.NotNull;
  *     <li>Is specifically associated with instances of {@link DisassemblyFile}.</li>
  * </ul>
  */
-public class DisassemblyFileType extends FakeFileType {
+public class DisassemblyFileType extends LanguageFileType {
 
     /**
      * Singleton instance of the disassembly file type.
      */
     public static final DisassemblyFileType INSTANCE = new DisassemblyFileType();
+
+    protected DisassemblyFileType() {
+        super(DisassemblyLanguage.INSTANCE);
+    }
 
     @Override
     public @NotNull String getName() {
@@ -43,6 +52,11 @@ public class DisassemblyFileType extends FakeFileType {
     @Override
     public @NotNull String getDefaultExtension() {
         return "";
+    }
+
+    @Override
+    public @Nullable Icon getIcon() {
+        return AllIcons.FileTypes.Archive;
     }
 
     /**
@@ -67,12 +81,12 @@ public class DisassemblyFileType extends FakeFileType {
     }
 
     @Override
-    public boolean isMyFileType(@NotNull VirtualFile file) {
-        return file instanceof DisassemblyFile;
+    public boolean isReadOnly() {
+        return true;
     }
 
     @Override
-    public boolean isBinary() {
-        return false;
+    public @NonNls @Nullable String getCharset(@NotNull VirtualFile file, byte @NotNull [] content) {
+        return super.getCharset(file, content);
     }
 }
