@@ -93,7 +93,7 @@ Here are some projects that use LSP4IJ:
  * [intellij-cangjie](https://github.com/lin-qingying/intellij-cangjie)
 ## Requirements
 
-* Intellij IDEA 2023.3 or more recent (we **try** to support the last 4 major IDEA releases)
+* Intellij IDEA 2024.2 or more recent (we **try** to support the last 4 major IDEA releases)
 * Java JDK (or JRE) 17 or more recent
 
 ## Contributing
