@@ -1036,6 +1036,9 @@
         <!-- Disassembly support-->
         <fileType
                 name="Disassembly"
+                language="Disassembly"
+                fieldName="INSTANCE"
+                extensions="lsp4ij"
                 implementationClass="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileType"/>
         <fileEditorProvider
                 id="lsp.disassembly"

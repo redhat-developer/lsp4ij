@@ -14,6 +14,7 @@ package com.redhat.devtools.lsp4ij.dap.disassembly;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFile;
@@ -47,7 +48,7 @@ import static com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyUtils.splice
  */
 public class DisassemblyFile extends DAPFile {
 
-    public static final String FILE_NAME = "disassembly";
+    public static final String FILE_NAME = "disassembly.lsp4ij";
     private static final Logger LOGGER = LoggerFactory.getLogger(DisassemblyFile.class);
     /**
      * Number of instructions to load initially or per batch.
@@ -63,6 +64,7 @@ public class DisassemblyFile extends DAPFile {
      * All disassembled instructions loaded so far.
      */
     private final List<DisassembledInstructionEntry> disassembledInstructions = new ArrayList<>();
+    private final @NotNull String presentableName;
 
     /**
      * Creates a new DisassemblyFile for the given configuration and project.
@@ -74,7 +76,13 @@ public class DisassemblyFile extends DAPFile {
     public DisassemblyFile(@NotNull String configName,
                            @NotNull String path,
                            @NotNull Project project) {
-        super("Disassembly (" + configName + ")", path, project);
+        super("Disassembly (" + configName + ").disasm", path, project);
+        this.presentableName = "Disassembly (" + configName + ")";
+    }
+
+    @Override
+    public @NotNull @NlsSafe String getPresentableName() {
+        return presentableName;
     }
 
     /**
