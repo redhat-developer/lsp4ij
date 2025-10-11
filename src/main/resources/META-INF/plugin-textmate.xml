@@ -1,3 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <idea-plugin>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <textmate.bundleProvider implementation="com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyTextMateBundleProvider"/>
+        <!--
+         We have to explicitly register textmate as the highlight provider because of a bug in how jetbrains textmate
+         works (and it's incredibly poorly documented). See jetbrains-plugin-fss for prior art
+         https://github.com/qligier/jetbrains-plugin-fss/blob/905622be4058fda8014f874af4acae46f24cc556/src/main/resources/META-INF/plugin.xml#L51-L53
+       -->
+        <editorHighlighterProvider
+                filetype="Disassembly"
+                implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
+        <lang.syntaxHighlighterFactory
+                language="Disassembly"
+                implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
+    </extensions>
+
 </idea-plugin>
