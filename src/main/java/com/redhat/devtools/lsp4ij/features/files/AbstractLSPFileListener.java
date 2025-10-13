@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.features.files;
 
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePropertyEvent;
 import com.intellij.openapi.vfs.newvfs.BulkFileListener;
@@ -52,7 +53,7 @@ import java.util.concurrent.TimeoutException;
  * VFS events are transformed into LSP {@link FileEvent}, {@link FileCreate},
  * {@link FileDelete}, or {@link FileRename} structures.</p>
  */
-public abstract class AbstractLSPFileListener implements FileEditorManagerListener, BulkFileListener {
+public abstract class AbstractLSPFileListener implements FileEditorManagerListener, AsyncFileListener {
 
     /** The associated language server wrapper. */
     protected final LanguageServerWrapper languageServerWrapper;
@@ -70,6 +71,25 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         this.fileSystemWatcherManager = new FileSystemWatcherManager(languageServerWrapper.getProject());
     }
 
+    @Override
+    public @Nullable ChangeApplier prepareChange(@NotNull List<? extends @NotNull VFileEvent> events) {
+        if (!languageServerWrapper.isActive()) {
+            return null;
+        }
+        return new ChangeApplier() {
+            @Override
+            public void beforeVfsChange() {
+                before(events);
+            }
+
+            @Override
+            public void afterVfsChange() {
+                after(events);
+            }
+        };
+    }
+
+
     /**
      * Called before VFS events are applied.
      * <p>
@@ -78,8 +98,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      *
      * @param events the list of file system events before execution
      */
-    @Override
-    public final void before(@NotNull List<? extends @NotNull VFileEvent> events) {
+    private void before(@NotNull List<? extends @NotNull VFileEvent> events) {
         List<FileCreate> fileCreates = new ArrayList<>(); // workspace/didCreateFiles events
         List<FileDelete> fileDeletes = new ArrayList<>(); // workspace/didDeleteFiles events
         List<FileRename> fileRenames = new ArrayList<>(); // workspace/didRenameFiles events
@@ -168,8 +187,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      *
      * @param events the list of file system events after execution
      */
-    @Override
-    public final void after(@NotNull List<? extends @NotNull VFileEvent> events) {
+    private void after(@NotNull List<? extends @NotNull VFileEvent> events) {
         List<FileEvent> fileEvents = new ArrayList<>(); // workspace/didChangeWatchedFiles events
         List<FileCreate> fileCreates = new ArrayList<>(); // workspace/didCreateFiles events
         List<FileDelete> fileDeletes = new ArrayList<>(); // workspace/didDeleteFiles events
