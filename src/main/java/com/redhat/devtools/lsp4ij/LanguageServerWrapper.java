@@ -155,6 +155,8 @@ public class LanguageServerWrapper implements Disposable {
         this.openedDocuments = new HashMap<>();
         this.closedDocuments = new HashMap<>();
         this.fileListener = new LSPFileListener(this);
+        VirtualFileManager.getInstance().addAsyncFileListener(fileListener, this);
+
         String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
         String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
         this.dispatcher = Executors
@@ -431,7 +433,6 @@ public class LanguageServerWrapper implements Disposable {
                     .thenApply(initializingContext -> {
                         messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
                         messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
-                        messageBusConnection.subscribe(VirtualFileManager.VFS_CHANGES, fileListener);
 
                         fileOperationsManager = new FileOperationsManager(this);
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
