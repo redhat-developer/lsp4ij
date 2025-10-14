@@ -224,6 +224,9 @@ public class DAPStackFrame extends XStackFrame {
     }
 
     private static @Nullable String getSourceNameFromNameOrPath(@Nullable Source source) {
+        if (source == null) {
+            return null;
+        }
         if (StringUtils.isNotBlank(source.getName())) {
             return source.getName();
         }
