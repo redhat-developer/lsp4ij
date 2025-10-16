@@ -9,3 +9,10 @@
 and *.c, *.h support should be available.
 
    ![Clangd template](../images/user-defined-ls/clangd/select_template.png)
+
+## Setting "build" options
+
+Often need to specify e.g. `-I` for your build and you therefore must tell `clangd` about it.
+To do this:
+
+????
