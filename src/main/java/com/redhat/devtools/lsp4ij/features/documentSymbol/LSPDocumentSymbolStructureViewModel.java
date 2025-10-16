@@ -15,10 +15,12 @@ import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
 import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -53,6 +55,12 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     @Override
     public boolean isAlwaysLeaf(StructureViewTreeElement element) {
         return element.getChildren().length == 0;
+    }
+
+    @Override
+    protected Class @NotNull [] getSuitableClasses() {
+        // Any PSI element
+        return new Class[] {PsiElement.class};
     }
 
     @Override
