@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.evaluation.ExpressionInfo;
@@ -33,7 +34,6 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.concurrency.Promise;
 import org.jetbrains.concurrency.Promises;
 
-import java.lang.reflect.Method;
 import java.util.concurrent.CompletionException;
 
 /**
@@ -122,55 +122,11 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
                         return null;
                     }
 
-                    TextRange textRange = getTextRange(document, offset);
-                    if (textRange == null) {
-                        return null;
-                    }
-                    // Extract the expression text
-                    String expression = getExpression(document, offset, textRange);
-
-                    // Build ExpressionInfo with the text range and expression string
-                    return new ExpressionInfo(textRange, expression);
+                    var variableSupport = client.getServerDescriptor().getVariableSupport();
+                    return variableSupport.getExpressionInfo(project, file, document, offset, sideEffectsAllowed);
                 })
                 .withDocumentsCommitted(project)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 
-    protected @Nullable TextRange getTextRange(@NotNull Document document,
-                                               int offset) {
-        // Get the entire document text
-        String text = document.getText();
-
-        // Safety check: ensure offset is within bounds
-        if (offset < 0 || offset >= text.length()) {
-            return null;
-        }
-
-        // Find the start of the identifier at the given offset
-        int start = offset;
-        while (start > 0) {
-            char ch = text.charAt(start - 1);
-            if (Character.isJavaIdentifierPart(ch) || ch == '.') {
-                start--;
-            } else {
-                break;
-            }
-        }
-
-        // Find the end of the identifier at the given offset
-        int end = offset;
-        while (end < text.length() && Character.isJavaIdentifierPart(text.charAt(end))) {
-            end++;
-        }
-
-        // If there is no identifier at the offset, do not return an expression
-        if (start == end) {
-            return null;
-        }
-        return new TextRange(start, end);
-    }
-
-    protected @NotNull String getExpression(@NotNull Document document, int offset, TextRange textRange) {
-        return document.getText(textRange);
-    }
 }

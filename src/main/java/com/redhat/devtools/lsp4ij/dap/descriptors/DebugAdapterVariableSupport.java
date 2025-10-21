@@ -11,12 +11,18 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.xdebugger.evaluation.ExpressionInfo;
 import com.intellij.xdebugger.frame.presentation.*;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariablePositionProvider;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.HighlighterDebugVariablePositionProvider;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.Collection;
@@ -33,7 +39,6 @@ public class DebugAdapterVariableSupport {
      * Returns the icon for the given variable.
      *
      * @param variable the variable.
-     *
      * @return the icon for the given variable.
      */
     @NotNull
@@ -64,7 +69,6 @@ public class DebugAdapterVariableSupport {
      * Returns the value representation for the given variable.
      *
      * @param variable the variable.
-     *
      * @return value representation for the given variable.
      */
     public @NotNull XValuePresentation getValuePresentation(@NotNull Variable variable) {
@@ -153,5 +157,67 @@ public class DebugAdapterVariableSupport {
         return value
                 .replaceAll("^\"+|\"+$", "")
                 .replaceAll("^\'+|\'+$", "");
+    }
+
+    public @Nullable ExpressionInfo getExpressionInfo(@NotNull Project project,
+                                                      @NotNull VirtualFile file,
+                                                      @NotNull Document document,
+                                                      int offset,
+                                                      boolean sideEffectsAllowed) {
+        TextRange textRange = getTextRange(project, file, document, offset, sideEffectsAllowed);
+        if (textRange == null) {
+            return null;
+        }
+        // Extract the expression text
+        String expression = getExpression(project, file, document, offset, sideEffectsAllowed, textRange);
+
+        // Build ExpressionInfo with the text range and expression string
+        return new ExpressionInfo(textRange, expression);
+    }
+
+    protected @Nullable TextRange getTextRange(@NotNull Project project,
+                                               @NotNull VirtualFile file,
+                                               @NotNull Document document,
+                                               int offset,
+                                               boolean sideEffectsAllowed) {
+        // Get the entire document text
+        String text = document.getText();
+
+        // Safety check: ensure offset is within bounds
+        if (offset < 0 || offset >= text.length()) {
+            return null;
+        }
+
+        // Find the start of the identifier at the given offset
+        int start = offset;
+        while (start > 0) {
+            char ch = text.charAt(start - 1);
+            if (Character.isJavaIdentifierPart(ch) || ch == '.') {
+                start--;
+            } else {
+                break;
+            }
+        }
+
+        // Find the end of the identifier at the given offset
+        int end = offset;
+        while (end < text.length() && Character.isJavaIdentifierPart(text.charAt(end))) {
+            end++;
+        }
+
+        // If there is no identifier at the offset, do not return an expression
+        if (start == end) {
+            return null;
+        }
+        return new TextRange(start, end);
+    }
+
+    protected @NotNull String getExpression(@NotNull Project project,
+                                            @NotNull VirtualFile file,
+                                            @NotNull Document document,
+                                            int offset,
+                                            boolean sideEffectsAllowed,
+                                            @NotNull TextRange textRange) {
+        return document.getText(textRange);
     }
 }
