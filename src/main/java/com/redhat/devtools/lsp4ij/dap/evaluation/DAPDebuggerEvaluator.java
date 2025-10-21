@@ -19,6 +19,7 @@ import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.evaluation.ExpressionInfo;
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XValueCallback;
+import com.intellij.xdebugger.impl.ui.tree.nodes.XEvaluationCallbackWithOrigin;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
@@ -40,11 +41,6 @@ import java.util.concurrent.CompletionException;
  */
 public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
 
-    private static final String ORIGIN_INTERFACE_NAME = "com.intellij.xdebugger.impl.ui.tree.nodes.XEvaluationCallbackWithOrigin";
-    private static volatile boolean reflectionUnsupported = false;
-    private static volatile Method getOriginMethod;
-    private static volatile Class<?> originInterface;
-
     private final @NotNull DAPStackFrame stackFrame;
 
     public DAPDebuggerEvaluator(@NotNull DAPStackFrame stackFrame) {
@@ -52,42 +48,13 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
     }
 
     private static @NotNull String getEvaluationContext(@NotNull XEvaluationCallback callback) {
-        // As XEvaluationCallbackWithOrigin is not available on old IntelliJ version  (<=2023.3), we need to use Java reflection.
-        if (reflectionUnsupported) {
-            return EvaluateArgumentsContext.WATCH;
+        if (callback instanceof XEvaluationCallbackWithOrigin origin) {
+            return switch (origin.getOrigin()) {
+                case INLINE, DIALOG -> EvaluateArgumentsContext.REPL;
+                case EDITOR -> EvaluateArgumentsContext.HOVER;
+                default -> EvaluateArgumentsContext.WATCH;
+            };
         }
-
-        try {
-            // Initialisation lazy
-            if (originInterface == null || getOriginMethod == null) {
-                synchronized (DAPDebuggerEvaluator.class) {
-                    if (originInterface == null || getOriginMethod == null) {
-                        originInterface = Class.forName(ORIGIN_INTERFACE_NAME);
-                        getOriginMethod = originInterface.getMethod("getOrigin");
-                    }
-                }
-            }
-
-            if (originInterface.isInstance(callback)) {
-                Object origin = getOriginMethod.invoke(callback);
-                if (origin != null) {
-                    String originName = origin.toString();
-                    return switch (originName) {
-                        case "INLINE", "CONSOLE",
-                             "DIALOG" -> //  XEvaluationOrigin.INLINE, XEvaluationOrigin.CONSOLE, XEvaluationOrigin.DIALOG
-                                EvaluateArgumentsContext.REPL;
-                        case "EDITOR" -> // XEvaluationOrigin.EDITOR
-                                EvaluateArgumentsContext.HOVER;
-                        default -> EvaluateArgumentsContext.WATCH;
-                    };
-                }
-            }
-        } catch (ClassNotFoundException e) {
-            reflectionUnsupported = true;
-        } catch (Exception e) {
-            // Do nothing
-        }
-
         return EvaluateArgumentsContext.WATCH;
     }
 
