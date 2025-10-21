@@ -12,6 +12,8 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.DocumentSymbolData;
@@ -126,5 +128,11 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
                                @NotNull PsiFile psiFile) {
         var selectionRange = documentSymbol.getSelectionRange();
         return selectionRange != null && selectionRange.getStart() != null;
+    }
+
+    public boolean isSame(@NotNull DocumentSymbolData documentSymbolData,
+                          @NotNull PsiElement psiElement) {
+        TextRange textRange = documentSymbolData.getSelectionTextRange() != null ? documentSymbolData.getSelectionTextRange() : documentSymbolData.getTextRange();
+        return textRange.equals(psiElement.getTextRange());
     }
 }
