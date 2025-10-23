@@ -2,7 +2,7 @@
 
 To debug [Python](https://www.python.org/) files, you can use the [Debugpy](https://github.com/microsoft/debugpy) DAP server.
 
-Let’s debugging the following `test.py` file:
+Let’s debug the following `test.py` file:
 
 ```python
 def main():

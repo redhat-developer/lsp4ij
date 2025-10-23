@@ -21,6 +21,7 @@ import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.ExceptionBreakpointsFilter;
+import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,20 +36,22 @@ import java.util.stream.Collectors;
  */
 public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements Disposable {
 
+    public static final @NotNull @NonNls String ID = "dap-breakpoints-panel";
+
     static final EnabledColumnInfo ENABLED_COLUMN = new EnabledColumnInfo();
     static final NameColumnInfo NAME_COLUMN = new NameColumnInfo();
 
-    private final @NotNull DAPBreakpointHandler breakpointHandler;
+    private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
     private final @NotNull ListTableModel<ExceptionBreakpointsFilter> myModel;
     private final @NotNull TableView<ExceptionBreakpointsFilter> myTable;
 
-    public DAPExceptionBreakpointsPanel(@NotNull DAPBreakpointHandler breakpointHandler) {
+    public DAPExceptionBreakpointsPanel(@NotNull DAPBreakpointHandlerBase<?> breakpointHandler) {
         this.breakpointHandler = breakpointHandler;
 
         // Create Table view
-        this.myModel = new ListTableModel(new ColumnInfo[]{ENABLED_COLUMN, NAME_COLUMN});
+        this.myModel = new ListTableModel<>(new ColumnInfo[]{ENABLED_COLUMN, NAME_COLUMN});
         this.myModel.setSortable(true);
-        this.myTable = new TableView(this.myModel);
+        this.myTable = new TableView<>(this.myModel);
         this.addToCenter(ScrollPaneFactory.createScrollPane(this.myTable));
         TableUtil.setupCheckboxColumn(this.myTable.getColumnModel().getColumn(0));
 
@@ -95,8 +98,8 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
             super(CommonBundle.message("title.name", new Object[0]));
         }
 
-        public @Nullable ExceptionBreakpointsFilter valueOf(ExceptionBreakpointsFilter aspects) {
-            return aspects;
+        public @Nullable ExceptionBreakpointsFilter valueOf(ExceptionBreakpointsFilter filter) {
+            return filter;
         }
 
         public Class<?> getColumnClass() {
@@ -122,7 +125,7 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
     }
 
     /**
-     * Redresh the table view with the given DAP breakpoint exception filters.
+     * Refresh the table view with the given DAP breakpoint exception filters.
      *
      * @param filters the DAP breakpoint exception filters.
      * @return the DAP breakpoint exception filters which are enabled.

@@ -28,11 +28,14 @@ Once you clicked on either of them, the dialog will appear:
 
 ![New Language Server Dialog](./images/user-defined-ls/NewLanguageServerDialogEmpty.png)
 
-When you click the `OK` button, it will create the language server.  
-If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)  
-in the [Installer tab](#installer-tab), you will be prompted to confirm whether you want to execute the installer:
+When you click the `OK` button, the language server will be created.
 
-![Installation dialog](./images/user-defined-ls/rust-analyzer/installation_dialog.png)
+If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)  
+in the [Installer tab](#installer-tab), the installer will run once when the language server starts.
+
+You can reinstall the server at any time (e.g. to fetch the latest version) using the `Reinstall` action:
+
+![Install actions](./images/InstallActions.png)
 
 ### Server tab
 
@@ -66,7 +69,7 @@ That command might look like this:
 
 `$PROJECT_DIR$/path/to/your/start/command`
 
-Here are some useful standard [built-in macros](https://www.jetbrains.com/help/idea/built-in-macros.html that you can use:
+Here are some useful standard [built-in macros](https://www.jetbrains.com/help/idea/built-in-macros.html) that you can use:
 
  * `$WORKSPACE_DIR$`: The path to the workspace where the current project belongs. The workspace is the root of the open file hierarchy and can include multiple projects.
  * `$PROJECT_DIR$`: The root of the project where run.json is located. A project is typically a collection of files for developing and building an application such as a Maven or Node.js project.
@@ -144,16 +147,27 @@ pre-filled with server name, command, mappings and potential configuration.
 
 ![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
-* [Clojure LSP](./user-defined-ls/clojure-lsp.md)
+* [Ada Language Server](./user-defined-ls/ada_language_server.md)
+* [Apache Camel Language Server](./user-defined-ls/camel-lsp-server.md)
+* [Astro Language Server](./user-defined-ls/astro-ls.md)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
+* [Clangd](./user-defined-ls/clangd.md) 
+* [Clojure LSP](./user-defined-ls/clojure-lsp.md)
+* [Dart LSP](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
-* [Erlang Language Server](./user-defined-ls/erlang-ls.md) 
+* [EO LSP Server](./user-defined-ls/eo-lsp-server.md) 
+* [Erlang Language Server](./user-defined-ls/erlang-ls.md)
+* [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
-* [Julia Language Server](./user-defined-ls/julia.md) 
-* [HTML Language Server](./user-defined-ls/vscode-html-language-server.md)
+* [JQ Language Server](./user-defined-ls/jq-lsp.md)
+* [Julia Language Server](./user-defined-ls/julia.md)
+* [Ruby LSP](./user-defined-ls/ruby-lsp.md)
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
-* [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md) 
+* [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md)
+* [Stylelint-LSP](./user-defined-ls/stylelint-lsp.md)
+* [Svelte Language Server](./user-defined-ls/svelte-language-server.md) 
+* [Terraform Language Server](./user-defined-ls/terraform-ls.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 * [Vue Language Server](./user-defined-ls/vue-js-language-server.md)
 

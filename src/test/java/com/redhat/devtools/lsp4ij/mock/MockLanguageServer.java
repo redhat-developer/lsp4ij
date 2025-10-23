@@ -314,22 +314,22 @@ public final class MockLanguageServer implements LanguageServer {
 		return new NotebookDocumentService() {
 			@Override
 			public void didSave(DidSaveNotebookDocumentParams params) {
-				// TODO Auto-generated method stub
+				// No-op
 			}
 
 			@Override
 			public void didOpen(DidOpenNotebookDocumentParams params) {
-				// TODO Auto-generated method stub
+				// No-op
 			}
 
 			@Override
 			public void didClose(DidCloseNotebookDocumentParams params) {
-				// TODO Auto-generated method stub
+				// No-op
 			}
 
 			@Override
 			public void didChange(DidChangeNotebookDocumentParams params) {
-				// TODO Auto-generated method stub
+				// No-op
 			}
 		};
 	}
@@ -337,6 +337,10 @@ public final class MockLanguageServer implements LanguageServer {
 	public void setFoldingRanges(List<FoldingRange> foldingRanges) {
 		this.textDocumentService.setFoldingRanges(foldingRanges);
 	}
+
+    public void setWillRename(WorkspaceEdit willRename) {
+        this.workspaceService.setWillRename(willRename);
+    }
 
 	@Override
 	public String toString() {

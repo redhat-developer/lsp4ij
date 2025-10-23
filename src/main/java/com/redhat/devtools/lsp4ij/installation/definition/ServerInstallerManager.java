@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
-import com.intellij.ide.util.DelegatingProgressIndicator;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationListener;
 import com.intellij.notification.NotificationType;
@@ -19,9 +18,8 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
-import com.intellij.openapi.util.NlsContexts;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
-import org.jetbrains.annotations.Nls;
+import com.redhat.devtools.lsp4ij.installation.PrintableProgressIndicator;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -113,15 +111,11 @@ public class ServerInstallerManager extends InstallerTaskRegistry {
         ProgressManager.getInstance().run(new Task.Backgroundable(context.getProject(), title.toString(), true) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                context.setProgressIndicator(new DelegatingProgressIndicator(indicator) {
+                context.setProgressIndicator(new PrintableProgressIndicator(indicator) {
 
                     @Override
-                    public void setText2(@Nls @NlsContexts.ProgressDetails String text) {
-                        super.setText2(text);
-                        if (text.startsWith("<html><code>")) {
-                            String s = text.substring("<html><code>".length(), text.length() - "</code></html>".length());
-                            context.printProgress(s);
-                        }
+                    protected void printProgress(@NotNull String progressMessage) {
+                        context.printProgress(progressMessage);
                     }
                 });
                 install(serverInstallerDescriptor, context);
@@ -134,6 +128,11 @@ public class ServerInstallerManager extends InstallerTaskRegistry {
         var commandUpdater = context.getCommandLineUpdater();
         if (commandUpdater != null) {
             context.putProperty("server.command", commandUpdater.getCommandLine());
+        }
+        var properties = installerDescriptor.getProperties();
+        var entrySet = properties.entrySet();
+        for (var entry : entrySet) {
+            context.putProperty(entry.getKey(), entry.getValue());
         }
         Boolean checkResult = null;
         Boolean checkRun = null;

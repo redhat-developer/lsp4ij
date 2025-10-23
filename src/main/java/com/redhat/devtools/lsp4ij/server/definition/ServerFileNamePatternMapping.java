@@ -36,7 +36,7 @@ public class ServerFileNamePatternMapping extends ServerMapping {
         this.fileNameMatchers = createFileNameMatchers(fileNamePatterns);
     }
 
-    private List<FileNameMatcher> createFileNameMatchers(List<String> fileNamePatterns) {
+    private List<FileNameMatcher> createFileNameMatchers(@NotNull List<String> fileNamePatterns) {
         return fileNamePatterns
                 .stream()
                 .map(pattern -> FileNameMatcherFactory.getInstance().createMatcher(pattern))

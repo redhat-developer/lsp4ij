@@ -52,7 +52,10 @@ import com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchySuperty
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
@@ -62,65 +65,40 @@ import java.util.concurrent.Callable;
 @ApiStatus.Internal
 public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
-    private static final Key<LSPFileSupport> LSP_FILE_SUPPORT_KEY = Key.create("lsp.file.support");
     public static final @NotNull CancelChecker NO_CANCELLABLE_CHECKER = () -> {
     };
-
-    private volatile Alarm refreshPsiFileAlarm = null;
-
+    private static final Key<LSPFileSupport> LSP_FILE_SUPPORT_KEY = Key.create("lsp.file.support");
     private final PsiFile file;
-
     private final LSPCodeLensSupport codeLensSupport;
-
     private final LSPInlayHintsSupport inlayHintsSupport;
-
     private final LSPColorSupport colorSupport;
-
     private final LSPFoldingRangeSupport foldingRangeSupport;
-
     private final LSPSelectionRangeSupport selectionRangeSupport;
-
     private final LSPFormattingSupport formattingSupport;
-
     private final LSPOnTypeFormattingSupport onTypeFormattingSupport;
-
     private final LSPHighlightSupport highlightSupport;
-
     private final LSPSignatureHelpSupport signatureHelpSupport;
-
     private final LSPDocumentLinkSupport documentLinkSupport;
-
     private final LSPHoverSupport hoverSupport;
-
     private final LSPIntentionCodeActionSupport intentionCodeActionSupport;
-
     private final LSPPrepareRenameSupport prepareRenameSupport;
-
     private final LSPRenameSupport renameSupport;
-
     private final LSPCompletionSupport completionSupport;
-
     private final LSPImplementationSupport implementationSupport;
-
     private final LSPReferenceSupport referenceSupport;
-
     private final LSPDefinitionSupport definitionSupport;
-
     private final LSPDeclarationSupport declarationSupport;
-
     private final LSPTypeDefinitionSupport typeDefinitionSupport;
-
     private final LSPSemanticTokensSupport semanticTokensSupport;
-
     private final LSPDocumentSymbolSupport documentSymbolSupport;
-
     private final LSPPrepareCallHierarchySupport prepareCallHierarchySupport;
     private final LSPCallHierarchyIncomingCallsSupport callHierarchyIncomingCallsSupport;
     private final LSPCallHierarchyOutgoingCallsSupport callHierarchyOutgoingCallsSupport;
-
     private final LSPPrepareTypeHierarchySupport prepareTypeHierarchySupport;
     private final LSPTypeHierarchySubtypesSupport typeHierarchySubtypesSupport;
     private final LSPTypeHierarchySupertypesSupport typeHierarchySupertypesSupport;
+    private final List<Key> keys = new ArrayList<>();
+    private volatile Alarm refreshPsiFileAlarm = null;
     private boolean disposed;
 
     private LSPFileSupport(@NotNull PsiFile file) {
@@ -159,6 +137,39 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
 
     }
 
+    /**
+     * Return the existing LSP file support for the given Psi file, or create a new one if necessary.
+     *
+     * @param file the Psi file.
+     * @return the existing LSP file support for the given Psi file, or create a new one if necessary.
+     */
+    public static @NotNull LSPFileSupport getSupport(@NotNull PsiFile file) {
+        LSPFileSupport support = file.getUserData(LSP_FILE_SUPPORT_KEY);
+        if (support == null) {
+            // create LSP support by taking care of multiple threads which could call it.
+            support = createSupport(file);
+        }
+        return support;
+    }
+
+    private synchronized static @NotNull LSPFileSupport createSupport(@NotNull PsiFile file) {
+        LSPFileSupport support = file.getUserData(LSP_FILE_SUPPORT_KEY);
+        if (support != null) {
+            return support;
+        }
+        return new LSPFileSupport(file);
+    }
+
+    /**
+     * Returns true if the given Psi file has LSP support and false otherwise.
+     *
+     * @param file the Psi file.
+     * @return true if the given Psi file has LSP support and false otherwise.
+     */
+    public static boolean hasSupport(@NotNull PsiFile file) {
+        return file.getUserData(LSP_FILE_SUPPORT_KEY) != null;
+    }
+
     @Override
     public void dispose() {
         this.disposed = true;
@@ -191,9 +202,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getPrepareTypeHierarchySupport().cancel();
         getTypeHierarchySubtypesSupport().cancel();
         getTypeHierarchySupertypesSupport().cancel();
-        var map = getUserMap();
-        for (var key : map.getKeys()) {
-            var value = map.get(key);
+        for (var key : keys) {
+            var value = super.getUserData(key);
             if (value instanceof Disposable disposable) {
                 disposable.dispose();
             }
@@ -505,41 +515,14 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         return refreshPsiFileAlarm.isDisposed() ? null : refreshPsiFileAlarm;
     }
 
-    /**
-     * Return the existing LSP file support for the given Psi file, or create a new one if necessary.
-     *
-     * @param file the Psi file.
-     * @return the existing LSP file support for the given Psi file, or create a new one if necessary.
-     */
-    public static @NotNull LSPFileSupport getSupport(@NotNull PsiFile file) {
-        LSPFileSupport support = file.getUserData(LSP_FILE_SUPPORT_KEY);
-        if (support == null) {
-            // create LSP support by taking care of multiple threads which could call it.
-            support = createSupport(file);
-        }
-        return support;
-    }
-
-    private synchronized static @NotNull LSPFileSupport createSupport(@NotNull PsiFile file) {
-        LSPFileSupport support = file.getUserData(LSP_FILE_SUPPORT_KEY);
-        if (support != null) {
-            return support;
-        }
-        return new LSPFileSupport(file);
-    }
-
-    /**
-     * Returns true if the given Psi file has LSP support and false otherwise.
-     *
-     * @param file the Psi file.
-     * @return true if the given Psi file has LSP support and false otherwise.
-     */
-    public static boolean hasSupport(@NotNull PsiFile file) {
-        return file.getUserData(LSP_FILE_SUPPORT_KEY) != null;
-    }
-
     public PsiFile getFile() {
         return file;
+    }
+
+    @Override
+    public <T> void putUserData(@NotNull Key<T> key, @Nullable T value) {
+        keys.add(key);
+        super.putUserData(key, value);
     }
 
 }

@@ -5,6 +5,8 @@
     "windows": "\"${BASE_DIR}/clojure-lsp.exe\"",
     "default": "\"${BASE_DIR}/clojure-lsp.sh\""
   },
+  "expandConfiguration": true,
+  "disablePromotionFor": ["com.github.clojure-lsp"],
   "fileTypeMappings": [
     {
       "fileType": {

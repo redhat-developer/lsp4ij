@@ -26,11 +26,23 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
+import com.redhat.devtools.lsp4ij.internal.ExtendedConcurrentMessageProcessor;
+import com.redhat.devtools.lsp4ij.internal.ExtendedStreamMessageProducer;
 import com.redhat.devtools.lsp4ij.internal.capabilities.CodeLensOptionsAdapter;
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.eclipse.lsp4j.CodeLensOptions;
-import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.*;
+import org.eclipse.lsp4j.jsonrpc.json.ConcurrentMessageProcessor;
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
+import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.json.StreamMessageProducer;
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -42,6 +54,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 /**
  * Base class for Language server definition.
@@ -65,6 +81,13 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
     private SemanticTokensColorsProvider semanticTokensColorsProvider;
+
+    private boolean serverInstallerCreated;
+    private @Nullable ServerInstaller serverInstaller;
+    private @Nullable Boolean hasInstaller;
+
+    private boolean languageServerSettingsContributorCreated;
+    private @Nullable LanguageServerSettingsContributor languageServerSettingsContributor;
 
     public LanguageServerDefinition(@NotNull String id,
                                     @NotNull String name,
@@ -192,13 +215,94 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         return languageIdFileNameMatcherMappings;
     }
 
-    public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder() {
-        return new Launcher.Builder<S>()
-                .configureGson(builder -> {
-                    // Add a custom CodeLensOptionsAdapter to support old language server
-                    // which declares codeLenProvider with a boolean instead of Json object.
-                    builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
-                });
+    /**
+     * Custom RemoteEndpoint that uses integer IDs instead of string IDs for JSON-RPC messages.
+     */
+    private static class RemoteEndpointWithIdAsInt extends RemoteEndpoint {
+
+        private final AtomicInteger nextRequestId = new AtomicInteger();
+
+        public RemoteEndpointWithIdAsInt(MessageConsumer out,
+                                         Endpoint localEndpoint,
+                                         Function<Throwable, ResponseError> exceptionHandler) {
+            super(out, localEndpoint, exceptionHandler);
+        }
+
+        public RemoteEndpointWithIdAsInt(MessageConsumer out,
+                                         Endpoint localEndpoint) {
+            super(out, localEndpoint);
+        }
+
+        @Override
+        protected RequestMessage createRequestMessage(String method, Object parameter) {
+            RequestMessage requestMessage = new RequestMessage();
+            // Use int as JSON-RPC id instead of String (by default from LSP4J)
+            requestMessage.setId(nextRequestId.incrementAndGet());
+            requestMessage.setMethod(method);
+            requestMessage.setParams(parameter);
+            return requestMessage;
+        }
+    }
+
+    public <S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder(@NotNull LSPClientFeatures clientFeatures) {
+
+        return new Launcher.Builder<S>() {
+
+            public Launcher<S> create() {
+                // Validate input
+                if (input == null)
+                    throw new IllegalStateException("Input stream must be configured.");
+                if (output == null)
+                    throw new IllegalStateException("Output stream must be configured.");
+                if (localServices == null)
+                    throw new IllegalStateException("Local service must be configured.");
+                if (remoteInterfaces == null)
+                    throw new IllegalStateException("Remote interface must be configured.");
+
+                // Create the JSON handler, remote endpoint and remote proxy
+                MessageJsonHandler jsonHandler = createJsonHandler();
+                RemoteEndpoint remoteEndpoint = createRemoteEndpoint(jsonHandler);
+                S remoteProxy = createProxy(remoteEndpoint);
+
+                // Create the message processor
+                StreamMessageProducer reader = new ExtendedStreamMessageProducer(input, jsonHandler, remoteEndpoint);
+                MessageConsumer messageConsumer = wrapMessageConsumer(remoteEndpoint);
+                ConcurrentMessageProcessor msgProcessor = createMessageProcessor(reader, messageConsumer, remoteProxy);
+                ExecutorService execService = executorService != null ? executorService : Executors.newCachedThreadPool();
+                return createLauncher(execService, remoteProxy, remoteEndpoint, msgProcessor);
+            }
+
+            @Override
+            protected ConcurrentMessageProcessor createMessageProcessor(MessageProducer reader, MessageConsumer messageConsumer, S remoteProxy) {
+                return new ExtendedConcurrentMessageProcessor(reader, messageConsumer);
+            }
+
+            @Override
+            protected RemoteEndpoint createRemoteEndpoint(MessageJsonHandler jsonHandler) {
+
+                boolean useIntAsId = clientFeatures.isUseIntAsJsonRpcId();
+                if (!useIntAsId) {
+                    // Use JSON-RPC as String (default behavior of LSP4J)
+                    return super.createRemoteEndpoint(jsonHandler);
+                }
+
+                // Override the remote endpoint to use JSON-RPC id as int
+                MessageConsumer outgoingMessageStream = new StreamMessageConsumer(output, jsonHandler);
+                outgoingMessageStream = wrapMessageConsumer(outgoingMessageStream);
+                Endpoint localEndpoint = ServiceEndpoints.toEndpoint(localServices);
+                RemoteEndpoint remoteEndpoint;
+                if (exceptionHandler == null)
+                    remoteEndpoint = new RemoteEndpointWithIdAsInt(outgoingMessageStream, localEndpoint);
+                else
+                    remoteEndpoint = new RemoteEndpointWithIdAsInt(outgoingMessageStream, localEndpoint, exceptionHandler);
+                jsonHandler.setMethodProvider(remoteEndpoint);
+                return remoteEndpoint;
+            }
+        }.configureGson(builder -> {
+            // Add a custom CodeLensOptionsAdapter to support old language server
+            // which declares codeLenProvider with a boolean instead of Json object.
+            builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
+        });
     }
 
     public boolean supportsCurrentEditMode(@NotNull Project project) {
@@ -361,4 +465,70 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
         }
         return null;
     }
+
+    /**
+     * Returns the global installer and null otherwise.
+     *
+     * @return the global installer and null otherwise.
+     */
+    public @Nullable ServerInstaller getServerInstaller() {
+        if (serverInstallerCreated) {
+            return serverInstaller;
+        }
+        return getServerInstallerSync();
+    }
+
+    private synchronized @Nullable ServerInstaller getServerInstallerSync() {
+        if (serverInstallerCreated) {
+            return serverInstaller;
+        }
+        serverInstaller = createServerInstaller();
+        serverInstallerCreated = true;
+        return serverInstaller;
+    }
+
+    /**
+     * Returns true if the server definition has an installer and false otherwise.
+     *
+     * @return  true if the server definition has an installer and false otherwise.
+     */
+    public boolean hasInstaller() {
+        if (getServerInstaller() != null) {
+            // Global installer
+            return true;
+        }
+        if (hasInstaller != null) {
+            return hasInstaller;
+        }
+        // We cache the installer to avoid creating client features on each call of this method.
+        hasInstaller = hasInstallerSync();
+        return hasInstaller;
+    }
+
+    synchronized boolean hasInstallerSync() {
+        try {
+            return createClientFeatures().getServerInstaller() != null;
+        }
+        catch(Throwable e) {
+            // Ignore error
+            return false;
+        }
+    }
+
+    public @Nullable LanguageServerSettingsContributor getLanguageServerSettingsContributor() {
+        if (languageServerSettingsContributorCreated) {
+            return languageServerSettingsContributor;
+        }
+        return getLanguageServerSettingsContributorSync();
+    }
+
+    private synchronized @Nullable LanguageServerSettingsContributor getLanguageServerSettingsContributorSync() {
+        if (languageServerSettingsContributorCreated) {
+            return languageServerSettingsContributor;
+        }
+        languageServerSettingsContributor = createLanguageServerSettingsContributor();
+        languageServerSettingsContributorCreated = true;
+        return languageServerSettingsContributor;
+    }
+
 }

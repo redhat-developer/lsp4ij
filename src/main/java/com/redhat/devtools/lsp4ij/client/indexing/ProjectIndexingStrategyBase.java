@@ -92,7 +92,7 @@ public abstract class ProjectIndexingStrategyBase {
     }
 
     private void refreshEditorsFeaturesIfNeeded(ProjectIndexingManager manager) {
-        if (!manager.isIndexingAll()) {
+        if (!ProjectIndexingManager.isIndexingAll()) {
             // All opened project are indexed,
             // refresh all editors which edit the files to refresh
             while (!manager.filesToRefresh.isEmpty()) {

@@ -19,10 +19,12 @@ import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -87,7 +89,6 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
         return clientFeatures;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public @NotNull Class<? extends LanguageServer> getServerInterface() {
         Class<? extends LanguageServer> serverInterface = null;
@@ -163,5 +164,15 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
     @Override
     public @NotNull SemanticTokensColorsProvider getSemanticTokensColorsProvider() {
         return super.getSemanticTokensColorsProvider();
+    }
+
+    @Override
+    public @Nullable ServerInstaller createServerInstaller() {
+        return getFactory().createServerInstaller();
+    }
+
+    @Override
+    public @Nullable LanguageServerSettingsContributor createLanguageServerSettingsContributor() {
+        return getFactory().createLanguageServerSettingsContributor();
     }
 }

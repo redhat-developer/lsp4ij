@@ -159,29 +159,33 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
 ```json
 {
   "id": "typescript-language-server",
-  "name": "Install and verify TypeScript Language Server",
+  "name": "TypeScript Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/typescript-language-server"
+  },
   "check": {
     "exec": {
-      "name": "Check TypeScript Language Server",
-      "command": {
-        "windows": "where typescript-language-server",
-        "default": "which typescript-language-server"
-      }
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
     }
   },
   "run": {
     "exec": {
-      "name": "Install TypeScript Language Server Globally",
+      "name": "Install TypeScript Language Server",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
       "command": {
-        "windows": "npm.cmd install -g typescript-language-server",
-        "default": "npm install -g typescript-language-server"
+        "windows": "npm.cmd install typescript-language-server typescript --force",
+        "default": "npm install typescript-language-server typescript --force"
       },
       "onSuccess": {
         "configureServer": {
           "name": "Configure TypeScript Language Server command",
           "command": {
-            "windows": "typescript-language-server.cmd --stdio",
-            "default": "typescript-language-server --stdio"
+            "windows": "${workingDir}/node_modules/.bin/typescript-language-server.cmd --stdio",
+            "default": "${workingDir}/node_modules/.bin/typescript-language-server --stdio"
           },
           "update": true
         }
@@ -352,6 +356,48 @@ Samples:
 * [clangd installer](../src/main/resources/templates/lsp/clangd/installer.json)
 * [clojure-lsp installer](../src/main/resources/templates/lsp/clojure-lsp/installer.json)
 * [rust-analyzer installer](../src/main/resources/templates/lsp/rust-analyzer/installer.json)
+
+#### Maven artifact download
+
+If the DAP/LSP server is published on [Maven Central](https://search.maven.org), you can use the `maven` object in your installer JSON to download the corresponding artifact:
+
+```json
+{
+  "download": {
+    "name": "Download Camel Language Server",
+    "maven": {
+      "groupId": "com.github.camel-tooling",
+      "artifactId": "camel-lsp-server"
+    }
+  }
+}
+```
+
+When the download occurs:
+
+1. A request is made to the following Maven Central API endpoint to find the latest artifact:
+   ```
+   https://search.maven.org/solrsearch/select?q=g:%22com.github.camel-tooling%22%20AND%20a:%22camel-lsp-server%22&rows=20&wt=json
+   ```
+2. The first result from the response is used to determine the latest available version.
+3. The download URL is then computed as:
+   ```
+   https://repo1.maven.org/maven2/{groupId with slashes}/{artifactId}/{version}/{artifactId}-{version}.jar
+   ```
+
+For example, if the groupId is `com.github.camel-tooling` and the artifactId is `camel-lsp-server`, the computed download URL might be:
+```
+https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.5.0/camel-lsp-server-1.5.0.jar
+```
+
+**Fields:**
+
+- `groupId` (required): Maven group ID.
+- `artifactId` (required): Maven artifact ID.
+
+**Sample:**
+
+- [Camel Language Server installer](../src/main/resources/templates/lsp/camel-lsp-server/installer.json)
 
 ##### Output customization
 

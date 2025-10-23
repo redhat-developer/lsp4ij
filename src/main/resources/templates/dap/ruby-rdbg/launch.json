@@ -1,0 +1,8 @@
+{
+  "type": "rdbg",
+  "name": "Debug current file with rdbg",
+  "request": "launch",
+  "script": "${file}",
+  "args": [],
+  "askParameters": true
+}

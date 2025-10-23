@@ -4,10 +4,33 @@
   "executeOnStartServer": false,
   "check": {
     "exec": {
-      "name": "Check Go Language Server",
-      "command": {
-        "windows": "where go",
-        "default": "which go"
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onFail": {
+        "exec": {
+          "name": "Check Go runtime",
+          "command": {
+            "windows": "where go",
+            "default": "which go"
+          },
+          "onSuccess": {
+            "exec": {
+              "name": "Trying current command",
+              "command": "${server.command}",
+              "timeout": 2000
+            }
+          },
+          "onFail": {
+            "showMessage": {
+              "name": "Go Language Server install problem",
+              "content": [
+                "<a href=\"https://go.dev/doc/install\">Install Go</a> to install the Go Language Server (<code>gopls</code>) using <code>go install</code>.",
+                "Make sure <code>go</code> is in your PATH, then restart your IDE."
+              ]
+            }
+          }
+        }
       }
     }
   },

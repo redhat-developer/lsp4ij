@@ -10,16 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
-import com.intellij.execution.impl.ConsoleViewImpl;
-import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.installation.download.Reporter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,8 +23,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Represents the execution context during a Language Server installation or verification process.
@@ -58,12 +53,12 @@ public class InstallerContext implements Reporter {
      */
     public static record InstallationStatus(String message, Level level) {}
 
-    private final @NotNull Project project;
+    private final @Nullable Project project;
     private final @NotNull InstallerAction action;
     private @Nullable CommandLineUpdater commandLineUpdater;
-    private final @NotNull Map<String, String> properties;
-    private boolean flushOnEachPrint;
-    private @Nullable ConsoleView console;
+    private final @NotNull Map<String, Object> properties;
+    private @Nullable Supplier<List<ConsoleProvider>> consoleProviders;
+
     private @Nullable ProgressIndicator progressIndicator;
     private final @NotNull List<InstallationStatus> status;
 
@@ -78,26 +73,16 @@ public class InstallerContext implements Reporter {
      * @param project             the IntelliJ {@link Project} in which the installation is taking place.
      * @param action              the {@link InstallerAction} to be performed (e.g., CHECK, RUN).
      */
-    public InstallerContext(@NotNull Project project,
+    public InstallerContext(@Nullable Project project,
                             @NotNull InstallerAction action) {
         this.project = project;
         this.action = action;
         this.properties = new HashMap<>();
         this.status = new ArrayList<>();
-        setFlushOnEachPrint(false);
         setShowNotification(true);
     }
 
-    /**
-     * Sets whether the console output should be flushed after each print.
-     *
-     * @param flushOnEachPrint {@code true} to flush after each message; {@code false} otherwise.
-     */
-    public void setFlushOnEachPrint(boolean flushOnEachPrint) {
-        this.flushOnEachPrint = flushOnEachPrint;
-    }
-
-    public @NotNull Project getProject() {
+    public @Nullable Project getProject() {
         return project;
     }
 
@@ -105,15 +90,8 @@ public class InstallerContext implements Reporter {
         return action;
     }
 
-    /**
-     * Assigns a {@link ConsoleView} for output display.
-     *
-     * @param console the console to use.
-     * @return the current {@code InstallerContext} for chaining.
-     */
-    public @NotNull InstallerContext setConsole(@Nullable ConsoleView console) {
-        this.console = console;
-        return this;
+    public void setConsoleProviders(@Nullable Supplier<List<ConsoleProvider>> consoleProviders) {
+        this.consoleProviders = consoleProviders;
     }
 
     public @Nullable ProgressIndicator getProgressIndicator() {
@@ -161,7 +139,7 @@ public class InstallerContext implements Reporter {
      * @param key   the property name.
      * @param value the property value.
      */
-    public void putProperty(@NotNull String key, @Nullable String value) {
+    public void putProperty(@NotNull String key, @Nullable Object value) {
         properties.put(key, value);
         print("${" + key + "}=" + value);
     }
@@ -172,7 +150,7 @@ public class InstallerContext implements Reporter {
      * @param key the property name.
      * @return the corresponding value, or {@code null} if not present.
      */
-    public @Nullable String getProperty(@NotNull String key) {
+    public @Nullable Object getProperty(@NotNull String key) {
         return properties.get(key);
     }
 
@@ -189,8 +167,10 @@ public class InstallerContext implements Reporter {
      * Clears the console output if available.
      */
     public void clear() {
-        if (console != null) {
-            console.clear();
+        if (consoleProviders != null) {
+            consoleProviders
+                    .get()
+                            .forEach(ConsoleProvider::clear);
         }
     }
 
@@ -245,11 +225,10 @@ public class InstallerContext implements Reporter {
         if (message == null) {
             return;
         }
-        if (console != null) {
-            console.print(message + "\n", contentType);
-            if (flushOnEachPrint && console instanceof ConsoleViewImpl consoleView) {
-                ApplicationManager.getApplication().invokeLater(consoleView::flushDeferredText);
-            }
+        if (consoleProviders != null) {
+            consoleProviders
+                    .get()
+                    .forEach(provider -> provider.print(message, contentType));
         }
         if (progressIndicator != null) {
             progressIndicator.setText2(message);
@@ -261,27 +240,14 @@ public class InstallerContext implements Reporter {
      *
      * @param message the message to replace the last line with.
      */
-    public void printProgress(String message) {
+    public void printProgress(@Nullable String message) {
         if (message == null) {
             return;
         }
-        if (console != null) {
-            Editor editor = ((ConsoleViewImpl) console).getEditor();
-            if (editor != null) {
-                Document document = editor.getDocument();
-                int lineCount = document.getLineCount();
-                if (lineCount > 0) {
-                    WriteCommandAction.runWriteCommandAction(project, () -> {
-                        try {
-                            int startOffset = document.getLineStartOffset(lineCount - 1);
-                            int endOffset = document.getLineEndOffset(lineCount - 1);
-                            document.replaceString(startOffset, endOffset, message);
-                        } catch (Exception e) {
-                            // Ignore error
-                        }
-                    });
-                }
-            }
+        if (consoleProviders != null) {
+            consoleProviders
+                    .get()
+                    .forEach(provider -> provider.printProgress(message));
         }
     }
 
@@ -332,9 +298,9 @@ public class InstallerContext implements Reporter {
         String resolved = unresolved;
         var keys = getPropertyKeys();
         for(var key : keys) {
-            String value = getProperty(key);
+            Object value = getProperty(key);
             if (value != null) {
-                resolved = resolved.replace("${" + key + "}", value);
+                resolved = resolved.replace("${" + key + "}", value.toString());
             }
         }
         return resolved;

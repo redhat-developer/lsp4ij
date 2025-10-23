@@ -67,6 +67,17 @@ public class DAPDebuggerEditorsProvider extends XDebuggerEditorsProviderBase {
             fileType = file.getFileType();
             language = file.getLanguage();
         }
-        return new DAPExpressionCodeFragment(text, fileType, language, debugProcess, project);
+        return createExpressionCodeFragment(project, text, fileType, language);
+    }
+
+    protected @NotNull PsiFile createExpressionCodeFragment(@NotNull Project project,
+                                                            @NotNull String text,
+                                                            @NotNull FileType fileType,
+                                                            @NotNull Language language) {
+        return new DAPExpressionCodeFragment(text, fileType, language, getDebugProcess(), project);
+    }
+
+    protected @Nullable DAPDebugProcess getDebugProcess() {
+        return debugProcess;
     }
 }

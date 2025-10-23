@@ -1,0 +1,6 @@
+{
+  "typescript": {
+    "tsdk": "$USER_HOME$/.lsp4ij/lsp/astro-ls/node_modules/typescript/lib"
+  },
+  "contentIntellisense": true
+}

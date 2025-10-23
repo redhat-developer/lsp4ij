@@ -1,0 +1,38 @@
+{
+  "id": "stylelint-lsp",
+  "name": "Stylelint Language Server",
+  "programArgs": {
+    "windows": "cmd /C stylelint-lsp.cmd --stdio",
+    "default": "sh -c stylelint-lsp --stdio"
+  },
+ "expandConfiguration": false,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "CSS",
+        "patterns": [
+          "*.css"
+        ]
+      },
+      "languageId": "css"
+    },
+    {
+      "fileType": {
+        "name": "LESS",
+        "patterns": [
+          "*.less"
+        ]
+      },
+      "languageId": "less"
+    },
+    {
+      "fileType": {
+        "name": "SCSS",
+        "patterns": [
+          "*.scss"
+        ]
+      },
+      "languageId": "scss"
+    }
+  ]
+}

@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.execution.ExecutionException;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.process.ProcessHandler;
@@ -22,10 +23,11 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.EnvironmentVariablesDataConfigurable;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
-import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -51,7 +53,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         this.id = serverDefinition.getId();
     }
 
-    public DefaultDebugAdapterDescriptor(@NotNull DAPRunConfigurationOptions options,
+    public DefaultDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
                                          @NotNull ExecutionEnvironment environment,
                                          @NotNull String runConfigurationName) {
         super(options, environment, null);
@@ -80,51 +82,38 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
             String command = dapOptions.getCommand();
             if (StringUtils.isBlank(command)) {
                 var server = dapOptions.getDebugAdapterServer();
-                if (server instanceof UserDefinedDebugAdapterServerDefinition userDefinedServer) {
+                if (server instanceof CommandLineUpdater userDefinedServer) {
                     command = userDefinedServer.getCommandLine();
                 }
             }
-            // TODO : store env configuration in the options
+            // Environment variables
             Map<String, String> userEnvironmentVariables = new HashMap<>();
             boolean includeSystemEnvironmentVariables = true;
+            var envData = getEnvData();
+            if (envData != null) {
+                userEnvironmentVariables.putAll(envData.getEnvs());
+                includeSystemEnvironmentVariables = envData.isPassParentEnvs();
+            }
+
             String resolvedCommandLine = resolveCommandLine(command, environment.getProject());
             return createStartServerCommandLine(resolvedCommandLine, userEnvironmentVariables, includeSystemEnvironmentVariables);
         }
         return null;
     }
 
-    /**
-     * Returns the strategy to use to know when DAP server is started and DAP client can connect to it.
-     *
-     * @return the strategy to use to know when DAP server is started and DAP client can connect to it.
-     */
-    @NotNull
-    public ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
-        if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            if (debugMode == DebugMode.ATTACH) {
-                String address = LaunchUtils.resolveAttachAddress(dapOptions.getAttachAddress(), getDapParameters());
-                int port = LaunchUtils.resolveAttachPort(dapOptions.getAttachPort(), getDapParameters());
-                return new ServerReadyConfig(address, port);
-            }
-            var strategy = dapOptions.getDebugServerWaitStrategy();
-            switch (strategy) {
-                case TIMEOUT:
-                    return new ServerReadyConfig(dapOptions.getConnectTimeout());
-                case TRACE:
-                    return new ServerReadyConfig(dapOptions.getNetworkAddressExtractor());
-                default:
-                    return new ServerReadyConfig(0);
-            }
+    protected @Nullable EnvironmentVariablesData getEnvData() {
+        if (environment.getRunProfile() instanceof EnvironmentVariablesDataConfigurable runConfiguration) {
+            return runConfiguration.getEnvData();
         }
-        return new ServerReadyConfig(500);
+        return null;
     }
 
     public @Nullable FileType getFileType() {
-        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+        if (options instanceof FileOptionConfigurable dapOptions) {
             String file = dapOptions.getFile();
             int index = file != null ? file.lastIndexOf('.') : -1;
             if (index != -1) {
-                String fileExtension = file.substring(index + 1, file.length());
+                String fileExtension = file.substring(index + 1);
                 return FileTypeManager.getInstance().getFileTypeByExtension(fileExtension);
             }
         }
@@ -152,14 +141,6 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         return super.getDebugMode();
     }
 
-    @NotNull
-    public ServerTrace getServerTrace() {
-        if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            return dapOptions.getServerTrace();
-        }
-        return super.getServerTrace();
-    }
-
     /**
      * Returns the DAP server name.
      *
@@ -171,7 +152,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             serverName = dapOptions.getServerName();
         }
-        if (StringUtils.isBlank(serverName) ) {
+        if (StringUtils.isBlank(serverName)) {
             return super.getServerName();
         }
         return serverName;
@@ -179,7 +160,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
 
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
-        if(getServerDefinition() != null &&
+        if (getServerDefinition() != null &&
                 super.isDebuggableFile(file, project)) {
             return true;
         }

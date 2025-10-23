@@ -13,9 +13,7 @@ package com.redhat.devtools.lsp4ij.features.color;
 import com.intellij.codeInsight.hints.presentation.BasePresentation;
 import com.intellij.codeInsight.hints.presentation.PresentationFactory;
 import com.intellij.openapi.editor.markup.TextAttributes;
-import com.intellij.ui.ColorUtil;
 import com.intellij.ui.Gray;
-import com.intellij.ui.JBColor;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
@@ -70,10 +68,4 @@ public class ColorInlayPresentation extends BasePresentation {
 
         g.setColor(preservedBackground);
     }
-
-    private static boolean isDarkTheme() {
-        Color color = JBColor.background();
-        return ColorUtil.isDark(color);
-    }
-
 }

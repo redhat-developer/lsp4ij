@@ -13,26 +13,25 @@ package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 import com.intellij.ide.util.gotoByName.ChooseByNamePopup;
 import com.intellij.navigation.ChooseByNameContributorEx;
 import com.intellij.navigation.NavigationItem;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.Processor;
 import com.intellij.util.indexing.FindSymbolParameters;
 import com.intellij.util.indexing.IdFilter;
 import com.redhat.devtools.lsp4ij.LSPWorkspaceSupport;
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.awaitWithCheckCanceled;
 
 /**
  * Abstract base class for LSP goto symbol contributors
  */
 abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameContributorEx {
-
-    private final static Logger LOGGER = LoggerFactory.getLogger(AbstractLSPWorkspaceSymbolContributor.class);
 
     @Override
     public void processNames(@NotNull Processor<? super String> processor,
@@ -46,30 +45,35 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
         if (queryString == null) {
             queryString = "";
         }
-        getWorkspaceSymbols(queryString, true, project)
-                .thenAccept(items -> {
-                    if (items != null) {
-                        items.stream()
-                                .filter(data -> data.getFile() != null && scope.accept(data.getFile()))
-                                .map(NavigationItem::getName)
-                                .forEach(processor::process);
-                    }
-                });
+
+        var workspaceSymbolsFuture = getWorkspaceSymbols(queryString, true, project);
+        awaitWithCheckCanceled(workspaceSymbolsFuture);
+        if (CompletableFutures.isDoneNormally(workspaceSymbolsFuture)) {
+            var items = workspaceSymbolsFuture.getNow(null);
+            if (items != null) {
+                items.stream()
+                        .filter(data -> data.getFile() != null && ReadAction.compute(() -> scope.accept(data.getFile())))
+                        .map(NavigationItem::getName)
+                        .forEach(processor::process);
+            }
+        }
     }
 
     @Override
     public void processElementsWithName(@NotNull String name,
                                         @NotNull Processor<? super NavigationItem> processor,
                                         @NotNull FindSymbolParameters parameters) {
-        getWorkspaceSymbols(name, false, parameters.getProject())
-                .thenAccept(items -> {
-                    if (items != null) {
-                        items
-                                .stream()
-                                .filter(ni -> parameters.getSearchScope().accept(ni.getFile()))
-                                .forEach(processor::process);
-                    }
-                });
+        var workspaceSymbolsFuture = getWorkspaceSymbols(name, false, parameters.getProject());
+        awaitWithCheckCanceled(workspaceSymbolsFuture);
+        if (CompletableFutures.isDoneNormally(workspaceSymbolsFuture)) {
+            var items = workspaceSymbolsFuture.getNow(null);
+            if (items != null) {
+                items
+                        .stream()
+                        .filter(data -> data.getFile() != null && ReadAction.compute(() -> parameters.getSearchScope().accept(data.getFile())))
+                        .forEach(processor::process);
+            }
+        }
     }
 
     private CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbols(@NotNull String name, boolean cancel, Project project) {

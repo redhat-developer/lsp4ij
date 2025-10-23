@@ -11,7 +11,6 @@
  * Contributors:
  *     Red Hat Inc. - initial API and implementation
  *******************************************************************************/
-
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.openapi.util.text.StringUtil;

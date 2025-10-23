@@ -1,0 +1,37 @@
+{
+  "id": "eo-lsp-server",
+  "name": "LSP Server for EOLANG",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/eo-lsp-server/node_modules"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install LSP Server for EOLANG",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
+      "command": {
+        "windows": "npm.cmd install eo-lsp-server --force",
+        "default": "npm install eo-lsp-server --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure LSP Server for EOLANG command",
+          "command": {
+            "windows": "${workingDir}/.bin/eo-lsp-server.cmd --stdio",
+            "default": "${workingDir}/.bin/eo-lsp-server --stdio"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}
+

@@ -13,11 +13,11 @@ package com.redhat.devtools.lsp4ij.launching.ui;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.intellij.openapi.ui.MessageDialogBuilder;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
@@ -25,17 +25,13 @@ import com.intellij.ui.HyperlinkLabel;
 import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
-import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
-import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import org.jetbrains.annotations.NotNull;
@@ -47,10 +43,8 @@ import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 import static com.redhat.devtools.lsp4ij.LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID;
 
@@ -91,15 +85,55 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Template combo
         createTemplatePanel(builder);
         // Create server name,  command line, mappings, configuration UI
-        this.languageServerPanel = new LanguageServerPanel(builder, null, LanguageServerPanel.EditionMode.NEW_USER_DEFINED, true, project);
+        this.languageServerPanel = new LanguageServerPanel(builder, null, createUIConfiguration(), false, project);
+        languageServerPanel.setCommandLineUpdater(new CommandLineUpdater() {
+            @Override
+            public String getCommandLine() {
+                return languageServerPanel.getCommandLine();
+            }
+
+            @Override
+            public void setCommandLine(String commandLine) {
+                ApplicationManager.getApplication().invokeLater(() -> languageServerPanel.setCommandLine(commandLine));
+            }
+        });
 
         // Add validation
         addValidator(this.languageServerPanel.getServerName());
-        addValidator(this.languageServerPanel.getCommandLine());
+        var commandLine = this.languageServerPanel.getCommandLineWidget();
+        if (commandLine != null) {
+            addValidator(commandLine);
+        }
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(builder.getPanel(), BorderLayout.CENTER);
+        panel.setPreferredSize(new Dimension(300, 500));
         return panel;
+    }
+
+    private UIConfiguration createUIConfiguration() {
+        UIConfiguration configuration = new UIConfiguration();
+
+        // Server tab configuration
+        configuration.setShowServerName(true);
+        configuration.setShowCommandLine(true);
+
+        // Mappings tab configuration
+        configuration.setServerMappingsEditable(true);
+
+        // Configuration tab configuration
+        configuration.setShowServerConfiguration(true);
+        configuration.setShowServerInitializationOptions(true);
+        configuration.setShowServerExperimental(true);
+        configuration.setShowClientConfiguration(true);
+
+        // Debug tab configuration
+        configuration.setShowDebug(false);
+
+        // Installer tab configuration
+        configuration.setShowInstaller(true);
+
+        return configuration;
     }
 
     private void createTemplatePanel(@NotNull FormBuilder builder) {
@@ -135,7 +169,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         VirtualFile virtualFile = FileChooser.chooseFile(fileChooserDescriptor, project, null);
         if (virtualFile != null) {
             try {
-                var template = LanguageServerTemplateManager.getInstance().importLsTemplate(virtualFile);
+                var template = LanguageServerTemplateManager.getInstance().importServerTemplate(virtualFile);
                 if (template != null) {
                     loadFromTemplate(template);
                 } else {
@@ -154,18 +188,6 @@ public class NewLanguageServerDialog extends DialogWrapper {
         Notifications.Bus.notify(notification);
     }
 
-    /**
-     * Check that the template is not a placeholder and that it has a valid description
-     *
-     * @param template to check
-     * @return true if template is not null, not a placeholder and has a description, else false
-     */
-    private boolean hasValidDescription(@Nullable LanguageServerTemplate template) {
-        return template != null && template != LanguageServerTemplate.NONE
-                && template != LanguageServerTemplate.NEW_TEMPLATE
-                && StringUtils.isNotBlank(template.getDescription());
-    }
-
     @Override
     protected @NotNull Action getHelpAction() {
         return new AbstractAction() {
@@ -179,46 +201,42 @@ public class NewLanguageServerDialog extends DialogWrapper {
         };
     }
 
-    private void loadFromTemplate(@NotNull LanguageServerTemplate template) {
+    public void loadFromTemplate(@NotNull LanguageServerTemplate template) {
+        this.currentTemplate = template;
         // Update name
         var serverName = this.languageServerPanel.getServerName();
         serverName.setText(template.getName() != null ? template.getName() : "");
 
+        // Update server Url
+        languageServerPanel.setServerUrl(template.getUrl());
+
         // Update command
-        var commandLine = this.languageServerPanel.getCommandLine();
         String command = getCommandLine(template);
-        commandLine.setText(command);
+        languageServerPanel.setCommandLine(command);
+        languageServerPanel.setEnvData(template.getEnvData());
 
         // Update mappings
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();
         mappingsPanel.refreshMappings(template);
 
-        // Update server configuration
-        var configuration = this.languageServerPanel.getConfiguration();
-        configuration.setText(template.getConfiguration() != null ? template.getConfiguration() : "");
-        configuration.setCaretPosition(0);
+        // Update server configuration + expand
+        languageServerPanel.setConfigurationContent(template.getConfiguration());
+        this.languageServerPanel.setExpandConfiguration(template.isExpandConfiguration());
 
         // Update server configuration JSON Schema
-        this.languageServerPanel.setConfigurationSchemaContent(template.getConfigurationSchema() != null ? template.getConfigurationSchema() : "");
+        this.languageServerPanel.setConfigurationSchemaContent(template.getConfigurationSchema());
 
         // Update initialization options
-        var initializationOptions = this.languageServerPanel.getInitializationOptionsWidget();
-        initializationOptions.setText(template.getInitializationOptions() != null ? template.getInitializationOptions() : "");
-        initializationOptions.setCaretPosition(0);
+        this.languageServerPanel.setInitializationOptionsContent(template.getInitializationOptions());
+
+        // Update experimental
+        this.languageServerPanel.setExperimentalContent(template.getExperimental());
 
         // Update client configuration
-        var clientConfiguration = this.languageServerPanel.getClientConfigurationWidget();
-        if (clientConfiguration != null) {
-            clientConfiguration.setText(template.getClientConfiguration() != null ? template.getClientConfiguration() : "");
-            clientConfiguration.setCaretPosition(0);
-        }
+        this.languageServerPanel.setClientConfigurationContent(template.getClientConfiguration());
 
         // Update installer configuration
-        var installerConfiguration = this.languageServerPanel.getInstallerConfigurationWidget();
-        if (installerConfiguration != null) {
-            installerConfiguration.setText(template.getInstallerConfiguration() != null ? template.getInstallerConfiguration() : "");
-            installerConfiguration.setCaretPosition(0);
-        }
+        this.languageServerPanel.setInstallerConfigurationContent(template.getInstallerConfiguration());
     }
 
     @Override
@@ -251,8 +269,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
     }
 
     private ValidationInfo validateCommand() {
-        var commandLine = this.languageServerPanel.getCommandLine();
-        if (commandLine.getText().isBlank()) {
+        var commandLine = this.languageServerPanel.getCommandLineWidget();
+        if (commandLine != null && commandLine.getText().isBlank()) {
             String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
             return new ValidationInfo(errorMessage, commandLine);
         }
@@ -275,35 +293,34 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Register language server and mappings definition
         String templateId = currentTemplate != null && currentTemplate != LanguageServerTemplate.NEW_TEMPLATE ? currentTemplate.getId() : null;
         String serverName = this.languageServerPanel.getServerName().getText();
-        String commandLine = this.languageServerPanel.getCommandLine().getText();
-        Map<String, String> userEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().getEnvs();
-        boolean includeSystemEnvironmentVariables = this.languageServerPanel.getEnvironmentVariables().isPassParentEnvs();
-        String configuration = this.languageServerPanel.getConfiguration().getText();
+        String serverUrl = this.languageServerPanel.getServerUrl();
+        String commandLine = this.languageServerPanel.getCommandLine();
+        Map<String, String> userEnvironmentVariables = this.languageServerPanel.getUserEnvironmentVariables();
+        boolean includeSystemEnvironmentVariables = this.languageServerPanel.isIncludeSystemEnvironmentVariables();
+        String configuration = this.languageServerPanel.getConfigurationContent();
+        boolean expandConfiguration = this.languageServerPanel.isExpandConfiguration();
         String configurationSchema = this.languageServerPanel.getConfigurationSchemaContent();
-        String initializationOptions = this.languageServerPanel.getInitializationOptionsWidget().getText();
-        String clientConfiguration = this.languageServerPanel.getClientConfigurationWidget() != null ?
-                this.languageServerPanel.getClientConfigurationWidget().getText() : null;
-        String installerConfiguration = this.languageServerPanel.getInstallerConfigurationWidget() != null ?
-                this.languageServerPanel.getInstallerConfigurationWidget().getText() : null;
+        String initializationOptions = this.languageServerPanel.getInitializationOptionsContent();
+        String experimental = this.languageServerPanel.getExperimentalContent();
+        String clientConfiguration = this.languageServerPanel.getClientConfigurationContent();
+        String installerConfiguration = this.languageServerPanel.getInstallerConfigurationContent();
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
                 templateId,
                 serverName,
+                serverUrl,
                 "",
-                commandLine,
-                userEnvironmentVariables,
+                commandLine != null ? commandLine : "",
+                userEnvironmentVariables != null ? userEnvironmentVariables : Collections.emptyMap(),
                 includeSystemEnvironmentVariables,
                 configuration,
+                expandConfiguration,
                 configurationSchema,
                 initializationOptions,
+                experimental,
                 clientConfiguration,
                 installerConfiguration);
+        definition.setUrl(this.languageServerPanel.getServerUrl());
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
-    }
-
-    private @NotNull InstallerContext createInstallerContext(@NotNull UserDefinedLanguageServerDefinition definition) {
-        var context = new InstallerContext(project, InstallerContext.InstallerAction.CHECK_AND_RUN);
-        context.setCommandLineUpdater(new UICommandLineUpdater(definition, project));
-        return context;
     }
 
     private void addValidator(JTextComponent textComponent) {

@@ -18,7 +18,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -41,9 +41,9 @@ public class DisableLanguageServerErrorAction extends AnAction {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        UserDefinedLanguageServerSettings manager = UserDefinedLanguageServerSettings.getInstance(project);
+        ProjectLanguageServerSettings manager = ProjectLanguageServerSettings.getInstance(project);
         manager.updateSettings(languageServerDefinition.getId(),
-                new UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings()
+                new ProjectLanguageServerSettings.LanguageServerDefinitionSettings()
                         .setErrorReportingKind(ErrorReportingKind.none));
         notification.expire();
     }

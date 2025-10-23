@@ -29,6 +29,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
 - [LSP breadcrumbs feature](#lsp-breadcrumbs-feature)
 - [LSP editor behavior feature](#lsp-editor-behavior-feature)
+- [JSON-RPC communication feature](#json-rpc-communication-feature)
 - [Language server installer](#language-server-installer)
 
 You can extend these default features by:
@@ -493,21 +494,24 @@ public class MyLSPDocumentSymbolFeature extends LSPDocumentSymbolFeature {
 
 ## LSP Formatting Feature
 
-| API                                                            | Description                                                                                                                                                                                                                        | Default Behaviour                                      |
-|----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------|
-| boolean isEnabled(PsiFile file)                                | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                                                 |
-| boolean isSupported(PsiFile file)                              | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability                            |
-| boolean isRangeFormattingSupported(PsiFile file)               | Returns `true` if the range formatting is supported for the given file and `false` otherwise.                                                                                                                                      | Check the server capability                            |
-| boolean isExistingFormatterOverrideable(PsiFile file)          | Returns `true` if existing formatters are overrideable and `false` otherwise.                                                                                                                                                      | `false`                                                |
-| boolean isOnTypeFormattingEnabled(PsiFile file)                | Whether or not server-side on-type formatting is enabled if `textDocument/onTypeFormatting` is supported by the server.                                                                                                            | `true`                                                 |
-| boolean isFormatOnCloseBrace(PsiFile file)                     | Whether or not to format the file when close braces are typed.                                                                                                                                                                     | `false`                                                |
-| boolean getFormatOnCloseBraceCharacters(PsiFile file)          | The specific close brace characters that should trigger on-type formatting in the file.                                                                                                                                            | The language's standard close brace characters.        |
-| boolean getFormatOnCloseBraceScope(PsiFile file)               | The scope that should be formatted when a close brace is typed. Allowed values are `CODE_BLOCK` and `FILE`.                                                                                                                        | `CODE_BLOCK`                                           |
-| boolean isFormatOnStatementTerminator(PsiFile file)            | Whether or not to format the file when statement terminators are typed.                                                                                                                                                            | `false`                                                |
-| boolean getFormatOnStatementTerminatorCharacters(PsiFile file) | The specific statement terminator characters that should trigger on-type formatting in the file.                                                                                                                                   | None.                                                  |
-| boolean getFormatOnStatementTerminatorScope(PsiFile file)      | The scope that should be formatted when a statement terminator is typed. Allowed values are `STATEMENT`, `CODE_BLOCK` and `FILE`.                                                                                                  | `STATEMENT`                                            |
-| boolean isFormatOnCompletionTrigger(PsiFile file)              | Whether or not to format the file when completion triggers are typed.                                                                                                                                                              | `false`                                                |
-| boolean getFormatOnCompletionTriggerCharacters(PsiFile file)   | The specific completion trigger characters that should trigger on-type formatting in the file.                                                                                                                                     | The language's standard completion trigger characters. |
+| API                                                                 | Description                                                                                                                                                                                                                        | Default Behaviour                                                     |
+|---------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| boolean isEnabled(PsiFile file)                                     | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                                                                |
+| boolean isSupported(PsiFile file)                                   | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability                                           |
+| boolean isRangeFormattingSupported(PsiFile file)                    | Returns `true` if the range formatting is supported for the given file and `false` otherwise.                                                                                                                                      | Check the server capability                                           |
+| FormattingOptions getFormattingOptions(PsiFile file, Editor editor) | Returns the formatting options for the given file and editor.                                                                                                                                                                      | Return a formatting options with tabSize and insertSpaces initialized |
+| Integer getTabSize(PsiFile file, Editor editor)                     | Returns the tab size to use for the given file and editor.                                                                                                                                                                         | Return the default tab size of the IDE                                |
+| Boolean getInsertSpaces(PsiFile file, Editor editor)                | Returns the insert spaces to use for the given file and editor.                                                                                                                                                                    | Return the default insert spaces of the IDE                           |
+| boolean isExistingFormatterOverrideable(PsiFile file)               | Returns `true` if existing formatters are overrideable and `false` otherwise.                                                                                                                                                      | `false`                                                               |
+| boolean isOnTypeFormattingEnabled(PsiFile file)                     | Whether or not server-side on-type formatting is enabled if `textDocument/onTypeFormatting` is supported by the server.                                                                                                            | `true`                                                                |
+| boolean isFormatOnCloseBrace(PsiFile file)                          | Whether or not to format the file when close braces are typed.                                                                                                                                                                     | `false`                                                               |
+| boolean getFormatOnCloseBraceCharacters(PsiFile file)               | The specific close brace characters that should trigger on-type formatting in the file.                                                                                                                                            | The language's standard close brace characters.                       |
+| boolean getFormatOnCloseBraceScope(PsiFile file)                    | The scope that should be formatted when a close brace is typed. Allowed values are `CODE_BLOCK` and `FILE`.                                                                                                                        | `CODE_BLOCK`                                                          |
+| boolean isFormatOnStatementTerminator(PsiFile file)                 | Whether or not to format the file when statement terminators are typed.                                                                                                                                                            | `false`                                                               |
+| boolean getFormatOnStatementTerminatorCharacters(PsiFile file)      | The specific statement terminator characters that should trigger on-type formatting in the file.                                                                                                                                   | None.                                                                 |
+| boolean getFormatOnStatementTerminatorScope(PsiFile file)           | The scope that should be formatted when a statement terminator is typed. Allowed values are `STATEMENT`, `CODE_BLOCK` and `FILE`.                                                                                                  | `STATEMENT`                                                           |
+| boolean isFormatOnCompletionTrigger(PsiFile file)                   | Whether or not to format the file when completion triggers are typed.                                                                                                                                                              | `false`                                                               |
+| boolean getFormatOnCompletionTriggerCharacters(PsiFile file)        | The specific completion trigger characters that should trigger on-type formatting in the file.                                                                                                                                     | The language's standard completion trigger characters.                |
 
 Here is an example of code that allows executing the LSP formatter even if there is a specific formatter registered by an IntelliJ plugin:
 
@@ -776,6 +780,16 @@ Unlike most features above, `LSPEditorFeature` does **not** correspond to an LSP
 | boolean isEnableSemanticTokensFileViewProvider(PsiFile file)   | Returns `true` if the semantic tokens-based file view provider is enabled and `false` otherwise.                                  | `true`, but a file view provider must be registered for non-user-defined language server definitions |
 =======
 
+## JSON-RPC communication feature
+
+You can customize JSON-RPC communication behavior by overriding the `isUseIntAsJsonRpcId()` method:
+
+| Method signature              | Description                                                                                      | Default value |
+|-------------------------------|--------------------------------------------------------------------------------------------------|---------------|
+| boolean isUseIntAsJsonRpcId() | Returns `true` if JSON-RPC id should be sent as integer instead of string and `false` otherwise. | `false`       |
+
+This feature is useful when working with language servers that require integer IDs for JSON-RPC messages instead of the default string IDs used by LSP4J.
+
 ## Language server installer
 
 If you need to verify whether your language server is correctly installed, and install it if necessary, 
@@ -848,7 +862,28 @@ public class MyLanguageServerInstaller extends LanguageServerInstallerBase {
 }
 ```
 
-and register your language server installer like this:
+ * If the installation is global (e.g., the language server will be stored in the HOME directory and shared across all projects), 
+you need to register it like this:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    @Nullable public ServerInstaller createServerInstaller() {
+        return new MyLanguageServerInstaller(); // customize language server installer         
+    }
+}
+```
+
+
+* If the installation is per project, you need to register it like this:
 
 ```java
 package my.language.server;

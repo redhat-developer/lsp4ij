@@ -6,898 +6,818 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "css": {
-      "type": "object",
-      "properties": {
-        "customData": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          },
-          "description": "A list of relative file paths pointing to JSON files following the [custom data format](https://github.com/microsoft/vscode-css-languageservice/blob/master/docs/customData.md).\n\nVS Code loads custom data on startup to enhance its CSS support for CSS custom properties (variables), at-rules, pseudo-classes, and pseudo-elements you specify in the JSON files.\n\nThe file paths are relative to workspace and only workspace folder settings are considered."
-        },
-        "completion": {
-          "type": "object",
-          "properties": {
-            "triggerPropertyValueCompletion": {
-              "type": "boolean",
-              "default": true,
-              "description": "By default, VS Code triggers property value completion after selecting a CSS property. Use this setting to disable this behavior."
-            },
-            "completePropertyWithSemicolon": {
-              "type": "boolean",
-              "default": true,
-              "description": "Insert semicolon at end of line when completing CSS properties."
-            }
-          }
-        },
-        "validate": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enables or disables all validations."
-        },
-        "hover": {
-          "type": "object",
-          "properties": {
-            "documentation": {
-              "type": "boolean",
-              "default": true,
-              "description": "Show property and value documentation in CSS hovers."
-            },
-            "references": {
-              "type": "boolean",
-              "default": true,
-              "description": "Show references to MDN in CSS hovers."
-            }
-          }
-        },
-        "lint": {
-          "type": "object",
-          "properties": {
-            "compatibleVendorPrefixes": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "When using a vendor-specific prefix make sure to also include all other vendor-specific properties."
-            },
-            "vendorPrefix": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "When using a vendor-specific prefix, also include the standard property."
-            },
-            "duplicateProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Do not use duplicate style definitions."
-            },
-            "emptyRules": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Do not use empty rulesets."
-            },
-            "importStatement": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Import statements do not load in parallel."
-            },
-            "boxModel": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Do not use `width` or `height` when using `padding` or `border`."
-            },
-            "universalSelector": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "The universal selector (`*`) is known to be slow."
-            },
-            "zeroUnits": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "No unit for zero needed."
-            },
-            "fontFaceProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "`@font-face` rule must define `src` and `font-family` properties."
-            },
-            "hexColorLength": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "error",
-              "description": "Hex colors must consist of 3, 4, 6 or 8 hex numbers."
-            },
-            "argumentsInColorFunction": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "error",
-              "description": "Invalid number of parameters."
-            },
-            "unknownProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Unknown property."
-            },
-            "validProperties": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string"
-              },
-              "default": [],
-              "description": "A list of properties that are not validated against the `unknownProperties` rule."
-            },
-            "ieHack": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "IE hacks are only necessary when supporting IE7 and older."
-            },
-            "unknownVendorSpecificProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Unknown vendor specific property."
-            },
-            "propertyIgnoredDueToDisplay": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Property is ignored due to the display. E.g. with `display: inline`, the `width`, `height`, `margin-top`, `margin-bottom`, and `float` properties have no effect."
-            },
-            "important": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Avoid using `!important`. It is an indication that the specificity of the entire CSS has gotten out of control and needs to be refactored."
-            },
-            "float": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Avoid using `float`. Floats lead to fragile CSS that is easy to break if one aspect of the layout changes."
-            },
-            "idSelector": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Selectors should not contain IDs because these rules are too tightly coupled with the HTML."
-            },
-            "unknownAtRules": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Unknown at-rule."
-            }
-          }
-        },
-        "trace": {
-          "type": "object",
-          "properties": {
-            "server": {
-              "type": "string",
-              "enum": [
-                "off",
-                "messages",
-                "verbose"
-              ],
-              "default": "off",
-              "description": "Traces the communication between VS Code and the CSS language server."
-            }
-          }
-        },
-        "format": {
-          "type": "object",
-          "properties": {
-            "enable": {
-              "type": "boolean",
-              "default": true,
-              "description": "Enable/disable default CSS formatter."
-            },
-            "newlineBetweenSelectors": {
-              "type": "boolean",
-              "default": true,
-              "description": "Separate selectors with a new line."
-            },
-            "newlineBetweenRules": {
-              "type": "boolean",
-              "default": true,
-              "description": "Separate rulesets by a blank line."
-            },
-            "spaceAroundSelectorSeparator": {
-              "type": "boolean",
-              "default": false,
-              "description": "Ensure a space character around selector separators \u0027\u003e\u0027, \u0027+\u0027, \u0027~\u0027 (e.g. `a \u003e b`)."
-            },
-            "braceStyle": {
-              "type": "string",
-              "default": "collapse",
-              "enum": [
-                "collapse",
-                "expand"
-              ],
-              "description": "Put braces on the same line as rules (`collapse`) or put braces on own line (`expand`)."
-            },
-            "preserveNewLines": {
-              "type": "boolean",
-              "default": true,
-              "description": "Whether existing line breaks before elements should be preserved."
-            },
-            "maxPreserveNewLines": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "description": "Maximum number of line breaks to be preserved in one chunk, when `#css.format.preserveNewLines#` is enabled."
-            }
-          }
-        }
-      }
+    "css.customData": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "description": "A list of relative file paths pointing to JSON files following the [custom data format](https://github.com/microsoft/vscode-css-languageservice/blob/master/docs/customData.md).\n\nVS Code loads custom data on startup to enhance its CSS support for CSS custom properties (variables), at-rules, pseudo-classes, and pseudo-elements you specify in the JSON files.\n\nThe file paths are relative to workspace and only workspace folder settings are considered."
     },
-    "scss": {
-      "type": "object",
-      "properties": {
-        "completion": {
-          "type": "object",
-          "properties": {
-            "triggerPropertyValueCompletion": {
-              "type": "boolean",
-              "default": true,
-              "description": "By default, VS Code triggers property value completion after selecting a CSS property. Use this setting to disable this behavior."
-            },
-            "completePropertyWithSemicolon": {
-              "type": "boolean",
-              "default": true,
-              "description": "Insert semicolon at end of line when completing CSS properties."
-            }
-          }
-        },
-        "validate": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enables or disables all validations."
-        },
-        "hover": {
-          "type": "object",
-          "properties": {
-            "documentation": {
-              "type": "boolean",
-              "default": true,
-              "description": "Show property and value documentation in SCSS hovers."
-            },
-            "references": {
-              "type": "boolean",
-              "default": true,
-              "description": "Show references to MDN in SCSS hovers."
-            }
-          }
-        },
-        "lint": {
-          "type": "object",
-          "properties": {
-            "compatibleVendorPrefixes": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "When using a vendor-specific prefix make sure to also include all other vendor-specific properties."
-            },
-            "vendorPrefix": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "When using a vendor-specific prefix, also include the standard property."
-            },
-            "duplicateProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Do not use duplicate style definitions."
-            },
-            "emptyRules": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Do not use empty rulesets."
-            },
-            "importStatement": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Import statements do not load in parallel."
-            },
-            "boxModel": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Do not use `width` or `height` when using `padding` or `border`."
-            },
-            "universalSelector": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "The universal selector (`*`) is known to be slow."
-            },
-            "zeroUnits": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "No unit for zero needed."
-            },
-            "fontFaceProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "`@font-face` rule must define `src` and `font-family` properties."
-            },
-            "hexColorLength": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "error",
-              "description": "Hex colors must consist of 3, 4, 6 or 8 hex numbers."
-            },
-            "argumentsInColorFunction": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "error",
-              "description": "Invalid number of parameters."
-            },
-            "unknownProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Unknown property."
-            },
-            "validProperties": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string"
-              },
-              "default": [],
-              "description": "A list of properties that are not validated against the `unknownProperties` rule."
-            },
-            "ieHack": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "IE hacks are only necessary when supporting IE7 and older."
-            },
-            "unknownVendorSpecificProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Unknown vendor specific property."
-            },
-            "propertyIgnoredDueToDisplay": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Property is ignored due to the display. E.g. with `display: inline`, the `width`, `height`, `margin-top`, `margin-bottom`, and `float` properties have no effect."
-            },
-            "important": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Avoid using `!important`. It is an indication that the specificity of the entire CSS has gotten out of control and needs to be refactored."
-            },
-            "float": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Avoid using `float`. Floats lead to fragile CSS that is easy to break if one aspect of the layout changes."
-            },
-            "idSelector": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Selectors should not contain IDs because these rules are too tightly coupled with the HTML."
-            },
-            "unknownAtRules": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Unknown at-rule."
-            }
-          }
-        },
-        "format": {
-          "type": "object",
-          "properties": {
-            "enable": {
-              "type": "boolean",
-              "default": true,
-              "description": "Enable/disable default SCSS formatter."
-            },
-            "newlineBetweenSelectors": {
-              "type": "boolean",
-              "default": true,
-              "description": "Separate selectors with a new line."
-            },
-            "newlineBetweenRules": {
-              "type": "boolean",
-              "default": true,
-              "description": "Separate rulesets by a blank line."
-            },
-            "spaceAroundSelectorSeparator": {
-              "type": "boolean",
-              "default": false,
-              "description": "Ensure a space character around selector separators \u0027\u003e\u0027, \u0027+\u0027, \u0027~\u0027 (e.g. `a \u003e b`)."
-            },
-            "braceStyle": {
-              "type": "string",
-              "default": "collapse",
-              "enum": [
-                "collapse",
-                "expand"
-              ],
-              "description": "Put braces on the same line as rules (`collapse`) or put braces on own line (`expand`)."
-            },
-            "preserveNewLines": {
-              "type": "boolean",
-              "default": true,
-              "description": "Whether existing line breaks before elements should be preserved."
-            },
-            "maxPreserveNewLines": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "description": "Maximum number of line breaks to be preserved in one chunk, when `#scss.format.preserveNewLines#` is enabled."
-            }
-          }
-        }
-      }
+    "css.completion.triggerPropertyValueCompletion": {
+      "type": "boolean",
+      "default": true,
+      "description": "By default, VS Code triggers property value completion after selecting a CSS property. Use this setting to disable this behavior."
     },
-    "less": {
-      "type": "object",
-      "properties": {
-        "completion": {
-          "type": "object",
-          "properties": {
-            "triggerPropertyValueCompletion": {
-              "type": "boolean",
-              "default": true,
-              "description": "By default, VS Code triggers property value completion after selecting a CSS property. Use this setting to disable this behavior."
-            },
-            "completePropertyWithSemicolon": {
-              "type": "boolean",
-              "default": true,
-              "description": "Insert semicolon at end of line when completing CSS properties."
-            }
-          }
-        },
-        "validate": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enables or disables all validations."
-        },
-        "hover": {
-          "type": "object",
-          "properties": {
-            "documentation": {
-              "type": "boolean",
-              "default": true,
-              "description": "Show property and value documentation in LESS hovers."
-            },
-            "references": {
-              "type": "boolean",
-              "default": true,
-              "description": "Show references to MDN in LESS hovers."
-            }
-          }
-        },
-        "lint": {
-          "type": "object",
-          "properties": {
-            "compatibleVendorPrefixes": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "When using a vendor-specific prefix make sure to also include all other vendor-specific properties."
-            },
-            "vendorPrefix": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "When using a vendor-specific prefix, also include the standard property."
-            },
-            "duplicateProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Do not use duplicate style definitions."
-            },
-            "emptyRules": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Do not use empty rulesets."
-            },
-            "importStatement": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Import statements do not load in parallel."
-            },
-            "boxModel": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Do not use `width` or `height` when using `padding` or `border`."
-            },
-            "universalSelector": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "The universal selector (`*`) is known to be slow."
-            },
-            "zeroUnits": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "No unit for zero needed."
-            },
-            "fontFaceProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "`@font-face` rule must define `src` and `font-family` properties."
-            },
-            "hexColorLength": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "error",
-              "description": "Hex colors must consist of 3, 4, 6 or 8 hex numbers."
-            },
-            "argumentsInColorFunction": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "error",
-              "description": "Invalid number of parameters."
-            },
-            "unknownProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Unknown property."
-            },
-            "validProperties": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "type": "string"
-              },
-              "default": [],
-              "description": "A list of properties that are not validated against the `unknownProperties` rule."
-            },
-            "ieHack": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "IE hacks are only necessary when supporting IE7 and older."
-            },
-            "unknownVendorSpecificProperties": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Unknown vendor specific property."
-            },
-            "propertyIgnoredDueToDisplay": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Property is ignored due to the display. E.g. with `display: inline`, the `width`, `height`, `margin-top`, `margin-bottom`, and `float` properties have no effect."
-            },
-            "important": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Avoid using `!important`. It is an indication that the specificity of the entire CSS has gotten out of control and needs to be refactored."
-            },
-            "float": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Avoid using `float`. Floats lead to fragile CSS that is easy to break if one aspect of the layout changes."
-            },
-            "idSelector": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "ignore",
-              "description": "Selectors should not contain IDs because these rules are too tightly coupled with the HTML."
-            },
-            "unknownAtRules": {
-              "type": "string",
-              "enum": [
-                "ignore",
-                "warning",
-                "error"
-              ],
-              "default": "warning",
-              "description": "Unknown at-rule."
-            }
-          }
-        },
-        "format": {
-          "type": "object",
-          "properties": {
-            "enable": {
-              "type": "boolean",
-              "default": true,
-              "description": "Enable/disable default LESS formatter."
-            },
-            "newlineBetweenSelectors": {
-              "type": "boolean",
-              "default": true,
-              "description": "Separate selectors with a new line."
-            },
-            "newlineBetweenRules": {
-              "type": "boolean",
-              "default": true,
-              "description": "Separate rulesets by a blank line."
-            },
-            "spaceAroundSelectorSeparator": {
-              "type": "boolean",
-              "default": false,
-              "description": "Ensure a space character around selector separators \u0027\u003e\u0027, \u0027+\u0027, \u0027~\u0027 (e.g. `a \u003e b`)."
-            },
-            "braceStyle": {
-              "type": "string",
-              "default": "collapse",
-              "enum": [
-                "collapse",
-                "expand"
-              ],
-              "description": "Put braces on the same line as rules (`collapse`) or put braces on own line (`expand`)."
-            },
-            "preserveNewLines": {
-              "type": "boolean",
-              "default": true,
-              "description": "Whether existing line breaks before elements should be preserved."
-            },
-            "maxPreserveNewLines": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "description": "Maximum number of line breaks to be preserved in one chunk, when `#less.format.preserveNewLines#` is enabled."
-            }
-          }
-        }
-      }
+    "css.completion.completePropertyWithSemicolon": {
+      "type": "boolean",
+      "default": true,
+      "description": "Insert semicolon at end of line when completing CSS properties."
+    },
+    "css.validate": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enables or disables all validations."
+    },
+    "css.hover.documentation": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show property and value documentation in CSS hovers."
+    },
+    "css.hover.references": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show references to MDN in CSS hovers."
+    },
+    "css.lint.compatibleVendorPrefixes": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "When using a vendor-specific prefix make sure to also include all other vendor-specific properties."
+    },
+    "css.lint.vendorPrefix": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "When using a vendor-specific prefix, also include the standard property."
+    },
+    "css.lint.duplicateProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Do not use duplicate style definitions."
+    },
+    "css.lint.emptyRules": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Do not use empty rulesets."
+    },
+    "css.lint.importStatement": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Import statements do not load in parallel."
+    },
+    "css.lint.boxModel": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Do not use `width` or `height` when using `padding` or `border`."
+    },
+    "css.lint.universalSelector": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "The universal selector (`*`) is known to be slow."
+    },
+    "css.lint.zeroUnits": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "No unit for zero needed."
+    },
+    "css.lint.fontFaceProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "`@font-face` rule must define `src` and `font-family` properties."
+    },
+    "css.lint.hexColorLength": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "error",
+      "description": "Hex colors must consist of 3, 4, 6 or 8 hex numbers."
+    },
+    "css.lint.argumentsInColorFunction": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "error",
+      "description": "Invalid number of parameters."
+    },
+    "css.lint.unknownProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Unknown property."
+    },
+    "css.lint.validProperties": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "A list of properties that are not validated against the `unknownProperties` rule."
+    },
+    "css.lint.ieHack": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "IE hacks are only necessary when supporting IE7 and older."
+    },
+    "css.lint.unknownVendorSpecificProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Unknown vendor specific property."
+    },
+    "css.lint.propertyIgnoredDueToDisplay": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Property is ignored due to the display. E.g. with `display: inline`, the `width`, `height`, `margin-top`, `margin-bottom`, and `float` properties have no effect."
+    },
+    "css.lint.important": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Avoid using `!important`. It is an indication that the specificity of the entire CSS has gotten out of control and needs to be refactored."
+    },
+    "css.lint.float": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Avoid using `float`. Floats lead to fragile CSS that is easy to break if one aspect of the layout changes."
+    },
+    "css.lint.idSelector": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Selectors should not contain IDs because these rules are too tightly coupled with the HTML."
+    },
+    "css.lint.unknownAtRules": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Unknown at-rule."
+    },
+    "css.trace.server": {
+      "type": "string",
+      "enum": [
+        "off",
+        "messages",
+        "verbose"
+      ],
+      "default": "off",
+      "description": "Traces the communication between VS Code and the CSS language server."
+    },
+    "css.format.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable/disable default CSS formatter."
+    },
+    "css.format.newlineBetweenSelectors": {
+      "type": "boolean",
+      "default": true,
+      "description": "Separate selectors with a new line."
+    },
+    "css.format.newlineBetweenRules": {
+      "type": "boolean",
+      "default": true,
+      "description": "Separate rulesets by a blank line."
+    },
+    "css.format.spaceAroundSelectorSeparator": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ensure a space character around selector separators \u0027\u003e\u0027, \u0027+\u0027, \u0027~\u0027 (e.g. `a \u003e b`)."
+    },
+    "css.format.braceStyle": {
+      "type": "string",
+      "default": "collapse",
+      "enum": [
+        "collapse",
+        "expand"
+      ],
+      "description": "Put braces on the same line as rules (`collapse`) or put braces on own line (`expand`)."
+    },
+    "css.format.preserveNewLines": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether existing line breaks before elements should be preserved."
+    },
+    "css.format.maxPreserveNewLines": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Maximum number of line breaks to be preserved in one chunk, when `#css.format.preserveNewLines#` is enabled."
+    },
+    "scss.completion.triggerPropertyValueCompletion": {
+      "type": "boolean",
+      "default": true,
+      "description": "By default, VS Code triggers property value completion after selecting a CSS property. Use this setting to disable this behavior."
+    },
+    "scss.completion.completePropertyWithSemicolon": {
+      "type": "boolean",
+      "default": true,
+      "description": "Insert semicolon at end of line when completing CSS properties."
+    },
+    "scss.validate": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enables or disables all validations."
+    },
+    "scss.hover.documentation": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show property and value documentation in SCSS hovers."
+    },
+    "scss.hover.references": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show references to MDN in SCSS hovers."
+    },
+    "scss.lint.compatibleVendorPrefixes": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "When using a vendor-specific prefix make sure to also include all other vendor-specific properties."
+    },
+    "scss.lint.vendorPrefix": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "When using a vendor-specific prefix, also include the standard property."
+    },
+    "scss.lint.duplicateProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Do not use duplicate style definitions."
+    },
+    "scss.lint.emptyRules": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Do not use empty rulesets."
+    },
+    "scss.lint.importStatement": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Import statements do not load in parallel."
+    },
+    "scss.lint.boxModel": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Do not use `width` or `height` when using `padding` or `border`."
+    },
+    "scss.lint.universalSelector": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "The universal selector (`*`) is known to be slow."
+    },
+    "scss.lint.zeroUnits": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "No unit for zero needed."
+    },
+    "scss.lint.fontFaceProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "`@font-face` rule must define `src` and `font-family` properties."
+    },
+    "scss.lint.hexColorLength": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "error",
+      "description": "Hex colors must consist of 3, 4, 6 or 8 hex numbers."
+    },
+    "scss.lint.argumentsInColorFunction": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "error",
+      "description": "Invalid number of parameters."
+    },
+    "scss.lint.unknownProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Unknown property."
+    },
+    "scss.lint.validProperties": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "A list of properties that are not validated against the `unknownProperties` rule."
+    },
+    "scss.lint.ieHack": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "IE hacks are only necessary when supporting IE7 and older."
+    },
+    "scss.lint.unknownVendorSpecificProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Unknown vendor specific property."
+    },
+    "scss.lint.propertyIgnoredDueToDisplay": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Property is ignored due to the display. E.g. with `display: inline`, the `width`, `height`, `margin-top`, `margin-bottom`, and `float` properties have no effect."
+    },
+    "scss.lint.important": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Avoid using `!important`. It is an indication that the specificity of the entire CSS has gotten out of control and needs to be refactored."
+    },
+    "scss.lint.float": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Avoid using `float`. Floats lead to fragile CSS that is easy to break if one aspect of the layout changes."
+    },
+    "scss.lint.idSelector": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Selectors should not contain IDs because these rules are too tightly coupled with the HTML."
+    },
+    "scss.lint.unknownAtRules": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Unknown at-rule."
+    },
+    "scss.format.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable/disable default SCSS formatter."
+    },
+    "scss.format.newlineBetweenSelectors": {
+      "type": "boolean",
+      "default": true,
+      "description": "Separate selectors with a new line."
+    },
+    "scss.format.newlineBetweenRules": {
+      "type": "boolean",
+      "default": true,
+      "description": "Separate rulesets by a blank line."
+    },
+    "scss.format.spaceAroundSelectorSeparator": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ensure a space character around selector separators \u0027\u003e\u0027, \u0027+\u0027, \u0027~\u0027 (e.g. `a \u003e b`)."
+    },
+    "scss.format.braceStyle": {
+      "type": "string",
+      "default": "collapse",
+      "enum": [
+        "collapse",
+        "expand"
+      ],
+      "description": "Put braces on the same line as rules (`collapse`) or put braces on own line (`expand`)."
+    },
+    "scss.format.preserveNewLines": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether existing line breaks before elements should be preserved."
+    },
+    "scss.format.maxPreserveNewLines": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Maximum number of line breaks to be preserved in one chunk, when `#scss.format.preserveNewLines#` is enabled."
+    },
+    "less.completion.triggerPropertyValueCompletion": {
+      "type": "boolean",
+      "default": true,
+      "description": "By default, VS Code triggers property value completion after selecting a CSS property. Use this setting to disable this behavior."
+    },
+    "less.completion.completePropertyWithSemicolon": {
+      "type": "boolean",
+      "default": true,
+      "description": "Insert semicolon at end of line when completing CSS properties."
+    },
+    "less.validate": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enables or disables all validations."
+    },
+    "less.hover.documentation": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show property and value documentation in LESS hovers."
+    },
+    "less.hover.references": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show references to MDN in LESS hovers."
+    },
+    "less.lint.compatibleVendorPrefixes": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "When using a vendor-specific prefix make sure to also include all other vendor-specific properties."
+    },
+    "less.lint.vendorPrefix": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "When using a vendor-specific prefix, also include the standard property."
+    },
+    "less.lint.duplicateProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Do not use duplicate style definitions."
+    },
+    "less.lint.emptyRules": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Do not use empty rulesets."
+    },
+    "less.lint.importStatement": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Import statements do not load in parallel."
+    },
+    "less.lint.boxModel": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Do not use `width` or `height` when using `padding` or `border`."
+    },
+    "less.lint.universalSelector": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "The universal selector (`*`) is known to be slow."
+    },
+    "less.lint.zeroUnits": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "No unit for zero needed."
+    },
+    "less.lint.fontFaceProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "`@font-face` rule must define `src` and `font-family` properties."
+    },
+    "less.lint.hexColorLength": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "error",
+      "description": "Hex colors must consist of 3, 4, 6 or 8 hex numbers."
+    },
+    "less.lint.argumentsInColorFunction": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "error",
+      "description": "Invalid number of parameters."
+    },
+    "less.lint.unknownProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Unknown property."
+    },
+    "less.lint.validProperties": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "A list of properties that are not validated against the `unknownProperties` rule."
+    },
+    "less.lint.ieHack": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "IE hacks are only necessary when supporting IE7 and older."
+    },
+    "less.lint.unknownVendorSpecificProperties": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Unknown vendor specific property."
+    },
+    "less.lint.propertyIgnoredDueToDisplay": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Property is ignored due to the display. E.g. with `display: inline`, the `width`, `height`, `margin-top`, `margin-bottom`, and `float` properties have no effect."
+    },
+    "less.lint.important": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Avoid using `!important`. It is an indication that the specificity of the entire CSS has gotten out of control and needs to be refactored."
+    },
+    "less.lint.float": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Avoid using `float`. Floats lead to fragile CSS that is easy to break if one aspect of the layout changes."
+    },
+    "less.lint.idSelector": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "ignore",
+      "description": "Selectors should not contain IDs because these rules are too tightly coupled with the HTML."
+    },
+    "less.lint.unknownAtRules": {
+      "type": "string",
+      "enum": [
+        "ignore",
+        "warning",
+        "error"
+      ],
+      "default": "warning",
+      "description": "Unknown at-rule."
+    },
+    "less.format.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable/disable default LESS formatter."
+    },
+    "less.format.newlineBetweenSelectors": {
+      "type": "boolean",
+      "default": true,
+      "description": "Separate selectors with a new line."
+    },
+    "less.format.newlineBetweenRules": {
+      "type": "boolean",
+      "default": true,
+      "description": "Separate rulesets by a blank line."
+    },
+    "less.format.spaceAroundSelectorSeparator": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ensure a space character around selector separators \u0027\u003e\u0027, \u0027+\u0027, \u0027~\u0027 (e.g. `a \u003e b`)."
+    },
+    "less.format.braceStyle": {
+      "type": "string",
+      "default": "collapse",
+      "enum": [
+        "collapse",
+        "expand"
+      ],
+      "description": "Put braces on the same line as rules (`collapse`) or put braces on own line (`expand`)."
+    },
+    "less.format.preserveNewLines": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether existing line breaks before elements should be preserved."
+    },
+    "less.format.maxPreserveNewLines": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Maximum number of line breaks to be preserved in one chunk, when `#less.format.preserveNewLines#` is enabled."
     }
   }
 }

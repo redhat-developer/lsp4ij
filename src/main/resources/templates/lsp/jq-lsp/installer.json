@@ -1,0 +1,50 @@
+{
+  "id": "jq-lsp",
+  "name": "JQ Language Server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onFail": {
+        "exec": {
+          "name": "Check Go runtime",
+          "command": {
+            "windows": "where go",
+            "default": "which go"
+          },
+          "onSuccess": {
+            "exec": {
+              "name": "Trying current command",
+              "command": "${server.command}",
+              "timeout": 2000
+            }
+          },
+          "onFail": {
+            "showMessage": {
+              "name": "Go Language Server install problem",
+              "content": [
+                "<a href=\"https://go.dev/doc/install\">Install Go</a> to install the Go Language Server (<code>gopls</code>) using <code>go install</code>.",
+                "Make sure <code>go</code> is in your PATH, then restart your IDE."
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install JQ Language Server Globally",
+      "command": "go install github.com/wader/jq-lsp@latest"
+    },
+    "onSuccess": {
+      "configureServer": {
+        "name": "Configure JQ Language Server command",
+        "command": "jq-lsp -mode=stdio",
+        "update": true
+      }
+    }
+  }
+}

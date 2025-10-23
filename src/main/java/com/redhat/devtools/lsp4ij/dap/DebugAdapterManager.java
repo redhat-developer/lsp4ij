@@ -18,6 +18,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
@@ -27,7 +28,7 @@ import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAd
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterServerListener;
 import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
 import com.redhat.devtools.lsp4ij.server.definition.ServerFileTypeMapping;
 import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
@@ -117,6 +118,7 @@ public class DebugAdapterManager implements DebuggableFile {
             UserDefinedDebugAdapterServerSettings.ItemSettings settings = new UserDefinedDebugAdapterServerSettings.ItemSettings();
             settings.setServerId(definitionFromSettings.getId());
             settings.setServerName(definitionFromSettings.getDisplayName());
+            settings.setServerUrl(definitionFromSettings.getUrl());
             settings.setUserEnvironmentVariables(definitionFromSettings.getUserEnvironmentVariables());
             settings.setIncludeSystemEnvironmentVariables(definitionFromSettings.isIncludeSystemEnvironmentVariables());
             settings.setCommandLine(definitionFromSettings.getCommandLine());
@@ -178,6 +180,7 @@ public class DebugAdapterManager implements DebuggableFile {
     public record UpdateDebugAdapterServerRequest(
             @NotNull UserDefinedDebugAdapterServerDefinition serverDefinition,
             @Nullable String name,
+            @Nullable String url,
             @Nullable Map<String, String> userEnvironmentVariables,
             boolean includeSystemEnvironmentVariables,
             @Nullable String commandLine,
@@ -187,7 +190,8 @@ public class DebugAdapterManager implements DebuggableFile {
             @NotNull List<ServerMappingSettings> fileTypeMappings,
             @Nullable List<LaunchConfiguration> launchConfigurations,
             @Nullable String attachAddress,
-            @Nullable String attachPort) {
+            @Nullable String attachPort,
+            @Nullable String installerConfiguration) {
     }
 
     /**
@@ -203,6 +207,7 @@ public class DebugAdapterManager implements DebuggableFile {
         var serverDefinition = request.serverDefinition();
         String serverId = request.serverDefinition().getId();
         serverDefinition.setName(request.name() != null ? request.name() : "");
+        serverDefinition.setUrl(request.url() != null ? request.url() : "");
         serverDefinition.setCommandLine(request.commandLine());
         serverDefinition.setConnectTimeout(request.connectTimeout());
         serverDefinition.setDebugServerReadyPattern(request.debugServerReadyPattern());
@@ -213,6 +218,7 @@ public class DebugAdapterManager implements DebuggableFile {
         serverDefinition.setFileTypeMappings(request.fileTypeMappings());
 
         serverDefinition.setLaunchConfigurations(request.launchConfigurations());
+        serverDefinition.setInstallerConfiguration(request.installerConfiguration());
 
         List<ServerMappingSettings> mappings = Stream.concat(request.languageMappings().stream(), request.fileTypeMappings().stream()).toList();
         UserDefinedDebugAdapterServerSettings.ItemSettings settings = UserDefinedDebugAdapterServerSettings.getInstance().getSettings(serverId);
@@ -226,10 +232,12 @@ public class DebugAdapterManager implements DebuggableFile {
         boolean launchConfigurationChanged = !Objects.equals(settings.getLaunchConfigurations(), request.launchConfigurations());
         boolean attachAddressChanged = !Objects.equals(settings.getAttachAddress(), request.attachAddress());
         boolean attachPortChanged = !Objects.equals(settings.getAttachAddress(), request.attachPort());
+        boolean installerConfigurationChanged = !Objects.equals(settings.getInstallerConfiguration(), request.installerConfiguration());
 
         // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
 
         settings.setServerName(request.name());
+        settings.setServerUrl(request.url());
         settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         settings.setCommandLine(request.commandLine());
@@ -237,11 +245,12 @@ public class DebugAdapterManager implements DebuggableFile {
         settings.setDebugServerReadyPattern(request.debugServerReadyPattern);
         settings.setMappings(mappings);
         settings.setLaunchConfigurations(request.launchConfigurations());
+        settings.setInstallerConfiguration(request.installerConfiguration());
 
         if (nameChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
                 commandChanged || connectTimeoutChanged || debugServerReadyPatternChanged ||
                 mappingsChanged || launchConfigurationChanged ||
-        attachAddressChanged || attachPortChanged) {
+        attachAddressChanged || attachPortChanged || installerConfigurationChanged) {
             // Notifications
             DebugAdapterServerListener.ChangedEvent event = new DebugAdapterServerListener.ChangedEvent(
                     serverDefinition,
@@ -254,7 +263,8 @@ public class DebugAdapterManager implements DebuggableFile {
                     mappingsChanged,
                     launchConfigurationChanged,
                     attachAddressChanged,
-                    attachPortChanged);
+                    attachPortChanged,
+                    installerConfigurationChanged);
             if (notify) {
                 handleChangeEvent(event);
             }
@@ -276,13 +286,40 @@ public class DebugAdapterManager implements DebuggableFile {
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file,
                                     @NotNull Project project) {
+        return isDebuggableFile(file, null, project);
+    }
+
+    public boolean isDebuggableFile(@NotNull VirtualFile file,
+                                    @Nullable XBreakpointType breakpointType,
+                                    @NotNull Project project) {
         // Search canDebug inside the factories
-        if (findDebugAdapterServerFor(file, project) != null) {
+        if (findDebugAdapterServerFor(file, breakpointType, project) != null) {
             return true;
         }
 
         // Search canDebug in existing DAP run configuration
         return findExistingConfigurationFor(file, project, false) != null;
+    }
+
+    /**
+     * Returns the DAP descriptor factory for the given file and null otherwise.
+     *
+     * @param file    the file.
+     * @param breakpointType the breakpoint toe and null otherwise.
+     * @param project the project.
+     * @return the DAP descriptor factory for the given file and null otherwise.
+     */
+    @Nullable
+    private DebugAdapterServerDefinition findDebugAdapterServerFor(@NotNull VirtualFile file,
+                                                                   @Nullable XBreakpointType breakpointType,
+                                                                   @NotNull Project project) {
+        for (var serverDefinition : serverDefinitions.values()) {
+            var factory = serverDefinition.getFactory();
+            if (factory.isDebuggableFile(file, project) && (breakpointType == null || factory.supportsBreakpointType(breakpointType))) {
+                return serverDefinition;
+            }
+        }
+        return null;
     }
 
     /**
@@ -292,7 +329,7 @@ public class DebugAdapterManager implements DebuggableFile {
      * @param project the project.
      * @return the existing run configuration  for the given file and null otherwise.
      */
-    private static RunConfiguration findExistingConfigurationFor(@NotNull VirtualFile file,
+    private static @Nullable RunConfiguration findExistingConfigurationFor(@NotNull VirtualFile file,
                                                                  @NotNull Project project,
                                                                  boolean checkFile) {
         List<RunConfiguration> all = RunManager.getInstance(project).getAllConfigurationsList();
@@ -300,7 +337,7 @@ public class DebugAdapterManager implements DebuggableFile {
             if (runConfiguration instanceof DAPRunConfiguration dapConfig) {
                 if (dapConfig.isDebuggableFile(file, project)) {
                     if (checkFile) {
-                        String existingFile = ((DAPRunConfiguration) runConfiguration).getFile();
+                        String existingFile = dapConfig.getFile();
                         if (!getFilePath(file).equals(existingFile)) {
                             return null;
                         }
@@ -335,8 +372,7 @@ public class DebugAdapterManager implements DebuggableFile {
                                         @NotNull VirtualFile file,
                                         @NotNull Project project) {
         RunConfiguration existingConfiguration = findExistingConfigurationFor(file, project, true);
-        if (existingConfiguration != null
-                && existingConfiguration instanceof DAPRunConfiguration existingDapConfiguration
+        if (existingConfiguration instanceof DAPRunConfiguration existingDapConfiguration
                 && configuration instanceof DAPRunConfiguration dapConfiguration) {
             existingDapConfiguration.copyTo(dapConfiguration);
             return true;
@@ -395,7 +431,7 @@ public class DebugAdapterManager implements DebuggableFile {
         // Load debug adapter servers from extensions point
         for (var server : DebugAdapterServerExtensionPointBean.EP_NAME.getExtensions()) {
             String serverId = server.getId();
-            if (serverId != null && !serverId.isEmpty()) {
+            if (!serverId.isEmpty()) {
                 List<ServerMapping> mappingsForServer = mappings.get(serverId);
                 mappings.remove(serverId);
                 var serverDefinition = new ExtensionDebugAdapterServerDefinition(server, mappingsForServer != null ? mappingsForServer : Collections.emptyList());
@@ -447,6 +483,7 @@ public class DebugAdapterManager implements DebuggableFile {
                         setting.getCommandLine(),
                         languageMappings,
                         fileTypeMappings);
+                serverDefinition.setUrl(setting.getServerUrl());
                 serverDefinition.setUserEnvironmentVariables(setting.getUserEnvironmentVariables());
                 serverDefinition.setIncludeSystemEnvironmentVariables(setting.isIncludeSystemEnvironmentVariables());
                 serverDefinition.setConnectTimeout(setting.getConnectTimeout());

@@ -1,8 +1,10 @@
 import com.adarshr.gradle.testlogger.theme.ThemeType
 import org.jetbrains.changelog.markdownToHTML
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.*
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.VerificationReportsFormats.*
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 
 
 fun properties(key: String) = providers.gradleProperty(key)
@@ -71,6 +73,11 @@ dependencies {
 
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
         plugins(properties("platformPlugins").map { it.split(',') })
+
+        if (ideaVersionInt >= 252) {
+            // Since 2025.2, JetBrains moved spellchecker in a new "intellij.spellchecker" module
+            bundledModule("intellij.spellchecker")
+        }
 
         pluginVerifier()
         zipSigner()
@@ -149,7 +156,12 @@ intellijPlatform {
         failureLevel = listOf(INVALID_PLUGIN, COMPATIBILITY_PROBLEMS, MISSING_DEPENDENCIES)
         verificationReportsFormats = listOf(MARKDOWN, PLAIN)
         ides {
-            recommended()
+            select {
+                types = listOf(IntelliJPlatformType.IntellijIdeaCommunity)
+                channels = listOf(ProductRelease.Channel.RELEASE) // Only stable releases
+                sinceBuild = "242" // From your minimum supported version
+                untilBuild = "252.*" // Up to current major version
+            }
         }
     }
 }

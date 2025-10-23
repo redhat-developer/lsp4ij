@@ -37,10 +37,13 @@ import com.redhat.devtools.lsp4ij.console.actions.ResetLanguageServerSettingsAct
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
+import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettingsListener;
+import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
 import org.jetbrains.annotations.NotNull;
@@ -139,8 +142,10 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         languageServerView.reset();
     }
 
-    private static ConsoleView createConsoleView(@NotNull LanguageServerDefinition serverDefinition, @NotNull Project project) {
-        var builder = new LSPTextConsoleBuilderImpl(serverDefinition, project);
+    private static ConsoleView createConsoleView(boolean withFolding,
+                                                 @NotNull LanguageServerDefinition serverDefinition,
+                                                 @NotNull Project project) {
+        var builder = new LSPTextConsoleBuilderImpl(withFolding, serverDefinition, project);
         builder.setViewer(true);
         return builder.getConsole();
     }
@@ -292,8 +297,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     // ---------------- Methods used by the Console view -----------
     // -------------------------------------------------------------
 
-    private UserDefinedLanguageServerSettingsListener createSettingsChangeListener(@NotNull LanguageServerDefinition serverDefinition,
-                                                                                   @NotNull LanguageServerView languageServerView) {
+    private LanguageServerSettingsListener createSettingsChangeListener(@NotNull LanguageServerDefinition serverDefinition,
+                                                                        @NotNull LanguageServerView languageServerView) {
         return (event) -> {
             if (isDisposed()) {
                 return;
@@ -331,7 +336,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         };
     }
 
-    public void showTrace(@NotNull LanguageServerProcessTreeNode processTreeNode, String message) {
+    public void showTrace(@NotNull LanguageServerProcessTreeNode processTreeNode,
+                          @NotNull String message) {
         if (isDisposed()) {
             return;
         }
@@ -450,7 +456,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         private static final String NAME_VIEW_DETAIL = "detail";
         private static final String NAME_VIEW_CONSOLE = "console";
-        private final Set<UserDefinedLanguageServerSettingsListener> settingsChangeListeners = new HashSet<UserDefinedLanguageServerSettingsListener>();
+        private final Set<LanguageServerSettingsListener> settingsChangeListeners = new HashSet<LanguageServerSettingsListener>();
         private final Set<LanguageServerDefinitionListener> serverDefinitionListeners = new HashSet<>();
         private JBTabbedPane tabbedPane;
         private LanguageServerView detailView;
@@ -470,14 +476,24 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                 tabbedPane = new JBTabbedPane();
                 add(tabbedPane, NAME_VIEW_CONSOLE);
 
-                tracesConsoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
+                var serverDefinition = ((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition();
+                tracesConsoleView = createConsoleView(true, serverDefinition, project);
                 Disposer.register(LSPConsoleToolWindowPanel.this, tracesConsoleView);
                 tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.traces.title"), tracesConsoleView.getComponent());
                 configureConsoleToolbar(tracesConsoleView);
 
-                logsConsoleView = createConsoleView(((LanguageServerProcessTreeNode) key).getLanguageServer().getServerDefinition(), project);
+                var serverInstaller = serverDefinition.getServerInstaller();
+                if (serverInstaller != null) {
+                    // The language server defines an installer
+                    // register the LSP traces consoles as console provider
+                    // to show traces from installation
+                    serverInstaller.registerConsoleProvider(new ConsoleProvider(tracesConsoleView, project));
+                }
+
+                logsConsoleView = createConsoleView(false, serverDefinition, project);
                 Disposer.register(LSPConsoleToolWindowPanel.this, logsConsoleView);
                 tabbedPane.add(LanguageServerBundle.message("lsp.console.tabs.logs.title"), logsConsoleView.getComponent());
+                configureConsoleToolbar(logsConsoleView);
 
                 showConsole();
             }
@@ -487,7 +503,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             LanguageServerDefinition serverDefinition = key.getServerDefinition();
             Project project = LSPConsoleToolWindowPanel.this.project;
             // Create the language server panel with 'Server', 'Mappings', 'Configuration', 'Debug' tabs
-            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, false, project);
+            LanguageServerView languageServerView = new LanguageServerView(serverDefinition, null, true, project);
             loadDetailPanel(languageServerView);
 
             // Track changes of definition + settings to reload the language server detail (command, mappings, etc):
@@ -498,8 +514,9 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             serverDefinitionListeners.add(serverDefinitionListener);
 
             // - 2. track changes of associated settings (trace, error reporting kind)
-            UserDefinedLanguageServerSettingsListener settingsChangeListener = createSettingsChangeListener(serverDefinition, languageServerView);
-            com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(getProject()).addSettingsListener(settingsChangeListener);
+            LanguageServerSettingsListener settingsChangeListener = createSettingsChangeListener(serverDefinition, languageServerView);
+            ProjectLanguageServerSettings.getInstance(getProject()).addSettingsListener(settingsChangeListener);
+            GlobalLanguageServerSettings.getInstance().addSettingsListener(settingsChangeListener);
             settingsChangeListeners.add(settingsChangeListener);
 
             return languageServerView;
@@ -547,8 +564,9 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         @Override
         public void dispose() {
-            for (UserDefinedLanguageServerSettingsListener settingsChangeListener : settingsChangeListeners) {
-                com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(getProject()).removeChangeHandler(settingsChangeListener);
+            for (LanguageServerSettingsListener settingsChangeListener : settingsChangeListeners) {
+                ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(settingsChangeListener);
+                GlobalLanguageServerSettings.getInstance().removeSettingsListener(settingsChangeListener);
             }
             settingsChangeListeners.clear();
             for (var serverDefinitionListener : serverDefinitionListeners) {

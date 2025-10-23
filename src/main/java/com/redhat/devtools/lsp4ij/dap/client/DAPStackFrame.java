@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.client;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
@@ -23,9 +24,11 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XValueChildrenList;
-import com.redhat.devtools.lsp4ij.dap.DAPIJUtils;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
+import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyDeferredSourcePosition;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.*;
@@ -46,6 +49,7 @@ public class DAPStackFrame extends XStackFrame {
     private final @NotNull StackFrame stackFrame;
     private final @NotNull DAPClient client;
     private @Nullable XSourcePosition sourcePosition;
+    private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
     private CompletableFuture<DebugVariableContext> variablesContext;
 
@@ -64,8 +68,8 @@ public class DAPStackFrame extends XStackFrame {
         }
         component.append(", ", SimpleTextAttributes.REGULAR_ATTRIBUTES);
         Source source = stackFrame.getSource();
-        String sourceName = source != null ? source.getName() : null;
-        if (sourceName != null && StringUtils.isNotBlank(sourceName)) {
+        String sourceName = getSourceNameFromNameOrPath(source);
+        if (sourceName != null) {
             component.append(sourceName, SimpleTextAttributes.REGULAR_ATTRIBUTES);
         } else {
             component.append(XDebuggerBundle.message("invalid.frame"), SimpleTextAttributes.ERROR_ATTRIBUTES);
@@ -75,20 +79,37 @@ public class DAPStackFrame extends XStackFrame {
 
     @Override
     public @Nullable XSourcePosition getSourcePosition() {
-        if (sourcePosition == null && stackFrame.getSource() != null) {
-            Path filePath = getValidFilePath(stackFrame.getSource());
-            if (filePath == null) {
-                return null;
-            }
-            try {
-                VirtualFile file = VfsUtil.findFile(filePath, true);
-                sourcePosition = XDebuggerUtil.getInstance().createPosition(file, stackFrame.getLine() - 1);
-            } catch (Exception e) {
-                // Invalid path...
-                // ex: <node_internals>/internal/modules/cjs/loader
-            }
+        var source = stackFrame.getSource();
+        if (sourcePosition == null && source != null) {
+            sourcePosition = doGetSourcePosition(source, stackFrame.getLine() - 1);
         }
         return sourcePosition;
+    }
+
+    private @Nullable XSourcePosition doGetSourcePosition(@NotNull Source source, int line) {
+        int sourceReference = source.getSourceReference() != null ? source.getSourceReference() : 0;
+        if (sourceReference > 0) {
+            // If the value &gt; 0 the contents of the source must be retrieved through
+            // the SourceRequest (even if a path is specified).
+            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), getValidSourceName(source), client.getProject());
+            if (file.shouldReload(getClient().getSessionId())) {
+                return new DAPSourceReferencePosition(file, sourceReference, line, client);
+            }
+            return XDebuggerUtil.getInstance().createPosition(file, line);
+        }
+
+        Path filePath = getValidFilePath(source);
+        if (filePath == null) {
+            return null;
+        }
+        try {
+            VirtualFile file = VfsUtil.findFile(filePath, true);
+            return XDebuggerUtil.getInstance().createPosition(file, line);
+        } catch (Exception e) {
+            // Invalid path...
+            // ex: <node_internals>/internal/modules/cjs/loader
+        }
+        return null;
     }
 
     public CompletableFuture<XSourcePosition> getSourcePositionFor(@NotNull Variable variable) {
@@ -97,9 +118,7 @@ public class DAPStackFrame extends XStackFrame {
             return CompletableFuture.completedFuture(null);
         }
         return getVariablesContext()
-                .thenApply(context -> {
-                    return context.getSourcePositionFor(variable);
-                });
+                .thenApply(context -> context.getSourcePositionFor(variable));
     }
 
     private CompletableFuture<DebugVariableContext> getVariablesContext() {
@@ -164,6 +183,10 @@ public class DAPStackFrame extends XStackFrame {
         return stackFrame.getId();
     }
 
+    public @Nullable String getInstructionPointerReference() {
+        return stackFrame.getInstructionPointerReference();
+    }
+
     @Override
     public @Nullable XDebuggerEvaluator getEvaluator() {
         if (evaluator == null) {
@@ -171,4 +194,52 @@ public class DAPStackFrame extends XStackFrame {
         }
         return evaluator;
     }
+
+    public @Nullable XSourcePosition getAlternativePosition() {
+        String instructionPointerReference = getInstructionPointerReference();
+        if (StringUtils.isEmpty(instructionPointerReference)) {
+            return null;
+        }
+        var disassemblyFile = getClient().getDisassemblyFile();
+        if (disassemblyFile == null || !FileEditorManager.getInstance(client.getProject()).isFileOpen(disassemblyFile)) {
+            // Don't load the disassembly instruction source position when:
+            // - the DAP server doesn't support Disassembly
+            // - the disassembly view is not opened
+            return null;
+        }
+        if (disassemblyInstructionSourcePosition != null && disassemblyInstructionSourcePosition.getModificationCount() == disassemblyFile.getModificationCount()) {
+            return disassemblyInstructionSourcePosition;
+        }
+        disassemblyInstructionSourcePosition = new DisassemblyDeferredSourcePosition(instructionPointerReference, disassemblyFile, client);
+        return disassemblyInstructionSourcePosition;
+    }
+
+
+    private static @NotNull String getValidSourceName(@NotNull Source source) {
+        String sourceName = getSourceNameFromNameOrPath(source);
+        if (sourceName != null) {
+            return sourceName;
+        }
+        return source.getSourceReference() + "";
+    }
+
+    private static @Nullable String getSourceNameFromNameOrPath(@Nullable Source source) {
+        if (source == null) {
+            return null;
+        }
+        if (StringUtils.isNotBlank(source.getName())) {
+            return source.getName();
+        }
+        if (StringUtils.isNotBlank(source.getPath())) {
+            // Get the file source name from the path
+            String path = source.getPath();
+            int slashIndex = path.lastIndexOf('/');
+            if (slashIndex == -1) {
+                slashIndex = path.lastIndexOf('\\');
+            }
+            return slashIndex != -1 ? path.substring(slashIndex + 1) : path;
+        }
+        return null;
+    }
+
 }

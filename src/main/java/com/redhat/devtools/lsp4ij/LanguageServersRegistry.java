@@ -27,7 +27,9 @@ import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
@@ -43,8 +45,8 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServerMappingSettings;
-import static com.redhat.devtools.lsp4ij.launching.ServerMappingSettings.toServerMappings;
+import static com.redhat.devtools.lsp4ij.templates.ServerMappingSettings.toServerMappingSettings;
+import static com.redhat.devtools.lsp4ij.templates.ServerMappingSettings.toServerMappings;
 
 /**
  * Language servers registry.
@@ -67,7 +69,7 @@ public class LanguageServersRegistry {
 
     private final Map<String, List<InlayProviderInfo>> declarativeInlayHintsProviders = new HashMap<>();
 
-    private final List<ProviderInfo<? extends Object>> inlayHintsProviders = new ArrayList<>();
+    private final List<ProviderInfo<?>> inlayHintsProviders = new ArrayList<>();
 
     private final Set<Language> customLanguageFindUsages = new HashSet<>();
 
@@ -125,7 +127,7 @@ public class LanguageServersRegistry {
             try {
                 semanticTokensColorsProviders.put(serverId, extension.getSemanticTokensColorsProvider());
             } catch (Exception e) {
-                LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='" + serverId + "'.", e);
+                LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='{}'.", serverId, e);
             }
         }
 
@@ -140,7 +142,7 @@ public class LanguageServersRegistry {
                 if (semanticTokensColorsProvider != null) {
                     serverDefinition.setSemanticTokensColorsProvider(semanticTokensColorsProvider);
                 }
-                addServerDefinitionWithoutNotification(serverDefinition, mappingsForServer);
+                addServerDefinitionWithoutNotification(serverDefinition, mappingsForServer, false);
             }
         }
 
@@ -153,24 +155,30 @@ public class LanguageServersRegistry {
 
     private void loadServersAndMappingFromSettings() {
         try {
-            for (var launch : UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings()) {
-                String serverId = launch.getServerId();
-                List<ServerMapping> mappings = toServerMappings(serverId, launch.getMappings());
-                // Register server definition from settings
-                addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(
-                                serverId,
-                                launch.getTemplateId(),
-                                launch.getServerName(),
-                                "",
-                                launch.getCommandLine(),
-                                launch.getUserEnvironmentVariables(),
-                                launch.isIncludeSystemEnvironmentVariables(),
-                                launch.getConfigurationContent(),
-                                launch.getConfigurationSchemaContent(),
-                                launch.getInitializationOptionsContent(),
-                                launch.getClientConfigurationContent(),
-                                launch.getInstallerConfigurationContent()),
-                        mappings);
+            for (var settings : UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings()) {
+                String serverId = settings.getServerId();
+                if (serverId != null) {
+                    var globalSettings = GlobalLanguageServerSettings.getInstance().getLanguageServerSettings(serverId);
+                    List<ServerMapping> mappings = toServerMappings(serverId, settings.getMappings());
+                    // Register server definition from settings
+                    addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(
+                                    serverId,
+                                    settings.getTemplateId(),
+                                    settings.getServerName(),
+                                    settings.getServerUrl(),
+                                    "",
+                                    settings.getCommandLine(),
+                                    settings.getUserEnvironmentVariables(),
+                                    settings.isIncludeSystemEnvironmentVariables(),
+                                    globalSettings != null ? globalSettings.getConfigurationContent() : null,
+                                    globalSettings == null || globalSettings.isExpandConfiguration(),
+                                    globalSettings != null ? globalSettings.getConfigurationSchemaContent() : null,
+                                    globalSettings != null ? globalSettings.getInitializationOptionsContent() : null,
+                                    globalSettings != null ? globalSettings.getExperimentalContent() : null,
+                                    settings.getClientConfigurationContent(),
+                                    settings.getInstallerConfigurationContent()),
+                            mappings, false);
+                }
             }
         } catch (Exception e) {
             LOGGER.error("Error while loading user defined language servers from settings", e);
@@ -372,17 +380,13 @@ public class LanguageServersRegistry {
             if (!StringUtils.isEmpty(languageId)) {
                 serverDefinition.registerAssociation(matchers, languageId);
                 // Update the mapping languageId -> file extensions
-                var fileExtensions = languageIdFileExtensionsCache.get(languageId);
-                if (fileExtensions == null) {
-                    fileExtensions = new ArrayList<>();
-                    languageIdFileExtensionsCache.put(languageId, fileExtensions);
-                }
+                var fileExtensions = languageIdFileExtensionsCache.computeIfAbsent(languageId, k -> new ArrayList<>());
                 fileExtensions.addAll(fileNamePatternMapping
                         .getFileNamePatterns()
                         .stream()
                         .map(fileExtension -> {
                             int index = fileExtension.indexOf('.');
-                            return index != -1 ? fileExtension.substring(index + 1, fileExtension.length()) : fileExtension;
+                            return index != -1 ? fileExtension.substring(index + 1) : fileExtension;
                         })
                         .toList());
 
@@ -410,43 +414,79 @@ public class LanguageServersRegistry {
         return serverDefinitions.values();
     }
 
-    public void addServerDefinition(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition, @Nullable List<ServerMappingSettings> mappings) {
+    public void addServerDefinition(@NotNull Project project,
+                                    @NotNull LanguageServerDefinition serverDefinition,
+                                    @Nullable List<ServerMappingSettings> mappings) {
         String languageServerId = serverDefinition.getId();
-        addServerDefinitionWithoutNotification(serverDefinition, toServerMappings(languageServerId, mappings));
+        addServerDefinitionWithoutNotification(serverDefinition, toServerMappings(languageServerId, mappings), true);
         updateLanguages();
         LanguageServerDefinitionListener.LanguageServerAddedEvent event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(project, Collections.singleton(serverDefinition));
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
                 listener.handleAdded(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition is added of the language server '" + languageServerId + "'", e);
+                LOGGER.error("Error while server definition is added of the language server '{}'", languageServerId, e);
             }
         }
     }
 
     private void addServerDefinitionWithoutNotification(@NotNull LanguageServerDefinition serverDefinition,
-                                                        @NotNull List<ServerMapping> mappings) {
+                                                        @NotNull List<ServerMapping> mappings,
+                                                        boolean updateSettings) {
         String languageServerId = serverDefinition.getId();
         serverDefinitions.put(languageServerId, serverDefinition);
+
         // Update associations
         updateAssociations(serverDefinition, mappings);
-        // Update settings
-        if (serverDefinition instanceof UserDefinedLanguageServerDefinition definitionFromSettings) {
-            UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = new UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings();
-            settings.setTemplateId(definitionFromSettings.getTemplateId());
-            settings.setServerId(languageServerId);
-            settings.setServerName(definitionFromSettings.getDisplayName());
-            settings.setCommandLine(definitionFromSettings.getCommandLine());
-            settings.setUserEnvironmentVariables(definitionFromSettings.getUserEnvironmentVariables());
-            settings.setIncludeSystemEnvironmentVariables(definitionFromSettings.isIncludeSystemEnvironmentVariables());
-            settings.setMappings(toServerMappingSettings(mappings));
-            settings.setConfigurationContent(definitionFromSettings.getConfigurationContent());
-            settings.setConfigurationSchemaContent(definitionFromSettings.getConfigurationSchemaContent());
-            settings.setInitializationOptionsContent(definitionFromSettings.getInitializationOptionsContent());
-            settings.setClientConfigurationContent(definitionFromSettings.getClientConfigurationContent());
-            settings.setInstallerConfigurationContent(definitionFromSettings.getInstallerConfigurationContent());
-            UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
+
+        if (updateSettings) {
+            // 1. Update user defined language settings
+            if (serverDefinition instanceof UserDefinedLanguageServerDefinition userDefinedServer) {
+                UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = new UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings();
+                settings.setTemplateId(userDefinedServer.getTemplateId());
+                settings.setServerId(languageServerId);
+                settings.setServerName(userDefinedServer.getDisplayName());
+                settings.setServerUrl(userDefinedServer.getUrl());
+                settings.setCommandLine(userDefinedServer.getCommandLine());
+                settings.setUserEnvironmentVariables(userDefinedServer.getUserEnvironmentVariables());
+                settings.setIncludeSystemEnvironmentVariables(userDefinedServer.isIncludeSystemEnvironmentVariables());
+                settings.setMappings(toServerMappingSettings(mappings));
+                settings.setClientConfigurationContent(userDefinedServer.getClientConfigurationContent());
+                settings.setInstallerConfigurationContent(userDefinedServer.getInstallerConfigurationContent());
+                UserDefinedLanguageServerSettings.getInstance().setUserDefinedLanguageServerSettings(languageServerId, settings);
+            }
         }
+
+        // 2. Update settings contributor
+        var languageServerSettingsContributor = serverDefinition.getLanguageServerSettingsContributor();
+        if (languageServerSettingsContributor != null) {
+
+            var serverConfigurationContributor = languageServerSettingsContributor.getServerConfigurationContributor();
+            var serverInitializationOptionsContributor = languageServerSettingsContributor.getServerInitializationOptionsContributor();
+            var experimentalContributor = languageServerSettingsContributor.getServerExperimentalContributor();
+            var globalSettings = GlobalLanguageServerSettings.getInstance().getLanguageServerSettings(languageServerId);
+            if (globalSettings == null) {
+                globalSettings = new LanguageServerSettings.LanguageServerDefinitionSettings();
+            }
+            if (StringUtils.isBlank(globalSettings.getConfigurationContent())) {
+                globalSettings.setConfigurationContent(serverConfigurationContributor != null ? serverConfigurationContributor.getDefaultConfigurationContent() : null);
+            }
+            if (globalSettings.isExpandConfiguration()) {
+                globalSettings.setExpandConfiguration(serverConfigurationContributor == null || serverConfigurationContributor.isDefaultExpandConfiguration());
+            }
+            if (StringUtils.isBlank(globalSettings.getConfigurationSchemaContent())) {
+                globalSettings.setConfigurationSchemaContent(serverConfigurationContributor != null ? serverConfigurationContributor.getDefaultConfigurationSchemaContent() : null);
+            }
+            if (StringUtils.isBlank(globalSettings.getInitializationOptionsContent())) {
+                globalSettings.setInitializationOptionsContent(serverInitializationOptionsContributor != null ? serverInitializationOptionsContributor.getDefaultInitializationOptionsContent() : null);
+            }
+            if (StringUtils.isBlank(globalSettings.getExperimentalContent())) {
+                globalSettings.setExperimentalContent(experimentalContributor != null ? experimentalContributor.getDefaultExperimentalContent() : null);
+            }
+            GlobalLanguageServerSettings.getInstance().updateSettings(languageServerId, globalSettings, false);
+
+        }
+
     }
 
     private void updateAssociations(@NotNull LanguageServerDefinition definition,
@@ -472,7 +512,7 @@ public class LanguageServersRegistry {
             try {
                 listener.handleRemoved(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition is removed of the language server '" + languageServerId + "'", e);
+                LOGGER.error("Error while server definition is removed of the language server '{}'", languageServerId, e);
             }
         }
     }
@@ -489,21 +529,25 @@ public class LanguageServersRegistry {
     public LanguageServerDefinitionListener.@Nullable LanguageServerChangedEvent updateServerDefinition(@NotNull UpdateServerDefinitionRequest request,
                                                                                                         boolean notify) {
         String languageServerId = request.serverDefinition().getId();
-        request.serverDefinition().setName(request.name());
-        request.serverDefinition().setCommandLine(request.commandLine());
-        request.serverDefinition().setUserEnvironmentVariables(request.userEnvironmentVariables());
-        request.serverDefinition().setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
-        request.serverDefinition().setConfigurationContent(request.configurationContent());
-        request.serverDefinition().setInitializationOptionsContent(request.initializationOptionsContent());
-        request.serverDefinition().setClientConfigurationContent(request.clientConfigurationContent());
-        request.serverDefinition().setInstallerConfigurationContent(request.installerConfigurationContent());
+        var serverDefinition = request.serverDefinition();
+        
+        if (serverDefinition instanceof UserDefinedLanguageServerDefinition ls) {
+            ls.setName(request.name());
+            ls.setUrl(request.url());
+            ls.setCommandLine(request.commandLine());
+            ls.setUserEnvironmentVariables(request.userEnvironmentVariables());
+            ls.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
+            ls.setClientConfigurationContent(request.clientConfigurationContent());
+            ls.setInstallerConfigurationContent(request.installerConfigurationContent());
 
-        // remove associations
-        removeAssociationsFor(request.serverDefinition());
-        // Update associations
-        updateAssociations(request.serverDefinition(), toServerMappings(languageServerId, request.mappings()));
+            // remove associations
+            removeAssociationsFor(request.serverDefinition());
+            // Update associations
+            updateAssociations(request.serverDefinition(), toServerMappings(languageServerId, request.mappings()));
 
-        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+        }
+
+        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
         boolean nameChanged = !Objects.equals(settings.getServerName(), request.name());
         boolean commandChanged = !Objects.equals(settings.getCommandLine(), request.commandLine());
         boolean userEnvironmentVariablesChanged = !Objects.equals(settings.getUserEnvironmentVariables(), request.userEnvironmentVariables());
@@ -513,28 +557,24 @@ public class LanguageServersRegistry {
             updateLanguages();
         }
 
-        boolean configurationContentChanged = !Objects.equals(settings.getConfigurationContent(), request.configurationContent());
-        boolean initializationOptionsContentChanged = !Objects.equals(settings.getInitializationOptionsContent(), request.initializationOptionsContent());
         boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
         boolean installerConfigurationContentChanged = !Objects.equals(settings.getInstallerConfigurationContent(), request.installerConfigurationContent());
 
         settings.setServerName(request.name());
+        settings.setServerUrl(request.url());
         settings.setCommandLine(request.commandLine());
         settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
-        settings.setConfigurationContent(request.configurationContent());
-        settings.setConfigurationSchemaContent(request.configurationSchemaContent());
-        settings.setInitializationOptionsContent(request.initializationOptionsContent());
         settings.setClientConfigurationContent(request.clientConfigurationContent());
         settings.setInstallerConfigurationContent(request.installerConfigurationContent());
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged ||
                 includeSystemEnvironmentVariablesChanged ||
-                mappingsChanged || configurationContentChanged || initializationOptionsContentChanged ||
-                clientConfigurationContentChanged || installerConfigurationContentChanged) {
+                mappingsChanged || clientConfigurationContentChanged || installerConfigurationContentChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                    LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.USER,
                     request.project(),
                     request.serverDefinition(),
                     nameChanged,
@@ -542,8 +582,6 @@ public class LanguageServersRegistry {
                     userEnvironmentVariablesChanged,
                     includeSystemEnvironmentVariablesChanged,
                     mappingsChanged,
-                    configurationContentChanged,
-                    initializationOptionsContentChanged,
                     clientConfigurationContentChanged,
                     installerConfigurationContentChanged);
             if (notify) {
@@ -554,12 +592,12 @@ public class LanguageServersRegistry {
         return null;
     }
 
-    public void handleChangeEvent(LanguageServerDefinitionListener.LanguageServerChangedEvent event) {
+    public void handleChangeEvent(@NotNull LanguageServerDefinitionListener.LanguageServerChangedEvent event) {
         for (LanguageServerDefinitionListener listener : this.listeners) {
             try {
                 listener.handleChanged(event);
             } catch (Exception e) {
-                LOGGER.error("Error while server definition has changed of the language server '" + event.serverDefinition.getId() + "'", e);
+                LOGGER.error("Error while server definition has changed of the language server '{}'", event.serverDefinition.getId(), e);
             }
         }
     }
@@ -618,9 +656,7 @@ public class LanguageServersRegistry {
                     return false;
                 }
                 @Nullable PsiFile pf = psiFile != null ? psiFile : LSPIJUtils.getPsiFile(file, project);
-                if (pf != null && !pf.isPhysical()) {
-                    return false;
-                }
+                return pf == null || pf.isPhysical();
             }
             return true;
         }
@@ -657,7 +693,7 @@ public class LanguageServersRegistry {
     /**
      * @return the LSP codeLens / color inlay hint providers for all languages which are associated with a language server.
      */
-    public List<ProviderInfo<? extends Object>> getInlayHintProviderInfos() {
+    public List<ProviderInfo<?>> getInlayHintProviderInfos() {
         return inlayHintsProviders;
     }
 
@@ -669,14 +705,13 @@ public class LanguageServersRegistry {
     }
 
     public record UpdateServerDefinitionRequest(@NotNull Project project,
-                                                @NotNull UserDefinedLanguageServerDefinition serverDefinition,
-                                                @Nullable String name, @Nullable String commandLine,
+                                                @NotNull LanguageServerDefinition serverDefinition,
+                                                @Nullable String name,
+                                                @Nullable String url,
+                                                @Nullable String commandLine,
                                                 @Nullable Map<String, String> userEnvironmentVariables,
                                                 boolean includeSystemEnvironmentVariables,
                                                 @NotNull List<ServerMappingSettings> mappings,
-                                                @Nullable String configurationContent,
-                                                @Nullable String configurationSchemaContent,
-                                                @Nullable String initializationOptionsContent,
                                                 @Nullable String clientConfigurationContent,
                                                 @Nullable String installerConfigurationContent) {
     }

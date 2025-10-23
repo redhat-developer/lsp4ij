@@ -1,0 +1,18 @@
+{
+  "id": "dart-lsp",
+  "name": "Dart LSP server",
+  "programArgs": {
+    "default": "dart language-server"
+  },
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.dart"
+        ]
+      },
+      "languageId": "dart"
+    }
+  ]
+}

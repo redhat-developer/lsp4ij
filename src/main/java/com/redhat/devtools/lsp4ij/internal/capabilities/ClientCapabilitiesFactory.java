@@ -13,7 +13,6 @@
 package com.redhat.devtools.lsp4ij.internal.capabilities;
 
 import org.eclipse.lsp4j.*;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
@@ -81,9 +80,9 @@ public class ClientCapabilitiesFactory {
         FileOperationsWorkspaceCapabilities fileOperationsWorkspaceCapabilities = new FileOperationsWorkspaceCapabilities();
         fileOperationsWorkspaceCapabilities.setDynamicRegistration(Boolean.TRUE);
         //fileOperationsWorkspaceCapabilities.setWillCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
-        //fileOperationsWorkspaceCapabilities.setDidCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles
+        fileOperationsWorkspaceCapabilities.setDidCreate(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didCreateFiles
         //fileOperationsWorkspaceCapabilities.setWillDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
-        //fileOperationsWorkspaceCapabilities.setDidDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles
+        fileOperationsWorkspaceCapabilities.setDidDelete(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles
         fileOperationsWorkspaceCapabilities.setWillRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
         fileOperationsWorkspaceCapabilities.setDidRename(Boolean.TRUE); // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles
         workspaceClientCapabilities.setFileOperations(fileOperationsWorkspaceCapabilities);
@@ -100,6 +99,9 @@ public class ClientCapabilitiesFactory {
 
         // Refresh support for SemanticTokens
         workspaceClientCapabilities.setSemanticTokens(new SemanticTokensWorkspaceCapabilities(Boolean.TRUE));
+
+        // Refresh support for Diagnostic
+        workspaceClientCapabilities.setDiagnostics(new DiagnosticWorkspaceCapabilities(Boolean.TRUE));
 
         return workspaceClientCapabilities;
     }
@@ -300,13 +302,19 @@ public class ClientCapabilitiesFactory {
 
     private static WindowClientCapabilities getWindowClientCapabilities() {
         final var windowClientCapabilities = new WindowClientCapabilities();
-        windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
         /**
          * LSP4IJ supports server initiated progress using the
          * `window/workDoneProgress/create` request.
          */
         windowClientCapabilities.setWorkDoneProgress(true);
-        windowClientCapabilities.setShowMessage(new WindowShowMessageRequestCapabilities());
+
+        // Support for window/showDocument
+        windowClientCapabilities.setShowDocument(new ShowDocumentCapabilities(true));
+
+        // Support for window/showMessage and window/showMessageRequest both
+        var showMessageRequestCapabilities = new WindowShowMessageRequestCapabilities();
+        showMessageRequestCapabilities.setMessageActionItem(new WindowShowMessageRequestActionItemCapabilities(Boolean.FALSE));
+        windowClientCapabilities.setShowMessage(showMessageRequestCapabilities);
         return windowClientCapabilities;
 
     }

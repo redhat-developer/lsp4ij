@@ -127,6 +127,70 @@ You should edit the variable:
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
 
+## Run In Terminal
+
+If the DAP server supports the [Run In Terminal](https://microsoft.github.io/debug-adapter-protocol/specification.html#Reverse_Requests_RunInTerminal) request, **LSP4IJ** can handle it automatically.  
+This feature allows launching a debug session in either the `integrated terminal` or an `external terminal`.
+
+Most DAP servers let you choose which terminal to use through the `console` field in the launch parameters:
+
+- `"console": "integratedTerminal"` → Use the IDE's integrated terminal
+- `"console": "externalTerminal"` → Open a separate external terminal window
+
+The [VS Code JS Debug](./user-defined-dap/vscode-js-debug.md) adapter supports `Run In Terminal`. Below are two sample configurations:
+
+### Integrated terminal
+
+Here a sample with VSCode JS Debug and `integratedTerminal`:
+
+```json
+{
+  "type": "pwa-node",
+  "name": "Launch JavaScript file",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}",
+  "console": "integratedTerminal"
+}
+```
+
+![Run In Terminal integrated](./images/DAP_runInTerminal_integrated.png)
+
+### External terminal
+
+Here a sample with VSCode JS Debug and `externalTerminal`:
+
+```json
+{
+  "type": "pwa-node",
+  "name": "Launch JavaScript file",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}",
+  "console": "externalTerminal"
+}
+```
+
+![Run In Terminal external](./images/DAP_runInTerminal_external.png)
+
+The `externalTerminal` is supported on **Windows** and **Linux**, but **not on macOS**.
+
+## Disassemble
+
+If the DAP server [supports disassembly](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disassemble), open the Disassembly view from the stack trace context menu: `Open Disassembly View`.
+
+![Open Disassembly View](./images/DAP_open_disassembly_view.png)
+
+The Disassembly view shows the instructions for the current stack frame. You can add breakpoints and step through instructions one by one.
+
+![Disassembly View](./images/DAP_disassembly_view.gif)
+
+You can switch between source files and the Disassembly view at any time to continue step-by-step debugging.
+
+Example: using [CodeLLDB](./user-defined-dap/codelldb.md) to debug a Rust executable built with `cargo build`.
+
+![Disassembly demo](./images/DAP_disassembly_demo.gif)
+
 ## Contextual Menu
 
 Click on right button open existing / new DAP run configuration:
@@ -153,8 +217,10 @@ You can `create/remove/update` DAP servers with `Debug Adapter Protocol` entry:
 
 LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:
 
+- [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
 - [Go Delve DAP server](./user-defined-dap/go-delve.md) which allows you to debug `Go` files.
 - [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files. 
 - [Python Debugpy DAP server](./user-defined-dap/python-debugpy.md) which allows you to debug `Python` files.
+- [Ruby rdbg DAP server](./user-defined-dap/ruby-rdbg.md) which allows you to debug `Ruby` files.
 - [Swift DAP Server](./user-defined-dap/swift-lldb.md) which allows you to debug `Swift` files.
 - [VSCode JS Debug DAP Server](./user-defined-dap/vscode-js-debug.md) which allows you to debug `JavaScript/TypeScript` files.

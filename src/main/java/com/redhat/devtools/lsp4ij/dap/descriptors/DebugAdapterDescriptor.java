@@ -23,11 +23,21 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.net.NetUtils;
+import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
+import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
+import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
+import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -163,6 +173,7 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         args.setLinesStartAt1(true);
         args.setColumnsStartAt1(true);
         args.setSupportsStartDebuggingRequest(true);
+        args.setSupportsRunInTerminalRequest(true);
         return args;
     }
 
@@ -213,6 +224,12 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
 
     @NotNull
     public ServerTrace getServerTrace() {
+        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            var serverTrace = dapOptions.getServerTrace();
+            if (serverTrace != null) {
+                return serverTrace;
+            }
+        }
         return ServerTrace.getDefaultValue();
     }
 
@@ -222,7 +239,24 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
      * @return the strategy to use to know when DAP server is started and DAP client can connect to it.
      */
     @NotNull
-    public abstract ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode);
+    public ServerReadyConfig getServerReadyConfig(@NotNull DebugMode debugMode) {
+        if (options instanceof AttachConfigurable dapOptions) {
+            if (debugMode == DebugMode.ATTACH) {
+                String address = LaunchUtils.resolveAttachAddress(dapOptions.getAttachAddress(), getDapParameters());
+                int port = LaunchUtils.resolveAttachPort(dapOptions.getAttachPort(), getDapParameters());
+                return new ServerReadyConfig(address, port);
+            }
+        }
+        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            var strategy = dapOptions.getDebugServerWaitStrategy();
+            return switch (strategy) {
+                case TIMEOUT -> new ServerReadyConfig(dapOptions.getConnectTimeout());
+                case TRACE -> new ServerReadyConfig(dapOptions.getNetworkAddressExtractor());
+                default -> new ServerReadyConfig(0);
+            };
+        }
+        return new ServerReadyConfig(500);
+    }
 
     public abstract @Nullable FileType getFileType();
 
@@ -243,5 +277,27 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
         return serverDefinition != null && serverDefinition.isDebuggableFile(file, project);
+    }
+
+    public @NotNull DAPBreakpointHandlerBase<?> createBreakpointHandler(@NotNull XDebugSession session, Project project) {
+        return new DAPBreakpointHandler(session, this, project);
+    }
+
+    public @NotNull DisassemblyBreakpointHandlerBase<?> createDisassemblyBreakpointHandler(@NotNull XDebugSession session, Project project) {
+        return new DisassemblyBreakpointHandler(session, this, project);
+    }
+
+    public @NotNull XDebuggerEditorsProvider createDebuggerEditorsProvider(@Nullable FileType fileType,
+                                                                           @NotNull DAPDebugProcess debugProcess) {
+        return new DAPDebuggerEditorsProvider(fileType, debugProcess);
+    }
+
+    /**
+     * Returns true if "Installer" tab must be shown and false otherwise.
+     *
+     * @return true if "Installer" tab must be shown and false otherwise.
+     */
+    public boolean isShowInstallerTab() {
+        return false;
     }
 }

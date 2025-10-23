@@ -11,18 +11,16 @@
 package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
-import com.intellij.execution.filters.TextConsoleBuilder;
-import com.intellij.execution.filters.TextConsoleBuilderFactory;
-import com.intellij.execution.ui.ConsoleView;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.ide.BrowserUtil;
-import com.intellij.notification.Notification;
-import com.intellij.notification.NotificationType;
-import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.NlsContexts;
-import com.intellij.ui.*;
+import com.intellij.ui.ContextHelpLabel;
+import com.intellij.ui.HyperlinkLabel;
+import com.intellij.ui.PortField;
+import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
@@ -32,15 +30,12 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
-import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
-import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
 import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPClientConfigurationJsonSchemaFileProvider;
-import com.redhat.devtools.lsp4ij.settings.jsonSchema.ServerInstallerJsonSchemaFileProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,7 +43,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.util.HashSet;
+import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
@@ -71,26 +66,30 @@ public class LanguageServerPanel implements Disposable {
     private final ComboBox<ServerTrace> serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
-    private final boolean flushOnEachPrint;
+    private final boolean canExecuteInstaller;
+    private final JBCheckBox expandConfigurationCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.configuration.expand"));
     private HyperlinkLabel editJsonSchemaAction;
     private JBTextField serverName;
-    private EnvironmentVariablesComponent environmentVariables;
+    private @Nullable EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private ServerMappingsPanel mappingsPanel;
-    private SchemaBackedJsonTextField configurationWidget;
+    private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
     private JsonTextField initializationOptionsWidget;
+    private JsonTextField experimentalWidget;
     private @Nullable JsonTextField clientConfigurationWidget;
     private @Nullable InstallerPanel installerPanel;
+    private @Nullable String serverUrl;
+    private HyperlinkLabel serverUrlHyperlink;
 
     public LanguageServerPanel(@NotNull FormBuilder builder,
                                @Nullable JComponent description,
-                               @NotNull EditionMode mode,
-                               boolean flushOnEachPrint,
-                               @NotNull Project project) {
-        this.flushOnEachPrint = flushOnEachPrint;
+                               @NotNull UIConfiguration uiConfiguration,
+                               boolean canExecuteInstaller,
+                               @Nullable Project project) {
+        this.canExecuteInstaller = canExecuteInstaller;
         this.project = project;
-        createUI(builder, description, mode);
+        createUI(builder, description, uiConfiguration);
     }
 
     private static FormBuilder addTab(@NotNull JBTabbedPane tabbedPane,
@@ -161,36 +160,38 @@ public class LanguageServerPanel implements Disposable {
 
     private void createUI(@NotNull FormBuilder builder,
                           @Nullable JComponent description,
-                          @NotNull EditionMode mode) {
+                          @NotNull UIConfiguration uiConfiguration) {
         JBTabbedPane tabbedPane = new JBTabbedPane();
         builder.addComponentFillVertically(tabbedPane, 0);
 
         // Server tab
-        addServerTab(tabbedPane, description, mode);
+        addServerTab(tabbedPane, description, uiConfiguration);
         // Mappings tab
-        addMappingsTab(tabbedPane, mode);
-        if (mode != EditionMode.EDIT_EXTENSION) {
-            // Configuration tab to fill LSP Configuration + LSP Initialize Options
-            addConfigurationTab(tabbedPane);
-            // Installer tab to fill installer of the LSP server
-            addInstallerTab(tabbedPane);
-        }
+        addMappingsTab(tabbedPane, uiConfiguration);
+
+        // Configuration tab to fill LSP Configuration + LSP Initialize Options
+        addConfigurationTab(tabbedPane, uiConfiguration);
+
+        // Installer tab to fill installer of the LSP server
+        addInstallerTab(tabbedPane, uiConfiguration);
+
         // Debug tab
-        addDebugTab(tabbedPane, mode);
+        addDebugTab(tabbedPane, uiConfiguration);
     }
 
     private void addServerTab(@NotNull JBTabbedPane tabbedPane,
                               @Nullable JComponent description,
-                              @NotNull EditionMode mode) {
+                              @NotNull UIConfiguration uiConfiguration) {
         FormBuilder serverTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.server"));
+        createServerUrl(serverTab);
         if (description != null) {
             serverTab.addComponent(description, 0);
         }
-        if (mode == EditionMode.NEW_USER_DEFINED) {
+        if (uiConfiguration.isShowServerName()) {
             // Server name
             createServerNameField(serverTab);
         }
-        if (mode != EditionMode.EDIT_EXTENSION) {
+        if (uiConfiguration.isShowCommandLine()) {
             environmentVariables = new EnvironmentVariablesComponent();
             serverTab.addComponent(environmentVariables);
             // Command line
@@ -198,29 +199,64 @@ public class LanguageServerPanel implements Disposable {
         }
     }
 
-    private void addMappingsTab(@NotNull JBTabbedPane tabbedPane,
-                                @NotNull EditionMode mode) {
-        FormBuilder mappingsTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.mappings"));
-        this.mappingsPanel = new ServerMappingsPanel(mappingsTab, mode != EditionMode.EDIT_EXTENSION);
+    private void createServerUrl(@NotNull FormBuilder serverTab) {
+        // Add hidden server url
+        serverUrlHyperlink = new HyperlinkLabel();
+        serverUrlHyperlink.setTextWithHyperlink(LanguageServerBundle.message("language.server.url", ""));
+        serverUrlHyperlink.setVisible(false);
+        serverTab.addComponent(serverUrlHyperlink, 0);
     }
 
-    private void addConfigurationTab(@NotNull JBTabbedPane tabbedPane) {
+    private void addMappingsTab(@NotNull JBTabbedPane tabbedPane,
+                                @NotNull UIConfiguration configuration) {
+        FormBuilder mappingsTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.mappings"));
+        this.mappingsPanel = new ServerMappingsPanel(mappingsTab, configuration.isServerMappingsEditable());
+    }
+
+    private void addConfigurationTab(@NotNull JBTabbedPane tabbedPane,
+                                     @NotNull UIConfiguration configuration) {
+
+        boolean showServerConfiguration = configuration.isShowServerConfiguration();
+        boolean showServerInitializationOptions = configuration.isShowServerInitializationOptions();
+        boolean showServerExperimental = configuration.isShowServerExperimental();
+        boolean showServerTab = showServerConfiguration || showServerInitializationOptions || showServerExperimental;
+        boolean showClientConfiguration = configuration.isShowClientConfiguration();
+
+        if (!showServerTab && !showClientConfiguration) {
+            // Don't show Configuration tab
+            return;
+        }
+
         FormBuilder configurationTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.configuration"), false);
 
         JBTabbedPane configurationTabbedPane = new JBTabbedPane();
         configurationTab.addComponentFillVertically(configurationTabbedPane, 0);
 
-        FormBuilder serverConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.server"), false);
-        createConfigurationField(serverConfigurationTab);
-        createInitializationOptionsTabField(serverConfigurationTab);
+        if (showServerTab) {
+            FormBuilder serverConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.server"), false);
+            if (showServerConfiguration) {
+                createConfigurationField(serverConfigurationTab);
+            }
+            if (showServerInitializationOptions) {
+                createInitializationOptionsTabField(serverConfigurationTab);
+            }
+            if (showServerExperimental) {
+                createExperimentalTabField(serverConfigurationTab);
+            }
+        }
 
-        FormBuilder clientConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.client"), false);
-        createClientConfigurationField(clientConfigurationTab);
+        if (showClientConfiguration) {
+            FormBuilder clientConfigurationTab = addTab(configurationTabbedPane, LanguageServerBundle.message("language.server.tab.configuration.client"), false);
+            createClientConfigurationField(clientConfigurationTab);
+        }
     }
 
-    private void addInstallerTab(@NotNull JBTabbedPane tabbedPane) {
+    private void addInstallerTab(@NotNull JBTabbedPane tabbedPane, @NotNull UIConfiguration uiConfiguration) {
+        if (!uiConfiguration.isShowInstaller()) {
+            return;
+        }
         FormBuilder installerTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.installer"), false);
-        this.installerPanel = new InstallerPanel(installerTab, getCommandLine(), flushOnEachPrint, project);
+        this.installerPanel = new InstallerPanel(installerTab, canExecuteInstaller, project);
     }
 
     public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
@@ -242,8 +278,8 @@ public class LanguageServerPanel implements Disposable {
     }
 
     private void addDebugTab(@NotNull JBTabbedPane tabbedPane,
-                             @NotNull EditionMode mode) {
-        if (mode == EditionMode.NEW_USER_DEFINED) {
+                             @NotNull UIConfiguration configuration) {
+        if (!configuration.isShowDebug()) {
             return;
         }
         FormBuilder debugTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.debug"));
@@ -254,7 +290,7 @@ public class LanguageServerPanel implements Disposable {
         // Server trace
         debugTab.addLabeledComponent(LanguageServerBundle.message("language.server.trace"), serverTraceComboBox);
 
-        if (mode == EditionMode.EDIT_EXTENSION) {
+        if (configuration.isShowDebugPortAndSuspend()) {
             // Debug port + suspend
             debugTab
                     .addLabeledComponent(LanguageServerBundle.message("language.server.debug.port"), debugPortField)
@@ -308,12 +344,16 @@ public class LanguageServerPanel implements Disposable {
     private void createConfigurationField(@NotNull FormBuilder builder) {
         // Create the hyperlink "Edit JSON Schema" / "Associate with JSON Schema".
         editJsonSchemaAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.configuration.json.schema.associate"));
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), editJsonSchemaAction);
+        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        headerPanel.add(expandConfigurationCheckBox);
+        headerPanel.add(editJsonSchemaAction);
+
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), headerPanel);
         editJsonSchemaAction.addHyperlinkListener(e -> {
             var dialog = new EditJsonSchemaDialog(project, configurationSchemaContent);
             dialog.show();
             if (dialog.isOK()) {
-                // Associate the Server / Configuration editor with the new Json JSON content
+                // Associate the Server / Configuration editor with the new JSON content
                 this.setConfigurationSchemaContent(dialog.getJsonSchemaContent());
             }
         });
@@ -328,6 +368,11 @@ public class LanguageServerPanel implements Disposable {
         builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.initializationOptions"), initializationOptionsWidget);
     }
 
+    private void createExperimentalTabField(@NotNull FormBuilder builder) {
+        experimentalWidget = new JsonTextField(project);
+        builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.experimental"), experimentalWidget);
+    }
+
     private void createClientConfigurationField(@NotNull FormBuilder builder) {
         clientConfigurationWidget = new JsonTextField(project);
         clientConfigurationWidget.setJsonFilename(LSPClientConfigurationJsonSchemaFileProvider.CLIENT_SETTINGS_JSON_FILE_NAME);
@@ -338,48 +383,128 @@ public class LanguageServerPanel implements Disposable {
         return serverName;
     }
 
-    public EnvironmentVariablesComponent getEnvironmentVariables() {
-        return environmentVariables;
+    public @Nullable Map<String, String> getUserEnvironmentVariables() {
+        return environmentVariables != null ? environmentVariables.getEnvs() : null;
     }
 
-    public CommandLineWidget getCommandLine() {
+    public boolean isIncludeSystemEnvironmentVariables() {
+        return environmentVariables != null && environmentVariables.getEnvData().isPassParentEnvs();
+    }
+
+    public void setEnvData(@Nullable EnvironmentVariablesData envData) {
+        if (environmentVariables != null && envData != null) {
+            environmentVariables.setEnvData(envData);
+        }
+    }
+
+    public @Nullable EnvironmentVariablesData getEnvData() {
+        return environmentVariables != null ? environmentVariables.getEnvData() : null;
+    }
+
+    public @Nullable CommandLineWidget getCommandLineWidget() {
         return commandLine;
+    }
+
+    public @Nullable String getCommandLine() {
+        return commandLine != null ? commandLine.getText() : null;
+    }
+
+    public void setCommandLine(@Nullable String commandLine) {
+        if (this.commandLine == null) {
+            return;
+        }
+        this.commandLine.setText(commandLine != null ? commandLine : "");
     }
 
     public ServerMappingsPanel getMappingsPanel() {
         return mappingsPanel;
     }
 
-    // TODO: Rename this to getConfigurationWidget()? getServerConfigurationWidget()?
-    public SchemaBackedJsonTextField getConfiguration() {
-        return configurationWidget;
+    public @Nullable String getConfigurationContent() {
+        return configurationWidget != null ? configurationWidget.getText() : null;
     }
 
-    public String getConfigurationSchemaContent() {
+    public void setConfigurationContent(@Nullable String configurationContent) {
+        if (configurationWidget == null) {
+            return;
+        }
+        configurationWidget.setText(configurationContent != null ? configurationContent : "");
+        configurationWidget.setCaretPosition(0);
+    }
+
+    public boolean isExpandConfiguration() {
+        return expandConfigurationCheckBox.isSelected();
+    }
+
+    public void setExpandConfiguration(boolean expandConfiguration) {
+        expandConfigurationCheckBox.setSelected(expandConfiguration);
+    }
+
+    public @Nullable String getConfigurationSchemaContent() {
         return configurationSchemaContent;
     }
 
-    public void setConfigurationSchemaContent(String configurationSchemaContent) {
+    public void setConfigurationSchemaContent(@Nullable String configurationSchemaContent) {
         this.configurationSchemaContent = configurationSchemaContent;
-        if (StringUtils.isNotBlank(configurationSchemaContent)) {
-            getConfiguration().associateWithJsonSchema(configurationSchemaContent);
+        if (configurationWidget == null) {
+            return;
+        }
+        if (configurationSchemaContent != null && StringUtils.isNotBlank(configurationSchemaContent)) {
+            configurationWidget.associateWithJsonSchema(configurationSchemaContent);
             editJsonSchemaAction.setHyperlinkText(LanguageServerBundle.message("language.server.configuration.json.schema.edit"));
         } else {
-            getConfiguration().resetJsonSchema();
+            configurationWidget.resetJsonSchema();
             editJsonSchemaAction.setHyperlinkText(LanguageServerBundle.message("language.server.configuration.json.schema.associate"));
         }
     }
 
-    public JsonTextField getInitializationOptionsWidget() {
-        return initializationOptionsWidget;
+    public @Nullable String getInitializationOptionsContent() {
+        return initializationOptionsWidget != null ? initializationOptionsWidget.getText() : null;
     }
 
-    public @Nullable JsonTextField getClientConfigurationWidget() {
-        return clientConfigurationWidget;
+    public void setInitializationOptionsContent(@Nullable String initializationOptionsContent) {
+        if (initializationOptionsWidget == null) {
+            return;
+        }
+        initializationOptionsWidget.setText(initializationOptionsContent != null ? initializationOptionsContent : "");
+        initializationOptionsWidget.setCaretPosition(0);
     }
 
-    public @Nullable JsonTextField getInstallerConfigurationWidget() {
-        return installerPanel != null ? installerPanel.getInstallerConfigurationWidget() : null;
+    public @Nullable String getExperimentalContent() {
+        return experimentalWidget != null ? experimentalWidget.getText() : null;
+    }
+
+    public void setExperimentalContent(@Nullable String experimentalContent) {
+        if (experimentalWidget == null) {
+            return;
+        }
+        experimentalWidget.setText(experimentalContent != null ? experimentalContent : "");
+        experimentalWidget.setCaretPosition(0);
+    }
+
+    public @Nullable String getClientConfigurationContent() {
+        return clientConfigurationWidget != null ? clientConfigurationWidget.getText() : null;
+    }
+
+    public void setClientConfigurationContent(@Nullable String clientConfigurationContent) {
+        if (clientConfigurationWidget == null) {
+            return;
+        }
+        clientConfigurationWidget.setText(clientConfigurationContent != null ? clientConfigurationContent : "");
+        clientConfigurationWidget.setCaretPosition(0);
+    }
+
+    public @Nullable String getInstallerConfigurationContent() {
+        return installerPanel != null ? installerPanel.getInstallerConfigurationWidget().getText() : null;
+    }
+
+    public void setInstallerConfigurationContent(@Nullable String installerConfigurationContent) {
+        if (installerPanel == null) {
+            return;
+        }
+        var installerConfigurationWidget = installerPanel.getInstallerConfigurationWidget();
+        installerConfigurationWidget.setText(installerConfigurationContent != null ? installerConfigurationContent : "");
+        installerConfigurationWidget.setCaretPosition(0);
     }
 
     public JBCheckBox getDebugSuspendCheckBox() {
@@ -398,6 +523,20 @@ public class LanguageServerPanel implements Disposable {
         return errorReportingKindCombo;
     }
 
+    public @Nullable String getServerUrl() {
+        return serverUrl;
+    }
+
+    public void setServerUrl(@Nullable String serverUrl) {
+        this.serverUrl = serverUrl;
+        if (serverUrl == null || StringUtils.isEmpty(serverUrl)) {
+            serverUrlHyperlink.setVisible(false);
+        } else {
+            serverUrlHyperlink.setVisible(true);
+            serverUrlHyperlink.setHyperlinkTarget(serverUrl);
+        }
+    }
+
     @Override
     public void dispose() {
         if (configurationWidget != null) {
@@ -408,9 +547,4 @@ public class LanguageServerPanel implements Disposable {
         }
     }
 
-    public enum EditionMode {
-        NEW_USER_DEFINED,
-        EDIT_USER_DEFINED,
-        EDIT_EXTENSION;
-    }
 }

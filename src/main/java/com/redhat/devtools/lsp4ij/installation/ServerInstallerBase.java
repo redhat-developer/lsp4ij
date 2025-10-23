@@ -15,16 +15,16 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
-import com.redhat.devtools.lsp4ij.ServerStatus;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatureAware;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Abstract class for handling server installation tasks.
@@ -39,7 +39,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class ServerInstallerBase implements ServerInstaller {
 
-    private static final CompletableFuture<ServerInstallationStatus> INSTALLED_FUTURE = CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
+    protected static final CompletableFuture<ServerInstallationStatus> INSTALLED_FUTURE = CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
 
     /**
      * A {@link CompletableFuture} representing the installation process.
@@ -57,8 +57,11 @@ public abstract class ServerInstallerBase implements ServerInstaller {
     @NotNull
     private ServerInstallationStatus status;
 
+    private final List<ConsoleProvider> consoleProviders;
+
     public ServerInstallerBase() {
         reset();
+        this.consoleProviders = new CopyOnWriteArrayList<>();
     }
 
     /**
@@ -70,15 +73,33 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      * @return a {@link CompletableFuture} that will be completed once the installation is finished.
      */
     @Override
-    public CompletableFuture<ServerInstallationStatus> checkInstallation() {
+    public @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation() {
+        return checkInstallation(new ServerInstallationContext());
+    }
+
+    /**
+     * Checks the current installation status and starts the installation if necessary.
+     * <p>
+     * If the server is already installed, it returns a pre-completed future.
+     * If not, it creates a new installation task and returns a future representing the installation process.
+     *
+     * @return a {@link CompletableFuture} that will be completed once the installation is finished.
+     */
+    @Override
+    public @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation(@NotNull ServerInstallationContext context) {
         if (status == ServerInstallationStatus.INSTALLED) {
             // Server is already installed, return completed future
             return INSTALLED_FUTURE;
         }
-        if (!isInstallFutureInitialized()) {
-            installFuture = createInstallFuture();
+        if (installFuture == null || !isInstallFutureInitialized()) {
+            installFuture = createInstallFuture(context);
         }
         return installFuture;
+    }
+
+    @Override
+    public @NotNull ServerInstallationStatus getStatus() {
+        return status;
     }
 
     /**
@@ -97,7 +118,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      * @return a {@link CompletableFuture} representing the installation process.
      */
     @NotNull
-    private synchronized CompletableFuture<ServerInstallationStatus> createInstallFuture() {
+    private synchronized CompletableFuture<ServerInstallationStatus> createInstallFuture(@NotNull ServerInstallationContext context) {
         if (installFuture != null && isInstallFutureInitialized()) {
             return installFuture;
         }
@@ -106,6 +127,13 @@ public abstract class ServerInstallerBase implements ServerInstaller {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
+                    indicator = new PrintableProgressIndicator(indicator) {
+                        @Override
+                        protected void printProgress(@NotNull String progressMessage) {
+                            getConsoleProviders()
+                                    .forEach(provider -> provider.printProgress(progressMessage));
+                        }
+                    };
                     indicator.setIndeterminate(false);
                     if (status == ServerInstallationStatus.NOT_INSTALLED) {
                         progressCheckingServerInstalled(indicator);
@@ -114,10 +142,12 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                     // Check if user has canceled the server installer task
                     ProgressManager.checkCanceled();
 
-                    // Checking if the server is installed
-                    if (checkServerInstalled(indicator)) {
-                        markAsInstalled(installFuture);
-                        return;
+                    if (!context.isForceInstall()) {
+                        // Checking if the server is installed
+                        if (checkServerInstalled(indicator)) {
+                            markAsInstalled(context, installFuture);
+                            return;
+                        }
                     }
 
                     // Check if user has canceled the server installer task
@@ -127,7 +157,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                     progressInstallingServer(indicator);
                     updateStatus(ServerInstallationStatus.INSTALLING);
 
-                    var beforeCode = getBeforeCode();
+                    var beforeCode = getBeforeCode(context);
                     if (beforeCode != null) {
                         beforeCode.run();
                     }
@@ -137,7 +167,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                     // Process the installation
                     install(indicator);
 
-                    markAsInstalled(installFuture);
+                    markAsInstalled(context, installFuture);
                 } catch (ProcessCanceledException e) {
                     //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                     //TODO delete block when minimum required version is 2024.2
@@ -157,9 +187,10 @@ public abstract class ServerInstallerBase implements ServerInstaller {
         this.status = status;
     }
 
-    private void markAsInstalled(@NotNull CompletableFuture<ServerInstallationStatus> installFuture) {
+    private void markAsInstalled(@NotNull ServerInstallationContext context,
+                                 @NotNull CompletableFuture<ServerInstallationStatus> installFuture) {
         updateStatus(ServerInstallationStatus.INSTALLED);
-        var afterCode = getAfterCode();
+        var afterCode = getAfterCode(context);
         if (afterCode != null) {
             afterCode.run();
         }
@@ -263,6 +294,21 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      *
      * @return the {@link Project} for the installation.
      */
-    protected abstract @NotNull Project getProject();
+    protected abstract @Nullable Project getProject();
 
+    @Override
+    public void registerConsoleProvider(@NotNull ConsoleProvider consoleProvider) {
+        this.consoleProviders.add(consoleProvider);
+        // Unregister the console provider when the console is disposed.
+        Disposer.register(consoleProvider.getConsole(), () -> unregisterConsoleProvider(consoleProvider));
+    }
+
+    @Override
+    public void unregisterConsoleProvider(@NotNull ConsoleProvider consoleProvider) {
+        this.consoleProviders.remove(consoleProvider);
+    }
+
+    public @NotNull List<ConsoleProvider> getConsoleProviders() {
+        return consoleProviders;
+    }
 }

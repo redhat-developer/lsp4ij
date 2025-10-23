@@ -1,0 +1,5 @@
+{
+  "astro.trace.server": "off",
+  "astro.content-intellisense": false,
+  "astro.updateImportsOnFileMove.enabled": false
+}

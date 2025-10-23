@@ -36,7 +36,6 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         setBreadcrumbsFeature(new UserDefinedBreadcrumbsFeature());
         setEditorBehaviorFeature(new UserDefinedEditorBehaviorFeature(this));
         setFileUriSupport(new UserDefinedFileUriSupport(this));
-        setServerInstaller(new UserDefinedLanguageServerInstaller());
     }
 
     public boolean isCaseSensitive(@NotNull PsiFile file) {
@@ -70,6 +69,12 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
     public String getStatementTerminatorCharacters(@NotNull PsiFile file) {
         ClientConfigurationSettings clientConfiguration = getClientConfigurationSettings();
         return clientConfiguration != null ? clientConfiguration.statementTerminatorCharacters : super.getStatementTerminatorCharacters(file);
+    }
+
+    @Override
+    public boolean isUseIntAsJsonRpcId() {
+        ClientConfigurationSettings clientConfiguration = getClientConfigurationSettings();
+        return clientConfiguration != null ? clientConfiguration.jsonRpc.useIntegerIds : super.isUseIntAsJsonRpcId();
     }
 
     public @Nullable ClientConfigurationSettings getClientConfigurationSettings() {

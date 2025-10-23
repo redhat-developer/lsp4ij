@@ -4,6 +4,7 @@
   "programArgs": {
     "default": "clangd"
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

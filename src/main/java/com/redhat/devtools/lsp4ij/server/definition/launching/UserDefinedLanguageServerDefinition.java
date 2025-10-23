@@ -13,24 +13,27 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
-import com.google.gson.JsonParser;
 import com.google.gson.annotations.SerializedName;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
+import com.redhat.devtools.lsp4ij.settings.contributors.ServerConfigurationContributor;
+import com.redhat.devtools.lsp4ij.settings.contributors.ServerExperimentalContributor;
+import com.redhat.devtools.lsp4ij.settings.contributors.ServerInitializationOptionsContributor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.StringReader;
 import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
@@ -39,21 +42,24 @@ import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtil
  * {@link com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition} implementation to start a
  * language server with a process command defined by the user.
  */
-public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition implements ClientConfigurableLanguageServerDefinition, CommandLineUpdater {
+public class UserDefinedLanguageServerDefinition extends LanguageServerDefinition implements ClientConfigurableLanguageServerDefinition, CommandLineUpdater,
+        ServerConfigurationContributor, ServerExperimentalContributor, ServerInitializationOptionsContributor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);//$NON-NLS-1$
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);
+    private final String templateId;
     @SerializedName("displayName")
     private String name;
-    private String templateId;
+    private String url;
     private String commandLine;
     private Map<String, String> userEnvironmentVariables;
     private boolean includeSystemEnvironmentVariables;
-    private String configurationContent;
-    private Object configuration;
-    private String configurationSchemaContent;
-    private String initializationOptionsContent;
-    private Object initializationOptions;
+
+    private final String defaultConfigurationContent;
+    private final boolean defaultExpandConfiguration;
+    private final String defaultConfigurationSchemaContent;
+    private final String defaultInitializationOptionsContent;
+    private final String defaultExperimentalContent;
+
     private String clientConfigurationContent;
     private ClientConfigurationSettings clientConfiguration;
     private @Nullable ServerInstallerDescriptor serverInstallerDescriptor;
@@ -62,24 +68,30 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     public UserDefinedLanguageServerDefinition(@NotNull String id,
                                                @Nullable String templateId,
                                                @NotNull String name,
+                                               @Nullable String url,
                                                @Nullable String description,
                                                @NotNull String commandLine,
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
-                                               @Nullable String configurationContent,
-                                               @Nullable String configurationSchemaContent,
-                                               @Nullable String initializationOptionsContent,
+                                               @Nullable String defaultConfigurationContent,
+                                               boolean defaultExpandConfiguration,
+                                               @Nullable String defaultConfigurationSchemaContent,
+                                               @Nullable String defaultInitializationOptionsContent,
+                                               @Nullable String defaultExperimentalContent,
                                                @Nullable String clientConfigurationContent,
                                                @Nullable String installerConfigurationContent) {
         super(id, name, description, true, null, false);
         this.name = name;
+        this.url = url;
         this.templateId = templateId;
         this.commandLine = commandLine;
         this.userEnvironmentVariables = userEnvironmentVariables;
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
-        this.configurationContent = configurationContent;
-        this.configurationSchemaContent = configurationSchemaContent;
-        this.initializationOptionsContent = initializationOptionsContent;
+        this.defaultConfigurationContent = defaultConfigurationContent;
+        this.defaultConfigurationSchemaContent = defaultConfigurationSchemaContent;
+        this.defaultExpandConfiguration = defaultExpandConfiguration;
+        this.defaultInitializationOptionsContent = defaultInitializationOptionsContent;
+        this.defaultExperimentalContent = defaultExperimentalContent;
         this.clientConfigurationContent = clientConfigurationContent;
         this.installerConfigurationContent = installerConfigurationContent;
     }
@@ -91,18 +103,21 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @NotNull String commandLine,
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
-                                               @Nullable String configurationContent,
-                                               @Nullable String initializationOptionsContent) {
+                                               @Nullable String defaultConfigurationContent,
+                                               @Nullable String defaultInitializationOptionsContent) {
         this(id,
                 null,
                 name,
+                null,
                 description,
                 commandLine,
                 userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
-                configurationContent,
+                defaultConfigurationContent,
+                false,
                 null,
-                initializationOptionsContent,
+                defaultInitializationOptionsContent,
+                null,
                 null,
                 null);
     }
@@ -141,6 +156,14 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.name = name;
     }
 
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
     @Override
     public String getCommandLine() {
         return commandLine;
@@ -167,30 +190,28 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
     }
 
-    public String getConfigurationContent() {
-        return configurationContent;
+    @Override
+    public String getDefaultConfigurationContent() {
+        return defaultConfigurationContent;
     }
 
-    public void setConfigurationContent(String configurationContent) {
-        this.configurationContent = configurationContent;
-        this.configuration = null;
+    @Override
+    public boolean isDefaultExpandConfiguration() {
+        return defaultExpandConfiguration;
     }
 
-    public String getConfigurationSchemaContent() {
-        return configurationSchemaContent;
+    @Override
+    public String getDefaultConfigurationSchemaContent() {
+        return defaultConfigurationSchemaContent;
     }
 
-    public void setConfigurationSchemaContent(String configurationSchemaContent) {
-        this.configurationSchemaContent = configurationSchemaContent;
+    public String getDefaultInitializationOptionsContent() {
+        return defaultInitializationOptionsContent;
     }
 
-    public String getInitializationOptionsContent() {
-        return initializationOptionsContent;
-    }
-
-    public void setInitializationOptionsContent(String initializationOptionsContent) {
-        this.initializationOptionsContent = initializationOptionsContent;
-        this.initializationOptions = null;
+    @Override
+    public String getDefaultExperimentalContent() {
+        return defaultExperimentalContent;
     }
 
     public String getClientConfigurationContent() {
@@ -211,28 +232,6 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.serverInstallerDescriptor = null;
     }
 
-    public Object getLanguageServerConfiguration() {
-        if (configuration == null && configurationContent != null && !configurationContent.isBlank()) {
-            try {
-                configuration = JsonParser.parseReader(new StringReader(configurationContent));
-            } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON configuration for the language server '" + getId() + "'", e);
-            }
-        }
-        return configuration;
-    }
-
-    public Object getLanguageServerInitializationOptions() {
-        if (initializationOptions == null && initializationOptionsContent != null && !initializationOptionsContent.isEmpty()) {
-            try {
-                initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
-            } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON Initialization Options for the language server '" + getId() + "'", e);
-            }
-        }
-        return initializationOptions;
-    }
-
     @Override
     @Nullable
     public ClientConfigurationSettings getLanguageServerClientConfiguration() {
@@ -240,7 +239,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
             try {
                 clientConfiguration = JSONUtils.getLsp4jGson().fromJson(clientConfigurationContent, ClientConfigurationSettings.class);
             } catch (Exception e) {
-                LOGGER.error("Error while parsing JSON client configuration for the language server '" + getId() + "'", e);
+                LOGGER.error("Error while parsing JSON client configuration for the language server '{}'", getId(), e);
             }
         }
         return clientConfiguration;
@@ -257,9 +256,19 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         }
         return serverInstallerDescriptor;
     }
-    
+
     @Override
     public @NotNull String getDisplayName() {
         return name;
+    }
+
+    @Override
+    public @Nullable ServerInstaller createServerInstaller() {
+        return new UserDefinedLanguageServerInstaller(this);
+    }
+
+    @Override
+    public @Nullable LanguageServerSettingsContributor createLanguageServerSettingsContributor() {
+        return new UserDefinedLanguageServerSettingsContributor(this);
     }
 }

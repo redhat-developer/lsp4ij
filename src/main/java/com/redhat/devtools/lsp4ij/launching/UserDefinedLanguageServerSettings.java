@@ -20,6 +20,7 @@ import com.intellij.openapi.components.Storage;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.intellij.util.xmlb.annotations.XCollection;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -58,11 +59,11 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         myState = state;
     }
 
-    public UserDefinedLanguageServerItemSettings getLaunchConfigSettings(String languageServerId) {
+    public UserDefinedLanguageServerItemSettings getUserDefinedLanguageServerSettings(String languageServerId) {
         return myState.myState.get(languageServerId);
     }
 
-    public void setLaunchConfigSettings(String languageServerId, UserDefinedLanguageServerItemSettings settings) {
+    public void setUserDefinedLanguageServerSettings(String languageServerId, UserDefinedLanguageServerItemSettings settings) {
         myState.myState.put(languageServerId, settings);
         fireStateChanged();
     }
@@ -111,17 +112,13 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String serverName;
 
+        private String serverUrl;
+
         private String commandLine;
 
         private Map<String, String> userEnvironmentVariables;
 
         private boolean includeSystemEnvironmentVariables = true;
-
-        private String configurationContent;
-
-        private String configurationSchemaContent;
-
-        private String initializationOptionsContent;
 
         private String clientConfigurationContent = "{}";
 
@@ -154,6 +151,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setServerName(String serverName) {
             this.serverName = serverName;
+        }
+
+        public String getServerUrl() {
+            return serverUrl;
+        }
+
+        public void setServerUrl(String serverUrl) {
+            this.serverUrl = serverUrl;
         }
 
         public String getCommandLine() {
@@ -207,30 +212,6 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setMappings(List<ServerMappingSettings> mappings) {
             this.mappings = mappings;
-        }
-
-        public String getConfigurationContent() {
-            return configurationContent;
-        }
-
-        public void setConfigurationContent(String configurationContent) {
-            this.configurationContent = configurationContent;
-        }
-
-        public String getConfigurationSchemaContent() {
-            return configurationSchemaContent;
-        }
-
-        public void setConfigurationSchemaContent(String configurationSchemaContent) {
-            this.configurationSchemaContent = configurationSchemaContent;
-        }
-
-        public String getInitializationOptionsContent() {
-            return initializationOptionsContent;
-        }
-
-        public void setInitializationOptionsContent(String initializationOptionsContent) {
-            this.initializationOptionsContent = initializationOptionsContent;
         }
 
         public String getClientConfigurationContent() {

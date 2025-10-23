@@ -1,0 +1,36 @@
+{
+  "id": "stylelint-lsp",
+  "name": "Stylelint Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/stylelint-lsp/node_modules"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Stylelint Language Server",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
+      "command": {
+        "windows": "npm.cmd install stylelint-lsp --force",
+        "default": "npm install stylelint-lsp --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Stylelint Language Server command",
+          "command": {
+            "windows": "${workingDir}/.bin/stylelint-lsp.cmd --stdio",
+            "default": "${workingDir}/.bin/stylelint-lsp --stdio"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}

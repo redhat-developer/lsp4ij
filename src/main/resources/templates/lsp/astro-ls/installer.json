@@ -1,0 +1,36 @@
+{
+  "id": "astro",
+  "name": "Astro Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/astro-ls/node_modules"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Astro Language Server",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
+      "command": {
+        "windows": "npm.cmd install @astrojs/language-server prettier-plugin-astro typescript --force",
+        "default": "npm install @astrojs/language-server prettier-plugin-astro typescript --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Astro Language Server command",
+          "command": {
+            "windows": "${workingDir}/.bin/astro-ls.cmd --stdio",
+            "default": "${workingDir}/.bin/astro-ls --stdio"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}

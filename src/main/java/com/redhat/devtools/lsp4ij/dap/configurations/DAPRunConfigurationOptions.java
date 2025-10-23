@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
-import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.lang.Language;
 import com.intellij.openapi.components.StoredProperty;
 import com.intellij.openapi.project.Project;
@@ -20,12 +19,13 @@ import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
 import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
-import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
@@ -35,7 +35,7 @@ import java.util.List;
 /**
  * Debug Adapter Protocol (DAP) run configuration options.
  */
-public class DAPRunConfigurationOptions extends RunConfigurationOptions implements FileOptionConfigurable, WorkingDirectoryConfigurable, DebuggableFile {
+public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase implements FileOptionConfigurable, WorkingDirectoryConfigurable, AttachConfigurable, DebuggableFile, CommandLineUpdater {
 
     @Nullable
     private NetworkAddressExtractor networkAddressExtractor;
@@ -73,6 +73,9 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     private final StoredProperty<String> serverName = string("")
             .provideDelegate(this, "serverName");
 
+    private final StoredProperty<String> serverUrl = string("")
+            .provideDelegate(this, "serverUrl");
+
     private final StoredProperty<String> command = string("")
             .provideDelegate(this, "command");
 
@@ -90,9 +93,6 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
 
     private final StoredProperty<String> attachPort = string("")
             .provideDelegate(this, "attachPort");
-
-    private final StoredProperty<String> serverTrace = string(ServerTrace.getDefaultValue().name())
-            .provideDelegate(this, "serverTrace");
 
     // Installer settings
     private final StoredProperty<String> installerConfiguration = string("")
@@ -199,6 +199,24 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         this.serverName.setValue(this, serverName);
     }
 
+    public String getServerUrl() {
+        return serverUrl.getValue(this);
+    }
+
+    public void setServerUrl(String serverUrl) {
+        this.serverUrl.setValue(this, serverUrl);
+    }
+
+    @Override
+    public String getCommandLine() {
+        return getCommand();
+    }
+
+    @Override
+    public void setCommandLine(String commandLine) {
+        setCommand(commandLine);
+    }
+
     /**
      * Returns the command to execute to start the Debug Adapter Protocol server.
      *
@@ -237,7 +255,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     /**
      * Set the current strategy used to wait for the debug server.
      */
-    public void setDebugServerWaitStrategy(DebugServerWaitStrategy debugServerWaitStrategy) {
+    public void setDebugServerWaitStrategy(@NotNull DebugServerWaitStrategy debugServerWaitStrategy) {
         this.debugServerWaitStrategy.setValue(this, debugServerWaitStrategy.name());
     }
 
@@ -267,29 +285,25 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         this.debugServerReadyPattern.setValue(this, debugServerReadyPattern);
         this.networkAddressExtractor = null;
     }
-    
-    public String getAttachAddress() {
+
+    @Override
+    public @Nullable String getAttachAddress() {
         return attachAddress.getValue(this);
     }
-    
-    public void setAttachAddress(String attachAddress) {
+
+    @Override
+    public void setAttachAddress(@Nullable String attachAddress) {
         this.attachAddress.setValue(this, attachAddress);
     }
 
-    public String getAttachPort() {
+    @Override
+    public @Nullable String getAttachPort() {
         return attachPort.getValue(this);
     }
 
-    public void setAttachPort(String attachPort) {
+    @Override
+    public void setAttachPort(@Nullable String attachPort) {
         this.attachPort.setValue(this, attachPort);
-    }
-    
-    public ServerTrace getServerTrace() {
-        return ServerTrace.get(serverTrace.getValue(this));
-    }
-
-    public void setServerTrace(ServerTrace serverTrace) {
-        this.serverTrace.setValue(this, serverTrace.name());
     }
 
     // Installer settings
@@ -301,7 +315,7 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
     public void setInstallerConfiguration(String installerConfiguration) {
         this.installerConfiguration.setValue(this, installerConfiguration);
     }
-    
+
     public @Nullable NetworkAddressExtractor getNetworkAddressExtractor() {
         if (networkAddressExtractor != null) {
             return networkAddressExtractor;
@@ -357,4 +371,5 @@ public class DAPRunConfigurationOptions extends RunConfigurationOptions implemen
         }
         return false;
     }
+
 }

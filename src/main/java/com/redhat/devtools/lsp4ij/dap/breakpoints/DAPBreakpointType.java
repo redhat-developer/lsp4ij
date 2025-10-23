@@ -10,28 +10,20 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
-import com.intellij.openapi.fileTypes.FileType;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
-import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
-import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
-import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
-import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- *  Debug Adapter Protocol (DAP) breakpoint type.
+ * Default Debug Adapter Protocol (DAP) breakpoint type.
  */
-public class DAPBreakpointType extends XLineBreakpointType<DAPBreakpointProperties> {
+public class DAPBreakpointType extends DAPBreakpointTypeBase<DAPBreakpointProperties> {
 
     private static final String BREAKPOINT_ID = "dap-breakpoint";
 
     public DAPBreakpointType() {
-        super(BREAKPOINT_ID, "DAP Breakpoint");
+        super(BREAKPOINT_ID, DAPBundle.message("dap.breakpoints.title"));
     }
 
     @Override
@@ -40,32 +32,4 @@ public class DAPBreakpointType extends XLineBreakpointType<DAPBreakpointProperti
         return new DAPBreakpointProperties();
     }
 
-    @Override
-    public boolean canPutAt(@NotNull VirtualFile file,
-                            int line,
-                            @NotNull Project project) {
-        return DebugAdapterManager.getInstance().isDebuggableFile(file, project);
-    }
-
-    @Override
-    public @Nullable XDebuggerEditorsProvider getEditorsProvider(@NotNull XLineBreakpoint<DAPBreakpointProperties> breakpoint,
-                                                                 @NotNull Project project) {
-        // Returns a non-null XDebuggerEditorsProvider to support Condition in the breakpoint type.
-        FileType fileType = null;
-        var file = LSPIJUtils.findResourceFor(breakpoint.getFileUrl());
-        if (file != null) {
-            if (!canSupportConditionBreakpoint(file, project)) {
-                return null;
-            }
-            fileType = file.getFileType();
-        }
-        return new DAPDebuggerEditorsProvider(fileType, null);
-    }
-
-    private boolean canSupportConditionBreakpoint(VirtualFile file, @NotNull Project project) {
-        // TODO: manage a settings to know if the given file which is associated to a DAP server
-        // can support condition breakpoint point
-        // At this step, the DAP server cannot be started, so we need to manage a DAP server settings for that.
-        return true;
-    }
 }

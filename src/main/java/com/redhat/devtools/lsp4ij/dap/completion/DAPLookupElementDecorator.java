@@ -10,16 +10,24 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.completion;
 
+import com.intellij.codeInsight.completion.CompletionInitializationContext;
+import com.intellij.codeInsight.completion.InsertionContext;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupElementDecorator;
 import com.intellij.codeInsight.lookup.LookupElementPresentation;
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.editor.Document;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.CompletionItem;
 import org.eclipse.lsp4j.debug.CompletionItemType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import java.util.Objects;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletionUtils.computePrefixStartFromInsertText;
 
 /**
  * Debug Adapter Protocol (DAP) lookup element decorator.
@@ -27,11 +35,14 @@ import javax.swing.*;
 public class DAPLookupElementDecorator extends LookupElementDecorator<LookupElement> {
 
     private final @NotNull CompletionItem item;
+    private final int completionOffset;
 
     protected DAPLookupElementDecorator(@NotNull LookupElement delegate,
-                                        @NotNull CompletionItem item) {
+                                        @NotNull CompletionItem item,
+                                        int completionOffset) {
         super(delegate);
         this.item = item;
+        this.completionOffset = completionOffset;
     }
 
     @Override
@@ -43,68 +54,118 @@ public class DAPLookupElementDecorator extends LookupElementDecorator<LookupElem
         presentation.setTypeText(this.getTypeText(item));
         presentation.setIcon(this.getIcon(item.getType()));
         presentation.setTypeGrayed(true);
-}
+    }
 
-private boolean isBold(@NotNull CompletionItem item) {
-    return false;
-}
+    @Override
+    public void handleInsert(@NotNull InsertionContext context) {
+        WriteAction.run(() -> handleInsertInWriteAction(context));
+    }
 
-private boolean isStrikeout(@NotNull CompletionItem item) {
-    return false;
-}
+    private void handleInsertInWriteAction(@NotNull InsertionContext context) {
+        var editor = context.getEditor();
+        final int oldCaretOffset = editor.getCaretModel().getOffset();
+        var document = context.getDocument();
 
-private @Nullable String getTailText(@NotNull CompletionItem item) {
-    return null;
-}
+        int startOffset = getStartOffset(document);
+        int endOffset = getEndOffset(startOffset, context);
+        String newText = getNewtText();
 
-private @Nullable String getTypeText(@NotNull CompletionItem item) {
-    return item.getDetail();
-}
+        // Update document with the new completion item text to insert
+        if (endOffset <= 0) {
+            document.insertString(startOffset, newText);
+        } else {
+            document.replaceString(startOffset, endOffset, newText);
+        }
 
-private static @Nullable Icon getIcon(@Nullable CompletionItemType type) {
-    if (type == null) {
+        // Update caret offset / selection (if needed)
+        Integer selectionStart = item.getSelectionStart();
+        if (selectionStart != null) {
+            // Update selection
+            selectionStart += startOffset;
+            Integer selectionLength = item.getSelectionLength();
+            int selectionEnd = selectionStart + Objects.requireNonNullElse(selectionLength, 0);
+            editor.getSelectionModel().setSelection(selectionStart, selectionEnd);
+
+            // Update caret offset
+            if (oldCaretOffset != selectionEnd) {
+                editor.getCaretModel().moveToOffset(selectionEnd);
+            }
+
+        } else {
+            // No selection, update caret offset only
+            int newCaretOffset = editor.getCaretModel().getOffset() + newText.length() - (endOffset - startOffset);
+            if (oldCaretOffset != newCaretOffset) {
+                editor.getCaretModel().moveToOffset(newCaretOffset);
+            }
+        }
+    }
+
+    private int getStartOffset(@NotNull Document document) {
+        Integer start = item.getStart();
+        if (start != null) {
+            return start;
+        }
+        Integer prefixStartOffset = computePrefixStartFromInsertText(document, null, completionOffset, getNewtText());
+        return Objects.requireNonNullElse(prefixStartOffset, completionOffset);
+    }
+
+    private int getEndOffset(int startOffset, @NotNull InsertionContext context) {
+        int selectionEndOffset = context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET);
+        Integer length = item.getLength();
+        if (length == null) {
+            return selectionEndOffset;
+        }
+        return startOffset + (selectionEndOffset - completionOffset + length);
+    }
+
+    private @NotNull String getNewtText() {
+        String newText = item.getText();
+        if (StringUtils.isBlank(newText)) {
+            return item.getLabel();
+        }
+        return newText;
+    }
+
+    private boolean isBold(@NotNull CompletionItem item) {
+        return false;
+    }
+
+    private boolean isStrikeout(@NotNull CompletionItem item) {
+        return false;
+    }
+
+    private @Nullable String getTailText(@NotNull CompletionItem item) {
         return null;
     }
 
-    switch (type) {
-        case CLASS:
-            return AllIcons.Nodes.Class;
-        case CUSTOMCOLOR:
-        case COLOR:
-            return AllIcons.Nodes.EmptyNode;
-        case CONSTRUCTOR:
-            return AllIcons.Nodes.ClassInitializer;
-        case ENUM:
-            return AllIcons.Nodes.Enum;
-        case FIELD:
-            return AllIcons.Nodes.Field;
-        case FILE:
-            return AllIcons.FileTypes.Any_type;
-        case FUNCTION:
-            return AllIcons.Nodes.Function;
-        case INTERFACE:
-            return AllIcons.Nodes.Interface;
-        case KEYWORD:
-            return AllIcons.Nodes.Constant;
-        case METHOD:
-            return AllIcons.Nodes.Method;
-        case MODULE:
-            return AllIcons.Nodes.Module;
-        case PROPERTY:
-            return AllIcons.Nodes.Property;
-        case SNIPPET:
-            return AllIcons.Nodes.Template;
-        case TEXT:
-            return AllIcons.Nodes.Word;
-        case UNIT:
-            return AllIcons.Nodes.Test;
-        case VALUE:
-        case REFERENCE:
-        case VARIABLE:
-            return AllIcons.Nodes.Variable;
-        default:
-            return AllIcons.Nodes.EmptyNode;
+    private @Nullable String getTypeText(@NotNull CompletionItem item) {
+        return item.getDetail();
     }
-}
+
+    private @Nullable Icon getIcon(@Nullable CompletionItemType type) {
+        if (type == null) {
+            return null;
+        }
+
+        return switch (type) {
+            case CLASS -> AllIcons.Nodes.Class;
+            case CUSTOMCOLOR, COLOR -> AllIcons.Nodes.EmptyNode;
+            case CONSTRUCTOR -> AllIcons.Nodes.ClassInitializer;
+            case ENUM -> AllIcons.Nodes.Enum;
+            case FIELD -> AllIcons.Nodes.Field;
+            case FILE -> AllIcons.FileTypes.Any_type;
+            case FUNCTION -> AllIcons.Nodes.Function;
+            case INTERFACE -> AllIcons.Nodes.Interface;
+            case KEYWORD -> AllIcons.Nodes.Constant;
+            case METHOD -> AllIcons.Nodes.Method;
+            case MODULE -> AllIcons.Nodes.Module;
+            case PROPERTY -> AllIcons.Nodes.Property;
+            case SNIPPET -> AllIcons.Nodes.Template;
+            case TEXT -> AllIcons.Nodes.Word;
+            case UNIT -> AllIcons.Nodes.Test;
+            case VALUE, REFERENCE, VARIABLE -> AllIcons.Nodes.Variable;
+            default -> AllIcons.Nodes.EmptyNode;
+        };
+    }
 
 }

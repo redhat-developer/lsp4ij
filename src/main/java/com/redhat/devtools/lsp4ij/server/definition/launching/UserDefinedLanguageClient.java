@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import org.jetbrains.annotations.NotNull;
@@ -23,28 +22,15 @@ import org.jetbrains.annotations.NotNull;
 public class UserDefinedLanguageClient extends LanguageClientImpl {
     private final UserDefinedLanguageServerDefinition serverDefinition;
 
-    private final UserDefinedLanguageListener languageServerStartedListener;
 
-    public UserDefinedLanguageClient(@NotNull UserDefinedLanguageServerDefinition serverDefinition, @NotNull Project project) {
+    public UserDefinedLanguageClient(@NotNull UserDefinedLanguageServerDefinition serverDefinition,
+                                     @NotNull Project project) {
         super(project);
         this.serverDefinition = serverDefinition;
-        this.languageServerStartedListener = new UserDefinedLanguageListener(this, project);
-        LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(languageServerStartedListener);
     }
 
     @Override
-    public void dispose() {
-        super.dispose();
-        LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(languageServerStartedListener);
-    }
-
-    @Override
-    protected Object createSettings() {
-        return serverDefinition.getLanguageServerConfiguration();
-    }
-
-    @Override
-    public void handleServerStatusChanged(ServerStatus serverStatus) {
+    public void handleServerStatusChanged(@NotNull ServerStatus serverStatus) {
         if (serverStatus== ServerStatus.started) {
             // Case 1: Language server is started:
             // Try to get the user defined configuration and
@@ -54,12 +40,8 @@ public class UserDefinedLanguageClient extends LanguageClientImpl {
     }
 
     @Override
-    public void triggerChangeConfiguration() {
-        super.triggerChangeConfiguration();
-    }
-
-    @Override
-    public UserDefinedLanguageServerDefinition getServerDefinition() {
+    public @NotNull UserDefinedLanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
+
 }

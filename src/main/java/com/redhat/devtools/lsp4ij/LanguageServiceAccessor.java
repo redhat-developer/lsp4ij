@@ -57,7 +57,7 @@ public class LanguageServiceAccessor implements Disposable {
 
     private final Project project;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
-
+    private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
         @Override
@@ -98,25 +98,55 @@ public class LanguageServiceAccessor implements Disposable {
             languageServerWrappers.forEach(LanguageServerWrapper::incrementModificationCount);
 
             // Restart all servers where command or mappings has changed
-            if (event.commandChanged ||
+            // if changes doesn't come from installer.
+            if (event.getUpdatedBy() != LanguageServerDefinitionEvent.UpdatedBy.INSTALLER
+                    && (event.commandChanged ||
                     event.userEnvironmentVariablesChanged ||
                     event.includeSystemEnvironmentVariablesChanged ||
-                    event.mappingsChanged) {
+                    event.mappingsChanged)) {
                 languageServerWrappers.forEach(LanguageServerWrapper::restart);
             }
         }
     };
-
-    public static LanguageServiceAccessor getInstance(@NotNull Project project) {
-        return project.getService(LanguageServiceAccessor.class);
-    }
 
     private LanguageServiceAccessor(@NotNull Project project) {
         this.project = project;
         LanguageServersRegistry.getInstance().addLanguageServerDefinitionListener(serverDefinitionListener);
     }
 
-    private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
+    public static LanguageServiceAccessor getInstance(@NotNull Project project) {
+        return project.getService(LanguageServiceAccessor.class);
+    }
+
+    @Nullable
+    private static Map<LanguageServerWrapper, LanguageServerWrapper.LSPFileConnectionInfo> getFileConnectionInfoMap(@NotNull VirtualFile file,
+                                                                                                                    @NotNull Collection<LanguageServerWrapper> languageServers,
+                                                                                                                    @Nullable Document document,
+                                                                                                                    @NotNull Project project) {
+        Map<LanguageServerWrapper, LanguageServerWrapper.LSPFileConnectionInfo> connectionFileInfo = null;
+        for (var ls : languageServers) {
+            var uri = ls.toUri(file);
+            if (uri != null && !ls.isConnectedTo(uri)) {
+                // The file is not connected to the current language server
+                // Get the required information for the didOpen (text and languageId) which requires a ReadAction.
+                if (document != null) {
+                    if (connectionFileInfo == null) {
+                        connectionFileInfo = new HashMap<>();
+                    }
+                    var info = ls.createFileConnectionInfo(file, document, true);
+                    connectionFileInfo.put(ls, info);
+                }
+            }
+        }
+        return connectionFileInfo;
+    }
+
+    private static boolean match(VirtualFile file, Project fileProject, LanguageServerFileAssociation mapping) {
+        if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return ReadAction.compute(() -> mapping.match(file, fileProject));
+        }
+        return mapping.match(file, fileProject);
+    }
 
     /**
      * Check each project for open files and start an LS if matching one is found and is not started yet
@@ -133,7 +163,7 @@ public class LanguageServiceAccessor implements Disposable {
                 try {
                     findAndStartLanguageServerIfNeeded(definition, false, p);
                 } catch (Exception e) {
-                    LOGGER.error("Error while starting language server for the language server '" + definition.getDisplayName() + "'.", e);
+                    LOGGER.error("Error while starting language server for the language server '{}'.", definition.getDisplayName(), e);
                 }
             }
         }
@@ -172,7 +202,9 @@ public class LanguageServiceAccessor implements Disposable {
         for (VirtualFile file : files) {
             // TODO : revisit that
             PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-            sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition);
+            if (psiFile != null) {
+                sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition);
+            }
         }
     }
 
@@ -362,31 +394,6 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
-    @Nullable
-    private static Map<LanguageServerWrapper, LanguageServerWrapper.LSPFileConnectionInfo> getFileConnectionInfoMap(@NotNull VirtualFile file,
-                                                                                                                    @NotNull Collection<LanguageServerWrapper> languageServers,
-                                                                                                                    @Nullable Document document,
-                                                                                                                    @NotNull Project project) {
-        Map<LanguageServerWrapper, LanguageServerWrapper.LSPFileConnectionInfo> connectionFileInfo = null;
-        for (var ls : languageServers) {
-            var uri = ls.toUri(file);
-            if (uri != null && !ls.isConnectedTo(uri)) {
-                // The file is not connected to the current language server
-                // Get the required information for the didOpen (text and languageId) which requires a ReadAction.
-                if (document != null) {
-                    if (connectionFileInfo == null) {
-                        connectionFileInfo = new HashMap<>();
-                    }
-                    String text = document.getText();
-                    String languageId = ls.getServerDefinition().getLanguageId(file, project);
-                    var info = new LanguageServerWrapper.LSPFileConnectionInfo(document, text, languageId, true);
-                    connectionFileInfo.put(ls, info);
-                }
-            }
-        }
-        return connectionFileInfo;
-    }
-
     /**
      * Return the started servers.
      *
@@ -475,39 +482,10 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
-    /**
-     * Store the matched language server definitions for a given file.
-     */
-    private static class MatchedLanguageServerDefinitions {
-
-        public static final MatchedLanguageServerDefinitions NO_MATCH = new MatchedLanguageServerDefinitions(Collections.emptySet(), null);
-
-        private final Set<LanguageServerDefinition> matched;
-
-        private final CompletableFuture<Set<LanguageServerDefinition>> asyncMatched;
-
-        public MatchedLanguageServerDefinitions(@NotNull Set<LanguageServerDefinition> matchedLanguageServersDefinition, CompletableFuture<Set<LanguageServerDefinition>> async) {
-            this.matched = matchedLanguageServersDefinition;
-            this.asyncMatched = async;
-        }
-
-        /**
-         * Return the matched server definitions get synchronously.
-         *
-         * @return the matched server definitions get synchronously.
-         */
-        public @NotNull Set<LanguageServerDefinition> getMatched() {
-            return matched;
-        }
-
-        /**
-         * Return the matched server definitions get asynchronously or null otherwise.
-         *
-         * @return the matched server definitions get asynchronously or null otherwise.
-         */
-        public CompletableFuture<Set<LanguageServerDefinition>> getAsyncMatched() {
-            return asyncMatched;
-        }
+    public LanguageServerWrapper forceCreateServer(@NotNull LanguageServerDefinition serverDefinition) {
+        LanguageServerWrapper wrapper = new LanguageServerWrapper(project, serverDefinition);
+        startedServers.add(wrapper);
+        return wrapper;
     }
 
     /**
@@ -528,9 +506,7 @@ public class LanguageServiceAccessor implements Disposable {
         Queue<Object> languages = new LinkedList<>();
         Set<Object> processedContentTypes = new HashSet<>();
         Language language = LSPIJUtils.getFileLanguage(psiFile);
-        if (language != null) {
-            languages.add(language);
-        }
+        languages.add(language);
         FileType fileType = psiFile.getFileType();
         languages.add(fileType);
 
@@ -606,13 +582,6 @@ public class LanguageServiceAccessor implements Disposable {
         return MatchedLanguageServerDefinitions.NO_MATCH;
     }
 
-    private static boolean match(VirtualFile file, Project fileProject, LanguageServerFileAssociation mapping) {
-        if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return ReadAction.compute(() -> mapping.match(file, fileProject));
-        }
-        return mapping.match(file, fileProject);
-    }
-
     @Override
     public void dispose() {
         LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(serverDefinitionListener);
@@ -655,7 +624,7 @@ public class LanguageServiceAccessor implements Disposable {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
             Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
-            Set<LanguageServerWrapper> languageServerWrappers = getStartedServers()
+            Set<LanguageServerWrapper> languageServerWrappers = new HashSet<>(getStartedServers())
                     .stream()
                     .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
                     .collect(Collectors.toSet());
@@ -667,5 +636,40 @@ public class LanguageServiceAccessor implements Disposable {
         }
 
         return modificationTrackers;
+    }
+
+    /**
+     * Store the matched language server definitions for a given file.
+     */
+    private static class MatchedLanguageServerDefinitions {
+
+        public static final MatchedLanguageServerDefinitions NO_MATCH = new MatchedLanguageServerDefinitions(Collections.emptySet(), null);
+
+        private final Set<LanguageServerDefinition> matched;
+
+        private final CompletableFuture<Set<LanguageServerDefinition>> asyncMatched;
+
+        public MatchedLanguageServerDefinitions(@NotNull Set<LanguageServerDefinition> matchedLanguageServersDefinition, CompletableFuture<Set<LanguageServerDefinition>> async) {
+            this.matched = matchedLanguageServersDefinition;
+            this.asyncMatched = async;
+        }
+
+        /**
+         * Return the matched server definitions get synchronously.
+         *
+         * @return the matched server definitions get synchronously.
+         */
+        public @NotNull Set<LanguageServerDefinition> getMatched() {
+            return matched;
+        }
+
+        /**
+         * Return the matched server definitions get asynchronously or null otherwise.
+         *
+         * @return the matched server definitions get asynchronously or null otherwise.
+         */
+        public CompletableFuture<Set<LanguageServerDefinition>> getAsyncMatched() {
+            return asyncMatched;
+        }
     }
 }

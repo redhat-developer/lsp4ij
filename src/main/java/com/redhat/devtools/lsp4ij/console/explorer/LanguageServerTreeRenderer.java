@@ -52,22 +52,22 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
         myDurationWidth = 0;
         myDurationOffset = 0;
 
-        if (value instanceof LanguageServerTreeNode) {
+        if (value instanceof LanguageServerTreeNode languageServerTreeNode) {
             // Render of language server
-            LanguageServerTreeNode languageServerTreeNode = (LanguageServerTreeNode) value;
             setIcon(languageServerTreeNode.getIcon());
             append(languageServerTreeNode.getDisplayName());
             return;
         }
 
-        if (value instanceof LanguageServerProcessTreeNode) {
+        if (value instanceof LanguageServerProcessTreeNode languageProcessTreeNode) {
             // Render of language server process
-            LanguageServerProcessTreeNode languageProcessTreeNode = (LanguageServerProcessTreeNode) value;
             setIcon(languageProcessTreeNode.getIcon());
             append(languageProcessTreeNode.getDisplayName());
 
             if (languageProcessTreeNode.getServerStatus() == ServerStatus.starting
-                    || languageProcessTreeNode.getServerStatus() == ServerStatus.stopping) {
+                    || languageProcessTreeNode.getServerStatus() == ServerStatus.stopping
+                    || languageProcessTreeNode.getServerStatus() == ServerStatus.checking_installed
+                    || languageProcessTreeNode.getServerStatus() == ServerStatus.installing) {
                 // Display elapsed time when language server is starting/stopping
                 myDurationText = languageProcessTreeNode.getElapsedTime();
                 final var durationText = myDurationText;

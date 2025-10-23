@@ -14,12 +14,14 @@
 package com.redhat.devtools.lsp4ij.launching.ui;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
@@ -29,14 +31,15 @@ import java.util.Objects;
 public class UICommandLineUpdater implements CommandLineUpdater {
 
     private final @NotNull UserDefinedLanguageServerDefinition definition;
-    private final @NotNull Project project;
+    private final @Nullable Project project;
 
     public UICommandLineUpdater(@NotNull UserDefinedLanguageServerDefinition definition,
-                                @NotNull Project project) {
+                                @Nullable Project project) {
         this.definition = definition;
         this.project = project;
 
     }
+
     @Override
     public String getCommandLine() {
         return definition.getCommandLine();
@@ -51,14 +54,25 @@ public class UICommandLineUpdater implements CommandLineUpdater {
 
         // Update command line settings
         String languageServerId = definition.getId();
-        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getLaunchConfigSettings(languageServerId);
+        UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
         if (settings != null) {
             settings.setCommandLine(commandLine);
-            UserDefinedLanguageServerSettings.getInstance().setLaunchConfigSettings(languageServerId, settings);
+            UserDefinedLanguageServerSettings.getInstance().setUserDefinedLanguageServerSettings(languageServerId, settings);
         }
 
-        // Notifications
+        if (project != null) {
+            // Notifications
+            sendNotification(project);
+        } else {
+            for (var project : ProjectManager.getInstance().getOpenProjects()) {
+                sendNotification(project);
+            }
+        }
+    }
+
+    private void sendNotification(@NotNull Project project) {
         LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.INSTALLER,
                 project,
                 definition,
                 false,
@@ -67,10 +81,8 @@ public class UICommandLineUpdater implements CommandLineUpdater {
                 false,
                 false,
                 false,
-                false,
-                false,
                 false);
         LanguageServersRegistry.getInstance().handleChangeEvent(event);
     }
-
 }
+

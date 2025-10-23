@@ -1,0 +1,33 @@
+{
+  "id": "vscode-eslint-language-server",
+  "name": "ESLint Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vscode-eslint-language-server/node_modules"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install ESLint Language Server",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
+      "command": {
+        "windows": "npm.cmd install vscode-langservers-extracted --force",
+        "default": "npm install vscode-langservers-extracted --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure ESlint Language Server command",
+          "command": "node ${workingDir}/vscode-langservers-extracted/lib/eslint-language-server/eslintServer.js --stdio",
+          "update": true
+        }
+      }
+    }
+  }
+}

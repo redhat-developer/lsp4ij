@@ -22,6 +22,7 @@ import com.intellij.ui.PopupHandler;
 import com.intellij.ui.treeStructure.Tree;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.*;
 import com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils;
@@ -224,13 +225,20 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                     group.addSeparator();
                     group.add(new OpenLanguageServerDialogAction(getProject()));
                 }
+                if (languageServerDefinition.hasInstaller()) {
+                    group.addSeparator();
+                    group.add(new InstallServerAction(languageServerDefinition, getProject()));
+                    group.add(new ReinstallServerAction(languageServerDefinition, getProject()));
+                }
             } else if (node instanceof LanguageServerProcessTreeNode processTreeNode) {
                 // Compute popup menu actions for Language Server process node
-                switch (processTreeNode.getServerStatus()) {
+                var serverStatus = processTreeNode.getServerStatus();
+                var serverWrapper = processTreeNode.getLanguageServer();
+                switch (serverStatus) {
                     case starting:
                     case started:
                         // Stop and disable the language server action
-                        if (processTreeNode.getLanguageServer().getClientFeatures().canStopServerByUser()) {
+                        if (serverWrapper.getClientFeatures().canStopServerByUser()) {
                             AnAction stopServerAction = ActionManager.getInstance().getAction(StopServerAction.ACTION_ID);
                             group.add(stopServerAction);
                         }
@@ -242,11 +250,24 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                         break;
                     case stopping:
                     case stopped:
+                    case installed:
                         // Restart language server action
                         AnAction restartServerAction = ActionManager.getInstance().getAction(RestartServerAction.ACTION_ID);
                         group.add(restartServerAction);
                         break;
                 }
+
+                if (serverStatus != ServerStatus.starting &&
+                        serverStatus != ServerStatus.stopping &&
+                        serverStatus != ServerStatus.installing ) {
+                    var serverDefinition = serverWrapper.getServerDefinition();
+                    if (serverDefinition.hasInstaller()) {
+                        group.addSeparator();
+                        group.add(new InstallServerAction(serverDefinition, getProject()));
+                        group.add(new ReinstallServerAction(serverDefinition, getProject()));
+                    }
+                }
+
                 AnAction testStartServerAction = ActionManager.getInstance().getAction(CopyStartServerCommandAction.ACTION_ID);
                 group.add(testStartServerAction);
             }
@@ -335,7 +356,9 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
      * Initialize language server process with the started language servers.
      */
     public void load() {
-        LanguageServiceAccessor.getInstance(getProject()).getStartedServers()
+        LanguageServiceAccessor
+                .getInstance(getProject())
+                .getStartedServers()
                 .forEach(ls -> {
                     Throwable serverError = ls.getServerError();
                     listener.handleStatusChanged(ls);

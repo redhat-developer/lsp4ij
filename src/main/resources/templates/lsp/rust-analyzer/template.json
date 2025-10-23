@@ -5,6 +5,7 @@
     "default": "sh -c ${BASE_DIR}/rust-analyzer",
     "windows": "${BASE_DIR}/rust-analyzer.exe"
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {
@@ -14,6 +15,15 @@
         ]
       },
       "languageId": "rust"
+    },
+    {
+      "fileType": {
+        "name": "ra_syntax_tree",
+        "patterns": [
+          "*.rast"
+        ]
+      },
+      "languageId": "ra_syntax_tree"
     }
   ]
 }

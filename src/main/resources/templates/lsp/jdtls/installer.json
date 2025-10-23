@@ -25,7 +25,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure jdt-ls server command",
-          "command": "\"${output.dir}/${output.file.name}\" -configuration \"USER_HOME$/.cache/jdtls\" -data \"$PROJECT_DIR$/jdtls-data\"",
+          "command": "\"${output.dir}/${output.file.name}\" -configuration \"$USER_HOME$/.cache/jdtls\" -data \"$PROJECT_DIR$/jdtls-data\"",
           "update": true
         }
       }

@@ -5,6 +5,7 @@
     "default": "sh -c gopls -mode=stdio",
     "windows": "gopls -mode=stdio"
   },
+  "expandConfiguration": false,
   "fileTypeMappings": [
     {
       "fileType": {

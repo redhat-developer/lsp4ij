@@ -25,7 +25,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -63,7 +63,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         var project = e.getProject();
 
         if (project != null) {
-            boolean showSaveTipOnConfigurationChange = com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings.getInstance(project).showSaveTipOnConfigurationChange();
+            boolean showSaveTipOnConfigurationChange = ProjectLanguageServerSettings.getInstance(project).showSaveTipOnConfigurationChange();
             // Only show the tooltip once per configuration change
             if (modified && !hasSaveTipBalloonShown && showSaveTipOnConfigurationChange) {
                 hasSaveTipBalloonShown = true;
@@ -128,7 +128,7 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
         JBLabel jbLabel = new JBLabel(" " + LanguageServerBundle.message("action.lsp.detail.apply.balloon"));
         HyperlinkLabel hyperlinkLabel = new HyperlinkLabel(LanguageServerBundle.message("action.lsp.detail.apply.balloon.disable"));
         hyperlinkLabel.addHyperlinkListener(e -> {
-            UserDefinedLanguageServerSettings.getInstance(project).showSaveTipOnConfigurationChange(false);
+            ProjectLanguageServerSettings.getInstance(project).showSaveTipOnConfigurationChange(false);
             this.saveTipBalloon.hide();
         });
 

@@ -1,0 +1,5 @@
+{
+  "request": "launch",
+  "dockerfile": "${file}",
+  "contextPath": "${workspaceFolder}"
+}

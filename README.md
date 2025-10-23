@@ -88,10 +88,12 @@ Here are some projects that use LSP4IJ:
  * [Huly Code](https://github.com/hcengineering/huly-code)
  * [SDLB LSP](https://github.com/smart-data-lake/sdl-lsp)
  * [Bloc Linter Support for IntelliJ](https://github.com/felangel/bloc)
-
+ * [Vala JetBrains Plugin](https://github.com/Tbusk/vala-jetbrains-plugin)
+ * [BAML JetBrains Plugin](http://github.com/BoundaryML/baml/tree/canary/jetbrains)
+ * [intellij-cangjie](https://github.com/lin-qingying/intellij-cangjie)
 ## Requirements
 
-* Intellij IDEA 2023.3 or more recent (we **try** to support the last 4 major IDEA releases)
+* Intellij IDEA 2024.2 or more recent (we **try** to support the last 4 major IDEA releases)
 * Java JDK (or JRE) 17 or more recent
 
 ## Contributing

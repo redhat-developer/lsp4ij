@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.CompletableFuture;
 
@@ -23,7 +24,23 @@ public interface ServerInstaller {
      *
      * @return A {@link CompletableFuture} that completes when the installation is finished.
      */
+    @NotNull
     CompletableFuture<ServerInstallationStatus> checkInstallation();
+
+    /**
+     * Starts the server installation process.
+     *
+     * @return A {@link CompletableFuture} that completes when the installation is finished.
+     */
+    @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation(@NotNull ServerInstallationContext context);
+
+    /**
+     * Returns the current server installer status.
+     *
+     * @return the current server installer status.
+     */
+    @NotNull
+    ServerInstallationStatus getStatus();
 
     /**
      * Code to be executed before installation (optional).
@@ -31,7 +48,7 @@ public interface ServerInstaller {
      * @return A {@link Runnable} task to execute before installation, or {@code null} if no task is defined.
      */
     @Nullable
-    default Runnable getBeforeCode() {
+    default Runnable getBeforeCode(@NotNull ServerInstallationContext context) {
         return null;
     }
 
@@ -41,7 +58,7 @@ public interface ServerInstaller {
      * @return A {@link Runnable} task to execute after installation, or {@code null} if no task is defined.
      */
     @Nullable
-    default Runnable getAfterCode() {
+    default Runnable getAfterCode(@NotNull ServerInstallationContext context) {
         return null;
     }
 
@@ -49,4 +66,8 @@ public interface ServerInstaller {
      * Resets the installation state, allowing the process to be restarted if necessary.
      */
     void reset();
+
+    void registerConsoleProvider(@NotNull ConsoleProvider consoleProvider);
+
+    void unregisterConsoleProvider(@NotNull ConsoleProvider consoleProvider);
 }

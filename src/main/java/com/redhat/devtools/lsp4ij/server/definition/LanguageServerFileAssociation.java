@@ -106,7 +106,9 @@ public class LanguageServerFileAssociation {
      * @param filename the file name to match by using file name patterns.
      * @return true if the given language, file type or file matches the server definition and false otherwise.
      */
-    public boolean match(@Nullable Language language, @Nullable FileType fileType, @NotNull String filename) {
+    public boolean match(@Nullable Language language,
+                         @Nullable FileType fileType,
+                         @NotNull String filename) {
         if (this.fileType != null) {
             return this.fileType.equals(fileType);
         }
@@ -132,11 +134,12 @@ public class LanguageServerFileAssociation {
      * It can take some times (ex: check if the project of the file contains some Java class in the classpath)
      * </p>
      *
-     * @param file    the
+     * @param file    the file
      * @param project
      * @return
      */
-    public boolean match(VirtualFile file, Project project) {
+    public boolean match(@NotNull VirtualFile file,
+                         @NotNull Project project) {
         return getServerDefinition().supportsCurrentEditMode(project) && documentMatcher.match(file, project);
     }
 
@@ -149,7 +152,7 @@ public class LanguageServerFileAssociation {
      * @return true if the match must be done asynchronously and false otherwise.
      * @see AbstractDocumentMatcher
      */
-    public boolean shouldBeMatchedAsynchronously(Project project) {
+    public boolean shouldBeMatchedAsynchronously(@NotNull Project project) {
         return documentMatcher.shouldBeMatchedAsynchronously(project);
     }
 
@@ -158,11 +161,12 @@ public class LanguageServerFileAssociation {
      *
      * @return true if the file association is enabled and false otherwise.
      */
-    public boolean isEnabled(Project project) {
+    public boolean isEnabled(@NotNull Project project) {
         return getServerDefinition().isEnabled(project);
     }
 
-    public @NotNull <R> CompletableFuture<Boolean> matchAsync(VirtualFile file, Project project) {
+    public @NotNull <R> CompletableFuture<Boolean> matchAsync(@NotNull VirtualFile file,
+                                                              @NotNull Project project) {
         if (!getServerDefinition().supportsCurrentEditMode(project)) {
             return CompletableFuture.completedFuture(false);
         }
@@ -174,7 +178,7 @@ public class LanguageServerFileAssociation {
      *
      * @return the language server definition.
      */
-    public LanguageServerDefinition getServerDefinition() {
+    public @NotNull LanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
 
@@ -201,7 +205,7 @@ public class LanguageServerFileAssociation {
      *
      * @return the list of file name matcher and null otherwise.
      */
-    public List<FileNameMatcher> getFileNameMatchers() {
+    public @Nullable List<FileNameMatcher> getFileNameMatchers() {
         return fileNameMatchers;
     }
 

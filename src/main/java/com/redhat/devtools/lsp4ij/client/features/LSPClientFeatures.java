@@ -99,6 +99,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
+    private LSPConfigurationFeature configurationFeature;
+    
     private EditorBehaviorFeature editorBehaviorFeature;
 
     public LSPClientFeatures() {
@@ -145,13 +147,28 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Nullable
     public ServerInstaller getServerInstaller() {
-        return serverInstaller;
+        if (serverInstaller != null) {
+            // Server installer on Project scope
+            return serverInstaller;
+        }
+        // Server installer on Application scope
+        return getServerDefinition().getServerInstaller();
     }
 
     /**
-     * Set the server installer.
+     * Registers a {@link ServerInstaller} for installing a language server in the scope of a specific project.
      *
-     * @param serverInstaller server installer.
+     * <p>
+     * This installer will be used only for the current project and overrides any global installer
+     * returned by {@link com.redhat.devtools.lsp4ij.LanguageServerFactory#createServerInstaller()}.
+     * </p>
+     *
+     * <p>
+     * Use this method when you want to provide a project-specific installation logic,
+     * such as downloading the server into the project's directory or using project-specific configuration.
+     * </p>
+     *
+     * @param serverInstaller the {@link ServerInstaller} to use for this project; must not be {@code null}.
      */
     public void setServerInstaller(@NotNull ServerInstaller serverInstaller) {
         this.serverInstaller = serverInstaller;
@@ -281,6 +298,15 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      * @return true if the server is kept alive even if all files associated with the language server are closed and false otherwise.
      */
     public boolean keepServerAlive() {
+        return false;
+    }
+
+    /**
+     * Returns true if the JSON-RPC id should be sent as integer instead of string and false otherwise.
+     *
+     * @return true if the JSON-RPC id should be sent as integer instead of string and false otherwise.
+     */
+    public boolean isUseIntAsJsonRpcId() {
         return false;
     }
 
@@ -1239,6 +1265,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public final LSPClientFeatures setWorkspaceSymbolFeature(@NotNull LSPWorkspaceSymbolFeature workspaceSymbolFeature) {
         workspaceSymbolFeature.setClientFeatures(this);
         this.workspaceSymbolFeature = workspaceSymbolFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP configuration feature.
+     *
+     * @return the LSP configuration feature.
+     */
+    @NotNull
+    public final LSPConfigurationFeature getConfigurationFeature() {
+        if (configurationFeature == null) {
+            initConfigurationFeature();
+        }
+        return configurationFeature;
+    }
+
+    private synchronized void initConfigurationFeature() {
+        if (configurationFeature != null) {
+            return;
+        }
+        setConfigurationFeature(new LSPConfigurationFeature());
+    }
+
+    /**
+     * Initialize the LSP configuration feature.
+     *
+     * @param configurationFeature the LSP configuration feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setConfigurationFeature(@NotNull LSPConfigurationFeature configurationFeature) {
+        configurationFeature.setClientFeatures(this);
+        this.configurationFeature = configurationFeature;
         return this;
     }
 

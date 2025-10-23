@@ -1,0 +1,28 @@
+{
+  "id": "codelldb",
+  "name": "CodeLLDB",
+  "launch": {
+    "windows": "<<insert base directory>>/extension/adapter/codelldb.exe",
+    "default": "<<insert base directory>>/extension/adapter/codelldb"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Rust",
+        "patterns": [
+          "*.rs"
+        ]
+      },
+      "languageId": "rust"
+    },
+    {
+      "fileType": {
+        "name": "ra_syntax_tree",
+        "patterns": [
+          "*.rast"
+        ]
+      },
+      "languageId": "ra_syntax_tree"
+    }
+  ]
+}

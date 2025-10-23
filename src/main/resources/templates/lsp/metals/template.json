@@ -5,6 +5,7 @@
     "windows": "\"${BASE_DIR}/metals.bat\"",
     "default": "\"${BASE_DIR}/metals\""
   },
+  "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {

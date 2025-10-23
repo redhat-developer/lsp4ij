@@ -17,11 +17,13 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
 import com.redhat.devtools.lsp4ij.server.definition.ServerFileTypeMapping;
 import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping;
 import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.List;
@@ -51,6 +53,9 @@ public abstract class DebugAdapterServerDefinition implements DebuggableFile {
     private final @NotNull String id;
     private @NotNull String name;
     private @NotNull DebugAdapterDescriptorFactory factory;
+
+    private boolean serverInstallerCreated;
+    private @Nullable ServerInstaller serverInstaller;
 
     /**
      * Creates a new debug adapter server definition with a given ID and name.
@@ -181,4 +186,20 @@ public abstract class DebugAdapterServerDefinition implements DebuggableFile {
      * @return a list of {@link ServerMapping} instances
      */
     protected abstract List<ServerMapping> getServerMappings();
+
+    public @Nullable ServerInstaller getServerInstaller() {
+        if (serverInstallerCreated) {
+            return serverInstaller;
+        }
+        return getServerInstallerSync();
+    }
+
+    private synchronized @Nullable ServerInstaller getServerInstallerSync() {
+        if (serverInstallerCreated) {
+            return serverInstaller;
+        }
+        serverInstaller = getFactory().createServerInstaller();
+        serverInstallerCreated = true;
+        return serverInstaller;
+    }
 }

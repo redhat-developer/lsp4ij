@@ -610,6 +610,39 @@ CompletableFuture<List<Application>> applications =
     );
 ```
 
+### Install language server
+
+Installs the language server using the given [`ServerInstallationContext`](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/installation/ServerInstallationContext.java).  
+
+#### Behavior
+
+When invoked, this method:
+
+1. Checks whether a [`Language server installer`](./LSPApi.md#language-server-installer) is configured for the current language server.
+2. If a `ServerInstaller` is present:
+  - Stops the language server if it is currently starting or already started.
+  - Resets the installer's internal state.
+  - Executes the installation via `checkInstallation(context)`.
+  - If the server was previously running, it restarts it once the installation completes.
+3. If no `ServerInstaller` is configured:
+  - The server is assumed to be already installed, and the method completes immediately with `ServerInstallationStatus.INSTALLED`.
+
+#### Example
+
+```java
+ServerInstallationContext context = new ServerInstallationContext()
+        .setForceInstall(true); 
+LanguageServerManager.getInstance(project)
+    .install("myLanguageServerId", context)
+    .thenAccept(status -> {
+        if (status == ServerInstallationStatus.INSTALLED) {
+        // installation succeeded
+        } else {
+        // handle other status (e.g., FAILED or CANCELLED)
+        }
+    });
+```
+
 ## Keep a Language Server alive with a Lease
 
 If you need a reference to your language server and need to execute operations with it, 
@@ -761,6 +794,114 @@ but you can use your own provider with the `semanticTokensColorsProvider` extens
                    class="my.language.server.MySemanticTokensColorsProvider" />
 
 </extensions>
+```
+
+# Contribute to UI settings
+
+When you integrate a **Language Server** into an IntelliJ plugin, the **LSP console** does not automatically show tabs like `Configuration` or `Installer`.
+
+If your plugin needs to expose a **JSON-based configuration editor** (like VS Code), you can contribute to the UI by implementing the `LanguageServerSettingsContributor` interface.
+
+Suppose you're integrating the **Astro Language Server** into an IntelliJ plugin and want to allow users to customize its behavior using a JSON editor.
+
+![](./images/LanguageServerSettingsContributor.png)
+
+You need to create `AstroLanguageServerSettingsContributor` like this:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributorBase;
+import com.redhat.devtools.lsp4ij.settings.contributors.ServerConfigurationContributor;
+
+public class AstroLanguageServerSettingsContributor extends LanguageServerSettingsContributorBase {
+
+    public AstroLanguageServerSettingsContributor() {
+        super.setServerConfigurationContributor(new AstroServerConfigurationContributor());
+    }
+
+    private static class AstroServerConfigurationContributor implements ServerConfigurationContributor {
+
+        @Override
+        public String getDefaultConfigurationContent() {
+            // language=json
+            return """
+                    {
+                      "astro.trace.server": "off",
+                      "astro.content-intellisense": false,
+                      "astro.updateImportsOnFileMove.enabled": false
+                    }""";
+        }
+
+        @Override
+        public String getDefaultConfigurationSchemaContent() {
+            // language=json
+            return """                  
+                  {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "$id": "LSP4IJ/astro/settings.schema.json",
+                    "title": "LSP4IJ astro server settings JSON schema",
+                    "description": "JSON schema for astro server settings.",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "astro.language-server.ls-path": {
+                        "type": "string",
+                        "title": "Language Server: Path",
+                        "description": "Path to the language server executable. You won\\u0027t need this in most cases, set this only when needing a specific version of the language server"
+                      },
+                      "astro.language-server.runtime": {
+                        "type": "string",
+                        "title": "Language Server: Runtime",
+                        "description": "Path to the node executable used to execute the language server. You won\\u0027t need this in most cases"
+                      },
+                      "astro.trace.server": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "messages",
+                          "verbose"
+                        ],
+                        "default": "off",
+                        "description": "Traces the communication between VS Code and the language server."
+                      },
+                      "astro.content-intellisense": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable experimental support for content collection intellisense inside Markdown, MDX and Markdoc. Note that this require also enabling the feature in your Astro config (experimental.contentCollectionIntellisense) (Astro 4.14+)"
+                      },
+                      "astro.updateImportsOnFileMove.enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Controls whether the extension updates imports when a file is moved to a new location. In most cases, you\\u0027ll want to keep this disabled as TypeScript and the Astro TypeScript plugin already handles this for you. Having multiple tools updating imports at the same time can lead to corrupted files."
+                      }
+                    }
+                  }""";
+        }
+    }
+}
+```
+
+and register this settings contributor with [LanguageServerFactory](#languageserverfactory):
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+  @Override
+  public @Nullable LanguageServerSettingsContributor createLanguageServerSettingsContributor() {
+    return new AstroLanguageServerSettingsContributor();
+  }
+  ...
+
+}
 ```
 
 # Customize LSP features

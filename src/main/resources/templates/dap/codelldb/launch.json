@@ -1,0 +1,7 @@
+{
+  "type": "lldb",
+  "name": "Launch Rust file",
+  "request": "launch",
+  "program": "${file}",
+  "cwd": "${workspaceFolder}"
+}

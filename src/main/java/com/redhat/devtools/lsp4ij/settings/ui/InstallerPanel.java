@@ -20,7 +20,6 @@ import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.OnePixelSplitter;
@@ -28,6 +27,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.settings.jsonSchema.ServerInstallerJsonSchemaFileProvider;
@@ -36,10 +36,8 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Set;
 
 /**
  * UI panel which display in a tabbed pane the server installer:
@@ -53,52 +51,62 @@ public class InstallerPanel implements Disposable {
 
     private final @NotNull Project project;
     private final @NotNull JsonTextField installerConfigurationWidget;
-    private final @NotNull ConsoleView console;
-    private final boolean flushOnEachPrint;
+    private final @Nullable ConsoleView console;
     private @Nullable CommandLineUpdater commandLineUpdater;
     private @Nullable Set<Runnable> onPreInstall;
     private @Nullable Set<Runnable> onPostInstall;
 
     public InstallerPanel(@NotNull FormBuilder builder,
-                          @NotNull CommandLineWidget commandLine,
-                          boolean flushOnEachPrint,
+                          boolean canExecuteInstaller,
                           @NotNull Project project) {
-        this.flushOnEachPrint = flushOnEachPrint;
         this.project = project;
-        // Display on the left Json editor to fill installer.json content
-        JPanel linksPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        HyperlinkLabel checkInstallerAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.installer.check"));
-        linksPanel.add(checkInstallerAction);
-        HyperlinkLabel runInstallerAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.installer.run"));
-        linksPanel.add(runInstallerAction);
-        HyperlinkLabel checkAndRunInstallerAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.installer.check.and.run"));
-        linksPanel.add(checkAndRunInstallerAction);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), linksPanel);
+
+        if (canExecuteInstaller) {
+            // Display on the left Json editor to fill installer.json content
+            JPanel linksPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+            // Check hyperlink
+            HyperlinkLabel checkInstallerAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.installer.check"));
+            checkInstallerAction.addHyperlinkListener(e -> {
+                processInstall(InstallerContext.InstallerAction.CHECK);
+            });
+            linksPanel.add(checkInstallerAction);
+
+            // Run hyperlink
+            HyperlinkLabel runInstallerAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.installer.run"));
+            runInstallerAction.addHyperlinkListener(e -> {
+                processInstall(InstallerContext.InstallerAction.RUN);
+            });
+            linksPanel.add(runInstallerAction);
+
+            // Check & Run hyperlink
+            HyperlinkLabel checkAndRunInstallerAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.installer.check.and.run"));
+            checkAndRunInstallerAction.addHyperlinkListener(e -> {
+                processInstall(InstallerContext.InstallerAction.CHECK_AND_RUN);
+            });
+            linksPanel.add(checkAndRunInstallerAction);
+
+            builder.addLabeledComponent(LanguageServerBundle.message("language.server.configuration"), linksPanel);
+        }
 
         installerConfigurationWidget = new JsonTextField(project);
         installerConfigurationWidget.setJsonFilename(ServerInstallerJsonSchemaFileProvider.INSTALLER_JSON_FILE_NAME);
 
-        // Display on the right, console which shows traces of execution of installer
-        TextConsoleBuilder consoleBuilder = TextConsoleBuilderFactory.getInstance().createBuilder(project);
-        console = consoleBuilder.getConsole();
+        if (canExecuteInstaller) {
+            // Display on the right, console which shows traces of execution of installer
+            TextConsoleBuilder consoleBuilder = TextConsoleBuilderFactory.getInstance().createBuilder(project);
+            console = consoleBuilder.getConsole();
+            OnePixelSplitter splitter = new OnePixelSplitter(false, 0.5f);
+            splitter.setShowDividerControls(true);
+            splitter.setHonorComponentsMinimumSize(true);
+            splitter.setFirstComponent(installerConfigurationWidget.getComponent());
+            splitter.setSecondComponent(console.getComponent());
+            builder.addComponentFillVertically(splitter, 0);
+        } else {
+            console = null;
+            builder.addComponentFillVertically(installerConfigurationWidget.getComponent(), 0);
+        }
 
-        OnePixelSplitter splitter = new OnePixelSplitter(false, 0.5f);
-        splitter.setShowDividerControls(true);
-        splitter.setHonorComponentsMinimumSize(true);
-        splitter.setFirstComponent(installerConfigurationWidget.getComponent());
-        splitter.setSecondComponent(console.getComponent());
-        builder.addComponentFillVertically(splitter, 0);
-        checkInstallerAction.addHyperlinkListener(e -> {
-            processInstall(InstallerContext.InstallerAction.CHECK);
-        });
-
-        runInstallerAction.addHyperlinkListener(e -> {
-            processInstall(InstallerContext.InstallerAction.RUN);
-        });
-
-        checkAndRunInstallerAction.addHyperlinkListener(e -> {
-            processInstall(InstallerContext.InstallerAction.CHECK_AND_RUN);
-        });
     }
 
     private void processInstall(@NotNull InstallerContext.InstallerAction action) {
@@ -117,9 +125,10 @@ public class InstallerPanel implements Disposable {
     }
 
     private @NotNull InstallerContext createInstallerContext(InstallerContext.@NotNull InstallerAction action) {
-        var context = new InstallerContext(project, action)
-                .setConsole(console);
-        context.setFlushOnEachPrint(flushOnEachPrint);
+        var context = new InstallerContext(project, action);
+        if (console != null) {
+            context.setConsoleProviders(() -> List.of(new ConsoleProvider(console, project)));
+        }
         context.setCommandLineUpdater(commandLineUpdater);
         if (action == InstallerContext.InstallerAction.RUN || action == InstallerContext.InstallerAction.CHECK_AND_RUN) {
             context.setOnPreInstall(onPreInstall);
@@ -152,6 +161,8 @@ public class InstallerPanel implements Disposable {
 
     @Override
     public void dispose() {
-        console.dispose();
+        if(console != null) {
+            console.dispose();
+        }
     }
 }

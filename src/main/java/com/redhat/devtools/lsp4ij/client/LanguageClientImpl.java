@@ -26,10 +26,13 @@ import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,12 +46,12 @@ import java.util.function.Consumer;
  * LSP {@link LanguageClient} implementation for IntelliJ.
  */
 public class LanguageClientImpl implements LanguageClient, Disposable {
-    private final Project project;
+
+    private final @NotNull Project project;
     private Consumer<PublishDiagnosticsParams> diagnosticHandler;
 
-    private LanguageServer server;
-    private LanguageServerWrapper wrapper;
-
+    private @Nullable LanguageServer server;
+    private @NotNull LanguageServerWrapper wrapper;
     private boolean disposed;
 
     private Runnable didChangeConfigurationListener;
@@ -56,32 +59,42 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     @NotNull
     private final LSPProgressManager progressManager;
 
-    public LanguageClientImpl(Project project) {
+    private final SettingsLanguageListener languageServerStartedListener;
+
+    public LanguageClientImpl(@NotNull Project project) {
         this.project = project;
-        progressManager = new LSPProgressManager();
+        this.progressManager = new LSPProgressManager();
+        this.languageServerStartedListener = new SettingsLanguageListener(this, project);
+        GlobalLanguageServerSettings.getInstance().addSettingsListener(languageServerStartedListener);
+        ProjectLanguageServerSettings.getInstance(getProject()).addSettingsListener(languageServerStartedListener);
     }
 
-    public Project getProject() {
+    public @NotNull Project getProject() {
         return project;
     }
 
-    public final void connect(@NotNull LanguageServer server, @NotNull LanguageServerWrapper wrapper) {
-        this.server = server;
+    @ApiStatus.Internal
+    public void setServerWrapper(@NotNull LanguageServerWrapper wrapper) {
         this.wrapper = wrapper;
+    }
+
+    public @NotNull LanguageServerDefinition getServerDefinition() {
+        return wrapper.getServerDefinition();
+    }
+
+    @NotNull
+    public LSPClientFeatures getClientFeatures() {
+        return wrapper.getClientFeatures();
+    }
+
+    public final void connect(@NotNull LanguageServer server) {
+        this.server = server;
         this.diagnosticHandler = new LSPDiagnosticHandler(wrapper);
         this.progressManager.connect(server, wrapper);
     }
 
-    protected final LanguageServer getLanguageServer() {
+    protected final @Nullable LanguageServer getLanguageServer() {
         return server;
-    }
-
-    public LanguageServerDefinition getServerDefinition() {
-        return wrapper.getServerDefinition();
-    }
-
-    public LSPClientFeatures getClientFeatures() {
-        return wrapper.getClientFeatures();
     }
 
     @Override
@@ -142,12 +155,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshCodeLenses() {
-        return CompletableFuture.runAsync(() -> {
-            if (wrapper == null) {
-                return;
-            }
-            refreshCodeLensForAllOpenedFiles();
-        });
+        return CompletableFuture.runAsync(this::refreshCodeLensForAllOpenedFiles);
     }
 
     private void refreshCodeLensForAllOpenedFiles() {
@@ -178,12 +186,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshSemanticTokens() {
-        return CompletableFuture.runAsync(() -> {
-            if (wrapper == null) {
-                return;
-            }
-            refreshSemanticTokensForAllOpenedFiles();
-        });
+        return CompletableFuture.runAsync(this::refreshSemanticTokensForAllOpenedFiles);
     }
 
     private void refreshSemanticTokensForAllOpenedFiles() {
@@ -207,19 +210,16 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshDiagnostics() {
-        return CompletableFuture.runAsync(() -> {
-            if (wrapper == null) {
-                return;
-            }
-            refreshDiagnosticsForAllOpenedFiles();
-        });
+        return CompletableFuture.runAsync(this::refreshDiagnosticsForAllOpenedFiles);
     }
 
     private void refreshDiagnosticsForAllOpenedFiles() {
         // Received request 'workspace/diagnostic/refresh
         for (var openedDocument : wrapper.getOpenedDocuments()) {
-            openedDocument.getSynchronizer()
-                    .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
+            if (openedDocument.getSynchronizer() != null) {
+                openedDocument.getSynchronizer()
+                        .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
+            }
         }
     }
 
@@ -265,7 +265,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     protected Object findSettings(@Nullable String section) {
         var config = createSettings();
         if (config instanceof JsonObject json) {
-            if (section == null) {
+            if (section == null || section.isEmpty()) {
                 return config;
             }
             return findSettings(section, json);
@@ -284,7 +284,11 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
      */
     @Nullable
     protected Object createSettings() {
-        return null;
+        String languageServerId = getServerDefinition().getId();
+        var project = getProject();
+        var settings = GlobalLanguageServerSettings.getInstance()
+                .getLanguageServerSettings(languageServerId);
+        return settings != null ? settings.getLanguageServerConfiguration(project) : null;
     }
 
     protected synchronized Runnable getDidChangeConfigurationListener() {
@@ -295,7 +299,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return didChangeConfigurationListener;
     }
 
-    protected void triggerChangeConfiguration() {
+    public void triggerChangeConfiguration() {
         LanguageServer languageServer = getLanguageServer();
         if (languageServer == null) {
             return;
@@ -308,6 +312,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         DidChangeConfigurationParams params = new DidChangeConfigurationParams(settings);
         languageServer.getWorkspaceService().didChangeConfiguration(params);
     }
+
 
     /**
      * Callback invoked when language server status changed.
@@ -339,6 +344,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     public void dispose() {
         this.disposed = true;
         this.progressManager.dispose();
+        GlobalLanguageServerSettings.getInstance().removeSettingsListener(languageServerStartedListener);
+        ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(languageServerStartedListener);
     }
 
     public boolean isDisposed() {

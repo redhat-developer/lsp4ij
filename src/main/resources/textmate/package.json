@@ -1,0 +1,31 @@
+{
+  "name": "vscode-lldb",
+  "displayName": "CodeLLDB",
+  "version": "@VERSION@",
+  "publisher": "vadimcn",
+  "description": "A native debugger powered by LLDB.  Debug C++, Rust and other compiled languages.",
+  "license": "MIT",
+  "author": {
+    "name": "vadimcn"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "lldb.disassembly",
+        "aliases": [
+          "Disassembly"
+        ],
+        "extensions": [
+          ".disasm"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lldb.disassembly",
+        "scopeName": "source.disassembly",
+        "path": "./syntaxes/disassembly.json"
+      }
+    ]
+  }
+}

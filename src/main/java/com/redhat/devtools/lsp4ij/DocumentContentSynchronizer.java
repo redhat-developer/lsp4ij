@@ -226,7 +226,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     public void documentSaved() {
         var saveOptions = syncOptions.getSave();
-        if ((saveOptions.isLeft() && !saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() == null)) {
+        if (saveOptions == null || (saveOptions.isLeft() && !saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() == null)) {
             // Don't send textDocument/didSave
             return;
         }
@@ -244,6 +244,17 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     public void documentClosed() {
         // When LS is shut down all documents are being disconnected. No need to send "didClose" message to the LS that is being shut down or not yet started
         if (syncOptions.getOpenClose() && languageServerWrapper.isActive()) {
+            // Ensure pending textDocument/didChange events are sent before the file is closed.
+            //
+            // This handles the specific case where a file is being renamed:
+            // the original file is closed (triggering a textDocument/didClose),
+            // but workspace/willRenameFiles may modify the file before that.
+            // Without this call, the didChange notification could be sent
+            // after didClose, breaking the expected LSP event order.
+            if (!changeEvents.isEmpty()) {
+                sendDidChangeEvents();
+            }
+
             // Send textDocument/didClose
             languageServerWrapper.sendNotification(ls -> {
                 TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
@@ -334,9 +345,12 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             }
             var ls = didOpenFuture.getNow(null);
             if (ls == null) {
-                // The didOpen is not finished, ignore the pull diagnostic
+                // The didOpen is not finished, refresh the pull diagnostic when server is ready
                 didOpenFuture.
                         thenAccept(readyLs -> refreshPullDiagnostic(version, readyLs));
+            } else {
+                // The server is ready, refresh the pull diagnostics
+                refreshPullDiagnostic(version, ls);
             }
             return;
         }

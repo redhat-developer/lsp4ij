@@ -20,13 +20,14 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 public class IndexAwareLanguageClient extends LanguageClientImpl {
 
-    public IndexAwareLanguageClient(Project project) {
+    public IndexAwareLanguageClient(@NotNull Project project) {
         super(project);
     }
 

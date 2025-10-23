@@ -30,8 +30,9 @@ import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
-import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointProperties;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
+import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -67,6 +68,7 @@ import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
  */
 public class DAPClient implements IDebugProtocolClient, Disposable {
 
+    public static final org.eclipse.lsp4j.debug.Thread[] EMPTY_THREADS = new org.eclipse.lsp4j.debug.Thread[0];
     /**
      * Any events we receive from the adapter that require further contact with the
      * adapter needs to be farmed off to another thread as the events arrive at the
@@ -96,10 +98,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private final boolean isDebug;
     private final @NotNull DebugMode debugMode;
     private final @NotNull ServerTrace serverTrace;
-    private boolean isConnected;
     private Future<Void> debugProtocolFuture;
     private IDebugProtocolServer debugProtocolServer;
-    private @Nullable Capabilities capabilities;
     private @NotNull
     final List<DAPClient> childrenClient;
     private boolean sentTerminateRequest;
@@ -122,6 +122,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @NotNull
     public CompletableFuture<Void> connectToServer(@NotNull ProgressIndicator indicator) {
+        indicator.setIndeterminate(false);
         TracingMessageConsumer tracing = serverTrace != ServerTrace.off ? new TracingMessageConsumer() : null;
 
         UnaryOperator<MessageConsumer> wrapper = consumer -> {
@@ -200,7 +201,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     .thenCompose(v -> {
                         // client sends zero or more setBreakpoints requests
                         monitor.checkCanceled();
-                        monitor.setFraction(60d / 100d);
+                        monitor.setFraction(50d / 100d);
                         monitor.setText2("Sending breakpoints");
                         return debugProcess
                                 .getBreakpointHandler()
@@ -211,7 +212,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         // if one or more exceptionBreakpointFilters have been defined
                         // (or if supportsConfigurationDoneRequest is not true)
                         monitor.checkCanceled();
-                        monitor.setFraction(70d / 100d);
+                        monitor.setFraction(60d / 100d);
                         monitor.setText2("Sending exception breakpoints filters");
 
                         var filters = getCapabilities().getExceptionBreakpointFilters();
@@ -221,6 +222,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                     .sendExceptionBreakpointFilters(filters, getDebugProtocolServer());
                         }
                         return CompletableFuture.completedFuture(null);
+                    })
+                    .thenCompose(v -> {
+                        monitor.checkCanceled();
+                        monitor.setFraction(70d / 100d);
+                        // client sends a setInstructionsBreakpoints request
+                        // if supportsDisassembleRequest returns true
+                        if (!canDisassemble()) {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                        monitor.setText2("Sending instruction breakpoints");
+                        return debugProcess
+                                .getDisassemblyBreakpointHandler()
+                                .initialize(getDebugProtocolServer(), getCapabilities());
                     });
         }
         configurationDoneFuture = configurationDoneFuture
@@ -250,11 +264,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * initialized.
      *
      * @return the current capabilities if they have been retrieved, or else
-     * return @{code null}
+     * return a default capabilities
      */
-    @Nullable
+    @NotNull
     Capabilities getCapabilities() {
-        return capabilitiesFuture.getNow(null);
+        return capabilitiesFuture.getNow(new Capabilities());
     }
 
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
@@ -306,6 +320,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     @Override
+    public CompletableFuture<RunInTerminalResponse> runInTerminal(@NotNull RunInTerminalRequestArguments args) {
+        return RunInTerminalManager.getInstance(getProject()).runInTerminal(args, this);
+    }
+
+    @Override
     public void breakpoint(BreakpointEventArguments args) {
         if (BreakpointEventArgumentsReason.CHANGED.equals(args.getReason())) {
             var breakpoint = args.getBreakpoint();
@@ -328,17 +347,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (threadId == null) {
             return;
         }
-        server
-                .threads()
-                .thenAcceptAsync(threadsResponse -> {
-                    var threadResult = Arrays.stream(threadsResponse.getThreads())
+        getThreads(true)
+                .thenAcceptAsync(threads -> {
+                    var threadResult = Arrays.stream(threads)
                             .filter(t -> threadId.equals(t.getId()))
                             .findFirst();
                     if (threadResult.isEmpty()) {
                         // The Thread doesn't exist
                         return;
                     }
-                    var thread = threadResult.get();
+                    var activeThread = threadResult.get();
                     // get the stack trace
                     StackTraceArguments stackTraceArgs = new StackTraceArguments();
                     stackTraceArgs.setThreadId(args.getThreadId());
@@ -348,12 +366,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 StackFrame[] stackFrames = stackTraceResponse.getStackFrames();
                                 if (stackFrames != null && stackFrames.length > 0) {
                                     var stackFrame = stackFrames[0];
-                                    XBreakpoint<DAPBreakpointProperties> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrame);
+                                    XBreakpoint<?> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrame);
                                     XSuspendContext context = getSession().getSuspendContext();
                                     if (context == null) {
                                         context = new DAPSuspendContext(this);
                                     }
-                                    ((DAPSuspendContext) context).addToExecutionStack(thread, stackFrames);
+                                    // Create an execution stack per thread and
+                                    // initialize the stack with current DAP stack frames for the active thread
+                                    for(var thread : threads) {
+                                        ((DAPSuspendContext) context).addToExecutionStack(thread, thread.equals(activeThread) ? stackFrames : null);
+                                    }
                                     XDebugSession session = getSession();
                                     if (breakpoint == null) {
                                         session.positionReached(context);
@@ -444,6 +466,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (transportStreams != null) {
             transportStreams.close();
         }
+        RunInTerminalManager.getInstance(getProject()).releaseClientTerminals(this);
         threadPool.shutdown();
         for (DAPClient child : childrenClient) {
             child.dispose();
@@ -519,41 +542,46 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 .continue_(args);
     }
 
-    public void next(int threadId) {
+    public void next(int threadId, @Nullable SteppingGranularity granularity) {
         if (debugProtocolServer == null) {
             return;
         }
         NextArguments args = new NextArguments();
         args.setThreadId(threadId);
+        args.setGranularity(granularity);
         debugProtocolServer.next(args);
     }
 
-    public void stepOut(int threadId) {
+    public void stepOut(int threadId, SteppingGranularity granularity) {
         if (debugProtocolServer == null) {
             return;
         }
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(threadId);
+        args.setGranularity(granularity);
         debugProtocolServer.stepOut(args);
     }
 
-    public void stepIn(int threadId) {
+    public void stepIn(int threadId, SteppingGranularity granularity) {
         if (debugProtocolServer == null) {
             return;
         }
         StepInArguments args = new StepInArguments();
         args.setThreadId(threadId);
+        args.setGranularity(granularity);
         debugProtocolServer.stepIn(args);
     }
 
-    public CompletableFuture<EvaluateResponse> evaluate(String expression, int frameId) {
+    public CompletableFuture<EvaluateResponse> evaluate(@NotNull String expression,
+                                                        @Nullable Integer frameId,
+                                                        @NotNull String context) {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
         }
         EvaluateArguments args = new EvaluateArguments();
         args.setExpression(expression);
         args.setFrameId(frameId);
-        args.setContext(EvaluateArgumentsContext.WATCH);
+        args.setContext(context);
         return debugProtocolServer.evaluate(args);
     }
 
@@ -587,8 +615,34 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProtocolServer.setVariable(args);
     }
 
-    // Capabilities
+    // Threads
 
+    @Override
+    public void thread(ThreadEventArguments args) {
+        debugProcess.refreshThread(args);
+    }
+
+    public CompletableFuture<org.eclipse.lsp4j.debug.Thread[]> getThreads(boolean refreshThreads) {
+        if (debugProtocolServer == null) {
+            return CompletableFuture.completedFuture(EMPTY_THREADS);
+        }
+        var result = debugProtocolServer
+                .threads()
+                .thenApply(response -> {
+                    if (response == null) {
+                        return EMPTY_THREADS;
+                    }
+                    return response.getThreads();
+                });
+        if (refreshThreads) {
+            result.thenAccept(threads -> {
+                debugProcess.refreshThreads(threads);
+            });
+        }
+        return result;
+    }
+
+    // Capabilities
 
     /**
      * Returns true if the debug adapter supports the 'terminate' request and false otherwise.
@@ -596,8 +650,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports the 'terminate' request and false otherwise.
      */
     public boolean isSupportsTerminateRequest() {
-        var capabilities = getCapabilities();
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsTerminateRequest());
     }
 
     /**
@@ -606,8 +659,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports the 'completions' request and false otherwise.
      */
     public boolean isSupportsCompletionsRequest() {
-        var capabilities = getCapabilities();
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsCompletionsRequest());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsCompletionsRequest());
     }
 
     /**
@@ -616,8 +668,20 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports setting a variable to a value and false otherwise.
      */
     public boolean isSupportsSetVariable() {
-        var capabilities = getCapabilities();
-        return capabilities != null && Boolean.TRUE.equals(capabilities.getSupportsSetVariable());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsSetVariable());
+    }
+
+    /**
+     * Returns true if the debug adapter supports evaluate request for data hovers and false otherwise.
+     *
+     * @return true if the debug adapter supports evaluate request for data hovers and false otherwise.
+     */
+    public boolean isSupportsEvaluateForHovers() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsEvaluateForHovers());
+    }
+
+    public boolean canDisassemble() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsDisassembleRequest());
     }
 
     @NotNull
@@ -625,8 +689,21 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProcess.getServerDescriptor();
     }
 
+    @Nullable
+    public DisassemblyFile getDisassemblyFile() {
+        return debugProcess.getDisassemblyFile();
+    }
+
     @NotNull
     public Project getProject() {
         return debugProcess.getSession().getProject();
+    }
+
+    public @NotNull String getConfigName() {
+        return debugProcess.getConfigName();
+    }
+
+    public long getSessionId() {
+        return debugProcess.getSessionId();
     }
 }

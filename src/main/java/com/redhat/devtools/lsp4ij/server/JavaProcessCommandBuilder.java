@@ -12,7 +12,7 @@ package com.redhat.devtools.lsp4ij.server;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
-import com.redhat.devtools.lsp4ij.settings.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -37,7 +37,7 @@ public class JavaProcessCommandBuilder {
     public JavaProcessCommandBuilder(Project project, String languageId) {
         this.languageId = languageId;
         setJavaPath(computeJavaPath());
-        UserDefinedLanguageServerSettings.LanguageServerDefinitionSettings settings = UserDefinedLanguageServerSettings.getInstance(project).getLanguageServerSettings(languageId);
+        ProjectLanguageServerSettings.LanguageServerDefinitionSettings settings = ProjectLanguageServerSettings.getInstance(project).getLanguageServerSettings(languageId);
         if (settings != null) {
             setDebugPort(settings.getDebugPort());
             setDebugSuspend(settings.isDebugSuspend());

@@ -29,12 +29,22 @@ public class MockWorkspaceService implements WorkspaceService {
 	private Function<?, ?> _futureFactory;
 	private CompletableFuture<ExecuteCommandParams> executedCommand = new CompletableFuture<>();
 	private List<DidChangeWorkspaceFoldersParams> workspaceFoldersEvents = new ArrayList<>();
+    private WorkspaceEdit willRename;
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
 	}
 
-	/**
+    public void setWillRename(WorkspaceEdit willRename) {
+        this.willRename = willRename;
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceEdit> willRenameFiles(RenameFilesParams params) {
+        return CompletableFuture.supplyAsync(() -> this.willRename);
+    }
+
+    /**
 	 * Use this method to get a future that will wait specified delay before returning
 	 * value
 	 * @param value the value that will be returned by the future
@@ -43,24 +53,22 @@ public class MockWorkspaceService implements WorkspaceService {
 	private <U> CompletableFuture<U> futureFactory(U value) {
 		return ((Function<U, CompletableFuture<U>>)this._futureFactory).apply(value);
 	}
-	
+
 	@Override
 	public CompletableFuture<Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> symbol(
 			WorkspaceSymbolParams params) {
-		// TODO Auto-generated method stub
+		// No-op
 		return null;
 	}
 
 	@Override
 	public void didChangeConfiguration(DidChangeConfigurationParams params) {
-		// TODO Auto-generated method stub
-
+		// No-op
 	}
 
 	@Override
 	public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-		// TODO Auto-generated method stub
-
+		// No-op
 	}
 
 	@Override

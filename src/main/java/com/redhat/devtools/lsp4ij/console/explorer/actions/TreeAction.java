@@ -20,6 +20,7 @@ import com.intellij.ui.treeStructure.Tree;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.tree.TreePath;
 import java.awt.*;
@@ -28,6 +29,7 @@ import java.awt.*;
  * Base class for Actions processed from the Language Server tree.
  */
 public abstract class TreeAction extends AnAction {
+
     public final void actionPerformed(@NotNull AnActionEvent e) {
         Tree tree = getTree(e);
         if (tree == null) {
@@ -42,7 +44,7 @@ public abstract class TreeAction extends AnAction {
      * @param e the action event.
      * @return the language server tree and null otherwise.
      */
-    private Tree getTree(AnActionEvent e) {
+    private @Nullable Tree getTree(AnActionEvent e) {
         Component component = e.getData(PlatformDataKeys.CONTEXT_COMPONENT);
         if (component instanceof Tree) {
             return (Tree) component;
@@ -56,7 +58,7 @@ public abstract class TreeAction extends AnAction {
      * @param tree the tree.
      * @return the selected language server tree node and null otherwise.
      */
-    protected LanguageServerWrapper getSelectedLanguageServer(Tree tree) {
+    protected @Nullable LanguageServerWrapper getSelectedLanguageServer(Tree tree) {
         TreePath path = tree.getSelectionPath();
         Object node = path != null ? path.getLastPathComponent() : null;
         if (node instanceof LanguageServerProcessTreeNode) {

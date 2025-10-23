@@ -1,0 +1,53 @@
+{
+  "id": "docker-language-server",
+  "name": "Docker Language Server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download docker-language-server",
+      "github": {
+        "owner": "docker",
+        "repository": "docker-language-server",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "amd64": "docker-language-server-windows-amd64-*",
+            "arm64": "docker-language-server-windows-arm64-*"
+          },
+          "unix": {
+            "amd64": "docker-language-server-linux-amd64-*",
+            "arm64": "docker-language-server-linux-arm64-*"
+          },
+          "mac": {
+            "amd64": "docker-language-server-darwin-amd64-*",
+            "arm64": "docker-language-server-darwin-arm64-*"
+          }
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/docker-language-server",
+        "file": {
+          "name": {
+            "windows": "docker-language-server.exe",
+            "default": "docker-language-server"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Docker Language Server command",
+          "command": "${output.dir}/${output.file.name} start --stdio",
+          "update": true
+        }
+      }
+    }
+  }
+}

@@ -12,11 +12,12 @@ package com.redhat.devtools.lsp4ij.dap.descriptors.templates;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
-import com.redhat.devtools.lsp4ij.launching.ServerMappingSettings;
+import com.intellij.execution.configuration.EnvironmentVariablesData;
+import com.redhat.devtools.lsp4ij.templates.ServerTemplateJsonDeserializer;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*;
@@ -24,15 +25,19 @@ import static com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplate.*
 /**
  * DAP template deserializer.
  */
-public class DAPTemplateDeserializer implements JsonDeserializer<DAPTemplate> {
+public class DAPTemplateDeserializer extends ServerTemplateJsonDeserializer<DAPTemplate> {
+
+    private static final @NotNull String BASE_URL = "https://github.com/redhat-developer/lsp4ij/tree/main/docs/dap/user-defined-dap/";
+
+    public DAPTemplateDeserializer() {
+        super(BASE_URL);
+    }
+
     @Override
-    public DAPTemplate deserialize(JsonElement jsonElement, Type type, JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
-        JsonObject jsonObject = jsonElement.getAsJsonObject();
-        DAPTemplate dapTemplate = new DAPTemplate();
-
-        dapTemplate.setId(jsonObject.get(ID_JSON_PROPERTY).getAsString());
-        dapTemplate.setName(jsonObject.get(NAME_JSON_PROPERTY).getAsString());
-
+    protected void deserializeCustom(@NotNull DAPTemplate dapTemplate,
+                                     @NotNull JsonObject jsonObject,
+                                     Type type,
+                                     JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
         // launch
         if (jsonObject.has(LAUNCH_PROPERTY)) {
             JsonObject programArgs = jsonObject.get(LAUNCH_PROPERTY).getAsJsonObject();
@@ -43,6 +48,7 @@ public class DAPTemplateDeserializer implements JsonDeserializer<DAPTemplate> {
                 Map<String, String> programArgsMap = gson.fromJson(programArgs, mapType);
                 dapTemplate.setProgramArgs(programArgsMap);
             }
+            dapTemplate.setEnvData(deserializeEnvData(jsonObject));
         }
 
         JsonElement connectTimeout = jsonObject.get(CONNECT_TIMEOUT_JSON_PROPERTY);
@@ -50,7 +56,7 @@ public class DAPTemplateDeserializer implements JsonDeserializer<DAPTemplate> {
             try {
                 dapTemplate.setConnectTimeout(connectTimeout.getAsInt());
             } catch (Exception e) {
-
+                // Do nothing
             }
         }
 
@@ -70,38 +76,11 @@ public class DAPTemplateDeserializer implements JsonDeserializer<DAPTemplate> {
                 dapTemplate.setAttachPort(attachObject.get(ATTACH_PORT_PROPERTY).getAsString());
             }
         }
-
-        JsonArray fileTypeMappings = jsonObject.getAsJsonArray(FILE_TYPE_MAPPINGS_JSON_PROPERTY);
-        if (fileTypeMappings != null && !fileTypeMappings.isEmpty()) {
-            for (JsonElement ftm : fileTypeMappings) {
-                List<String> patterns = new ArrayList<>();
-                JsonObject fileType = ftm.getAsJsonObject().getAsJsonObject(FILE_TYPE_JSON_PROPERTY);
-                JsonArray patternArray = fileType.getAsJsonArray(PATTERNS_JSON_PROPERTY);
-                if (patternArray != null) {
-                    for (JsonElement pattern : patternArray) {
-                        patterns.add(pattern.getAsString());
-                    }
-                }
-                if (!patterns.isEmpty()) {
-                    dapTemplate.addFileTypeMapping(ServerMappingSettings.createFileNamePatternsMappingSettings(patterns, null));
-                }
-
-                JsonElement language = fileType.get(NAME_JSON_PROPERTY);
-                if (language != null) {
-                    dapTemplate.addFileTypeMapping(ServerMappingSettings.createFileTypeMappingSettings(language.getAsString(), null));
-                }
-            }
-        }
-        JsonArray languageMappings = jsonObject.getAsJsonArray(LANGUAGE_MAPPINGS_JSON_PROPERTY);
-        if (languageMappings != null && !languageMappings.isEmpty()) {
-            for (JsonElement language : languageMappings) {
-                String lang = language.getAsJsonObject().get(LANGUAGE_JSON_PROPERTY) != null ? language.getAsJsonObject().get(LANGUAGE_JSON_PROPERTY).getAsString() : null;
-                if (lang != null) {
-                    dapTemplate.addLanguageMapping(ServerMappingSettings.createLanguageMappingSettings(lang, null));
-                }
-            }
-        }
-
-        return dapTemplate;
     }
+
+    @Override
+    protected DAPTemplate createServerTemplateInstance() {
+        return new DAPTemplate();
+    }
+
 }

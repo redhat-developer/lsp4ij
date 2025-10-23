@@ -1,0 +1,24 @@
+{
+  "id": "buildx-dockerfile",
+  "name": "Docker: Dockerfile Build Debugging",
+  "launch": {
+    "default": "docker buildx dap build"
+  },
+  "env": {
+    "includeSystemEnvironmentVariables": true,
+    "variables": {
+      "BUILDX_EXPERIMENTAL": "1"
+    }
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Dockerfile",
+        "patterns": [
+          "Dockerfile*"
+        ]
+      },
+      "languageId": "dockerfile"
+    }
+  ]
+}

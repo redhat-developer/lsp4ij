@@ -1,0 +1,20 @@
+{
+  "snippetTextEdit": true,
+  "codeActionGroup": true,
+  "hoverActions": true,
+  "serverStatusNotification": true,
+  "colorDiagnosticOutput": true,
+  "openServerLogs": true,
+  "localDocs": true,
+  "testExplorer": false,
+  "commands": {
+    "commands": [
+      "rust-analyzer.runSingle",
+      "rust-analyzer.debugSingle",
+      "rust-analyzer.showReferences",
+      "rust-analyzer.gotoLocation",
+      "rust-analyzer.triggerParameterHints",
+      "rust-analyzer.rename"
+    ]
+  }
+}

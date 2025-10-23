@@ -22,6 +22,7 @@ public enum ServerStatus {
     checking_installed,
     installing,
     installed,
+    not_installed,
     starting, // The language server process is starting
     started, // The language server is started without error
     stopping, // The language server is stopping
