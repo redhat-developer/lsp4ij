@@ -20,23 +20,26 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiInvalidElementAccessException;
 import com.intellij.psi.impl.FakePsiElement;
+import com.intellij.psi.impl.light.LightElement;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.*;
+
 /**
  * Base class for LSP Psi element.
  */
-public class LSPPsiElement extends FakePsiElement {
+public class LSPPsiElement extends LightElement {
 
     private final @NotNull PsiFile file;
-
     private @NotNull TextRange textRange;
     private String name;
 
     public LSPPsiElement(@NotNull PsiFile file,
                          @NotNull TextRange textRange) {
+        super(file.getManager(), file.getLanguage());
         this.file = file;
         setTextRange(textRange);
     }
@@ -72,10 +75,14 @@ public class LSPPsiElement extends FakePsiElement {
         return textRange.getStartOffset();
     }
 
-    @Override
-    public int getTextLength() {
-        return textRange.getEndOffset() - textRange.getStartOffset();
+    public @Nullable Icon getIcon(boolean open) {
+        return null;
     }
+
+    //@Override
+    //public int getTextLength() {
+    //    return textRange.getEndOffset() - textRange.getStartOffset();
+    //}
 
     @Override
     public String getName() {
@@ -86,7 +93,7 @@ public class LSPPsiElement extends FakePsiElement {
         return name;
     }
 
-    @Override
+    //@Override
     public PsiElement setName(@NonNls @NotNull String name) throws IncorrectOperationException {
         this.name = name;
         return this;
@@ -102,7 +109,7 @@ public class LSPPsiElement extends FakePsiElement {
         return getName();
     }
 
-    @Override
+    //@Override
     public @NlsSafe @Nullable String getLocationString() {
         return file.getName();
     }
@@ -117,4 +124,8 @@ public class LSPPsiElement extends FakePsiElement {
         return true;
     }
 
+    @Override
+    public String toString() {
+        return "";
+    }
 }
