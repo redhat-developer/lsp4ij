@@ -2,8 +2,8 @@
   "id": "metals",
   "name": "Scala Language Server (Metals)",
   "programArgs": {
-    "windows": "\"${BASE_DIR}/metals.bat\"",
-    "default": "\"${BASE_DIR}/metals\""
+    "windows": "${workingDir}/metals.bat",
+    "default": "${workingDir}/metals"
   },
   "expandConfiguration": true,
   "fileTypeMappings": [
