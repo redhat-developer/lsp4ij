@@ -225,7 +225,8 @@ public class LanguageServerWrapper implements Disposable {
      */
     private synchronized void stopAndRefreshEditorFeature(boolean refreshEditorFeature, boolean disable) {
         // Collect opened files before stopping the language server
-        List<VirtualFile> openedFiles = refreshEditorFeature ? openedDocuments.values()
+        List<VirtualFile> openedFiles = refreshEditorFeature ?
+                new ArrayList<>(openedDocuments.values())
                 .stream()
                 .map(OpenedDocument::getFile)
                 .toList() : Collections.emptyList();
