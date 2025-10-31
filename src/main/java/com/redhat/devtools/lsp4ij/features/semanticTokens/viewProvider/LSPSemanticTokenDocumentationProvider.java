@@ -92,7 +92,11 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
             }
         }
 
-        return getFallbackDocumentation(sourceElement, targetElement);
+        // Don't return result of getFallbackDocumentation because LSPSemanticTokenDocumentationProvider could be
+        // process before some other provider which will generate a proper documentation
+        // see https://github.com/redhat-developer/lsp4ij/issues/1240
+        // return getFallbackDocumentation(sourceElement, targetElement);
+        return null;
     }
 
     @Nullable
