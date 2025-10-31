@@ -443,6 +443,7 @@
                 implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
         <lang.documentationProvider
                 language=""
+                order="last"
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkDocumentationProvider"/>
 
         <!-- LSP textDocument/documentSymbol request support -->
@@ -617,6 +618,7 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElementManipulator"/>
         <lang.documentationProvider
                 language=""
+                order="last"
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider"/>
 
         <!-- We cannot register one for plain text abstract file types, so we have to do that dynamically. Do so when a project is opened. -->
