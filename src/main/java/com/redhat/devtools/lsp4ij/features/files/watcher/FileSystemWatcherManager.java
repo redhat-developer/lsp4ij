@@ -184,6 +184,16 @@ public class FileSystemWatcherManager {
         return fileSystemWatchers != null && !fileSystemWatchers.isEmpty();
     }
 
+    public boolean hasFilePatternsFor(int kind) {
+        if (!hasFilePatterns()) {
+            return false;
+        }
+
+        // Ensure pattern matchers are initialized before use
+        computePatternMatchersIfNeed();
+
+        return !pathPatternMatchers.get(kind).isEmpty();
+    }
     /**
      * Returns true if the given uri matches a pattern for the given watch kind and false otherwise.
      *

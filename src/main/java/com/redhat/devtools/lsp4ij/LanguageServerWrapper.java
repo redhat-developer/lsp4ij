@@ -137,6 +137,7 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
     private InitializingContext currentInitializingContext;
+    private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
     public LanguageServerWrapper(@NotNull Project project, @NotNull LanguageServerDefinition serverDefinition) {
@@ -423,6 +424,7 @@ public class LanguageServerWrapper implements Disposable {
                             errorNotification = null;
                         }
                         serverCapabilities = initializingContext.initializeResult.getCapabilities();
+                        syncOptions = createSyncOptions();
                         getClientFeatures().setServerCapabilities(serverCapabilities);
                         this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                         return initializingContext;
@@ -709,8 +711,20 @@ public class LanguageServerWrapper implements Disposable {
                                                                           @NotNull Document document,
                                                                           @Nullable String documentText,
                                                                           @Nullable String languageId) {
-        TextDocumentSyncOptions syncOptions = createSyncOptions();
-        return new DocumentContentSynchronizer(this, fileUri, file, document, documentText, languageId, syncOptions);
+        return new DocumentContentSynchronizer(this, fileUri, file, document, documentText, languageId);
+    }
+
+    public @NotNull TextDocumentSyncOptions getSyncOptions() {
+        if (syncOptions != null) {
+            return syncOptions;
+        }
+        syncOptions = createSyncOptions();
+        return syncOptions;
+    }
+
+    public boolean isSaveSupported() {
+        var saveOptions = getSyncOptions().getSave();
+        return saveOptions != null && (saveOptions.isLeft() && saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() != null);
     }
 
     private @NotNull TextDocumentSyncOptions createSyncOptions() {
@@ -794,7 +808,7 @@ public class LanguageServerWrapper implements Disposable {
      * @param fileUri the file URI
      * @return the {@link OpenedDocument} representing the opened editor document, or {@code null} if not found
      */
-    public @Nullable OpenedDocument getOpenedDocument(URI fileUri) {
+    public @Nullable OpenedDocument getOpenedDocument(@Nullable URI fileUri) {
         return getOpenedDocument(fileUri, false);
     }
 
@@ -808,8 +822,8 @@ public class LanguageServerWrapper implements Disposable {
      * @param force   if {@code true}, attempt to open the document if it is not already opened
      * @return the {@link OpenedDocument} representing the opened editor document, or {@code null} if not found
      */
-    public @Nullable OpenedDocument getOpenedDocument(URI fileUri, boolean force) {
-        var openedDocument = openedDocuments.get(fileUri);
+    public @Nullable OpenedDocument getOpenedDocument(@Nullable URI fileUri, boolean force) {
+        var openedDocument = fileUri != null ? openedDocuments.get(fileUri) : null;
         if (openedDocument != null) {
             // Document is already opened (with or without synchronization with the LSP server when content changes)
             return openedDocument;
@@ -1252,6 +1266,18 @@ public class LanguageServerWrapper implements Disposable {
         return fileOperationsManager.canDidRenameFiles(uri, file.isDirectory());
     }
 
+    public boolean canCreateFilesSupported() {
+        return fileOperationsManager != null && (fileOperationsManager.canWillCreateFiles() || fileOperationsManager.canDidCreateFiles());
+    }
+
+    public boolean canDeleteFilesSupported() {
+        return fileOperationsManager != null && (fileOperationsManager.canWillDeleteFiles() || fileOperationsManager.canDidDeleteFiles());
+    }
+
+    public boolean canRenameFilesSupported() {
+        return fileOperationsManager != null && (fileOperationsManager.canWillRenameFiles() || fileOperationsManager.canDidRenameFiles());
+    }
+
     /**
      * Update diagnostics for the given file URi.
      *
@@ -1310,7 +1336,7 @@ public class LanguageServerWrapper implements Disposable {
      * @return the corresponding URI, or {@code null} if the conversion fails
      */
     @Nullable
-    URI toUri(@NotNull VirtualFile file) {
+    public URI toUri(@NotNull VirtualFile file) {
         return FileUriSupport.getFileUri(file, getClientFeatures());
     }
 

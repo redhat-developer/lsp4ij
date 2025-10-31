@@ -66,12 +66,11 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                                        @NotNull VirtualFile file,
                                        @NotNull Document document,
                                        @Nullable String documentText,
-                                       @Nullable String languageId,
-                                       @NotNull TextDocumentSyncOptions syncOptions) {
+                                       @Nullable String languageId) {
         this.languageServerWrapper = languageServerWrapper;
         this.file = file;
         this.fileUri = fileUri;
-        this.syncOptions = syncOptions;
+        this.syncOptions = languageServerWrapper.getSyncOptions();
         this.document = document;
         this.documentText = documentText;
         this.languageId = languageId;
@@ -225,8 +224,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     }
 
     public void documentSaved() {
-        var saveOptions = syncOptions.getSave();
-        if (saveOptions == null || (saveOptions.isLeft() && !saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() == null)) {
+        if (!languageServerWrapper.isSaveSupported()) {
             // Don't send textDocument/didSave
             return;
         }
@@ -234,6 +232,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         // Send textDocument/didSave
         languageServerWrapper.sendNotification(ls -> {
             TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
+            var saveOptions = syncOptions.getSave();
             boolean includedText = saveOptions.isRight() && saveOptions.getRight().getIncludeText() != null && saveOptions.getRight().getIncludeText();
             DidSaveTextDocumentParams params = new DidSaveTextDocumentParams(identifier, includedText ? document.getText() : null);
             ls.getTextDocumentService().didSave(params);

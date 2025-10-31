@@ -14,7 +14,6 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePropertyEvent;
-import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.events.*;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
@@ -27,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -35,10 +35,10 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * Abstract listener that bridges IntelliJ Virtual File System (VFS) events
- * with corresponding Language Server Protocol (LSP) workspace notifications.
+ * with Language Server Protocol (LSP) workspace notifications.
  * <p>
- * It handles file system operations such as creation, deletion, renaming,
- * movement and content change, and sends matching LSP events:
+ * This listener handles creation, deletion, renaming, moving, and content change
+ * events on files and directories, translating them into corresponding LSP events:
  * <ul>
  *   <li>{@code workspace/willCreateFiles}</li>
  *   <li>{@code workspace/willDeleteFiles}</li>
@@ -48,17 +48,21 @@ import java.util.concurrent.TimeoutException;
  *   <li>{@code workspace/didRenameFiles}</li>
  *   <li>{@code workspace/didChangeWatchedFiles}</li>
  * </ul>
- *
- * <p>Subclasses must implement the abstract hook methods to define how IntelliJ
- * VFS events are transformed into LSP {@link FileEvent}, {@link FileCreate},
- * {@link FileDelete}, or {@link FileRename} structures.</p>
+ * <p>
+ * Subclasses must implement the abstract hook methods to specify how IntelliJ
+ * VFS events are converted into LSP {@link FileEvent}, {@link FileCreate},
+ * {@link FileDelete}, and {@link FileRename} structures.
  */
 public abstract class AbstractLSPFileListener implements FileEditorManagerListener, AsyncFileListener {
 
-    /** The associated language server wrapper. */
+    /**
+     * The associated language server wrapper.
+     */
     protected final LanguageServerWrapper languageServerWrapper;
 
-    /** Manages file system watchers declared by the LSP client. */
+    /**
+     * Manages file system watchers declared by the LSP client.
+     */
     protected final FileSystemWatcherManager fileSystemWatcherManager;
 
     /**
@@ -73,30 +77,106 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
 
     @Override
     public @Nullable ChangeApplier prepareChange(@NotNull List<? extends @NotNull VFileEvent> events) {
-        if (!languageServerWrapper.isActive()) {
+        var supportedEvents = getSupportedEvents(events);
+        if (supportedEvents.isEmpty()) {
             return null;
         }
         return new ChangeApplier() {
             @Override
             public void beforeVfsChange() {
-                before(events);
+                before(supportedEvents);
             }
 
             @Override
             public void afterVfsChange() {
-                after(events);
+                after(supportedEvents);
             }
         };
     }
 
+    /**
+     * Filters the list of VFS events to only those supported by the current LSP server.
+     *
+     * @param events the original list of VFS events
+     * @return a filtered list containing only events supported by the LSP server
+     */
+    private @NotNull List<? extends @NotNull VFileEvent> getSupportedEvents(@NotNull List<? extends @NotNull VFileEvent> events) {
+        if (!languageServerWrapper.isActive()) {
+            return Collections.emptyList();
+        }
+        boolean createFilesSupported = canCreateFilesSupported();
+        boolean deleteFilesSupported = canDeleteFilesSupported();
+        boolean renameFilesSupported = canRenameFilesSupported();
+        boolean changeFilesSupported = canChangeFilesSupported();
+        boolean saveSupported = languageServerWrapper.isSaveSupported();
+        if (!createFilesSupported && !deleteFilesSupported && !renameFilesSupported && !changeFilesSupported && !saveSupported) {
+            return Collections.emptyList();
+        }
+        List<@NotNull VFileEvent> supportedEvents = null;
+        for (VFileEvent event : events) {
+            if (event instanceof VFileCreateEvent || event instanceof VFileCopyEvent) {
+                if (createFilesSupported) {
+                    if (supportedEvents == null) {
+                        supportedEvents = new ArrayList<>();
+                    }
+                    supportedEvents.add(event);
+                }
+            } else if (event instanceof VFileDeleteEvent) {
+                if (deleteFilesSupported) {
+                    if (supportedEvents == null) {
+                        supportedEvents = new ArrayList<>();
+                    }
+                    supportedEvents.add(event);
+                }
+            } else if (event instanceof VFilePropertyChangeEvent || event instanceof VFileMoveEvent) {
+                if (renameFilesSupported) {
+                    if (supportedEvents == null) {
+                        supportedEvents = new ArrayList<>();
+                    }
+                    supportedEvents.add(event);
+                }
+            } else if (event instanceof VFileContentChangeEvent) {
+                if (changeFilesSupported || saveSupported && isOpened(event.getFile())) {
+                    if (supportedEvents == null) {
+                        supportedEvents = new ArrayList<>();
+                    }
+                    supportedEvents.add(event);
+                }
+            }
+        }
+        return supportedEvents != null ? supportedEvents : Collections.emptyList();
+    }
+
+    private boolean isOpened(@Nullable VirtualFile file) {
+        if (file == null) {
+            return false;
+        }
+        URI fileUri = languageServerWrapper.toUri(file);
+        return languageServerWrapper.getOpenedDocument(fileUri) != null;
+    }
+
+    private boolean canCreateFilesSupported() {
+        return languageServerWrapper.canCreateFilesSupported() || fileSystemWatcherManager.hasFilePatternsFor(WatchKind.Create);
+    }
+
+    private boolean canDeleteFilesSupported() {
+        return languageServerWrapper.canDeleteFilesSupported() || fileSystemWatcherManager.hasFilePatternsFor(WatchKind.Delete);
+    }
+
+    private boolean canRenameFilesSupported() {
+        return languageServerWrapper.canRenameFilesSupported();
+    }
+
+    private boolean canChangeFilesSupported() {
+        return fileSystemWatcherManager.hasFilePatternsFor(WatchKind.Change);
+    }
 
     /**
      * Called before VFS events are applied.
      * <p>
-     * Collects "will*" file operations (create, delete, rename, move) and
-     * sends corresponding {@code workspace/will*} requests to the Language Server.
+     * Sends "will*" LSP requests to the server for file creation, deletion, and renaming/movement.
      *
-     * @param events the list of file system events before execution
+     * @param events the list of VFS events before execution
      */
     private void before(@NotNull List<? extends @NotNull VFileEvent> events) {
         List<FileCreate> fileCreates = new ArrayList<>(); // workspace/didCreateFiles events
@@ -156,10 +236,10 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     }
 
     /**
-     * Applies a {@link WorkspaceEdit} returned by a {@code workspace/will*} request.
-     * Waits for up to 500 ms to avoid blocking the UI thread.
+     * Applies a {@link WorkspaceEdit} returned by a "will*" LSP request.
+     * Waits for up to 500ms to avoid blocking the UI thread.
      *
-     * @param future a future returning the workspace edit
+     * @param future the future returning the workspace edit
      */
     private static void applyWorkspaceEdit(CompletableFuture<WorkspaceEdit> future) {
         try {
@@ -182,10 +262,9 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     /**
      * Called after VFS events are applied.
      * <p>
-     * Collects "did*" events (create, delete, rename, move, change) and
-     * sends corresponding {@code workspace/did*} notifications to the Language Server.
+     * Sends "did*" LSP notifications for file creation, deletion, renaming/movement, and content changes.
      *
-     * @param events the list of file system events after execution
+     * @param events the list of VFS events after execution
      */
     private void after(@NotNull List<? extends @NotNull VFileEvent> events) {
         List<FileEvent> fileEvents = new ArrayList<>(); // workspace/didChangeWatchedFiles events
@@ -234,23 +313,21 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
         }
 
-        // Send workspace/didCreateFiles
         if (!fileCreates.isEmpty()) {
             didCreateFiles(fileCreates);
         }
-        // Send workspace/didDeleteFiles
         if (!fileDeletes.isEmpty()) {
             didDeleteFiles(fileDeletes);
         }
-        // Send workspace/didRenameFiles
         if (!fileRenames.isEmpty()) {
             didRenameFiles(fileRenames);
         }
-        // Send workspace/didChangeWatchedFiles
         if (!fileEvents.isEmpty()) {
             didChangeWatchedFiles(fileEvents);
         }
     }
+
+    // -------------------- Abstract hooks --------------------
 
     /**
      * Called before a file is created.
@@ -301,6 +378,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                                               @NotNull List<FileEvent> fileEvents,
                                               @NotNull List<FileRename> fileRenames);
 
+    // -------------------- Utilities --------------------
+
     /**
      * Determines if the given property change event represents a file rename.
      */
@@ -313,14 +392,11 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         return false;
     }
 
-    // Send file events for workspace/didCreateFiles, workspace/didDeleteFiles, workspace/didRenameFiles, workspace/didChangeWatchedFiles
-
     /**
      * Sends a {@code workspace/didCreateFiles} notification.
      */
     private void didCreateFiles(@NotNull List<FileCreate> fileCreates) {
         languageServerWrapper.sendNotification(ls -> {
-            // Send a workspace/didCreateFiles
             var params = new CreateFilesParams(fileCreates);
             ls.getWorkspaceService().didCreateFiles(params);
             return ls;
@@ -332,7 +408,6 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     private void didDeleteFiles(@NotNull List<FileDelete> fileDeletes) {
         languageServerWrapper.sendNotification(ls -> {
-            // Send a workspace/didDeleteFiles
             var params = new DeleteFilesParams(fileDeletes);
             ls.getWorkspaceService().didDeleteFiles(params);
             return ls;
@@ -344,7 +419,6 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     private void didRenameFiles(@NotNull List<FileRename> fileRenames) {
         languageServerWrapper.sendNotification(ls -> {
-            // Send a workspace/didRenameFiles
             var params = new RenameFilesParams(fileRenames);
             ls.getWorkspaceService().didRenameFiles(params);
             return ls;
@@ -357,8 +431,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     private void didChangeWatchedFiles(@NotNull List<FileEvent> fileEvents) {
         languageServerWrapper.sendNotification(ls -> {
             DidChangeWatchedFilesParams params = new DidChangeWatchedFilesParams(fileEvents);
-            ls.getWorkspaceService()
-                    .didChangeWatchedFiles(params);
+            ls.getWorkspaceService().didChangeWatchedFiles(params);
             return ls;
         });
     }
