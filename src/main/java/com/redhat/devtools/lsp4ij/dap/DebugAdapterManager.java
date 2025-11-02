@@ -19,6 +19,7 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DebuggableFile;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
@@ -292,13 +293,14 @@ public class DebugAdapterManager implements DebuggableFile {
     public boolean isDebuggableFile(@NotNull VirtualFile file,
                                     @Nullable XBreakpointType breakpointType,
                                     @NotNull Project project) {
-        // Search canDebug inside the factories
+        // Search canDebug inside the server descriptors
         if (findDebugAdapterServerFor(file, breakpointType, project) != null) {
             return true;
         }
 
         // Search canDebug in existing DAP run configuration
-        return findExistingConfigurationFor(file, project, false) != null;
+        // only with DAP breakpoint type
+        return breakpointType instanceof DAPBreakpointType && findExistingConfigurationFor(file, project, false) != null;
     }
 
     /**
