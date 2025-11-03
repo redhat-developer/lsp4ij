@@ -723,6 +723,10 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public boolean isSaveSupported() {
+        if (this.serverCapabilities == null) {
+            // Language server is not started, save is not supported
+            return false;
+        }
         var saveOptions = getSyncOptions().getSave();
         return saveOptions != null && (saveOptions.isLeft() && saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() != null);
     }
