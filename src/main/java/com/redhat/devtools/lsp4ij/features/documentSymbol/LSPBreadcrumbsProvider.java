@@ -16,13 +16,12 @@ package com.redhat.devtools.lsp4ij.features.documentSymbol;
 
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.lang.Language;
-import com.intellij.lang.LanguageUtil;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Conditions;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.ui.breadcrumbs.BreadcrumbsProvider;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewModel.LSPDocumentSymbolViewElement;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewModel.LSPFileStructureViewElement;
@@ -42,9 +41,7 @@ public class LSPBreadcrumbsProvider implements BreadcrumbsProvider {
 
     @Override
     public Language[] getLanguages() {
-        // Register for all languages and filter in isSupported()
-        List<Language> languages = LanguageUtil.getLanguages(Conditions.alwaysTrue());
-        return languages.toArray(Language.EMPTY_ARRAY);
+        return LanguageServersRegistry.getInstance().getSupportedLanguages().toArray(Language.EMPTY_ARRAY);
     }
 
     private boolean isSupported(@NotNull PsiElement element) {
