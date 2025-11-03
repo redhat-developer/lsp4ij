@@ -27,13 +27,13 @@ import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
-import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
-import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.usages.LSPFindUsagesProvider;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -57,6 +57,8 @@ public class LanguageServersRegistry {
     public static LanguageServersRegistry getInstance() {
         return ApplicationManager.getApplication().getService(LanguageServersRegistry.class);
     }
+
+    private @Nullable Set<Language> supportedLanguages;
 
     private final Map<String, LanguageServerDefinition> serverDefinitions = new HashMap<>();
 
@@ -191,35 +193,80 @@ public class LanguageServersRegistry {
      * LSPFindUsagesProvider to activate inlay hint, color, and find usages for those languages.
      */
     private void updateLanguages() {
-        Set<Language> distinctLanguages = getDistinctLanguages();
-        // When a file is not linked to a language
-        //  - if the file is associated to a textmate to support syntax coloration
-        //  - otherwise if the file is associated (by default) to plain/text file type
-        // the language received in InlayHintProviders
-        // is "textmate" / "TEXT" language, we add them to support
-        // LSP codeLens, inlayHint, color for a file which is not linked to a language.
-        distinctLanguages.addAll(SimpleLanguageUtils.getSupportedSimpleLanguages());
-        // When a file is not linked to a language (just with a file type) and not linked to a textmate,
-        // the language received in InlayHintProviders is plain/text, we add it to support
-        // LSP inlayHint, color for a file which is not linked to a language.
-        distinctLanguages.add(PlainTextLanguage.INSTANCE);
+        var supportedLanguages = getSupportedLanguages(true);
         // register LSPInlayHintsProvider automatically
         // for all languages associated with a language server.
-        updateDeclarativeInlayHintsProviders(distinctLanguages);
+        updateDeclarativeInlayHintsProviders(supportedLanguages);
         // register LSPColorProvider automatically
         // for all languages associated with a language server.
-        updateInlayHintsProviders(distinctLanguages);
+        updateInlayHintsProviders(supportedLanguages);
         // register LSPFindUsagesProvider automatically
         // for all languages associated with a language server.
-        updateFindUsagesProvider(distinctLanguages);
+        updateFindUsagesProvider(supportedLanguages);
     }
 
     /**
-     * Returns all distinct languages which are associated with a language server.
+     * Returns all distinct {@link Language} instances that are currently associated
+     * with at least one registered {@link LanguageServerDefinition}.
+     * <p>
+     * A language is considered <em>supported</em> if it is linked to a language server
+     * through a {@link LanguageServerFileAssociation}. This includes mappings defined
+     * by language, file type, or file name pattern. Additionally, fallback languages
+     * such as {@code textmate} and {@code PlainTextLanguage.INSTANCE} are included to
+     * ensure proper LSP support for files without a specific language.
+     * </p>
      *
-     * @return all distinct languages which are associated with a language server.
+     * @return a non-null set of distinct supported languages (may be empty)
+     * @see #getSupportedLanguages(boolean)
+     * @see #computeSupportedLanguages()
      */
-    private @NotNull Set<Language> getDistinctLanguages() {
+    public @NotNull Set<Language> getSupportedLanguages() {
+        return getSupportedLanguages(false);
+    }
+
+    /**
+     * Returns all distinct {@link Language} instances supported by the currently
+     * registered {@link LanguageServerDefinition}s.
+     * <p>
+     * This method optionally recomputes the supported languages from the current
+     * {@link LanguageServerFileAssociation}s if {@code refresh} is {@code true}.
+     * Otherwise, it may return a cached result from a previous computation.
+     * </p>
+     *
+     * @param refreshCache if {@code true}, forces a recomputation of supported languages;
+     *                     if {@code false}, may return cached data
+     * @return a non-null set of distinct supported languages (may be empty)
+     * @see #computeSupportedLanguages()
+     * @see #getSupportedLanguages()
+     */
+    public @NotNull Set<Language> getSupportedLanguages(boolean refreshCache) {
+        if (supportedLanguages != null && !refreshCache) {
+            return supportedLanguages;
+        }
+        supportedLanguages = computeSupportedLanguages();
+        return supportedLanguages;
+    }
+
+    /**
+     * Computes and returns all distinct {@link Language} instances that are currently
+     * associated with registered {@link LanguageServerDefinition}s.
+     * <p>
+     * This method scans all {@link LanguageServerFileAssociation}s to determine which
+     * languages are mapped to an active language server. Associations can be based on
+     * language ID, file type, or file name pattern. The resulting set may also include
+     * fallback languages such as {@code textmate} or {@code PlainTextLanguage.INSTANCE}
+     * to ensure basic LSP support for untyped files.
+     * </p>
+     * <p>
+     * Unlike {@link #getSupportedLanguages()}, this method always recomputes the result
+     * and does not rely on cached values.
+     * </p>
+     *
+     * @return a non-null set of distinct supported languages (may be empty)
+     * @see #getSupportedLanguages()
+     * @see LanguageServerFileAssociation
+     */
+    private @NotNull Set<Language> computeSupportedLanguages() {
         List<Pair<Language, List<FileNameMatcher>>> languageMatchers = null;
         Set<Language> distinctLanguages = new HashSet<>();
         for (var association : fileAssociations) {
@@ -262,6 +309,17 @@ public class LanguageServersRegistry {
                 }
             }
         }
+        // When a file is not linked to a language
+        //  - if the file is associated to a textmate to support syntax coloration
+        //  - otherwise if the file is associated (by default) to plain/text file type
+        // the language received in InlayHintProviders
+        // is "textmate" / "TEXT" language, we add them to support
+        // LSP codeLens, inlayHint, color for a file which is not linked to a language.
+        distinctLanguages.addAll(SimpleLanguageUtils.getSupportedSimpleLanguages());
+        // When a file is not linked to a language (just with a file type) and not linked to a textmate,
+        // the language received in InlayHintProviders is plain/text, we add it to support
+        // LSP inlayHint, color for a file which is not linked to a language.
+        distinctLanguages.add(PlainTextLanguage.INSTANCE);
         return distinctLanguages;
     }
 
@@ -277,7 +335,7 @@ public class LanguageServersRegistry {
 
     private void updateDeclarativeInlayHintsProviders(Set<Language> distinctLanguages) {
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
-        inlayHintsProviders.clear();
+        declarativeInlayHintsProviders.clear();
         for (Language language : distinctLanguages) {
             List<InlayProviderInfo> hints = new ArrayList<>();
             hints.add(new InlayProviderInfo(lspInlayHintsProvider, LSPInlayHintsProvider.PROVIDER_ID, Collections.emptySet(), true, LanguageServerBundle.message("lsp.hints.declarative.provider.name")));
@@ -530,7 +588,7 @@ public class LanguageServersRegistry {
                                                                                                         boolean notify) {
         String languageServerId = request.serverDefinition().getId();
         var serverDefinition = request.serverDefinition();
-        
+
         if (serverDefinition instanceof UserDefinedLanguageServerDefinition ls) {
             ls.setName(request.name());
             ls.setUrl(request.url());
