@@ -446,6 +446,10 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkDocumentationProvider"/>
 
         <!-- LSP textDocument/documentSymbol request support -->
+        <structureViewBuilder
+                id="LSPStructureViewBuilderProvider"
+                factoryClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPStructureViewBuilderProvider"
+                order="last"/>
         <lang.psiStructureViewFactory
                 id="LSPDocumentSymbolStructureViewFactoryForText"
                 language="TEXT"
