@@ -47,7 +47,7 @@ import java.util.concurrent.CompletableFuture;
 @ApiStatus.Internal
 public class EditorFeatureManager implements Disposable {
 
-    record RefreshEditorFeatureContext(@NotNull PsiFile file, @NotNull List<Runnable> runnables) {
+    record RefreshEditorFeatureContext(@NotNull PsiFile file, @NotNull List<Runnable> runnables, Editor[] editors) {
     }
 
     private final @NotNull Project project;
@@ -135,19 +135,21 @@ public class EditorFeatureManager implements Disposable {
 
                     final List<Runnable> runnables = new ArrayList<>();
                     for (Editor editor : editors) {
-                        // Clear editor cache according the feature type
-                        // (IntelliJ stores generally the modification time stamp of the Psi file to avoid refreshing the feature if Psi file doesn't change)
-                        clearEditorCache(editor, project, featureType);
                         // Collect runnable which must be executed on UI step.
                         collectUiRunnables(pf, editor, featureType, runnables);
                     }
-                    return new RefreshEditorFeatureContext(pf, runnables);
+                    return new RefreshEditorFeatureContext(pf, runnables, editors);
                 })
                 .coalesceBy(file, featureType, clearLSPCache)
                 .finishOnUiThread(ModalityState.any(), context -> {
                     if (context == null) {
                         // No opened editors associated from any language servers.
                         return;
+                    }
+                    for (Editor editor : context.editors()) {
+                        // Clear editor cache according the feature type
+                        // (IntelliJ stores generally the modification time stamp of the Psi file to avoid refreshing the feature if Psi file doesn't change)
+                        clearEditorCache(editor, project, featureType);
                     }
                     LSPFileSupport.getSupport(context.file()).restartDaemonCodeAnalyzerWithDebounce(cancelChecker);
                     for (var runnable : context.runnables()) {
