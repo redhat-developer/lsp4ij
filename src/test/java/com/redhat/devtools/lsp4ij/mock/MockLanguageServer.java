@@ -309,6 +309,12 @@ public final class MockLanguageServer implements LanguageServer {
 		this.textDocumentService.setDocumentSymbols(Arrays.asList(documentSymbols));
 	}
 
+    public void setCodeActionHandler(Function<CodeActionParams, CompletableFuture<List<Either<Command, CodeAction>>>> handler) {
+        if (this.textDocumentService != null) {
+            this.textDocumentService.setCodeActionHandler(handler);
+        }
+    }
+
 	@Override
 	public NotebookDocumentService getNotebookDocumentService() {
 		return new NotebookDocumentService() {
