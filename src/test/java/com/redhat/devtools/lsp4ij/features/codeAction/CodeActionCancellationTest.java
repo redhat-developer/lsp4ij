@@ -27,157 +27,156 @@ public class CodeActionCancellationTest extends LSPCodeActionFixtureTestCase {
     public void testWebFilterQuickFix() {
 
         assertCodeActions(TEST_FILE_NAME,
-                IntentionActionKind.QUICK_FIX_ONLY,
-                // language=JAVA
-                """
-                package io.openliberty.sample.jakarta.servlet;
-                
-                import jakarta.servlet.Filter;
-                import jakarta.servlet.annotation.WebFilter;
-                
-                @WebFilter(<caret>)
-                public abstract class InvalidWebFilter implements Filter {
-                
-                }""",
-                // language=JSON
-                """                
-                [
+            IntentionActionKind.QUICK_FIX_ONLY,
+            // language=JAVA
+            """
+            package io.openliberty.sample.jakarta.servlet;
+            
+            import jakarta.servlet.Filter;
+            import jakarta.servlet.annotation.WebFilter;
+            
+            @WebFilter(<caret>)
+            public abstract class InvalidWebFilter implements Filter {
+            
+            }""",
+            // language=JSON
+            """                
+            [
+                 {
+                   "title": "Add the `servletNames` attribute to @WebFilter",
+                   "kind": "quickfix",
+                   "diagnostics": [
                      {
-                       "title": "Add the `servletNames` attribute to @WebFilter",
-                       "kind": "quickfix",
-                       "diagnostics": [
-                         {
-                           "range": {
-                             "start": {
-                               "line": 5,
-                               "character": 0
-                             },
-                             "end": {
-                               "line": 5,
-                               "character": 12
-                             }
-                           },
-                           "severity": 1,
-                           "code": "CompleteWebFilterAttributes",
-                           "source": "jakarta-servlet",
-                           "message": "The annotation @WebFilter must define the attribute \\u0027urlPatterns\\u0027, \\u0027servletNames\\u0027 or \\u0027value\\u0027."
+                       "range": {
+                         "start": {
+                           "line": 5,
+                           "character": 0
+                         },
+                         "end": {
+                           "line": 5,
+                           "character": 12
                          }
-                       ],
-                       "data": {
-                         "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
-                         "documentUri": "unused",
-                         "range": {
-                           "start": {
-                             "line": 5,
-                             "character": 0
-                           },
-                           "end": {
-                             "line": 5,
-                             "character": 12
-                           }
-                         },
-                         "extendedData": {
-                           "annotation": "jakarta.servlet.annotation.WebFilter",
-                           "attribute": "servletNames",
-                           "diagnosticCode": "CompleteWebFilterAttributes"
-                         },
-                         "resourceOperationSupported": true,
-                         "commandConfigurationUpdateSupported": false
-                       }
-                     },
-                     {
-                       "title": "Add the `urlPatterns` attribute to @WebFilter",
-                       "kind": "quickfix",
-                       "diagnostics": [
-                         {
-                           "range": {
-                             "start": {
-                               "line": 5,
-                               "character": 0
-                             },
-                             "end": {
-                               "line": 5,
-                               "character": 12
-                             }
-                           },
-                           "severity": 1,
-                           "code": "CompleteWebFilterAttributes",
-                           "source": "jakarta-servlet",
-                           "message": "The annotation @WebFilter must define the attribute \\u0027urlPatterns\\u0027, \\u0027servletNames\\u0027 or \\u0027value\\u0027."
-                         }
-                       ],
-                       "data": {
-                         "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
-                         "documentUri": "unused",
-                         "range": {
-                           "start": {
-                             "line": 5,
-                             "character": 0
-                           },
-                           "end": {
-                             "line": 5,
-                             "character": 12
-                           }
-                         },
-                         "extendedData": {
-                           "annotation": "jakarta.servlet.annotation.WebFilter",
-                           "attribute": "urlPatterns",
-                           "diagnosticCode": "CompleteWebFilterAttributes"
-                         },
-                         "resourceOperationSupported": true,
-                         "commandConfigurationUpdateSupported": false
-                       }
-                     },
-                     {
-                       "title": "Add the `value` attribute to @WebFilter",
-                       "kind": "quickfix",
-                       "diagnostics": [
-                         {
-                           "range": {
-                             "start": {
-                               "line": 5,
-                               "character": 0
-                             },
-                             "end": {
-                               "line": 5,
-                               "character": 12
-                             }
-                           },
-                           "severity": 1,
-                           "code": "CompleteWebFilterAttributes",
-                           "source": "jakarta-servlet",
-                           "message": "The annotation @WebFilter must define the attribute \\u0027urlPatterns\\u0027, \\u0027servletNames\\u0027 or \\u0027value\\u0027."
-                         }
-                       ],
-                       "data": {
-                         "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
-                         "documentUri": "unused",
-                         "range": {
-                           "start": {
-                             "line": 5,
-                             "character": 0
-                           },
-                           "end": {
-                             "line": 5,
-                             "character": 12
-                           }
-                         },
-                         "extendedData": {
-                           "annotation": "jakarta.servlet.annotation.WebFilter",
-                           "attribute": "value",
-                           "diagnosticCode": "CompleteWebFilterAttributes"
-                         },
-                         "resourceOperationSupported": true,
-                         "commandConfigurationUpdateSupported": false
-                       }
+                       },
+                       "severity": 1,
+                       "code": "CompleteWebFilterAttributes",
+                       "source": "jakarta-servlet",
+                       "message": "The annotation @WebFilter must define the attribute \\u0027urlPatterns\\u0027, \\u0027servletNames\\u0027 or \\u0027value\\u0027."
                      }
-                ]
-                """,
-                true, // simulateCancellation = true
-                "Add the `servletNames` attribute to @WebFilter",
-                "Add the `urlPatterns` attribute to @WebFilter",
-                "Add the `value` attribute to @WebFilter"
-                );
+                   ],
+                   "data": {
+                     "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
+                     "documentUri": "unused",
+                     "range": {
+                       "start": {
+                         "line": 5,
+                         "character": 0
+                       },
+                       "end": {
+                         "line": 5,
+                         "character": 12
+                       }
+                     },
+                     "extendedData": {
+                       "annotation": "jakarta.servlet.annotation.WebFilter",
+                       "attribute": "servletNames",
+                       "diagnosticCode": "CompleteWebFilterAttributes"
+                     },
+                     "resourceOperationSupported": true,
+                     "commandConfigurationUpdateSupported": false
+                   }
+                 },
+                 {
+                   "title": "Add the `urlPatterns` attribute to @WebFilter",
+                   "kind": "quickfix",
+                   "diagnostics": [
+                     {
+                       "range": {
+                         "start": {
+                           "line": 5,
+                           "character": 0
+                         },
+                         "end": {
+                           "line": 5,
+                           "character": 12
+                         }
+                       },
+                       "severity": 1,
+                       "code": "CompleteWebFilterAttributes",
+                       "source": "jakarta-servlet",
+                       "message": "The annotation @WebFilter must define the attribute \\u0027urlPatterns\\u0027, \\u0027servletNames\\u0027 or \\u0027value\\u0027."
+                     }
+                   ],
+                   "data": {
+                     "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
+                     "documentUri": "unused",
+                     "range": {
+                       "start": {
+                         "line": 5,
+                         "character": 0
+                       },
+                       "end": {
+                         "line": 5,
+                         "character": 12
+                       }
+                     },
+                     "extendedData": {
+                       "annotation": "jakarta.servlet.annotation.WebFilter",
+                       "attribute": "urlPatterns",
+                       "diagnosticCode": "CompleteWebFilterAttributes"
+                     },
+                     "resourceOperationSupported": true,
+                     "commandConfigurationUpdateSupported": false
+                   }
+                 },
+                 {
+                   "title": "Add the `value` attribute to @WebFilter",
+                   "kind": "quickfix",
+                   "diagnostics": [
+                     {
+                       "range": {
+                         "start": {
+                           "line": 5,
+                           "character": 0
+                         },
+                         "end": {
+                           "line": 5,
+                           "character": 12
+                         }
+                       },
+                       "severity": 1,
+                       "code": "CompleteWebFilterAttributes",
+                       "source": "jakarta-servlet",
+                       "message": "The annotation @WebFilter must define the attribute \\u0027urlPatterns\\u0027, \\u0027servletNames\\u0027 or \\u0027value\\u0027."
+                     }
+                   ],
+                   "data": {
+                     "participantId": "io.openliberty.tools.intellij.lsp4jakarta.lsp4ij.servlet.CompleteFilterAnnotationQuickFix",
+                     "documentUri": "unused",
+                     "range": {
+                       "start": {
+                         "line": 5,
+                         "character": 0
+                       },
+                       "end": {
+                         "line": 5,
+                         "character": 12
+                       }
+                     },
+                     "extendedData": {
+                       "annotation": "jakarta.servlet.annotation.WebFilter",
+                       "attribute": "value",
+                       "diagnosticCode": "CompleteWebFilterAttributes"
+                     },
+                     "resourceOperationSupported": true,
+                     "commandConfigurationUpdateSupported": false
+                   }
+                 }
+            ]
+            """,
+            true, // simulateCancellation = true
+            "Add the `servletNames` attribute to @WebFilter",
+            "Add the `urlPatterns` attribute to @WebFilter",
+            "Add the `value` attribute to @WebFilter"
+        );
     }
-
 }

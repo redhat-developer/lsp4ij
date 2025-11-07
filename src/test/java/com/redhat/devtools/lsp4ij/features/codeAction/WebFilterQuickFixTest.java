@@ -173,7 +173,7 @@ public abstract class InvalidWebFilter implements Filter {
                              }
                            ]"""
                 ,
-                false,
+                false, // simulateCancellation = false
                 "Add the `servletNames` attribute to @WebFilter",
                 "Add the `urlPatterns` attribute to @WebFilter",
                 "Add the `value` attribute to @WebFilter");
