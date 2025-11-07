@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.features.codeAction;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeActionFixtureTestCase;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
