@@ -91,6 +91,7 @@ Here are some projects that use LSP4IJ:
  * [Vala JetBrains Plugin](https://github.com/Tbusk/vala-jetbrains-plugin)
  * [BAML JetBrains Plugin](http://github.com/BoundaryML/baml/tree/canary/jetbrains)
  * [intellij-cangjie](https://github.com/lin-qingying/intellij-cangjie)
+ * [poryscript-idea](https://github.com/okafke/poryscript-idea)
 ## Requirements
 
 * Intellij IDEA 2024.2 or more recent (we **try** to support the last 4 major IDEA releases)
