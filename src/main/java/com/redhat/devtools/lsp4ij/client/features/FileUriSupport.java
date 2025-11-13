@@ -93,11 +93,7 @@ public interface FileUriSupport {
         if (file == null) {
             return null;
         }
-        URI fileUri = getFileUri(file, fileUriSupport);
-        if (fileUri == null) {
-            return null;
-        }
-        return toString(fileUri, file.isDirectory(), fileUriSupport);
+        return fileUriSupport != null ? fileUriSupport.toString(file) : DEFAULT.toString(file);
     }
 
     @Nullable
