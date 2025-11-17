@@ -254,7 +254,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         if (CompletableFutures.isDoneNormally(future)) {
             var workspaceEdit = future.getNow(null);
             if (workspaceEdit != null) {
-                LSPIJUtils.applyWorkspaceEdit(workspaceEdit);
+                LSPIJUtils.applyWorkspaceEdit(workspaceEdit, false);
             }
         }
     }
