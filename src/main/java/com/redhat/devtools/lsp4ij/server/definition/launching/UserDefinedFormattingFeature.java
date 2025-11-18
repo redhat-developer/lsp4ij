@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPFormattingFeature;
@@ -27,13 +28,19 @@ import org.jetbrains.annotations.Nullable;
  */
 public class UserDefinedFormattingFeature extends LSPFormattingFeature {
 
+    @Nullable
+    private ClientConfigurationSettings.ClientConfigurationFormatSettings getClientConfigurationFormatSettings() {
+        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
+        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
+        return clientConfiguration != null ? clientConfiguration.format : null;
+    }
+
     // Server-side on-type formatting
 
     @Nullable
     private ServerSideOnTypeFormattingSettings getServerSideOnTypeFormattingSettings() {
-        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
-        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return clientConfiguration != null ? clientConfiguration.format.onTypeFormatting.serverSide : null;
+        var format = getClientConfigurationFormatSettings();
+        return format != null ? format.onTypeFormatting.serverSide : null;
     }
 
     @Override
@@ -46,9 +53,8 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
 
     @Nullable
     private ClientSideOnTypeFormattingSettings getClientSideOnTypeFormattingSettings() {
-        ClientConfigurableLanguageServerDefinition serverDefinition = (ClientConfigurableLanguageServerDefinition) getClientFeatures().getServerDefinition();
-        ClientConfigurationSettings clientConfiguration = serverDefinition.getLanguageServerClientConfiguration();
-        return clientConfiguration != null ? clientConfiguration.format.onTypeFormatting.clientSide : null;
+        var format = getClientConfigurationFormatSettings();
+        return format != null ? format.onTypeFormatting.clientSide : null;
     }
 
     @Override
@@ -104,5 +110,17 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
     public String getFormatOnCompletionTriggerCharacters(@NotNull PsiFile file) {
         ClientSideOnTypeFormattingSettings settings = getClientSideOnTypeFormattingSettings();
         return settings != null ? settings.formatOnCompletionTriggerCharacters : super.getFormatOnCompletionTriggerCharacters(file);
+    }
+
+    @Override
+    public @Nullable Integer getTabSize(@NotNull PsiFile file, @Nullable Editor editor) {
+        var format = getClientConfigurationFormatSettings();
+        return format != null && format.tabSize != null ? format.tabSize : super.getTabSize(file, editor);
+    }
+
+    @Override
+    public @Nullable Boolean getInsertSpaces(@NotNull PsiFile file, @Nullable Editor editor) {
+        var format = getClientConfigurationFormatSettings();
+        return format != null && format.insertSpaces != null ? format.insertSpaces : super.getInsertSpaces(file, editor);
     }
 }

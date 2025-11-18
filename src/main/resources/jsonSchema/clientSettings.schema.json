@@ -122,6 +122,16 @@
       "title": "Client-side formatter configuration",
       "additionalProperties": false,
       "properties": {
+        "tabSize": {
+          "type": "integer",
+          "title": "Size of a tab in spaces.",
+          "description": "Size of a tab in spaces."
+        },
+        "insertSpaces": {
+          "type": "boolean",
+          "title": "Prefer spaces over tabs.",
+          "description": "Prefer spaces over tabs."
+        },
         "onTypeFormatting": {
           "type": "object",
           "title": "On-type formatting configuration",
