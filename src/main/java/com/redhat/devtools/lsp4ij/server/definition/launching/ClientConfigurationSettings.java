@@ -174,6 +174,10 @@ public class ClientConfigurationSettings {
          * On-type formatting settings
          */
         public @NotNull OnTypeFormattingSettings onTypeFormatting = new OnTypeFormattingSettings();
+
+        public @Nullable Integer tabSize;
+
+        public @Nullable Boolean insertSpaces;
     }
 
     /**
