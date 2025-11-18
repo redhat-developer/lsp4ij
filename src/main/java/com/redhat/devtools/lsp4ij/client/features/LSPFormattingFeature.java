@@ -318,7 +318,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
      */
     public @Nullable Integer getTabSize(@NotNull PsiFile file,
                                         @Nullable Editor editor) {
-        return 4; //editor != null ? LSPIJUtils.getTabSize(editor) : null;
+        return editor != null ? LSPIJUtils.getTabSize(editor) : null;
     }
 
     /**
