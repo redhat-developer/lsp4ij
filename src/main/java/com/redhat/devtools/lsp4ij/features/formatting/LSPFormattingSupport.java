@@ -141,15 +141,19 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         boolean isRangeFormatting = textRange != null;
         Ref<LanguageServerItem> server = Ref.create(null);
         LanguageServiceAccessor.getInstance(file.getProject()).processLanguageServers(file, ls -> {
-            if (!isRangeFormatting) {
-                if (server.isNull() && ls.getClientFeatures().getFormattingFeature().isFormattingSupported(file)) {
-                    server.set(new LanguageServerItem(ls.getLanguageServer(), ls));
-                }
-            } else {
-                if  (ls.getClientFeatures().getFormattingFeature().isFormattingSupported(file) ||
-                        ls.getClientFeatures().getFormattingFeature().isRangeFormattingSupported(file)) {
-                    if (server.isNull() || !server.get().isDocumentRangeFormattingSupported()) {
+            var formattingFeature = ls.getClientFeatures().getFormattingFeature();
+            if (formattingFeature.isEnabled(file)) {
+                boolean overridable = formattingFeature.isExistingFormatterOverrideable(file);
+                if (!isRangeFormatting) {
+                    if ((overridable || server.isNull()) && formattingFeature.isFormattingSupported(file)) {
                         server.set(new LanguageServerItem(ls.getLanguageServer(), ls));
+                    }
+                } else {
+                    if (formattingFeature.isFormattingSupported(file) ||
+                            formattingFeature.isRangeFormattingSupported(file)) {
+                        if (overridable || server.isNull() || !server.get().isDocumentRangeFormattingSupported()) {
+                            server.set(new LanguageServerItem(ls.getLanguageServer(), ls));
+                        }
                     }
                 }
             }

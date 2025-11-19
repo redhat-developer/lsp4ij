@@ -122,6 +122,11 @@
       "title": "Client-side formatter configuration",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "Server-side formatting enabled",
+          "description": "Server-side formatting enabled"
+        },
         "tabSize": {
           "type": "integer",
           "title": "Size of a tab in spaces.",
@@ -135,7 +140,7 @@
         "existingFormatterOverrideable": {
           "type": "boolean",
           "title": "Returns true to use the language server for code formatting and false to use plugin-provided/built-in formatters.",
-          "description": "Prefer spaces over tabs."
+          "description": "Returns true to use the language server for code formatting and false to use plugin-provided/built-in formatters."
         },
         "onTypeFormatting": {
           "type": "object",

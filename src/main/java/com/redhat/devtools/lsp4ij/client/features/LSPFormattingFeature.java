@@ -71,7 +71,7 @@ public class LSPFormattingFeature extends AbstractLSPDocumentFeature {
      * @return true to use the language server for code formatting and false to use plugin-provided/built-in formatters.
      * @apiNote This method will only be called with files that contain a language supported by this language server.
      */
-    protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
+    public boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
         return false;
     }
 

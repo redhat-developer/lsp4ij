@@ -171,6 +171,8 @@ public class ClientConfigurationSettings {
      */
     public static class ClientConfigurationFormatSettings {
 
+        public @Nullable Boolean enabled;
+
         public @Nullable Integer tabSize;
 
         public @Nullable Boolean insertSpaces;
