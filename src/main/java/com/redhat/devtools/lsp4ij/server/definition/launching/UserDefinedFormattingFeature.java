@@ -35,6 +35,24 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
         return clientConfiguration != null ? clientConfiguration.format : null;
     }
 
+    @Override
+    public @Nullable Integer getTabSize(@NotNull PsiFile file, @Nullable Editor editor) {
+        var format = getClientConfigurationFormatSettings();
+        return format != null && format.tabSize != null ? format.tabSize : super.getTabSize(file, editor);
+    }
+
+    @Override
+    public @Nullable Boolean getInsertSpaces(@NotNull PsiFile file, @Nullable Editor editor) {
+        var format = getClientConfigurationFormatSettings();
+        return format != null && format.insertSpaces != null ? format.insertSpaces : super.getInsertSpaces(file, editor);
+    }
+
+    @Override
+    protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
+        var format = getClientConfigurationFormatSettings();
+        return format != null && format.existingFormatterOverrideable != null ? format.existingFormatterOverrideable : super.isExistingFormatterOverrideable(file);
+    }
+
     // Server-side on-type formatting
 
     @Nullable
@@ -112,15 +130,4 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
         return settings != null ? settings.formatOnCompletionTriggerCharacters : super.getFormatOnCompletionTriggerCharacters(file);
     }
 
-    @Override
-    public @Nullable Integer getTabSize(@NotNull PsiFile file, @Nullable Editor editor) {
-        var format = getClientConfigurationFormatSettings();
-        return format != null && format.tabSize != null ? format.tabSize : super.getTabSize(file, editor);
-    }
-
-    @Override
-    public @Nullable Boolean getInsertSpaces(@NotNull PsiFile file, @Nullable Editor editor) {
-        var format = getClientConfigurationFormatSettings();
-        return format != null && format.insertSpaces != null ? format.insertSpaces : super.getInsertSpaces(file, editor);
-    }
 }

@@ -170,14 +170,18 @@ public class ClientConfigurationSettings {
      * Client-side formatter settings.
      */
     public static class ClientConfigurationFormatSettings {
+
+        public @Nullable Integer tabSize;
+
+        public @Nullable Boolean insertSpaces;
+
+        public @Nullable Boolean existingFormatterOverrideable;
+
         /**
          * On-type formatting settings
          */
         public @NotNull OnTypeFormattingSettings onTypeFormatting = new OnTypeFormattingSettings();
 
-        public @Nullable Integer tabSize;
-
-        public @Nullable Boolean insertSpaces;
     }
 
     /**
