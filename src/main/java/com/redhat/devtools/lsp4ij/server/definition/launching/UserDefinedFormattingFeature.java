@@ -36,6 +36,12 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
     }
 
     @Override
+    public boolean isEnabled(@NotNull PsiFile file) {
+        var format = getClientConfigurationFormatSettings();
+        return format != null && format.enabled != null ? format.enabled : super.isEnabled(file);
+    }
+
+    @Override
     public @Nullable Integer getTabSize(@NotNull PsiFile file, @Nullable Editor editor) {
         var format = getClientConfigurationFormatSettings();
         return format != null && format.tabSize != null ? format.tabSize : super.getTabSize(file, editor);
@@ -48,7 +54,7 @@ public class UserDefinedFormattingFeature extends LSPFormattingFeature {
     }
 
     @Override
-    protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
+    public boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
         var format = getClientConfigurationFormatSettings();
         return format != null && format.existingFormatterOverrideable != null ? format.existingFormatterOverrideable : super.isExistingFormatterOverrideable(file);
     }
