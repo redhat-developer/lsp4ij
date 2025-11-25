@@ -1,0 +1,6 @@
+{
+  "dependency-scheme": "jar",
+  "auto-add-ns-to-new-files?": true,
+  "document-formatting?": false,
+  "document-range-formatting?": false
+}

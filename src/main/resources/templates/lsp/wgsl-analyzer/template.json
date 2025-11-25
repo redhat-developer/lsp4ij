@@ -1,0 +1,38 @@
+{
+  "id": "wgsl-analyzer",
+  "name": "WGSL Analyzer",
+  "programArgs": {
+    "default": "sh -c ${BASE_DIR}/wgsl-analyzer",
+    "windows": "${BASE_DIR}/wgsl-analyzer.exe"
+  },
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "wa_syntax_tree",
+        "patterns": [
+          "*.wast"
+        ]
+      },
+      "languageId": "wa_syntax_tree"
+    },
+    {
+      "fileType": {
+        "name": "WGSL",
+        "patterns": [
+          "*.wgsl"
+        ]
+      },
+      "languageId": "wgsl"
+    },
+    {
+      "fileType": {
+        "name": "WESL",
+        "patterns": [
+          "*.wesl"
+        ]
+      },
+      "languageId": "wesl"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "id": "wgsl-analyzer-installer",
+  "name": "wgsl-analyzer",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download wgsl-analyzer",
+      "github": {
+        "owner": "wgsl-analyzer",
+        "repository": "wgsl-analyzer",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "x86_64": "wgsl-analyzer-x86_64-pc-windows-msvc.zip",
+            "x86": "wgsl-analyzer-i686-pc-windows-msvc.zip",
+            "arm64": "wgsl-analyzer-aarch64-pc-windows-msvc.zip"
+          },
+          "unix": {
+            "x86_64": "wgsl-analyzer-x86_64-unknown-linux-gnu.gz",
+            "arm64": "wgsl-analyzer-aarch64-unknown-linux-gnu.gz"
+          },
+          "mac": "wgsl-analyzer-aarch64-apple-darwin.gz"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/wgsl-analyzer",
+        "file": {
+          "name": {
+            "windows": "wgsl-analyzer.exe",
+            "unix": {
+              "x86_64": "wgsl-analyzer-x86_64-unknown-linux-gnu",
+              "arm64": "wgsl-analyzer-aarch64-unknown-linux-gnu"
+            },
+            "mac": "wgsl-analyzer-aarch64-apple-darwin"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure WSGL Language server command",
+          "command": "${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}
