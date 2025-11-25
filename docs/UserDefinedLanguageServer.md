@@ -170,6 +170,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Terraform Language Server](./user-defined-ls/terraform-ls.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 * [Vue Language Server](./user-defined-ls/vue-js-language-server.md)
+* [WGSL Analyzer](./user-defined-ls/wgsl-analyzer.md)
 
 If the template directory contains a `README.md` file, you can open the instructions by pressing the help icon.
 

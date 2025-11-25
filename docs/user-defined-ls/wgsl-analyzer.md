@@ -13,7 +13,7 @@ To enable [WGSL](https://www.w3.org/TR/WGSL/) language support in your IDE, you 
 
    ![Open file](../images/user-defined-ls/wgsl-analyzer/open_file.png)
 
-3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `Astro Language Server` pre-selected:
+3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `WGSL Analyzer` pre-selected:
 
    ![New Language Server Dialog](../images/user-defined-ls/wgsl-analyzer/new_language_server_dialog.png)
 
