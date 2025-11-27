@@ -61,4 +61,27 @@ public class LSPIJUtils_toUriTest {
             assertEquals("/home/user/project/file.txt", resultUri.getPath());
         }
     }
+
+    @Test
+    void testToUriWithSpaces() {
+        // Given
+        File fileWithSpaces;
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            fileWithSpaces = new File("C:\\Users\\user name\\project name\\file.txt");
+        } else {
+            fileWithSpaces = new File("/home/user name/project name/file.txt");
+        }
+
+        // When
+        URI resultUri = LSPIJUtils.toUri(fileWithSpaces);
+
+        // Then
+        assertNotNull(resultUri);
+        assertEquals("file", resultUri.getScheme());
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            assertEquals("/C:/Users/user%20name/project%20name/file.txt", resultUri.getRawPath());
+        } else {
+            assertEquals("/home/user%20name/project%20name/file.txt", resultUri.getRawPath());
+        }
+    }
 }
