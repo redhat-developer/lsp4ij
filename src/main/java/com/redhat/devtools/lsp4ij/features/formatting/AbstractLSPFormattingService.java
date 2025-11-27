@@ -43,7 +43,7 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
         if (ioFile == null) {
             return null;
         }
-        VirtualFile file = LSPIJUtils.findResourceFor(LSPIJUtils.toUri(ioFile).toString());
+        VirtualFile file = LSPIJUtils.findResourceFor(ioFile);
         if (file == null) {
             return null;
         }

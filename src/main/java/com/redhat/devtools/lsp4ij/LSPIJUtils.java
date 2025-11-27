@@ -1053,6 +1053,10 @@ public class LSPIJUtils {
         return VfsUtil.findFileByIoFile(newFile, true);
     }
 
+    public static @Nullable VirtualFile findResourceFor(@NotNull File file) {
+        return findResourceFor(toUri(file).toString());
+    }
+
     public static @Nullable VirtualFile findResourceFor(@NotNull URI uri) {
         return LocalFileSystem.getInstance().findFileByIoFile(Paths.get(uri).toFile());
     }
