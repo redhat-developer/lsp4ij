@@ -490,7 +490,17 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull File file) {
-        return file.toPath().toUri();
+        try {
+            return file.toPath().toUri();
+        } catch (Exception e) {
+            LOGGER.debug("Failed to convert file '{}' to URI, using fallback", file.getAbsolutePath(), e);
+            try {
+                return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
+            } catch (URISyntaxException e2) {
+                LOGGER.warn(e2.getLocalizedMessage(), e2);
+                return file.getAbsoluteFile().toURI();
+            }
+        }
     }
 
     public static @Nullable URI toUri(@NotNull PsiFile psiFile) {
