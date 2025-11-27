@@ -25,6 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.Icon;
+import java.util.Objects;
 
 
 /**
@@ -39,6 +40,7 @@ public class DocumentSymbolData extends FakePsiElement {
     private final DocumentSymbolData parent;
     private final @NotNull LanguageServerItem languageServer;
     private volatile TextRange textRange = null;
+    private volatile TextRange selectionTextRange = null;
     private DocumentSymbolData[] cachedChildren;
 
     public DocumentSymbolData(@NotNull DocumentSymbol documentSymbol,
@@ -95,6 +97,21 @@ public class DocumentSymbolData extends FakePsiElement {
         return textRange;
     }
 
+    public @Nullable TextRange getSelectionTextRange() {
+        if (documentSymbol.getSelectionRange() == null) {
+            return null;
+        }
+        if (selectionTextRange == null) {
+            synchronized (this) {
+                if (selectionTextRange == null) {
+                    Range range = documentSymbol.getSelectionRange();
+                    Document document = LSPIJUtils.getDocument(psiFile);
+                    this.selectionTextRange = (document != null) ? LSPIJUtils.toTextRange(range, document) : null;
+                }
+            }
+        }
+        return selectionTextRange;
+    }
     @Override
     public void navigate(boolean requestFocus) {
         getClientFeatures().getDocumentSymbolFeature().navigate(documentSymbol, psiFile, requestFocus);
@@ -122,6 +139,26 @@ public class DocumentSymbolData extends FakePsiElement {
                     .toArray(DocumentSymbolData[]::new);
         }
         return cachedChildren;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null) {
+            return false;
+        }
+        if (getClass() == o.getClass()) {
+            DocumentSymbolData that = (DocumentSymbolData) o;
+            return Objects.equals(documentSymbol, that.documentSymbol);
+        }
+        if (o instanceof PsiElement psiElement) {
+            return getClientFeatures().getDocumentSymbolFeature().isSame(this, psiElement);
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(documentSymbol);
     }
 
     public @NotNull LSPClientFeatures getClientFeatures() {
