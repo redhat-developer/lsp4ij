@@ -288,7 +288,7 @@
     <depends optional="true" config-file="plugin-json.xml">com.intellij.modules.json</depends>
     <depends optional="true" config-file="plugin-terminal.xml">org.jetbrains.plugins.terminal</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
-    <idea-version since-build="242.*"/>
+    <idea-version since-build="252.*"/>
 
     <!-- Server Installer support -->
     <extensionPoints>
