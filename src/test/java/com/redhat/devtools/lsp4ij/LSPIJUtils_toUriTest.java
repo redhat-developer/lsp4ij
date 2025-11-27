@@ -55,13 +55,10 @@ public class LSPIJUtils_toUriTest {
     }
 
     @Test
-    void testToUriWithLocalPath() {
+    @EnabledOnOs(OS.WINDOWS)
+    void testToUriWithLocalPathOnWindows() {
         // Given
-        File localFile = new File("/home/user/project/file.txt");
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            localFile = new File("C:\\Users\\user\\project\\file.txt");
-        }
-
+        File localFile = new File("C:\\Users\\user\\project\\file.txt");
 
         // When
         URI resultUri = LSPIJUtils.toUri(localFile);
@@ -69,22 +66,29 @@ public class LSPIJUtils_toUriTest {
         // Then
         assertNotNull(resultUri);
         assertEquals("file", resultUri.getScheme());
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            assertEquals("/C:/Users/user/project/file.txt", resultUri.getPath());
-        } else {
-            assertEquals("/home/user/project/file.txt", resultUri.getPath());
-        }
+        assertEquals("/C:/Users/user/project/file.txt", resultUri.getPath());
     }
 
     @Test
-    void testToUriWithSpaces() {
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void testToUriWithLocalPathOnUnix() {
         // Given
-        File fileWithSpaces;
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            fileWithSpaces = new File("C:\\Users\\user name\\project name\\file.txt");
-        } else {
-            fileWithSpaces = new File("/home/user name/project name/file.txt");
-        }
+        File localFile = new File("/home/user/project/file.txt");
+
+        // When
+        URI resultUri = LSPIJUtils.toUri(localFile);
+
+        // Then
+        assertNotNull(resultUri);
+        assertEquals("file", resultUri.getScheme());
+        assertEquals("/home/user/project/file.txt", resultUri.getPath());
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void testToUriWithSpacesOnWindows() {
+        // Given
+        File fileWithSpaces = new File("C:\\Users\\user name\\project name\\file.txt");
 
         // When
         URI resultUri = LSPIJUtils.toUri(fileWithSpaces);
@@ -92,10 +96,21 @@ public class LSPIJUtils_toUriTest {
         // Then
         assertNotNull(resultUri);
         assertEquals("file", resultUri.getScheme());
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            assertEquals("/C:/Users/user%20name/project%20name/file.txt", resultUri.getRawPath());
-        } else {
-            assertEquals("/home/user%20name/project%20name/file.txt", resultUri.getRawPath());
-        }
+        assertEquals("/C:/Users/user%20name/project%20name/file.txt", resultUri.getRawPath());
+    }
+
+    @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void testToUriWithSpacesOnUnix() {
+        // Given
+        File fileWithSpaces = new File("/home/user name/project name/file.txt");
+
+        // When
+        URI resultUri = LSPIJUtils.toUri(fileWithSpaces);
+
+        // Then
+        assertNotNull(resultUri);
+        assertEquals("file", resultUri.getScheme());
+        assertEquals("/home/user%20name/project%20name/file.txt", resultUri.getRawPath());
     }
 }
