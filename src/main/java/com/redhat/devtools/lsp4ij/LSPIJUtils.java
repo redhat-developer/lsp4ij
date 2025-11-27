@@ -490,13 +490,7 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull File file) {
-        // URI scheme specified by language server protocol and LSP
-        try {
-            return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
-        } catch (URISyntaxException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-            return file.getAbsoluteFile().toURI();
-        }
+        return file.toPath().toUri();
     }
 
     public static @Nullable URI toUri(@NotNull PsiFile psiFile) {
