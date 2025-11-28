@@ -104,6 +104,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }
 
 // Set the JVM language level used to build the project.
@@ -206,6 +207,7 @@ changelog {
 }
 
 tasks.withType<Test> {
+    useJUnitPlatform()
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
     systemProperty("idea.log.leaked.projects.in.tests", "false")
     systemProperty( "idea.maven.test.mirror", "https://repo1.maven.org/maven2")

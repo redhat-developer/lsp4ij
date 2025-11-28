@@ -490,12 +490,16 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull File file) {
-        // URI scheme specified by language server protocol and LSP
         try {
-            return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
-        } catch (URISyntaxException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-            return file.getAbsoluteFile().toURI();
+            return file.toPath().toUri();
+        } catch (Exception e) {
+            LOGGER.debug("Failed to convert file '{}' to URI, using fallback", file.getAbsolutePath(), e);
+            try {
+                return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
+            } catch (URISyntaxException e2) {
+                LOGGER.warn(e2.getLocalizedMessage(), e2);
+                return file.getAbsoluteFile().toURI();
+            }
         }
     }
 
@@ -1057,6 +1061,10 @@ public class LSPIJUtils {
         FileUtils.createParentDirectories(newFile);
         newFile.createNewFile();
         return VfsUtil.findFileByIoFile(newFile, true);
+    }
+
+    public static @Nullable VirtualFile findResourceFor(@NotNull File file) {
+        return findResourceFor(toUri(file).toString());
     }
 
     public static @Nullable VirtualFile findResourceFor(@NotNull URI uri) {
