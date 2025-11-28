@@ -18,6 +18,7 @@ import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -56,6 +57,12 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     @Override
     public boolean isAlwaysLeaf(StructureViewTreeElement element) {
         return element.getChildren().length == 0;
+    }
+
+    @Override
+    protected Class @NotNull [] getSuitableClasses() {
+        // Any PSI element
+        return new Class[] {PsiElement.class};
     }
 
     @Override

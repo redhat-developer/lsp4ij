@@ -12,6 +12,8 @@ package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.DocumentSymbolData;
@@ -74,22 +76,50 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
         }
     }
 
+    /**
+     * Creates a StructureViewTreeElement for a given document symbol.
+     *
+     * @param documentSymbol the document symbol data
+     * @return the tree element, or null if unavailable
+     */
     @Nullable
     public StructureViewTreeElement getStructureViewTreeElement(@NotNull DocumentSymbolData documentSymbol) {
         return new LSPDocumentSymbolStructureViewModel.LSPDocumentSymbolViewElement(documentSymbol);
     }
 
+    /**
+     * Returns the display text for the given document symbol.
+     *
+     * @param documentSymbol the symbol
+     * @param psiFile the associated PSI file
+     * @return the presentable text, usually the symbol's name
+     */
     public @Nullable String getPresentableText(@NotNull DocumentSymbol documentSymbol,
                                                @NotNull PsiFile psiFile) {
         return documentSymbol.getName();
     }
 
+    /**
+     * Returns the icon for a document symbol based on its kind.
+     *
+     * @param documentSymbol the symbol
+     * @param psiFile the associated PSI file
+     * @param unused unused parameter
+     * @return the icon or null
+     */
     public @Nullable Icon getIcon(@NotNull DocumentSymbol documentSymbol,
                                   @NotNull PsiFile psiFile,
                                   boolean unused) {
         return IconMapper.getIcon(documentSymbol.getKind());
     }
 
+    /**
+     * Returns the location string for a document symbol, typically used in Structure View.
+     *
+     * @param documentSymbol the symbol
+     * @param psiFile the associated PSI file
+     * @return the location string (detail) or null
+     */
     public @Nullable String getLocationString(@NotNull DocumentSymbol documentSymbol,
                                               @NotNull PsiFile psiFile) {
         return documentSymbol.getDetail();
@@ -115,6 +145,13 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
         return 0;
     }
 
+    /**
+     * Navigates to the symbol in the editor.
+     *
+     * @param documentSymbol the symbol
+     * @param psiFile the associated PSI file
+     * @param requestFocus whether to request editor focus
+     */
     public void navigate(@NotNull DocumentSymbol documentSymbol,
                          @NotNull PsiFile psiFile,
                          boolean requestFocus) {
@@ -122,9 +159,35 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
         LSPIJUtils.openInEditor(psiFile.getVirtualFile(), selectionRange.getStart(), requestFocus, psiFile.getProject());
     }
 
+    /**
+     * Checks if a symbol can be navigated to (has a valid selection start).
+     *
+     * @param documentSymbol the symbol
+     * @param psiFile the associated PSI file
+     * @return true if navigation is possible
+     */
     public boolean canNavigate(@NotNull DocumentSymbol documentSymbol,
                                @NotNull PsiFile psiFile) {
         var selectionRange = documentSymbol.getSelectionRange();
         return selectionRange != null && selectionRange.getStart() != null;
+    }
+
+    /**
+     * Checks if the given {@link DocumentSymbolData} corresponds to the specified {@link PsiElement}.
+     *
+     * <p>The comparison is performed using the text ranges:
+     * it uses the selection range if available, otherwise the full symbol range.
+     * If the ranges are equal, the document symbol is considered to match the PSI element.</p>
+     *
+     * @param documentSymbolData the document symbol data
+     * @param psiElement the PSI element to compare with
+     * @return true if the document symbol represents the given PSI element (text ranges match), false otherwise
+     */
+    public boolean matchesPsiElement(@NotNull DocumentSymbolData documentSymbolData,
+                                     @NotNull PsiElement psiElement) {
+        TextRange textRange = documentSymbolData.getSelectionTextRange() != null
+                ? documentSymbolData.getSelectionTextRange()
+                : documentSymbolData.getTextRange();
+        return textRange.equals(psiElement.getTextRange());
     }
 }
