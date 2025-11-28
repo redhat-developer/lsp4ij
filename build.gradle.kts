@@ -6,7 +6,6 @@ import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.Verificatio
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 
-
 fun properties(key: String) = providers.gradleProperty(key)
 fun environment(key: String) = providers.environmentVariable(key)
 fun prop(name: String): String {
@@ -26,8 +25,6 @@ plugins {
 group = prop("pluginGroup")
 version = prop("pluginVersion")
 
-val lsp4jVersion = prop("lsp4jVersion")
-val lsp4jDebugVersion = prop("lsp4jDebugVersion")
 val flexmarkVersion = prop("flexmarkVersion")
 
 val platformVersion = prop("platformVersion")
@@ -74,6 +71,7 @@ dependencies {
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
         plugins(properties("platformPlugins").map { it.split(',') })
 
+        // Tu ajoutes les modules LSP4J de la plateforme JetBrains
         if (ideaVersionInt >= 252) {
             // Since 2025.2, JetBrains moved spellchecker in a new "intellij.spellchecker" module
             bundledModule("intellij.spellchecker")
@@ -82,19 +80,6 @@ dependencies {
         pluginVerifier()
         zipSigner()
         testFramework(TestFrameworkType.Platform)
-    }
-
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j:$lsp4jVersion") {
-        exclude(group = "org.eclipse.lsp4j", module="org.eclipse.lsp4j.jsonrpc")
-    }
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:$lsp4jVersion") {
-        exclude(group = "com.google.code.gson", module = "gson")
-    }
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.debug:$lsp4jDebugVersion") {
-        exclude(group = "org.eclipse.lsp4j", module = "org.eclipse.lsp4j.jsonrpc.debug")
-    }
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc.debug:$lsp4jDebugVersion") {
-        exclude(group = "com.google.code.gson", module = "gson")
     }
 
     implementation("com.vladsch.flexmark:flexmark:$flexmarkVersion")
@@ -109,7 +94,7 @@ dependencies {
 // Set the JVM language level used to build the project.
 kotlin {
     jvmToolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
         vendor = JvmVendorSpec.JETBRAINS
     }
 }
