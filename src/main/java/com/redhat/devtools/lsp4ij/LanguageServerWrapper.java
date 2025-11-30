@@ -728,7 +728,10 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         var saveOptions = getSyncOptions().getSave();
-        return saveOptions != null && (saveOptions.isLeft() && saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() != null);
+        if (saveOptions == null) {
+            return false;
+        }
+        return (saveOptions.isLeft() && saveOptions.getLeft()) || (saveOptions.isRight() && saveOptions.getRight() != null);
     }
 
     private @NotNull TextDocumentSyncOptions createSyncOptions() {
