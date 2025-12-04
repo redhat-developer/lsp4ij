@@ -159,6 +159,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Erlang Language Server](./user-defined-ls/erlang-ls.md)
 * [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
+* [Harper Language Server](./user-defined-ls/harper-ls.md)
 * [JQ Language Server](./user-defined-ls/jq-lsp.md)
 * [Julia Language Server](./user-defined-ls/julia.md)
 * [Ruby LSP](./user-defined-ls/ruby-lsp.md)
