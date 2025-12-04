@@ -1,0 +1,408 @@
+{
+  "id": "harper-ls",
+  "name": "Harper Language Server",
+  "programArgs": {
+    "default": "sh -c ${BASE_DIR}/harper-ls --stdio",
+    "windows": "${BASE_DIR}/harper-ls.exe --stdio"
+  },
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.c",
+          "*.i"
+        ]
+      },
+      "languageId": "c"
+    },
+    {
+      "fileType": {
+        "name": "Clojure",
+        "patterns": [
+          "*.clj",
+          "*.cljs",
+          "*.cljc",
+          "*.cljd",
+          "*.cljr",
+          "*.cljx",
+          "*.clojure",
+          "*.edn",
+          "*.joke",
+          "*.boot",
+          "*.bb",
+          "*.ly",
+          "*.lpy",
+          "*.calva-repl",
+          "*.fiddle"
+        ]
+      },
+      "languageId": "clojure"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.cmake",
+          "CMakelists.txt"
+        ]
+      },
+      "languageId": "cmake"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.cpp",
+          "*.cppm",
+          "*.cc",
+          "*.ccm",
+          "*.cxx",
+          "*.cxxm",
+          "*.c++",
+          "*.c++m",
+          "*.hpp",
+          "*.hh",
+          "*.hxx",
+          "*.h++",
+          "*.h",
+          "*.ii",
+          "*.ino",
+          "*.inl",
+          "*.ipp",
+          "*.ixx",
+          "*.tpp",
+          "*.txx",
+          "*.hpp.in",
+          "*.h.in"
+        ]
+      },
+      "languageId": "cpp"
+    },
+    {
+      "fileType": {
+        "name": "C#",
+        "patterns": [
+          "*.cs",
+          "*.csx",
+          "*.cake"
+        ]
+      },
+      "languageId": "csharp"
+    },
+    {
+      "fileType": {
+        "name": "Dart",
+        "patterns": [
+          "*.dart"
+        ]
+      },
+      "languageId": "dart"
+    },
+    {
+      "fileType": {
+        "name": "git-commit",
+        "patterns": [
+          "git-commit"
+        ]
+      },
+      "languageId": "git-commit"
+    },
+    {
+      "fileType": {
+        "name": "Go",
+        "patterns": [
+          "*.go"
+        ]
+      },
+      "languageId": "go"
+    },
+    {
+      "fileType": {
+        "name": "Haskell",
+        "patterns": [
+          "*.hs"
+        ]
+      },
+      "languageId": "haskell"
+    },
+    {
+      "fileType": {
+        "name": "HTML",
+        "patterns": [
+          "*.html",
+          "*.htm",
+          "*.shtml",
+          "*.xhtml",
+          "*.xht",
+          "*.mdoc",
+          "*.jsp",
+          "*.asp",
+          "*.aspx",
+          "*.jshtm",
+          "*.volt",
+          "*.ejs",
+          "*.rhtml"
+        ]
+      },
+      "languageId": "html"
+    },
+    {
+      "fileType": {
+        "name": "ink",
+        "patterns": [
+          "*.ink"
+        ]
+      },
+      "languageId": "ink"
+    },
+    {
+      "fileType": {
+        "name": "JAVA",
+        "patterns": [
+          "*.java"
+        ]
+      },
+      "languageId": "java"
+    },
+    {
+      "fileType": {
+        "name": "JavaScript",
+        "patterns": [
+          "*.js"
+        ]
+      },
+      "languageId": "javascript"
+    },
+    {
+      "fileType": {
+        "name": "JavaScript-React",
+        "patterns": [
+          "*.jsx"
+        ]
+      },
+      "languageId": "javascriptreact"
+    },
+    {
+      "fileType": {
+        "name": "Kotlin",
+        "patterns": [
+          "*.kt"
+        ]
+      },
+      "languageId": "kotlin"
+    },
+    {
+      "fileType": {
+        "name": "Lua",
+        "patterns": [
+          "*.lua"
+        ]
+      },
+      "languageId": "lua"
+    },
+    {
+      "fileType": {
+        "name": "Markdown",
+        "patterns": [
+          "*.md"
+        ]
+      },
+      "languageId": "markdown"
+    },
+    {
+      "fileType": {
+        "name": "PHP",
+        "patterns": [
+          "*.php"
+        ]
+      },
+      "languageId": "php"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.txt"
+        ]
+      },
+      "languageId": "plaintext"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.py",
+          "*.rpy",
+          "*.pyw",
+          "*.cpy",
+          "*.gyp",
+          "*.gypi",
+          "*.pyi",
+          "*.ipy",
+          "*.pyt"
+        ]
+      },
+      "languageId": "python"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.rb",
+          "*.rbx",
+          "*.rjs",
+          "*.gemspec",
+          "*.rake",
+          "*.ru",
+          "*.erb",
+          "*.podspec",
+          "*.rbi",
+          "rakefile",
+          "gemfile",
+          "guardfile",
+          "podfile",
+          "capfile",
+          "cheffile",
+          "hobofile",
+          "vagrantfile",
+          "appraisals",
+          "rantfile",
+          "berksfile",
+          "berksfile.lock",
+          "thorfile",
+          "puppetfile",
+          "dangerfile",
+          "brewfile",
+          "fastfile",
+          "appfile",
+          "deliverfile",
+          "matchfile",
+          "scanfile",
+          "snapfile",
+          "gymfile"
+        ]
+      },
+      "languageId": "ruby"
+    },
+    {
+      "fileType": {
+        "name": "Rust",
+        "patterns": [
+          "*.rs"
+        ]
+      },
+      "languageId": "rust"
+    },
+    {
+      "fileType": {
+        "name": "Scala",
+        "patterns": [
+          "*.scala",
+          "*.sbt",
+          "*.sc"
+        ]
+      },
+      "languageId": "scala"
+    },
+    {
+      "fileType": {
+        "name": "Scala",
+        "patterns": [
+          "*.sh",
+          "*.bash",
+          "*.bashrc",
+          "*.bash_aliases",
+          "*.bash_profile",
+          "*.bash_login",
+          "*.ebuild",
+          "*.eclass",
+          "*.profile",
+          "*.bash_logout",
+          "*.xprofile",
+          "*.xsession",
+          "*.xsessionrc",
+          "*.Xsession",
+          "*.zsh",
+          "*.zshrc",
+          "*.zprofile",
+          "*.zlogin",
+          "*.zlogout",
+          "*.zshenv",
+          "*.zsh-theme",
+          "*.fish",
+          "*.ksh",
+          "*.csh",
+          "*.cshrc",
+          "*.tcshrc",
+          "*.yashrc",
+          "*.yash_profile",
+          "APKBUILD",
+          "PKGBUILD",
+          ".envrc",
+          ".hushlogin",
+          "zshrc",
+          "zshenv",
+          "zlogin",
+          "zprofile",
+          "zlogout",
+          "bashrc_Apple_Terminal",
+          "zshrc_Apple_Terminal"
+        ]
+      },
+      "languageId": "shellscript"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.swiftinterface",
+          "*.swift"
+        ]
+      },
+      "languageId": "swift"
+    },
+    {
+      "fileType": {
+        "name": "Solidity",
+        "patterns": [
+          "*.sol",
+          "*.s.sol",
+          "*.t.sol"
+        ]
+      },
+      "languageId": "solidity"
+    },
+    {
+      "fileType": {
+        "name": "toml",
+        "patterns": [
+          "*.toml",
+          "*.tml"
+        ]
+      },
+      "languageId": "toml"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript",
+        "patterns": [
+          "*.ts"
+        ]
+      },
+      "languageId": "typescript"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript-React",
+        "patterns": [
+          "*.tsx"
+        ]
+      },
+      "languageId": "typescriptreact"
+    },
+    {
+      "fileType": {
+        "name": "Typst",
+        "patterns": [
+          "*.typ"
+        ]
+      },
+      "languageId": "typst"
+    }
+  ]
+}

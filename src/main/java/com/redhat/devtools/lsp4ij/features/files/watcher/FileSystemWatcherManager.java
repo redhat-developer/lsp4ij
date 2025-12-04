@@ -192,7 +192,8 @@ public class FileSystemWatcherManager {
         // Ensure pattern matchers are initialized before use
         computePatternMatchersIfNeed();
 
-        return !pathPatternMatchers.get(kind).isEmpty();
+        var matchers = pathPatternMatchers.get(kind);
+        return matchers != null && !matchers.isEmpty();
     }
     /**
      * Returns true if the given uri matches a pattern for the given watch kind and false otherwise.

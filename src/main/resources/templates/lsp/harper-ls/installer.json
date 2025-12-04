@@ -1,0 +1,57 @@
+{
+  "id": "harper-ls-installer",
+  "name": "harper-ls",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download harper-ls",
+      "github": {
+        "owner": "Automattic",
+        "repository": "harper",
+        "prerelease": false,
+        "asset": {
+          "windows": "harper-ls-x86_64-pc-windows-msvc.zip",
+          "unix": {
+            "x86_64": "harper-ls-x86_64-unknown-linux-gnu.tar.gz",
+            "arm64": "harper-ls-aarch64-unknown-linux-gnu.tar.gz"
+          },
+          "mac": {
+            "x86_64": "harper-ls-x86_64-apple-darwin.tar.gz",
+            "arm64": "harper-ls-aarch64-apple-darwin.tar.gz"
+          }
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/harper-ls",
+        "file": {
+          "name": {
+            "windows": "harper-ls.exe",
+            "unix": {
+              "x86_64": "harper-ls-x86_64-unknown-linux-gnu",
+              "arm64": "harper-ls-aarch64-unknown-linux-gnu"
+            },
+            "mac": {
+              "x86_64": "harper-ls-x86_64-apple-darwin",
+              "arm64": "harper-ls-aarch64-apple-darwin"
+            }
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Harper Language server command",
+          "command": "${output.dir}/${output.file.name} --stdio",
+          "update": true
+        }
+      }
+    }
+  }
+}
