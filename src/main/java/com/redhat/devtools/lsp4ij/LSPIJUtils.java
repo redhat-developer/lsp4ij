@@ -490,16 +490,18 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull File file) {
+        String path = file.getPath();
+        // Handle Windows UNC paths (\\server\share\...) including WSL (\\wsl$\...)
+        if (path.startsWith("\\\\")) {
+            return Paths.get(path).toUri();
+        }
+        
+        // URI scheme specified by language server protocol and LSP
         try {
-            return file.toPath().toUri();
-        } catch (Exception e) {
-            LOGGER.debug("Failed to convert file '{}' to URI, using fallback", file.getAbsolutePath(), e);
-            try {
-                return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
-            } catch (URISyntaxException e2) {
-                LOGGER.warn(e2.getLocalizedMessage(), e2);
-                return file.getAbsoluteFile().toURI();
-            }
+            return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
+        } catch (URISyntaxException e) {
+            LOGGER.warn(e.getLocalizedMessage(), e);
+            return file.getAbsoluteFile().toURI();
         }
     }
 
