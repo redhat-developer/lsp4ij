@@ -491,8 +491,23 @@ public class LSPIJUtils {
 
     public static @NotNull URI toUri(@NotNull File file) {
         String path = file.getPath();
-        // Handle Windows UNC paths (\\server\share\...) including WSL (\\wsl$\...)
         if (path.startsWith("\\\\")) {
+            // Extract authority and path from Windows UNC path: \\authority\path\…
+            // This includes WSL paths such as \\wsl$\…
+            String uncPath = path.substring(2); // Remove leading \\
+            int firstSep = uncPath.indexOf('\\');
+            if (firstSep > 0) {
+                String authority = uncPath.substring(0, firstSep);
+                String uriPath = uncPath.substring(firstSep).replace('\\', '/');
+                // The URI constructor doesn't accept '$' in hostname.
+                // Build the URI from a string
+                String uriString = "file://" + authority + uriPath;
+                try {
+                    return new URI(uriString);
+                } catch (URISyntaxException e) {
+                    LOGGER.warn("Failed to create URI from UNC path: " + path, e);
+                }
+            }
             return Paths.get(path).toUri();
         }
         
