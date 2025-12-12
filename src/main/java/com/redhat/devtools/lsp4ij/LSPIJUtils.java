@@ -490,6 +490,19 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull File file) {
+        String path = file.getPath();
+        if (path.startsWith("\\\\")) {
+            // Extract authority and path from Windows UNC path: \\authority\path\…
+            String uncPath = path.substring(2); // Remove leading \\
+            int firstSep = uncPath.indexOf('\\');
+            if (firstSep > 0) {
+                String authority = uncPath.substring(0, firstSep);
+                String uriPath = uncPath.substring(firstSep).replace('\\', '/');
+                // Use lenient parsing to support WSL authority 'wsl$'
+                return URI.create("file://" + authority + uriPath);
+            }
+        }
+        
         // URI scheme specified by language server protocol and LSP
         try {
             return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
@@ -1057,6 +1070,10 @@ public class LSPIJUtils {
         FileUtils.createParentDirectories(newFile);
         newFile.createNewFile();
         return VfsUtil.findFileByIoFile(newFile, true);
+    }
+
+    public static @Nullable VirtualFile findResourceFor(@NotNull File file) {
+        return findResourceFor(toUri(file).toString());
     }
 
     public static @Nullable VirtualFile findResourceFor(@NotNull URI uri) {
