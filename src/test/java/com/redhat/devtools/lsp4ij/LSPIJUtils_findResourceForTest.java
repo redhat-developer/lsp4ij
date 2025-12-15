@@ -17,6 +17,7 @@ import org.junit.Assert;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -33,6 +34,14 @@ public class LSPIJUtils_findResourceForTest extends BasePlatformTestCase {
     public void testEncodedUri() throws IOException {
         assertVirtualFileExists("dir", "file.txt", getUri("dir/file.txt", true));
         assertVirtualFileExists("base.dir", "file.txt", getUri("base.dir/file.txt", true));
+    }
+
+    public void testUncUriParsing() {
+        // WSL paths should be parsed (but return null since the paths don't exist)
+        Assert.assertNull(LSPIJUtils.findResourceFor("file://wsl$/Ubuntu/home/user/test.txt"));
+        Assert.assertNull(LSPIJUtils.findResourceFor("file://wsl.localhost/Ubuntu/home/user/test.txt"));
+        // Non-WSL UNC paths should not use special handling
+        Assert.assertNull(LSPIJUtils.findResourceFor("file://server/share/folder/file.txt"));
     }
 
     private static @NotNull String getUri(String s) {
