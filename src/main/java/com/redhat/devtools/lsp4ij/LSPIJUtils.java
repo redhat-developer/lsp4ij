@@ -43,6 +43,7 @@ import com.intellij.psi.PsiManager;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.internal.uri.UriConverterManager;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
@@ -67,14 +68,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class LSPIJUtils {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPIJUtils.class);
-
-    public static final String JAR_PROTOCOL = "jar";
-
-    public static final String JRT_PROTOCOL = "jrt";
-
-    private static final String JAR_SCHEME = JAR_PROTOCOL + ":";
-
-    private static final String JRT_SCHEME = JRT_PROTOCOL + ":";
 
     public static final String HASH_SEPARATOR = "#";
 
@@ -490,26 +483,7 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull File file) {
-        String path = file.getPath();
-        if (path.startsWith("\\\\")) {
-            // Extract authority and path from Windows UNC path: \\authority\path\…
-            String uncPath = path.substring(2); // Remove leading \\
-            int firstSep = uncPath.indexOf('\\');
-            if (firstSep > 0) {
-                String authority = uncPath.substring(0, firstSep);
-                String uriPath = uncPath.substring(firstSep).replace('\\', '/');
-                // Use lenient parsing to support WSL authority 'wsl$'
-                return URI.create("file://" + authority + uriPath);
-            }
-        }
-        
-        // URI scheme specified by language server protocol and LSP
-        try {
-            return new URI("file", "", file.getAbsoluteFile().toURI().getPath(), null); //$NON-NLS-1$ //$NON-NLS-2$
-        } catch (URISyntaxException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
-            return file.getAbsoluteFile().toURI();
-        }
+        return UriConverterManager.getInstance().toUri(file);
     }
 
     public static @Nullable URI toUri(@NotNull PsiFile psiFile) {
@@ -518,7 +492,7 @@ public class LSPIJUtils {
     }
 
     public static @NotNull URI toUri(@NotNull VirtualFile file) {
-        return toUri(VfsUtilCore.virtualToIoFile(file));
+        return UriConverterManager.getInstance().toUri(file);
     }
 
     public static @Nullable String toUriAsString(@NotNull PsiFile psFile) {
@@ -1076,10 +1050,6 @@ public class LSPIJUtils {
         return findResourceFor(toUri(file).toString());
     }
 
-    public static @Nullable VirtualFile findResourceFor(@NotNull URI uri) {
-        return LocalFileSystem.getInstance().findFileByIoFile(Paths.get(uri).toFile());
-    }
-
     /**
      * Returns the virtual file from the given uri and null otherwise.
      *
@@ -1087,23 +1057,7 @@ public class LSPIJUtils {
      * @return the virtual file from the given uri and null otherwise.
      */
     public static @Nullable VirtualFile findResourceFor(@NotNull String uri) {
-        if (uri.startsWith(JAR_SCHEME) || uri.startsWith(JRT_SCHEME)) {
-            // ex : jar:file:///C:/Users/azerr/.m2/repository/io/quarkus/quarkus-core/3.0.1.Final/quarkus-core-3.0.1.Final.jar!/io/quarkus/runtime/ApplicationConfig.class
-            try {
-                return VfsUtil.findFileByURL(new URL(uri));
-            } catch (MalformedURLException e) {
-                return null;
-            }
-        }
-        if (uri.contains("%")) {
-            // ex : file:///c%3A/Users/azerr/IdeaProjects/untitled7/test.js
-            // the uri must be decoded (ex : file:///c:/Users) otherwise IntelliJ cannot retrieve the virtual file.
-            // Keep the original '+' after decoding the Uri
-            uri = uri.replace("+", "%2B");
-            // Decode the uri
-            uri = URLDecoder.decode(uri, StandardCharsets.UTF_8);
-        }
-        return VirtualFileManager.getInstance().findFileByUrl(VfsUtilCore.fixURLforIDEA(uri));
+        return UriConverterManager.getInstance().findResourceFor(uri);
     }
 
     /**
