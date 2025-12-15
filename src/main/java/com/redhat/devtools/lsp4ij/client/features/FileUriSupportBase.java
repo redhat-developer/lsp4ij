@@ -10,18 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client.features;
 
-import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.internal.uri.UriConverterManager;
 import com.redhat.devtools.lsp4ij.internal.uri.UriFormatter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
-import java.util.Objects;
-
-import static com.redhat.devtools.lsp4ij.LSPIJUtils.JAR_PROTOCOL;
-import static com.redhat.devtools.lsp4ij.LSPIJUtils.JRT_PROTOCOL;
 
 /**
  * Provides a base implementation of the {@link FileUriSupport} interface
@@ -45,9 +41,9 @@ public class FileUriSupportBase implements FileUriSupport {
 
     @Override
     public String toString(@NotNull VirtualFile file) {
-        String protocol = file.getFileSystem().getProtocol();
-        if (JAR_PROTOCOL.equals(protocol) || JRT_PROTOCOL.equals(protocol)) {
-            return Objects.requireNonNull(VfsUtilCore.convertToURL(file.getUrl())).toExternalForm();
+        String uriString = UriConverterManager.getInstance().toString(file);
+        if (uriString != null) {
+            return uriString;
         }
         URI fileUri = getFileUri(file);
         return fileUri != null ? toString(fileUri, file.isDirectory()) : null;
