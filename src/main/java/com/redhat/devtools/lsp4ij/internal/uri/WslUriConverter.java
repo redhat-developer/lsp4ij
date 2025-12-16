@@ -73,17 +73,16 @@ class WslUriConverter implements UriConverter {
     @Override
     public @Nullable URI toUri(@NotNull File file) {
         String path = file.getPath();
-        if (path.startsWith("\\\\")) {
+        if (path.startsWith("\\\\wsl$\\") || path.startsWith("\\\\wsl.localhost\\")) {
             // Strip leading UNC prefix (\\)
+            // Format: authority\path\...
             String uncPath = path.substring(2);
 
-            // Extract authority and remaining path: authority\path\...
+            // Extract authority and remaining path
             int firstSep = uncPath.indexOf('\\');
             if (firstSep > 0) {
                 String authority = uncPath.substring(0, firstSep);
-                String uriPath = uncPath
-                        .substring(firstSep)
-                        .replace('\\', '/');
+                String uriPath = uncPath.substring(firstSep).replace('\\', '/');
 
                 // Use lenient parsing to allow WSL authority such as "wsl$"
                 return URI.create("file://" + authority + uriPath);
