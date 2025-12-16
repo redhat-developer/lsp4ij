@@ -10,12 +10,16 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal.uri;
 
+import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.util.SystemInfo;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 
 /**
  * {@link UriConverter} implementation dedicated to Windows Subsystem for Linux (WSL)
@@ -34,19 +38,37 @@ import java.net.URI;
  */
 class WslUriConverter implements UriConverter {
 
+    private static final Logger LOGGER = Logger.getInstance(WslUriConverter.class);
+
     /**
-     * Resolving a {@link VirtualFile} from a WSL URI is not currently supported.
+     * Resolving a {@link VirtualFile} from a WSL URI.
      *
      * <p>
-     * IntelliJ exposes WSL files through dedicated file systems rather than
-     * plain {@code file://} URIs, making reverse resolution non-trivial.
+     * Handle WSL UNC paths ('\\wsl$\...' or '\\wsl.localhost\...') on Windows
+     * Corresponding URIs have the format: 'file://wsl$/...' or 'file://wsl.localhost/...'
      * </p>
      *
      * @param uri the URI string
-     * @return always {@code null}
+     * @return the virtual file
      */
     @Override
     public @Nullable VirtualFile findResourceFor(@NotNull String uri) {
+        // Handle WSL UNC paths ('\\wsl$\...' or '\\wsl.localhost\...') on Windows
+        // Corresponding URIs have the format: 'file://wsl$/...' or 'file://wsl.localhost/...'
+        if (SystemInfo.isWindows && (uri.startsWith("file://wsl$/") || uri.startsWith("file://wsl.localhost/"))) {
+            try {
+                URI parsedUri = new URI(uri);
+                String authority = parsedUri.getAuthority();
+                String path = parsedUri.getPath();
+                if (authority != null && path != null && authority.startsWith("wsl")) {
+                    String uncPath = "\\\\" + authority + path.replace('/', '\\');
+                    return LocalFileSystem.getInstance().findFileByPath(uncPath);
+                }
+            } catch (URISyntaxException e) {
+                LOGGER.warn("Failed to parse WSL URI: " + uri, e);
+                // Delegate to a more generic converter
+            }
+        }
         return null;
     }
 
