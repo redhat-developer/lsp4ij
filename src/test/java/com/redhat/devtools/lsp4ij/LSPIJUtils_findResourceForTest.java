@@ -38,10 +38,10 @@ public class LSPIJUtils_findResourceForTest extends BasePlatformTestCase {
 
     public void testUncUriParsing() {
         // WSL paths should be parsed (but return null since the paths don't exist)
-        Assert.assertNull(LSPIJUtils.findResourceFor("file://wsl$/Ubuntu/home/user/test.txt"));
-        Assert.assertNull(LSPIJUtils.findResourceFor("file://wsl.localhost/Ubuntu/home/user/test.txt"));
+        Assert.assertNull(LSPIJUtils.findResourceFor("file://wsl$/Ubuntu/home/user4270d2e/test.txt"));
+        Assert.assertNull(LSPIJUtils.findResourceFor("file://wsl.localhost/Ubuntu/home/user4270d2e/test.txt"));
         // Non-WSL UNC paths should not use special handling
-        Assert.assertNull(LSPIJUtils.findResourceFor("file://server/share/folder/file.txt"));
+        Assert.assertNull(LSPIJUtils.findResourceFor("file://server42cc119/share/folder/file.txt"));
     }
 
     private static @NotNull String getUri(String s) {
