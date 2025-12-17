@@ -140,6 +140,9 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
                                          @NotNull InlayHintData hintData,
                                          @NotNull InlayPosition position,
                                          @NotNull InlayTreeSink sink) {
+        if (parts.isEmpty()) {
+            return;
+        }
         int index = 0;
         var builds = new ArrayList<Consumer<PresentationTreeBuilder>>();
         var tooltip = new StringBuilder();
