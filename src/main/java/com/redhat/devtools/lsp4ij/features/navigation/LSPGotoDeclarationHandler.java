@@ -64,21 +64,13 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
     public PsiElement[] getGotoDeclarationTargets(@Nullable PsiElement sourceElement,
                                                   int offset,
                                                   Editor editor) {
-        Project project = editor.getProject();
-        if (project == null || project.isDisposed()) {
-            return PsiElement.EMPTY_ARRAY;
-        }
-        PsiFile psiFile = sourceElement != null ? sourceElement.getContainingFile() : null;
+        PsiFile psiFile = getPsiFile(sourceElement, editor);
         if (psiFile == null) {
-            return PsiElement.EMPTY_ARRAY;
-        }
-        if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return PsiElement.EMPTY_ARRAY;
         }
 
         // If this was called for a populated semantic tokens view provider, try to get the target directly from it
         LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(psiFile);
-        boolean isSemanticDeclaration = false;
         if (semanticTokensFileViewProvider != null) {
             // If this is definitely a reference, resolve it
             if (semanticTokensFileViewProvider.isReference(offset)) {
@@ -86,27 +78,17 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
                 PsiElement target = reference != null ? reference.resolve() : null;
                 return target != null ? new PsiElement[]{target} : PsiElement.EMPTY_ARRAY;
             }
-            // If it's definitely a declaration, just return an empty set of targets
+            // If it's definitely a declaration, skip definition request and go straight to references
             else if (semanticTokensFileViewProvider.isDeclaration(offset)) {
-                isSemanticDeclaration = true;
+                return handleReferenceFallback(psiFile, editor, offset);
             }
         }
 
         // First try the regular definition request; when it only points back to the caret,
         // fall back to references so the user still sees usages for "Declaration or Usages".
         PsiElement[] resolvedTargets = getGotoDeclarationTargets(sourceElement, offset);
-        if (shouldFallBackToReferences(sourceElement, resolvedTargets, isSemanticDeclaration)) {
-            List<LocationData> referenceLocations = LSPReferenceCollector.collect(psiFile, editor.getDocument(), offset);
-            if (!referenceLocations.isEmpty()) {
-                if (isCtrlMouseInvocation()) {
-                    return toPsiElements(referenceLocations, psiFile.getProject());
-                }
-                showReferencesPopup(psiFile, editor, referenceLocations);
-                throw new ProcessCanceledException();
-            }
-            if (isSemanticDeclaration) {
-                resolvedTargets = PsiElement.EMPTY_ARRAY;
-            }
+        if (shouldFallBackToReferences(sourceElement, resolvedTargets)) {
+            return handleReferenceFallback(psiFile, editor, offset);
         }
 
         // If this is a semantic token-backed file and there were targets but this wasn't represented in semantic tokens
@@ -183,39 +165,52 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
     }
 
     private static boolean shouldFallBackToReferences(@Nullable PsiElement sourceElement,
-                                                      PsiElement[] targets,
-                                                      boolean semanticDeclaration) {
-        if (sourceElement == null) {
-            return false;
-        }
-        if (semanticDeclaration) {
-            return true;
-        }
-        if (targets == null || targets.length == 0) {
-            return true;
+                                                      @Nullable PsiElement[] targets) {
+        if (sourceElement == null || targets == null || targets.length == 0) {
+            return sourceElement != null;
         }
         return Arrays.stream(targets)
                 .allMatch(target -> target == null || isSameElement(target, sourceElement));
+    }
+
+    private PsiElement[] handleReferenceFallback(@NotNull PsiFile psiFile, @NotNull Editor editor, int offset) {
+        List<LocationData> referenceLocations = LSPReferenceCollector.collect(psiFile, editor.getDocument(), offset);
+        if (!referenceLocations.isEmpty()) {
+            if (isCtrlMouseInvocation()) {
+                return toPsiElements(referenceLocations, psiFile.getProject());
+            }
+            showReferencesPopup(psiFile, editor, referenceLocations);
+            throw new ProcessCanceledException();
+        }
+        return PsiElement.EMPTY_ARRAY;
+    }
+
+    @Nullable
+    private static PsiFile getPsiFile(@Nullable PsiElement sourceElement, @NotNull Editor editor) {
+        Project project = editor.getProject();
+        if (project == null || project.isDisposed()) {
+            return null;
+        }
+        PsiFile psiFile = sourceElement != null ? sourceElement.getContainingFile() : null;
+        if (psiFile == null || !LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
+            return null;
+        }
+        return psiFile;
     }
 
     private static boolean isSameElement(@Nullable PsiElement target, @Nullable PsiElement source) {
         if (target == null || source == null) {
             return false;
         }
-        PsiFile targetFile = target.getContainingFile();
-        PsiFile sourceFile = source.getContainingFile();
-        if (targetFile == null || sourceFile == null) {
-            return false;
-        }
-        VirtualFile targetVirtualFile = targetFile.getVirtualFile();
-        VirtualFile sourceVirtualFile = sourceFile.getVirtualFile();
-        if (targetVirtualFile == null || sourceVirtualFile == null) {
-            return false;
-        }
-        if (!targetVirtualFile.getUrl().equals(sourceVirtualFile.getUrl())) {
-            return false;
-        }
-        return target.getTextOffset() == source.getTextOffset();
+        VirtualFile targetFile = getVirtualFile(target);
+        VirtualFile sourceFile = getVirtualFile(source);
+        return targetFile != null && targetFile.equals(sourceFile) && target.getTextOffset() == source.getTextOffset();
+    }
+
+    @Nullable
+    private static VirtualFile getVirtualFile(@NotNull PsiElement element) {
+        PsiFile file = element.getContainingFile();
+        return file != null ? file.getVirtualFile() : null;
     }
 
     private void showReferencesPopup(@NotNull PsiFile psiFile,
