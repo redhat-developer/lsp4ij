@@ -140,7 +140,7 @@ public class EditorFeatureManager implements Disposable {
                     }
                     return new RefreshEditorFeatureContext(pf, runnables, editors);
                 })
-                .coalesceBy(file, featureType, clearLSPCache)
+                .coalesceBy(file != null ? file : psiFile, featureType, clearLSPCache)
                 .finishOnUiThread(ModalityState.any(), context -> {
                     if (context == null) {
                         // No opened editors associated from any language servers.
