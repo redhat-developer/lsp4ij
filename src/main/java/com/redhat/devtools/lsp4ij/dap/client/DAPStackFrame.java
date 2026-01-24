@@ -12,9 +12,14 @@ package com.redhat.devtools.lsp4ij.dap.client;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.pom.Navigatable;
 import com.intellij.ui.ColoredTextContainer;
 import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.xdebugger.XDebuggerBundle;
@@ -24,6 +29,7 @@ import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XValueChildrenList;
+import com.intellij.xdebugger.impl.XSourcePositionEx;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
@@ -31,6 +37,9 @@ import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableCo
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyDeferredSourcePosition;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import kotlinx.coroutines.flow.Flow;
+import kotlinx.coroutines.flow.MutableStateFlow;
+import kotlinx.coroutines.flow.StateFlowKt;
 import org.eclipse.lsp4j.debug.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -38,7 +47,6 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
 
@@ -50,9 +58,6 @@ public class DAPStackFrame extends XStackFrame {
     private final @NotNull StackFrame stackFrame;
     private final @NotNull DAPClient client;
     private volatile @Nullable XSourcePosition sourcePosition;
-    // Track async resolution to avoid repeating EDT VFS work.
-    private final AtomicBoolean sourcePositionResolved = new AtomicBoolean(false);
-    private final AtomicBoolean sourcePositionScheduled = new AtomicBoolean(false);
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
     private CompletableFuture<DebugVariableContext> variablesContext;
@@ -83,100 +88,107 @@ public class DAPStackFrame extends XStackFrame {
 
     @Override
     public @Nullable XSourcePosition getSourcePosition() {
-        var source = stackFrame.getSource();
-        if (source != null && !sourcePositionResolved.get()) {
-            sourcePosition = resolveSourcePosition(source, stackFrame.getLine() - 1);
+        XSourcePosition cached = sourcePosition;
+        if (cached != null) {
+            return cached;
         }
+
+        var source = stackFrame.getSource();
+        if (source == null) {
+            return null;
+        }
+
+        sourcePosition = doGetSourcePosition(source, stackFrame.getLine() - 1);
         return sourcePosition;
     }
 
-    private @Nullable XSourcePosition resolveSourcePosition(@NotNull Source source, int line) {
+    private @Nullable XSourcePosition doGetSourcePosition(@NotNull Source source, int line) {
         int sourceReference = source.getSourceReference() != null ? source.getSourceReference() : 0;
         if (sourceReference > 0) {
             // If the value > 0 the contents of the source must be retrieved through
             // the SourceRequest (even if a path is specified).
             var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), getValidSourceName(source), client.getProject());
             if (file.shouldReload(getClient().getSessionId())) {
-                sourcePositionResolved.set(true);
                 return new DAPSourceReferencePosition(file, sourceReference, line, client);
             }
-            sourcePositionResolved.set(true);
             return XDebuggerUtil.getInstance().createPosition(file, line);
         }
 
         Path filePath = getValidFilePath(source);
         if (filePath == null) {
-            sourcePositionResolved.set(true);
             return null;
         }
 
-        // Avoid VFS lookups on EDT; resolve asynchronously and refresh the UI when ready.
+        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath.toString());
+        if (file == null || !file.isValid()) {
+            return null;
+        }
+
         if (ApplicationManager.getApplication().isDispatchThread()) {
-            scheduleSourcePositionResolve(filePath, line);
-            return sourcePosition;
+            return new DeferredLocalFileSourcePosition(file, line);
         }
 
-        var resolved = resolveFilePosition(filePath, line);
-        sourcePositionResolved.set(true);
-        return resolved;
+        return XDebuggerUtil.getInstance().createPosition(file, line);
     }
 
-    private void scheduleSourcePositionResolve(@NotNull Path filePath, int line) {
-        if (!sourcePositionScheduled.compareAndSet(false, true)) {
-            return;
-        }
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            XSourcePosition resolved = null;
-            boolean changed = false;
-            try {
-                resolved = ApplicationManager.getApplication().runReadAction(
-                        (com.intellij.openapi.util.Computable<XSourcePosition>) () -> resolveFilePosition(filePath, line)
-                );
-                XSourcePosition previous = sourcePosition;
-                sourcePosition = resolved;
-                sourcePositionResolved.set(true);
-                changed = !isSameSourcePosition(previous, resolved);
-            } finally {
-                sourcePositionScheduled.set(false);
-            }
+    private static final class DeferredLocalFileSourcePosition implements XSourcePositionEx {
+        private final @NotNull VirtualFile file;
+        private final int line;
+        private final @NotNull MutableStateFlow<Boolean> positionUpdateFlow = StateFlowKt.MutableStateFlow(false);
+        private volatile int offset = -1;
 
-            if (resolved == null || !changed) {
-                return;
-            }
-
-            ApplicationManager.getApplication().invokeLater(() -> {
-                var session = getClient().getSession();
-                if (!session.isStopped()) {
-                    session.rebuildViews();
-                }
+        private DeferredLocalFileSourcePosition(@NotNull VirtualFile file, int line) {
+            this.file = file;
+            this.line = line;
+            // `getSourcePosition()` may be called on EDT; precompute offset in background and notify the debugger UI.
+            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                int resolvedOffset = com.intellij.openapi.application.ReadAction.compute(() -> computeOffset(file, line));
+                offset = resolvedOffset;
+                positionUpdateFlow.setValue(true);
             });
-        });
-    }
+        }
 
-    private @Nullable XSourcePosition resolveFilePosition(@NotNull Path filePath, int line) {
-        try {
-            VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath.toString());
-            if (file == null || !file.isValid()) {
-                return null;
+        @Override
+        public int getLine() {
+            return line;
+        }
+
+        @Override
+        public int getOffset() {
+            return offset;
+        }
+
+        @Override
+        public @NotNull VirtualFile getFile() {
+            return file;
+        }
+
+        @Override
+        public @NotNull Navigatable createNavigatable(@NotNull Project project) {
+            int resolvedOffset = offset;
+            if (resolvedOffset >= 0) {
+                return new OpenFileDescriptor(project, file, resolvedOffset);
             }
-            return XDebuggerUtil.getInstance().createPosition(file, line);
-        } catch (Exception e) {
-            // Invalid path...
-            // ex: <node_internals>/internal/modules/cjs/loader
+            return new OpenFileDescriptor(project, file, Math.max(0, line), 0);
         }
-        return null;
-    }
 
-    private static boolean isSameSourcePosition(@Nullable XSourcePosition a, @Nullable XSourcePosition b) {
-        if (a == b) {
-            return true;
+        @Override
+        public @NotNull Flow<Boolean> getPositionUpdateFlow() {
+            return positionUpdateFlow;
         }
-        if (a == null || b == null) {
-            return false;
+
+        private static int computeOffset(@NotNull VirtualFile file, int line) {
+            Document document = FileDocumentManager.getInstance().getDocument(file);
+            if (document == null) {
+                return -1;
+            }
+            int l = Math.max(0, line);
+            int offset = l < document.getLineCount() ? document.getLineStartOffset(l) : -1;
+            if (offset >= document.getTextLength()) {
+                offset = document.getTextLength() - 1;
+            }
+            return offset;
         }
-        return a.getLine() == b.getLine()
-                && a.getOffset() == b.getOffset()
-                && a.getFile().equals(b.getFile());
     }
 
     public CompletableFuture<XSourcePosition> getSourcePositionFor(@NotNull Variable variable) {
