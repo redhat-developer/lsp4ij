@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.client;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
 import com.intellij.ui.SimpleTextAttributes;
@@ -26,6 +26,7 @@ import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XValueChildrenList;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
+import com.redhat.devtools.lsp4ij.dap.client.files.DeferredLocalFileSourcePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyDeferredSourcePosition;
@@ -48,7 +49,7 @@ public class DAPStackFrame extends XStackFrame {
 
     private final @NotNull StackFrame stackFrame;
     private final @NotNull DAPClient client;
-    private @Nullable XSourcePosition sourcePosition;
+    private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
     private CompletableFuture<DebugVariableContext> variablesContext;
@@ -79,17 +80,23 @@ public class DAPStackFrame extends XStackFrame {
 
     @Override
     public @Nullable XSourcePosition getSourcePosition() {
-        var source = stackFrame.getSource();
-        if (sourcePosition == null && source != null) {
-            sourcePosition = doGetSourcePosition(source, stackFrame.getLine() - 1);
+        if (sourcePosition != null) {
+            return sourcePosition;
         }
+
+        var source = stackFrame.getSource();
+        if (source == null) {
+            return null;
+        }
+
+        sourcePosition = doGetSourcePosition(source, stackFrame.getLine() - 1);
         return sourcePosition;
     }
 
     private @Nullable XSourcePosition doGetSourcePosition(@NotNull Source source, int line) {
         int sourceReference = source.getSourceReference() != null ? source.getSourceReference() : 0;
         if (sourceReference > 0) {
-            // If the value &gt; 0 the contents of the source must be retrieved through
+            // If the value > 0 the contents of the source must be retrieved through
             // the SourceRequest (even if a path is specified).
             var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), getValidSourceName(source), client.getProject());
             if (file.shouldReload(getClient().getSessionId())) {
@@ -102,14 +109,18 @@ public class DAPStackFrame extends XStackFrame {
         if (filePath == null) {
             return null;
         }
-        try {
-            VirtualFile file = VfsUtil.findFile(filePath, true);
-            return XDebuggerUtil.getInstance().createPosition(file, line);
-        } catch (Exception e) {
-            // Invalid path...
-            // ex: <node_internals>/internal/modules/cjs/loader
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            // getSourcePosition() is queried from UI code on the EDT (e.g. stack frames list rendering).
+            // LocalFileSystem.findFileByPath() can hit PersistentFS and triggers SlowOperations on the EDT,
+            // so we defer VFS resolution and notify the debugger UI once the position is ready.
+            return new DeferredLocalFileSourcePosition(filePath, line);
         }
-        return null;
+
+        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath.toString());
+        if (file == null || !file.isValid()) {
+            return null;
+        }
+        return XDebuggerUtil.getInstance().createPosition(file, line);
     }
 
     public CompletableFuture<XSourcePosition> getSourcePositionFor(@NotNull Variable variable) {
