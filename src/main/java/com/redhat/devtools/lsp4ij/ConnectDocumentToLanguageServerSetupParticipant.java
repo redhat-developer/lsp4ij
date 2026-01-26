@@ -31,6 +31,15 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectManagerListener, FileEditorManagerListener {
 
+    private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {
+        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+        if (psiFile != null) {
+            // Force the startup of all Language Servers mapped to this file.
+            LanguageServiceAccessor.getInstance(project)
+                    .getLanguageServers(psiFile, null, null);
+        }
+    }
+
     @Override
     public void projectOpened(@NotNull Project project) {
         // Subscribe to file open/close/selection events for this project.
@@ -58,20 +67,23 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
             return;
         }
         var project = event.getManager().getProject();
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-        if (psiFile == null || LSPFileSupport.hasSupport(psiFile)) {
-            // No PsiFile available, or the file is already connected to a Language Server.
-            return;
-        }
-        if (!LanguageServersRegistry.getInstance().isFileSupported(file, project)) {
-            return;
-        }
+
         // Since file-to-server matching requires a read action,
         // and Language Server startup may be expensive,
         // schedule the connection asynchronously after indexing is finished.
+        // Note: selectionChanged is always called on EDT, so we move getPsiFile()
+        // and isFileSupported() calls off EDT to avoid slow operation violations.
         ProjectIndexingManager
                 .waitForIndexingAll()
                 .thenApplyAsync(unused -> {
+                    if (!LanguageServersRegistry.getInstance().isFileSupported(file, project)) {
+                        return null;
+                    }
+                    PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                    if (psiFile == null || LSPFileSupport.hasSupport(psiFile)) {
+                        // No PsiFile available, or the file is already connected to a Language Server.
+                        return null;
+                    }
                     connectToLanguageServer(file, project);
                     return null;
                 });
@@ -87,15 +99,6 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
                 // release its resources (code lenses, inlay hints, color providers, etc.).
                 LSPFileSupport.getSupport(psiFile).dispose();
             }
-        }
-    }
-
-    private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-        if (psiFile != null) {
-            // Force the startup of all Language Servers mapped to this file.
-            LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(psiFile, null, null);
         }
     }
 }
