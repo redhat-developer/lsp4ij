@@ -13,6 +13,10 @@ package com.redhat.devtools.lsp4ij.features.navigation;
 
 import com.intellij.codeInsight.navigation.CtrlMouseHandler2;
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationHandler;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.PlatformCoreDataKeys;
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -27,7 +31,10 @@ import com.intellij.util.ExceptionUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.features.references.LSPReferenceCollector;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
+import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
+import com.redhat.devtools.lsp4ij.usages.LSPUsagesManager;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -37,6 +44,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
@@ -56,15 +64,8 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
     public PsiElement[] getGotoDeclarationTargets(@Nullable PsiElement sourceElement,
                                                   int offset,
                                                   Editor editor) {
-        Project project = editor.getProject();
-        if (project == null || project.isDisposed()) {
-            return PsiElement.EMPTY_ARRAY;
-        }
-        PsiFile psiFile = sourceElement != null ? sourceElement.getContainingFile() : null;
+        PsiFile psiFile = getPsiFile(sourceElement, editor);
         if (psiFile == null) {
-            return PsiElement.EMPTY_ARRAY;
-        }
-        if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return PsiElement.EMPTY_ARRAY;
         }
 
@@ -77,19 +78,23 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
                 PsiElement target = reference != null ? reference.resolve() : null;
                 return target != null ? new PsiElement[]{target} : PsiElement.EMPTY_ARRAY;
             }
-            // If it's definitely a declaration, just return an empty set of targets
+            // If it's definitely a declaration, skip definition request and go straight to references
             else if (semanticTokensFileViewProvider.isDeclaration(offset)) {
-                return PsiElement.EMPTY_ARRAY;
+                return handleReferenceFallback(psiFile, editor, offset);
             }
         }
 
-        // Use LSP to find targets
-        PsiElement[] targets = getGotoDeclarationTargets(sourceElement, offset);
+        // First try the regular definition request; when it only points back to the caret,
+        // fall back to references so the user still sees usages for "Declaration or Usages".
+        PsiElement[] resolvedTargets = getGotoDeclarationTargets(sourceElement, offset);
+        if (shouldFallBackToReferences(sourceElement, resolvedTargets)) {
+            return handleReferenceFallback(psiFile, editor, offset);
+        }
 
         // If this is a semantic token-backed file and there were targets but this wasn't represented in semantic tokens
         // as a reference, stub a reference for the word at the current offset
         if (semanticTokensFileViewProvider != null) {
-            if (!ArrayUtil.isEmpty(targets)) {
+            if (!ArrayUtil.isEmpty(resolvedTargets)) {
                 TextRange wordRange = LSPIJUtils.getWordRangeAt(editor.getDocument(), psiFile, offset);
                 if (wordRange != null) {
                     // This will ensure it's stubbed as a generic reference
@@ -102,12 +107,12 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
             // declaration. Otherwise things that can't act as references will show up as hyperlinked incorrectly.
             // Unfortunately there's no symbolic state available as to whether or not this was invoked that way, so
             // we have to check the stack trace for the known caller.
-            if (ExceptionUtil.currentStackTrace().contains(CtrlMouseHandler2.class.getName())) {
+            if (isCtrlMouseInvocation()) {
                 throw new ProcessCanceledException();
             }
         }
 
-        return targets;
+        return resolvedTargets;
     }
 
     /**
@@ -137,9 +142,6 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
         try {
             waitUntilDone(definitionsFuture, psiFile);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests textDocument/definition
-            definitionSupport.cancel();
         } catch (CancellationException ex) {
             // cancel the LSP requests textDocument/definition
             definitionSupport.cancel();
@@ -160,5 +162,80 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
             }
         }
         return PsiElement.EMPTY_ARRAY;
+    }
+
+    private static boolean shouldFallBackToReferences(@Nullable PsiElement sourceElement,
+                                                      @Nullable PsiElement[] targets) {
+        if (sourceElement == null || targets == null || targets.length == 0) {
+            return sourceElement != null;
+        }
+        return Arrays.stream(targets)
+                .allMatch(target -> target == null || isSameElement(target, sourceElement));
+    }
+
+    private PsiElement[] handleReferenceFallback(@NotNull PsiFile psiFile, @NotNull Editor editor, int offset) {
+        List<LocationData> referenceLocations = LSPReferenceCollector.collect(psiFile, editor.getDocument(), offset);
+        if (!referenceLocations.isEmpty()) {
+            if (isCtrlMouseInvocation()) {
+                return toPsiElements(referenceLocations, psiFile.getProject());
+            }
+            showReferencesPopup(psiFile, editor, referenceLocations);
+            throw new ProcessCanceledException();
+        }
+        return PsiElement.EMPTY_ARRAY;
+    }
+
+    @Nullable
+    private static PsiFile getPsiFile(@Nullable PsiElement sourceElement, @NotNull Editor editor) {
+        Project project = editor.getProject();
+        if (project == null || project.isDisposed()) {
+            return null;
+        }
+        PsiFile psiFile = sourceElement != null ? sourceElement.getContainingFile() : null;
+        if (psiFile == null || !LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
+            return null;
+        }
+        return psiFile;
+    }
+
+    private static boolean isSameElement(@Nullable PsiElement target, @Nullable PsiElement source) {
+        if (target == null || source == null) {
+            return false;
+        }
+        VirtualFile targetFile = getVirtualFile(target);
+        VirtualFile sourceFile = getVirtualFile(source);
+        return targetFile != null && targetFile.equals(sourceFile) && target.getTextOffset() == source.getTextOffset();
+    }
+
+    @Nullable
+    private static VirtualFile getVirtualFile(@NotNull PsiElement element) {
+        PsiFile file = element.getContainingFile();
+        return file != null ? file.getVirtualFile() : null;
+    }
+
+    private void showReferencesPopup(@NotNull PsiFile psiFile,
+                                     @NotNull Editor editor,
+                                     @NotNull List<LocationData> locations) {
+        Project project = psiFile.getProject();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            var dataContext = SimpleDataContext.builder()
+                    .add(CommonDataKeys.PSI_FILE, psiFile)
+                    .add(CommonDataKeys.EDITOR, editor)
+                    .add(PlatformCoreDataKeys.CONTEXT_COMPONENT, editor.getContentComponent())
+                    .build();
+            LSPUsagesManager.getInstance(project)
+                    .findShowUsagesInPopup(locations, LSPUsageType.References, dataContext, null);
+        });
+    }
+
+    private PsiElement[] toPsiElements(@NotNull List<LocationData> locations, @NotNull Project project) {
+        return locations.stream()
+                .map(location -> toPsiElement(location.location(), location.languageServer().getClientFeatures(), project))
+                .filter(Objects::nonNull)
+                .toArray(PsiElement[]::new);
+    }
+
+    private static boolean isCtrlMouseInvocation() {
+        return ExceptionUtil.currentStackTrace().contains(CtrlMouseHandler2.class.getName());
     }
 }

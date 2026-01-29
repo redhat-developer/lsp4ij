@@ -12,33 +12,21 @@ package com.redhat.devtools.lsp4ij.features.references;
 
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPFileSupport;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
-import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP Go To Reference.
  */
 public class LSPGoToReferenceAction extends AbstractLSPGoToAction {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(LSPGoToReferenceAction.class);
 
     public LSPGoToReferenceAction() {
         super(LSPUsageType.References);
@@ -49,21 +37,8 @@ public class LSPGoToReferenceAction extends AbstractLSPGoToAction {
                                                                  @NotNull Document document,
                                                                  @NotNull Editor editor,
                                                                  int offset) {
-        LSPReferenceSupport referenceSupport = LSPFileSupport.getSupport(psiFile).getReferenceSupport();
-        var params = new LSPReferenceParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<LocationData>> referencesFuture = referenceSupport.getReferences(params);
-        try {
-            waitUntilDone(referencesFuture, psiFile);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests textDocument/references
-            referenceSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests textDocument/references
-            referenceSupport.cancel();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/references' request", e);
-        }
-        return referencesFuture;
+        List<LocationData> locations = LSPReferenceCollector.collect(psiFile, document, offset);
+        return CompletableFuture.completedFuture(locations);
     }
 
     @Override
