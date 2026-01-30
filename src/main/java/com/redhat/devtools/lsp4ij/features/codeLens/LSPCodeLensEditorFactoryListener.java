@@ -10,13 +10,18 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.awt.*;
 
 /**
  * Listens to editor events and manages the context for unresolved code lenses.
@@ -27,83 +32,6 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
     // Key used to store and retrieve the unresolved code lens context for each editor
     private static final Key<UnresolvedCodeLensViewportContext> UNRESOLVED_CODELENS_CONTEXT_KEY = Key.create("unresolved.codelens.viewport.context");
     private static final Key<LSPCodeLensSupport> CODELENS_SUPPORT_KEY = Key.create("codelens.support.context");
-
-    /**
-     * Called when an editor is created.
-     * Checks if the editor's file is supported and attaches a scroll listener.
-     *
-     * @param event The event associated with the editor creation.
-     */
-    @Override
-    public void editorCreated(@NotNull EditorFactoryEvent event) {
-        Editor editor = event.getEditor();
-        Project project = editor.getProject();
-        if (project != null) {
-            attachScrollListener(editor, project);
-        }
-    }
-
-    @Override
-    public void editorReleased(@NotNull EditorFactoryEvent event) {
-        Editor editor = event.getEditor();
-        UnresolvedCodeLensViewportContext context = editor.getUserData(UNRESOLVED_CODELENS_CONTEXT_KEY);
-        if (context != null) {
-            context.dispose();
-            editor.putUserData(UNRESOLVED_CODELENS_CONTEXT_KEY, null);
-        }
-        editor.putUserData(CODELENS_SUPPORT_KEY, null);
-    }
-
-    /**
-     * Attaches a listener to the editor's scrolling model to track the visible area changes.
-     * When the visible area changes, it updates the viewport context and triggers the resolution of code lenses.
-     *
-     * @param editor  The editor to which the scroll listener is attached.
-     * @param project the project.
-     */
-    private static void attachScrollListener(@NotNull Editor editor,
-                                             @NotNull Project project) {
-        // Initialize context
-        final var context = getCodeLensResolveContext(editor);
-        // Adding a listener for visible area changes
-        editor.getScrollingModel().addVisibleAreaListener((e) -> {
-            if (e.getNewRectangle().equals(e.getOldRectangle())) {
-                // View port range has no changed
-                return;
-            }
-            // Update the first/last visible lines from the viewport
-            context.updateViewportLines(e.getNewRectangle());
-
-            LSPCodeLensSupport codeLensSupport = getCodeLensSupport(editor);
-            if (codeLensSupport == null) {
-                // The file is not linked to a language server which have LSP codeLens support.
-                return;
-            }
-
-            if (context.hasFileChanged(codeLensSupport.getFile())) {
-                // file has changed, do nothing
-                return;
-            }
-
-            // Get valid LSP codelens future.
-            var resultFuture = codeLensSupport.getFuture();
-            if (resultFuture != null && resultFuture.isDone()) {
-                var result = resultFuture.getNow(null);
-                if (result == null || !result.hasToResolve(context.getFirstViewportLine(), context.getLastViewportLine())) {
-                    // No codelens to resolve to the current viewport
-                    return;
-                }
-                // Refresh the LSP code vision to resolve codelens visible in the viewport
-                var file = codeLensSupport.getFile();
-                final int firstViewportLine = context.getFirstViewportLine();
-                final int lastViewportLine = context.getLastViewportLine();
-                context.refreshCodeVision(result,
-                        file,
-                        firstViewportLine,
-                        lastViewportLine);
-            }
-        });
-    }
 
     /**
      * Retrieves the unresolved code lens resolution context for the given editor.
@@ -145,5 +73,125 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
     @Nullable
     public static LSPCodeLensSupport getCodeLensSupport(@NotNull Editor editor) {
         return editor.getUserData(CODELENS_SUPPORT_KEY);
+    }
+
+    private static void updateViewportLinesAndRefreshCodeVision(@NotNull CodeLensDataResult result, LSPCodeLensSupport codeLensSupport, UnresolvedCodeLensViewportContext context) {
+        if (!result.hasToResolve(context.getFirstViewportLine(), context.getLastViewportLine())) {
+            // No codelens to resolve to the current viewport
+            return;
+        }
+        // Refresh the LSP code vision to resolve codelens visible in the viewport
+        var file = codeLensSupport.getFile();
+        final int firstViewportLine = context.getFirstViewportLine();
+        final int lastViewportLine = context.getLastViewportLine();
+        context.refreshCodeVision(result,
+                file,
+                firstViewportLine,
+                lastViewportLine);
+    }
+
+    private static boolean updateViewportLinesAndRefreshCodeVision(@NotNull CodeLensDataResult result,
+                                                                   @NotNull Rectangle newRect,
+                                                                   @NotNull LSPCodeLensSupport codeLensSupport,
+                                                                   @NotNull UnresolvedCodeLensViewportContext context,
+                                                                   boolean forceReadAction) {
+        // Step 1: Update the first/last visible lines from the viewport
+        // This update requires EDT+ReadAction
+        if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
+            // We are not in ReadAction
+            if (!forceReadAction) {
+                // Don't force Read Action, do nothing
+                return false;
+            }
+            // Update viewport lines in blocking ReadAction
+            ReadAction.run(() -> context.updateViewportLines(newRect));
+        } else {
+            // We are in ReadAction
+            context.updateViewportLines(newRect);
+        }
+
+        // Step 2: Refresh code visions
+        updateViewportLinesAndRefreshCodeVision(result, codeLensSupport, context);
+        return true;
+    }
+
+    /**
+     * Attaches a listener to the editor's scrolling model to track the visible area changes.
+     * When the visible area changes, it updates the viewport context and triggers the resolution of code lenses.
+     *
+     * @param editor The editor to which the scroll listener is attached.
+     */
+    private void attachScrollListener(@NotNull Editor editor) {
+        // Initialize context
+        final var context = getCodeLensResolveContext(editor);
+        // Adding a listener for visible area changes
+        editor.getScrollingModel().addVisibleAreaListener((e) -> {
+            Rectangle newRect = e.getNewRectangle();
+            if (newRect.equals(e.getOldRectangle())) {
+                // View port range has not changed
+                return;
+            }
+
+            LSPCodeLensSupport codeLensSupport = getCodeLensSupport(editor);
+            if (codeLensSupport == null) {
+                // The file is not linked to a language server which has LSP codeLens support.
+                return;
+            }
+
+            if (context.hasFileChanged(codeLensSupport.getFile())) {
+                // file has changed, do nothing
+                return;
+            }
+
+            // Get valid LSP codelens future.
+            var resultFuture = codeLensSupport.getFuture();
+            if (resultFuture != null && resultFuture.isDone()) {
+                var result = resultFuture.getNow(null);
+                if (result == null) {
+                    return;
+                }
+
+                // call of context.updateViewportLines requires EDT+ReadAction
+                if (!updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, false)) {
+                    // Use NonBlockingReadAction to safely read PSI and file data
+                    ReadAction.nonBlocking(() -> {
+                                return null;
+                            })
+                            .expireWhen(() -> editor.isDisposed())
+                            .coalesceBy(editor, LSPCodeLensEditorFactoryListener.this)
+                            .finishOnUiThread(ModalityState.any(), unused -> {
+                                // Refresh Code visions by forcing ReadAction if needed
+                                updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, true);
+                            })
+                            .submit(AppExecutorUtil.getAppExecutorService());
+                }
+            }
+        });
+    }
+
+    /**
+     * Called when an editor is created.
+     * Checks if the editor's file is supported and attaches a scroll listener.
+     *
+     * @param event The event associated with the editor creation.
+     */
+    @Override
+    public void editorCreated(@NotNull EditorFactoryEvent event) {
+        Editor editor = event.getEditor();
+        if (editor.getVirtualFile() != null) {
+            // Attach listener only for editor which is editing file
+            attachScrollListener(editor);
+        }
+    }
+
+    @Override
+    public void editorReleased(@NotNull EditorFactoryEvent event) {
+        Editor editor = event.getEditor();
+        UnresolvedCodeLensViewportContext context = editor.getUserData(UNRESOLVED_CODELENS_CONTEXT_KEY);
+        if (context != null) {
+            context.dispose();
+            editor.putUserData(UNRESOLVED_CODELENS_CONTEXT_KEY, null);
+        }
+        editor.putUserData(CODELENS_SUPPORT_KEY, null);
     }
 }
