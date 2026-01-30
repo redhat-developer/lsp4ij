@@ -53,7 +53,15 @@ public class FileSystemWatcherManager {
 
     private static @Nullable Path getProjectBasePath(@NotNull Project project) {
         var baseDir = ProjectUtil.guessProjectDir(project);
-        return baseDir != null ? baseDir.toNioPath() : null;
+        if (baseDir != null) {
+            try {
+                return baseDir.toNioPath();
+            } catch (UnsupportedOperationException e) {
+                // TempFileSystem (used in light tests) doesn't support toNioPath()
+            }
+        }
+        String basePath = project.getBasePath();
+        return basePath != null ? Path.of(basePath) : null;
     }
 
     private static void tryAddingMatcher(@NotNull PathPatternMatcher matcher,
