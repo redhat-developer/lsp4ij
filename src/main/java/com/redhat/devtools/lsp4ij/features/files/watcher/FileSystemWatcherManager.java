@@ -60,6 +60,8 @@ public class FileSystemWatcherManager {
                 // TempFileSystem (used in light tests) doesn't support toNioPath()
             }
         }
+        // Fallback to project.getBasePath(), which returns a path string like "temp:///src"
+        // in light tests using TempFileSystem. Path.of() handles this without throwing.
         String basePath = project.getBasePath();
         return basePath != null ? Path.of(basePath) : null;
     }
