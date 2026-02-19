@@ -663,7 +663,11 @@ public class LanguageServerWrapper implements Disposable {
                 }
 
                 DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(toUriString(fileUri), file, document, fileConnectionInfo.documentText(), fileConnectionInfo.languageId());
-                document.addDocumentListener(synchronizer);
+                // Synchronizer usually is disposed when document editor is closed.
+                // But in case of closing the project, it does not close all editors,
+                // so to ensure synchronizer is disposed we also register it here
+                Disposer.register(this, synchronizer);
+                document.addDocumentListener(synchronizer, synchronizer);
                 OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
                 LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
 
@@ -766,8 +770,7 @@ public class LanguageServerWrapper implements Disposable {
             // Remove the listener from the old document stored in synchronizer
             DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
             if (synchronizer != null) {
-                synchronizer.getDocument().removeDocumentListener(synchronizer);
-                synchronizer.dispose();
+                Disposer.dispose(synchronizer);
             }
             clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
         }
