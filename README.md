@@ -95,6 +95,7 @@ Here are some projects that use LSP4IJ:
  * [poryscript-idea](https://github.com/okafke/poryscript-idea)
  * [t-ruby](https://github.com/type-ruby/t-ruby)
  * [Rovo LSP - IntelliJ](https://github.com/arthurdw/rovo)
+ * [Fish Shell for JetBrains](https://github.com/tox-dev/jetbrains-fish)
 
 ## Requirements
 
