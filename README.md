@@ -96,6 +96,7 @@ Here are some projects that use LSP4IJ:
  * [t-ruby](https://github.com/type-ruby/t-ruby)
  * [Rovo LSP - IntelliJ](https://github.com/arthurdw/rovo)
  * [Fish Shell for JetBrains](https://github.com/tox-dev/jetbrains-fish)
+ * [GN Language Server](https://github.com/google/gn-language-server/)
 
 ## Requirements
 
