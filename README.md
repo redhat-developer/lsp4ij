@@ -97,6 +97,7 @@ Here are some projects that use LSP4IJ:
  * [Rovo LSP - IntelliJ](https://github.com/arthurdw/rovo)
  * [Fish Shell for JetBrains](https://github.com/tox-dev/jetbrains-fish)
  * [GN Language Server](https://github.com/google/gn-language-server/)
+ * [OPA IDEA Plugin](https://github.com/open-policy-agent/opa-idea-plugin)
 
 ## Requirements
 
