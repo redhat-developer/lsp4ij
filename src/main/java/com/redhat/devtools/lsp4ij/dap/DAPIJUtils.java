@@ -29,7 +29,13 @@ public class DAPIJUtils {
 
     @NotNull
     public static String getFilePath(@NotNull VirtualFile file) {
-        return file.toNioPath().toString();
+        // Files inside JARs or virtual file systems do not support toNioPath()
+        if (file.isInLocalFileSystem()) {
+            // File is on disk: return the native OS path (e.g. C:\foo\bar on Windows)
+            return file.toNioPath().toString();
+        }
+        // Fallback for JARs and virtual files: return the IntelliJ path (e.g. /path/to/lib.jar!/com/foo/Bar.class)
+        return file.getPath();
     }
 
     @NotNull
