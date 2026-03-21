@@ -786,15 +786,19 @@ public class LSPIJUtils {
                 // No adjustment, the TextRange with start/end offset is invalid
                 return null;
             }
+            // When the offset is at the end of the line, return
+            // a zero-width range so the annotation renders via
+            // afterEndOfLine() instead of expanding to a token.
+            if (isEndOfLine(document, range.getEnd().getLine(), start)) {
+                return new TextRange(start, end);
+            }
             // Select token at current offset, if possible
             TextRange tokenRange = getWordRangeAt(document, file, start);
             if (tokenRange != null) {
                 return tokenRange;
             }
-            // Adjust the end offset if the offset is not at the end of the line.
-            if (!isEndOfLine(document, range.getEnd().getLine(), start)) {
-                end++;
-            }
+            // Adjust the end offset.
+            end++;
             return new TextRange(start, end);
         } catch (IndexOutOfBoundsException e) {
             // Language server reports invalid diagnostic, ignore it.
