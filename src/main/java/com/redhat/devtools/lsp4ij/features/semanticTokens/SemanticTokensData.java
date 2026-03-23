@@ -68,7 +68,6 @@ public class SemanticTokensData {
     public void highlight(@NotNull PsiFile file,
                           @NotNull Document document,
                           @NotNull LazyHighlightInfo.Consumer addInfo) {
-        // Try to populate the file's view provider with these tokens if possible
         LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
 
         var inspector = SemanticTokensInspectorManager.getInstance(file.getProject());
@@ -80,6 +79,16 @@ public class SemanticTokensData {
             if (dataStream == null || dataStream.isEmpty()) {
                 return;
             }
+
+            // Snapshot the document length once at the start of the highlight pass.
+            //
+            // Semantic tokens were computed against the document as it was when the LSP
+            // request was sent. Even though LSPSemanticTokensHighlightVisitor performs a
+            // stamp check before calling this method, a write action can still arrive in
+            // the narrow window between that check and this point. Using a single snapshot
+            // here ensures all token ranges are validated against a consistent length and
+            // prevents any single token from causing an out-of-bounds HighlightInfo.
+            int docLength = document.getTextLength();
 
             int idx = 0;
             int prevLine = 0;
@@ -118,12 +127,29 @@ public class SemanticTokensData {
                         List<String> tokenModifiers = tokenModifiers(data, semanticTokensLegend.getTokenModifiers());
                         int start = offset;
                         int end = offset + length;
+
+                        // Guard: skip tokens whose computed range is invalid or extends
+                        // beyond the current document length.
+                        //
+                        // - start >= end  : should never happen per the LSP spec, but
+                        //                   defended against for robustness.
+                        // - end > docLength: the token extends beyond the document, which
+                        //                   would cause HighlightInfo to throw
+                        //                   IllegalArgumentException. This can happen when
+                        //                   a write action arrives between the stamp check
+                        //                   in LSPSemanticTokensHighlightVisitor and this
+                        //                   method being called.
+                        // In both cases, skip the token silently. The next highlighting
+                        // pass will fetch fresh tokens for the updated document content.
+                        if (start < 0 || start >= end || end > docLength) {
+                            break;
+                        }
+
                         TextAttributesKey colorKey = tokenType != null ? semanticTokensColorsProvider.getTextAttributesKey(tokenType, tokenModifiers, file) : null;
                         if (colorKey != null) {
                             addInfo.accept(start, end, colorKey);
                         }
 
-                        // If this file uses a view provider based on semantic tokens, add this one
                         if (semanticTokensFileViewProvider != null) {
                             semanticTokensFileViewProvider.addSemanticToken(TextRange.create(start, end), tokenType, tokenModifiers);
                         }

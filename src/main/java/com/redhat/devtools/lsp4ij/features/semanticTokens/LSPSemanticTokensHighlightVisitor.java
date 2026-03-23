@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
@@ -57,6 +56,29 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
  * {@link ProcessCanceledException} when the current progress indicator is
  * cancelled, allowing the framework to release the read lock and reschedule
  * the highlighting pass once the write action completes.
+ * </p>
+ *
+ * <p>
+ * <b>Stale token protection — two layers:</b>
+ * <ol>
+ *   <li><b>Stamp check (primary):</b> {@link #getSemanticTokens} captures the file's
+ *       modification stamp before awaiting the LSP future and returns {@code null} if
+ *       the stamp changed while waiting. The stamp is then threaded through to
+ *       {@link #highlightSemanticTokens}, which re-checks it immediately before
+ *       applying any highlights. If the document changed in the narrow window between
+ *       those two points the entire highlighting pass is cancelled — no stale token
+ *       is ever applied.</li>
+ *   <li><b>Defensive guards (safety net):</b> {@link SemanticTokensData#highlight} and
+ *       {@link LazyHighlightInfo#resolve} both validate that computed offsets are
+ *       within the current document bounds before creating a
+ *       {@link com.intellij.codeInsight.daemon.impl.HighlightInfo}.
+ *       This covers the rare race where a write action lands in the narrow window
+ *       between the two stamp checks (e.g. between the document-length snapshot in
+ *       {@code SemanticTokensData} and the array allocation in
+ *       {@code highlightSemanticTokens}).</li>
+ * </ol>
+ * In both cases IntelliJ will reschedule the highlighting pass and the next pass
+ * will produce correct results.
  * </p>
  */
 @ApiStatus.Internal
@@ -85,18 +107,21 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         try {
             this.lazyInfos = null;
             this.holder = null;
-            this.semanticTokens = getSemanticTokens(file);
-            if (semanticTokens != null) {
-                if (!semanticTokens.shouldVisitPsiElement(file)) {
+            this.semanticTokens = null;
+
+            SemanticTokensResult result = getSemanticTokens(file);
+            if (result != null) {
+                this.semanticTokens = result.data();
+                if (!result.data().shouldVisitPsiElement(file)) {
                     // The PsiFile must highlight without using HighlightVisitor#visit(PsiElement)
                     // e.g. TextMate or PlainText files.
-                    highlightSemanticTokens(file, semanticTokens, holder);
+                    highlightSemanticTokens(file, result, holder);
                     this.lazyInfos = null;
                     this.holder = null;
                 } else {
                     // The PsiFile is a custom PsiFile with proper tokenization of PsiElements;
                     // highlighting is driven by HighlightVisitor#visit(PsiElement).
-                    this.lazyInfos = highlightSemanticTokens(file, semanticTokens, null);
+                    this.lazyInfos = highlightSemanticTokens(file, result, null);
                     this.holder = holder;
                 }
             }
@@ -122,11 +147,24 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         for (int i = start; i < end && i < lazyInfos.length; i++) {
             var info = lazyInfos[i];
             if (info != null) {
-                holder.add(info.resolve(i));
+                // resolve() returns null when the stored end offset is invalid (defensive
+                // guard for the rare race described in the class Javadoc). Skip silently.
+                var highlight = info.resolve(i);
+                if (highlight != null) {
+                    holder.add(highlight);
+                }
                 lazyInfos[i] = null;
             }
         }
     }
+
+    /**
+     * Pairs {@link SemanticTokensData} with the file modification stamp captured at
+     * fetch time. Threading the stamp through to {@link #highlightSemanticTokens}
+     * allows a second staleness check right before highlights are applied, without
+     * an extra {@code getModificationStamp()} call.
+     */
+    private record SemanticTokensResult(@NotNull SemanticTokensData data, long modificationStamp) {}
 
     /**
      * Fetches semantic tokens from the LSP server for the given file.
@@ -144,51 +182,34 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
      * <br>
      * {@code ProgressIndicatorUtils.awaitWithCheckCanceled} integrates with
      * IntelliJ's concurrency model: when a write action is requested, the current
-     * progress indicator is cancelled, which causes this method to throw
-     * {@link ProcessCanceledException}. The read lock is then released immediately,
-     * the write action proceeds, and IntelliJ automatically reschedules the
-     * highlighting pass once the write action is done.
-     * </p>
-     *
-     * <p>
-     * <b>File modification stamp:</b> The original {@code waitUntilDone(future, file)}
-     * checked {@code file.getModificationStamp()} on each polling iteration and threw
-     * {@link com.redhat.devtools.lsp4ij.internal.PsiFileChangedException} if the file
-     * was edited while waiting. We replicate this check by capturing the stamp before
-     * waiting and comparing it after — if it changed, the LSP response is stale and
-     * we discard it. A {@link ProcessCanceledException} is thrown by
-     * {@code awaitWithCheckCanceled} anyway when the user types (triggering a write
-     * action), so in practice the stamp check is a belt-and-suspenders safety net.
+     * progress indicator is cancelled → ProcessCanceledException is thrown →
+     * the read lock is released → the write action can proceed immediately.
+     * <br>
+     * IntelliJ will reschedule the GeneralHighlightingPass (and therefore this
+     * visitor) once the write action completes, so semantic tokens will still be
+     * applied — just after a short delay.
      * </p>
      *
      * @param file the PSI file for which semantic tokens are requested
-     * @return the semantic tokens data, or {@code null} if unavailable or stale
+     * @return the semantic tokens data paired with the modification stamp at fetch
+     *         time, or {@code null} if unavailable or stale
      * @throws ProcessCanceledException if the progress indicator is cancelled
      *                                  (e.g. a write action is pending); the caller
-     *                                  (IntelliJ's highlighting framework) handles the
-     *                                  reschedule automatically
+     *                                  (IntelliJ's highlighting framework) handles
+     *                                  the reschedule automatically
      */
-    private static @Nullable SemanticTokensData getSemanticTokens(@NotNull PsiFile file) {
+    private static @Nullable SemanticTokensResult getSemanticTokens(@NotNull PsiFile file) {
         LSPSemanticTokensSupport semanticTokensSupport = LSPFileSupport.getSupport(file).getSemanticTokensSupport();
         var params = new SemanticTokensParams(new TextDocumentIdentifier());
         CompletableFuture<SemanticTokensData> semanticTokensFuture = semanticTokensSupport.getSemanticTokens(params);
 
         // Capture the modification stamp before waiting so we can detect file edits
-        // that occurred while the LSP server was responding (see Javadoc above).
+        // that occurred while the LSP server was responding.
         final long modificationStampBefore = file.getModificationStamp();
 
         try {
             // Wait for the LSP future while cooperating with IntelliJ's lock model.
-            //
-            // Unlike the previous CompletableFutures.waitUntilDone(), this call does NOT
-            // hold the read lock for the full duration of the wait. If a write action is
-            // requested (e.g. user types, or the Git Push dialog tries to setText()),
-            // the progress indicator is cancelled → ProcessCanceledException is thrown →
-            // the read lock is released → the write action can proceed immediately.
-            //
-            // IntelliJ will reschedule the GeneralHighlightingPass (and therefore this
-            // visitor) once the write action completes, so semantic tokens will still be
-            // applied — just after a short delay.
+            // See class Javadoc for a detailed explanation of why this is safe.
             ProgressIndicatorUtils.awaitWithCheckCanceled(semanticTokensFuture);
 
         } catch (ProcessCanceledException e) {
@@ -196,47 +217,94 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
             // reason (e.g. the editor was closed). Do NOT cancel the LSP future here:
             // the server response may arrive before the next rescheduled pass, in which
             // case it will be served from the support's internal cache at no extra cost.
-            throw e; // propagate so the framework handles rescheduling
+            throw e;
 
         } catch (CancellationException e) {
             // The CompletableFuture itself was cancelled (e.g. the file was closed,
             // or the language server shut down). Nothing to do — propagate as-is.
             throw e;
-
         }
 
-        // Belt-and-suspenders: if the file was modified while we were waiting (e.g. a
-        // paste that completed before the write action triggered cancellation), the
-        // tokens are stale. Discard them; the next highlighting pass will request fresh
-        // ones with the updated document content.
+        // Primary staleness check: if the file was modified while we were waiting,
+        // the tokens no longer match the document. Discard them and let the next
+        // highlighting pass request fresh ones.
         if (file.getModificationStamp() != modificationStampBefore) {
             semanticTokensSupport.cancel();
             return null;
         }
 
         if (isDoneNormally(semanticTokensFuture)) {
-            return semanticTokensFuture.getNow(null);
+            SemanticTokensData data = semanticTokensFuture.getNow(null);
+            if (data != null) {
+                // Return the data together with the stamp so highlightSemanticTokens()
+                // can perform its own staleness check before applying any highlights.
+                return new SemanticTokensResult(data, modificationStampBefore);
+            }
         }
         return null;
     }
 
-    private static LazyHighlightInfo[] highlightSemanticTokens(@NotNull PsiFile file,
-                                                               @NotNull SemanticTokensData semanticTokens,
-                                                               @Nullable HighlightInfoHolder holder) {
-        // textDocument/semanticTokens/full has been collected correctly;
-        // create IntelliJ HighlightInfo entries from the LSP SemanticTokens data.
+    /**
+     * Applies semantic token highlights to the given file.
+     *
+     * <p>The modification stamp carried by {@code result} is re-checked immediately
+     * before any highlight is created. If the file was edited in the narrow window
+     * between {@link #getSemanticTokens} returning and this method being called, the
+     * tokens are already stale and the entire pass is cancelled — no partial or
+     * incorrect highlights are applied. The defensive guards in
+     * {@link SemanticTokensData#highlight} and {@link LazyHighlightInfo#resolve} cover
+     * the even narrower race where a write action arrives mid-highlight.</p>
+     *
+     * @param file   the PSI file
+     * @param result the tokens + stamp returned by {@link #getSemanticTokens}
+     * @param holder the highlight holder, or {@code null} for the lazy (PSI-driven) path
+     * @return a {@link LazyHighlightInfo} array indexed by start offset (lazy path),
+     *         or {@code null} (direct path or stale tokens)
+     */
+    private static @Nullable LazyHighlightInfo[] highlightSemanticTokens(@NotNull PsiFile file,
+                                                                         @NotNull SemanticTokensResult result,
+                                                                         @Nullable HighlightInfoHolder holder) {
         var document = LSPIJUtils.getDocument(file.getVirtualFile());
         if (document == null) {
             return null;
         }
+
+        // Secondary staleness check: cancel the entire pass if the document changed
+        // between getSemanticTokens() and now. Applying tokens from a previous document
+        // version would produce inverted or out-of-bounds offsets and cause
+        // IllegalArgumentException inside HighlightInfo (see issue #XXX).
+        if (file.getModificationStamp() != result.modificationStamp()) {
+            return null;
+        }
+
         if (holder != null) {
-            semanticTokens.highlight(file, document, (start, end, colorKey) ->
-                    holder.add(LazyHighlightInfo.resolve(start, end, colorKey)));
+            // Direct highlight path (TextMate / PlainText files).
+            // LazyHighlightInfo.resolve() returns null for invalid ranges (defensive
+            // guard for the rare race described in the class Javadoc); skip those.
+            result.data().highlight(file, document, (start, end, colorKey) -> {
+                var info = LazyHighlightInfo.resolve(start, end, colorKey);
+                if (info != null) {
+                    holder.add(info);
+                }
+            });
             return null;
         } else {
+            // Lazy highlight path (custom PSI files): one LazyHighlightInfo per start
+            // offset; visit() resolves them per PsiElement.
+            //
+            // The array size is snapshotted here. A write action arriving after this
+            // line could shrink the document; the guard in SemanticTokensData.highlight()
+            // rejects out-of-bounds tokens, and the bounds check below covers the
+            // remaining window between that snapshot and the array allocation.
             var infos = new LazyHighlightInfo[document.getTextLength()];
-            semanticTokens.highlight(file, document, (start, end, colorKey) ->
-                    infos[start] = new LazyHighlightInfo(end, colorKey));
+            result.data().highlight(file, document, (start, end, colorKey) -> {
+                // SemanticTokensData validated start/end against its own docLength
+                // snapshot. This guard covers the window between that snapshot and the
+                // infos[] allocation above.
+                if (start < infos.length && end <= infos.length) {
+                    infos[start] = new LazyHighlightInfo(end, colorKey);
+                }
+            });
             return infos;
         }
     }
