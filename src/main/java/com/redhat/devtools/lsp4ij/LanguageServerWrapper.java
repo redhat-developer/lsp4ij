@@ -400,7 +400,7 @@ public class LanguageServerWrapper implements Disposable {
                             }
                         });
 
-                        Launcher<LanguageServer> launcher = serverDefinition.createLauncherBuilder(getClientFeatures()) //
+                        Launcher<LanguageServer> launcher = getClientFeatures().createLauncherBuilder() //
                                 .setLocalService(languageClient)//
                                 .setRemoteInterface(serverDefinition.getServerInterface())//
                                 .setInput(provider.getInputStream())//

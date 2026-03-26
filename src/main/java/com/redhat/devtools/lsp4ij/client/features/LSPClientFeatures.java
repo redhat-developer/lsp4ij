@@ -19,8 +19,10 @@ import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
+import com.redhat.devtools.lsp4ij.server.DefaultLauncherBuilder;
 import com.redhat.devtools.lsp4ij.server.capabilities.TextDocumentServerCapabilityRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.TextDocumentRegistrationOptions;
@@ -308,6 +310,22 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     public boolean isUseIntAsJsonRpcId() {
         return false;
+    }
+
+    /**
+     * Creates the {@link Launcher.Builder} used to build the LSP launcher.
+     *
+     * <p>The default implementation returns a {@link DefaultLauncherBuilder}.
+     * Subclasses can override this to return a custom builder — for example,
+     * a subclass of {@link DefaultLauncherBuilder} that overrides
+     * {@link DefaultLauncherBuilder#createMessageProducer} to provide a custom
+     * {@link org.eclipse.lsp4j.jsonrpc.MessageProducer}.</p>
+     *
+     * @param <S> the language server interface type.
+     * @return the launcher builder.
+     */
+    public <S extends LanguageServer> @NotNull Launcher.Builder<S> createLauncherBuilder() {
+        return new DefaultLauncherBuilder<>(this);
     }
 
     /**
