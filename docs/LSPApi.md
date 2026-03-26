@@ -30,6 +30,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP breadcrumbs feature](#lsp-breadcrumbs-feature)
 - [LSP editor behavior feature](#lsp-editor-behavior-feature)
 - [JSON-RPC communication feature](#json-rpc-communication-feature)
+- [Custom launcher builder](#custom-launcher-builder)
 - [Language server installer](#language-server-installer)
 
 You can extend these default features by:
@@ -789,6 +790,102 @@ You can customize JSON-RPC communication behavior by overriding the `isUseIntAsJ
 | boolean isUseIntAsJsonRpcId() | Returns `true` if JSON-RPC id should be sent as integer instead of string and `false` otherwise. | `false`       |
 
 This feature is useful when working with language servers that require integer IDs for JSON-RPC messages instead of the default string IDs used by LSP4J.
+
+## Custom Launcher Builder
+
+You can customize how the JSON-RPC launcher is built by overriding the `createLauncherBuilder()` method in your `LSPClientFeatures` subclass. This gives you full control over the lsp4j `Launcher.Builder`, including the ability to replace the default `MessageProducer` that reads LSP messages from the server's output stream.
+
+| Method signature                                                        | Description                                                                                                          | Default Behaviour                                                       |
+|-------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `<S extends LanguageServer> Launcher.Builder<S> createLauncherBuilder()` | Returns the `Launcher.Builder` used to create the JSON-RPC launcher for communicating with the language server. | Returns a `DefaultLauncherBuilder` that reads messages from the standard input stream. |
+
+The [DefaultLauncherBuilder](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/DefaultLauncherBuilder.java) provides a protected `createMessageProducer()` method that you can override to inject a custom `MessageProducer`:
+
+| Method signature                                                                                                                                        | Description                                                                                     | Default Behaviour                                        |
+|---------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|----------------------------------------------------------|
+| `MessageProducer createMessageProducer(InputStream input, MessageJsonHandler jsonHandler, MessageIssueHandler issueHandler)` | Creates the `MessageProducer` that feeds JSON-RPC messages into the lsp4j processing pipeline. | Returns an `ExtendedStreamMessageProducer` that reads from the input stream. |
+
+### Use case: Non-standard message transport
+
+This API is useful when your language server does not communicate via standard `stdin`/`stdout` streams with Content-Length framing. For example, the Dart Analysis Server uses a legacy JSON protocol and requires a proxy layer that translates between the legacy protocol and LSP. Instead of piping responses through a stream, the proxy can feed parsed messages directly into lsp4j via a custom `MessageProducer` backed by a queue.
+
+Here is how the Dart plugin uses this API:
+
+**Step 1:** Create a custom `MessageProducer` that accepts messages via a queue instead of reading from a stream:
+
+```java
+public class DartMessageProducer implements MessageProducer {
+
+    private final LinkedBlockingQueue<String> queue = new LinkedBlockingQueue<>();
+    private final MessageJsonHandler jsonHandler;
+
+    public DartMessageProducer(MessageJsonHandler jsonHandler) {
+        this.jsonHandler = jsonHandler;
+    }
+
+    /** Called by the proxy layer to enqueue a JSON-RPC message. */
+    public void enqueue(String json) {
+        queue.add(json);
+    }
+
+    @Override
+    public void listen(MessageConsumer callback) {
+        try {
+            while (true) {
+                String json = queue.take();
+                Message message = jsonHandler.parseMessage(new StringReader(json));
+                callback.consume(message);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @Override
+    public void close() {
+        // no-op
+    }
+}
+```
+
+**Step 2:** Create a custom `DefaultLauncherBuilder` subclass that overrides `createMessageProducer()`:
+
+```java
+class DartLauncherBuilder<S extends LanguageServer> extends DefaultLauncherBuilder<S> {
+
+    DartLauncherBuilder(@NotNull LSPClientFeatures clientFeatures) {
+        super(clientFeatures);
+    }
+
+    @Override
+    protected @NotNull MessageProducer createMessageProducer(@NotNull InputStream input,
+                                                              @NotNull MessageJsonHandler jsonHandler,
+                                                              @NotNull MessageIssueHandler issueHandler) {
+        DartMessageProducer producer = new DartMessageProducer(jsonHandler);
+        // Register the producer so the proxy layer can enqueue responses into it.
+        Project project = getClientFeatures().getProject();
+        DartMessageProducerRegistry.register(project, producer);
+        return producer;
+    }
+}
+```
+
+**Step 3:** Override `createLauncherBuilder()` in your `LSPClientFeatures` subclass:
+
+```java
+public class DartLSPClientFeatures extends LSPClientFeatures {
+
+    public DartLSPClientFeatures() {
+        super.setCompletionFeature(new DartLSPCompletionFeature());
+        super.setDiagnosticFeature(new DartLSPDiagnosticFeature());
+    }
+
+    @Override
+    public <S extends LanguageServer> @NotNull Launcher.Builder<S> createLauncherBuilder() {
+        return new DartLauncherBuilder<>(this);
+    }
+}
+```
 
 ## Language server installer
 
