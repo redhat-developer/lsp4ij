@@ -879,7 +879,7 @@
             <keyboard-shortcut first-keystroke="control alt H" keymap="$default"/>
         </action>
 
-        <group>
+        <group id="LSP.GoToGroup">
             <add-to-group group-id="EditorPopupMenu.GoTo" anchor="first"/>
             <add-to-group group-id="GoToMenu" anchor="before" relative-to-action="GotoDeclaration"/>
             <reference ref="LSP.GotoImplementation"/>
