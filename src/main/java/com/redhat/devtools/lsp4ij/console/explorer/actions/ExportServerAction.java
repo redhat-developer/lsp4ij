@@ -55,7 +55,7 @@ public class ExportServerAction extends AnAction {
     public void actionPerformed(@NotNull AnActionEvent e) {
         FileChooserFactory fileChooserFactory = FileChooserFactory.getInstance();
         FileSaverDescriptor fileSaverDescriptor = new FileSaverDescriptor(
-                LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"));
+                LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.title"), LanguageServerBundle.message("action.lsp.console.explorer.export.servers.zip.save.description"), new String[]{"zip"});
         FileSaverDialog fileSaverDialog = fileChooserFactory.createSaveFileDialog(fileSaverDescriptor, e.getProject());
 
         String currentDate = getCurrentDate();
