@@ -98,6 +98,7 @@ Here are some projects that use LSP4IJ:
  * [Fish Shell for JetBrains](https://github.com/tox-dev/jetbrains-fish)
  * [GN Language Server](https://github.com/google/gn-language-server/)
  * [OPA IDEA Plugin](https://github.com/open-policy-agent/opa-idea-plugin)
+ * [aer Local Apex Debugger](https://www.octoberswimmer.com/tools/aer/docs/intellij-debugging/)
 
 ## Requirements
 
