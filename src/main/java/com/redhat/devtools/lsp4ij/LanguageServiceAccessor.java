@@ -39,7 +39,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -118,6 +120,28 @@ public class LanguageServiceAccessor implements Disposable {
         return project.getService(LanguageServiceAccessor.class);
     }
 
+    /**
+     * Handles exceptions from CompletableFuture chains, silently ignoring cancellations
+     * (which are normal when a language server is stopped/restarted) and re-throwing
+     * all other exceptions so they are not swallowed.
+     *
+     * @param ex the exception thrown in the future chain.
+     * @return null if the exception is a normal cancellation, otherwise rethrows.
+     */
+    @Nullable
+    private static <T> T handleFutureException(@NotNull Throwable ex) {
+        Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
+        if (cause instanceof CancellationException || cause instanceof ProcessCanceledException) {
+            // A cancellation means the language server was stopped or restarted while
+            // this request was in flight — this is a normal lifecycle event, not an error.
+            return null;
+        }
+        // Unexpected error: propagate so it is not silently swallowed.
+        throw ex instanceof CompletionException
+                ? (CompletionException) ex
+                : new CompletionException(ex);
+    }
+
     @Nullable
     private static Map<LanguageServerWrapper, LanguageServerWrapper.LSPFileConnectionInfo> getFileConnectionInfoMap(@NotNull VirtualFile file,
                                                                                                                     @NotNull Collection<LanguageServerWrapper> languageServers,
@@ -192,9 +216,9 @@ public class LanguageServiceAccessor implements Disposable {
      * <li>2. refresh code vision, inlay hints, folding for all opened editors
      * which edit the files associated to the language server.</li>
      * </ul>
-     *      @param serverDefinition the language server definition.
      *
-     * @param project the project.
+     * @param serverDefinition the language server definition.
+     * @param project          the project.
      */
     void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
                                                           @NotNull Project project) {
@@ -309,7 +333,10 @@ public class LanguageServiceAccessor implements Disposable {
                                                     servers.add(new LanguageServerItem(server, wrapper));
                                                 }
                                                 return CompletableFuture.completedFuture(null);
-                                            }))
+                                            })
+                                            // A cancellation here means the server was stopped/restarted mid-flight;
+                                            // silently skip this wrapper instead of surfacing an error to the user.
+                                            .exceptionally(LanguageServiceAccessor::handleFutureException))
                             .toArray(CompletableFuture[]::new))
                     .thenApply(theVoid -> servers);
         } catch (ProcessCanceledException cancellation) {
@@ -339,7 +366,6 @@ public class LanguageServiceAccessor implements Disposable {
             // None language servers matches the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
         }
-
 
         // getLanguageServers is generally called with Read Access.
         // We get the Document instance now, to avoid creating a new Read Action thread to get it from the file.
@@ -382,7 +408,10 @@ public class LanguageServiceAccessor implements Disposable {
                                                     if (server != null) {
                                                         servers.add(new LanguageServerItem(server, wrapper));
                                                     }
-                                                });
+                                                })
+                                                // A cancellation here means the server was stopped/restarted mid-flight;
+                                                // silently skip this wrapper instead of surfacing an error to the user.
+                                                .exceptionally(LanguageServiceAccessor::handleFutureException);
                                     }
                             ).toArray(CompletableFuture[]::new)))
                     .thenApply(theVoid -> servers);
