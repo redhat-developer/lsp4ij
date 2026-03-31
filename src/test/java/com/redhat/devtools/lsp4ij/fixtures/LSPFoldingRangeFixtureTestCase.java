@@ -88,6 +88,12 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
 
         PsiFile file = myFixture.configureByText(fileName, stripTokens(fileBody));
         Editor editor = myFixture.getEditor();
+        // Move the caret to the end to avoid implicitly opening a fold region that would
+        // interfere with the test assertions. This was required because JB 2026.1
+        // started accounting for caret positions in tests in the:
+        //   EditorTestUtil.buildInitialFoldingsInBackground()
+        // function.
+        editor.getCaretModel().moveToOffset(file.getTextLength());
 
         // Initialize the language server
         try {

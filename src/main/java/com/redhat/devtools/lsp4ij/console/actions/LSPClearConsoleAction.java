@@ -23,10 +23,10 @@ import org.jetbrains.annotations.NotNull;
  *
  * @author Angelo ZERR
  */
-public class ClearThisConsoleAction extends ClearConsoleAction {
+public class LSPClearConsoleAction extends ClearConsoleAction {
     private final ConsoleView myConsoleView;
 
-    public ClearThisConsoleAction(@NotNull ConsoleView consoleView) {
+    public LSPClearConsoleAction(@NotNull ConsoleView consoleView) {
         myConsoleView = consoleView;
     }
 
