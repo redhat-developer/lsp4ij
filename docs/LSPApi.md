@@ -763,9 +763,10 @@ or, if appropriate, the the child/descendant element that represents the declara
 
 Unlike most features above, `LSPBreadcrumbsFeature` does **not** correspond directly to an LSP feature, but it does build upon `LSPDocumentSymbolFeature` to add breadcrumbs and sticky lines behavior to the IDE. It is _enabled by default_ for all language server definitions except for the HTML and XML language server definition templates. Those implementing custom language server integrations can opt out of these features if desired by overriding the respective methods listed below.
 
-| API                             | Description                                                                                                  | Default Behaviour |
-|---------------------------------|--------------------------------------------------------------------------------------------------------------|-------------------|
-| boolean isEnabled(PsiFile file) | Returns `true` if the the document symbols-based breadcrumbs info provider is enabled and `false` otherwise. | `true`            |
+| API                                                             | Description                                                                                                  | Default Behaviour |
+|-----------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|-------------------|
+| boolean isEnabled(PsiFile file)                                 | Returns `true` if the the document symbols-based breadcrumbs info provider is enabled and `false` otherwise. | `true`            |
+| boolean isExistingBreadcrumbsProviderOverrideable(PsiFile file) | Returns `true` if existing breadcrumbs provider are overrideable and `false` otherwise.                      | `false`           |
 =======
 
 ## LSP Editor Behavior Feature
