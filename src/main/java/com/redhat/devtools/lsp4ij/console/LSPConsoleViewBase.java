@@ -19,7 +19,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
-import com.redhat.devtools.lsp4ij.console.actions.ClearThisConsoleAction;
+import com.redhat.devtools.lsp4ij.console.actions.LSPClearConsoleAction;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -48,6 +48,6 @@ public class LSPConsoleViewBase extends ConsoleViewImpl {
     protected void fillConsoleActions(List<AnAction> consoleActions) {
         consoleActions.add(new ScrollToTheEndToolbarAction(getEditor()));
         consoleActions.add(ActionManager.getInstance().getAction("Print"));
-        consoleActions.add(new ClearThisConsoleAction(this));
+        consoleActions.add(new LSPClearConsoleAction(this));
     }
 }

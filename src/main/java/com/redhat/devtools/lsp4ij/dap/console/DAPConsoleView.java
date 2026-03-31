@@ -22,7 +22,7 @@ import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.redhat.devtools.lsp4ij.console.actions.AutoFoldingAction;
-import com.redhat.devtools.lsp4ij.console.actions.ClearThisConsoleAction;
+import com.redhat.devtools.lsp4ij.console.actions.LSPClearConsoleAction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
@@ -130,7 +130,7 @@ public class DAPConsoleView extends ConsoleViewImpl {
             consoleActions.add(new ScrollToTheEndToolbarAction(editor));
         }
         consoleActions.add(ActionManager.getInstance().getAction("Print"));
-        consoleActions.add(new ClearThisConsoleAction(this));
+        consoleActions.add(new LSPClearConsoleAction(this));
         return consoleActions.toArray(AnAction.EMPTY_ARRAY);
     }
 
