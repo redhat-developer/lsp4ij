@@ -34,6 +34,12 @@ public class UserDefinedBreadcrumbsFeature extends LSPBreadcrumbsFeature {
     public boolean isEnabled(@NotNull PsiFile file) {
         ClientConfigurationBreadcrumbsSettings breadcrumbsSettings = getSettings();
         // Note that this defaults to enabled for user-defined language server definitions
-        return (breadcrumbsSettings == null) || breadcrumbsSettings.enabled;
+        return (super.isEnabled(file) && breadcrumbsSettings == null) || breadcrumbsSettings.enabled;
+    }
+
+    @Override
+    public boolean isExistingBreadcrumbsProviderOverrideable(@NotNull PsiFile file) {
+        var breadcrumbsSettings = getSettings();
+        return breadcrumbsSettings != null && breadcrumbsSettings.existingBreadcrumbsProviderOverrideable != null ? breadcrumbsSettings.existingBreadcrumbsProviderOverrideable : super.isExistingBreadcrumbsProviderOverrideable(file);
     }
 }
