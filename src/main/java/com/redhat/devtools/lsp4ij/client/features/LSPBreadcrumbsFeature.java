@@ -58,6 +58,7 @@ public class LSPBreadcrumbsFeature extends AbstractLSPDocumentFeature {
      * Returns {@code true} if a {@link BreadcrumbsProvider} other than LSP4IJ's own
      * is registered and supports the language of the given file.
      */
+    @SuppressWarnings("UnstableApiUsage")
     private static boolean hasThirdPartyBreadcrumbsProvider(@NotNull PsiFile file) {
         // Check all languages exposed by the file (handles multi-language files
         // such as HTML+JS or JSX).
