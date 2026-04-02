@@ -53,6 +53,14 @@ public class PathPatternMatcher {
         int firstGlobChar = findFirstGlobCharacter(fullPattern);
 
         if (firstGlobChar == -1) {
+            // For literal patterns (no glob characters) that are relative (e.g., "node_modules"),
+            // we assume they are relative to the workspace root. By setting defaultBasePath,
+            // the FileSystemWatcherManager can relativize absolute file paths against it
+            // and match the relative pattern correctly.
+            Path patternPath = Paths.get(fullPattern.replace('\\', '/'));
+            if (!patternPath.isAbsolute()) {
+                return new PathPatternMatcher(fullPattern, defaultBasePath);
+            }
             // No glob characters, treat entire string as pattern
             return new PathPatternMatcher(fullPattern, null);
         }
@@ -85,7 +93,18 @@ public class PathPatternMatcher {
 
         try {
             // Normalize separators for Path
-            Path basePath = Paths.get(basePathStr.replace('\\', '/'));
+            Path extractedPath = Paths.get(basePathStr.replace('\\', '/'));
+            // If the extracted base path is relative (e.g., "some" from "some/**/*.js"),
+            // we resolve it against defaultBasePath so it can be compared against absolute paths.
+            // Otherwise, absolute paths being tested won't match the relative base path prefix.
+            Path basePath;
+            if (extractedPath.isAbsolute()) {
+                basePath = extractedPath;
+            } else if (defaultBasePath != null) {
+                basePath = defaultBasePath.resolve(extractedPath);
+            } else {
+                basePath = extractedPath;
+            }
             return new PathPatternMatcher(relativePattern, basePath);
         } catch (Exception e) {
             // If path creation fails, return with original pattern and no base
