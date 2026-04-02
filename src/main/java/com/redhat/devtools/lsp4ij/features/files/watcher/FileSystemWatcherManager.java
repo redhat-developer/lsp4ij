@@ -378,8 +378,8 @@ public class FileSystemWatcherManager {
                 if (matcher.matches(relativePath)) {
                     return true;
                 }
-            } else {
-                // ex: "globPattern": "C:\\Users\\XXX\\IdeaProjects\\test-rust/**/*.rs"
+            } else if (matcher.getBasePath() == null) {
+                // ex: "globPattern": "**/*.rs" (no base path extracted)
                 // Apply the matcher to the path
                 if (matcher.matches(path)) {
                     return true;

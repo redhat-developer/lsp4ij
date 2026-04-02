@@ -216,8 +216,9 @@ public class FileSystemWatcherManagerTest {
         assertMatchFile(getBaseUri() + "src/foo.ts"); // "file:///C:/src/foo.ts"
 
         // Match c:/Users/X/foo/lib/**
-        assertNoMatchFile(getBaseUri() + "Users/X/lib/bar.jar"); // file:///C:/Users/X/lib/bar.jar
-        assertMatchFile(getBaseUri() + "Users/X/foo/lib/bar.jar"); // file:///C:/Users/X/foo/lib/bar.jar
+        // Using .txt instead of .jar because FileSystemWatcherManager explicitly skips archive files to prevent IDE freezes.
+        assertNoMatchFile(getBaseUri() + "Users/X/lib/bar.txt"); // file:///C:/Users/X/lib/bar.txt
+        assertMatchFile(getBaseUri() + "Users/X/foo/lib/bar.txt"); // file:///C:/Users/X/foo/lib/bar.txt
 
         // Match "**/.settings
         assertNoMatchFile(getBaseUri() + "foo.ts"); // file:///C:/foo.ts
