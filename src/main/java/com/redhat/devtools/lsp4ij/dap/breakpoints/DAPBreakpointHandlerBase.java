@@ -233,8 +233,16 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             }
             VirtualFile fileInBreakpoint = breakpointPosition.getFile();
             int line = breakpointPosition.getLine() + 1;
-            if (fileInBreakpoint.toNioPath().equals(filePath) && line == lineNumber) {
-                return breakpoint;
+            if (fileInBreakpoint.isInLocalFileSystem()) {
+                if (fileInBreakpoint.toNioPath().equals(filePath) && line == lineNumber) {
+                    return breakpoint;
+                }
+            } else {
+                // Virtual files (e.g. DAPFile backed by LightVirtualFile) don't support toNioPath().
+                // Fall back to comparing the VirtualFile path as a string. See #1447.
+                if (fileInBreakpoint.getPath().equals(filePath.toString()) && line == lineNumber) {
+                    return breakpoint;
+                }
             }
         }
         return null;
