@@ -318,8 +318,14 @@ public class LanguageServerWrapper implements Disposable {
             final VirtualFile rootURI = getRootURI();
             this.launcherFuture = new CompletableFuture<>();
             var context = this.currentInitializingContext = new InitializingContext();
-            this.initializeFuture = CompletableFuture.supplyAsync(() -> {
-
+            // Use IntelliJ pooled thread instead of ForkJoinPool.commonPool() to avoid
+            // ForkJoinPool.helpAsyncBlocker() executing blocking operations (like OSProcessHandler.waitFor())
+            // in the current thread when called from ReadAction.
+            // We cannot use 'dispatcher' (single thread executor) as it's reserved for ordered notification dispatch.
+            // See: https://github.com/redhat-developer/lsp4ij/issues/1442
+            CompletableFuture<InitializingContext> startFuture = new CompletableFuture<>();
+            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                try {
                         var initializingContext = context;
                         // Starting process...
                         updateStatus(ServerStatus.starting);
@@ -362,8 +368,13 @@ public class LanguageServerWrapper implements Disposable {
                         // Throws the CannotStartProcessException exception if process is not alive.
                         // This use case comes for instance when the start process command fails (not a valid start command)
                         provider.ensureIsAlive();
-                        return currentInitializingContext;
-                    }).thenApply(initializingContext -> {
+                        startFuture.complete(currentInitializingContext);
+                } catch (Exception e) {
+                    startFuture.completeExceptionally(e);
+                }
+            });
+            this.initializeFuture = startFuture
+                    .thenApply(initializingContext -> {
                         var languageClient = serverDefinition.createLanguageClient(initialProject);
                         initializingContext.languageClient = languageClient;
                         languageClient.setServerWrapper(this);
