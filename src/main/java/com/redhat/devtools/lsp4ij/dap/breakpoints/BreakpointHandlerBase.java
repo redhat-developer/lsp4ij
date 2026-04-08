@@ -26,6 +26,8 @@ import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -36,6 +38,8 @@ import java.util.concurrent.CompletableFuture;
  * @param <B> the breakpoint
  */
 public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XBreakpointHandler<B> implements Disposable {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BreakpointHandlerBase.class);
 
     protected static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture[0];
     protected static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
@@ -64,8 +68,25 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     @Override
     public void registerBreakpoint(@NotNull B breakpoint) {
-        if (!(breakpoint.isEnabled() &&
-                supportsBreakpoint(breakpoint))) {
+        if (!breakpoint.isEnabled()) {
+            return;
+        }
+
+        if (!supportsBreakpoint(breakpoint)) {
+            // Log why the breakpoint is not supported to help diagnose issues like #1433
+            var sourcePosition = breakpoint.getSourcePosition();
+            LOGGER.warn("Breakpoint not supported - enabled={}, sourcePosition={}, type={}",
+                       breakpoint.isEnabled(),
+                       sourcePosition,
+                       breakpoint.getType().getClass().getSimpleName());
+
+            // Mark the breakpoint as invalid so the user sees visual feedback
+            if (breakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
+                String message = sourcePosition == null
+                    ? "Breakpoint location not available"
+                    : "File not debuggable with current debug adapter";
+                debugSession.setBreakpointInvalid(lineBreakpoint, message);
+            }
             return;
         }
 
@@ -92,8 +113,13 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
                                                                 @Nullable TemporaryBreakpoint temporaryBreakpoint) {
-        if (debugProtocolServers.isEmpty() || (breakpoints.isEmpty() && temporaryBreakpoint == null)) {
-            // DAP servers are not started or there are no breakpoints to send
+        if (breakpoints.isEmpty() && temporaryBreakpoint == null) {
+            // No breakpoints to send
+            return CompletableFuture.completedFuture(null);
+        }
+        if (debugProtocolServers.isEmpty()) {
+            // DAP server not yet initialized - breakpoints are stored and will be sent
+            // when initialize() is called (which calls sendBreakpoints with the server)
             return CompletableFuture.completedFuture(null);
         }
         return doSendBreakpoints(debugProtocolServer, temporaryBreakpoint);
