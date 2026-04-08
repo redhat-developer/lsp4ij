@@ -37,11 +37,27 @@ public class DAPExpressionCodeFragment extends PsiFileBase {
                                      @Nullable DAPDebugProcess debugProcess,
                                      @NotNull Project project) {
         super(new SingleRootFileViewProvider(PsiManager.getInstance(project),
-                new LightVirtualFile("DAPExpressionCodeFragment." + fileType.getDefaultExtension(), language, text)),
+                createLightVirtualFile(text, fileType, language)),
                 language);
         this.fileType = fileType;
         this.debugProcess = debugProcess;
         ((SingleRootFileViewProvider) getViewProvider()).forceCachedPsi(this);
+    }
+
+    @NotNull
+    private static LightVirtualFile createLightVirtualFile(@NotNull CharSequence text,
+                                                           @NotNull FileType fileType,
+                                                           @NotNull Language language) {
+        String codeFragmentFilename = "DAPExpressionCodeFragment." + fileType.getDefaultExtension();
+
+        // If this is a dialect, use the base language so that the code fragment supports all dialects needed during
+        // debugging, even if in a least common denominator manner
+        Language baseLanguage = language.getBaseLanguage();
+        if ((baseLanguage != null) && !baseLanguage.is(language)) {
+            return new LightVirtualFile(codeFragmentFilename, baseLanguage, text);
+        } else {
+            return new LightVirtualFile(codeFragmentFilename, fileType, text);
+        }
     }
 
     @NotNull
