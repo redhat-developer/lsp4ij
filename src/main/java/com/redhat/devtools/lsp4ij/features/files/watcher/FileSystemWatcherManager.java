@@ -36,6 +36,19 @@ public class FileSystemWatcherManager {
     private static final int WatchKindAny = 7;
 
     /**
+     * JAR/ZIP entry separator used in paths like "/path/to/lib.jar!/com/example/Class.class"
+     */
+    private static final String JAR_SEPARATOR = "!/";
+
+    /**
+     * Archive URI schemes that should be skipped to avoid ZipFileSystemProvider
+     * triggering toRealPath() which causes EDT freezes on Windows.
+     */
+    private static final Set<String> ARCHIVE_SCHEMES = Set.of(
+            "jar", "zip", "war", "ear"
+    );
+
+    /**
      * Archive file extensions that should be skipped to avoid ZipFileSystemProvider
      * triggering toRealPath() which causes EDT freezes on Windows.
      */
@@ -256,11 +269,24 @@ public class FileSystemWatcherManager {
      * which calls toRealPath() -> FindFirstFile0 on Windows, causing EDT freezes.
      */
     private static boolean isArchiveFile(@NotNull URI uri) {
+        // First check: URI scheme (jar:, zip:, etc.)
+        String scheme = uri.getScheme();
+        if (scheme != null && ARCHIVE_SCHEMES.contains(scheme.toLowerCase())) {
+            return true;
+        }
+
+        // Second check: path contains JAR entry separator
         String path = uri.getPath();
         if (path == null) {
             return false;
         }
 
+        // Paths containing JAR_SEPARATOR are JAR/ZIP entry paths (e.g., /path/to/lib.jar!/com/example/Class.class)
+        if (path.contains(JAR_SEPARATOR)) {
+            return true;
+        }
+
+        // Third check: file extension
         // Extract the extension (including the dot)
         int lastDot = path.lastIndexOf('.');
         if (lastDot == -1 || lastDot == path.length() - 1) {
