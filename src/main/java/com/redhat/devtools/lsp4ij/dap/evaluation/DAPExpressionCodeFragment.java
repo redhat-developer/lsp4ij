@@ -37,7 +37,7 @@ public class DAPExpressionCodeFragment extends PsiFileBase {
                                      @Nullable DAPDebugProcess debugProcess,
                                      @NotNull Project project) {
         super(new SingleRootFileViewProvider(PsiManager.getInstance(project),
-                new LightVirtualFile("DAPExpressionCodeFragment." + fileType.getDefaultExtension(), fileType, text)),
+                new LightVirtualFile("DAPExpressionCodeFragment." + fileType.getDefaultExtension(), language, text)),
                 language);
         this.fileType = fileType;
         this.debugProcess = debugProcess;
