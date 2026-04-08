@@ -32,8 +32,8 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
     private static final long VIEWPORT_CHANGE_DELAY_MS = 500L; // Debounce delay before processing viewport changes
 
     private final @NotNull Editor editor;
-    private int firstViewportLine;
-    private int lastViewportLine;
+    private int firstViewportLine = -1;
+    private int lastViewportLine = -1;
     private long modificationStamp;
     private volatile Alarm scrollStopAlarm = null;
 
@@ -61,7 +61,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
     /**
      * Gets the first visible line in the editor's viewport.
      *
-     * @return The first visible line number.
+     * @return The first visible line number, or -1 if not yet initialized.
      */
     public int getFirstViewportLine() {
         return firstViewportLine;
@@ -70,10 +70,19 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
     /**
      * Gets the last visible line in the editor's viewport.
      *
-     * @return The last visible line number.
+     * @return The last visible line number, or -1 if not yet initialized.
      */
     public int getLastViewportLine() {
         return lastViewportLine;
+    }
+
+    /**
+     * Checks if the viewport has been initialized.
+     *
+     * @return true if viewport lines have been set, false otherwise.
+     */
+    public boolean isViewportInitialized() {
+        return firstViewportLine != -1;
     }
 
     /**
@@ -136,8 +145,14 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
      * @return true if the file content has changed and false otherwise.
      */
     public boolean hasFileChanged(@NotNull PsiFile file) {
-        if (modificationStamp != file.getModificationStamp()) {
-            modificationStamp = file.getModificationStamp();
+        long currentStamp = file.getModificationStamp();
+        if (modificationStamp == 0) {
+            // First time initialization - don't consider this as a change
+            modificationStamp = currentStamp;
+            return false;
+        }
+        if (modificationStamp != currentStamp) {
+            modificationStamp = currentStamp;
             return true;
         }
         return false;
