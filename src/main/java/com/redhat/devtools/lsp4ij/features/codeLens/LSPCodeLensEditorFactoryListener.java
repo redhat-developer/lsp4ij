@@ -76,6 +76,10 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
     }
 
     private static void updateViewportLinesAndRefreshCodeVision(@NotNull CodeLensDataResult result, LSPCodeLensSupport codeLensSupport, UnresolvedCodeLensViewportContext context) {
+        if (!context.isViewportInitialized()) {
+            // Viewport not initialized yet, cannot determine what to resolve
+            return;
+        }
         if (!result.hasToResolve(context.getFirstViewportLine(), context.getLastViewportLine())) {
             // No codelens to resolve to the current viewport
             return;
@@ -124,9 +128,23 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
     private void attachScrollListener(@NotNull Editor editor) {
         // Initialize context
         final var context = getCodeLensResolveContext(editor);
+
         // Adding a listener for visible area changes
         editor.getScrollingModel().addVisibleAreaListener((e) -> {
             Rectangle newRect = e.getNewRectangle();
+
+            // Initialize viewport on first event (when editor is fully rendered)
+            if (!context.isViewportInitialized() && newRect.width > 0 && newRect.height > 0) {
+                // First time - initialize viewport even if it hasn't "changed"
+                // We're on EDT here, and we have a valid rectangle
+                if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+                    context.updateViewportLines(newRect);
+                } else {
+                    ReadAction.run(() -> context.updateViewportLines(newRect));
+                }
+                // Don't return - continue to process the event normally
+            }
+
             if (newRect.equals(e.getOldRectangle())) {
                 // View port range has not changed
                 return;

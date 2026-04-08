@@ -134,12 +134,21 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         // There is some codelens to resolve
                         applicableCodeLens = new ArrayList<>();
                         var resolveContext = LSPCodeLensEditorFactoryListener.getCodeLensResolveContext(editor);
+                        // Get viewport lines - if not initialized yet (viewport is updated by scroll listener on EDT),
+                        // use a default range to resolve code lenses in the first visible area
+                        int firstLine = resolveContext.getFirstViewportLine();
+                        int lastLine = resolveContext.getLastViewportLine();
+                        if (firstLine == -1) {
+                            // Viewport not yet initialized, use a reasonable default (first ~100 lines)
+                            firstLine = 0;
+                            lastLine = 100;
+                        }
                         // Get the codelens to resolve which are inside the view port range (visible lines)
                         @Nullable CompletableFuture<Void> visibleCodeLensToResolve =
                                 collectApplicableCodeLens(codelensData,
                                         applicableCodeLens,
-                                        resolveContext.getFirstViewportLine(),
-                                        resolveContext.getLastViewportLine());
+                                        firstLine,
+                                        lastLine);
                         if (visibleCodeLensToResolve != null) {
                             // Resolve all visible code lens
                             try {
