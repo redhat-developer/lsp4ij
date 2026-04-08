@@ -24,10 +24,7 @@ import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.execution.ui.RunContentManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.xdebugger.XDebugProcess;
-import com.intellij.xdebugger.XDebugProcessStarter;
-import com.intellij.xdebugger.XDebugSession;
-import com.intellij.xdebugger.XDebuggerManager;
+import com.intellij.xdebugger.*;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationBase;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
@@ -51,6 +48,15 @@ public class DAPDebugRunner extends AsyncProgramRunner<RunnerSettings> {
 
     // Unique ID for this runner
     private static final String RUNNER_ID = "DAPDebugRunner";
+
+    // Cache for API detection (null = not yet checked, true = new API available, false = old API only)
+    private static volatile Boolean useNewDebuggerApi = null;
+
+    // Cached reflection methods for new debugger API (2026.1+) - initialized once for performance
+    private static java.lang.reflect.Method newSessionBuilderMethod = null;
+    private static java.lang.reflect.Method environmentMethod = null;
+    private static java.lang.reflect.Method startSessionMethod = null;
+    private static java.lang.reflect.Method getRunContentDescriptorMethod = null;
 
     @Override
     public @NotNull String getRunnerId() {
@@ -142,18 +148,77 @@ public class DAPDebugRunner extends AsyncProgramRunner<RunnerSettings> {
     }
 
     /**
+     * Detects which debugger API is available and caches the result along with reflection methods.
+     *
+     * @return true if new API (2026.1+) is available, false otherwise
+     */
+    private static boolean isNewDebuggerApiAvailable() {
+        if (useNewDebuggerApi == null) {
+            synchronized (DAPDebugRunner.class) {
+                if (useNewDebuggerApi == null) {
+                    try {
+                        // Check if newSessionBuilder method exists (2026.1+) and cache all required methods
+                        newSessionBuilderMethod = XDebuggerManager.class.getMethod("newSessionBuilder", XDebugProcessStarter.class);
+
+                        // Cache the builder methods by inspecting the return type
+                        Class<?> builderClass = newSessionBuilderMethod.getReturnType();
+                        environmentMethod = builderClass.getMethod("environment", ExecutionEnvironment.class);
+                        startSessionMethod = builderClass.getMethod("startSession");
+
+                        // Cache the result method
+                        Class<?> resultClass = startSessionMethod.getReturnType();
+                        getRunContentDescriptorMethod = resultClass.getMethod("getRunContentDescriptor");
+
+                        useNewDebuggerApi = true;
+                    } catch (NoSuchMethodException e) {
+                        useNewDebuggerApi = false;
+                    }
+                }
+            }
+        }
+        return useNewDebuggerApi;
+    }
+
+    /**
      * Launches the actual debug session using the IntelliJ XDebugger infrastructure.
+     *
+     * Uses cached reflection to support both old and new debugger APIs:
+     * - 2026.1+: newSessionBuilder() + XSessionStartedResult (no warnings)
+     * - 2024.2-2025.3: startSession() + getRunContentDescriptor() (legacy API)
+     *
+     * @see <a href="https://blog.jetbrains.com/platform/2026/01/platform-debugger-architecture-redesign-for-remote-development-in-2026-1/">Debugger Architecture Redesign</a>
      */
     private @NotNull RunContentDescriptor doExecute(@NotNull ExecutionEnvironment env, DAPCommandLineState dapState)
             throws ExecutionException {
-        return XDebuggerManager.getInstance(env.getProject())
-                .startSession(env, new XDebugProcessStarter() {
-                    @Override
-                    public @NotNull XDebugProcess start(@NotNull XDebugSession session) throws ExecutionException {
-                        ExecutionResult result = dapState.execute(env.getExecutor(), DAPDebugRunner.this);
-                        boolean debugMode = DEBUG_EXECUTOR_ID.equals(env.getExecutor().getId());
-                        return new DAPDebugProcess(dapState, session, result, debugMode);
-                    }
-                }).getRunContentDescriptor();
+        XDebuggerManager manager = XDebuggerManager.getInstance(env.getProject());
+        XDebugProcessStarter starter = new XDebugProcessStarter() {
+            @Override
+            public @NotNull XDebugProcess start(@NotNull XDebugSession session) throws ExecutionException {
+                ExecutionResult result = dapState.execute(env.getExecutor(), DAPDebugRunner.this);
+                boolean debugMode = DEBUG_EXECUTOR_ID.equals(env.getExecutor().getId());
+                return new DAPDebugProcess(dapState, session, result, debugMode);
+            }
+        };
+
+        if (isNewDebuggerApiAvailable()) {
+            // Use new API (2026.1+) via cached reflection methods
+            try {
+                // newSessionBuilder(starter)
+                var builder = newSessionBuilderMethod.invoke(manager, starter);
+                // .environment(env)
+                builder = environmentMethod.invoke(builder, env);
+                // .startSession()
+                var sessionResult = startSessionMethod.invoke(builder);
+                // .getRunContentDescriptor()
+                return (RunContentDescriptor) getRunContentDescriptorMethod.invoke(sessionResult);
+            } catch (Exception e) {
+                throw new ExecutionException("Failed to start debug session using new API", e);
+            }
+        } else {
+            // Use old API for versions < 2026.1
+            @SuppressWarnings("deprecation")
+            XDebugSession session = manager.startSession(env, starter);
+            return session.getRunContentDescriptor();
+        }
     }
 }
