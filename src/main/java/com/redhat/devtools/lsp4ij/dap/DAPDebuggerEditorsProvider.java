@@ -14,6 +14,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.impl.DocumentImpl;
 import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.LanguageFileType;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
@@ -66,6 +67,13 @@ public class DAPDebuggerEditorsProvider extends XDebuggerEditorsProviderBase {
             // Get file type / language of the file which is debugging when debugger is suspended.
             fileType = file.getFileType();
             language = file.getLanguage();
+            // If the file's language is a more specific dialect of the file type's language, degrade to the file type's
+            if (fileType instanceof LanguageFileType languageFileType) {
+                Language fileTypeLanguage = languageFileType.getLanguage();
+                if (!language.is(fileTypeLanguage) && language.isKindOf(fileTypeLanguage)) {
+                    language = fileTypeLanguage;
+                }
+            }
         }
         return createExpressionCodeFragment(project, text, fileType, language);
     }
