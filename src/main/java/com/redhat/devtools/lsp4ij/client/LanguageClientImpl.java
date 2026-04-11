@@ -209,6 +209,11 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     @Override
+    public CompletableFuture<Void> refreshInlineValues() {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
     public CompletableFuture<Void> refreshDiagnostics() {
         return CompletableFuture.runAsync(this::refreshDiagnosticsForAllOpenedFiles);
     }
