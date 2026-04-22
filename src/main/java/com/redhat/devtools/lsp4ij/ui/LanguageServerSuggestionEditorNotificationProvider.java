@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.ui;
 
 import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -138,9 +139,11 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
                 NewLanguageServerDialog dialog = new NewLanguageServerDialog(project);
                 dialog.loadFromTemplate(template);
                 dialog.show();
-                // Refresh notifications to hide it
-                EditorNotifications.getInstance(project)
-                        .updateAllNotifications();
+                // Refresh notifications to hide it (deferred to avoid race condition)
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    EditorNotifications.getInstance(project)
+                            .updateAllNotifications();
+                });
             });
         });
 
@@ -148,9 +151,11 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
         panel.createActionLabel(LanguageServerBundle.message("language.server.suggest.install.dismiss"), () -> {
             // Store preference to disable future notifications
             PropertiesComponent.getInstance().setValue(DISABLE_KEY, true);
-            // Refresh notifications to hide the panel
-            EditorNotifications.getInstance(project)
-                    .updateAllNotifications();
+            // Refresh notifications to hide the panel (deferred to avoid race condition)
+            ApplicationManager.getApplication().invokeLater(() -> {
+                EditorNotifications.getInstance(project)
+                        .updateAllNotifications();
+            });
         });
 
         return panel;
