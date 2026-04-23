@@ -435,6 +435,7 @@
         <externalAnnotator
                 id="LSPDiagnosticAnnotator"
                 language=""
+                applyExternalAnnotatorsWhenInactive="true"
                 implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
         <localInspection id="LSPLocalInspectionTool"
                          language=""
@@ -465,6 +466,7 @@
         <externalAnnotator
                 id="LSPDocumentLinkAnnotator"
                 language=""
+                applyExternalAnnotatorsWhenInactive="true"
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkAnnotator"/>
         <gotoDeclarationHandler
                 id="LSPDocumentLinkGotoDeclarationHandler"
