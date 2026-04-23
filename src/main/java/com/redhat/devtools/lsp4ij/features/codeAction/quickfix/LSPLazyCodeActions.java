@@ -197,4 +197,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     public void cancel() {
         CancellationSupport.cancel(lspCodeActionRequest);
     }
+
+    @Override
+    public void clear() {
+        cancel();
+        lspCodeActionRequest = null;
+    }
 }
