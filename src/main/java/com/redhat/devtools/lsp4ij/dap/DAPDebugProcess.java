@@ -35,6 +35,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
+import com.intellij.xdebugger.stepping.XSmartStepIntoHandler;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
@@ -47,6 +48,8 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPSmartStepIntoHandler;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -85,6 +88,9 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull DisassemblyBreakpointHandlerBase<?> disassemblyBreakpointHandler;
     private final @NotNull DAPAlternativeSourceHandler alternativeSourceHandler;
     private final long sessionId;
+
+    // Smart Step Into
+    private DAPSmartStepIntoHandler smartStepIntoHandler;
 
     private @Nullable CompletableFuture<Void> connectToServerFuture;
     private Status status;
@@ -315,6 +321,14 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 client.stepIn(threadId, granularity);
             }
         }
+    }
+
+    @Override
+    public @Nullable XSmartStepIntoHandler<DAPStepIntoVariant> getSmartStepIntoHandler() {
+        if (smartStepIntoHandler == null) {
+            smartStepIntoHandler = new DAPSmartStepIntoHandler(getSession());
+        }
+        return smartStepIntoHandler;
     }
 
     private @Nullable SteppingGranularity getSteppingGranularity(@NotNull DAPClient client) {
