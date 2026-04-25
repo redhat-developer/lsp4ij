@@ -563,13 +563,27 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     public void stepIn(int threadId, SteppingGranularity granularity) {
+        stepIn(threadId, null, granularity);
+    }
+
+    public void stepIn(int threadId, @Nullable Integer targetId, @Nullable SteppingGranularity granularity) {
         if (debugProtocolServer == null) {
             return;
         }
         StepInArguments args = new StepInArguments();
         args.setThreadId(threadId);
+        args.setTargetId(targetId);
         args.setGranularity(granularity);
         debugProtocolServer.stepIn(args);
+    }
+
+    public CompletableFuture<StepInTargetsResponse> stepInTargets(int frameId) {
+        if (debugProtocolServer == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        StepInTargetsArguments args = new StepInTargetsArguments();
+        args.setFrameId(frameId);
+        return debugProtocolServer.stepInTargets(args);
     }
 
     public CompletableFuture<EvaluateResponse> evaluate(@NotNull String expression,
@@ -678,6 +692,15 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     public boolean isSupportsEvaluateForHovers() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsEvaluateForHovers());
+    }
+
+    /**
+     * Returns true if the debug adapter supports the 'stepInTargets' request and false otherwise.
+     *
+     * @return true if the debug adapter supports the 'stepInTargets' request and false otherwise.
+     */
+    public boolean isSupportsStepInTargetsRequest() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsStepInTargetsRequest());
     }
 
     public boolean canDisassemble() {

@@ -83,6 +83,34 @@ Take a sample JavaScript file containing an error:
 In this example, no breakpoints are defined. 
 However, when you start the DAP server, it stops at the line with the line error:
 
+###  Smart Step Into
+
+[Smart Step Into](https://www.jetbrains.com/help/idea/stepping-through-the-program.html#smart-step-into) is available
+if the DAP server supports [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets).
+
+When you're stopped at a breakpoint on a line with multiple function calls, press **Shift+F7** (or select **Smart Step Into** from the debug menu).
+A popup will appear showing all available functions you can step into. 
+Use the arrow keys to navigate between functions, and press **Enter** to step into the selected one.
+You can also click directly on a function name in the editor.
+
+For example, on this line:
+```python
+result = multiply(add(x, y), subtract(x, y))
+```
+
+Smart Step Into will let you choose between `multiply`, `add`, and `subtract`.
+
+The feature also handles duplicate function names on the same line correctly. For instance:
+```python
+result = add(1, 2) + add(3, 4)
+```
+
+Each `add` call will be highlighted separately, allowing you to step into the specific occurrence you want.
+
+Here's a demo with [Python Debugpy](./user-defined-dap/python-debugpy.md) which supports [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets):
+
+![DAP Smart Step Into](./images/DAP_SmartStepIntoDemo.gif)
+
 ![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample_stop.png)
 
 This happens because `Caught Exceptions` is selected.

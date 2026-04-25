@@ -64,7 +64,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [StackTrace](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StackTrace).
 * ❌ [StepBack](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepBack).
 * ✅ [StepIn](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepIn).
-* ❌ [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets).
+* ✅ [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets).
 * ✅ [StepOut](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepOut).
 * ✅ [Terminate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Terminate).
 * ❌ [TerminateThreads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_TerminateThreads).
