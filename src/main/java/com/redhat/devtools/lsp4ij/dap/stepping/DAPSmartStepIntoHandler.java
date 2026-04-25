@@ -203,6 +203,13 @@ public class DAPSmartStepIntoHandler extends XSmartStepIntoHandler<DAPStepIntoVa
 
     @Override
     public @Nullable String getPopupTitle(@NotNull XSourcePosition position) {
+        return getPopupTitle();
+    }
+
+    //@Override
+    public @Nullable String getPopupTitle() {
+        // In 2026.1 this method must be implemented
+        // See https://github.com/JetBrains/intellij-community/blob/f2a2af473deafff16e900aa725b60c8fb0712039/platform/xdebugger-api/src/com/intellij/xdebugger/stepping/XSmartStepIntoHandler.java#L79
         return "Choose Method to Step Into";
     }
 
