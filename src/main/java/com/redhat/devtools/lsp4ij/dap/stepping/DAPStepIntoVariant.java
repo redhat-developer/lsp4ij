@@ -59,25 +59,39 @@ public class DAPStepIntoVariant extends XSmartStepIntoVariant {
 
         if (document != null && line != null && column != null) {
             // DAP uses 1-based line numbers
-            int oneBasedLine = line;
-            int lineNumber = oneBasedLine - 1;
+            int startLineNumber = line - 1;
 
-            if (lineNumber >= 0 && lineNumber < document.getLineCount()) {
-                int lineStartOffset = document.getLineStartOffset(lineNumber);
-                int lineEndOffset = document.getLineEndOffset(lineNumber);
+            if (startLineNumber >= 0 && startLineNumber < document.getLineCount()) {
+                int lineStartOffset = document.getLineStartOffset(startLineNumber);
 
                 // Column is 1-based, convert to offset
                 int columnOffset = column - 1;
                 if (columnOffset >= 0) {
                     int startOffset = lineStartOffset + columnOffset;
 
-                    // Try to use endColumn if provided for precise range
+                    // Calculate end offset using endLine and endColumn if provided
+                    Integer endLine = target.getEndLine();
                     Integer endColumn = target.getEndColumn();
                     int endOffset;
-                    if (endColumn != null && endColumn > column) {
+
+                    if (endLine != null && endColumn != null) {
+                        // Multi-line or precise single-line range
+                        int endLineNumber = endLine - 1;
+                        if (endLineNumber >= 0 && endLineNumber < document.getLineCount()) {
+                            int endLineStartOffset = document.getLineStartOffset(endLineNumber);
+                            endOffset = endLineStartOffset + (endColumn - 1);
+                        } else {
+                            // Fallback if endLine is invalid
+                            int lineEndOffset = document.getLineEndOffset(startLineNumber);
+                            endOffset = Math.min(startOffset + 20, lineEndOffset);
+                        }
+                    } else if (endColumn != null && endColumn > column) {
+                        // Same line, use endColumn
+                        int lineEndOffset = document.getLineEndOffset(startLineNumber);
                         endOffset = Math.min(lineStartOffset + (endColumn - 1), lineEndOffset);
                     } else {
-                        // Highlight the function name (estimate ~20 chars or to end of line)
+                        // No end info, estimate function name length
+                        int lineEndOffset = document.getLineEndOffset(startLineNumber);
                         endOffset = Math.min(startOffset + 20, lineEndOffset);
                     }
 
