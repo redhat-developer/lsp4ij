@@ -916,11 +916,21 @@ public class LSPIJUtils {
     }
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit) {
-        applyWorkspaceEdit(edit, null);
+        applyWorkspaceEdit(edit, false);
+    }
+
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit, boolean saveDocument) {
+        applyWorkspaceEdit(edit, null, saveDocument);
     }
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
                                           @Nullable String label) {
+        applyWorkspaceEdit(edit, label, false);
+    }
+
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                          @Nullable String label,
+                                          boolean saveDocument) {
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -929,13 +939,13 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyEdits(null, document, textDocumentEdit.getEdits(), false);
+                            applyEdits(null, document, textDocumentEdit.getEdits(), saveDocument);
                         }
                     }
                 } else if (change.isRight()) {
                     ResourceOperation resourceOperation = change.getRight();
                     if (resourceOperation instanceof CreateFile createFile) {
-                        applyCreateFile(createFile);
+                        applyCreateFile(createFile, saveDocument);
                     } else if (resourceOperation instanceof DeleteFile deleteFile) {
                         applyDeleteFile(deleteFile);
                     } else if (resourceOperation instanceof RenameFile renameFile) {
@@ -957,21 +967,21 @@ public class LSPIJUtils {
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
-                        applyEdits(null, document, change.getValue(), false);
+                        applyEdits(null, document, change.getValue(), saveDocument);
                     }
                 }
             }
         }
     }
 
-    private static void applyCreateFile(CreateFile createFile) {
+    private static void applyCreateFile(CreateFile createFile, boolean saveDocument) {
         VirtualFile targetFile = findResourceFor(createFile.getUri());
         if (targetFile != null && createFile.getOptions() != null) {
             if (!createFile.getOptions().getIgnoreIfExists()) {
                 Document document = getDocument(targetFile);
                 if (document != null) {
                     TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
-                    applyEdits(null, document, Collections.singletonList(textEdit), false);
+                    applyEdits(null, document, Collections.singletonList(textEdit), saveDocument);
                 }
             }
         } else {
