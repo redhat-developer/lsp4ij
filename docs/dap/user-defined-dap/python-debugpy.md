@@ -13,7 +13,7 @@ if __name__ == "__main__":
     main()
 ```
 
-![Set Breakpoint](../images/python-debugpy/set_breakpoint.png)
+![Breakpoint hit](../images/python-debugpy/breakpoint_hit.png)
 
 ## Configure DAP server
 
@@ -105,9 +105,15 @@ in the IntelliJ console. Read [Python debugging in VS Code](https://code.visuals
 ## Set Breakpoint
 
 After applying the run configuration, you should set a breakpoint to files which matches file mappings.
-Set a breakpoint in the `test.py` file:
+Setting a breakpoint requires two steps due to the default Python Line Breakpoint type provided by PyCharm:
 
-![Set Breakpoint](../images/python-debugpy/set_breakpoint.png)
+Step 1: Click on the line number in the gutter where you want the breakpoint to set a Python Breakpoint
+![Set Breakpoint Step 1](../images/python-debugpy/set_breakpoint_step_1.png)
+
+Step 2: Click on the faded red dot next to the code on the same line to create a **DAP Breakpoint**
+![Set Breakpoint Step 2](../images/python-debugpy/set_breakpoint_step_2.png)
+
+Please note that if you only set the Python Breakpoint (step 1), then the breakpoint will not be hit. You must complete both steps.
 
 ## Start Python program in a Terminal
 
