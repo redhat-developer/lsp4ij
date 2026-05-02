@@ -158,9 +158,19 @@ public class CancellationSupport implements CancelChecker {
                     // - Caused by: java.util.concurrent.CancellationException
                     //	at java.base/java.util.concurrent.CompletableFuture.cancel(CompletableFuture.java:2478)
                     // To fix those issues, we ignore CancellationException in this case.
+                    // Note: ProcessCanceledException extends CancellationException, so it's also caught here
+                    return null;
+                }
+                // Check if the error is a CompletionException wrapping a CancellationException (including ProcessCanceledException)
+                if (error instanceof CompletionException && error.getCause() instanceof CancellationException) {
+                    // Same as above, but for wrapped cancellation exceptions
                     return null;
                 }
                 if (error instanceof MessageIssueException) {
+                    return null;
+                }
+                // Check if the error is a CompletionException wrapping a MessageIssueException
+                if (error instanceof CompletionException && error.getCause() instanceof MessageIssueException) {
                     return null;
                 }
                 if (error instanceof RuntimeException) {
