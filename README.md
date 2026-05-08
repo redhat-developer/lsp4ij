@@ -100,6 +100,7 @@ Here are some projects that use LSP4IJ:
  * [OPA IDEA Plugin](https://github.com/open-policy-agent/opa-idea-plugin)
  * [aer Local Apex Debugger](https://www.octoberswimmer.com/tools/aer/docs/intellij-debugging/)
  * [Rider Unreal Angelscript](https://github.com/scriptacus/rider-unreal-angelscript)
+ * [agnix](https://github.com/agent-sh/agnix)
 
 ## Requirements
 
