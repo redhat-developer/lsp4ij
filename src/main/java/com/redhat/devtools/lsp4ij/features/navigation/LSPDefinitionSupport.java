@@ -85,7 +85,7 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
         updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .definition(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
+                        .definition(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DEFINITION)
                 .thenApplyAsync(locations -> LSPIJUtils.getLocations(locations, languageServer));
     }
 }
