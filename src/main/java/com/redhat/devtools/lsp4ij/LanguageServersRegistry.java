@@ -15,9 +15,14 @@ import com.intellij.codeInsight.hints.declarative.InlayProviderInfo;
 import com.intellij.lang.Language;
 import com.intellij.lang.findUsages.EmptyFindUsagesProvider;
 import com.intellij.lang.findUsages.LanguageFindUsages;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.extensions.ExtensionPointListener;
+import com.intellij.openapi.extensions.ExtensionPointName;
+import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.fileTypes.*;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -42,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
@@ -51,7 +57,7 @@ import static com.redhat.devtools.lsp4ij.templates.ServerMappingSettings.toServe
 /**
  * Language servers registry.
  */
-public class LanguageServersRegistry {
+public class LanguageServersRegistry implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServersRegistry.class);
 
     public static LanguageServersRegistry getInstance() {
@@ -60,23 +66,30 @@ public class LanguageServersRegistry {
 
     private @Nullable Set<Language> supportedLanguages;
 
-    private final Map<String, LanguageServerDefinition> serverDefinitions = new HashMap<>();
+    // Concurrent: mutated by EP listener callbacks on any thread; read from many call sites.
+    private final Map<String, LanguageServerDefinition> serverDefinitions = new ConcurrentHashMap<>();
 
-    private final List<LanguageServerFileAssociation> fileAssociations = new ArrayList<>();
+    private final List<LanguageServerFileAssociation> fileAssociations = new CopyOnWriteArrayList<>();
 
     private final Map<String /* languageId (ex : typescript) */,
-            List<String> /* file extensions (ex : ts) */> languageIdFileExtensionsCache = new HashMap<>();
+            List<String> /* file extensions (ex : ts) */> languageIdFileExtensionsCache = new ConcurrentHashMap<>();
 
     private final Collection<LanguageServerDefinitionListener> listeners = new CopyOnWriteArrayList<>();
 
-    private final Map<String, List<InlayProviderInfo>> declarativeInlayHintsProviders = new HashMap<>();
+    // Volatile + replaced wholesale so readers never see a half-rebuilt state.
+    private volatile Map<String, List<InlayProviderInfo>> declarativeInlayHintsProviders = Map.of();
 
-    private final List<ProviderInfo<?>> inlayHintsProviders = new ArrayList<>();
+    private volatile List<ProviderInfo<?>> inlayHintsProviders = List.of();
 
-    private final Set<Language> customLanguageFindUsages = new HashSet<>();
+    private final Set<Language> customLanguageFindUsages = ConcurrentHashMap.newKeySet();
+
+    // Tracks our registrations with the platform-side LanguageFindUsages so we can unregister
+    // them; otherwise the platform retains a hard ref to the contributing plugin's Language.
+    private final Map<Language, LSPFindUsagesProvider> registeredFindUsagesProviders = new ConcurrentHashMap<>();
 
     private LanguageServersRegistry() {
         initialize();
+        registerExtensionPointListeners();
     }
 
     private void initialize() {
@@ -86,6 +99,62 @@ public class LanguageServersRegistry {
         // Load language servers / mappings from user settings
         loadServersAndMappingFromSettings();
         updateLanguages();
+    }
+
+    private void registerExtensionPointListeners() {
+        registerEpListener(ServerExtensionPointBean.EP_NAME,
+                this::handleServerExtensionAdded,
+                this::handleServerExtensionRemoved);
+        registerEpListener(LanguageMappingExtensionPointBean.EP_NAME,
+                this::handleLanguageMappingAdded,
+                this::handleLanguageMappingRemoved);
+        registerEpListener(FileTypeMappingExtensionPointBean.EP_NAME,
+                this::handleFileTypeMappingAdded,
+                this::handleFileTypeMappingRemoved);
+        registerEpListener(FileNamePatternMappingExtensionPointBean.EP_NAME,
+                this::handleFileNamePatternMappingAdded,
+                this::handleFileNamePatternMappingRemoved);
+        registerEpListener(SemanticTokensColorsProviderExtensionPointBean.EP_NAME,
+                this::handleSemanticTokensColorsProviderAdded,
+                this::handleSemanticTokensColorsProviderRemoved);
+    }
+
+    private <T> void registerEpListener(@NotNull ExtensionPointName<T> epName,
+                                        @NotNull java.util.function.Consumer<T> onAdded,
+                                        @NotNull java.util.function.Consumer<T> onRemoved) {
+        epName.getPoint().addExtensionPointListener(new ExtensionPointListener<T>() {
+            @Override
+            public void extensionAdded(@NotNull T extension, @NotNull PluginDescriptor pluginDescriptor) {
+                try {
+                    onAdded.accept(extension);
+                } catch (Exception e) {
+                    LOGGER.error("Error while handling extensionAdded for {}", epName.getName(), e);
+                }
+            }
+
+            @Override
+            public void extensionRemoved(@NotNull T extension, @NotNull PluginDescriptor pluginDescriptor) {
+                try {
+                    onRemoved.accept(extension);
+                } catch (Exception e) {
+                    LOGGER.error("Error while handling extensionRemoved for {}", epName.getName(), e);
+                }
+            }
+        }, /* invokeForLoadedExtensions */ false, /* parentDisposable */ this);
+    }
+
+    @Override
+    public void dispose() {
+        // Undo platform-side LanguageFindUsages registrations: on lsp4ij's own unload, no
+        // updateLanguages() call would otherwise prune them.
+        for (var entry : registeredFindUsagesProviders.entrySet()) {
+            try {
+                LanguageFindUsages.INSTANCE.removeExplicitExtension(entry.getKey(), entry.getValue());
+            } catch (Exception e) {
+                LOGGER.warn("Error while unregistering LSPFindUsagesProvider for language '{}'", entry.getKey().getID(), e);
+            }
+        }
+        registeredFindUsagesProviders.clear();
     }
 
     private void loadServersAndMappingsFromExtensionPoint() {
@@ -335,32 +404,47 @@ public class LanguageServersRegistry {
 
     private void updateDeclarativeInlayHintsProviders(Set<Language> distinctLanguages) {
         LSPInlayHintsProvider lspInlayHintsProvider = new LSPInlayHintsProvider();
-        declarativeInlayHintsProviders.clear();
+        Map<String, List<InlayProviderInfo>> next = new HashMap<>();
         for (Language language : distinctLanguages) {
             List<InlayProviderInfo> hints = new ArrayList<>();
             hints.add(new InlayProviderInfo(lspInlayHintsProvider, LSPInlayHintsProvider.PROVIDER_ID, Collections.emptySet(), true, LanguageServerBundle.message("lsp.hints.declarative.provider.name")));
-            declarativeInlayHintsProviders.put(language.getID(), hints);
+            next.put(language.getID(), hints);
         }
+        declarativeInlayHintsProviders = Map.copyOf(next);
     }
 
     private void updateInlayHintsProviders(Set<Language> distinctLanguages) {
         LSPColorProvider lspColorProvider = new LSPColorProvider();
-        inlayHintsProviders.clear();
+        List<ProviderInfo<?>> next = new ArrayList<>(distinctLanguages.size());
         for (Language language : distinctLanguages) {
-            inlayHintsProviders.add(new ProviderInfo<>(language, lspColorProvider));
+            next.add(new ProviderInfo<>(language, lspColorProvider));
         }
+        inlayHintsProviders = List.copyOf(next);
     }
 
     private void updateFindUsagesProvider(Set<Language> distinctLanguages) {
         customLanguageFindUsages.clear();
-        // Associate the LSP find usage provider
-        // for all languages associated with a language server.
-        // and which does not already define a provider for the language.
+        // Drop platform registrations for languages no longer backed by any LSP server; otherwise
+        // LanguageFindUsages keeps a hard ref to the unloading plugin's Language.
+        var staleEntries = new ArrayList<Map.Entry<Language, LSPFindUsagesProvider>>();
+        for (var entry : registeredFindUsagesProviders.entrySet()) {
+            if (!distinctLanguages.contains(entry.getKey())) {
+                staleEntries.add(entry);
+            }
+        }
+        for (var entry : staleEntries) {
+            LanguageFindUsages.INSTANCE.removeExplicitExtension(entry.getKey(), entry.getValue());
+            registeredFindUsagesProviders.remove(entry.getKey());
+        }
         LSPFindUsagesProvider provider = new LSPFindUsagesProvider();
         for (Language language : distinctLanguages) {
+            if (registeredFindUsagesProviders.containsKey(language)) {
+                continue;
+            }
             var existingProviders = LanguageFindUsages.INSTANCE.allForLanguage(language);
             if (existingProviders.isEmpty() || (existingProviders.size() == 1 && existingProviders.get(0) instanceof EmptyFindUsagesProvider)) {
                 LanguageFindUsages.INSTANCE.addExplicitExtension(language, provider);
+                registeredFindUsagesProviders.put(language, provider);
             } else {
                 customLanguageFindUsages.add(language);
             }
@@ -582,6 +666,273 @@ public class LanguageServersRegistry {
                 .toList();
         fileAssociations.removeAll(mappingsToRemove);
         definition.removeAssociations();
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Dynamic extension point handlers.
+    // Invoked by the platform when a plugin contributing one of the LSP extension points is
+    // loaded or unloaded at runtime. They keep the registry in sync without an IDE restart.
+    // ---------------------------------------------------------------------------------------
+
+    private void handleServerExtensionAdded(@NotNull ServerExtensionPointBean ext) {
+        String serverId = ext.id;
+        if (serverId == null || serverId.isEmpty()) {
+            return;
+        }
+        if (serverDefinitions.containsKey(serverId)) {
+            return;
+        }
+        var serverDefinition = new ExtensionLanguageServerDefinition(ext);
+        for (var stExt : SemanticTokensColorsProviderExtensionPointBean.EP_NAME.getExtensions()) {
+            if (serverId.equals(stExt.serverId)) {
+                try {
+                    serverDefinition.setSemanticTokensColorsProvider(stExt.getSemanticTokensColorsProvider());
+                } catch (Exception e) {
+                    LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='{}'.", serverId, e);
+                }
+                break;
+            }
+        }
+        List<ServerMapping> mappings = collectMappingsFromExtensionPoints(serverId);
+        addServerDefinitionWithoutNotification(serverDefinition, mappings, false);
+        updateLanguages();
+        notifyServerAdded(Collections.singleton(serverDefinition));
+    }
+
+    private void handleServerExtensionRemoved(@NotNull ServerExtensionPointBean ext) {
+        String serverId = ext.id;
+        if (serverId == null || serverId.isEmpty()) {
+            return;
+        }
+        LanguageServerDefinition definition = serverDefinitions.remove(serverId);
+        if (definition == null) {
+            return;
+        }
+        removeAssociationsFor(definition);
+        updateLanguages();
+        notifyServerRemoved(Collections.singleton(definition));
+    }
+
+    private void handleLanguageMappingAdded(@NotNull LanguageMappingExtensionPointBean ext) {
+        Language language = Language.findLanguageByID(ext.language);
+        if (language == null) {
+            return;
+        }
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            // Mapping will be picked up later via collectMappingsFromExtensionPoints when the server arrives.
+            return;
+        }
+        var mapping = new ServerLanguageMapping(language, ext.serverId, ext.languageId, ext.getDocumentMatcher());
+        registerAssociation(definition, mapping);
+        updateLanguages();
+        notifyMappingsChanged(definition);
+    }
+
+    private void handleLanguageMappingRemoved(@NotNull LanguageMappingExtensionPointBean ext) {
+        Language language = Language.findLanguageByID(ext.language);
+        if (language == null) {
+            return;
+        }
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            return;
+        }
+        boolean removed = fileAssociations.removeIf(association ->
+                definition.equals(association.getServerDefinition())
+                        && language.equals(association.getLanguage()));
+        if (removed) {
+            // Drop the per-language ref inside the def too — otherwise it pins the plugin's Language.
+            definition.unregisterAssociation(language);
+            updateLanguages();
+            notifyMappingsChanged(definition);
+        }
+    }
+
+    private void handleFileTypeMappingAdded(@NotNull FileTypeMappingExtensionPointBean ext) {
+        FileType fileType = FileTypeManager.getInstance().findFileTypeByName(ext.fileType);
+        if (fileType == null) {
+            return;
+        }
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            return;
+        }
+        var mapping = new ServerFileTypeMapping(fileType, ext.serverId, ext.languageId, ext.getDocumentMatcher());
+        registerAssociation(definition, mapping);
+        updateLanguages();
+        notifyMappingsChanged(definition);
+    }
+
+    private void handleFileTypeMappingRemoved(@NotNull FileTypeMappingExtensionPointBean ext) {
+        FileType fileType = FileTypeManager.getInstance().findFileTypeByName(ext.fileType);
+        if (fileType == null) {
+            return;
+        }
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            return;
+        }
+        boolean removed = fileAssociations.removeIf(association ->
+                definition.equals(association.getServerDefinition())
+                        && fileType.equals(association.getFileType()));
+        if (removed) {
+            definition.unregisterAssociation(fileType);
+            updateLanguages();
+            notifyMappingsChanged(definition);
+        }
+    }
+
+    private void handleFileNamePatternMappingAdded(@NotNull FileNamePatternMappingExtensionPointBean ext) {
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            return;
+        }
+        List<String> patterns = Arrays.asList(ext.patterns.split(";"));
+        var mapping = new ServerFileNamePatternMapping(patterns, ext.serverId, ext.languageId, ext.getDocumentMatcher());
+        registerAssociation(definition, mapping);
+        updateLanguages();
+        notifyMappingsChanged(definition);
+    }
+
+    private void handleFileNamePatternMappingRemoved(@NotNull FileNamePatternMappingExtensionPointBean ext) {
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            return;
+        }
+        List<String> patterns = Arrays.asList(ext.patterns.split(";"));
+        // Set equality (not anyMatch on individual patterns) so overlapping pattern sets don't co-remove.
+        Set<String> targetPatternSet = Set.copyOf(patterns);
+        boolean removed = fileAssociations.removeIf(association -> {
+            if (!definition.equals(association.getServerDefinition())) return false;
+            var matchers = association.getFileNameMatchers();
+            if (matchers == null) return false;
+            Set<String> associationPatterns = matchers.stream()
+                    .map(FileNameMatcher::getPresentableString)
+                    .collect(Collectors.toUnmodifiableSet());
+            return associationPatterns.equals(targetPatternSet);
+        });
+        if (removed) {
+            definition.unregisterFileNamePatternAssociation(targetPatternSet, ext.languageId);
+            if (ext.languageId != null) {
+                List<String> languageExtensions = languageIdFileExtensionsCache.get(ext.languageId);
+                if (languageExtensions != null) {
+                    List<String> extensions = patterns.stream()
+                            .map(p -> {
+                                int idx = p.indexOf('.');
+                                return idx != -1 ? p.substring(idx + 1) : p;
+                            })
+                            .toList();
+                    languageExtensions.removeAll(extensions);
+                    if (languageExtensions.isEmpty()) {
+                        languageIdFileExtensionsCache.remove(ext.languageId);
+                    }
+                }
+            }
+            updateLanguages();
+            notifyMappingsChanged(definition);
+        }
+    }
+
+    private void handleSemanticTokensColorsProviderAdded(@NotNull SemanticTokensColorsProviderExtensionPointBean ext) {
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            return;
+        }
+        try {
+            definition.setSemanticTokensColorsProvider(ext.getSemanticTokensColorsProvider());
+        } catch (Exception e) {
+            LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='{}'.", ext.serverId, e);
+        }
+    }
+
+    private void handleSemanticTokensColorsProviderRemoved(@NotNull SemanticTokensColorsProviderExtensionPointBean ext) {
+        LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
+        if (definition == null) {
+            return;
+        }
+        // Prefer any surviving provider for this server before falling back to the default.
+        for (var stExt : SemanticTokensColorsProviderExtensionPointBean.EP_NAME.getExtensions()) {
+            if (stExt == ext) {
+                continue;
+            }
+            if (ext.serverId.equals(stExt.serverId)) {
+                try {
+                    definition.setSemanticTokensColorsProvider(stExt.getSemanticTokensColorsProvider());
+                    return;
+                } catch (Exception e) {
+                    LOGGER.warn("Error while creating custom semanticTokensColorsProvider for server id='{}'.", stExt.serverId, e);
+                }
+            }
+        }
+        definition.setSemanticTokensColorsProvider(LanguageServerDefinition.DEFAULT_SEMANTIC_TOKENS_COLORS_PROVIDER);
+    }
+
+    private @NotNull List<ServerMapping> collectMappingsFromExtensionPoints(@NotNull String serverId) {
+        List<ServerMapping> result = new ArrayList<>();
+        for (var ext : LanguageMappingExtensionPointBean.EP_NAME.getExtensions()) {
+            if (!serverId.equals(ext.serverId)) continue;
+            Language language = Language.findLanguageByID(ext.language);
+            if (language != null) {
+                result.add(new ServerLanguageMapping(language, serverId, ext.languageId, ext.getDocumentMatcher()));
+            }
+        }
+        for (var ext : FileTypeMappingExtensionPointBean.EP_NAME.getExtensions()) {
+            if (!serverId.equals(ext.serverId)) continue;
+            FileType fileType = FileTypeManager.getInstance().findFileTypeByName(ext.fileType);
+            if (fileType != null) {
+                result.add(new ServerFileTypeMapping(fileType, serverId, ext.languageId, ext.getDocumentMatcher()));
+            }
+        }
+        for (var ext : FileNamePatternMappingExtensionPointBean.EP_NAME.getExtensions()) {
+            if (!serverId.equals(ext.serverId)) continue;
+            List<String> patterns = Arrays.asList(ext.patterns.split(";"));
+            result.add(new ServerFileNamePatternMapping(patterns, serverId, ext.languageId, ext.getDocumentMatcher()));
+        }
+        return result;
+    }
+
+    private void notifyServerAdded(@NotNull Collection<LanguageServerDefinition> definitions) {
+        for (Project project : ProjectManager.getInstance().getOpenProjects()) {
+            var event = new LanguageServerDefinitionListener.LanguageServerAddedEvent(project, definitions);
+            for (LanguageServerDefinitionListener listener : this.listeners) {
+                try {
+                    listener.handleAdded(event);
+                } catch (Exception e) {
+                    LOGGER.error("Error while notifying server added", e);
+                }
+            }
+        }
+    }
+
+    private void notifyServerRemoved(@NotNull Collection<LanguageServerDefinition> definitions) {
+        for (Project project : ProjectManager.getInstance().getOpenProjects()) {
+            var event = new LanguageServerDefinitionListener.LanguageServerRemovedEvent(project, definitions);
+            for (LanguageServerDefinitionListener listener : this.listeners) {
+                try {
+                    listener.handleRemoved(event);
+                } catch (Exception e) {
+                    LOGGER.error("Error while notifying server removed", e);
+                }
+            }
+        }
+    }
+
+    private void notifyMappingsChanged(@NotNull LanguageServerDefinition definition) {
+        for (Project project : ProjectManager.getInstance().getOpenProjects()) {
+            var event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                    LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.USER,
+                    project,
+                    definition,
+                    /* nameChanged */ false,
+                    /* commandChanged */ false,
+                    /* userEnvironmentVariablesChanged */ false,
+                    /* includeSystemEnvironmentVariablesChanged */ false,
+                    /* mappingsChanged */ true,
+                    /* clientConfigurationContentChanged */ false,
+                    /* installerConfigurationContentChanged */ false);
+            handleChangeEvent(event);
+        }
     }
 
     public LanguageServerDefinitionListener.@Nullable LanguageServerChangedEvent updateServerDefinition(@NotNull UpdateServerDefinitionRequest request,

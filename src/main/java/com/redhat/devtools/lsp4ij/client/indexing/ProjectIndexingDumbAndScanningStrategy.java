@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client.indexing;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.messages.Topic;
@@ -42,7 +43,7 @@ import java.lang.reflect.Proxy;
  * </p>
  */
 @ApiStatus.Internal
-public class ProjectIndexingDumbAndScanningStrategy extends ProjectIndexingStrategyBase {
+public class ProjectIndexingDumbAndScanningStrategy extends ProjectIndexingStrategyBase implements Disposable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ProjectIndexingDumbAndScanningStrategy.class);
 
@@ -99,14 +100,17 @@ public class ProjectIndexingDumbAndScanningStrategy extends ProjectIndexingStrat
             getTopicMethod.setAccessible(true);
             Topic topicInstance = (Topic) getTopicMethod.invoke(companionInstance);
 
-            // Subscribe the proxyInstance with the topicInstance
-            //ApplicationManager.getApplication().getMessageBus().connect(ProjectIndexingActivityHistoryListener.Companion.getTOPIC(), proxyInstance)
-            ApplicationManager.getApplication().getMessageBus().connect().subscribe(topicInstance, proxyInstance);
+            // Subscribe the proxyInstance with the topicInstance.
+            ApplicationManager.getApplication().getMessageBus().connect(this).subscribe(topicInstance, proxyInstance);
 
             enabled = true;
         } catch (Exception e) {
             LOGGER.error("Error while initializing ProjectIndexingDumbAndScanningStrategy", e);
         }
+    }
+
+    @Override
+    public void dispose() {
     }
 
     private @Nullable Project getProject(Object[] args) {
