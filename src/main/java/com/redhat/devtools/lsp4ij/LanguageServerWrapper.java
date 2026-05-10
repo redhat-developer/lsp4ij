@@ -159,16 +159,33 @@ public class LanguageServerWrapper implements Disposable {
         VirtualFileManager.getInstance().addAsyncFileListener(fileListener, this);
 
         String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
+
+        // Worker threads must not inherit the plugin classloader, or they pin it and block dynamic unload.
+        var workerCtxClassLoader = ApplicationManager.class.getClassLoader();
         String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
-        this.dispatcher = Executors
-                .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(dispatcherThreadNameFormat).build());
+        this.dispatcher = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+                .setNameFormat(dispatcherThreadNameFormat)
+                .setDaemon(true)
+                .setThreadFactory(r -> {
+                    var t = new Thread(r);
+                    t.setContextClassLoader(workerCtxClassLoader);
+                    return t;
+                })
+                .build());
 
         // Executor service passed through to the LSP4j layer when we attempt to start the LS. It will be used
         // to create a listener that sits on the input stream and processes inbound messages (responses, or server-initiated
         // requests).
         String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
-        this.listener = Executors
-                .newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(listenerThreadNameFormat).build());
+        this.listener = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
+                .setNameFormat(listenerThreadNameFormat)
+                .setDaemon(true)
+                .setThreadFactory(r -> {
+                    var t = new Thread(r);
+                    t.setContextClassLoader(workerCtxClassLoader);
+                    return t;
+                })
+                .build());
         updateStatus(ServerStatus.none);
 
         // When project is disposed, we dispose the language server
@@ -213,6 +230,20 @@ public class LanguageServerWrapper implements Disposable {
         // If we don't do this then a full test run will generate a lot of threads because we create new
         // instances of this class for each test
         this.listener.shutdownNow();
+
+        // Wait briefly for threads to actually exit.
+        try {
+            if (!this.dispatcher.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOGGER.warn("Dispatcher executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
+                        serverDefinition.getId());
+            }
+            if (!this.listener.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOGGER.warn("Listener executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
+                        serverDefinition.getId());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public synchronized void stopAndDisable() {
@@ -445,7 +476,7 @@ public class LanguageServerWrapper implements Disposable {
                         return initializingContext;
                     })
                     .thenApply(initializingContext -> {
-                        messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
+                        messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect(this);
                         messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
 
                         fileOperationsManager = new FileOperationsManager(this);
@@ -567,7 +598,7 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void startStopTimer() {
-        timer = new Timer("Stop Language Server Timer"); //$NON-NLS-1$
+        timer = new Timer("Stop Language Server Timer", true); //$NON-NLS-1$
         updateStatus(ServerStatus.stopping);
         timer.schedule(new TimerTask() {
             @Override

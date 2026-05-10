@@ -42,6 +42,7 @@ import javax.swing.Icon;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -52,7 +53,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
-    private static final SemanticTokensColorsProvider DEFAULT_SEMANTIC_TOKENS_COLORS_PROVIDER = new DefaultSemanticTokensColorsProvider();
+    @ApiStatus.Internal
+    public static final SemanticTokensColorsProvider DEFAULT_SEMANTIC_TOKENS_COLORS_PROVIDER = new DefaultSemanticTokensColorsProvider();
 
     private final @NotNull String id;
     private final @NotNull String name;
@@ -187,6 +189,30 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     public void registerAssociation(List<FileNameMatcher> matchers, String languageId) {
         this.languageIdFileNameMatcherMappings.add(Pair.create(matchers, languageId));
+    }
+
+    @ApiStatus.Internal
+    public void unregisterAssociation(@NotNull Language language) {
+        this.languageIdLanguageMappings.remove(language);
+    }
+
+    @ApiStatus.Internal
+    public void unregisterAssociation(@NotNull FileType fileType) {
+        this.languageIdFileTypeMappings.remove(fileType);
+    }
+
+    @ApiStatus.Internal
+    public void unregisterFileNamePatternAssociation(@NotNull Set<String> presentablePatterns,
+                                                     @Nullable String languageId) {
+        this.languageIdFileNameMatcherMappings.removeIf(p -> {
+            if (!java.util.Objects.equals(p.getSecond(), languageId)) {
+                return false;
+            }
+            Set<String> existing = p.getFirst().stream()
+                    .map(FileNameMatcher::getPresentableString)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            return existing.equals(presentablePatterns);
+        });
     }
 
     public Map<Language, String> getLanguageMappings() {

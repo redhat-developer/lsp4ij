@@ -324,7 +324,8 @@
         <!-- Installer task factory -->
         <extensionPoint
                 name="installerTaskFactory"
-                beanClass="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryPointBean"
+                dynamic="true">
             <with attribute="factoryClass"
                   implements="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactory"/>
         </extensionPoint>
@@ -361,31 +362,36 @@
         <!-- Language server extension point -->
         <extensionPoint
                 name="server"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean"
+                dynamic="true">
             <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.LanguageServerFactory"/>
         </extensionPoint>
 
         <!-- Language server mappings extension point -->
         <extensionPoint
                 name="languageMapping"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean"
+                dynamic="true">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
         <extensionPoint
                 name="fileTypeMapping"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean"
+                dynamic="true">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
         <extensionPoint
                 name="fileNamePatternMapping"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean"
+                dynamic="true">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
 
         <!-- Semantic tokens colors provider extension point -->
         <extensionPoint
                 name="semanticTokensColorsProvider"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean"
+                dynamic="true">
             <with attribute="class"
                   implements="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider"/>
         </extensionPoint>
@@ -1025,7 +1031,8 @@
         <!-- Debug adapter server extension point -->
         <extensionPoint
                 name="debugAdapterServer"
-                beanClass="com.redhat.devtools.lsp4ij.dap.definitions.extension.DebugAdapterServerExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.dap.definitions.extension.DebugAdapterServerExtensionPointBean"
+                dynamic="true">
             <with attribute="factoryClass"
                   implements="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory"/>
         </extensionPoint>
