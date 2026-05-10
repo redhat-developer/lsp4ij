@@ -165,7 +165,6 @@ public class LanguageServerWrapper implements Disposable {
         String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
         this.dispatcher = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
                 .setNameFormat(dispatcherThreadNameFormat)
-                .setDaemon(true)
                 .setThreadFactory(r -> {
                     var t = new Thread(r);
                     t.setContextClassLoader(workerCtxClassLoader);
@@ -179,7 +178,6 @@ public class LanguageServerWrapper implements Disposable {
         String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
         this.listener = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
                 .setNameFormat(listenerThreadNameFormat)
-                .setDaemon(true)
                 .setThreadFactory(r -> {
                     var t = new Thread(r);
                     t.setContextClassLoader(workerCtxClassLoader);
