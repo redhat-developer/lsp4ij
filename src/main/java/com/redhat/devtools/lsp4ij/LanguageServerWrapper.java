@@ -121,7 +121,7 @@ public class LanguageServerWrapper implements Disposable {
     private LanguageServer languageServer;
     private LanguageClientImpl languageClient;
     private ServerCapabilities serverCapabilities;
-    private Timer timer;
+    private final Alarm stopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
     private ServerStatus serverStatus;
     private boolean disposed;
     private LanguageServerException serverError;
@@ -572,9 +572,8 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void removeStopTimer(boolean stopping) {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
+        if (stopAlarm.getActiveRequestCount() > 0) {
+            stopAlarm.cancelAllRequests();
             if (!stopping) {
                 updateStatus(ServerStatus.started);
             }
@@ -598,19 +597,15 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void startStopTimer() {
-        timer = new Timer("Stop Language Server Timer", true); //$NON-NLS-1$
         updateStatus(ServerStatus.stopping);
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                try {
-                    stop();
-                } catch (Throwable t) {
-                    //Need to catch time task exceptions, or it will cancel the timer
-                    LOGGER.error("Failed to stop language server {}", LanguageServerWrapper.this.serverDefinition.getId(), t);
-                }
+        int delayMs = (int) TimeUnit.SECONDS.toMillis(serverDefinition.getLastDocumentDisconnectedTimeout());
+        stopAlarm.addRequest(() -> {
+            try {
+                stop();
+            } catch (Throwable t) {
+                LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
             }
-        }, TimeUnit.SECONDS.toMillis(this.serverDefinition.getLastDocumentDisconnectedTimeout()));
+        }, delayMs);
     }
 
     /**
