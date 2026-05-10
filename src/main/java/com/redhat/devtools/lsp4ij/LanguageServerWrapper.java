@@ -570,10 +570,13 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void removeStopTimer(boolean stopping) {
-        if (stopAlarm.getActiveRequestCount() > 0) {
-            stopAlarm.cancelAllRequests();
-            if (!stopping) {
-                updateStatus(ServerStatus.started);
+        Alarm stopAlarm = this.stopAlarm;
+        if (stopAlarm != null) {
+            if (stopAlarm.getActiveRequestCount() > 0) {
+                stopAlarm.cancelAllRequests();
+                if (!stopping) {
+                    updateStatus(ServerStatus.started);
+                }
             }
         }
     }
