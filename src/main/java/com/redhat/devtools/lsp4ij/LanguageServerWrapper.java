@@ -121,7 +121,7 @@ public class LanguageServerWrapper implements Disposable {
     private LanguageServer languageServer;
     private LanguageClientImpl languageClient;
     private ServerCapabilities serverCapabilities;
-    private final Alarm stopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+    private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
     private boolean disposed;
     private LanguageServerException serverError;
@@ -597,13 +597,24 @@ public class LanguageServerWrapper implements Disposable {
     private void startStopTimer() {
         updateStatus(ServerStatus.stopping);
         int delayMs = (int) TimeUnit.SECONDS.toMillis(serverDefinition.getLastDocumentDisconnectedTimeout());
-        stopAlarm.addRequest(() -> {
+        getStopAlarm().addRequest(() -> {
             try {
                 stop();
             } catch (Throwable t) {
                 LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
             }
         }, delayMs);
+    }
+
+    private @NotNull Alarm getStopAlarm() {
+        if (stopAlarm == null) {
+            synchronized (this) {
+                if (stopAlarm == null) {
+                    stopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+                }
+            }
+        }
+        return stopAlarm;
     }
 
     /**
