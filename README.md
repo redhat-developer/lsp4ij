@@ -62,6 +62,7 @@ You can find more documentation in:
 Here are some projects that use LSP4IJ:
 
  * [Quarkus Tools for IntelliJ](https://github.com/redhat-developer/intellij-quarkus)
+ * [Xonsh plugin for JetBrains IDEs](https://github.com/nahoj/xonsh-jetbrains)
  * [Inga for IntelliJ](https://github.com/seachicken/intellij-inga)
  * [IntelliJ SumnekoLua](https://github.com/CppCXY/Intellij-SumnekoLua)
  * [Haskell LSP for IntelliJ](https://github.com/rockofox/intellij-haskell-lsp)
