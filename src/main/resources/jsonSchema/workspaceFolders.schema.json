@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/jsonSchema/workspaceFolders.schema.json",
+  "title": "LSP4IJ workspace folders configuration JSON schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "rootType": {
+      "type": "string",
+      "title": "Root type",
+      "description": "Type of roots to use as workspace folders",
+      "enum": ["PROJECT_BASE", "SOURCE_ROOTS", "NONE"],
+      "default": "PROJECT_BASE"
+    },
+    "lazy": {
+      "type": "boolean",
+      "title": "Lazy loading",
+      "description": "Enable lazy loading of workspace folders (discover as files are opened)",
+      "default": false
+    },
+    "markers": {
+      "type": "array",
+      "title": "Root markers",
+      "description": "Marker files/folders to search for when discovering workspace folders (e.g., .git, pyproject.toml, pom.xml). When specified, workspace folders are discovered dynamically by walking up the directory tree, and rootType is automatically set to MARKERS.",
+      "items": {
+        "type": "string"
+      },
+      "default": [".git", "pyproject.toml", "pom.xml", "package.json"]
+    }
+  }
+}

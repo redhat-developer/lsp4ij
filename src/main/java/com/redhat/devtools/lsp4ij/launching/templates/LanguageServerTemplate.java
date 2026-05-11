@@ -34,6 +34,7 @@ public class LanguageServerTemplate extends ServerTemplate {
     public static final String SETTINGS_FILE_NAME = "settings.json";
     public static final String SETTINGS_SCHEMA_FILE_NAME = "settings.schema.json";
     public static final String CLIENT_SETTINGS_FILE_NAME = "clientSettings.json";
+    public static final String WORKSPACE_FOLDER_SETTINGS_FILE_NAME = "workspaceFolderSettings.json";
     public static final String README_FILE_NAME = "README.md";
 
     public static final String DISABLE_PROMOTION_FOR = "disablePromotionFor";
@@ -48,6 +49,7 @@ public class LanguageServerTemplate extends ServerTemplate {
     private String initializationOptions;
     private String experimental;
     private String clientConfiguration;
+    private String workspaceFolderConfiguration;
 
     private Set<String> disablePromotionFor;
     private Boolean promotable;
@@ -106,6 +108,14 @@ public class LanguageServerTemplate extends ServerTemplate {
 
     public void setClientConfiguration(String clientConfiguration) {
         this.clientConfiguration = clientConfiguration;
+    }
+
+    public String getWorkspaceFolderConfiguration() {
+        return workspaceFolderConfiguration;
+    }
+
+    public void setWorkspaceFolderConfiguration(String workspaceFolderConfiguration) {
+        this.workspaceFolderConfiguration = workspaceFolderConfiguration;
     }
 
     public void setDisablePromotionFor(Set<String> disablePromotionFor) {

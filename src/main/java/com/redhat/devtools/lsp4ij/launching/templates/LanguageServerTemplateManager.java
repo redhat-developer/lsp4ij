@@ -87,6 +87,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
         String experimentalJson = null;
         String clientSettingsJson = null;
         String installerSettingsJson = null;
+        String workspaceFolderSettingsJson = null;
         String description = null;
 
         for (VirtualFile file : templateFolder.getChildren()) {
@@ -114,6 +115,9 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
                     break;
                 case INSTALLER_FILE_NAME:
                     installerSettingsJson = VfsUtilCore.loadText(file);
+                    break;
+                case WORKSPACE_FOLDER_SETTINGS_FILE_NAME:
+                    workspaceFolderSettingsJson = VfsUtilCore.loadText(file);
                     break;
                 case README_FILE_NAME:
                     description = VfsUtilCore.loadText(file);
@@ -151,6 +155,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
         template.setExperimental(experimentalJson);
         template.setClientConfiguration(clientSettingsJson);
         template.setInstallerConfiguration(installerSettingsJson);
+        template.setWorkspaceFolderConfiguration(workspaceFolderSettingsJson);
         if (StringUtils.isNotBlank(description)) {
             template.setDescription(description);
         }
@@ -200,6 +205,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
             String settingsSchema = ((UserDefinedLanguageServerDefinition) lsDefinition).getDefaultConfigurationSchemaContent();
             String clientSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getClientConfigurationContent();
             String installerSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getInstallerConfigurationContent();
+            String workspaceFolderSettings = ((UserDefinedLanguageServerDefinition) lsDefinition).getWorkspaceFolderStrategyConfiguration();
             lsName = lsDefinition.getDisplayName();
 
             writeToZip(TEMPLATE_FILE_NAME, template, zos);
@@ -209,6 +215,7 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
             writeToZip(SETTINGS_SCHEMA_FILE_NAME, settingsSchema, zos);
             writeToZip(CLIENT_SETTINGS_FILE_NAME, clientSettings, zos);
             writeToZip(INSTALLER_FILE_NAME, installerSettings, zos);
+            writeToZip(WORKSPACE_FOLDER_SETTINGS_FILE_NAME, workspaceFolderSettings, zos);
             zos.closeEntry();
             count++;
         }

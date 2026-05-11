@@ -396,6 +396,12 @@
                   implements="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider"/>
         </extensionPoint>
 
+        <!-- Workspace folder strategy extension point -->
+        <extensionPoint
+                name="workspaceFolderStrategy"
+                interface="com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategyProvider"
+                dynamic="true"/>
+
     </extensionPoints>
 
     <!-- Language Server support -->

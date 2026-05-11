@@ -29,6 +29,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.Alarm;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.client.WorkspaceFolderNotificationManager;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
@@ -129,6 +130,7 @@ public class LanguageServerWrapper implements Disposable {
     private List<String> currentProcessCommandLines;
     private boolean initiallySupportsWorkspaceFolders = false;
     private FileOperationsManager fileOperationsManager;
+    private WorkspaceFolderNotificationManager workspaceFolderNotificationManager;
 
     private LSPClientFeatures clientFeatures;
     // error notification displayed when server start fails.
@@ -480,6 +482,8 @@ public class LanguageServerWrapper implements Disposable {
                         fileOperationsManager = new FileOperationsManager(this);
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
 
+                        workspaceFolderNotificationManager = new WorkspaceFolderNotificationManager(this);
+
                         this.lspStreamProvider = initializingContext.provider;
                         this.languageClient = initializingContext.languageClient;
                         this.languageServer = initializingContext.languageServer;
@@ -541,7 +545,9 @@ public class LanguageServerWrapper implements Disposable {
         initParams.setClientInfo(getClientInfo());
         initParams.setTrace(provider.getTrace(rootURI));
 
-        var folders = LSPIJUtils.toWorkspaceFolders(initialProject, getClientFeatures());
+        var folders = getClientFeatures()
+            .getWorkspaceFolderFeature()
+            .getInitialWorkspaceFolders(initialProject);
         initParams.setWorkspaceFolders(folders);
 
         // Customize initialize params if needed
@@ -701,14 +707,28 @@ public class LanguageServerWrapper implements Disposable {
                 return CompletableFuture.completedFuture(null);
             }
 
+            // Compute workspace folder BEFORE synchronized block to avoid slow I/O operations in critical section
+            WorkspaceFolder folderToNotify = null;
+            if (workspaceFolderNotificationManager != null) {
+                folderToNotify = workspaceFolderNotificationManager.computeWorkspaceFolderToNotify(file);
+            }
+
             synchronized (closedDocuments) {
                 closedDocuments.remove(fileUri);
             }
+
+            CompletableFuture<LanguageServer> result;
+            boolean shouldNotify = false;
             synchronized (openedDocuments) {
                 // Check again if file is already opened (within synchronized block)
                 ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
                 if (ls2 != null) {
                     return ls2;
+                }
+
+                // Mark workspace folder as notified BEFORE didOpen (fast operation in synchronized block)
+                if (folderToNotify != null) {
+                    shouldNotify = workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify);
                 }
 
                 DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(toUriString(fileUri), file, document, fileConnectionInfo.documentText(), fileConnectionInfo.languageId());
@@ -721,10 +741,19 @@ public class LanguageServerWrapper implements Disposable {
                 LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
 
                 if (waitForDidOpen) {
-                    return getLanguageServerWhenDidOpen(synchronizer.getDidOpenFuture());
+                    result = getLanguageServerWhenDidOpen(synchronizer.getDidOpenFuture());
+                } else {
+                    result = CompletableFuture.completedFuture(languageServer);
                 }
-                return CompletableFuture.completedFuture(languageServer);
             }
+
+            // Send notification AFTER synchronized block to avoid blocking other file opens
+            // Only send if folder was newly marked (not already notified)
+            if (shouldNotify) {
+                workspaceFolderNotificationManager.sendFolderAddedNotification(folderToNotify);
+            }
+
+            return result;
         });
     }
 
@@ -1602,6 +1631,9 @@ public class LanguageServerWrapper implements Disposable {
                 }
                 this.serverCapabilities = null;
                 this.dynamicRegistrations.clear();
+                if (clientFeatures != null) {
+                    clientFeatures.getWorkspaceFolderFeature().reset();
+                }
             }
 
             if (isDisposed()) {

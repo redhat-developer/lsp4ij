@@ -120,7 +120,7 @@ public class JsonTextField extends JPanel {
 
     public boolean hasErrors() {
         VirtualFile file = LSPIJUtils.getFile(editorTextField.getDocument());
-        return PsiErrorElementUtil.hasErrors(getProject(), file);
+        return file != null && PsiErrorElementUtil.hasErrors(getProject(), file);
     }
 
     public @NotNull Project getProject() {

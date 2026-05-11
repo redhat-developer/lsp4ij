@@ -140,12 +140,20 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                 existingSettings.setServerTrace(newSettings.getServerTrace());
             }
 
+            // Workspace folders
+            boolean workspaceFolderStrategyConfigurationChanged = newSettings.getWorkspaceFolderStrategyConfiguration() != null && !(isEquals(existingSettings.getWorkspaceFolderStrategyConfiguration(), newSettings.getWorkspaceFolderStrategyConfiguration()));
+            if (workspaceFolderStrategyConfigurationChanged) {
+                existingSettings.setWorkspaceFolderStrategyConfiguration(newSettings.getWorkspaceFolderStrategyConfiguration());
+            }
+
             if (configurationContentChanged || expandConfigurationChanged || configurationSchemaContentChanged || experimentalContentChanged ||
-                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged){
+                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged ||
+                    workspaceFolderStrategyConfigurationChanged){
                 // There are some changes, fire the changed event.
                 return handleChanged(languageServerId, existingSettings, notify,
                         configurationContentChanged, expandConfigurationChanged, configurationSchemaContentChanged, initializationOptionsContentChanged, experimentalContentChanged,
-                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged);
+                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged,
+                        workspaceFolderStrategyConfigurationChanged);
             }
         } else {
             // The settings don't exist
@@ -160,11 +168,14 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             boolean debugSuspendChanged = newSettings.isDebugSuspend();
             boolean errorReportingKindChanged = newSettings.getErrorReportingKind() != null && !(isEquals(ErrorReportingKind.getDefaultValue(), newSettings.getErrorReportingKind()));
             boolean serverTraceChanged = newSettings.getServerTrace() != null && !(isEquals(ServerTrace.getDefaultValue(), newSettings.getServerTrace()));
+            boolean workspaceFolderStrategyConfigurationChanged = !StringUtils.isBlank(newSettings.getWorkspaceFolderStrategyConfiguration());
             if  (configurationContentChanged || expandConfigurationChanged || configurationSchemaContentChanged || experimentalContentChanged ||
-                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged) {
+                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged ||
+                    workspaceFolderStrategyConfigurationChanged) {
                 return handleChanged(languageServerId, newSettings, notify,
                         configurationContentChanged, expandConfigurationChanged, configurationSchemaContentChanged, initializationOptionsContentChanged, experimentalContentChanged,
-                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged);
+                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged,
+                        workspaceFolderStrategyConfigurationChanged);
             }
         }
         return null;
@@ -183,7 +194,8 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             boolean debugPortChanged,
             boolean debugSuspendChanged,
             boolean errorReportingKindChanged,
-            boolean serverTraceChanged) {
+            boolean serverTraceChanged,
+            boolean workspaceFolderStrategyConfigurationChanged) {
         if (listeners.isEmpty()) {
             return null;
         }
@@ -198,7 +210,8 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                 debugPortChanged,
                 debugSuspendChanged,
                 errorReportingKindChanged,
-                serverTraceChanged);
+                serverTraceChanged,
+                workspaceFolderStrategyConfigurationChanged);
         if (notify) {
             handleChanged(event);
         }
@@ -289,6 +302,8 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
         private boolean debugSuspend;
         private ServerTrace serverTrace;
         private ErrorReportingKind errorReportingKind;
+
+        private String workspaceFolderStrategyConfiguration;
 
         public String getConfigurationContent() {
             return configurationContent;
@@ -419,6 +434,15 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
 
         public LanguageServerDefinitionSettings setErrorReportingKind(ErrorReportingKind errorReportingKind) {
             this.errorReportingKind = errorReportingKind;
+            return this;
+        }
+
+        public String getWorkspaceFolderStrategyConfiguration() {
+            return workspaceFolderStrategyConfiguration;
+        }
+
+        public LanguageServerDefinitionSettings setWorkspaceFolderStrategyConfiguration(String workspaceFolderStrategyConfiguration) {
+            this.workspaceFolderStrategyConfiguration = workspaceFolderStrategyConfiguration;
             return this;
         }
 

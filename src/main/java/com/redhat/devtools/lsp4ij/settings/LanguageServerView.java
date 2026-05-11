@@ -142,7 +142,8 @@ public class LanguageServerView implements Disposable {
                     && this.isIncludeSystemEnvironmentVariables() == settings.isIncludeSystemEnvironmentVariables()
                     && Objects.deepEquals(this.getMappings(), settings.getMappings())
                     && isEquals(this.getClientConfigurationContent(), settings.getClientConfigurationContent())
-                    && isEquals(this.getInstallerConfigurationContent(), settings.getInstallerConfigurationContent()))) {
+                    && isEquals(this.getInstallerConfigurationContent(), settings.getInstallerConfigurationContent())
+                    && isEquals(this.getWorkspaceFolderStrategyConfiguration(), settings.getWorkspaceFolderStrategyConfiguration()))) {
                 return true;
             }
         }
@@ -226,6 +227,7 @@ public class LanguageServerView implements Disposable {
                         userSettings.isIncludeSystemEnvironmentVariables()));
                 this.setClientConfigurationContent(userSettings.getClientConfigurationContent());
                 this.setInstallerConfigurationContent(userSettings.getInstallerConfigurationContent());
+                this.setWorkspaceFolderStrategyConfiguration(userSettings.getWorkspaceFolderStrategyConfiguration());
 
                 List<ServerMappingSettings> languageMappings = userSettings.getMappings()
                         .stream()
@@ -343,7 +345,8 @@ public class LanguageServerView implements Disposable {
                                     isIncludeSystemEnvironmentVariables(),
                                     getMappings(),
                                     getClientConfigurationContent(),
-                                    getInstallerConfigurationContent()),
+                                    getInstallerConfigurationContent(),
+                                    getWorkspaceFolderStrategyConfiguration()),
                             false);
             if (projectSettingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -386,10 +389,22 @@ public class LanguageServerView implements Disposable {
                 .createFormBuilder()
                 .setFormLeftIndent(10);
         var uiConfiguration = createUIConfiguration();
+
+        // Get workspace folder strategy from language server definition
+        com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy workspaceFolderStrategy = null;
+        try {
+            var clientFeatures = languageServerDefinition.createClientFeatures();
+            clientFeatures.setServerDefinition(languageServerDefinition);
+            workspaceFolderStrategy = clientFeatures.getWorkspaceFolderFeature().getStrategy();
+        } catch (Exception e) {
+            // Ignore, will use default
+        }
+
         this.languageServerPanel = new LanguageServerPanel(builder,
                 description,
                 uiConfiguration,
                 canExecuteInstaller,
+                workspaceFolderStrategy,
                 project);
         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition def) {
             languageServerPanel.setCommandLineUpdater(new UICommandLineUpdater(def, project));
@@ -438,6 +453,9 @@ public class LanguageServerView implements Disposable {
 
         // Installer tab configuration
         configuration.setShowInstaller(isUserDefined);
+
+        // Workspace folders tab configuration
+        configuration.setShowWorkspaceFolders(true);
 
         return configuration;
     }
@@ -608,6 +626,17 @@ public class LanguageServerView implements Disposable {
 
     public void setInstallerConfigurationContent(String installerConfigurationContent) {
         languageServerPanel.setInstallerConfigurationContent(installerConfigurationContent);
+    }
+
+    public String getWorkspaceFolderStrategyConfiguration() {
+        return languageServerPanel.getWorkspaceFoldersPanel() != null ?
+                languageServerPanel.getWorkspaceFoldersPanel().getJsonConfiguration() : null;
+    }
+
+    public void setWorkspaceFolderStrategyConfiguration(String workspaceFolderStrategyConfiguration) {
+        if (languageServerPanel.getWorkspaceFoldersPanel() != null) {
+            languageServerPanel.getWorkspaceFoldersPanel().setJsonConfiguration(workspaceFolderStrategyConfiguration);
+        }
     }
 
     @Override
