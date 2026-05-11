@@ -81,7 +81,8 @@ public class UICommandLineUpdater implements CommandLineUpdater {
                 false,
                 false,
                 false,
-                false);
+                false,
+                /* workspaceFolderStrategyConfigurationChanged*/ false);
         LanguageServersRegistry.getInstance().handleChangeEvent(event);
     }
 }

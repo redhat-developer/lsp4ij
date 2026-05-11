@@ -105,7 +105,8 @@ public class LanguageServiceAccessor implements Disposable {
                     && (event.commandChanged ||
                     event.userEnvironmentVariablesChanged ||
                     event.includeSystemEnvironmentVariablesChanged ||
-                    event.mappingsChanged)) {
+                    event.mappingsChanged ||
+                    event.workspaceFolderStrategyConfigurationChanged)) {
                 languageServerWrappers.forEach(LanguageServerWrapper::restart);
             }
         }

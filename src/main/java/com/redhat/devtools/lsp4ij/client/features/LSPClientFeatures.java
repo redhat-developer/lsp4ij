@@ -102,8 +102,11 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
     private LSPConfigurationFeature configurationFeature;
-    
+
     private EditorBehaviorFeature editorBehaviorFeature;
+
+    private LSPWorkspaceFolderFeature workspaceFolderFeature;
+    private @Nullable LanguageServerDefinition serverDefinition;
 
     public LSPClientFeatures() {
         setFileUriSupport(FileUriSupport.DEFAULT);
@@ -357,6 +360,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @NotNull
     public final LanguageServerDefinition getServerDefinition() {
+        if (serverDefinition != null) {
+            return serverDefinition;
+        }
         return getServerWrapper().getServerDefinition();
     }
 
@@ -1344,6 +1350,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     }
 
     /**
+     * Returns the LSP workspace folder feature.
+     *
+     * @return the LSP workspace folder feature.
+     */
+    @NotNull
+    public final LSPWorkspaceFolderFeature getWorkspaceFolderFeature() {
+        if (workspaceFolderFeature == null) {
+            initWorkspaceFolderFeature();
+        }
+        return workspaceFolderFeature;
+    }
+
+    private synchronized void initWorkspaceFolderFeature() {
+        if (workspaceFolderFeature != null) {
+            return;
+        }
+        setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature());
+    }
+
+    /**
+     * Initialize the LSP workspace folder feature.
+     *
+     * @param workspaceFolderFeature the LSP workspace folder feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setWorkspaceFolderFeature(@NotNull LSPWorkspaceFolderFeature workspaceFolderFeature) {
+        workspaceFolderFeature.setClientFeatures(this);
+        this.workspaceFolderFeature = workspaceFolderFeature;
+        return this;
+    }
+
+    /**
      * Set the language server wrapper.
      *
      * @param serverWrapper the language server wrapper.
@@ -1351,6 +1389,16 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     @ApiStatus.Internal
     public final void setServerWrapper(LanguageServerWrapper serverWrapper) {
         this.serverWrapper = serverWrapper;
+    }
+
+    /**
+     * Set the language server definition.
+     *
+     * @param serverDefinition the language server definition.
+     */
+    @ApiStatus.Internal
+    public final void setServerDefinition(LanguageServerDefinition serverDefinition) {
+        this.serverDefinition = serverDefinition;
     }
 
     /**
@@ -1439,6 +1487,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         }
         if (workspaceSymbolFeature != null) {
             workspaceSymbolFeature.dispose();
+        }
+        if (workspaceFolderFeature != null) {
+            workspaceFolderFeature.reset();
         }
     }
 

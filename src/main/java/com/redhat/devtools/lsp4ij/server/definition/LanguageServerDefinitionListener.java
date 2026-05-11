@@ -81,6 +81,7 @@ public interface LanguageServerDefinitionListener {
         public final boolean mappingsChanged;
         public final boolean clientConfigurationContentChanged;
         public final boolean installerConfigurationContentChanged;
+        public final boolean workspaceFolderStrategyConfigurationChanged;
 
         public LanguageServerChangedEvent(@NotNull UpdatedBy updatedBy,
                                           @NotNull Project project,
@@ -91,7 +92,8 @@ public interface LanguageServerDefinitionListener {
                                           boolean includeSystemEnvironmentVariablesChanged,
                                           boolean mappingsChanged,
                                           boolean clientConfigurationContentChanged,
-                                          boolean installerConfigurationContentChanged) {
+                                          boolean installerConfigurationContentChanged,
+                                          boolean workspaceFolderStrategyConfigurationChanged) {
             super(updatedBy, project);
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
@@ -101,6 +103,7 @@ public interface LanguageServerDefinitionListener {
             this.mappingsChanged = mappingsChanged;
             this.clientConfigurationContentChanged = clientConfigurationContentChanged;
             this.installerConfigurationContentChanged = installerConfigurationContentChanged;
+            this.workspaceFolderStrategyConfigurationChanged = workspaceFolderStrategyConfigurationChanged;
         }
     }
 

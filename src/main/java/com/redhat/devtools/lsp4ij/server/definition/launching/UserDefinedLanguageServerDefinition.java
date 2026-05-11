@@ -64,6 +64,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private ClientConfigurationSettings clientConfiguration;
     private @Nullable ServerInstallerDescriptor serverInstallerDescriptor;
     private String installerConfigurationContent;
+    private String workspaceFolderStrategyConfiguration;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
                                                @Nullable String templateId,
@@ -79,7 +80,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String defaultInitializationOptionsContent,
                                                @Nullable String defaultExperimentalContent,
                                                @Nullable String clientConfigurationContent,
-                                               @Nullable String installerConfigurationContent) {
+                                               @Nullable String installerConfigurationContent,
+                                               @Nullable String workspaceFolderStrategyConfiguration) {
         super(id, name, description, true, null, false);
         this.name = name;
         this.url = url;
@@ -94,6 +96,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.defaultExperimentalContent = defaultExperimentalContent;
         this.clientConfigurationContent = clientConfigurationContent;
         this.installerConfigurationContent = installerConfigurationContent;
+        this.workspaceFolderStrategyConfiguration = workspaceFolderStrategyConfiguration;
     }
 
     // Backward-compatible signature for clients calling without client configuration content
@@ -117,6 +120,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 false,
                 null,
                 defaultInitializationOptionsContent,
+                null,
                 null,
                 null,
                 null);
@@ -230,6 +234,14 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     public void setInstallerConfigurationContent(String installerConfigurationContent) {
         this.installerConfigurationContent = installerConfigurationContent;
         this.serverInstallerDescriptor = null;
+    }
+
+    public String getWorkspaceFolderStrategyConfiguration() {
+        return workspaceFolderStrategyConfiguration;
+    }
+
+    public void setWorkspaceFolderStrategyConfiguration(String workspaceFolderStrategyConfiguration) {
+        this.workspaceFolderStrategyConfiguration = workspaceFolderStrategyConfiguration;
     }
 
     @Override

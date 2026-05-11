@@ -237,6 +237,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update installer configuration
         this.languageServerPanel.setInstallerConfigurationContent(template.getInstallerConfiguration());
+
+        // Update workspace folder configuration
+        this.languageServerPanel.setWorkspaceFolderStrategyConfiguration(template.getWorkspaceFolderConfiguration());
     }
 
     @Override
@@ -304,6 +307,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String experimental = this.languageServerPanel.getExperimentalContent();
         String clientConfiguration = this.languageServerPanel.getClientConfigurationContent();
         String installerConfiguration = this.languageServerPanel.getInstallerConfigurationContent();
+        String workspaceFolderStrategyConfiguration = "";
+
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
                 templateId,
                 serverName,
@@ -318,7 +323,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 initializationOptions,
                 experimental,
                 clientConfiguration,
-                installerConfiguration);
+                installerConfiguration,
+                workspaceFolderStrategyConfiguration);
         definition.setUrl(this.languageServerPanel.getServerUrl());
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
     }

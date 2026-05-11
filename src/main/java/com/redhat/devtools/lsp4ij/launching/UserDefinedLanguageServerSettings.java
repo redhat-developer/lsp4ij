@@ -126,6 +126,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private boolean installAlreadyDone;
 
+        private String workspaceFolderStrategyConfiguration;
+
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
 
@@ -236,6 +238,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setInstallAlreadyDone(boolean installAlreadyDone) {
             this.installAlreadyDone = installAlreadyDone;
+        }
+
+        public String getWorkspaceFolderStrategyConfiguration() {
+            return workspaceFolderStrategyConfiguration;
+        }
+
+        public void setWorkspaceFolderStrategyConfiguration(String workspaceFolderStrategyConfiguration) {
+            this.workspaceFolderStrategyConfiguration = workspaceFolderStrategyConfiguration;
         }
     }
 

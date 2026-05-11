@@ -247,7 +247,8 @@ public class LanguageServersRegistry implements Disposable {
                                     globalSettings != null ? globalSettings.getInitializationOptionsContent() : null,
                                     globalSettings != null ? globalSettings.getExperimentalContent() : null,
                                     settings.getClientConfigurationContent(),
-                                    settings.getInstallerConfigurationContent()),
+                                    settings.getInstallerConfigurationContent(),
+                                    settings.getWorkspaceFolderStrategyConfiguration()),
                             mappings, false);
                 }
             }
@@ -594,6 +595,7 @@ public class LanguageServersRegistry implements Disposable {
                 settings.setIncludeSystemEnvironmentVariables(userDefinedServer.isIncludeSystemEnvironmentVariables());
                 settings.setMappings(toServerMappingSettings(mappings));
                 settings.setClientConfigurationContent(userDefinedServer.getClientConfigurationContent());
+                settings.setWorkspaceFolderStrategyConfiguration(userDefinedServer.getWorkspaceFolderStrategyConfiguration());
                 settings.setInstallerConfigurationContent(userDefinedServer.getInstallerConfigurationContent());
                 UserDefinedLanguageServerSettings.getInstance().setUserDefinedLanguageServerSettings(languageServerId, settings);
             }
@@ -930,7 +932,8 @@ public class LanguageServersRegistry implements Disposable {
                     /* includeSystemEnvironmentVariablesChanged */ false,
                     /* mappingsChanged */ true,
                     /* clientConfigurationContentChanged */ false,
-                    /* installerConfigurationContentChanged */ false);
+                    /* installerConfigurationContentChanged */ false,
+                    /* workspaceFolderStrategyConfigurationChanged*/ false);
             handleChangeEvent(event);
         }
     }
@@ -948,6 +951,7 @@ public class LanguageServersRegistry implements Disposable {
             ls.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
             ls.setClientConfigurationContent(request.clientConfigurationContent());
             ls.setInstallerConfigurationContent(request.installerConfigurationContent());
+            ls.setWorkspaceFolderStrategyConfiguration(request.workspaceFolderStrategyConfiguration());
 
             // remove associations
             removeAssociationsFor(request.serverDefinition());
@@ -968,6 +972,7 @@ public class LanguageServersRegistry implements Disposable {
 
         boolean clientConfigurationContentChanged = !Objects.equals(settings.getClientConfigurationContent(), request.clientConfigurationContent());
         boolean installerConfigurationContentChanged = !Objects.equals(settings.getInstallerConfigurationContent(), request.installerConfigurationContent());
+        boolean workspaceFolderStrategyConfigurationChanged = !Objects.equals(settings.getWorkspaceFolderStrategyConfiguration(), request.workspaceFolderStrategyConfiguration());
 
         settings.setServerName(request.name());
         settings.setServerUrl(request.url());
@@ -976,11 +981,13 @@ public class LanguageServersRegistry implements Disposable {
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         settings.setClientConfigurationContent(request.clientConfigurationContent());
         settings.setInstallerConfigurationContent(request.installerConfigurationContent());
+        settings.setWorkspaceFolderStrategyConfiguration(request.workspaceFolderStrategyConfiguration());
         settings.setMappings(request.mappings());
 
         if (nameChanged || commandChanged || userEnvironmentVariablesChanged ||
                 includeSystemEnvironmentVariablesChanged ||
-                mappingsChanged || clientConfigurationContentChanged || installerConfigurationContentChanged) {
+                mappingsChanged || clientConfigurationContentChanged || installerConfigurationContentChanged ||
+                workspaceFolderStrategyConfigurationChanged) {
             // Notifications
             LanguageServerDefinitionListener.LanguageServerChangedEvent event = new LanguageServerDefinitionListener.LanguageServerChangedEvent(
                     LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.USER,
@@ -992,7 +999,8 @@ public class LanguageServersRegistry implements Disposable {
                     includeSystemEnvironmentVariablesChanged,
                     mappingsChanged,
                     clientConfigurationContentChanged,
-                    installerConfigurationContentChanged);
+                    installerConfigurationContentChanged,
+                    workspaceFolderStrategyConfigurationChanged);
             if (notify) {
                 handleChangeEvent(event);
             }
@@ -1122,7 +1130,8 @@ public class LanguageServersRegistry implements Disposable {
                                                 boolean includeSystemEnvironmentVariables,
                                                 @NotNull List<ServerMappingSettings> mappings,
                                                 @Nullable String clientConfigurationContent,
-                                                @Nullable String installerConfigurationContent) {
+                                                @Nullable String installerConfigurationContent,
+                                                @Nullable String workspaceFolderStrategyConfiguration) {
     }
 
     /**

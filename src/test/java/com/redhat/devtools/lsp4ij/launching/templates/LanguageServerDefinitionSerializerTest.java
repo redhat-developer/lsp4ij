@@ -45,6 +45,7 @@ public class LanguageServerDefinitionSerializerTest {
                 "",
                 "",
                 "",
+                "",
                 "");
 
         Gson gson = new GsonBuilder()
@@ -70,6 +71,7 @@ public class LanguageServerDefinitionSerializerTest {
                 false,
                 "",
                 false,
+                "",
                 "",
                 "",
                 "",
@@ -103,6 +105,7 @@ public class LanguageServerDefinitionSerializerTest {
                 false,
                 "",
                 false,
+                "",
                 "",
                 "",
                 "",
@@ -143,6 +146,7 @@ public class LanguageServerDefinitionSerializerTest {
                 false,
                 "",
                 false,
+                "",
                 "",
                 "",
                 "",

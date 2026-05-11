@@ -30,6 +30,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
@@ -67,6 +68,7 @@ public class LanguageServerPanel implements Disposable {
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
     private final boolean canExecuteInstaller;
+    private final WorkspaceFolderStrategy workspaceFolderStrategy;
     private final JBCheckBox expandConfigurationCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.configuration.expand"));
     private HyperlinkLabel editJsonSchemaAction;
     private JBTextField serverName;
@@ -81,13 +83,24 @@ public class LanguageServerPanel implements Disposable {
     private @Nullable InstallerPanel installerPanel;
     private @Nullable String serverUrl;
     private HyperlinkLabel serverUrlHyperlink;
+    private WorkspaceFoldersPanel workspaceFoldersPanel;
 
     public LanguageServerPanel(@NotNull FormBuilder builder,
                                @Nullable JComponent description,
                                @NotNull UIConfiguration uiConfiguration,
                                boolean canExecuteInstaller,
                                @Nullable Project project) {
+        this(builder, description, uiConfiguration, canExecuteInstaller, null, project);
+    }
+
+    public LanguageServerPanel(@NotNull FormBuilder builder,
+                               @Nullable JComponent description,
+                               @NotNull UIConfiguration uiConfiguration,
+                               boolean canExecuteInstaller,
+                               @Nullable WorkspaceFolderStrategy workspaceFolderStrategy,
+                               @Nullable Project project) {
         this.canExecuteInstaller = canExecuteInstaller;
+        this.workspaceFolderStrategy = workspaceFolderStrategy;
         this.project = project;
         createUI(builder, description, uiConfiguration);
     }
@@ -171,6 +184,9 @@ public class LanguageServerPanel implements Disposable {
 
         // Configuration tab to fill LSP Configuration + LSP Initialize Options
         addConfigurationTab(tabbedPane, uiConfiguration);
+
+        // Workspace Folders tab
+        addWorkspaceFoldersTab(tabbedPane, uiConfiguration);
 
         // Installer tab to fill installer of the LSP server
         addInstallerTab(tabbedPane, uiConfiguration);
@@ -275,6 +291,20 @@ public class LanguageServerPanel implements Disposable {
         if (installerPanel != null) {
             this.installerPanel.addPostInstallAction(action);
         }
+    }
+
+    private void addWorkspaceFoldersTab(@NotNull JBTabbedPane tabbedPane, @NotNull UIConfiguration uiConfiguration) {
+        if (!uiConfiguration.isShowWorkspaceFolders()) {
+            return;
+        }
+        workspaceFoldersPanel = new WorkspaceFoldersPanel(project, workspaceFolderStrategy);
+        JScrollPane scrollPane = new JBScrollPane(workspaceFoldersPanel);
+        tabbedPane.addTab(LanguageServerBundle.message("language.server.tab.workspaceFolders"), scrollPane);
+    }
+
+    @Nullable
+    public WorkspaceFoldersPanel getWorkspaceFoldersPanel() {
+        return workspaceFoldersPanel;
     }
 
     private void addDebugTab(@NotNull JBTabbedPane tabbedPane,
@@ -505,6 +535,13 @@ public class LanguageServerPanel implements Disposable {
         var installerConfigurationWidget = installerPanel.getInstallerConfigurationWidget();
         installerConfigurationWidget.setText(installerConfigurationContent != null ? installerConfigurationContent : "");
         installerConfigurationWidget.setCaretPosition(0);
+    }
+
+    public void setWorkspaceFolderStrategyConfiguration(@Nullable String workspaceFolderStrategyConfiguration) {
+        if (workspaceFoldersPanel == null) {
+            return;
+        }
+        workspaceFoldersPanel.setJsonConfiguration(workspaceFolderStrategyConfiguration);
     }
 
     public JBCheckBox getDebugSuspendCheckBox() {
