@@ -103,6 +103,7 @@ Here are some projects that use LSP4IJ:
  * [agnix](https://github.com/agent-sh/agnix)
  * [Xonsh plugin for JetBrains IDEs](https://github.com/nahoj/xonsh-jetbrains)
  * [Rell IntelliJ Plugin](https://bitbucket.org/chromawallet/rell-jetbrains)
+ * [Dart](https://github.com/flutter/dart-intellij-third-party)
 
 ## Requirements
 
