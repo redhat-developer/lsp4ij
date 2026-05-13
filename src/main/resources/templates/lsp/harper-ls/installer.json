@@ -33,14 +33,8 @@
         "file": {
           "name": {
             "windows": "harper-ls.exe",
-            "unix": {
-              "x86_64": "harper-ls-x86_64-unknown-linux-gnu",
-              "arm64": "harper-ls-aarch64-unknown-linux-gnu"
-            },
-            "mac": {
-              "x86_64": "harper-ls-x86_64-apple-darwin",
-              "arm64": "harper-ls-aarch64-apple-darwin"
-            }
+            "unix": "harmer-ls",
+            "mac": "harmer-ls"
           },
           "executable": true
         }
