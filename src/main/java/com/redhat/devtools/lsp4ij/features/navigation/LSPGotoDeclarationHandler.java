@@ -60,6 +60,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         if (project == null || project.isDisposed()) {
             return PsiElement.EMPTY_ARRAY;
         }
+
         PsiFile psiFile = sourceElement != null ? sourceElement.getContainingFile() : null;
         if (psiFile == null) {
             return PsiElement.EMPTY_ARRAY;
@@ -85,6 +86,14 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
 
         // Use LSP to find targets
         PsiElement[] targets = getGotoDeclarationTargets(sourceElement, offset);
+        if (targets.length == 1) {
+            // Some language servers return the definition of the element itself when already at the declaration.
+            // In this case, we need to return an empty array to let IntelliJ fall back to finding usages.
+            // IntelliJ's navigation logic tries declarations first, then usages if no declarations are found.
+            if (isAlreadyAtDeclaration(targets[0], psiFile, offset)) {
+                return PsiElement.EMPTY_ARRAY;
+            }
+        }
 
         // If this is a semantic token-backed file and there were targets but this wasn't represented in semantic tokens
         // as a reference, stub a reference for the word at the current offset
@@ -160,5 +169,49 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
             }
         }
         return PsiElement.EMPTY_ARRAY;
+    }
+
+    /**
+     * Checks if the target element is at the same location as the source offset.
+     * <p>
+     * Some language servers return the definition of the element itself when the user is already
+     * positioned at the declaration. By detecting this case and returning true, we allow IntelliJ's
+     * navigation system to fall back to finding usages instead of navigating to the same location.
+     * <p>
+     * This is important because IntelliJ's navigation logic works in two phases:
+     * 1. First, it tries to find declarations (via GotoDeclarationHandler)
+     * 2. If no declarations are found (empty array), it falls back to finding usages
+     *
+     * @param target        the target PsiElement from LSP textDocument/definition
+     * @param sourcePsiFile the source file where the navigation was triggered
+     * @param sourceOffset  the offset in the source file where the user clicked
+     * @return true if the target is at the same location as the source, false otherwise
+     */
+    private static boolean isAlreadyAtDeclaration(@NotNull PsiElement target,
+                                                    @NotNull PsiFile sourcePsiFile,
+                                                    int sourceOffset) {
+        // Get the file containing the target element
+        PsiFile targetFile = target.getContainingFile();
+        if (targetFile == null) {
+            return false;
+        }
+
+        // Get the virtual files to compare
+        VirtualFile sourceVirtualFile = sourcePsiFile.getVirtualFile();
+        VirtualFile targetVirtualFile = targetFile.getVirtualFile();
+
+        // If not in the same file, they can't be the same element
+        if (sourceVirtualFile == null || targetVirtualFile == null || !sourceVirtualFile.equals(targetVirtualFile)) {
+            return false;
+        }
+
+        // Check if the source offset falls within the target element's text range
+        TextRange targetRange = target.getTextRange();
+        if (targetRange == null) {
+            return false;
+        }
+
+        // If the source offset is within the target range, we're already at the declaration
+        return targetRange.contains(sourceOffset);
     }
 }
