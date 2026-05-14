@@ -14,7 +14,7 @@ import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
-import com.intellij.ide.plugins.PluginManagerCore;
+import com.intellij.ide.plugins.PluginManager;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
@@ -159,7 +159,7 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
 
     public static Path getDebugAdapterServerPath(@NotNull String pluginId,
                                                  @NotNull String serverPath) {
-        IdeaPluginDescriptor descriptor = PluginManagerCore.getPlugin(PluginId.getId(pluginId));
+        IdeaPluginDescriptor descriptor = PluginManager.getInstance().findEnabledPlugin(PluginId.getId(pluginId));
         assert descriptor != null;
         Path pluginPath = descriptor.getPluginPath();
         assert pluginPath != null;
