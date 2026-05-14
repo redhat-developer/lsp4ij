@@ -73,21 +73,45 @@ public class LSPIJUtils {
 
     private static final String ENCODED_HASH_SEPARATOR = "%23";
 
-    private static final Comparator<TextEdit> TEXT_EDITS_ASCENDING_COMPARATOR = (a, b) -> {
-        int diff = a.getRange().getStart().getLine() - b.getRange().getStart().getLine();
-        if (diff == 0) {
-            return a.getRange().getStart().getCharacter() - b.getRange().getStart().getCharacter();
-        }
-        return diff;
-    };
+    /**
+     * Helper record to track original index of TextEdit for stable sorting.
+     */
+    private record IndexedTextEdit(int index, TextEdit edit) {}
 
-    private static final Comparator<TextEdit> TEXT_EDITS_DESCENDING_COMPARATOR = (a, b) -> {
-        int diff = b.getRange().getStart().getLine() - a.getRange().getStart().getLine();
-        if (diff == 0) {
-            return b.getRange().getStart().getCharacter() - a.getRange().getStart().getCharacter();
+    /**
+     * Sort text edits by position, preserving array order for edits at the same position
+     * as required by LSP spec.
+     *
+     * @param edits the text edits to sort
+     * @return a new sorted list of text edits
+     */
+    private static List<TextEdit> sortTextEdits(List<? extends TextEdit> edits) {
+        // No need to sort if there's 0 or 1 edit
+        if (edits.size() <= 1) {
+            return new ArrayList<>(edits);
         }
-        return diff;
-    };
+
+        // Create indexed entries to preserve original order for edits at the same position
+        List<IndexedTextEdit> indexedEdits = new ArrayList<>(edits.size());
+        for (int i = 0; i < edits.size(); i++) {
+            indexedEdits.add(new IndexedTextEdit(i, edits.get(i)));
+        }
+
+        // Sort text edits by position, then by index when positions are equal.
+        // The index preserves the original array order for same-position edits,
+        // as required by the LSP spec.
+        indexedEdits.sort(Comparator
+            .comparingInt((IndexedTextEdit e) -> e.edit.getRange().getStart().getLine())
+            .thenComparingInt(e -> e.edit.getRange().getStart().getCharacter())
+            .thenComparingInt((IndexedTextEdit e) -> e.index));
+
+        // Extract sorted edits
+        List<TextEdit> result = new ArrayList<>(indexedEdits.size());
+        for (IndexedTextEdit indexed : indexedEdits) {
+            result.add(indexed.edit);
+        }
+        return result;
+    }
 
     /**
      * Open the LSP location in an editor.
@@ -1163,6 +1187,11 @@ public class LSPIJUtils {
                                      @NotNull List<TextEdit> edits,
                                      boolean saveDocument) {
         // Create an owned copy to insulate against modification of the provided list while processing it
+        // We don't sort here because:
+        // 1. RangeMarkers capture positions from the original document (S1 in LSP spec)
+        // 2. All edits refer to the original document, not intermediate states
+        // 3. RangeMarkers automatically adjust as edits are applied
+        // 4. The original array order must be preserved for same-position edits
         List<TextEdit> ownedEdits = new ArrayList<>(edits);
 
         if (ownedEdits.isEmpty()) {
@@ -1317,13 +1346,9 @@ public class LSPIJUtils {
      */
     public static String applyEdits(@NotNull Document document,
                                     @NotNull List<? extends TextEdit> edits) {
-        // Create an owned mutable copy since we're going to modify the list
-        List<TextEdit> mutableEdits = new ArrayList<>(edits);
+        // Sort text edits by position, preserving array order for same-position edits
+        List<TextEdit> mutableEdits = sortTextEdits(edits);
 
-        // Sort text edits
-        if (mutableEdits.size() > 1) {
-            mutableEdits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
-        }
         String text = document.getText();
         int lastModifiedOffset = 0;
         List<String> spans = new ArrayList<>(mutableEdits.size() + 1);
