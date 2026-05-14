@@ -10,7 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.runInTerminal.integrated;
 
-import com.intellij.ide.plugins.PluginManagerCore;
+import com.intellij.ide.plugins.PluginManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.util.SystemInfo;
@@ -129,7 +129,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
     @Override
     public boolean isApplicable() {
         PluginId pluginId = PluginId.getId("org.jetbrains.plugins.terminal");
-        return PluginManagerCore.getPlugin(pluginId) != null;
+        return PluginManager.getInstance().findEnabledPlugin(pluginId) != null;
     }
 
     /**
