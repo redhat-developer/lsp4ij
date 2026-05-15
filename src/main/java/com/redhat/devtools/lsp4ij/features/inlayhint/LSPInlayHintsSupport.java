@@ -18,7 +18,9 @@ import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.InlayHint;
+import org.eclipse.lsp4j.InlayHintLabelPart;
 import org.eclipse.lsp4j.InlayHintParams;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -102,13 +104,34 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentRefreshableFeatureS
                                             .getTextDocumentService()
                                             .resolveInlayHint(inlayHint), languageServer, LSPRequestConstants.INLAY_HINT_RESOLVE);
                                 }
-                                if (inlayHint.getLabel() != null || resolvedInlayHintFuture != null) {
-                                    // The inlayHint content is filled or the inlayHint must be resolved
+                                if (hasValidLabel(inlayHint) || resolvedInlayHintFuture != null) {
+                                    // The inlayHint content is filled with valid label or the inlayHint must be resolved
                                     data.add(new InlayHintData(inlayHint, languageServer, resolvedInlayHintFuture));
                                 }
                             });
                     return data;
                 });
+    }
+
+    /**
+     * Checks if an InlayHint has a valid label (non-empty).
+     *
+     * @param inlayHint the inlay hint to check
+     * @return true if the label is valid, false otherwise
+     */
+    private static boolean hasValidLabel(@NotNull InlayHint inlayHint) {
+        Either<String, List<InlayHintLabelPart>> label = inlayHint.getLabel();
+        if (label == null) {
+            return false;
+        }
+        if (label.isLeft()) {
+            // Simple string label: must not be empty
+            return !label.getLeft().isEmpty();
+        } else {
+            // Multi-part label: at least one part must have non-empty text
+            List<InlayHintLabelPart> parts = label.getRight();
+            return parts != null && parts.stream().anyMatch(part -> part.getValue() != null && !part.getValue().isEmpty());
+        }
     }
 
 }

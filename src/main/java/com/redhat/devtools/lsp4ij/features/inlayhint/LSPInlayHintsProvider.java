@@ -191,7 +191,9 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             data = null;
         }
         return new InlayHintPartBuildInfo(tooltipStr, builder -> {
-            builder.text(text, data);
+            if (!text.isEmpty()) {
+                builder.text(text, data);
+            }
         });
     }
 
