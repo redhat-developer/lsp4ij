@@ -27,6 +27,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP typeDefinition feature](#lsp-typeDefinition-feature)
 - [LSP usage feature](#lsp-usage-feature)
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
+- [LSP workspace folder feature](#lsp-workspace-folder-feature)
 - [LSP breadcrumbs feature](#lsp-breadcrumbs-feature)
 - [LSP editor behavior feature](#lsp-editor-behavior-feature)
 - [JSON-RPC communication feature](#json-rpc-communication-feature)
@@ -758,6 +759,77 @@ or, if appropriate, the the child/descendant element that represents the declara
 | boolean isEnabled()         | Returns `true` if the LSP feature is enabled and `false` otherwise.                                                                                                                      | `true` when server is starting/started |
 | boolean isSupported()       | Returns `true` if the LSP feature is supported and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the LSP server capabilities. | Check the server capability            |
 | boolean supportsGotoClass() | Returns `true` if the LSP feature is efficient enough to support the IDE's Go To Class action which may be invoked frequently and `false` otherwise.                                     | `false`                                |
+
+## LSP Workspace Folder Feature
+
+The `LSPWorkspaceFolderFeature` manages how workspace folders are discovered and sent to the language server via [workspace/workspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders) and [workspace/didChangeWorkspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders).
+
+See [Workspace Folders](./DeveloperGuide.md#workspace-folders) for complete documentation.
+
+| API                                                               | Description                                                                                                       | Default Behaviour                                              |
+|-------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
+| WorkspaceFolderStrategy getStrategy()                             | Returns the workspace folder strategy.                                                                            | `ProjectWorkspaceFolderStrategy`                               |
+| WorkspaceFolderStrategy createStrategy()                          | Creates the default workspace folder strategy. Override this method to provide a different default strategy.      | Returns a `ProjectWorkspaceFolderStrategy`                     |
+| List\<WorkspaceFolder\> getInitialWorkspaceFolders(Project)         | Returns the initial workspace folders to send during initialization.                                              | Delegates to the configured strategy                           |
+| WorkspaceFolder getWorkspaceFolderForFile(VirtualFile)            | Returns the workspace folder for the given file, or `null` if none.                                               | Delegates to the configured strategy                           |
+| WorkspaceFolder computeWorkspaceFolderToNotify(VirtualFile)       | Computes the workspace folder to notify for the given file without marking it as notified.                        | Checks if folder needs notification based on lazy loading mode |
+| boolean markFolderAsNotified(WorkspaceFolder)                     | Marks a workspace folder as notified.                                                                              | Adds folder URI to internal tracking set                       |
+| void reset()                                                      | Clears the tracking of notified workspace folders. This should be called when the language server is restarted.   | Clears the internal tracking set                               |
+
+### Customizing Workspace Folder Strategy
+
+To customize workspace folder discovery, extend `LSPWorkspaceFolderFeature` and override `createStrategy()`:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.MarkersWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        // Use marker-based discovery for Python projects
+        return new MarkersWorkspaceFolderStrategy("pyproject.toml", "setup.py");
+    }
+}
+```
+
+Then register it in your `LSPClientFeatures`:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+    
+    @Override
+    public @NotNull LSPClientFeatures createClientFeatures() {
+        LSPClientFeatures clientFeatures = new LSPClientFeatures();
+        clientFeatures.setWorkspaceFolderFeature(new MyWorkspaceFolderFeature());
+        return clientFeatures;
+    }
+}
+```
+
+### Available Workspace Folder Strategies
+
+LSP4IJ provides several built-in strategies:
+
+- **[ProjectWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ProjectWorkspaceFolderStrategy.java)** (default): Uses IntelliJ project base directories
+- **[SourceRootsWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/SourceRootsWorkspaceFolderStrategy.java)**: Uses module source roots
+- **[MarkersWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/MarkersWorkspaceFolderStrategy.java)**: Discovers workspace folders by walking up the directory tree looking for marker files (e.g., `pyproject.toml`, `package.json`)
+- **[ConfigurableWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ConfigurableWorkspaceFolderStrategy.java)**: Configurable strategy using JSON configuration
+
+All strategies support both eager loading (all folders sent during initialization) and lazy loading (folders sent progressively as files are opened).
+
+For more details, see the [Workspace Folders documentation](./DeveloperGuide.md#workspace-folders).
 
 ## LSP Breadcrumbs Feature
 
