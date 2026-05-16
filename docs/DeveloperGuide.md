@@ -779,17 +779,44 @@ LSP4IJ provides several built-in strategies:
 
 Uses the IntelliJ [ProjectWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ProjectWorkspaceFolderStrategy.java) project base directories as workspace folders. By default, all folders are sent during initialization.
 
+To customize the workspace folder strategy, you need to:
+
+1. Create a class that extends `LSPWorkspaceFolderFeature` and overrides `createStrategy()`:
+
 ```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ProjectWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        return new ProjectWorkspaceFolderStrategy();
+    }
+}
+```
+
+2. In your `LanguageServerFactory`, create `LSPClientFeatures` and set the workspace folder feature:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.jetbrains.annotations.NotNull;
+
 public class MyLanguageServerFactory implements LanguageServerFactory {
     
     @Override
     public @NotNull LSPClientFeatures createClientFeatures() {
-        return new LSPClientFeatures() {
-            @Override
-            protected @NotNull WorkspaceFolderStrategy createWorkspaceFolderStrategy() {
-                return new ProjectWorkspaceFolderStrategy();
-            }
-        };
+        LSPClientFeatures clientFeatures = new LSPClientFeatures();
+        clientFeatures.setWorkspaceFolderFeature(new MyWorkspaceFolderFeature());
+        return clientFeatures;
     }
 }
 ```
@@ -799,9 +826,19 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 You can extend the strategy to enable lazy loading, sending workspace folders progressively via `workspace/didChangeWorkspaceFolders` as files are opened:
 
 ```java
-@Override
-protected @NotNull WorkspaceFolderStrategy createWorkspaceFolderStrategy() {
-    return new ProjectWorkspaceFolderStrategy(true /* Enable lazy loading */);
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ProjectWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        return new ProjectWorkspaceFolderStrategy(true /* Enable lazy loading */);
+    }
 }
 ```
 
@@ -814,9 +851,19 @@ Uses IntelliJ module [SourceRootsWorkspaceFolderStrategy](https://github.com/red
 Useful when you want to expose only source directories (not the entire project root) to the language server.
 
 ```java
-@Override
-protected @NotNull WorkspaceFolderStrategy createWorkspaceFolderStrategy() {
-    return new SourceRootsWorkspaceFolderStrategy();
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.SourceRootsWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        return new SourceRootsWorkspaceFolderStrategy();
+    }
 }
 ```
 
@@ -825,9 +872,19 @@ protected @NotNull WorkspaceFolderStrategy createWorkspaceFolderStrategy() {
 You can extend the strategy to enable lazy loading, sending workspace folders on-demand as files are opened:
 
 ```java
-@Override
-protected @NotNull WorkspaceFolderStrategy createWorkspaceFolderStrategy() {
-    return new SourceRootsWorkspaceFolderStrategy(true /* Enable lazy loading */);
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.SourceRootsWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        return new SourceRootsWorkspaceFolderStrategy(true /* Enable lazy loading */);
+    }
 }
 ```
 
@@ -838,9 +895,19 @@ to discover workspace folders dynamically by walking up the directory tree looki
 Folders are discovered lazily as files are opened.
 
 ```java
-@Override
-protected @NotNull WorkspaceFolderStrategy createWorkspaceFolderStrategy() {
-    return new MarkersWorkspaceFolderStrategy("pyproject.toml", "setup.py");
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.MarkersWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        return new MarkersWorkspaceFolderStrategy("pyproject.toml", "setup.py");
+    }
 }
 ```
 
@@ -859,18 +926,28 @@ For example, when opening `/monorepo/backend/src/app.py` with markers `["pyproje
 [ConfigurableWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ConfigurableWorkspaceFolderStrategy.java) is a flexible strategy that can be configured with JSON to support different root types, markers, and lazy loading options:
 
 ```java
-@Override
-protected @NotNull WorkspaceFolderStrategy createWorkspaceFolderStrategy() {
-    // language=json
-    String config = """
-        {
-          "markers": ["pyproject.toml", "setup.py"],
-          "lazy": true
-        }
-        """;
-    ConfigurableWorkspaceFolderStrategy strategy = new ConfigurableWorkspaceFolderStrategy();
-    strategy.configure(config);
-    return strategy;
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        // language=json
+        String config = """
+            {
+              "markers": ["pyproject.toml", "setup.py"],
+              "lazy": true
+            }
+            """;
+        ConfigurableWorkspaceFolderStrategy strategy = new ConfigurableWorkspaceFolderStrategy();
+        strategy.configure(config);
+        return strategy;
+    }
 }
 ```
 
@@ -1070,7 +1147,22 @@ When `lazy: true`, the language server receives workspace folders progressively:
 
 For complete control, implement your own `WorkspaceFolderStrategy`:
 
+1. Create your custom strategy implementation:
+
 ```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.eclipse.lsp4j.WorkspaceFolder;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+
 public class MyWorkspaceFolderStrategy implements WorkspaceFolderStrategy {
     
     @Override
@@ -1097,6 +1189,24 @@ public class MyWorkspaceFolderStrategy implements WorkspaceFolderStrategy {
     public boolean sendAllFoldersOnInitialization() {
         // Return true to send all folders at init, false for lazy loading
         return true;
+    }
+}
+```
+
+2. Create a workspace folder feature that uses your custom strategy:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        return new MyWorkspaceFolderStrategy();
     }
 }
 ```
