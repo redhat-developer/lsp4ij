@@ -14,8 +14,10 @@ import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
@@ -74,6 +76,7 @@ public class LanguageServerPanel implements Disposable {
     private JBTextField serverName;
     private @Nullable EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
+    private TextFieldWithBrowseButton workingDir;
     private ServerMappingsPanel mappingsPanel;
     private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
@@ -165,6 +168,53 @@ public class LanguageServerPanel implements Disposable {
         });
     }
 
+    /**
+     * Update preview working directory label with expanded macro response if needed.
+     *
+     * @param workingDir         the working directory field which could contains macro syntax.
+     * @param previewLabel       the preview label.
+     * @param project            the project.
+     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
+     */
+    private static void updatePreviewWorkingDir(@NotNull TextFieldWithBrowseButton workingDir,
+                                                @NotNull JLabel previewLabel,
+                                                @NotNull Project project) {
+        workingDir.getTextField().getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateLabel(previewLabel);
+            }
+
+            private void updateLabel(JLabel previewLabel) {
+                String text = workingDir.getText();
+                if (text.isBlank()) {
+                    previewLabel.setToolTipText("");
+                    previewLabel.setText("");
+                    return;
+                }
+                String preview = resolveCommandLine(text, project);
+                if (preview.equals(text)) {
+                    previewLabel.setToolTipText("");
+                    previewLabel.setText("");
+                } else {
+                    previewLabel.setToolTipText(preview);
+                    String shortPreview = preview.length() > COMMAND_LENGTH_MAX ? preview.substring(0, COMMAND_LENGTH_MAX) + "..." : preview;
+                    previewLabel.setText(shortPreview);
+                }
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateLabel(previewLabel);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateLabel(previewLabel);
+            }
+        });
+    }
+
     private static JLabel createLabelForComponent(@NotNull @NlsContexts.Label String labelText, @NotNull JComponent component) {
         JLabel label = new JLabel(UIUtil.replaceMnemonicAmpersand(labelText));
         label.setLabelFor(component);
@@ -212,6 +262,8 @@ public class LanguageServerPanel implements Disposable {
             serverTab.addComponent(environmentVariables);
             // Command line
             createCommandLineField(serverTab);
+            // Working directory
+            createWorkingDirField(serverTab);
         }
     }
 
@@ -371,6 +423,15 @@ public class LanguageServerPanel implements Disposable {
         builder.addComponent(previewCommandLabel, 0);
     }
 
+    private void createWorkingDirField(@NotNull FormBuilder builder) {
+        workingDir = new TextFieldWithBrowseButton();
+        workingDir.addBrowseFolderListener(null, null, project, FileChooserDescriptorFactory.createSingleFolderDescriptor());
+        JLabel previewWorkingDirLabel = createLabelForComponent("", workingDir);
+        updatePreviewWorkingDir(workingDir, previewWorkingDirLabel, project);
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.workingDir"), workingDir);
+        builder.addComponent(previewWorkingDirLabel, 0);
+    }
+
     private void createConfigurationField(@NotNull FormBuilder builder) {
         // Create the hyperlink "Edit JSON Schema" / "Associate with JSON Schema".
         editJsonSchemaAction = new HyperlinkLabel(LanguageServerBundle.message("language.server.configuration.json.schema.associate"));
@@ -444,6 +505,17 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         this.commandLine.setText(commandLine != null ? commandLine : "");
+    }
+
+    public @Nullable String getWorkingDir() {
+        return workingDir != null ? workingDir.getText() : null;
+    }
+
+    public void setWorkingDir(@Nullable String workingDir) {
+        if (this.workingDir == null) {
+            return;
+        }
+        this.workingDir.setText(workingDir != null ? workingDir : "");
     }
 
     public ServerMappingsPanel getMappingsPanel() {

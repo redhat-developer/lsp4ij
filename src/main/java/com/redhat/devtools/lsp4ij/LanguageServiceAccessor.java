@@ -99,10 +99,11 @@ public class LanguageServiceAccessor implements Disposable {
             // Bump the modification trackers
             languageServerWrappers.forEach(LanguageServerWrapper::incrementModificationCount);
 
-            // Restart all servers where command or mappings has changed
+            // Restart all servers where command, working dir or mappings has changed
             // if changes doesn't come from installer.
             if (event.getUpdatedBy() != LanguageServerDefinitionEvent.UpdatedBy.INSTALLER
                     && (event.commandChanged ||
+                    event.workingDirChanged ||
                     event.userEnvironmentVariablesChanged ||
                     event.includeSystemEnvironmentVariablesChanged ||
                     event.mappingsChanged ||

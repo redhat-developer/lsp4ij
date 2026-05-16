@@ -108,6 +108,7 @@ public class LanguageServerTemplateManagerTest {
                 null,
                 null,
                 "cmd",
+                null,
                 new HashMap<>(),
                 false,
                 null,

@@ -33,6 +33,11 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
         programArgs.addProperty(DEFAULT_JSON_PROPERTY, src.getCommandLine());
         userDefinedLSDefinitionJson.add(PROGRAM_ARGS_JSON_PROPERTY, programArgs);
 
+        // Working directory
+        if (src.getWorkingDir() != null && !src.getWorkingDir().isBlank()) {
+            userDefinedLSDefinitionJson.addProperty(WORKING_DIR_JSON_PROPERTY, src.getWorkingDir());
+        }
+
         JsonArray languageMappings = new JsonArray();
         for (var languageEntry : src.getLanguageMappings().entrySet()) {
             JsonObject language = new JsonObject();

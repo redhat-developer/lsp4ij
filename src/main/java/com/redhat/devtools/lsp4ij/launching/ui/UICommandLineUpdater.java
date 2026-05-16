@@ -75,13 +75,14 @@ public class UICommandLineUpdater implements CommandLineUpdater {
                 LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.INSTALLER,
                 project,
                 definition,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
+                /* nameChanged */ false,
+                /* commandChanged */ true,
+                /* workingDirChanged */ false,
+                /* userEnvironmentVariablesChanged */ false,
+                /* includeSystemEnvironmentVariablesChanged */ false,
+                /* mappingsChanged */ false,
+                /* clientConfigurationContentChanged */ false,
+                /* installerConfigurationContentChanged */ false,
                 /* workspaceFolderStrategyConfigurationChanged*/ false);
         LanguageServersRegistry.getInstance().handleChangeEvent(event);
     }

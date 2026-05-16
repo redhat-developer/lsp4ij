@@ -77,13 +77,25 @@ public class CommandUtils {
     public static GeneralCommandLine createCommandLine(@NotNull String commandLine,
                                                        @NotNull Map<String, String> userEnvironmentVariables,
                                                        boolean includeSystemEnvironmentVariables) {
+        return createCommandLine(commandLine, null, userEnvironmentVariables, includeSystemEnvironmentVariables);
+    }
+
+    @NotNull
+    public static GeneralCommandLine createCommandLine(@NotNull String commandLine,
+                                                       @Nullable String workingDir,
+                                                       @NotNull Map<String, String> userEnvironmentVariables,
+                                                       boolean includeSystemEnvironmentVariables) {
         Map<String, String> environmentVariables = new HashMap<>(userEnvironmentVariables);
         // Add System environment variables
         if (includeSystemEnvironmentVariables) {
             environmentVariables.putAll(EnvironmentUtil.getEnvironmentMap());
         }
-        return new GeneralCommandLine(CommandUtils.createCommands(commandLine))
+        GeneralCommandLine generalCommandLine = new GeneralCommandLine(CommandUtils.createCommands(commandLine))
                 .withEnvironment(environmentVariables);
+        if (workingDir != null && !workingDir.isBlank()) {
+            generalCommandLine.setWorkDirectory(workingDir);
+        }
+        return generalCommandLine;
     }
 
     /**

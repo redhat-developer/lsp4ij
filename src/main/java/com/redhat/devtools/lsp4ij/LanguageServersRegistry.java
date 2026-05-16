@@ -239,6 +239,7 @@ public class LanguageServersRegistry implements Disposable {
                                     settings.getServerUrl(),
                                     "",
                                     settings.getCommandLine(),
+                                    settings.getWorkingDir(),
                                     settings.getUserEnvironmentVariables(),
                                     settings.isIncludeSystemEnvironmentVariables(),
                                     globalSettings != null ? globalSettings.getConfigurationContent() : null,
@@ -591,6 +592,7 @@ public class LanguageServersRegistry implements Disposable {
                 settings.setServerName(userDefinedServer.getDisplayName());
                 settings.setServerUrl(userDefinedServer.getUrl());
                 settings.setCommandLine(userDefinedServer.getCommandLine());
+                settings.setWorkingDir(userDefinedServer.getWorkingDir());
                 settings.setUserEnvironmentVariables(userDefinedServer.getUserEnvironmentVariables());
                 settings.setIncludeSystemEnvironmentVariables(userDefinedServer.isIncludeSystemEnvironmentVariables());
                 settings.setMappings(toServerMappingSettings(mappings));
@@ -928,6 +930,7 @@ public class LanguageServersRegistry implements Disposable {
                     definition,
                     /* nameChanged */ false,
                     /* commandChanged */ false,
+                    /* workingDirChanged */ false,
                     /* userEnvironmentVariablesChanged */ false,
                     /* includeSystemEnvironmentVariablesChanged */ false,
                     /* mappingsChanged */ true,
@@ -947,6 +950,7 @@ public class LanguageServersRegistry implements Disposable {
             ls.setName(request.name());
             ls.setUrl(request.url());
             ls.setCommandLine(request.commandLine());
+            ls.setWorkingDir(request.workingDir());
             ls.setUserEnvironmentVariables(request.userEnvironmentVariables());
             ls.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
             ls.setClientConfigurationContent(request.clientConfigurationContent());
@@ -963,6 +967,7 @@ public class LanguageServersRegistry implements Disposable {
         UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
         boolean nameChanged = !Objects.equals(settings.getServerName(), request.name());
         boolean commandChanged = !Objects.equals(settings.getCommandLine(), request.commandLine());
+        boolean workingDirChanged = !Objects.equals(settings.getWorkingDir(), request.workingDir());
         boolean userEnvironmentVariablesChanged = !Objects.equals(settings.getUserEnvironmentVariables(), request.userEnvironmentVariables());
         boolean includeSystemEnvironmentVariablesChanged = settings.isIncludeSystemEnvironmentVariables() != request.includeSystemEnvironmentVariables();
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), request.mappings());
@@ -977,6 +982,7 @@ public class LanguageServersRegistry implements Disposable {
         settings.setServerName(request.name());
         settings.setServerUrl(request.url());
         settings.setCommandLine(request.commandLine());
+        settings.setWorkingDir(request.workingDir());
         settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         settings.setClientConfigurationContent(request.clientConfigurationContent());
@@ -984,7 +990,7 @@ public class LanguageServersRegistry implements Disposable {
         settings.setWorkspaceFolderStrategyConfiguration(request.workspaceFolderStrategyConfiguration());
         settings.setMappings(request.mappings());
 
-        if (nameChanged || commandChanged || userEnvironmentVariablesChanged ||
+        if (nameChanged || commandChanged || workingDirChanged || userEnvironmentVariablesChanged ||
                 includeSystemEnvironmentVariablesChanged ||
                 mappingsChanged || clientConfigurationContentChanged || installerConfigurationContentChanged ||
                 workspaceFolderStrategyConfigurationChanged) {
@@ -995,6 +1001,7 @@ public class LanguageServersRegistry implements Disposable {
                     request.serverDefinition(),
                     nameChanged,
                     commandChanged,
+                    workingDirChanged,
                     userEnvironmentVariablesChanged,
                     includeSystemEnvironmentVariablesChanged,
                     mappingsChanged,
@@ -1126,6 +1133,7 @@ public class LanguageServersRegistry implements Disposable {
                                                 @Nullable String name,
                                                 @Nullable String url,
                                                 @Nullable String commandLine,
+                                                @Nullable String workingDir,
                                                 @Nullable Map<String, String> userEnvironmentVariables,
                                                 boolean includeSystemEnvironmentVariables,
                                                 @NotNull List<ServerMappingSettings> mappings,

@@ -51,6 +51,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private String name;
     private String url;
     private String commandLine;
+    private String workingDir;
     private Map<String, String> userEnvironmentVariables;
     private boolean includeSystemEnvironmentVariables;
 
@@ -72,6 +73,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                @Nullable String url,
                                                @Nullable String description,
                                                @NotNull String commandLine,
+                                               @Nullable String workingDir,
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
                                                @Nullable String defaultConfigurationContent,
@@ -87,6 +89,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         this.url = url;
         this.templateId = templateId;
         this.commandLine = commandLine;
+        this.workingDir = workingDir;
         this.userEnvironmentVariables = userEnvironmentVariables;
         this.includeSystemEnvironmentVariables = includeSystemEnvironmentVariables;
         this.defaultConfigurationContent = defaultConfigurationContent;
@@ -114,6 +117,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                 null,
                 description,
                 commandLine,
+                null,
                 userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
                 defaultConfigurationContent,
@@ -129,7 +133,9 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
         String resolvedCommandLine = resolveCommandLine(commandLine, project);
+        String resolvedWorkingDir = workingDir != null ? resolveCommandLine(workingDir, project) : null;
         return new UserDefinedStreamConnectionProvider(resolvedCommandLine,
+                resolvedWorkingDir,
                 userEnvironmentVariables,
                 includeSystemEnvironmentVariables,
                 this,
@@ -176,6 +182,14 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public void setCommandLine(String commandLine) {
         this.commandLine = commandLine;
+    }
+
+    public String getWorkingDir() {
+        return workingDir;
+    }
+
+    public void setWorkingDir(String workingDir) {
+        this.workingDir = workingDir;
     }
 
     public Map<String, String> getUserEnvironmentVariables() {
