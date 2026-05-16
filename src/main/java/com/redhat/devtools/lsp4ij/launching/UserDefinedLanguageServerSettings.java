@@ -116,6 +116,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String commandLine;
 
+        private String workingDir;
+
         private Map<String, String> userEnvironmentVariables;
 
         private boolean includeSystemEnvironmentVariables = true;
@@ -169,6 +171,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setCommandLine(String commandLine) {
             this.commandLine = commandLine;
+        }
+
+        public String getWorkingDir() {
+            return workingDir;
+        }
+
+        public void setWorkingDir(String workingDir) {
+            this.workingDir = workingDir;
         }
 
         /**

@@ -43,6 +43,10 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
             Map<String, String> programArgsMap = gson.fromJson(programArgs, mapType);
             languageServerTemplate.setProgramArgs(programArgsMap);
         }
+        String workingDir = JSONUtils.getString(jsonObject, WORKING_DIR_JSON_PROPERTY);
+        if (workingDir != null) {
+            languageServerTemplate.setWorkingDir(workingDir);
+        }
         languageServerTemplate.setEnvData(deserializeEnvData(jsonObject));
 
         boolean expandConfiguration = JSONUtils.getBoolean(jsonObject, EXPAND_CONFIGURATION_JSON_PROPERTY);

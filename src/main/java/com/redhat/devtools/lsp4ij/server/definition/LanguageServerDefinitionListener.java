@@ -76,6 +76,7 @@ public interface LanguageServerDefinitionListener {
 
         public final boolean nameChanged;
         public final boolean commandChanged;
+        public final boolean workingDirChanged;
         public final boolean userEnvironmentVariablesChanged;
         public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean mappingsChanged;
@@ -88,6 +89,7 @@ public interface LanguageServerDefinitionListener {
                                           @NotNull LanguageServerDefinition serverDefinition,
                                           boolean nameChanged,
                                           boolean commandChanged,
+                                          boolean workingDirChanged,
                                           boolean userEnvironmentVariablesChanged,
                                           boolean includeSystemEnvironmentVariablesChanged,
                                           boolean mappingsChanged,
@@ -98,6 +100,7 @@ public interface LanguageServerDefinitionListener {
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
+            this.workingDirChanged = workingDirChanged;
             this.userEnvironmentVariablesChanged = userEnvironmentVariablesChanged;
             this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.mappingsChanged = mappingsChanged;

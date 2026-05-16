@@ -308,6 +308,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String clientConfiguration = this.languageServerPanel.getClientConfigurationContent();
         String installerConfiguration = this.languageServerPanel.getInstallerConfigurationContent();
         String workspaceFolderStrategyConfiguration = "";
+        String workingDir = this.languageServerPanel.getWorkingDir();
 
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
                 templateId,
@@ -315,6 +316,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 serverUrl,
                 "",
                 commandLine != null ? commandLine : "",
+                workingDir,
                 userEnvironmentVariables != null ? userEnvironmentVariables : Collections.emptyMap(),
                 includeSystemEnvironmentVariables,
                 configuration,

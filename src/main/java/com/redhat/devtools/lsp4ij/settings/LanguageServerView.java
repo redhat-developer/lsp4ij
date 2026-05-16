@@ -138,6 +138,7 @@ public class LanguageServerView implements Disposable {
             }
             if (!(isEquals(getDisplayName(), settings.getServerName())
                     && isEquals(this.getCommandLine(), settings.getCommandLine())
+                    && isEquals(this.getWorkingDir(), settings.getWorkingDir())
                     && Objects.equals(this.getUserEnvironmentVariables(), settings.getUserEnvironmentVariables())
                     && this.isIncludeSystemEnvironmentVariables() == settings.isIncludeSystemEnvironmentVariables()
                     && Objects.deepEquals(this.getMappings(), settings.getMappings())
@@ -222,6 +223,7 @@ public class LanguageServerView implements Disposable {
             // User defined language server
             if (userSettings != null) {
                 this.setCommandLine(userSettings.getCommandLine());
+                this.setWorkingDir(userSettings.getWorkingDir());
                 this.setEnvData(EnvironmentVariablesData.create(
                         userSettings.getUserEnvironmentVariables(),
                         userSettings.isIncludeSystemEnvironmentVariables()));
@@ -341,6 +343,7 @@ public class LanguageServerView implements Disposable {
                                     getDisplayName(),
                                     getServerUrl(),
                                     getCommandLine(),
+                                    getWorkingDir(),
                                     getEnvData() != null ? getEnvData().getEnvs() : null,
                                     isIncludeSystemEnvironmentVariables(),
                                     getMappings(),
@@ -534,6 +537,14 @@ public class LanguageServerView implements Disposable {
 
     public void setCommandLine(@Nullable String commandLine) {
         languageServerPanel.setCommandLine(commandLine);
+    }
+
+    public @Nullable String getWorkingDir() {
+        return languageServerPanel.getWorkingDir();
+    }
+
+    public void setWorkingDir(@Nullable String workingDir) {
+        languageServerPanel.setWorkingDir(workingDir);
     }
 
     public String getServerUrl() {
