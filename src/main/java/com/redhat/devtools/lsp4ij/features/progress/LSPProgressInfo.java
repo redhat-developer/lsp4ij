@@ -26,6 +26,14 @@ class LSPProgressInfo {
     private boolean cancellable;
     private boolean done;
 
+    // Flag to prevent creating multiple IntelliJ tasks for the same token
+    // (non-compliant servers may send multiple 'begin' notifications with the same token)
+    private boolean taskStarted;
+
+    // Counter to track active 'begin' notifications
+    // Handles non-compliant servers that reuse tokens: done=true only when all begins have their corresponding end
+    private int beginCount;
+
     private final LinkedBlockingDeque<WorkDoneProgressNotification> progressNotifications;
 
     public LSPProgressInfo(String token) {
@@ -116,5 +124,38 @@ class LSPProgressInfo {
 
     public void cancel() {
         this.cancelled = true;
+    }
+
+    public boolean isTaskStarted() {
+        return taskStarted;
+    }
+
+    public void setTaskStarted(boolean taskStarted) {
+        this.taskStarted = taskStarted;
+    }
+
+    /**
+     * Increments the begin count when a 'begin' notification arrives.
+     * Resets the done flag to ensure the task continues processing.
+     * This handles the case where a non-compliant server sends multiple 'begin' with the same token.
+     */
+    public synchronized void incrementBeginCount() {
+        this.beginCount++;
+        // Reset done flag when a new begin arrives
+        if (this.beginCount > 0) {
+            this.done = false;
+        }
+    }
+
+    /**
+     * Decrements the begin count when an 'end' notification arrives.
+     * Marks the progress as done only when all 'begin' notifications have their corresponding 'end'.
+     */
+    public synchronized void decrementBeginCount() {
+        this.beginCount--;
+        // Mark as done only when all begins have their corresponding end
+        if (this.beginCount <= 0) {
+            this.done = true;
+        }
     }
 }
