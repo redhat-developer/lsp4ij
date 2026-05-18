@@ -68,7 +68,7 @@ public class LSPGoToReferenceAction extends AbstractLSPGoToAction {
 
     @Override
     protected boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file) {
-        return clientFeatures.getReferencesFeature().isReferencesSupported(file);
+        return clientFeatures.getReferencesFeature().isSupported(file);
     }
 
     @Override

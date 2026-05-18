@@ -35,11 +35,11 @@ public class LSPUsageFeature extends AbstractLSPDocumentFeature {
      */
     public boolean isUsageSupported(@NotNull PsiFile file) {
         var clientFeature = getClientFeatures();
-        return clientFeature.getDeclarationFeature().isDeclarationSupported(file) ||
-                clientFeature.getTypeDefinitionFeature().isTypeDefinitionSupported(file) ||
-                clientFeature.getDefinitionFeature().isDefinitionSupported(file) ||
-                clientFeature.getReferencesFeature().isReferencesSupported(file) ||
-                clientFeature.getImplementationFeature().isImplementationSupported(file);
+        return clientFeature.getDeclarationFeature().isSupported(file) ||
+                clientFeature.getTypeDefinitionFeature().isSupported(file) ||
+                clientFeature.getDefinitionFeature().isSupported(file) ||
+                clientFeature.getReferencesFeature().isSupported(file) ||
+                clientFeature.getImplementationFeature().isSupported(file);
     }
 
     @Override
