@@ -68,7 +68,7 @@ public class LSPGoToTypeDefinitionAction extends AbstractLSPGoToAction {
 
     @Override
     protected boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file) {
-        return clientFeatures.getTypeDefinitionFeature().isTypeDefinitionSupported(file);
+        return clientFeatures.getTypeDefinitionFeature().isSupported(file);
     }
 
     @Override

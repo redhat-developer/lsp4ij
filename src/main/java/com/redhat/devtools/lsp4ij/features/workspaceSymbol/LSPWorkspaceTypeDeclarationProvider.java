@@ -84,7 +84,7 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         }
 
         if (!LanguageServiceAccessor.getInstance(project)
-                .hasAny(file, ls -> ls.getClientFeatures().getTypeDefinitionFeature().isTypeDefinitionSupported(file))) {
+                .hasAny(file, ls -> ls.getClientFeatures().getTypeDefinitionFeature().isSupported(file))) {
             return null;
         }
 
