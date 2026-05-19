@@ -482,6 +482,11 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor"
                 order="first, before wordCompletion"/>
 
+        <!-- LSP textDocument/inlineCompletion request support (LSP 3.18.0) -->
+        <inline.completion.provider
+                id="LSPInlineCompletionProvider"
+                implementationClass="com.redhat.devtools.lsp4ij.features.inlineCompletion.LSPInlineCompletionProvider"/>
+
         <!-- LSP textDocument/definition request support -->
         <gotoDeclarationHandler
                 id="LSPGotoDeclarationHandler"

@@ -55,6 +55,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPCompletionFeature completionFeature;
 
+    private LSPInlineCompletionFeature inlineCompletionFeature;
+
     private LSPDeclarationFeature declarationFeature;
 
     private LSPDefinitionFeature definitionFeature;
@@ -553,6 +555,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public final LSPClientFeatures setCompletionFeature(@NotNull LSPCompletionFeature completionFeature) {
         completionFeature.setClientFeatures(this);
         this.completionFeature = completionFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP inline completion feature.
+     *
+     * @return the LSP inline completion feature.
+     */
+    @NotNull
+    public final LSPInlineCompletionFeature getInlineCompletionFeature() {
+        if (inlineCompletionFeature == null) {
+            initInlineCompletionFeature();
+        }
+        return inlineCompletionFeature;
+    }
+
+    private synchronized void initInlineCompletionFeature() {
+        if (inlineCompletionFeature != null) {
+            return;
+        }
+        setInlineCompletionFeature(new LSPInlineCompletionFeature());
+    }
+
+    /**
+     * Initialize the LSP inline completion feature.
+     *
+     * @param inlineCompletionFeature the LSP inline completion feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setInlineCompletionFeature(@NotNull LSPInlineCompletionFeature inlineCompletionFeature) {
+        inlineCompletionFeature.setClientFeatures(this);
+        this.inlineCompletionFeature = inlineCompletionFeature;
         return this;
     }
 
@@ -1542,11 +1576,17 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         if (inlayHintFeature != null) {
             inlayHintFeature.setServerCapabilities(serverCapabilities);
         }
+        if (inlineCompletionFeature != null) {
+            inlineCompletionFeature.setServerCapabilities(serverCapabilities);
+        }
         if (referencesFeature != null) {
             referencesFeature.setServerCapabilities(serverCapabilities);
         }
         if (renameFeature != null) {
             renameFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (selectionRangeFeature != null) {
+            selectionRangeFeature.setServerCapabilities(serverCapabilities);
         }
         if (semanticTokensFeature != null) {
             semanticTokensFeature.setServerCapabilities(serverCapabilities);
@@ -1623,6 +1663,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
                     getImplementationFeature().getImplementationCapabilityRegistry();
             // register 'textDocument/inlayHint' capability
             case LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT -> getInlayHintFeature().getInlayHintCapabilityRegistry();
+            // register 'textDocument/inlineCompletion' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_INLINE_COMPLETION ->
+                    getInlineCompletionFeature().getInlineCompletionCapabilityRegistry();
             // register 'textDocument/callHierarchy' capability
             case LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY ->
                     getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();

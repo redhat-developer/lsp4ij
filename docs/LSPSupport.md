@@ -43,6 +43,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [workspace/inlayHint/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlayHint_refresh) 
  * ✅ [textDocument/completion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion) (see [implementation details](#completion-proposals))
  * ✅ [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) (see [implementation details](#completion-item-resolve))
+ * ✅ [textDocument/inlineCompletion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_inlineCompletion) (see [implementation details](#inline-completion))
  * ✅ [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp) (see [implementation details](#signature-help))
  * ✅ [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) (see [implementation details](#publish-diagnostics))
  * ✅ [textDocument/codeAction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction) (see [implementation details](#codeAction))
@@ -343,6 +344,18 @@ Here a sample with [TypeScript Language Server](./user-defined-ls/typescript-lan
 ![completionItem/resolve/detail](./images/lsp-support/completionItem_resolve_detail.png)
 
  * the `additionalTextEdits` property of a completionItem.
+
+### Inline Completion
+
+[textDocument/inlineCompletion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_inlineCompletion) is implemented with
+[LSPInlineCompletionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/kotlin/com/redhat/devtools/lsp4ij/features/inlineCompletion/LSPInlineCompletionProvider.kt) class
+which integrates with IntelliJ's inline completion API to provide AI-assisted code completion via Language Server Protocol.
+
+The provider uses debounced requests (300ms delay) to avoid excessive server calls during rapid typing, with immediate response for manual triggers.
+
+Here is an example with the [Perl Language Server](./user-defined-ls/perl-lsp.md) showing inline completion:
+
+![textDocument/inlineCompletion](./images/lsp-support/textDocument_inlineCompletion.gif)
 
 ### Signature Help
 

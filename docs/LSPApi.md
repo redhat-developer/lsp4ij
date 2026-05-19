@@ -6,6 +6,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP codeLens feature](#lsp-codeLens-feature)
 - [LSP color feature](#lsp-color-feature)
 - [LSP completion feature](#lsp-completion-feature)
+- [LSP inlineCompletion feature](#lsp-inlineCompletion-feature)
 - [LSP diagnostic feature](#lsp-diagnostic-feature) 
 - [LSP declaration feature](#lsp-declaration-feature)
 - [LSP definition feature](#lsp-definition-feature)
@@ -248,6 +249,15 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | boolean isItemTextBold(CompletionItem item)                                           | Returns the IntelliJ lookup item text bold from the given LSP completion item and null otherwise.                                                                                                                                  | `item.getKind() == CompletionItemKind.Keyword`                                        |
 | boolean useContextAwareSorting(PsiFile file)                                          | Returns `true` if client-side context-aware completion sorting should be used for the specified file and `false` otherwise.                                                                                                        | `false`                                                                               |
 | boolean useTemplateForInvocationOnlySnippet(PsiFile file)                             | Returns `true` if an editor template should be used for invocation-only snippets and `false` otherwise.                                                                                                                            | `true`                                                                                |
+
+## LSP InlineCompletion Feature
+
+| API                           | Description                                                                                                                                                                                                                        | Default Behaviour           |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| boolean isEnabled(PsiFile file)  | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
+| boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+
+The inline completion feature integrates with IntelliJ's inline completion API to provide AI-assisted code completion suggestions that appear as you type.
 
 ## LSP Diagnostic Feature
 

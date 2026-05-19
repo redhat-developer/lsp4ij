@@ -138,7 +138,8 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
             for (var filter : filters) {
                 boolean hasLanguage = !StringUtils.isEmpty(filter.getLanguage());
                 boolean hasScheme = !StringUtils.isEmpty(filter.getScheme());
-                boolean hasPattern = !StringUtils.isEmpty(filter.getPattern());
+                var pattern = filter.getPattern();
+                boolean hasPattern = pattern != null && (pattern.isLeft() ? !StringUtils.isEmpty(pattern.getLeft()) : true);
 
                 boolean matchDocumentSelector = false;
                 // Matches language?

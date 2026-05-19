@@ -46,7 +46,12 @@ public class ExtendedDocumentSelector {
             if (patternMatcher != null) {
                 return patternMatcher;
             }
-            String pattern = super.getPattern();
+            var patternEither = super.getPattern();
+            if (patternEither == null || !patternEither.isLeft()) {
+                // Only support String patterns for now, not RelativePattern
+                return null;
+            }
+            String pattern = patternEither.getLeft();
             if (StringUtils.isEmpty(pattern)) {
                 return null;
             }
@@ -59,7 +64,11 @@ public class ExtendedDocumentSelector {
         this.filters = documentSelector != null ?
                 documentSelector
                         .stream()
-                        .filter(f -> !(StringUtils.isEmpty(f.getLanguage()) && StringUtils.isEmpty(f.getPattern()) && StringUtils.isEmpty(f.getScheme())))
+                        .filter(f -> {
+                            var pattern = f.getPattern();
+                            boolean hasPattern = pattern != null && (pattern.isLeft() ? !StringUtils.isEmpty(pattern.getLeft()) : true);
+                            return !(StringUtils.isEmpty(f.getLanguage()) && !hasPattern && StringUtils.isEmpty(f.getScheme()));
+                        })
                         .map(f -> new ExtendedDocumentFilter(f))
                         .toList() :
                 Collections.emptyList();

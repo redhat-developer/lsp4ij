@@ -30,6 +30,7 @@ import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorPresentationSupport;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.declaration.LSPDeclarationSupport;
+import com.redhat.devtools.lsp4ij.features.inlineCompletion.LSPInlineCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
@@ -86,6 +87,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPPrepareRenameSupport prepareRenameSupport;
     private final LSPRenameSupport renameSupport;
     private final LSPCompletionSupport completionSupport;
+    private final LSPInlineCompletionSupport inlineCompletionSupport;
     private final LSPImplementationSupport implementationSupport;
     private final LSPReferenceSupport referenceSupport;
     private final LSPDefinitionSupport definitionSupport;
@@ -121,6 +123,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.prepareRenameSupport = new LSPPrepareRenameSupport(file);
         this.renameSupport = new LSPRenameSupport(file);
         this.completionSupport = new LSPCompletionSupport(file);
+        this.inlineCompletionSupport = new LSPInlineCompletionSupport(file);
         this.implementationSupport = new LSPImplementationSupport(file);
         this.referenceSupport = new LSPReferenceSupport(file);
         this.definitionSupport = new LSPDefinitionSupport(file);
@@ -356,6 +359,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPCompletionSupport getCompletionSupport() {
         return completionSupport;
+    }
+
+    /**
+     * Returns the LSP inline completion support.
+     *
+     * @return the LSP inline completion support.
+     */
+    public LSPInlineCompletionSupport getInlineCompletionSupport() {
+        return inlineCompletionSupport;
     }
 
     /**
