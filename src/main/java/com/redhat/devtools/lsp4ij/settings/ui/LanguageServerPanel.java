@@ -277,7 +277,7 @@ public class LanguageServerPanel implements Disposable {
 
     private void addMappingsTab(@NotNull JBTabbedPane tabbedPane,
                                 @NotNull UIConfiguration configuration) {
-        FormBuilder mappingsTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.mappings"));
+        FormBuilder mappingsTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.mappings"), false);
         this.mappingsPanel = new ServerMappingsPanel(mappingsTab, configuration.isServerMappingsEditable());
     }
 
