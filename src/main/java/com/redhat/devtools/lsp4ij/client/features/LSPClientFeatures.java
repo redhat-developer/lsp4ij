@@ -55,6 +55,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPCompletionFeature completionFeature;
 
+    private LSPInlineCompletionFeature inlineCompletionFeature;
+
     private LSPDeclarationFeature declarationFeature;
 
     private LSPDefinitionFeature definitionFeature;
@@ -553,6 +555,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public final LSPClientFeatures setCompletionFeature(@NotNull LSPCompletionFeature completionFeature) {
         completionFeature.setClientFeatures(this);
         this.completionFeature = completionFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP inline completion feature.
+     *
+     * @return the LSP inline completion feature.
+     */
+    @NotNull
+    public final LSPInlineCompletionFeature getInlineCompletionFeature() {
+        if (inlineCompletionFeature == null) {
+            initInlineCompletionFeature();
+        }
+        return inlineCompletionFeature;
+    }
+
+    private synchronized void initInlineCompletionFeature() {
+        if (inlineCompletionFeature != null) {
+            return;
+        }
+        setInlineCompletionFeature(new LSPInlineCompletionFeature());
+    }
+
+    /**
+     * Initialize the LSP inline completion feature.
+     *
+     * @param inlineCompletionFeature the LSP inline completion feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setInlineCompletionFeature(@NotNull LSPInlineCompletionFeature inlineCompletionFeature) {
+        inlineCompletionFeature.setClientFeatures(this);
+        this.inlineCompletionFeature = inlineCompletionFeature;
         return this;
     }
 

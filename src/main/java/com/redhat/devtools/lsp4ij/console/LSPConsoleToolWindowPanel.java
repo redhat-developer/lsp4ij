@@ -96,6 +96,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             case Info -> ConsoleViewContentType.LOG_INFO_OUTPUT;
             case Log -> ConsoleViewContentType.LOG_VERBOSE_OUTPUT;
             case Warning -> ConsoleViewContentType.LOG_WARNING_OUTPUT;
+            case Debug -> ConsoleViewContentType.LOG_DEBUG_OUTPUT;
         };
     }
 
