@@ -183,7 +183,15 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
      */
     @NotNull
     public String getMessage(@NotNull Diagnostic diagnostic) {
-        return diagnostic.getMessage();
+        var message = diagnostic.getMessage();
+        if (message == null) {
+            return "";
+        }
+        if (message.isLeft()) {
+            return message.getLeft();
+        }
+        // MarkupContent
+        return message.getRight().getValue();
     }
 
     /**
@@ -196,7 +204,7 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
     public String getTooltip(@NotNull Diagnostic diagnostic) {
         // message
         StringBuilder tooltip = new StringBuilder("<html>");
-        tooltip.append(StringUtil.escapeXmlEntities(diagnostic.getMessage()));
+        tooltip.append(StringUtil.escapeXmlEntities(getMessage(diagnostic)));
         // source
         tooltip.append("<span style=\"font: italic;\"> ");
         String source = diagnostic.getSource();

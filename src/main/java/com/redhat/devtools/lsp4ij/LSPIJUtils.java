@@ -953,7 +953,12 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyEdits(null, document, textDocumentEdit.getEdits(), false);
+                            // Extract TextEdit from Either<TextEdit, SnippetTextEdit>
+                            List<TextEdit> textEdits = textDocumentEdit.getEdits().stream()
+                                    .filter(Either::isLeft)
+                                    .map(Either::getLeft)
+                                    .toList();
+                            applyEdits(null, document, textEdits, false);
                         }
                     }
                 } else if (change.isRight()) {

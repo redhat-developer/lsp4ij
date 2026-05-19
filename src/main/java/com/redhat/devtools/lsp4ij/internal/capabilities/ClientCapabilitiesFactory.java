@@ -166,6 +166,11 @@ public class ClientCapabilitiesFactory {
         completionCapabilities.setDynamicRegistration(Boolean.TRUE);
         textDocumentClientCapabilities.setCompletion(completionCapabilities);
 
+        // Inline Completion support (LSP 3.18.0)
+        InlineCompletionCapabilities inlineCompletionCapabilities = new InlineCompletionCapabilities();
+        inlineCompletionCapabilities.setDynamicRegistration(Boolean.TRUE);
+        textDocumentClientCapabilities.setInlineCompletion(inlineCompletionCapabilities);
+
         // Signature help support
         SignatureHelpCapabilities signatureHelpCapabilities = new SignatureHelpCapabilities(Boolean.TRUE);
         SignatureInformationCapabilities signatureInformationCapabilities = new SignatureInformationCapabilities();

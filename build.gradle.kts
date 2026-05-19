@@ -127,10 +127,12 @@ tasks.withType<JavaCompile> {
     options.release.set(17)
 }
 
-// Set Kotlin JVM language level. While there's currently no Kotlin in this project, it is configured with the Kotlin plugin.
+// Set Kotlin JVM language level to match Java compatibility.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
     }
 }
 
