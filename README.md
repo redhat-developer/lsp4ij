@@ -66,6 +66,7 @@ Here are some projects that use LSP4IJ:
  * [IntelliJ SumnekoLua](https://github.com/CppCXY/Intellij-SumnekoLua)
  * [Haskell LSP for IntelliJ](https://github.com/rockofox/intellij-haskell-lsp)
  * [Zowe™ COBOL Language Support](https://github.com/zowe/zowe-cobol-language-support-intellij)
+ * [Nim using nimlangserver](https://codeberg.org/laamella-gad/nim-intellij-plugin)
  * [ZigBrains](https://github.com/FalsePattern/ZigBrains)
  * [Pyright for PyCharm](https://github.com/InSyncWithFoo/pyright-for-pycharm)
  * [Intellij EmmyLua2](https://github.com/EmmyLua/Intellij-EmmyLua2)
