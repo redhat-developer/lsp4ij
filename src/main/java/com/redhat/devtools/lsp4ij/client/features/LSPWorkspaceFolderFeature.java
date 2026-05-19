@@ -105,27 +105,6 @@ public class LSPWorkspaceFolderFeature {
     }
 
     /**
-     * Returns the workspace folder for the given file, or null if none.
-     * If the folder hasn't been notified to the server yet and the strategy is dynamic,
-     * this method will mark it for notification.
-     *
-     * @param file the file
-     * @return the workspace folder for the file, or null
-     */
-    @Nullable
-    public WorkspaceFolder getWorkspaceFolderForFile(@NotNull VirtualFile file) {
-        Project project = getClientFeatures().getProject();
-        WorkspaceFolder folder = getStrategy().getWorkspaceFolderForFile(file, project, getClientFeatures());
-
-        if (folder != null && !getStrategy().sendAllFoldersOnInitialization()) {
-            // For dynamic strategies, track which folders we've seen
-            notifiedWorkspaceFolders.add(folder.getUri());
-        }
-
-        return folder;
-    }
-
-    /**
      * Computes the workspace folder to notify for the given file without marking it as notified.
      * This method performs I/O operations and should be called outside synchronized blocks.
      *
