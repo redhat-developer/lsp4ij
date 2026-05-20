@@ -194,22 +194,11 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     }
 
     private void refreshSemanticTokensForAllOpenedFiles() {
-        // Received request 'workspace/semanticTokens/refresh
-        ReadAction.nonBlocking((Callable<Void>) () -> {
-                    for (var openedDocument : wrapper.getOpenedDocuments()) {
-                        VirtualFile file = openedDocument.getFile();
-                        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-                        if (psiFile != null) {
-                            var fileSupport = LSPFileSupport.getSupport(psiFile);
-                            // Evict the semantic tokens cache
-                            fileSupport.getSemanticTokensSupport().cancel();
-                            // Refresh the UI
-                            fileSupport.restartDaemonCodeAnalyzerWithDebounce(new PsiFileCancelChecker(psiFile));
-                        }
-                    }
-                    return null;
-                }).coalesceBy(this)
-                .submit(AppExecutorUtil.getAppExecutorService());
+        for (var openedDocument : wrapper.getOpenedDocuments()) {
+            VirtualFile file = openedDocument.getFile();
+            EditorFeatureManager.getInstance(getProject())
+                    .refreshEditorFeature(file, EditorFeatureType.SEMANTIC_TOKENS, true, new VirtualFileCancelChecker(file));
+        }
     }
 
     @Override
