@@ -13,26 +13,25 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
-import com.google.gson.JsonObject;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
-import com.intellij.openapi.progress.ProgressIndicator;
-import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.ui.*;
+import com.intellij.ui.ColoredTreeCellRenderer;
+import com.intellij.ui.HyperlinkLabel;
+import com.intellij.ui.OnePixelSplitter;
+import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.components.panels.HorizontalLayout;
 import com.intellij.ui.treeStructure.Tree;
-import com.intellij.util.ui.StatusText;
 import com.intellij.util.Alarm;
 import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.StatusText;
 import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -51,7 +50,10 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.dnd.*;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDropEvent;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Paths;
@@ -102,6 +104,9 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
         // Setup context menu and delete key for tested files
         setupTreeActions();
+
+        // Setup mouse listener for clickable links in tree
+        setupTreeLinkListener();
 
         JPanel jsonEditorPanel = null;
         if (showJsonEditor) {
@@ -161,12 +166,22 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
     private JPanel createRightPanel() {
         JPanel panel = new JPanel(new BorderLayout());
 
-        // Header with label
+        // Header with label and description
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBorder(JBUI.Borders.empty(5));
 
+        JPanel labelPanel = new JPanel(new BorderLayout());
         JLabel label = new JLabel(LanguageServerBundle.message("language.server.workspaceFolders.detected"));
-        headerPanel.add(label, BorderLayout.WEST);
+        labelPanel.add(label, BorderLayout.NORTH);
+
+        // Add description to explain this is a preview/test panel
+        JBLabel descriptionLabel = new JBLabel(LanguageServerBundle.message("language.server.workspaceFolders.detected.description"));
+        descriptionLabel.setForeground(UIUtil.getLabelDisabledForeground());
+        descriptionLabel.setBorder(JBUI.Borders.emptyTop(2));
+        descriptionLabel.setFont(JBUI.Fonts.smallFont());
+        labelPanel.add(descriptionLabel, BorderLayout.CENTER);
+
+        headerPanel.add(labelPanel, BorderLayout.WEST);
 
         // Test zone (above tree)
         JPanel testPanel = createTestPanel();
@@ -200,6 +215,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
         JBLabel testLabel = new JBLabel(LanguageServerBundle.message("language.server.workspaceFolders.test"));
         testLabel.setForeground(UIUtil.getLabelDisabledForeground());
+        testLabel.setToolTipText(LanguageServerBundle.message("language.server.workspaceFolders.test.description"));
         dropZone.add(testLabel);
 
         HyperlinkLabel browseLink = new HyperlinkLabel(LanguageServerBundle.message("language.server.workspaceFolders.browse"));
@@ -209,14 +225,25 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         // Send at init checkbox (only for configurable strategy)
         if (showJsonEditor) {
             dropZone.add(new JLabel(" - "));
-            sendAtInitCheckbox = new JBCheckBox(LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit"), false);
+
+            // Create checkbox without text
+            sendAtInitCheckbox = new JBCheckBox("", false);
             sendAtInitCheckbox.setOpaque(false);
+            sendAtInitCheckbox.setToolTipText(LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit.tooltip"));
             sendAtInitCheckbox.addActionListener(e -> {
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
                     updateWorkspaceFoldersDisplay();
                 });
             });
             dropZone.add(sendAtInitCheckbox);
+
+            // Create label with clickable link
+            JPanel labelPanel = createLabelWithHyperlink(
+                LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit"),
+                "initialize",
+                "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize"
+            );
+            dropZone.add(labelPanel);
         }
 
         // Setup drag and drop
@@ -276,6 +303,53 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 if (e.isPopupTrigger()) {
                     showContextMenu(e);
                 }
+            }
+        });
+    }
+
+    private void setupTreeLinkListener() {
+        workspaceFoldersTree.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                TreePath path = workspaceFoldersTree.getPathForLocation(e.getX(), e.getY());
+                if (path == null) {
+                    return;
+                }
+
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                if (node.getUserObject() instanceof FolderNodeData) {
+                    FolderNodeData data = (FolderNodeData) node.getUserObject();
+
+                    // Open LSP specification link
+                    String url;
+                    if (data.sentAtInit) {
+                        url = "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize";
+                    } else {
+                        url = "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders";
+                    }
+
+                    try {
+                        java.awt.Desktop.getDesktop().browse(new URI(url));
+                    } catch (Exception ex) {
+                        // Ignore
+                    }
+                }
+            }
+        });
+
+        // Change cursor to hand when hovering over folder nodes
+        workspaceFoldersTree.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            @Override
+            public void mouseMoved(java.awt.event.MouseEvent e) {
+                TreePath path = workspaceFoldersTree.getPathForLocation(e.getX(), e.getY());
+                if (path != null) {
+                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                    if (node.getUserObject() instanceof FolderNodeData) {
+                        workspaceFoldersTree.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                        return;
+                    }
+                }
+                workspaceFoldersTree.setCursor(Cursor.getDefaultCursor());
             }
         });
     }
@@ -581,6 +655,51 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         }
     }
 
+    /**
+     * Creates a panel with text that includes a clickable hyperlink.
+     * Parses <hyperlink>text</hyperlink> tags from the message.
+     */
+    private JPanel createLabelWithHyperlink(String messageWithTags, String linkText, String url) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        panel.setOpaque(false);
+
+        String text = messageWithTags;
+        int start = text.indexOf("<hyperlink>");
+        if (start == -1) {
+            panel.add(new JLabel(text));
+            return panel;
+        }
+
+        int end = text.indexOf("</hyperlink>", start);
+        if (end == -1) {
+            panel.add(new JLabel(text));
+            return panel;
+        }
+
+        // Add text before link
+        if (start > 0) {
+            panel.add(new JLabel(text.substring(0, start)));
+        }
+
+        // Add clickable link
+        HyperlinkLabel link = new HyperlinkLabel(linkText);
+        link.addHyperlinkListener(e -> {
+            try {
+                java.awt.Desktop.getDesktop().browse(new URI(url));
+            } catch (Exception ex) {
+                // Ignore
+            }
+        });
+        panel.add(link);
+
+        // Add text after link
+        if (end + "</hyperlink>".length() < text.length()) {
+            panel.add(new JLabel(text.substring(end + "</hyperlink>".length())));
+        }
+
+        return panel;
+    }
+
     // Data classes for tree nodes
     private static class FolderNodeData {
         final VirtualFile file;
@@ -612,20 +731,49 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 FolderNodeData data = (FolderNodeData) userObject;
                 setIcon(AllIcons.Nodes.Folder);
                 append(data.file.getPath(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
-                if (data.sentAtInit) {
-                    append(" " + LanguageServerBundle.message("language.server.workspaceFolders.sentAtInit"), SimpleTextAttributes.GRAYED_ATTRIBUTES);
-                } else {
-                    append(" " + LanguageServerBundle.message("language.server.workspaceFolders.lazy"), SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES);
-                }
+                // Parse and render message with hyperlink
+                String message = data.sentAtInit ?
+                        LanguageServerBundle.message("language.server.workspaceFolders.sentAtInit") :
+                        LanguageServerBundle.message("language.server.workspaceFolders.lazy");
+                appendTextWithHyperlink(" " + message);
             } else if (userObject instanceof FileNodeData) {
                 FileNodeData data = (FileNodeData) userObject;
-                setIcon(AllIcons.FileTypes.Any_type);
+                setIcon(data.file.getFileType().getIcon());
                 append(data.file.getName(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
                 append(" - " + data.file.getPath(), SimpleTextAttributes.GRAYED_ATTRIBUTES);
             } else if (userObject instanceof String && NO_ROOT_NODE_KEY.equals(userObject)) {
                 // It's the NO_ROOT node
                 setIcon(AllIcons.General.Warning);
                 append(LanguageServerBundle.message(NO_ROOT_NODE_KEY), SimpleTextAttributes.ERROR_ATTRIBUTES);
+            }
+        }
+
+        private void appendTextWithHyperlink(String text) {
+            // Parse <hyperlink>text</hyperlink> tags
+            int start = text.indexOf("<hyperlink>");
+            if (start == -1) {
+                append(text, SimpleTextAttributes.GRAYED_ATTRIBUTES);
+                return;
+            }
+
+            int end = text.indexOf("</hyperlink>", start);
+            if (end == -1) {
+                append(text, SimpleTextAttributes.GRAYED_ATTRIBUTES);
+                return;
+            }
+
+            // Append text before hyperlink
+            if (start > 0) {
+                append(text.substring(0, start), SimpleTextAttributes.GRAYED_ATTRIBUTES);
+            }
+
+            // Append hyperlink text
+            String linkText = text.substring(start + "<hyperlink>".length(), end);
+            append(linkText, SimpleTextAttributes.LINK_ATTRIBUTES);
+
+            // Append text after hyperlink
+            if (end + "</hyperlink>".length() < text.length()) {
+                append(text.substring(end + "</hyperlink>".length()), SimpleTextAttributes.GRAYED_ATTRIBUTES);
             }
         }
     }
