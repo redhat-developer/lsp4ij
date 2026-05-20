@@ -14,6 +14,7 @@ import com.intellij.find.findUsages.FindUsagesHandler;
 import com.intellij.find.findUsages.FindUsagesHandlerFactory;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.IndexNotReadyException;
+import com.intellij.openapi.util.Key;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -42,6 +43,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
 
+    private static final Key<Boolean> CHECKING_PLUGIN_FACTORY_KEY = Key.create("lsp.find.usages.checking.plugin.factory");
+
     /**
      * Determines if this factory can provide Find Usages support for the given element.
      * <p>
@@ -64,11 +67,19 @@ public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
      */
     @Override
     public boolean canFindUsages(@NotNull PsiElement element) {
+        if (element.getUserData(CHECKING_PLUGIN_FACTORY_KEY) != null) {
+            return false;
+        }
         if (ProjectIndexingManager.canExecuteLSPFeature(element.getContainingFile()) == ExecuteLSPFeatureStatus.NOW
                 && isUsageSupportedByLanguageServer(element)) {
             // Defer to plugin-defined factories (e.g., JavaFindUsagesHandlerFactory) to avoid conflicts.
             // Both this factory and language-specific factories may be registered as "last" priority.
-            return !hasPluginDefinedFactory(element);
+            try {
+                element.putUserData(CHECKING_PLUGIN_FACTORY_KEY, true);
+                return !hasPluginDefinedFactory(element);
+            } finally {
+                element.putUserData(CHECKING_PLUGIN_FACTORY_KEY, null);
+            }
         }
         return false;
     }
@@ -95,7 +106,7 @@ public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
         if (element == null) {
             return false;
         }
-        PsiFile file = element instanceof PsiFile ? (PsiFile) element: element.getContainingFile();
+        PsiFile file = element instanceof PsiFile ? (PsiFile) element : element.getContainingFile();
         if (file == null) {
             return false;
         }
@@ -113,7 +124,7 @@ public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
      * definitions, implementations, and type definitions via LSP protocol.
      * </p>
      *
-     * @param element the PSI element to find usages for.
+     * @param element            the PSI element to find usages for.
      * @param forHighlightUsages {@code true} if the handler is being created for highlighting usages in the editor,
      *                           {@code false} if for the Find Usages dialog.
      * @return a new {@link LSPFindUsagesHandler} instance.
@@ -147,14 +158,12 @@ public class LSPFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
     private boolean hasPluginDefinedFactory(@NotNull PsiElement element) {
         for (FindUsagesHandlerFactory factory : FindUsagesHandlerFactory.EP_NAME.getExtensions(element.getProject())) {
             try {
-                if (!factory.equals(this) &&  factory.canFindUsages(element)) {
+                if (!factory.equals(this) && factory.canFindUsages(element)) {
                     return true;
                 }
-            }
-            catch (IndexNotReadyException | ProcessCanceledException e) {
+            } catch (IndexNotReadyException | ProcessCanceledException e) {
                 throw e;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
 
             }
         }
