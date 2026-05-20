@@ -21,5 +21,6 @@ public enum EditorFeatureType {
     DECLARATIVE_INLAY_HINT,
     INLAY_HINT,
     FOLDING,
+    SEMANTIC_TOKENS,
     ALL
 }

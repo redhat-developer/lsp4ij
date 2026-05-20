@@ -61,6 +61,7 @@ public class EditorFeatureManager implements Disposable {
         addEditorFeature(new FoldingEditorFeature());
         addEditorFeature(new InlayHintsEditorFeature());
         addEditorFeature(new DeclarativeInlayHintsEditorFeature());
+        addEditorFeature(new SemanticTokensEditorFeature());
     }
 
     private void addEditorFeature(EditorFeature editorFeature) {
