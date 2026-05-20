@@ -137,6 +137,136 @@ with task to execute like:
 This installer content will be used when you will create the language server. See [here](UserDefinedLanguageServerTemplate.md#installer-descriptor)
 to understand how to write this JSON installer descriptor.
 
+### Workspace Folders tab
+
+[Workspace folders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceFolder) define the scope of files that the language server will analyze. They can be sent to the language server:
+
+ * At startup via the [initialize](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize) request
+ * Dynamically via [workspace/didChangeWorkspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders) notifications
+
+This tab allows you to configure and preview how workspace folders will be discovered and sent to your language server.
+
+#### Configuration strategies
+
+##### Root type
+
+The `rootType` defines which IntelliJ project structure to use as workspace folders:
+
+ * `PROJECT_BASE` (default): Uses [content roots](https://www.jetbrains.com/help/idea/content-roots.html#adding_content_root)
+ * `SOURCE_ROOTS`: Uses [source roots](https://www.jetbrains.com/help/idea/content-roots.html#folder-categories)  
+ * `NONE`: No workspace folders
+
+```json
+{
+    "rootType": "SOURCE_ROOTS"
+}
+```
+
+This configuration will populate `InitializeParams.workspaceFolders` when the language server starts:
+
+```json
+{
+  "workspaceFolders": [
+    {
+      "name": "my-module",
+      "uri": "file:///path/to/my-module"
+    }
+  ]
+}
+```
+
+##### Marker-based discovery
+
+If `rootType` strategies don't match your project structure, use markers to define workspace folders based on specific files. This is useful for:
+
+- Mono-repos with multiple independent modules
+- Python projects with `pyproject.toml` or `setup.py`
+- Projects where workspace boundaries are defined by configuration files
+
+```json
+{
+  "markers": [
+    "pyproject.toml",
+    "pom.xml",
+    ".git"
+  ]
+}
+```
+
+When a file is opened, LSP4IJ walks up the directory tree to find the closest marker file and uses its directory as the workspace folder.
+
+**Note:** Marker-based discovery always uses [lazy mode](#lazy-mode).
+
+#### Lazy mode
+
+By default (eager mode), all workspace folders are sent at startup via the `initialize` request. For large projects, this can cause the language server to load and analyze many files unnecessarily.
+
+**Lazy mode** defers workspace folder discovery: folders are sent progressively via `workspace/didChangeWorkspaceFolders` notifications as you open files.
+
+```json
+{
+    "rootType": "PROJECT_BASE",
+    "lazy": true
+}
+```
+
+**Example:** Consider a project with 2 [content roots](https://www.jetbrains.com/help/idea/content-roots.html#adding_content_root): `client` and `common`.
+
+![Project content roots](./images/workspace-folders/ProjectContentRoots.png)
+
+**Eager mode** (`lazy: false`):
+- All folders sent at startup in the `initialize` request:
+  ```json
+  {
+    "workspaceFolders": [
+      { "uri": "file:///.../client", "name": "client" },
+      { "uri": "file:///.../common", "name": "common" }
+    ]
+  }
+  ```
+- Language server loads **all** files from both `client` and `common`, even if you only open a file in `common`
+
+You can see this behavior with the following configuration:
+
+![Root type - PROJECT_BASE](./images/workspace-folders/RootType_PROJECT_BASE.png)
+
+**Lazy mode** (`lazy: true`):
+- Empty workspace folders at startup:
+  ```json
+  {
+    "workspaceFolders": []
+  }
+  ```
+- When you open a file from `common`, only that folder is sent via `workspace/didChangeWorkspaceFolders`:
+  ```json
+  {
+    "event": {
+      "added": [{ "uri": "file:///.../common", "name": "common" }],
+      "removed": []
+    }
+  }
+  ```
+
+#### Testing your configuration
+
+The **preview panel** on the right shows how workspace folders will be sent based on your configuration.
+
+**Checkbox unchecked** - Shows all discovered workspace folders (discovery mode):
+
+![Root type - PROJECT_BASE - lazy](./images/workspace-folders/RootType_PROJECT_BASE_lazy.png)
+
+**Checkbox checked** - Shows only folders sent at initialization (empty in lazy mode):
+
+![Root type - PROJECT_BASE - lazy](./images/workspace-folders/RootType_PROJECT_BASE_lazy_checkInit_empty.png)
+
+**Drag & drop or click "Open file..."** to simulate opening a file and see which workspace folder it belongs to:
+
+![Root type - PROJECT_BASE - lazy](./images/workspace-folders/RootType_PROJECT_BASE_lazy_checkInit_openFile.png)
+
+If a file is not included in any workspace folder, it will appear under a "(No root)" node:
+
+![Root type - PROJECT_BASE - lazy](./images/workspace-folders/RootType_PROJECT_BASE_noRoot.png)
+
 ## Using template
 Template can be used to quickly create user defined language server pre-filled 
 with server name, command, mappings and potential configurations.
