@@ -6,6 +6,20 @@
 
     <change-notes><![CDATA[
 
+    <h3>0.19.4</h3>
+    <ul>
+      <li>Added support for debugger <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md#smart-step-into">Smart Step Into</a> action via DAP <code>StepInTargets</code></li>
+      <li>Added <strong>Advanced Workspace folders</strong> support</li>
+      <li>Improved definition navigation: open references if definition result has the same range as clicked offset</li>
+      <li>Support for <strong>dynamic plugin unloading</strong> via disposable listeners and cleanup logic</li>
+      <li>Fixed text edits ordering to comply with LSP spec (same position edits)</li>
+      <li>Fixed various DAP issues including <code>AbstractMethodError</code> in Smart Step Into handler</li>
+      <li>Fixed <code>InlayHintsPassFactory</code> compatibility with IntelliJ 2026.2 EAP</li>
+      <li>Fixed definition/declaration request error reporting</li>
+      <li>Replaced deprecated internal API for IntelliJ 2026.2+ compatibility</li>
+    </ul>
+    See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/27?closed=1">changelog</a>.
+
     <h3>0.19.3</h3>
     <ul>
       <li>Provide <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md#custom-launcher-builder">Custom launch Builder</a> API</li>
