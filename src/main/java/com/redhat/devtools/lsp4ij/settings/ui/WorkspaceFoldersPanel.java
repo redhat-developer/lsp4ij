@@ -14,7 +14,9 @@
 package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileChooser.FileChooser;
@@ -33,6 +35,7 @@ import com.intellij.util.Alarm;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.StatusText;
 import com.intellij.util.ui.UIUtil;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
@@ -54,6 +57,10 @@ import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetAdapter;
 import java.awt.dnd.DropTargetDropEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseMotionAdapter;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Paths;
@@ -117,8 +124,8 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             jsonEditor.setJsonFilename(LSPWorkspaceFoldersJsonSchemaFileProvider.WORKSPACE_FOLDERS_JSON_FILE_NAME);
 
             // Initialize with current configuration
-            if (this.strategy instanceof ConfigurableWorkspaceFolderStrategy) {
-                String currentConfig = ((ConfigurableWorkspaceFolderStrategy) this.strategy).getJsonConfiguration();
+            if (this.strategy instanceof ConfigurableWorkspaceFolderStrategy configurableWorkspaceFolderStrategy) {
+                String currentConfig = configurableWorkspaceFolderStrategy.getJsonConfiguration();
                 jsonEditor.setText(currentConfig);
             }
 
@@ -156,9 +163,17 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
     private JPanel createLeftPanel(JPanel jsonEditorPanel) {
         JPanel panel = new JPanel(new BorderLayout());
+
+        // Create header panel with label and doc link
+        JPanel headerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         JLabel label = new JLabel(LanguageServerBundle.message("language.server.workspaceFolders.configuration"));
-        label.setBorder(JBUI.Borders.empty(5));
-        panel.add(label, BorderLayout.NORTH);
+        headerPanel.add(label);
+
+        HyperlinkLabel docLink = new HyperlinkLabel("Learn more");
+        docLink.addHyperlinkListener(e -> BrowserUtil.browse("https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md#workspace-folders-tab"));
+        headerPanel.add(docLink);
+
+        panel.add(headerPanel, BorderLayout.NORTH);
         panel.add(jsonEditorPanel, BorderLayout.CENTER);
         return panel;
     }
@@ -218,9 +233,10 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         testLabel.setToolTipText(LanguageServerBundle.message("language.server.workspaceFolders.test.description"));
         dropZone.add(testLabel);
 
-        HyperlinkLabel browseLink = new HyperlinkLabel(LanguageServerBundle.message("language.server.workspaceFolders.browse"));
-        browseLink.addHyperlinkListener(e -> browseFile());
-        dropZone.add(browseLink);
+        HyperlinkLabel dropZoneLabel = new HyperlinkLabel();
+        dropZoneLabel.setTextWithHyperlink(LanguageServerBundle.message("language.server.workspaceFolders.dropZone"));
+        dropZoneLabel.addHyperlinkListener(e -> browseFile());
+        dropZone.add(dropZoneLabel);
 
         // Send at init checkbox (only for configurable strategy)
         if (showJsonEditor) {
@@ -231,19 +247,15 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             sendAtInitCheckbox.setOpaque(false);
             sendAtInitCheckbox.setToolTipText(LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit.tooltip"));
             sendAtInitCheckbox.addActionListener(e -> {
-                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
-                    updateWorkspaceFoldersDisplay();
-                });
+                ApplicationManager.getApplication().invokeLater(this::updateWorkspaceFoldersDisplay);
             });
             dropZone.add(sendAtInitCheckbox);
 
             // Create label with clickable link
-            JPanel labelPanel = createLabelWithHyperlink(
-                LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit"),
-                "initialize",
-                "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize"
-            );
-            dropZone.add(labelPanel);
+            HyperlinkLabel sendAtInitLabel = new HyperlinkLabel();
+            sendAtInitLabel.setTextWithHyperlink(LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit"));
+            sendAtInitLabel.addHyperlinkListener(e -> BrowserUtil.browse("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize"));
+            dropZone.add(sendAtInitLabel);
         }
 
         // Setup drag and drop
@@ -283,7 +295,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         workspaceFoldersTree.addKeyListener(new java.awt.event.KeyAdapter() {
             @Override
             public void keyPressed(java.awt.event.KeyEvent e) {
-                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_DELETE) {
+                if (e.getKeyCode() == KeyEvent.VK_DELETE) {
                     removeSelectedFile();
                 }
             }
@@ -292,7 +304,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         // Add context menu
         workspaceFoldersTree.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
-            public void mousePressed(java.awt.event.MouseEvent e) {
+            public void mousePressed(MouseEvent e) {
                 if (e.isPopupTrigger()) {
                     showContextMenu(e);
                 }
@@ -308,9 +320,9 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
     }
 
     private void setupTreeLinkListener() {
-        workspaceFoldersTree.addMouseListener(new java.awt.event.MouseAdapter() {
+        workspaceFoldersTree.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
+            public void mouseClicked(MouseEvent e) {
                 TreePath path = workspaceFoldersTree.getPathForLocation(e.getX(), e.getY());
                 if (path == null) {
                     return;
@@ -328,19 +340,15 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                         url = "https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders";
                     }
 
-                    try {
-                        java.awt.Desktop.getDesktop().browse(new URI(url));
-                    } catch (Exception ex) {
-                        // Ignore
-                    }
+                    BrowserUtil.browse(url);
                 }
             }
         });
 
         // Change cursor to hand when hovering over folder nodes
-        workspaceFoldersTree.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+        workspaceFoldersTree.addMouseMotionListener(new MouseMotionAdapter() {
             @Override
-            public void mouseMoved(java.awt.event.MouseEvent e) {
+            public void mouseMoved(MouseEvent e) {
                 TreePath path = workspaceFoldersTree.getPathForLocation(e.getX(), e.getY());
                 if (path != null) {
                     DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
@@ -354,7 +362,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         });
     }
 
-    private void showContextMenu(java.awt.event.MouseEvent e) {
+    private void showContextMenu(MouseEvent e) {
         TreePath path = workspaceFoldersTree.getPathForLocation(e.getX(), e.getY());
         if (path == null) {
             return;
@@ -442,11 +450,11 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
     private void testFile(@NotNull VirtualFile file) {
         // Always run slow operation in background thread
-        com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread(() -> {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
             WorkspaceFolder folder = strategy.getWorkspaceFolderForFile(file, project, FileUriSupport.DEFAULT);
 
             // Update UI on EDT
-            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+            ApplicationManager.getApplication().invokeLater(() -> {
                 addTestedFile(file, folder);
             });
         });
@@ -460,7 +468,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             // Find or create the folder node
             DefaultMutableTreeNode folderNode = folderNodes.get(folder.getUri());
             if (folderNode == null) {
-                VirtualFile folderFile = uriToVirtualFile(folder.getUri());
+                VirtualFile folderFile = LSPIJUtils.findResourceFor(folder.getUri());
                 if (folderFile != null) {
                     folderNode = new DefaultMutableTreeNode(new FolderNodeData(folderFile, true));
                     folderNodes.put(folder.getUri(), folderNode);
@@ -517,7 +525,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
             // Add folders to tree
             for (WorkspaceFolder folder : folders) {
-                VirtualFile file = uriToVirtualFile(folder.getUri());
+                VirtualFile file = LSPIJUtils.findResourceFor(folder.getUri());
                 if (file != null) {
                     DefaultMutableTreeNode node = new DefaultMutableTreeNode(new FolderNodeData(file, strategy.sendAllFoldersOnInitialization()));
                     folderNodes.put(folder.getUri(), node);
@@ -533,7 +541,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                     // Find or create folder node
                     DefaultMutableTreeNode folderNode = folderNodes.get(folder.getUri());
                     if (folderNode == null) {
-                        VirtualFile folderFile = uriToVirtualFile(folder.getUri());
+                        VirtualFile folderFile = LSPIJUtils.findResourceFor(folder.getUri());
                         if (folderFile != null) {
                             folderNode = new DefaultMutableTreeNode(new FolderNodeData(folderFile, strategy.sendAllFoldersOnInitialization()));
                             folderNodes.put(folder.getUri(), folderNode);
@@ -596,7 +604,16 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 emptyText.appendText(" to test discovery.");
             }
         } else if (isLazy) {
-            emptyText.setText(LanguageServerBundle.message("language.server.workspaceFolders.emptyLazy"));
+            boolean hasOpenedFiles = !openedFiles.isEmpty();
+            if (hasOpenedFiles) {
+                emptyText.setText("Workspace folders will be discovered dynamically as files are opened");
+            } else {
+                emptyText.setText("Workspace folders are discovered when you open a file.");
+                emptyText.appendLine("");
+                emptyText.appendText("Drag & drop a file here or ");
+                emptyText.appendText("Open a file", SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES, e -> browseFile());
+                emptyText.appendText(" to test discovery.");
+            }
         } else {
             emptyText.setText("No workspace folders");
         }
@@ -606,23 +623,6 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         for (int i = 0; i < workspaceFoldersTree.getRowCount(); i++) {
             workspaceFoldersTree.expandRow(i);
         }
-    }
-
-    @Nullable
-    private VirtualFile uriToVirtualFile(@NotNull String uri) {
-        try {
-            URI javaUri = new URI(uri);
-            String path = Paths.get(javaUri).toString();
-            return com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(path);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public void refreshWorkspaceFolders() {
-        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
-            updateWorkspaceFoldersDisplay();
-        });
     }
 
     @Nullable
@@ -653,51 +653,6 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         if (updateAlarm != null && !updateAlarm.isDisposed()) {
             updateAlarm.cancelAllRequests();
         }
-    }
-
-    /**
-     * Creates a panel with text that includes a clickable hyperlink.
-     * Parses <hyperlink>text</hyperlink> tags from the message.
-     */
-    private JPanel createLabelWithHyperlink(String messageWithTags, String linkText, String url) {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        panel.setOpaque(false);
-
-        String text = messageWithTags;
-        int start = text.indexOf("<hyperlink>");
-        if (start == -1) {
-            panel.add(new JLabel(text));
-            return panel;
-        }
-
-        int end = text.indexOf("</hyperlink>", start);
-        if (end == -1) {
-            panel.add(new JLabel(text));
-            return panel;
-        }
-
-        // Add text before link
-        if (start > 0) {
-            panel.add(new JLabel(text.substring(0, start)));
-        }
-
-        // Add clickable link
-        HyperlinkLabel link = new HyperlinkLabel(linkText);
-        link.addHyperlinkListener(e -> {
-            try {
-                java.awt.Desktop.getDesktop().browse(new URI(url));
-            } catch (Exception ex) {
-                // Ignore
-            }
-        });
-        panel.add(link);
-
-        // Add text after link
-        if (end + "</hyperlink>".length() < text.length()) {
-            panel.add(new JLabel(text.substring(end + "</hyperlink>".length())));
-        }
-
-        return panel;
     }
 
     // Data classes for tree nodes
