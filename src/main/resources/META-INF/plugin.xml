@@ -521,6 +521,9 @@
         <postStartupActivity
                 id="LSPBreadcrumbsRefreshListener"
                 implementation="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPBreadcrumbsRefreshListener"/>
+        <postStartupActivity
+                id="LSPStructureViewRefreshListener"
+                implementation="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPStructureViewRefreshListener"/>
 
         <!-- LSP textDocument/documentHighlight request support -->
         <highlightUsagesHandlerFactory
