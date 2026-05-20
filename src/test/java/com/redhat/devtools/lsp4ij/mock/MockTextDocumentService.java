@@ -68,6 +68,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private SemanticTokens mockSemanticTokens;
     private List<FoldingRange> foldingRanges;
     public int codeActionRequests = 0;
+    private Function<CodeActionParams, CompletableFuture<List<Either<Command, CodeAction>>>> codeActionHandler;
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
         this._futureFactory = futureFactory;
@@ -147,11 +148,15 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
         codeActionRequests++;
+        // For a custom handler
+        if (codeActionHandler != null) {
+            return codeActionHandler.apply(params);
+        }
         // Filter code actions by using params.getContext().getOnly()
         var only = (params.getContext() != null && params.getContext().getOnly() != null && !params.getContext().getOnly().isEmpty()) ?
                 params.getContext().getOnly() : null;
         var filteredCodeActions = mockCodeActions;
-        if (only != null) {
+        if (only != null && mockCodeActions != null) {
             filteredCodeActions = mockCodeActions
                     .stream()
                     .filter(ca -> {
@@ -409,6 +414,10 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void setMockSelectionRanges(List<SelectionRange> mockSelectionRanges) {
         this.mockSelectionRanges = mockSelectionRanges;
+    }
+
+    public void setCodeActionHandler(Function<CodeActionParams, CompletableFuture<List<Either<Command, CodeAction>>>> handler) {
+        this.codeActionHandler = handler;
     }
 
     @Override
