@@ -42,7 +42,7 @@ public class TelemetryManager implements Disposable {
     public TelemetryManager() {
         try {
             Class.forName("com.redhat.devtools.intellij.telemetry.core.service.TelemetryService");
-            telemetryService = new RedHatTelemetryService();
+            telemetryService = new NoOpTelemetryService();
         } catch (Exception ignore) {
             telemetryService = new NoOpTelemetryService();
         }
