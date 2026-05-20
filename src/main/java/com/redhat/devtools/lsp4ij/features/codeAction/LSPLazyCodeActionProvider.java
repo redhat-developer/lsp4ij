@@ -24,4 +24,9 @@ public interface LSPLazyCodeActionProvider {
      * @return a code action at the given index and false otherwise.
      */
     Either<CodeActionData, Boolean /* false when code action is not already loaded*/> getCodeActionAt(int index);
+
+    /**
+     * Clear code actions cache.
+     */
+    void clear();
 }
