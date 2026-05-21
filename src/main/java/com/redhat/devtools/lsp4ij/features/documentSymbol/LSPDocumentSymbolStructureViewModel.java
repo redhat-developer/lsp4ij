@@ -18,12 +18,12 @@ import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -33,10 +33,9 @@ import javax.swing.*;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import static com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory.isSymbolsSupportedByLanguageServer;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
@@ -62,7 +61,7 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     @Override
     protected Class @NotNull [] getSuitableClasses() {
         // Any PSI element
-        return new Class[] {PsiElement.class};
+        return new Class[]{PsiElement.class};
     }
 
     @Override
@@ -93,9 +92,11 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
                 return Collections.emptyList();
             }
 
-            if (!LSPFileSupport.hasSupport(psiFile)) {
+            if (!LSPFileSupport.hasSupport(psiFile) || !isSymbolsSupportedByLanguageServer(psiFile)) {
                 // Don't force file support creation
-                // Ex: when file is closed, document symbol must return an empty list.
+                // Ex:
+                // 1. when file is closed, document symbol must return an empty list.
+                // 2. when language servers are stopped, document symbol must return an empty list.
                 return Collections.emptyList();
             }
 
@@ -106,14 +107,9 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
             try {
                 waitUntilDone(documentSymbolFuture, psiFile);
-            } catch (
-                    PsiFileChangedException e) { //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-                documentSymbolSupport.cancel();
+            } catch (ProcessCanceledException e) {
                 throw e;
-            } catch (CancellationException e) {
-                //documentSymbolSupport.cancel();
-                throw e;
-            } catch (ExecutionException e) {
+            } catch (Exception e) {
                 return Collections.emptyList();
             }
 
@@ -181,5 +177,4 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     private static @Nullable StructureViewTreeElement getStructureViewTreeElement(DocumentSymbolData documentSymbol) {
         return documentSymbol.getClientFeatures().getDocumentSymbolFeature().getStructureViewTreeElement(documentSymbol);
     }
-
 }

@@ -62,6 +62,7 @@ public class EditorFeatureManager implements Disposable {
         addEditorFeature(new InlayHintsEditorFeature());
         addEditorFeature(new DeclarativeInlayHintsEditorFeature());
         addEditorFeature(new SemanticTokensEditorFeature());
+        addEditorFeature(new StructureViewEditorFeature());
     }
 
     private void addEditorFeature(EditorFeature editorFeature) {
@@ -192,9 +193,16 @@ public class EditorFeatureManager implements Disposable {
 
     private void clearLSPCache(PsiFile psiFile, @NotNull EditorFeatureType featureType) {
         if (featureType == EditorFeatureType.ALL) {
-            editorFeatures.values().forEach(feature -> feature.clearLSPCache(psiFile));
+            editorFeatures.values().forEach(feature -> {
+                if (feature.shouldProcess(psiFile)) {
+                    feature.clearLSPCache(psiFile);
+                }
+            });
         } else {
-            getEditorFeature(featureType).clearLSPCache(psiFile);
+            EditorFeature feature = getEditorFeature(featureType);
+            if (feature.shouldProcess(psiFile)) {
+                feature.clearLSPCache(psiFile);
+            }
         }
     }
 
@@ -204,9 +212,16 @@ public class EditorFeatureManager implements Disposable {
                                     @NotNull EditorFeatureType featureType,
                                     @NotNull List<Runnable> runnables) {
         if (featureType == EditorFeatureType.ALL) {
-            editorFeatures.values().forEach(feature -> feature.collectUiRunnable(editor, psiFile, runnables));
+            editorFeatures.values().forEach(feature -> {
+                if (feature.shouldProcess(psiFile)) {
+                    feature.collectUiRunnable(editor, psiFile, runnables);
+                }
+            });
         } else {
-            getEditorFeature(featureType).collectUiRunnable(editor, psiFile, runnables);
+            EditorFeature feature = getEditorFeature(featureType);
+            if (feature.shouldProcess(psiFile)) {
+                feature.collectUiRunnable(editor, psiFile, runnables);
+            }
         }
     }
 

@@ -19,6 +19,7 @@ import com.intellij.ide.structureView.TreeBasedStructureViewBuilder;
 import com.intellij.lang.PsiStructureViewFactory;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import org.jetbrains.annotations.NotNull;
@@ -31,7 +32,8 @@ public class LSPDocumentSymbolStructureViewFactory implements PsiStructureViewFa
 
     @Override
     public @Nullable StructureViewBuilder getStructureViewBuilder(@NotNull PsiFile psiFile) {
-        if (ProjectIndexingManager.canExecuteLSPFeature(psiFile) != ExecuteLSPFeatureStatus.NOW) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(psiFile) != ExecuteLSPFeatureStatus.NOW
+                || !isSymbolsSupportedByLanguageServer(psiFile)) {
             return null;
         }
         return new LSPDocumentSymbolStructureViewBuilder(psiFile);
@@ -48,5 +50,23 @@ public class LSPDocumentSymbolStructureViewFactory implements PsiStructureViewFa
         public @NotNull StructureViewModel createStructureViewModel(@Nullable Editor editor) {
             return new LSPDocumentSymbolStructureViewModel(psiFile, editor);
         }
+    }
+
+    /**
+     * Checks if document symbols are supported by at least one language server for the given file.
+     * <p>
+     * Document symbols are supported when a language server provides the textDocument/documentSymbol LSP feature
+     * and it is enabled and supported for the given file.
+     * </p>
+     *
+     * @param file the PSI file to check.
+     * @return {@code true} if at least one language server supports document symbols for this file, {@code false} otherwise.
+     */
+    public static boolean isSymbolsSupportedByLanguageServer(@NotNull PsiFile file) {
+        return LanguageServiceAccessor.getInstance(file.getProject())
+                .hasAny(file, ls -> {
+                    var symbolFeature = ls.getClientFeatures().getDocumentSymbolFeature();
+                    return symbolFeature.isEnabled(file) && symbolFeature.isSupported(file);
+                });
     }
 }

@@ -245,7 +245,7 @@ public class LanguageServiceAccessor implements Disposable {
                                 if (servers.isEmpty()) {
                                     return;
                                 }
-                                // refresh IJ code visions, inlay hints, folding features
+                                // refresh IJ code visions, inlay hints, folding features, color, structure view
                                 EditorFeatureManager.getInstance(project)
                                         .refreshEditorFeature(file, EditorFeatureType.ALL, true, new PsiFileCancelChecker(file));
                             });
