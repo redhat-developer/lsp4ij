@@ -321,6 +321,33 @@ public class LanguageServerWrapper implements Disposable {
      * @throws LanguageServerException thrown when the language server cannot be started
      */
     public synchronized void start() throws LanguageServerException {
+        // Check for errors in LSP messages
+        // launcherFuture manages request/reponse LSP messages from the server
+        if (serverError == null) {
+            // If the launcher is done, check if there was an error
+            if (launcherFuture != null && launcherFuture.isDone()) {
+                // There is an error with messages. Ex: invalid int id)
+                // {
+                //  "id" : 1779401475267,
+                //  "jsonrpc" : "2.0",
+                //  "method" : "client/registerCapability",
+                //  "params" : {
+                try {
+                    // Try to get the result with a short timeout
+                    launcherFuture.get(5, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    // Interrupted - no action needed
+                } catch (ExecutionException e) {
+                    // An error occurred in LSP message processing
+                    serverError = new LanguageServerException(e.getCause());
+                } catch (TimeoutException e) {
+                    // Timeout - no error detected
+                }
+                // Show error notification if serverError was set
+                // The server will be stopped automatically after several attempts
+                showNotificationStartServerError();
+            }
+        }
         if (serverError != null) {
             // Here the language server has been not possible
             // we stop it and attempts a new restart if needed
