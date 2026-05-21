@@ -17,6 +17,7 @@ import com.intellij.ide.structureView.StructureViewModel;
 import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
+import com.intellij.ide.util.treeView.smartTree.Filter;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiElement;
@@ -24,6 +25,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.features.documentSymbol.filter.*;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -62,6 +64,38 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     protected Class @NotNull [] getSuitableClasses() {
         // Any PSI element
         return new Class[]{PsiElement.class};
+    }
+
+    @Override
+    public Filter @NotNull [] getFilters() {
+        return new Filter[]{
+                new HideArraysFilter(),
+                new HideBooleansFilter(),
+                new HideClassesFilter(),
+                new HideConstantsFilter(),
+                new HideConstructorsFilter(),
+                new HideEnumMembersFilter(),
+                new HideEnumsFilter(),
+                new HideEventsFilter(),
+                new HideFieldsFilter(),
+                new HideFilesFilter(),
+                new HideFunctionsFilter(),
+                new HideInterfacesFilter(),
+                new HideKeysFilter(),
+                new HideMethodsFilter(),
+                new HideModulesFilter(),
+                new HideNamespacesFilter(),
+                new HideNullsFilter(),
+                new HideNumbersFilter(),
+                new HideObjectsFilter(),
+                new HideOperatorsFilter(),
+                new HidePackagesFilter(),
+                new HidePropertiesFilter(),
+                new HideStringsFilter(),
+                new HideStructsFilter(),
+                new HideTypeParametersFilter(),
+                new HideVariablesFilter()
+        };
     }
 
     @Override

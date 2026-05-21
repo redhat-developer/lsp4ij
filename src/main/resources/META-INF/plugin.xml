@@ -9,7 +9,8 @@
     <h3>0.19.4</h3>
     <ul>
       <li>Added support for debugger <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md#smart-step-into">Smart Step Into</a> action via DAP <code>StepInTargets</code></li>
-      <li>Added <strong>Advanced Workspace folders</strong> support</li>
+      <li>Added <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md#workspace-folders-tab">Advanced Workspace folders</a> support</li>
+      <li>Added <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#filters">filters</a> for LSP Structure View</li>
       <li>Improved definition navigation: open references if definition result has the same range as clicked offset</li>
       <li>Support for <strong>dynamic plugin unloading</strong> via disposable listeners and cleanup logic</li>
       <li>Fixed text edits ordering to comply with LSP spec (same position edits)</li>
