@@ -62,6 +62,25 @@ or configure LSP CodeLens on the `Right`:
 
 ![LSP CodeLens settings - Right](./images/LSPCodeLensSettingsRight.png)
 
+## Structure View
+
+The Structure View displays the file outline using LSP [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol):
+
+![LSP Structure View](./images/structure-view/LSPStructureView.png)
+
+### Filters
+
+You can filter symbols by [SymbolKind](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#symbolKind) 
+(Class, Method, Field, etc.) using the filter dropdown.
+
+Show all symbols:
+
+![Show all symbols](./images/structure-view/LSPStructureViewShowAll.png)
+
+Hide specific symbol types (e.g., constants):
+
+![Hide constants](./images/structure-view/LSPStructureViewHideConstant.png)
+
 ## Actions
 
 ### Formatting
