@@ -66,6 +66,41 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
         return new Class[]{PsiElement.class};
     }
 
+    /**
+     * Finds the acceptable element in the structure view for a given PSI element.
+     * <p>
+     * This method is called by {@link #getCurrentEditorElement()} to determine which element
+     * should be selected in the Structure View based on the cursor position.
+     * Unlike the default implementation that walks up the PSI tree, this method performs
+     * a breadth-first search through the DocumentSymbol hierarchy to find the closest
+     * containing parent symbol.
+     * </p>
+     * <p>
+     * This enables "Always Select Opened Element" to work properly even when the cursor
+     * is positioned at an offset that doesn't correspond exactly to a DocumentSymbol
+     * (e.g., whitespace or text between symbols).
+     * </p>
+     *
+     * @param element the PSI element at the cursor position
+     * @return the DocumentSymbolData for the closest containing symbol, or null if none found
+     */
+    @Override
+    protected @Nullable Object findAcceptableElement(PsiElement element) {
+        if (element == null) {
+            return null;
+        }
+
+        // If this is already a DocumentSymbolData, return it directly
+        if (element instanceof DocumentSymbolData) {
+            return element;
+        }
+
+        // Find the closest containing DocumentSymbol using breadth-first search
+        // This ensures that even if the cursor is not exactly on a symbol boundary,
+        // the parent symbol that contains the cursor position will be selected
+        return LSPDocumentSymbolUtils.getDocumentSymbolData(element);
+    }
+
     @Override
     public Filter @NotNull [] getFilters() {
         return new Filter[]{
