@@ -59,17 +59,24 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return PsiElement.EMPTY_ARRAY;
         }
+        Project project = sourceElement.getProject();
         Document document = editor.getDocument();
-        VirtualFile file = LSPIJUtils.getFile(document);
-        Module module = LSPIJUtils.getModule(file, sourceElement.getProject());
-        Project project = module != null ? module.getProject() : null;
-        if (project == null || project.isDisposed()) {
-            return PsiElement.EMPTY_ARRAY;
-        }
 
         LSPDocumentLinkSupport documentLinkSupport = LSPFileSupport.getSupport(psiFile).getDocumentLinkSupport();
-        var params = new DocumentLinkParams(new TextDocumentIdentifier());
-        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
+        CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getValidLSPFuture();
+
+        if (documentLinkFuture == null) {
+            VirtualFile file = LSPIJUtils.getFile(document);
+            Module module = LSPIJUtils.getModule(file, sourceElement.getProject());
+            // Query LS only for files inside the project.
+            if (module == null || module.isDisposed()) {
+                return PsiElement.EMPTY_ARRAY;
+            }
+
+            var params = new DocumentLinkParams(new TextDocumentIdentifier());
+            documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
+        }
+
         try {
             waitUntilDone(documentLinkFuture, psiFile);
         } catch (
