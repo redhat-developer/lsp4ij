@@ -105,6 +105,7 @@ Here are some projects that use LSP4IJ:
  * [Xonsh plugin for JetBrains IDEs](https://github.com/nahoj/xonsh-jetbrains)
  * [Rell IntelliJ Plugin](https://bitbucket.org/chromawallet/rell-jetbrains)
  * [Dart](https://github.com/flutter/dart-intellij-third-party)
+ * [Semantic Web Language Server](https://github.com/SemanticWebLanguageServer/swls)
 
 ## Requirements
 
