@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.features.inlayhint;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentRefreshableFeatureSupport;
+import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
@@ -37,13 +37,13 @@ import java.util.concurrent.CompletableFuture;
  *     <li>LSP 'inlayHint/resolve' requests</li>
  * </ul>
  */
-public class LSPInlayHintsSupport extends AbstractLSPDocumentRefreshableFeatureSupport<InlayHintParams, List<InlayHintData>> {
+public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<InlayHintParams, List<InlayHintData>> {
 
     public LSPInlayHintsSupport(@NotNull PsiFile file) {
-        super(file, EditorFeatureType.DECLARATIVE_INLAY_HINT);
+        super(file);
     }
 
-    public CompletableFuture<List<InlayHintData>> getInlayHints(InlayHintParams params) {
+    public CompletableFuture<List<InlayHintData>> getInlayHints(@NotNull InlayHintParams params) {
         return super.getFeatureData(params);
     }
 

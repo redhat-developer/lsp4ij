@@ -81,10 +81,8 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         } catch (PsiFileChangedException e) {
             // The file content has changed, cancel the LSP textDocument/inlayHint requests.
             inlayHintSupport.cancel();
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            // the future which collects all textDocument/inlayHint for all servers is not finished
-            // add it to the pending futures to refresh again the UI when this future will be finished.
-            inlayHintSupport.refreshEditorFeatureWhenReady();
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/inlayHint' request", e);

@@ -129,14 +129,14 @@ public class CompletableFutures {
             return;
         }
         long start = System.currentTimeMillis();
-        final long modificationStamp = file != null ? file.getModificationStamp() : -1;
+        final long modificationStamp = file != null ? file.getFileDocument().getModificationStamp() : -1;
         while (!future.isDone()) {
             try {
                 // check progress canceled
                 ProgressManager.checkCanceled();
                 // check psi file
                 if (file != null) {
-                    if (modificationStamp != file.getModificationStamp()) {
+                    if (modificationStamp != file.getFileDocument().getModificationStamp()) {
                         throw new PsiFileChangedException();
                     }
                 }
@@ -200,9 +200,9 @@ public class CompletableFutures {
                     waitUntilDone(future, file);
                 } catch (
                         ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-                    //TODO delete block when minimum required version is 2024.2
                     // Case when user click on cancel of progress Task.
                     CancellationSupport.cancel(future);
+                    throw e;
                 } catch (CancellationException e) {
                     CancellationSupport.cancel(future);
                 } catch (Exception e) {
