@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
@@ -86,6 +87,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
     /**
      * Returns true if there is a started language server which supports LSP foldingRanges and false otherwise.
+     *
      * @param file the Psi file
      * @return true if there is a started language server which supports LSP foldingRanges and false otherwise.
      */
@@ -119,16 +121,14 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges(params);
         try {
             waitUntilDone(foldingRangesFuture, file, timeout);
-        } catch (
-                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            foldingRangeSupport.cancel();
-            return Collections.emptyList();
-        } catch (CancellationException e) {
+        } catch (PsiFileChangedException e) {
             // cancel the LSP requests textDocument/foldingRanges
             foldingRangeSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException e) {
             return Collections.emptyList();
-        } catch(TimeoutException e) {
+        } catch (TimeoutException e) {
             // Ignore timeout error
             return Collections.emptyList();
         } catch (ExecutionException e) {
