@@ -45,35 +45,32 @@ public class LSPCodeLensSupport extends AbstractLSPDocumentFeatureSupport<CodeLe
     }
 
     @Override
-    protected CompletableFuture<CodeLensDataResult> doLoad(@NotNull CodeLensParams params,
-                                                           @NotNull CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getCodeLenses(file, params, cancellationSupport);
+        return getLanguageServers(file,
+                f -> f.getCodeLensFeature().isEnabled(file),
+                f -> f.getCodeLensFeature().isSupported(file));
     }
 
-    private static @NotNull CompletableFuture<CodeLensDataResult> getCodeLenses(@NotNull PsiFile file,
-                                                                                @NotNull CodeLensParams params,
-                                                                                @NotNull CancellationSupport cancellationSupport) {
+    @Override
+    protected CompletableFuture<CodeLensDataResult> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                               @NotNull CodeLensParams params,
+                                                               @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have code lens capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(new CodeLensDataResult(Collections.emptyList()));
+        }
 
-        return getLanguageServers(file,
-                        f -> f.getCodeLensFeature().isEnabled(file),
-                        f -> f.getCodeLensFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have code lens capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedStage(Collections.emptyList());
-                    }
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/codeLens future for each language servers
+        List<CompletableFuture<List<CodeLensData>>> codeLensPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getCodeLensesFor(params, languageServer, file, cancellationSupport))
+                .toList();
 
-                    // Collect list of textDocument/codeLens future for each language servers
-                    List<CompletableFuture<List<CodeLensData>>> codeLensPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getCodeLensesFor(params, languageServer, file, cancellationSupport))
-                            .toList();
-
-                    // Merge list of textDocument/codelens future in one future which return the list of code lenses
-                    return CompletableFutures.mergeInOneFuture(codeLensPerServerFutures, cancellationSupport);
-                })
+        // Merge list of textDocument/codelens future in one future which return the list of code lenses
+        return CompletableFutures.mergeInOneFuture(codeLensPerServerFutures, cancellationSupport)
                 .thenApply(codeLensData -> {
                     // Sort codelens by line number
                     codeLensData.sort(LSPCodeLensProvider::sortCodeLensByLine);

@@ -48,33 +48,32 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
     }
 
     @Override
-    protected CompletableFuture<List<LocationData>> doLoad(LSPDeclarationParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return collectDeclarations(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<LocationData>> collectDeclarations(@NotNull PsiFile file,
-                                                                                  @NotNull LSPDeclarationParams params,
-                                                                                  @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getDeclarationFeature().isEnabled(file),
-                f -> f.getDeclarationFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have declaration capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+                f -> f.getDeclarationFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/declaration future for each language servers
-                    List<CompletableFuture<List<LocationData>>> declarationsPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getDeclarationFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<LocationData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                               @NotNull LSPDeclarationParams params,
+                                                               @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have declaration capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-                    // Merge list of textDocument/declaration future in one future which return the list of declaration ranges
-                    return CompletableFutures.mergeInOneFuture(declarationsPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/declaration future for each language servers
+        List<CompletableFuture<List<LocationData>>> declarationsPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getDeclarationFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/declaration future in one future which return the list of declaration ranges
+        return CompletableFutures.mergeInOneFuture(declarationsPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<LocationData>> getDeclarationFor(@NotNull LSPDeclarationParams params,

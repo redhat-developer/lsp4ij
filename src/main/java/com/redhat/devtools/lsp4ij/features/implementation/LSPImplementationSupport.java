@@ -48,33 +48,32 @@ public class LSPImplementationSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     @Override
-    protected CompletableFuture<List<LocationData>> doLoad(LSPImplementationParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return collectImplementations(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<LocationData>> collectImplementations(@NotNull PsiFile file,
-                                                                                     @NotNull LSPImplementationParams params,
-                                                                                     @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getImplementationFeature().isEnabled(file),
-                f -> f.getImplementationFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have implementation capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+                f -> f.getImplementationFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/implementation future for each language servers
-                    List<CompletableFuture<List<LocationData>>> implementationsPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getImplementationFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<LocationData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                               @NotNull LSPImplementationParams params,
+                                                               @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have implementation capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-                    // Merge list of textDocument/implementation future in one future which return the list of implementation ranges
-                    return CompletableFutures.mergeInOneFuture(implementationsPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/implementation future for each language servers
+        List<CompletableFuture<List<LocationData>>> implementationsPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getImplementationFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/implementation future in one future which return the list of implementation ranges
+        return CompletableFutures.mergeInOneFuture(implementationsPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<LocationData>> getImplementationFor(@NotNull LSPImplementationParams params,

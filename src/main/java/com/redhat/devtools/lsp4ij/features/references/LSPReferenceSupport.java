@@ -49,33 +49,32 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
     }
 
     @Override
-    protected CompletableFuture<List<LocationData>> doLoad(LSPReferenceParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return collectReferences(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<LocationData>> collectReferences(@NotNull PsiFile file,
-                                                                                @NotNull LSPReferenceParams params,
-                                                                                @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getReferencesFeature().isEnabled(file),
-                f -> f.getReferencesFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have reference capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+                f -> f.getReferencesFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/reference future for each language servers
-                    List<CompletableFuture<List<LocationData>>> referencesPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getReferenceFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<LocationData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                               @NotNull LSPReferenceParams params,
+                                                               @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have reference capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-                    // Merge list of textDocument/reference future in one future which return the list of reference ranges
-                    return CompletableFutures.mergeInOneFuture(referencesPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/reference future for each language servers
+        List<CompletableFuture<List<LocationData>>> referencesPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getReferenceFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/reference future in one future which return the list of reference ranges
+        return CompletableFutures.mergeInOneFuture(referencesPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<LocationData>> getReferenceFor(@NotNull LSPReferenceParams params,

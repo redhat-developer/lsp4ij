@@ -167,33 +167,32 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     @Override
-    protected CompletableFuture<List<SelectionRange>> doLoad(LSPSelectionRangeParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getSelectionRanges(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<SelectionRange>> getSelectionRanges(@NotNull PsiFile file,
-                                                                                       @NotNull LSPSelectionRangeParams params,
-                                                                                       @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getSelectionRangeFeature().isEnabled(file),
-                f -> f.getSelectionRangeFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have selection range capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedStage(Collections.emptyList());
-                    }
+                f -> f.getSelectionRangeFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/selectionRange future for each language servers
-                    List<CompletableFuture<List<SelectionRange>>> selectionRangesPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getSelectionRangesFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<SelectionRange>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                 @NotNull LSPSelectionRangeParams params,
+                                                                 @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have selection range capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/selectionRange future in one future which return the list of selection ranges
-                    return CompletableFutures.mergeInOneFuture(selectionRangesPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/selectionRange future for each language servers
+        List<CompletableFuture<List<SelectionRange>>> selectionRangesPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getSelectionRangesFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/selectionRange future in one future which return the list of selection ranges
+        return CompletableFutures.mergeInOneFuture(selectionRangesPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<SelectionRange>> getSelectionRangesFor(@NotNull LSPSelectionRangeParams params,

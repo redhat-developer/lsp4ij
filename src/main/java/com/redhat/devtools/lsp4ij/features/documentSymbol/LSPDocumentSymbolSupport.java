@@ -46,33 +46,32 @@ public class LSPDocumentSymbolSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     @Override
-    protected CompletableFuture<List<DocumentSymbolData>> doLoad(DocumentSymbolParams documentSymbolParams, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getDocumentSymbols(file, documentSymbolParams, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<DocumentSymbolData>> getDocumentSymbols(@NotNull PsiFile file,
-                                                                                           @NotNull DocumentSymbolParams params,
-                                                                                           @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getDocumentSymbolFeature().isEnabled(file),
-                f -> f.getDocumentSymbolFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have document link capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getDocumentSymbolFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/documentSymbol future for each language servers
-                    List<CompletableFuture<List<DocumentSymbolData>>> documentSymbolInformationPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getDocumentSymbolsFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<DocumentSymbolData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                     @NotNull DocumentSymbolParams params,
+                                                                     @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have document link capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/documentSymbol future in one future which return the list of document link
-                    return CompletableFutures.mergeInOneFuture(documentSymbolInformationPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/documentSymbol future for each language servers
+        List<CompletableFuture<List<DocumentSymbolData>>> documentSymbolInformationPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getDocumentSymbolsFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/documentSymbol future in one future which return the list of document link
+        return CompletableFutures.mergeInOneFuture(documentSymbolInformationPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<DocumentSymbolData>> getDocumentSymbolsFor(@NotNull DocumentSymbolParams params,

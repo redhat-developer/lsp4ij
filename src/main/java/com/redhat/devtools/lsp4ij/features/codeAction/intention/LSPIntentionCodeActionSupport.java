@@ -55,35 +55,32 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
     }
 
     @Override
-    protected CompletableFuture<List<CodeActionData>> doLoad(@NotNull CodeActionParams params,
-                                                             @NotNull CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getCodeActions(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<CodeActionData>> getCodeActions(@NotNull PsiFile file,
-                                                                                   @NotNull CodeActionParams params,
-                                                                                   @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getCodeActionFeature().isIntentionActionsEnabled(file),
-                f -> f.getCodeActionFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have code action capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getCodeActionFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/codeAction future for each language servers
-                    List<CompletableFuture<List<CodeActionData>>> codeActionPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getCodeActionsFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<CodeActionData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                 @NotNull CodeActionParams params,
+                                                                 @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have code action capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/codeAction future in one future which return the list of code actions
-                    return CompletableFutures.mergeInOneFuture(codeActionPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/codeAction future for each language servers
+        List<CompletableFuture<List<CodeActionData>>> codeActionPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getCodeActionsFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/codeAction future in one future which return the list of code actions
+        return CompletableFutures.mergeInOneFuture(codeActionPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<CodeActionData>> getCodeActionsFor(@NotNull CodeActionParams params,

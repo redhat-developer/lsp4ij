@@ -14,6 +14,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,6 +50,37 @@ public abstract class AbstractLSPWorkspaceFeatureSupport<Params, Result> extends
     protected boolean checkValid() {
         return !project.isDisposed();
     }
+
+    @Override
+    public CompletableFuture<Result> getFeatureData(Params params) {
+        if (!isValidLSPFuture()) {
+            // - the LSP requests have never been executed
+            // - or the LSP requests has failed
+            // --> consume LSP requests for all language servers applying to a given project.
+            load(getLanguageServers(), params);
+        }
+        return getFuture();
+    }
+
+    /**
+     * Returns the language servers that support this feature for the current project.
+     * This method should return a future with the filtered language servers.
+     *
+     * @return the language servers future.
+     */
+    protected abstract CompletableFuture<List<LanguageServerItem>> getLanguageServers();
+
+    /**
+     * Load the LSP data for the given language servers.
+     *
+     * @param languageServers     the language servers.
+     * @param params              the LSP parameters expected to execute LSP requests.
+     * @param cancellationSupport the cancellation support.
+     * @return the LSP response results.
+     */
+    protected abstract CompletableFuture<Result> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                            @NotNull Params params,
+                                                            @NotNull CancellationSupport cancellationSupport);
 
     protected static CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull Project project,
                                                                                     @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,

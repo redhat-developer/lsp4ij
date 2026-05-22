@@ -45,33 +45,39 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
     }
 
     @Override
-    protected CompletableFuture<List<WorkspaceSymbolData>> doLoad(LSPWorkspaceSymbolParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
+        // Note: We can't use params.canSupport here, so we filter in doLoadData
         Project project = super.getProject();
-        return getWorkspaceSymbol(project, params, cancellationSupport);
+        return getLanguageServers(project,
+                f -> f.getWorkspaceSymbolFeature().isEnabled(),
+                f -> f.getWorkspaceSymbolFeature().isSupported());
     }
 
-    private static @NotNull CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbol(@NotNull Project project,
-                                                                                            @NotNull LSPWorkspaceSymbolParams params,
-                                                                                            @NotNull CancellationSupport cancellationSupport) {
-        return getLanguageServers(project,
-                f -> f.getWorkspaceSymbolFeature().isEnabled() && params.canSupport(f.getWorkspaceSymbolFeature()),
-                f -> f.getWorkspaceSymbolFeature().isSupported())
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which have workspaceSymbol capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+    @Override
+    protected CompletableFuture<List<WorkspaceSymbolData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                      @NotNull LSPWorkspaceSymbolParams params,
+                                                                      @NotNull CancellationSupport cancellationSupport) {
+        // Filter language servers based on params.canSupport
+        Project project = super.getProject();
+        List<LanguageServerItem> filteredServers = languageServers
+                .stream()
+                .filter(ls -> params.canSupport(ls.getClientFeatures().getWorkspaceSymbolFeature()))
+                .toList();
 
-                    // Collect list of workspace/symbol future for each language servers
-                    List<CompletableFuture<List<WorkspaceSymbolData>>> workspaceSymbolPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getWorkspaceSymbolFor(params, languageServer, cancellationSupport, project))
-                            .filter(Objects::nonNull)
-                            .toList();
+        // Here languageServers is the list of language servers which have workspaceSymbol capability
+        if (filteredServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-                    // Merge list of workspace/symbol future in one future which return the list of workspace symbol data
-                    return CompletableFutures.mergeInOneFuture(workspaceSymbolPerServerFutures, cancellationSupport);
-                });
+        // Collect list of workspace/symbol future for each language servers
+        List<CompletableFuture<List<WorkspaceSymbolData>>> workspaceSymbolPerServerFutures = filteredServers
+                .stream()
+                .map(languageServer -> getWorkspaceSymbolFor(params, languageServer, cancellationSupport, project))
+                .filter(Objects::nonNull)
+                .toList();
+
+        // Merge list of workspace/symbol future in one future which return the list of workspace symbol data
+        return CompletableFutures.mergeInOneFuture(workspaceSymbolPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<WorkspaceSymbolData>> getWorkspaceSymbolFor(@NotNull LSPWorkspaceSymbolParams params,

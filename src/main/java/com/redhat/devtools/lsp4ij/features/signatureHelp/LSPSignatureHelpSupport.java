@@ -19,6 +19,7 @@ import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureHelpParams;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -38,29 +39,27 @@ public class LSPSignatureHelpSupport extends AbstractLSPDocumentFeatureSupport<S
     }
 
     @Override
-    protected CompletableFuture<SignatureHelp> doLoad(SignatureHelpParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getSignatureHelp(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<SignatureHelp> getSignatureHelp(@NotNull PsiFile file,
-                                                                              @NotNull SignatureHelpParams params,
-                                                                              @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getSignatureHelpFeature().isEnabled(file),
-                f -> f.getSignatureHelpFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have signature help capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+                f -> f.getSignatureHelpFeature().isSupported(file));
+    }
 
-                    // Get signature help for the first language server
-                    LanguageServerItem languageServer = languageServers.get(0);
-                    return getSignatureHelpFor(params, file, languageServer, cancellationSupport);
-                });
+    @Override
+    protected CompletableFuture<SignatureHelp> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                          @NotNull SignatureHelpParams params,
+                                                          @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have signature help capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        PsiFile file = super.getFile();
+        // Get signature help for the first language server
+        LanguageServerItem languageServer = languageServers.get(0);
+        return getSignatureHelpFor(params, file, languageServer, cancellationSupport);
     }
 
     private static CompletableFuture<SignatureHelp> getSignatureHelpFor(@NotNull SignatureHelpParams params,

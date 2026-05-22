@@ -50,35 +50,33 @@ public class LSPSemanticTokensSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     @Override
-    protected CompletableFuture<SemanticTokensData> doLoad(SemanticTokensParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getSemanticTokens(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<SemanticTokensData> getSemanticTokens(@NotNull PsiFile file,
-                                                                                    @NotNull SemanticTokensParams params,
-                                                                                    @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getSemanticTokensFeature().isEnabled(file),
-                f -> f.getSemanticTokensFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have folding range capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+                f -> f.getSemanticTokensFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/semanticTokens future for each language servers
-                    List<CompletableFuture<SemanticTokensData>> semanticTokensPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getSemanticTokensFor(params, file, languageServer, cancellationSupport))
-                            .filter(Objects::nonNull)
-                            .toList();
+    @Override
+    protected CompletableFuture<SemanticTokensData> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                               @NotNull SemanticTokensParams params,
+                                                               @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have folding range capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-                    // Merge list of textDocument/foldingRange future in one future which return the list of folding ranges
-                    return semanticTokensPerServerFutures.get(0); //CompletableFutures.mergeInOneFuture(semanticTokensPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/semanticTokens future for each language servers
+        List<CompletableFuture<SemanticTokensData>> semanticTokensPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getSemanticTokensFor(params, file, languageServer, cancellationSupport))
+                .filter(Objects::nonNull)
+                .toList();
+
+        // Merge list of textDocument/foldingRange future in one future which return the list of folding ranges
+        return semanticTokensPerServerFutures.get(0); //CompletableFutures.mergeInOneFuture(semanticTokensPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<SemanticTokensData> getSemanticTokensFor(@NotNull SemanticTokensParams params,

@@ -54,46 +54,44 @@ public class LSPPrepareRenameSupport extends AbstractLSPDocumentFeatureSupport<L
     }
 
     @Override
-    protected CompletableFuture<List<PrepareRenameResultData>> doLoad(@NotNull LSPPrepareRenameParams params,
-                                                                      @NotNull CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getPrepareRenameResult(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<PrepareRenameResultData>> getPrepareRenameResult(@NotNull PsiFile file,
-                                                                                                    @NotNull LSPPrepareRenameParams params,
-                                                                                                    @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getRenameFeature().isEnabled(file),
-                f -> f.getRenameFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have 'rename' support
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getRenameFeature().isSupported(file));
+    }
 
-                    List<CompletableFuture<List<PrepareRenameResultData>>> prepareRenamePerServerFutures = new ArrayList<>();
-                    DefaultPrepareRenameResultProvider defaultPrepareRenameResult = new DefaultPrepareRenameResultProvider(params);
-                    for (var languageServer : languageServers) {
-                        CompletableFuture<List<PrepareRenameResultData>> future = null;
-                        if (languageServer.isPrepareRenameSupported()) {
-                            future = getPrepareRenamesFor(params, file, defaultPrepareRenameResult, languageServer, cancellationSupport);
-                        } else {
-                            var result = defaultPrepareRenameResult.apply(languageServer);
-                            if (result != null) {
-                                prepareRenamePerServerFutures.add(CompletableFuture.completedFuture(List.of(result)));
-                            }
-                        }
-                        if (future != null) {
-                            // The rename has been done in a valid location
-                            // ex : foo.ba|r(), the prepare rename future is added ('bar' as placeholder)
-                            prepareRenamePerServerFutures.add(future);
-                        }
-                    }
-                    // Merge list of textDocument/prepareRename future in one future which return the list of color information
-                    return CompletableFutures.mergeInOneFuture(prepareRenamePerServerFutures, cancellationSupport);
-                });
+    @Override
+    protected CompletableFuture<List<PrepareRenameResultData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                          @NotNull LSPPrepareRenameParams params,
+                                                                          @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have 'rename' support
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        PsiFile file = super.getFile();
+        List<CompletableFuture<List<PrepareRenameResultData>>> prepareRenamePerServerFutures = new ArrayList<>();
+        DefaultPrepareRenameResultProvider defaultPrepareRenameResult = new DefaultPrepareRenameResultProvider(params);
+        for (var languageServer : languageServers) {
+            CompletableFuture<List<PrepareRenameResultData>> future = null;
+            if (languageServer.isPrepareRenameSupported()) {
+                future = getPrepareRenamesFor(params, file, defaultPrepareRenameResult, languageServer, cancellationSupport);
+            } else {
+                var result = defaultPrepareRenameResult.apply(languageServer);
+                if (result != null) {
+                    prepareRenamePerServerFutures.add(CompletableFuture.completedFuture(List.of(result)));
+                }
+            }
+            if (future != null) {
+                // The rename has been done in a valid location
+                // ex : foo.ba|r(), the prepare rename future is added ('bar' as placeholder)
+                prepareRenamePerServerFutures.add(future);
+            }
+        }
+        // Merge list of textDocument/prepareRename future in one future which return the list of color information
+        return CompletableFutures.mergeInOneFuture(prepareRenamePerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<PrepareRenameResultData>> getPrepareRenamesFor(@NotNull PrepareRenameParams params,

@@ -49,33 +49,32 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
     }
 
     @Override
-    protected CompletableFuture<List<HoverData>> doLoad(HoverParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getHover(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<HoverData>> getHover(@NotNull PsiFile file,
-                                                                        @NotNull HoverParams params,
-                                                                        @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getHoverFeature().isEnabled(file),
-                f -> f.getHoverFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have hover capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getHoverFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/hover future for each language servers
-                    List<CompletableFuture<HoverData>> hoverPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getHoverFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<HoverData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                            @NotNull HoverParams params,
+                                                            @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have hover capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/hover future in one future which return the list of highlights
-                    return mergeInOneFuture(hoverPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/hover future for each language servers
+        List<CompletableFuture<HoverData>> hoverPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getHoverFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/hover future in one future which return the list of highlights
+        return mergeInOneFuture(hoverPerServerFutures, cancellationSupport);
     }
 
     public static @NotNull CompletableFuture<List<HoverData>> mergeInOneFuture(@NotNull List<CompletableFuture<HoverData>> futures,

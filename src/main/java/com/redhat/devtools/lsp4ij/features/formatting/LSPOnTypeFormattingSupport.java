@@ -45,27 +45,32 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
     }
 
     @Override
-    protected CompletableFuture<List<TextEdit>> doLoad(DocumentOnTypeFormattingParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return onTypeFormatting(file, params, cancellationSupport);
+        // Note: We can't determine the charTyped here, so we check it in doLoadData
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
-    private static @NotNull CompletableFuture<List<TextEdit>> onTypeFormatting(@NotNull PsiFile file,
-                                                                               @NotNull DocumentOnTypeFormattingParams params,
-                                                                               @NotNull CancellationSupport cancellationSupport) {
+    @Override
+    protected CompletableFuture<List<TextEdit>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                           @NotNull DocumentOnTypeFormattingParams params,
+                                                           @NotNull CancellationSupport cancellationSupport) {
+        // For onTypeFormatting, we need to filter based on the charTyped
+        // So we call getLanguageServers here with the charTyped filter
+        PsiFile file = super.getFile();
         String charTyped = params.getCh();
         return getLanguageServers(file,
                 f -> f.getOnTypeFormattingFeature().isEnabled(file) && f.getOnTypeFormattingFeature().isOnTypeFormattingTriggerCharacter(file, charTyped),
                 f -> f.getOnTypeFormattingFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
+                .thenComposeAsync(filteredServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have on-type formatting capability
-                    if (languageServers.isEmpty()) {
+                    if (filteredServers.isEmpty()) {
                         return CompletableFuture.completedFuture(Collections.emptyList());
                     }
 
                     // Collect list of textDocument/onTypeFormatting future for each language servers
-                    List<CompletableFuture<List<TextEdit>>> textEditsPerServerFutures = languageServers
+                    List<CompletableFuture<List<TextEdit>>> textEditsPerServerFutures = filteredServers
                             .stream()
                             .map(languageServer -> getTextEditsFor(params, file, languageServer, cancellationSupport))
                             .toList();

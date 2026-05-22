@@ -54,127 +54,127 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
     }
 
     @Override
-    protected CompletableFuture<List<LSPUsagePsiElement>> doLoad(LSPUsageSupportParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return collectUsages(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<LSPUsagePsiElement>> collectUsages(@NotNull PsiFile file,
-                                                                                      @NotNull LSPUsageSupportParams params,
-                                                                                      @NotNull CancellationSupport cancellationSupport) {
-        var textDocumentIdentifier = new TextDocumentIdentifier();
-        Project project = file.getProject();
         return getLanguageServers(file,
                 f -> f.getUsageFeature().isEnabled(file),
-                f -> f.getUsageFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have usage (references, implementation, etc) capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+                f -> f.getUsageFeature().isSupported(file));
+    }
 
-                    // Assume we need to collect everything
-                    boolean collectDefinitions = true;
-                    boolean collectTypeDefinitions = true;
+    @Override
+    protected CompletableFuture<List<LSPUsagePsiElement>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                     @NotNull LSPUsageSupportParams params,
+                                                                     @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have usage (references, implementation, etc) capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-                    // If we can determine the type of element being searched, see if we can/should search for less
-                    Position position = params.position();
-                    Document document = LSPIJUtils.getDocument(file);
-                    int offset = document != null ? LSPIJUtils.toOffset(position, document) : -1;
-                    if (offset > -1) {
-                        LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
-                        if (semanticTokensFileViewProvider != null) {
-                            // Don't collect non-type definitions for type elements
-                            ThreeState isType = semanticTokensFileViewProvider.isType(offset);
-                            if (isType == ThreeState.YES) {
-                                collectDefinitions = false;
-                            }
-                            // Don't collect type definitions for non-type elements
-                            else if (isType == ThreeState.NO) {
-                                collectTypeDefinitions = false;
-                            }
-                        }
-                    }
+        PsiFile file = super.getFile();
+        var textDocumentIdentifier = new TextDocumentIdentifier();
+        Project project = file.getProject();
 
-                    DeclarationParams declarationParams = new DeclarationParams(textDocumentIdentifier, position);
-                    DefinitionParams definitionParams = new DefinitionParams(textDocumentIdentifier, position);
-                    TypeDefinitionParams typeDefinitionParams = new TypeDefinitionParams(textDocumentIdentifier, position);
-                    ReferenceParams referenceParams = createReferenceParams(textDocumentIdentifier, position, project);
-                    ImplementationParams implementationParams = new ImplementationParams(textDocumentIdentifier, position);
+        // Assume we need to collect everything
+        boolean collectDefinitions = true;
+        boolean collectTypeDefinitions = true;
 
-                    List<CompletableFuture<List<LSPUsagePsiElement>>> allFutures = new ArrayList<>();
-                    for (var ls : languageServers) {
-                        var clientFeature = ls.getClientFeatures();
+        // If we can determine the type of element being searched, see if we can/should search for less
+        Position position = params.position();
+        Document document = LSPIJUtils.getDocument(file);
+        int offset = document != null ? LSPIJUtils.toOffset(position, document) : -1;
+        if (offset > -1) {
+            LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(file);
+            if (semanticTokensFileViewProvider != null) {
+                // Don't collect non-type definitions for type elements
+                ThreeState isType = semanticTokensFileViewProvider.isType(offset);
+                if (isType == ThreeState.YES) {
+                    collectDefinitions = false;
+                }
+                // Don't collect type definitions for non-type elements
+                else if (isType == ThreeState.NO) {
+                    collectTypeDefinitions = false;
+                }
+            }
+        }
 
-                        // Collect declarations
-                        if (clientFeature.getDeclarationFeature().isEnabled(file)
-                                && clientFeature.getDeclarationFeature().isSupported(file)) {
-                            updateTextDocumentUri(declarationParams.getTextDocument(), file, ls);
-                            allFutures.add(
-                                    // Update textDocument Uri with custom file Uri if needed
-                                    cancellationSupport.execute(ls
-                                                    .getTextDocumentService()
-                                                    .declaration(declarationParams), ls, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
-                                            .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.declarations))
-                            );
-                        }
+        DeclarationParams declarationParams = new DeclarationParams(textDocumentIdentifier, position);
+        DefinitionParams definitionParams = new DefinitionParams(textDocumentIdentifier, position);
+        TypeDefinitionParams typeDefinitionParams = new TypeDefinitionParams(textDocumentIdentifier, position);
+        ReferenceParams referenceParams = createReferenceParams(textDocumentIdentifier, position, project);
+        ImplementationParams implementationParams = new ImplementationParams(textDocumentIdentifier, position);
 
-                        // Collect definitions
-                        if (collectDefinitions
-                                && clientFeature.getDefinitionFeature().isEnabled(file)
-                                && clientFeature.getDefinitionFeature().isSupported(file)) {
-                            updateTextDocumentUri(definitionParams.getTextDocument(), file, ls);
-                            allFutures.add(
-                                    cancellationSupport.execute(ls
-                                                    .getTextDocumentService()
-                                                    .definition(definitionParams), ls, LSPRequestConstants.TEXT_DOCUMENT_DEFINITION)
-                                            .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.definitions))
-                            );
-                        }
+        List<CompletableFuture<List<LSPUsagePsiElement>>> allFutures = new ArrayList<>();
+        for (var ls : languageServers) {
+            var clientFeature = ls.getClientFeatures();
 
-                        // Collect type definitions
-                        if (collectTypeDefinitions
-                                && clientFeature.getTypeDefinitionFeature().isEnabled(file)
-                                && clientFeature.getTypeDefinitionFeature().isSupported(file)) {
-                            updateTextDocumentUri(typeDefinitionParams.getTextDocument(), file, ls);
-                            allFutures.add(
-                                    cancellationSupport.execute(ls
-                                                    .getTextDocumentService()
-                                                    .typeDefinition(typeDefinitionParams), ls, LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION)
-                                            .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.typeDefinitions))
-                            );
-                        }
+            // Collect declarations
+            if (clientFeature.getDeclarationFeature().isEnabled(file)
+                    && clientFeature.getDeclarationFeature().isSupported(file)) {
+                updateTextDocumentUri(declarationParams.getTextDocument(), file, ls);
+                allFutures.add(
+                        // Update textDocument Uri with custom file Uri if needed
+                        cancellationSupport.execute(ls
+                                        .getTextDocumentService()
+                                        .declaration(declarationParams), ls, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
+                                .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.declarations))
+                );
+            }
 
-                        // Collect references
-                        if (clientFeature.getReferencesFeature().isEnabled(file)
-                                && clientFeature.getReferencesFeature().isSupported(file)) {
-                            updateTextDocumentUri(referenceParams.getTextDocument(), file, ls);
-                            allFutures.add(
-                                    cancellationSupport.execute(ls
-                                                    .getTextDocumentService()
-                                                    .references(referenceParams), ls, LSPRequestConstants.TEXT_DOCUMENT_REFERENCES)
-                                            .handle(reportUsages2(ls, project, LSPUsagePsiElement.UsageKind.references))
-                            );
-                        }
+            // Collect definitions
+            if (collectDefinitions
+                    && clientFeature.getDefinitionFeature().isEnabled(file)
+                    && clientFeature.getDefinitionFeature().isSupported(file)) {
+                updateTextDocumentUri(definitionParams.getTextDocument(), file, ls);
+                allFutures.add(
+                        cancellationSupport.execute(ls
+                                        .getTextDocumentService()
+                                        .definition(definitionParams), ls, LSPRequestConstants.TEXT_DOCUMENT_DEFINITION)
+                                .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.definitions))
+                );
+            }
 
-                        // Collect implementations
-                        if (clientFeature.getImplementationFeature().isEnabled(file)
-                                && clientFeature.getImplementationFeature().isSupported(file)) {
-                            updateTextDocumentUri(implementationParams.getTextDocument(), file, ls);
-                            allFutures.add(
-                                    cancellationSupport.execute(ls
-                                                    .getTextDocumentService()
-                                                    .implementation(implementationParams), ls, LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION)
-                                            .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.implementations))
-                            );
-                        }
+            // Collect type definitions
+            if (collectTypeDefinitions
+                    && clientFeature.getTypeDefinitionFeature().isEnabled(file)
+                    && clientFeature.getTypeDefinitionFeature().isSupported(file)) {
+                updateTextDocumentUri(typeDefinitionParams.getTextDocument(), file, ls);
+                allFutures.add(
+                        cancellationSupport.execute(ls
+                                        .getTextDocumentService()
+                                        .typeDefinition(typeDefinitionParams), ls, LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION)
+                                .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.typeDefinitions))
+                );
+            }
 
-                    }
+            // Collect references
+            if (clientFeature.getReferencesFeature().isEnabled(file)
+                    && clientFeature.getReferencesFeature().isSupported(file)) {
+                updateTextDocumentUri(referenceParams.getTextDocument(), file, ls);
+                allFutures.add(
+                        cancellationSupport.execute(ls
+                                        .getTextDocumentService()
+                                        .references(referenceParams), ls, LSPRequestConstants.TEXT_DOCUMENT_REFERENCES)
+                                .handle(reportUsages2(ls, project, LSPUsagePsiElement.UsageKind.references))
+                );
+            }
 
-                    // Merge list of textDocument/references future in one future which return the list of location information
-                    return CompletableFutures.mergeInOneFuture(allFutures, cancellationSupport);
-                });
+            // Collect implementations
+            if (clientFeature.getImplementationFeature().isEnabled(file)
+                    && clientFeature.getImplementationFeature().isSupported(file)) {
+                updateTextDocumentUri(implementationParams.getTextDocument(), file, ls);
+                allFutures.add(
+                        cancellationSupport.execute(ls
+                                        .getTextDocumentService()
+                                        .implementation(implementationParams), ls, LSPRequestConstants.TEXT_DOCUMENT_IMPLEMENTATION)
+                                .handle(reportUsages(ls, project, LSPUsagePsiElement.UsageKind.implementations))
+                );
+            }
+
+        }
+
+        // Merge list of textDocument/references future in one future which return the list of location information
+        return CompletableFutures.mergeInOneFuture(allFutures, cancellationSupport);
     }
 
     private static BiFunction<? super List<? extends Location>, Throwable, ? extends List<LSPUsagePsiElement>> reportUsages2(

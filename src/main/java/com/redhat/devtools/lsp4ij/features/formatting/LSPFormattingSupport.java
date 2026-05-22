@@ -92,13 +92,21 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
     }
 
     @Override
-    protected CompletableFuture<List<? extends TextEdit>> doLoad(LSPFormattingParams params, CancellationSupport cancellationSupport) {
-        PsiFile file = super.getFile();
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
+        // Special case: the formatting server is already determined by findFormattingServer
+        // and passed via params, so we don't need to retrieve language servers here
+        return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+    }
+
+    @Override
+    protected CompletableFuture<List<? extends TextEdit>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                     @NotNull LSPFormattingParams params,
+                                                                     @NotNull CancellationSupport cancellationSupport) {
         return getFormatting(params, cancellationSupport);
     }
 
-    protected @NotNull CompletableFuture<List<? extends TextEdit>> getFormatting(@NotNull LSPFormattingParams params,
-                                                                                 @NotNull CancellationSupport cancellationSupport) {
+    private @NotNull CompletableFuture<List<? extends TextEdit>> getFormatting(@NotNull LSPFormattingParams params,
+                                                                                @NotNull CancellationSupport cancellationSupport) {
         boolean isRangeFormatting = params.textRange() != null;
         var formattingServer = params.formattingServer();
         if (isRangeFormatting && formattingServer.isDocumentRangeFormattingSupported()) {

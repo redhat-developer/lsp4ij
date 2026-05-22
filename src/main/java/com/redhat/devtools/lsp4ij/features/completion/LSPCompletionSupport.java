@@ -49,35 +49,32 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
     }
 
     @Override
-    protected CompletableFuture<List<CompletionData>> doLoad(@NotNull LSPCompletionParams params,
-                                                             @NotNull CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getCompletions(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<CompletionData>> getCompletions(@NotNull PsiFile file,
-                                                                                   @NotNull LSPCompletionParams params,
-                                                                                   @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getCompletionFeature().isEnabled(file),
-                f -> f.getCompletionFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have completion capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getCompletionFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/completion future for each language servers
-                    List<CompletableFuture<List<CompletionData>>> completionPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getCompletionsFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<CompletionData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                 @NotNull LSPCompletionParams params,
+                                                                 @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have completion capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/completion future in one future which return the list of completion items
-                    return CompletableFutures.mergeInOneFuture(completionPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/completion future for each language servers
+        List<CompletableFuture<List<CompletionData>>> completionPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getCompletionsFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/completion future in one future which return the list of completion items
+        return CompletableFutures.mergeInOneFuture(completionPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<CompletionData>> getCompletionsFor(@NotNull LSPCompletionParams params,

@@ -44,34 +44,32 @@ public class LSPFoldingRangeSupport extends AbstractLSPDocumentFeatureSupport<Fo
     }
 
     @Override
-    protected CompletableFuture<List<FoldingRange>> doLoad(FoldingRangeRequestParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getFoldingRanges(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<FoldingRange>> getFoldingRanges(@NotNull PsiFile file,
-                                                                                   @NotNull FoldingRangeRequestParams params,
-                                                                                   @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getFoldingRangeFeature().isEnabled(file),
-                f -> f.getFoldingRangeFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have folding range capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedStage(Collections.emptyList());
-                    }
+                f -> f.getFoldingRangeFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/foldingRange future for each language servers
-                    List<CompletableFuture<List<FoldingRange>>> foldingRangesPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getFoldingRangesFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<FoldingRange>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                               @NotNull FoldingRangeRequestParams params,
+                                                               @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have folding range capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/foldingRange future in one future which return the list of folding ranges
-                    return CompletableFutures.mergeInOneFuture(foldingRangesPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/foldingRange future for each language servers
+        List<CompletableFuture<List<FoldingRange>>> foldingRangesPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getFoldingRangesFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/foldingRange future in one future which return the list of folding ranges
+        return CompletableFutures.mergeInOneFuture(foldingRangesPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<FoldingRange>> getFoldingRangesFor(@NotNull FoldingRangeRequestParams params,

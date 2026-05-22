@@ -48,34 +48,32 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
     }
 
     @Override
-    protected CompletableFuture<List<InlayHintData>> doLoad(InlayHintParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getInlayHints(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<InlayHintData>> getInlayHints(@NotNull PsiFile file,
-                                                                                 @NotNull InlayHintParams params,
-                                                                                 @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getInlayHintFeature().isEnabled(file),
-                f -> f.getInlayHintFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have inlay hint capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedStage(Collections.emptyList());
-                    }
+                f -> f.getInlayHintFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/inlayHint future for each language servers
-                    List<CompletableFuture<List<InlayHintData>>> inlayHintPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getInlayHintsFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<InlayHintData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                @NotNull InlayHintParams params,
+                                                                @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have inlay hint capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/inlayHint future in one future which return the list of inlay hints
-                    return CompletableFutures.mergeInOneFuture(inlayHintPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/inlayHint future for each language servers
+        List<CompletableFuture<List<InlayHintData>>> inlayHintPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getInlayHintsFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/inlayHint future in one future which return the list of inlay hints
+        return CompletableFutures.mergeInOneFuture(inlayHintPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<InlayHintData>> getInlayHintsFor(@NotNull InlayHintParams params,

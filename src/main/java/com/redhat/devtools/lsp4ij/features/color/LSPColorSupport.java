@@ -42,35 +42,32 @@ public class LSPColorSupport extends AbstractLSPDocumentFeatureSupport<DocumentC
     }
 
     @Override
-    protected CompletableFuture<List<ColorData>> doLoad(@NotNull DocumentColorParams params,
-                                                        @NotNull CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getColors(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<ColorData>> getColors(@NotNull PsiFile file,
-                                                                         @NotNull DocumentColorParams params,
-                                                                         @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getDocumentColorFeature().isEnabled(file),
-                f -> f.getDocumentColorFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have color capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getDocumentColorFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/documentColor future for each language servers
-                    List<CompletableFuture<List<ColorData>>> colorInformationPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getColorsFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<ColorData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                            @NotNull DocumentColorParams params,
+                                                            @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have color capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/documentColor future in one future which return the list of color information
-                    return CompletableFutures.mergeInOneFuture(colorInformationPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/documentColor future for each language servers
+        List<CompletableFuture<List<ColorData>>> colorInformationPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getColorsFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/documentColor future in one future which return the list of color information
+        return CompletableFutures.mergeInOneFuture(colorInformationPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<ColorData>> getColorsFor(@NotNull DocumentColorParams params,

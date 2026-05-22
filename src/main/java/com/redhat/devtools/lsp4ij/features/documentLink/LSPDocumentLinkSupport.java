@@ -42,34 +42,32 @@ public class LSPDocumentLinkSupport extends AbstractLSPDocumentFeatureSupport<Do
     }
 
     @Override
-    protected CompletableFuture<List<DocumentLinkData>> doLoad(@NotNull DocumentLinkParams params,
-                                                               @NotNull CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getDocumentLinks(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<DocumentLinkData>> getDocumentLinks(@NotNull PsiFile file,
-                                                                                       @NotNull DocumentLinkParams params,
-                                                                                       @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getDocumentLinkFeature().isEnabled(file),
-                f -> f.getDocumentLinkFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have document link capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getDocumentLinkFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/documentLink future for each language servers
-                    List<CompletableFuture<List<DocumentLinkData>>> linkInformationPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getDocumentLinksFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<DocumentLinkData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                   @NotNull DocumentLinkParams params,
+                                                                   @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have document link capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/documentLink future in one future which return the list of document link
-                    return CompletableFutures.mergeInOneFuture(linkInformationPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/documentLink future for each language servers
+        List<CompletableFuture<List<DocumentLinkData>>> linkInformationPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getDocumentLinksFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/documentLink future in one future which return the list of document link
+        return CompletableFutures.mergeInOneFuture(linkInformationPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<DocumentLinkData>> getDocumentLinksFor(@NotNull DocumentLinkParams params,

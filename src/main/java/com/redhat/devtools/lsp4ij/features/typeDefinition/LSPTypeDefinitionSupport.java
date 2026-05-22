@@ -48,33 +48,32 @@ public class LSPTypeDefinitionSupport extends AbstractLSPDocumentFeatureSupport<
     }
 
     @Override
-    protected CompletableFuture<List<LocationData>> doLoad(LSPTypeDefinitionParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return collectTypeDefinitions(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<LocationData>> collectTypeDefinitions(@NotNull PsiFile file,
-                                                                                     @NotNull LSPTypeDefinitionParams params,
-                                                                                     @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getTypeDefinitionFeature().isEnabled(file),
-                f -> f.getTypeDefinitionFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have typeDefinition capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(null);
-                    }
+                f -> f.getTypeDefinitionFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/typeDefinition future for each language servers
-                    List<CompletableFuture<List<LocationData>>> typeDefinitionsPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getTypeDefinitionFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<LocationData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                               @NotNull LSPTypeDefinitionParams params,
+                                                               @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have typeDefinition capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
 
-                    // Merge list of textDocument/typeDefinition future in one future which return the list of typeDefinition ranges
-                    return CompletableFutures.mergeInOneFuture(typeDefinitionsPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/typeDefinition future for each language servers
+        List<CompletableFuture<List<LocationData>>> typeDefinitionsPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getTypeDefinitionFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/typeDefinition future in one future which return the list of typeDefinition ranges
+        return CompletableFutures.mergeInOneFuture(typeDefinitionsPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<LocationData>> getTypeDefinitionFor(@NotNull LSPTypeDefinitionParams params,

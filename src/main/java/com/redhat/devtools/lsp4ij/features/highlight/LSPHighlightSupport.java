@@ -50,33 +50,32 @@ public class LSPHighlightSupport extends AbstractLSPDocumentFeatureSupport<Docum
     }
 
     @Override
-    protected CompletableFuture<List<DocumentHighlight>> doLoad(DocumentHighlightParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getHighlights(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<DocumentHighlight>> getHighlights(@NotNull PsiFile file,
-                                                                                     @NotNull DocumentHighlightParams params,
-                                                                                     @NotNull CancellationSupport cancellationSupport) {
         return getLanguageServers(file,
                 f -> f.getDocumentHighlightFeature().isEnabled(file),
-                f -> f.getDocumentHighlightFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have documentHighlights capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getDocumentHighlightFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/highlights future for each language servers
-                    List<CompletableFuture<List<? extends org.eclipse.lsp4j.DocumentHighlight>>> highlightsPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getHighlightsFor(params, file, languageServer, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<DocumentHighlight>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                    @NotNull DocumentHighlightParams params,
+                                                                    @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have documentHighlights capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/highlights future in one future which return the list of highlights
-                    return mergeInOneFuture(highlightsPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/highlights future for each language servers
+        List<CompletableFuture<List<? extends org.eclipse.lsp4j.DocumentHighlight>>> highlightsPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getHighlightsFor(params, file, languageServer, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/highlights future in one future which return the list of highlights
+        return mergeInOneFuture(highlightsPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<? extends org.eclipse.lsp4j.DocumentHighlight>> getHighlightsFor(@NotNull DocumentHighlightParams params,

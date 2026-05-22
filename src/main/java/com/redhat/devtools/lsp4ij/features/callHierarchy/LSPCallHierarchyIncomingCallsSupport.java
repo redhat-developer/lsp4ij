@@ -44,34 +44,31 @@ public class LSPCallHierarchyIncomingCallsSupport extends AbstractLSPDocumentFea
     }
 
     @Override
-    protected CompletableFuture<List<CallHierarchyItemData>> doLoad(CallHierarchyIncomingCallsParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getCallHierarchyIncomingCalls(file, params, cancellationSupport);
+        return getLanguageServers(file,
+                f -> f.getCallHierarchyFeature().isEnabled(file),
+                f -> f.getCallHierarchyFeature().isSupported(file));
     }
 
-    private static @NotNull CompletableFuture<List<CallHierarchyItemData>> getCallHierarchyIncomingCalls(@NotNull PsiFile file,
-                                                                                                         @NotNull CallHierarchyIncomingCallsParams params,
-                                                                                                         @NotNull CancellationSupport cancellationSupport) {
+    @Override
+    protected CompletableFuture<List<CallHierarchyItemData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                        @NotNull CallHierarchyIncomingCallsParams params,
+                                                                        @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have call hierarchy capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-        return getLanguageServers(file,
-                        f -> f.getCallHierarchyFeature().isEnabled(file),
-                        f -> f.getCallHierarchyFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have call hierarchy capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+        // Collect list of callHierarchy/incomingCalls future for each language servers
+        List<CompletableFuture<List<CallHierarchyItemData>>> callHierarchyPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getCallHierarchyIncomingCalls(params, languageServer, cancellationSupport))
+                .toList();
 
-                    // Collect list of callHierarchy/incomingCalls future for each language servers
-                    List<CompletableFuture<List<CallHierarchyItemData>>> callHierarchyPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getCallHierarchyIncomingCalls(params, languageServer, cancellationSupport))
-                            .toList();
-
-                    // Merge list of callHierarchy/incomingCalls future in one future which return the list of call hierarchy items
-                    return CompletableFutures.mergeInOneFuture(callHierarchyPerServerFutures, cancellationSupport);
-                });
+        // Merge list of callHierarchy/incomingCalls future in one future which return the list of call hierarchy items
+        return CompletableFutures.mergeInOneFuture(callHierarchyPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<CallHierarchyItemData>> getCallHierarchyIncomingCalls(@NotNull CallHierarchyIncomingCallsParams params,

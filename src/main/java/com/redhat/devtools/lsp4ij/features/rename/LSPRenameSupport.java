@@ -49,15 +49,19 @@ public class LSPRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPRenam
     }
 
     @Override
-    protected CompletableFuture<List<WorkspaceEditData>> doLoad(@NotNull LSPRenameParams params,
-                                                                @NotNull CancellationSupport cancellationSupport) {
-        return getRename(params, getFile(), cancellationSupport);
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
+        // The language servers are passed directly in the params in this case,
+        // so we return an empty future. The actual servers will be retrieved in doLoadData.
+        return CompletableFuture.completedFuture(Collections.emptyList());
     }
 
-    private static @NotNull CompletableFuture<List<WorkspaceEditData>> getRename(@NotNull LSPRenameParams params,
-                                                                                 @NotNull PsiFile file,
-                                                                                 @NotNull CancellationSupport cancellationSupport) {
-        // Collect list of textDocument/rename future for each language servers
+    @Override
+    protected CompletableFuture<List<WorkspaceEditData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                    @NotNull LSPRenameParams params,
+                                                                    @NotNull CancellationSupport cancellationSupport) {
+        // Use the language servers from params instead of the parameter
+        // because this support receives servers from the prepare rename phase
+        PsiFile file = super.getFile();
         List<CompletableFuture<List<WorkspaceEditData>>> renamePerServerFutures = params.getLanguageServers()
                 .stream()
                 .map(languageServer -> getRenameFor(params, file, languageServer, cancellationSupport))

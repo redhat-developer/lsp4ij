@@ -51,34 +51,32 @@ public class LSPPrepareTypeHierarchySupport extends AbstractLSPDocumentFeatureSu
     }
 
     @Override
-    protected CompletableFuture<List<TypeHierarchyItemData>> doLoad(TypeHierarchyPrepareParams params, CancellationSupport cancellationSupport) {
+    protected CompletableFuture<List<LanguageServerItem>> getLanguageServers() {
         PsiFile file = super.getFile();
-        return getPrepareTypeHierarchies(file, params, cancellationSupport);
-    }
-
-    private static @NotNull CompletableFuture<List<TypeHierarchyItemData>> getPrepareTypeHierarchies(@NotNull PsiFile file,
-                                                                                                     @NotNull TypeHierarchyPrepareParams params,
-                                                                                                     @NotNull CancellationSupport cancellationSupport) {
-
         return getLanguageServers(file,
                 f -> f.getTypeHierarchyFeature().isEnabled(file),
-                f -> f.getTypeHierarchyFeature().isSupported(file))
-                .thenComposeAsync(languageServers -> {
-                    // Here languageServers is the list of language servers which matches the given file
-                    // and which have type hierarchy capability
-                    if (languageServers.isEmpty()) {
-                        return CompletableFuture.completedFuture(Collections.emptyList());
-                    }
+                f -> f.getTypeHierarchyFeature().isSupported(file));
+    }
 
-                    // Collect list of textDocument/prepareTypeHierarchy future for each language servers
-                    List<CompletableFuture<List<TypeHierarchyItemData>>> typeHierarchyPerServerFutures = languageServers
-                            .stream()
-                            .map(languageServer -> getTypeHierarchiesFor(params, languageServer, file, cancellationSupport))
-                            .toList();
+    @Override
+    protected CompletableFuture<List<TypeHierarchyItemData>> doLoadData(@NotNull List<LanguageServerItem> languageServers,
+                                                                        @NotNull TypeHierarchyPrepareParams params,
+                                                                        @NotNull CancellationSupport cancellationSupport) {
+        // Here languageServers is the list of language servers which matches the given file
+        // and which have type hierarchy capability
+        if (languageServers.isEmpty()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
 
-                    // Merge list of textDocument/prepareTypeHierarchy future in one future which return the list of type hierarchy items
-                    return CompletableFutures.mergeInOneFuture(typeHierarchyPerServerFutures, cancellationSupport);
-                });
+        PsiFile file = super.getFile();
+        // Collect list of textDocument/prepareTypeHierarchy future for each language servers
+        List<CompletableFuture<List<TypeHierarchyItemData>>> typeHierarchyPerServerFutures = languageServers
+                .stream()
+                .map(languageServer -> getTypeHierarchiesFor(params, languageServer, file, cancellationSupport))
+                .toList();
+
+        // Merge list of textDocument/prepareTypeHierarchy future in one future which return the list of type hierarchy items
+        return CompletableFutures.mergeInOneFuture(typeHierarchyPerServerFutures, cancellationSupport);
     }
 
     private static CompletableFuture<List<TypeHierarchyItemData>> getTypeHierarchiesFor(@NotNull TypeHierarchyPrepareParams params,
