@@ -71,11 +71,7 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
                     return true;
                 }
 
-                try {
-                    doCollect(psiFile, editor, getFactory(), inlayHintsSink);
-                } catch (CancellationException e) {
-                    // Do nothing
-                }
+                doCollect(psiFile, editor, getFactory(), inlayHintsSink);
                 return true;
             }
         };

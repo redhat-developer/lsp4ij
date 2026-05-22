@@ -82,9 +82,7 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
             // The file content has changed, cancel the LSP textDocument/documentColor requests.
             colorSupport.cancel();
         } catch (ProcessCanceledException e) {
-            // the future which collects all textDocument/documentColor for all servers is not finished
-            // add it to the pending futures to refresh again the UI when this future will be finished.
-            colorSupport.refreshEditorFeatureWhenReady();
+            throw e;
         } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/documentColor' request", e);
