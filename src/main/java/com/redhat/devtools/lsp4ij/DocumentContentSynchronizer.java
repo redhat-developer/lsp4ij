@@ -294,6 +294,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     @Override
     public void dispose() {
         documentClosed();
+        if (debouncePullDiagnosticsAlarm != null) {
+            debouncePullDiagnosticsAlarm.dispose();
+            debouncePullDiagnosticsAlarm = null;
+        }
     }
 
     /**
