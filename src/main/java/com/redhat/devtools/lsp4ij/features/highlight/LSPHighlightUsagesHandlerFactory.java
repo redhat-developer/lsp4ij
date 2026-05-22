@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -80,13 +81,12 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
         try {
             waitUntilDone(highlightFuture, psiFile);
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
+        } catch (PsiFileChangedException e) {
+            // cancel the LSP requests textDocument/foldingRanges
             highlightSupport.cancel();
-            return Collections.emptyList();
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/documentHighlight
-            highlightSupport.cancel();
             return Collections.emptyList();
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/documentHighlight' request", e);

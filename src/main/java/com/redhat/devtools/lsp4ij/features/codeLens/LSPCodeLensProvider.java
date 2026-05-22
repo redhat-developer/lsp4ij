@@ -179,11 +179,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                             var codeLensFeature = ls.getClientFeatures().getCodeLensFeature();
                             String text = codeLens.getCommand().getTitle();
                             if (!StringUtils.isEmpty(text)) {
-                                var context = codeLensContexts.get(ls);
-                                if (context == null) {
-                                    context = new LSPCodeLensFeature.LSPCodeLensContext(psiFile, ls);
-                                    codeLensContexts.put(ls, context);
-                                }
+                                var context = codeLensContexts.computeIfAbsent(ls, l -> new LSPCodeLensFeature.LSPCodeLensContext(psiFile, l));
                                 String providerId = nbCodeLensForCurrentLine == -1 ? getId() : getId() + nbCodeLensForCurrentLine;
                                 CodeVisionEntry entry = codeLensFeature.createCodeVisionEntry(codeLens, providerId, context);
                                 if (entry != null) {
@@ -289,10 +285,8 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                 assert (ApplicationManager.getApplication().isUnitTestMode());
                 return ReadAction.compute(computable);
             }
-        } catch (ReadAction.CannotReadException e) {
-            return CodeVisionState.NotReady.INSTANCE;
         } catch (ProcessCanceledException e) {
-            return CodeVisionState.NotReady.INSTANCE;
+            throw e;
         } catch (CancellationException e) {
             return CodeVisionState.NotReady.INSTANCE;
         } catch (Throwable e) {

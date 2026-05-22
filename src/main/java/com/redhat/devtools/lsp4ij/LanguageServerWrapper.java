@@ -138,7 +138,7 @@ public class LanguageServerWrapper implements Disposable {
     private @Nullable TracingMessageConsumer tracing;
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
-    private InitializingContext currentInitializingContext;
+    private @Nullable InitializingContext currentInitializingContext;
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -375,7 +375,7 @@ public class LanguageServerWrapper implements Disposable {
         if (this.initializeFuture == null) {
             final VirtualFile rootURI = getRootURI();
             this.launcherFuture = new CompletableFuture<>();
-            var context = this.currentInitializingContext = new InitializingContext();
+            @NotNull var context = this.currentInitializingContext = new InitializingContext();
             // Use IntelliJ pooled thread instead of ForkJoinPool.commonPool() to avoid
             // ForkJoinPool.helpAsyncBlocker() executing blocking operations (like OSProcessHandler.waitFor())
             // in the current thread when called from ReadAction.
@@ -426,7 +426,7 @@ public class LanguageServerWrapper implements Disposable {
                         // Throws the CannotStartProcessException exception if process is not alive.
                         // This use case comes for instance when the start process command fails (not a valid start command)
                         provider.ensureIsAlive();
-                        startFuture.complete(currentInitializingContext);
+                        startFuture.complete(context);
                 } catch (Exception e) {
                     startFuture.completeExceptionally(e);
                 }
@@ -1672,7 +1672,7 @@ public class LanguageServerWrapper implements Disposable {
                 // stopping the new process created with a new start.
                 return CompletableFuture.runAsync(() -> {
                     shutdownAll(languageServer, lspStreamProvider, launcherFuture);
-                    boolean delayedCurrent = currentInitializingContext == null || initializingContext.equals(currentInitializingContext);
+                    boolean delayedCurrent = currentInitializingContext == null || currentInitializingContext.equals(initializingContext);
                     if (delayedCurrent) {
                         updateStatus(ServerStatus.stopped);
                     }
