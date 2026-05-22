@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPPrepareCallHierarchy
 import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCodeActionSupport;
 import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
+import com.redhat.devtools.lsp4ij.features.color.LSPColorPresentationSupport;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.declaration.LSPDeclarationSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
@@ -72,6 +73,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPCodeLensSupport codeLensSupport;
     private final LSPInlayHintsSupport inlayHintsSupport;
     private final LSPColorSupport colorSupport;
+    private final LSPColorPresentationSupport colorPresentationSupport;
     private final LSPFoldingRangeSupport foldingRangeSupport;
     private final LSPSelectionRangeSupport selectionRangeSupport;
     private final LSPFormattingSupport formattingSupport;
@@ -106,6 +108,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.codeLensSupport = new LSPCodeLensSupport(file);
         this.inlayHintsSupport = new LSPInlayHintsSupport(file);
         this.colorSupport = new LSPColorSupport(file);
+        this.colorPresentationSupport = new LSPColorPresentationSupport(file);
         this.foldingRangeSupport = new LSPFoldingRangeSupport(file);
         this.selectionRangeSupport = new LSPSelectionRangeSupport(file);
         this.formattingSupport = new LSPFormattingSupport(file);
@@ -178,6 +181,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getCodeLensSupport().cancel();
         getInlayHintsSupport().cancel();
         getColorSupport().cancel();
+        getColorPresentationSupport().cancel();
         getFoldingRangeSupport().cancel();
         getSelectionRangeSupport().cancel();
         getFormattingSupport().cancel();
@@ -235,6 +239,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPColorSupport getColorSupport() {
         return colorSupport;
+    }
+
+    /**
+     * Returns the LSP color presentation support.
+     *
+     * @return the LSP color presentation support.
+     */
+    public LSPColorPresentationSupport getColorPresentationSupport() {
+        return colorPresentationSupport;
     }
 
     /**

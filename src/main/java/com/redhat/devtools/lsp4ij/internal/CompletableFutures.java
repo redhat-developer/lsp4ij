@@ -219,4 +219,16 @@ public class CompletableFutures {
         CancellationSupport.forwardCancellation(allOff, cfs);
         return allOff;
     }
+
+    /**
+     * Returns an exception handler that silently ignores all exceptions.
+     * Useful for operations where errors (including cancellations) can be safely ignored,
+     * such as real-time color picker updates where rapid changes may cancel pending requests.
+     *
+     * @param <T> the type of the CompletableFuture result
+     * @return a function that returns null for any exception
+     */
+    public static <T> Function<Throwable, T> ignoreAllExceptions() {
+        return ex -> null;
+    }
 }
