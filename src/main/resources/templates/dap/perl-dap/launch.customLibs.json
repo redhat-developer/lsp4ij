@@ -1,0 +1,11 @@
+{
+  "type": "perl",
+  "request": "launch",
+  "name": "Debug with Custom Libs",
+  "program": "${workspaceFolder}/bin/app.pl",
+  "includePaths": [
+    "${workspaceFolder}/lib",
+    "${workspaceFolder}/local/lib/perl5",
+    "/opt/custom/perl/lib"
+  ]
+}

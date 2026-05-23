@@ -292,6 +292,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Harper Language Server](./user-defined-ls/harper-ls.md)
 * [JQ Language Server](./user-defined-ls/jq-lsp.md)
 * [Julia Language Server](./user-defined-ls/julia.md)
+* [Perl Language Server](./user-defined-ls/perl-lsp.md)
 * [Ruby LSP](./user-defined-ls/ruby-lsp.md)
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)

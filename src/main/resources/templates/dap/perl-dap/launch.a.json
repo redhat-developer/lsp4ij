@@ -1,0 +1,7 @@
+{
+  "type": "perl",
+  "request": "launch",
+  "name": "Debug Script",
+  "program": "${file}",
+  "stopOnEntry": false
+}

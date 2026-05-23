@@ -247,7 +247,8 @@ LSP4IJ provides DAP templates that allow to initialize a given DAP server very q
 
 - [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
 - [Go Delve DAP server](./user-defined-dap/go-delve.md) which allows you to debug `Go` files.
-- [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files. 
+- [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files.
+- [Perl DAP server](./user-defined-dap/perl-dap.md) which allows you to debug `Perl` files. 
 - [Python Debugpy DAP server](./user-defined-dap/python-debugpy.md) which allows you to debug `Python` files.
 - [Ruby rdbg DAP server](./user-defined-dap/ruby-rdbg.md) which allows you to debug `Ruby` files.
 - [Swift DAP Server](./user-defined-dap/swift-lldb.md) which allows you to debug `Swift` files.
