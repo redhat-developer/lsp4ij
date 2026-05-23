@@ -1,0 +1,35 @@
+{
+  "id": "perl-lsp",
+  "name": "Perl Language Server",
+  "programArgs": {
+    "default": "sh -c ${BASE_DIR}/perllsp --stdio",
+    "windows": "${BASE_DIR}/perllsp.exe --stdio"
+  },
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Perl",
+        "patterns": [
+          "*.pl",
+          "*.PL",
+          "*.cgi",
+          "*.fcgi",
+          "*.pm",
+          "*.xs",
+          "*.xsi",
+          "*.pod",
+          "*.t",
+          "*.psgi",
+          "*.mason",
+          "*.mas",
+          "*.tt",
+          "*.tt2",
+          "*.ep",
+          "*.i"
+        ]
+      },
+      "languageId": "perl"
+    }
+  ]
+}

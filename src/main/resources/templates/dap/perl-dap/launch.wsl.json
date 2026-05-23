@@ -1,0 +1,8 @@
+{
+  "type": "perl",
+  "request": "launch",
+  "name": "Debug in WSL",
+  "program": "${workspaceFolder}/script.pl",
+  "perlPath": "/usr/bin/perl",
+  "cwd": "${workspaceFolder}"
+}
