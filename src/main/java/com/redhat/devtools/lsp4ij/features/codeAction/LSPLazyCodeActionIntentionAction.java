@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class LSPLazyCodeActionIntentionAction implements IntentionAction {
 
-
     private LSPLazyCodeActionProvider lazyCodeActions;
 
     private final int index;
