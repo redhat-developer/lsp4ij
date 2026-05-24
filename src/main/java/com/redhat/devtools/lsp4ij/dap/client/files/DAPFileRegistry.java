@@ -83,4 +83,17 @@ public class DAPFileRegistry {
         }
     }
 
+    /**
+     * Clears all cached {@link DAPFile} instances associated with the given project.
+     * This should be called when a project is being closed to prevent memory leaks.
+     *
+     * @param project the project whose files should be cleared from the cache
+     */
+    public void clearProjectFiles(@NotNull Project project) {
+        String projectPrefix = project.getLocationHash() + "/";
+        synchronized (dapFilesCache) {
+            dapFilesCache.entrySet().removeIf(entry -> entry.getKey().startsWith(projectPrefix));
+        }
+    }
+
 }

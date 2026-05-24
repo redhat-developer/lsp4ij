@@ -17,9 +17,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages the connection between open editor files and Language Servers:
@@ -30,6 +34,9 @@ import org.jetbrains.annotations.NotNull;
  * </ul>
  */
 public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectManagerListener, FileEditorManagerListener {
+
+    // Store connections per project to properly dispose them
+    private final Map<Project, MessageBusConnection> projectConnections = new ConcurrentHashMap<>();
 
     private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {
         PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
@@ -43,7 +50,9 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
     @Override
     public void projectOpened(@NotNull Project project) {
         // Subscribe to file open/close/selection events for this project.
-        project.getMessageBus().connect().subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, this);
+        com.intellij.util.messages.MessageBusConnection connection = project.getMessageBus().connect();
+        connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, this);
+        projectConnections.put(project, connection);
     }
 
     @Override
@@ -51,6 +60,12 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // Stop active Language Servers and clean up resources before the project is closed.
         LanguageServerLifecycleManager.getInstance(project).dispose();
         LanguageServiceAccessor.getInstance(project).projectClosing(project);
+
+        // Properly dispose MessageBusConnection to prevent memory leak
+        MessageBusConnection connection = projectConnections.remove(project);
+        if (connection != null) {
+            connection.disconnect();
+        }
     }
 
     @Override

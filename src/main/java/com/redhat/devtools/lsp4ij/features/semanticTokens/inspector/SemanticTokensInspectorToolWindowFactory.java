@@ -37,14 +37,17 @@ public class SemanticTokensInspectorToolWindowFactory implements ToolWindowFacto
         content.setDisposer(semanticTokensInspectorView);
         contentManager.addContent(content);
 
-        project.getMessageBus().connect().subscribe(ToolWindowManagerListener.TOPIC, new ToolWindowManagerListener() {
-            @Override
-            public void stateChanged(@NotNull ToolWindowManager toolWindowManager, @NotNull ToolWindowManagerEventType changeType) {
-                if (changeType == ToolWindowManagerEventType.HideToolWindow && !toolWindowManager.isStripeButtonShow(toolWindow)) {
-                    toolWindow.setAvailable(false);
-                }
-            }
-        });
+        // Associate connection with disposer to prevent memory leak
+        project.getMessageBus()
+                .connect(semanticTokensInspectorView)
+                .subscribe(ToolWindowManagerListener.TOPIC, new ToolWindowManagerListener() {
+                    @Override
+                    public void stateChanged(@NotNull ToolWindowManager toolWindowManager, @NotNull ToolWindowManagerEventType changeType) {
+                        if (changeType == ToolWindowManagerEventType.HideToolWindow && !toolWindowManager.isStripeButtonShow(toolWindow)) {
+                            toolWindow.setAvailable(false);
+                        }
+                    }
+                });
     }
 
     @Override

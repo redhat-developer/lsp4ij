@@ -1047,6 +1047,13 @@
 
     <!-- DAP Support -->
 
+    <!-- DAP application listeners -->
+    <applicationListeners>
+        <listener
+                topic="com.intellij.openapi.project.ProjectManagerListener"
+                class="com.redhat.devtools.lsp4ij.dap.DAPProjectLifecycleListener"/>
+    </applicationListeners>
+
     <extensionPoints>
 
         <!-- Debug adapter server extension point -->
