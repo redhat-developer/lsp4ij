@@ -99,6 +99,8 @@ public class LanguageServerWrapper implements Disposable {
     protected final Map<URI /* file Uri */, OpenedDocument> openedDocuments;
     @NotNull
     protected final Map<URI /* file Uri */, ClosedDocument> closedDocuments;
+    // Lock object to prevent deadlock when accessing both openedDocuments and closedDocuments
+    private final Object documentsLock = new Object();
     @Nullable
     protected final URI initialPath;
     protected final InitializeParams initParams = new InitializeParams();
@@ -115,7 +117,7 @@ public class LanguageServerWrapper implements Disposable {
     private final LSPFileListener fileListener;
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
     protected StreamConnectionProvider lspStreamProvider;
-    private MessageBusConnection messageBusConnection;
+    private volatile MessageBusConnection messageBusConnection;
     private Future<?> launcherFuture;
     private int numberOfRestartAttempts;
     private @Nullable CompletableFuture<Void> initializeFuture;
@@ -138,7 +140,7 @@ public class LanguageServerWrapper implements Disposable {
     private @Nullable TracingMessageConsumer tracing;
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
-    private @Nullable InitializingContext currentInitializingContext;
+    private volatile @Nullable InitializingContext currentInitializingContext;
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -740,13 +742,12 @@ public class LanguageServerWrapper implements Disposable {
                 folderToNotify = workspaceFolderNotificationManager.computeWorkspaceFolderToNotify(file);
             }
 
-            synchronized (closedDocuments) {
-                closedDocuments.remove(fileUri);
-            }
-
             CompletableFuture<LanguageServer> result;
             boolean shouldNotify = false;
-            synchronized (openedDocuments) {
+            synchronized (documentsLock) {
+                // Remove from closed documents and check if already opened
+                closedDocuments.remove(fileUri);
+
                 // Check again if file is already opened (within synchronized block)
                 ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
                 if (ls2 != null) {
@@ -976,7 +977,7 @@ public class LanguageServerWrapper implements Disposable {
     public @Nullable ClosedDocument getClosedDocument(URI fileUri, boolean force) {
         var closedDocument = closedDocuments.get(fileUri);
         if (closedDocument == null && force) {
-            synchronized (closedDocuments) {
+            synchronized (documentsLock) {
                 closedDocument = closedDocuments.get(fileUri);
                 if (closedDocument == null) {
                     closedDocument = new ClosedDocument();
@@ -1695,6 +1696,7 @@ public class LanguageServerWrapper implements Disposable {
 
                 if (messageBusConnection != null) {
                     messageBusConnection.disconnect();
+                    messageBusConnection = null;
                 }
             }
         }

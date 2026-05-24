@@ -515,11 +515,12 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     }
 
     private Alarm getRefreshPsiFileAlarm() {
-        if (disposed) {
-            return null;
-        }
         if (refreshPsiFileAlarm == null) {
             synchronized (this) {
+                // Check disposed inside synchronized to prevent race condition
+                if (disposed) {
+                    return null;
+                }
                 if (refreshPsiFileAlarm == null) {
                     refreshPsiFileAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
                 }

@@ -156,7 +156,16 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
                 shellWidget.executeCommand(command);
 
                 // Poll until the terminal process PID becomes available
+                // Fix: Create Alarm and ensure it's properly disposed when future completes or fails
                 Alarm alarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, project);
+
+                // Ensure alarm is disposed when future completes (success or failure)
+                future.whenComplete((result, error) -> {
+                    if (alarm != null && !alarm.isDisposed()) {
+                        alarm.dispose();
+                    }
+                });
+
                 Runnable checkProcess = new Runnable() {
                     @Override
                     public void run() {
@@ -165,6 +174,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
                             RunInTerminalResponse resp = new RunInTerminalResponse();
                             resp.setProcessId((int) tty.getProcess().pid());
                             future.complete(resp);
+                            // Alarm will be disposed by whenComplete callback
                         } else if (!future.isDone()) {
                             alarm.addRequest(this, 100);
                         }
@@ -174,6 +184,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
 
             } catch (Exception e) {
                 future.completeExceptionally(e);
+                // Alarm will be disposed by whenComplete callback
             }
         });
 

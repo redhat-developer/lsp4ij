@@ -368,8 +368,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 .thenApply(ls -> {
                     // didOpen, didChange notification has been sent, consume 'textDocument/diagnostic' with debounce mode.
                     // Check if alarm is not disposed (can happen during rapid start/stop cycles)
-                    if (debouncePullDiagnosticsAlarm != null && !debouncePullDiagnosticsAlarm.isDisposed()) {
-                        debouncePullDiagnosticsAlarm.addRequest(() -> {
+                    // Store local reference to avoid race condition between null check and usage
+                    Alarm alarm = debouncePullDiagnosticsAlarm;
+                    if (alarm != null && !alarm.isDisposed()) {
+                        alarm.addRequest(() -> {
                             if (version != -1 && version != this.version) {
                                 // The document has changed, do nothing
                                 return;
