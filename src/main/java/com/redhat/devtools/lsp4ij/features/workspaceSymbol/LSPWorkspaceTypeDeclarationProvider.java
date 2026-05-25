@@ -28,6 +28,7 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionParams;
 import com.redhat.devtools.lsp4ij.features.typeDefinition.LSPTypeDefinitionSupport;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -93,12 +94,12 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
         try {
             waitUntilDone(typeDefinitionsFuture, file);
-        } catch (ProcessCanceledException ex) {
+        } catch (PsiFileChangedException e) {
             // cancel the LSP requests textDocument/typeDefinition
             typeDefinitionSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests textDocument/typeDefinition
-            typeDefinitionSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException e) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/typeDefinition' request", e);
         }

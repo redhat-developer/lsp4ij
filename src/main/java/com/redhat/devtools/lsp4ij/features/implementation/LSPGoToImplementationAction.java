@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -54,12 +55,12 @@ public class LSPGoToImplementationAction extends AbstractLSPGoToAction {
         CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
         try {
             waitUntilDone(implementationsFuture, psiFile);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests textDocument/implementation
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/implementation requests.
             implementationSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests textDocument/implementation
-            implementationSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/implementation' request", e);
         }

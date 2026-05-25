@@ -20,6 +20,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -105,10 +106,12 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiElement.getContainingFile());
-        } catch (ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/signatureHelp requests.
+            signatureHelpSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (CancellationException ignore) {
-            // Do nothing
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/signatureHelp' request", e);
         }

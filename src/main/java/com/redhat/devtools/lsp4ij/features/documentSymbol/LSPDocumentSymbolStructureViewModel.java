@@ -26,15 +26,20 @@ import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.filter.*;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import static com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory.isSymbolsSupportedByLanguageServer;
@@ -45,6 +50,8 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  * LSP document symbol structure view model.
  */
 public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase implements StructureViewModel.ElementInfoProvider {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPDocumentSymbolStructureViewModel.class);
 
     public LSPDocumentSymbolStructureViewModel(@NotNull PsiFile psiFile, @Nullable Editor editor) {
         super(psiFile, editor, new LSPFileStructureViewElement(psiFile));
@@ -174,12 +181,17 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
             LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
             var params = new DocumentSymbolParams(new TextDocumentIdentifier());
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
+
             try {
                 waitUntilDone(documentSymbolFuture, psiFile);
+            } catch (PsiFileChangedException e) {
+                // The file content has changed, cancel the LSP textDocument/documentSymbol requests.
+                documentSymbolSupport.cancel();
             } catch (ProcessCanceledException e) {
                 throw e;
-            } catch (Exception e) {
-                return Collections.emptyList();
+            } catch (CancellationException ignore) {
+            } catch (ExecutionException e) {
+                LOGGER.error("Error while consuming LSP 'textDocument/documentSymbol' request", e);
             }
 
             if (isDoneNormally(documentSymbolFuture)) {

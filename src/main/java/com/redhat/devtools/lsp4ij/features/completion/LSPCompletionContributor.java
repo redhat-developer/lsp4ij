@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature;
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -75,16 +76,17 @@ public class LSPCompletionContributor extends CompletionContributor {
                 offset,
                 autoPopup ? getCompletionChar(offset, document) : null,
                 autoPopup);
-        CompletableFuture<List<CompletionData>> future = LSPFileSupport.getSupport(psiFile)
-                .getCompletionSupport()
-                .getCompletions(params);
+        var completionSupport = LSPFileSupport.getSupport(psiFile)
+                .getCompletionSupport();
+        CompletableFuture<List<CompletionData>> future = completionSupport.getCompletions(params);
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(future, psiFile);
-        } catch (
-                ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            return;
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/completion requests.
+            completionSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (CancellationException ignore) {
             return;
         } catch (ExecutionException e) {

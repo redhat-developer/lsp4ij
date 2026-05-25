@@ -28,6 +28,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPExternalAnnotator;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -69,14 +70,12 @@ public class LSPDocumentLinkAnnotator extends AbstractLSPExternalAnnotator<List<
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
             waitUntilDone(documentLinkFuture, psiFile);
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/documentLink requests.
             documentLinkSupport.cancel();
-            return null;
-        } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/documentLink
-            documentLinkSupport.cancel();
-            return null;
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/documentLink' request", e);
             return null;
