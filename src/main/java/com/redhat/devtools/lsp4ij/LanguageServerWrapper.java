@@ -633,9 +633,9 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void startStopTimer() {
-        updateStatus(ServerStatus.stopping);
         int delayMs = (int) TimeUnit.SECONDS.toMillis(serverDefinition.getLastDocumentDisconnectedTimeout());
         getStopAlarm().addRequest(() -> {
+            updateStatus(ServerStatus.stopping);
             try {
                 stop();
             } catch (Throwable t) {
