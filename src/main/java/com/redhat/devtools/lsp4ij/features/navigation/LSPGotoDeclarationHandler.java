@@ -28,6 +28,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -146,12 +147,12 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
         try {
             waitUntilDone(definitionsFuture, psiFile);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests textDocument/definition
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/definition requests.
             definitionSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests textDocument/definition
-            definitionSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/definition' request", e);
         }
@@ -188,8 +189,8 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
      * @return true if the target is at the same location as the source, false otherwise
      */
     private static boolean isAlreadyAtDeclaration(@NotNull PsiElement target,
-                                                    @NotNull PsiFile sourcePsiFile,
-                                                    int sourceOffset) {
+                                                  @NotNull PsiFile sourcePsiFile,
+                                                  int sourceOffset) {
         // Get the file containing the target element
         PsiFile targetFile = target.getContainingFile();
         if (targetFile == null) {

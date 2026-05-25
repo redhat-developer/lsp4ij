@@ -22,6 +22,7 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SelectionRange;
@@ -76,14 +77,12 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
         CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);
         try {
             waitUntilDone(selectionRangesFuture, file, timeout);
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/documentColor requests.
+            selectionRangeSupport.cancel();
         } catch (ProcessCanceledException e) {
-            //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            selectionRangeSupport.cancel();
-            return Collections.emptyList();
-        } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/selectionRanges
-            selectionRangeSupport.cancel();
+            throw e;
+        } catch (CancellationException ignore) {
             return Collections.emptyList();
         } catch (TimeoutException e) {
             // Ignore timeout error

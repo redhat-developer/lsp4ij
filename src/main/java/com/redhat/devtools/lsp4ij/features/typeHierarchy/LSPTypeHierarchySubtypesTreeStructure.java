@@ -17,6 +17,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyNodeDescriptor;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.TypeHierarchyItem;
 import org.eclipse.lsp4j.TypeHierarchySubtypesParams;
 import org.jetbrains.annotations.NotNull;
@@ -53,12 +54,12 @@ public class LSPTypeHierarchySubtypesTreeStructure extends LSPTypeHierarchyTreeS
         CompletableFuture<List<TypeHierarchyItemData>> prepareTypeHierarchyFuture = typeHierarchySubtypesSupport.getTypeHierarchySubtypes(params);
         try {
             waitUntilDone(prepareTypeHierarchyFuture, psiFile);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests typeHierarchy/subtypes
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP typeHierarchy/subtypes requests.
             typeHierarchySubtypesSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests typeHierarchy/subtypes
-            typeHierarchySubtypesSupport.cancel();
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException ignore) {
         } catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'typeHierarchy/subtypes' request", e);
         }

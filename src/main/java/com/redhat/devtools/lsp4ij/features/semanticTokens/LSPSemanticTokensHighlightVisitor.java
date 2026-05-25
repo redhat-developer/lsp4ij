@@ -222,7 +222,7 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         } catch (CancellationException e) {
             // The CompletableFuture itself was cancelled (e.g. the file was closed,
             // or the language server shut down). Nothing to do — propagate as-is.
-            throw e;
+            return null;
         }
 
         // Primary staleness check: if the file was modified while we were waiting,

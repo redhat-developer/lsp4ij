@@ -23,6 +23,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.Range;
@@ -75,13 +76,14 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
 
         try {
             waitUntilDone(hoverFuture, psiFile);
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP textDocument/hover requests.
+            hoverSupport.cancel();
         } catch (ProcessCanceledException e) {
-            // cancel the LSP requests textDocument/hover
-            hoverSupport.cancel();
-        } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/hover
-            hoverSupport.cancel();
-        } catch (ExecutionException e) {
+            throw e;
+        } catch (CancellationException ignore) {
+        }
+        catch (ExecutionException e) {
             LOGGER.error("Error while consuming LSP 'textDocument/hover' request", e);
         }
 
