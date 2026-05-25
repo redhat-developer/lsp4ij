@@ -16,6 +16,8 @@ package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
@@ -23,10 +25,13 @@ import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntention
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,13 +51,15 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  */
 public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPLazyCodeActions.class);
+
     private static final int NB_LAZY_CODE_ACTIONS = 20;
 
     // The diagnostic
     private final List<Diagnostic> diagnostics;
 
     // The virtual file
-    private final VirtualFile file;
+    private final PsiFile file;
 
     // The language server which has reported the diagnostic
     private final LanguageServerItem languageServer;
@@ -67,7 +74,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                               @NotNull VirtualFile file,
                               @NotNull LanguageServerItem languageServer) {
         this.diagnostics = diagnostics;
-        this.file = file;
+        this.file = LSPIJUtils.getPsiFile(file, languageServer.getProject());
         this.languageServer = languageServer;
         // Create 20 lazy IJ quick fixes which does nothing (IntentAction#isAvailable returns false)
         codeActions = new ArrayList<>(NB_LAZY_CODE_ACTIONS);
@@ -95,23 +102,37 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         return null;
     }
 
-    private List<CodeActionData> getOrLoadCodeActions() {
+    private @Nullable List<CodeActionData> getOrLoadCodeActions() {
         if (lspCodeActionRequest == null) {
             // Create LSP textDocument/codeAction request
             lspCodeActionRequest = loadCodeActionsFor(diagnostics);
         }
         // Get the response of the LSP textDocument/codeAction request.
         List<CodeActionData> codeActions = null;
+        // Wait for the textDocument/codeAction LSP request to complete.
+        // waitUntilDone() will:
+        // - Poll in 25ms increments without blocking continuously
+        // - Check for cancellation via ProgressManager
+        // - Detect if the PSI file was modified during the wait
+        // - Display a progress indicator if it takes more than 5 seconds
+        var future = lspCodeActionRequest;
         try {
-            waitUntilDone(lspCodeActionRequest);
-            if (isDoneNormally(lspCodeActionRequest)) {
-                codeActions = lspCodeActionRequest.getNow(null);
-            }
-        } catch (ProcessCanceledException | ExecutionException e) {
-            // ProcessCanceledException occurs when user move the mouse, in this case the hover popup is closed
-            // but the lspCodeActionRequest is not cancelled here if user hover again the error.
+            waitUntilDone(future, file);
+        } catch (PsiFileChangedException e) {
+            // The file was modified while waiting - cancel the now-obsolete LSP request
+            cancel();
+        } catch (ProcessCanceledException e) {
+            // User or IDE canceled the operation - propagate the cancellation
+            throw e;
         } catch (CancellationException e) {
-            // Occur when code action is loading and a cancel has occurred, ignore the error.
+        	// Occur when code action is loading and a cancel has occurred, ignore the error.
+            return null;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/codeAction' request", e);
+            return null;
+        }
+        if (isDoneNormally(lspCodeActionRequest)) {
+            codeActions = lspCodeActionRequest.getNow(null);
         }
         return codeActions;
     }
@@ -165,10 +186,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @return the LSP code action parameters for the given diagnostic and file.
      */
     private static CodeActionParams createCodeActionParams(@NotNull List<Diagnostic> diagnostics,
-                                                           @NotNull VirtualFile file,
+                                                           @NotNull PsiFile file,
                                                            @NotNull FileUriSupport fileUriSupport) {
         CodeActionParams params = new CodeActionParams();
-        var identifier = new TextDocumentIdentifier(FileUriSupport.toString(file, fileUriSupport));
+        var identifier = new TextDocumentIdentifier(FileUriSupport.toString(file.getVirtualFile(), fileUriSupport));
         params.setTextDocument(identifier);
         // As diagnostic list is never empty, and it is sorted by the max range, the code action range parameter is the first diagnostic
         Range range = diagnostics.get(0).getRange();

@@ -30,6 +30,7 @@ import java.util.Collections;
  * LSP {@link com.intellij.codeInsight.intention.IntentionAction} at given index.
  */
 public abstract class LSPIntentionAction extends LSPLazyCodeActionIntentionAction {
+
     public LSPIntentionAction(int index) {
         super(index);
     }

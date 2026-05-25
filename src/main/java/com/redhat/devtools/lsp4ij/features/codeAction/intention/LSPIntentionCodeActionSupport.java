@@ -26,13 +26,14 @@ import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
@@ -45,6 +46,8 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  * </ul>
  */
 public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSupport<CodeActionParams, List<CodeActionData>> implements LSPLazyCodeActionProvider {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPIntentionCodeActionSupport.class);
 
     private CodeActionParams previousParams;
 
@@ -164,8 +167,10 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
         } catch (ProcessCanceledException e) {
             // User or IDE canceled the operation - propagate the cancellation
             throw e;
-        } catch (Exception e) {
-            // Other errors (ExecutionException, etc.) - code action is not available
+        } catch (CancellationException e) {
+            return null;
+        } catch (ExecutionException e) {
+            LOGGER.error("Error while consuming LSP 'textDocument/codeAction' request", e);
             return null;
         }
 

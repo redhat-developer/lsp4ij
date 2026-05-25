@@ -44,7 +44,7 @@ public class OpenedDocument extends LSPDocumentBase {
                           @Nullable DocumentContentSynchronizer synchronizer) {
         this.file = file;
         this.synchronizer = synchronizer;
-        this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer,file);
+        this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer, file);
         this.displayingDiagnosticsTime = -1;
     }
 
@@ -112,6 +112,6 @@ public class OpenedDocument extends LSPDocumentBase {
 
     @Override
     public boolean hasErrors() {
-        return  diagnosticsForServer.hasErrors();
+        return diagnosticsForServer.hasErrors();
     }
 }
