@@ -40,8 +40,8 @@ public abstract class LSPIntentionAction extends LSPLazyCodeActionIntentionActio
      * This method is invoked frequently as the user moves the caret or edits the file.
      *
      * @param project the current project
-     * @param editor the current editor
-     * @param file the current PSI file
+     * @param editor  the current editor
+     * @param file    the current PSI file
      * @return true if the intention is available at the current caret position
      */
     @Override
@@ -56,14 +56,8 @@ public abstract class LSPIntentionAction extends LSPLazyCodeActionIntentionActio
 
         // Create parameters for the current caret position/selection
         CodeActionParams params = createCodeActionParams(editor, file);
-
-        // Only trigger a new textDocument/codeAction request if the position changed
-        // This optimization avoids redundant LSP calls when IntelliJ polls isAvailable() multiple times
-        if (intentionCodeActionSupport.hasChanged(params)) {
-            super.setLazyCodeActions(intentionCodeActionSupport);
-            intentionCodeActionSupport.getCodeActions(params);
-        }
-
+        super.setLazyCodeActions(intentionCodeActionSupport);
+        intentionCodeActionSupport.getCodeActions(params);
         // Delegate to parent to check if the specific code action at this index is available
         return super.isAvailable(project, editor, file);
     }
@@ -73,7 +67,7 @@ public abstract class LSPIntentionAction extends LSPLazyCodeActionIntentionActio
      * These parameters are used for the textDocument/codeAction request.
      *
      * @param editor the editor containing the caret position
-     * @param file the PSI file being edited
+     * @param file   the PSI file being edited
      * @return the LSP code action parameters with range, context, and document identifier
      */
     private static CodeActionParams createCodeActionParams(@NotNull Editor editor,
