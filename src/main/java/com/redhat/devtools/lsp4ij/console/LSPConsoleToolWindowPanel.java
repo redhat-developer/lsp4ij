@@ -224,7 +224,12 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         super.setContent(splitPane);
         super.revalidate();
         super.repaint();
-        explorer.load();
+        // Load language servers asynchronously to avoid blocking IDE startup
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            if (!isDisposed()) {
+                explorer.load();
+            }
+        });
     }
 
     public Project getProject() {
