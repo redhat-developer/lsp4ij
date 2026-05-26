@@ -168,7 +168,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                                                         CodeAction codeAction = ca.getRight();
                                                         return codeAction.getKind() == null ||
                                                                 codeAction.getKind().isEmpty() ||
-                                                                CodeActionKind.QuickFix.equals(codeAction.getKind());
+                                                                codeAction.getKind().startsWith(CodeActionKind.QuickFix);
                                                     }
                                                     return true;
                                                 })

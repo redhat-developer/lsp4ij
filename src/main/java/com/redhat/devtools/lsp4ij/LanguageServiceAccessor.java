@@ -361,6 +361,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                                             @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                             @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
                                                                             @Nullable LanguageServerDefinition matchServerDefinition) {
+
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(psiFile, matchServerDefinition, beforeStartingServerFilter);
         var matchedServersNow = matchedServers.getNow(Collections.emptyList());

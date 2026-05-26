@@ -145,33 +145,32 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
      */
     @Override
     public @Nullable Either<CodeActionData, Boolean> getCodeActionAt(int index) {
+        var future = super.getValidLSPFuture();
+
         // This method is called by IntelliJ when checking if intentions (light bulb) should be displayed.
         // We must NOT block the EDT, as it would freeze the UI.
         // See: https://github.com/redhat-developer/lsp4ij/issues/1545
-        if (EDT.isCurrentThreadEdt()) {
-            return null;
-        }
-
-        // Wait for the textDocument/codeAction LSP request to complete.
-        // waitUntilDone() will:
-        // - Poll in 25ms increments without blocking continuously
-        // - Check for cancellation via ProgressManager
-        // - Detect if the PSI file was modified during the wait
-        // - Display a progress indicator if it takes more than 5 seconds
-        var future = super.getValidLSPFuture();
-        try {
-            waitUntilDone(future, super.getFile());
-        } catch (PsiFileChangedException e) {
-            // The file was modified while waiting - cancel the now-obsolete LSP request
-            cancel();
-        } catch (ProcessCanceledException e) {
-            // User or IDE canceled the operation - propagate the cancellation
-            throw e;
-        } catch (CancellationException e) {
-            return null;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/codeAction' request", e);
-            return null;
+        if (!EDT.isCurrentThreadEdt()) {
+            // Wait for the textDocument/codeAction LSP request to complete.
+            // waitUntilDone() will:
+            // - Poll in 25ms increments without blocking continuously
+            // - Check for cancellation via ProgressManager
+            // - Detect if the PSI file was modified during the wait
+            // - Display a progress indicator if it takes more than 5 seconds
+            try {
+                waitUntilDone(future, super.getFile());
+            } catch (PsiFileChangedException e) {
+                // The file was modified while waiting - cancel the now-obsolete LSP request
+                cancel();
+            } catch (ProcessCanceledException e) {
+                // User or IDE canceled the operation - propagate the cancellation
+                throw e;
+            } catch (CancellationException e) {
+                return null;
+            } catch (ExecutionException e) {
+                LOGGER.error("Error while consuming LSP 'textDocument/codeAction' request", e);
+                return null;
+            }
         }
 
         if (isDoneNormally(future)) {
