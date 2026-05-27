@@ -15,11 +15,15 @@ package com.redhat.devtools.lsp4ij.console.explorer;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.ui.AnimatedIcon;
 import com.intellij.ui.PopupHandler;
 import com.intellij.ui.treeStructure.Tree;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -52,6 +56,8 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
     private final LSPConsoleToolWindowPanel panel;
 
     private final Tree tree;
+    private final DefaultMutableTreeNode treeRoot;
+    private final LoadingDecorator loadingDecorator;
     private final LanguageServerExplorerLifecycleListener listener;
     private final LanguageServerDefinitionListener definitionListener = new LanguageServerDefinitionListener() {
 
@@ -137,8 +143,13 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
     public LanguageServerExplorer(LSPConsoleToolWindowPanel panel) {
         super(true, false);
         this.panel = panel;
+        this.treeRoot = new DefaultMutableTreeNode("Language servers");
         tree = buildTree();
-        this.setContent(tree);
+
+        // Wrap tree with loading decorator to show spinner during async loading
+        loadingDecorator = new LoadingDecorator(tree, this, 0);
+        this.setContent(loadingDecorator.getComponent());
+
         listener = new LanguageServerExplorerLifecycleListener(this);
         LanguageServerLifecycleManager.getInstance(panel.getProject())
                 .addLanguageServerLifecycleListener(listener);
@@ -166,13 +177,10 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
      */
     private Tree buildTree() {
 
-        DefaultMutableTreeNode top = new DefaultMutableTreeNode("Language servers");
-
-        Tree tree = new Tree(top);
+        Tree tree = new Tree(treeRoot);
         tree.setRootVisible(false);
 
-        // Fill tree will all language server definitions, ordered alphabetically
-        loadLanguageServerDefinitions(top);
+        // Language server definitions will be loaded asynchronously in loadAsync()
 
         tree.setCellRenderer(new LanguageServerTreeRenderer());
 
@@ -204,7 +212,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
         tree.putClientProperty(AnimatedIcon.ANIMATION_IN_RENDERER_ALLOWED, true);
 
-        ((DefaultTreeModel) tree.getModel()).reload(top);
+        ((DefaultTreeModel) tree.getModel()).reload(treeRoot);
         return tree;
     }
 
@@ -293,15 +301,6 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
     }
 
-    private static void loadLanguageServerDefinitions(DefaultMutableTreeNode top) {
-        LanguageServersRegistry.getInstance()
-                .getServerDefinitions()
-                .stream()
-                .sorted(Comparator.comparing(LanguageServerDefinition::getDisplayName))
-                .map(LanguageServerTreeNode::new)
-                .forEach(top::add);
-    }
-
     public Tree getTree() {
         return tree;
     }
@@ -353,19 +352,62 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
     }
 
     /**
-     * Initialize language server process with the started language servers.
+     * Load language server definitions and started servers asynchronously.
+     * This avoids blocking the EDT during tool window initialization.
      */
-    public void load() {
-        LanguageServiceAccessor
-                .getInstance(getProject())
-                .getStartedServers()
-                .forEach(ls -> {
-                    Throwable serverError = ls.getServerError();
-                    listener.handleStatusChanged(ls);
-                    if (serverError != null) {
-                        listener.handleError(ls, serverError);
-                    }
-                });
+    public void loadAsync() {
+        // Show loading spinner
+        loadingDecorator.startLoading(false);
+
+        // Step 1: Load server definitions quickly and populate the tree
+        ReadAction.nonBlocking(() -> {
+            // Load all language server definitions (may need read access)
+            return LanguageServersRegistry.getInstance()
+                    .getServerDefinitions()
+                    .stream()
+                    .sorted(java.util.Comparator.comparing(LanguageServerDefinition::getDisplayName))
+                    .map(LanguageServerTreeNode::new)
+                    .toList();
+        })
+        .expireWith(this)
+        .finishOnUiThread(ModalityState.defaultModalityState(), (serverNodes) -> {
+            if (isDisposed()) {
+                return;
+            }
+
+            // Update tree model with definitions
+            DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
+            serverNodes.forEach(treeRoot::add);
+            treeModel.reload(treeRoot);
+
+            // Hide loading spinner immediately after tree is updated
+            loadingDecorator.stopLoading();
+        })
+        .submit(AppExecutorUtil.getAppExecutorService());
+
+        // Step 2: Load started servers state in parallel (independent, no spinner)
+        ReadAction.nonBlocking(() -> {
+            return LanguageServiceAccessor
+                    .getInstance(getProject())
+                    .getStartedServers()
+                    .stream()
+                    .toList();
+        })
+        .expireWith(this)
+        .finishOnUiThread(ModalityState.defaultModalityState(), (startedServers) -> {
+            if (isDisposed()) {
+                return;
+            }
+            // Update started servers state
+            startedServers.forEach(ls -> {
+                Throwable serverError = ls.getServerError();
+                listener.handleStatusChanged(ls);
+                if (serverError != null) {
+                    listener.handleError(ls, serverError);
+                }
+            });
+        })
+        .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     /**
