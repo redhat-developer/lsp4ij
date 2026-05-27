@@ -20,15 +20,19 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionToolbar;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.CardLayoutPanel;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.ui.JBUI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
@@ -70,6 +74,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     private LanguageServerExplorer explorer;
 
     private ConsolesPanel consoles;
+    private LoadingDecorator loadingDecorator;
     private boolean disposed;
 
     public LSPConsoleToolWindowPanel(@NotNull Project project) {
@@ -221,16 +226,17 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         explorer = new LanguageServerExplorer(this);
         var scrollPane = new JBScrollPane(explorer);
         this.consoles = new ConsolesPanel();
-        var splitPane = createSplitPanel(scrollPane, consoles);
+
+        // Wrap consoles with a loading decorator to show spinner during panel construction
+        this.loadingDecorator = new LoadingDecorator(consoles, this, 0);
+
+        var splitPane = createSplitPanel(scrollPane, loadingDecorator.getComponent());
         super.setContent(splitPane);
         super.revalidate();
         super.repaint();
-        // Load language servers asynchronously to avoid blocking IDE startup
-        ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            if (!isDisposed()) {
-                explorer.load();
-            }
-        });
+
+        // Load language server definitions and started servers asynchronously
+        explorer.loadAsync();
     }
 
     public Project getProject() {
@@ -241,7 +247,30 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (consoles == null || isDisposed()) {
             return;
         }
-        consoles.select(treeNode, true);
+
+        // Show loading spinner
+        if (loadingDecorator != null) {
+            loadingDecorator.startLoading(false);
+        }
+
+        ReadAction.nonBlocking(() -> {
+            // Read action needed for document access during UI construction
+            return treeNode;
+        })
+        .expireWith(this)
+        .finishOnUiThread(ModalityState.defaultModalityState(), (node) -> {
+            try {
+                if (consoles != null && !isDisposed()) {
+                    consoles.select(node, true);
+                }
+            } finally {
+                // Hide loading spinner
+                if (loadingDecorator != null && !isDisposed()) {
+                    loadingDecorator.stopLoading();
+                }
+            }
+        })
+        .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     /**
@@ -271,7 +300,30 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (consoles == null || isDisposed()) {
             return;
         }
-        consoles.select(processTreeNode, true);
+
+        // Show loading spinner
+        if (loadingDecorator != null) {
+            loadingDecorator.startLoading(false);
+        }
+
+        ReadAction.nonBlocking(() -> {
+            // Read action needed for document access during UI construction
+            return processTreeNode;
+        })
+        .expireWith(this)
+        .finishOnUiThread(ModalityState.defaultModalityState(), (node) -> {
+            try {
+                if (consoles != null && !isDisposed()) {
+                    consoles.select(node, true);
+                }
+            } finally {
+                // Hide loading spinner
+                if (loadingDecorator != null && !isDisposed()) {
+                    loadingDecorator.stopLoading();
+                }
+            }
+        })
+        .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     /**
