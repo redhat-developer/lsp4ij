@@ -15,18 +15,19 @@ import com.intellij.codeInsight.inline.completion.InlineCompletionEvent
 import com.intellij.codeInsight.inline.completion.InlineCompletionProviderID
 import com.intellij.codeInsight.inline.completion.InlineCompletionRequest
 import com.intellij.codeInsight.inline.completion.elements.InlineCompletionGrayTextElement
+import com.intellij.codeInsight.inline.completion.elements.InlineCompletionSkipTextElement
 import com.intellij.codeInsight.inline.completion.suggestion.InlineCompletionSuggestion
 import com.intellij.codeInsight.inline.completion.suggestion.InlineCompletionVariant
-import kotlinx.coroutines.flow.asFlow
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.psi.PsiDocumentManager
 import com.redhat.devtools.lsp4ij.LSPFileSupport
 import com.redhat.devtools.lsp4ij.LSPIJUtils
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone
 import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException
+import kotlinx.coroutines.flow.asFlow
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ExecutionException
@@ -61,29 +62,26 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
     }
 
     override suspend fun getSuggestionDebounced(request: InlineCompletionRequest): InlineCompletionSuggestion {
-        val editor = request.editor
+        // Check if any language server supports inline completion for this file
         val file = request.file
         val project = file.project
-        val offset = request.endOffset
-
-        // Get PsiFile (must be done in read action)
-        val psiFile = readAction {
-            PsiDocumentManager.getInstance(project).getPsiFile(editor.document)
-        } ?: return InlineCompletionSuggestion.Empty
-
-        // Check if any language server supports inline completion for this file
         if (!LanguageServiceAccessor.getInstance(project).hasAny(
-                psiFile,
+                file,
                 // The inline completion feature must be enabled and supported for the file's language server
-                { ls -> ls.clientFeatures.inlineCompletionFeature.isEnabled(psiFile) &&
-                        ls.clientFeatures.inlineCompletionFeature.isSupported(psiFile) }
-            )) {
+                { ls ->
+                    ls.clientFeatures.inlineCompletionFeature.isEnabled(file) &&
+                            ls.clientFeatures.inlineCompletionFeature.isSupported(file)
+                }
+            )
+        ) {
             return InlineCompletionSuggestion.Empty
         }
 
         // Create LSP params (must be done in read action)
+        val document = request.document
+        val offset = request.endOffset
         val (position, textDocument) = readAction {
-            val pos = LSPIJUtils.toPosition(offset, editor.document)
+            val pos = LSPIJUtils.toPosition(offset, document)
             val doc = TextDocumentIdentifier(LSPIJUtils.toUri(file).toString())
             Pair(pos, doc)
         }
@@ -91,19 +89,18 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
         val params = LSPInlineCompletionParams(textDocument, position, offset)
 
         // Get inline completions from language servers via LSPFileSupport
-        val support = LSPFileSupport.getSupport(psiFile).inlineCompletionSupport
+        val support = LSPFileSupport.getSupport(file).inlineCompletionSupport
         val future = support.getInlineCompletions(params)
 
         try {
             // Use waitUntilDone to properly handle cancellation and file changes
-            CompletableFutures.waitUntilDone(future, psiFile)
+            waitUntilDone(future, file)
 
-            if (!CompletableFutures.isDoneNormally(future)) {
+            if (!isDoneNormally(future)) {
                 return InlineCompletionSuggestion.Empty
             }
 
             val completions = future.get()
-
             if (completions.isEmpty()) {
                 return InlineCompletionSuggestion.Empty
             }
@@ -132,11 +129,53 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
                 if (insertText.isNullOrBlank()) {
                     null
                 } else {
-                    val elements = listOf(InlineCompletionGrayTextElement(insertText))
-                    InlineCompletionVariant.build(elements = elements.asFlow())
+                    // Build elements list considering the range
+                    val elements = buildList {
+                        var textToDisplay = insertText
+
+                        if (item.range != null) {
+                            // Get the range that will be replaced
+                            val range = item.range
+                            val (startOffset, endOffset) = readAction {
+                                val startOffset = LSPIJUtils.toOffset(range.start, document)
+                                val endOffset = LSPIJUtils.toOffset(range.end, document)
+                                Pair(startOffset, endOffset)
+                            }
+
+                            // If the range starts before current offset,
+                            // the insertText likely contains text already typed
+                            if (startOffset < offset && offset <= endOffset) {
+                                val alreadyTypedLength = offset - startOffset
+                                if (alreadyTypedLength < insertText.length) {
+                                    // Skip the part of insertText that corresponds to already typed text
+                                    textToDisplay = insertText.substring(alreadyTypedLength)
+                                }
+                            }
+
+                            // If the range ends after current offset, skip that existing text (it will be replaced)
+                            if (endOffset > offset) {
+                                val skipText = readAction {
+                                    document.getText(com.intellij.openapi.util.TextRange(offset, endOffset))
+                                }
+                                if (skipText.isNotEmpty()) {
+                                    add(InlineCompletionSkipTextElement(skipText))
+                                }
+                            }
+                        }
+
+                        // Add the new text (adjusted if range starts before offset)
+                        if (textToDisplay.isNotEmpty()) {
+                            add(InlineCompletionGrayTextElement(textToDisplay))
+                        }
+                    }
+
+                    if (elements.isEmpty()) {
+                        null
+                    } else {
+                        InlineCompletionVariant.build(elements = elements.asFlow())
+                    }
                 }
             }
-
             if (variants.isEmpty()) {
                 return InlineCompletionSuggestion.Empty
             }

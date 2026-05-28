@@ -89,7 +89,7 @@ public class LanguageServerManagerTest extends UsefulTestCase {
         TestFixtureBuilder<IdeaProjectTestFixture> projectBuilder = IdeaTestFixtureFactory.getFixtureFactory().createFixtureBuilder(getName());
         myFixture = LSPTestFixtureFactory.getFixtureFactory().createCodeInsightFixture(projectBuilder.getFixture());
         myFixture.setUp();
-        serverDefinition = new MockLanguageServerDefinition("test-server-status");
+        serverDefinition = new MockLanguageServerDefinition("test-server-status", true);
         List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.foo"), null));
         LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), serverDefinition, mappings);
     }

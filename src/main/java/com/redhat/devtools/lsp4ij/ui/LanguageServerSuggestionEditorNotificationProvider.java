@@ -70,7 +70,7 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
             @NotNull VirtualFile virtualFile) {
 
         // Do not show notification if user dismissed it
-        if (PropertiesComponent.getInstance().isTrueValue(DISABLE_KEY)) {
+        if (PropertiesComponent.getInstance().isTrueValue(DISABLE_KEY) || ApplicationManager.getApplication().isUnitTestMode()) {
             return null;
         }
 

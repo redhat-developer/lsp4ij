@@ -37,6 +37,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     private CompletionList mockCompletionList;
     private CompletionItem mockCompletionItem;
+    private Either<List<InlineCompletionItem>, InlineCompletionList> mockInlineCompletion;
     private Hover mockHover;
     private List<? extends Location> mockDefinitionLocations;
     private List<? extends LocationLink> mockTypeDefinitions;
@@ -89,6 +90,11 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams position) {
         return futureFactory(Either.forRight(mockCompletionList));
+    }
+
+    @Override
+    public CompletableFuture<Either<List<InlineCompletionItem>, InlineCompletionList>> inlineCompletion(InlineCompletionParams params) {
+        return futureFactory(mockInlineCompletion);
     }
 
     @Override
@@ -287,6 +293,10 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void setMockCompletionList(CompletionList completionList) {
         this.mockCompletionList = completionList;
+    }
+
+    public void setMockInlineCompletion(Either<List<InlineCompletionItem>, InlineCompletionList> inlineCompletion) {
+        this.mockInlineCompletion = inlineCompletion;
     }
 
     public void setMockCompletionItem(CompletionItem mockCompletionItem) {
