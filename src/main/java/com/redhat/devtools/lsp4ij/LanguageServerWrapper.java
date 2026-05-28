@@ -1409,7 +1409,8 @@ public class LanguageServerWrapper implements Disposable {
         if (fileUri == null) {
             return;
         }
-        boolean isOpen = FileEditorManager.getInstance(getProject()).isFileOpen(file);
+        boolean isOpen = getOpenedDocument(fileUri, false) != null
+                || FileEditorManager.getInstance(getProject()).isFileOpen(file);
         final LSPDocumentBase openedOrClosedDocument = isOpen ? getOpenedDocument(fileUri, true) : getClosedDocument(fileUri, true);
         if (openedOrClosedDocument == null) {
             return;
