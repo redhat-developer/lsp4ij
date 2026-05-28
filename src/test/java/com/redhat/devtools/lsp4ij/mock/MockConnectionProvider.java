@@ -19,6 +19,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
@@ -44,7 +45,12 @@ public class MockConnectionProvider implements StreamConnectionProvider {
 	private Collection<Closeable> streams = new ArrayList<>(4);
 
 	private static ExecutorService testRunner = Executors.newCachedThreadPool();
+	private final @Nullable MockLanguageServer server;
 
+	public MockConnectionProvider(@Nullable MockLanguageServer server) {
+		this.server = server;
+	}
+	
 	@Override
 	public void start() throws CannotStartProcessException {
 		Pipe serverOutputToClientInput = openPipe();
@@ -53,12 +59,13 @@ public class MockConnectionProvider implements StreamConnectionProvider {
 
 		InputStream serverInputStream = Channels.newInputStream(clientOutputToServerInput.source());
 		OutputStream serverOutputStream = Channels.newOutputStream(serverOutputToClientInput.sink());
-		Launcher<LanguageClient> launcher = LSPLauncher.createServerLauncher(MockLanguageServer.INSTANCE, serverInputStream,
+		var relevantServer = server != null ? server : MockLanguageServer.INSTANCE;
+		Launcher<LanguageClient> launcher = LSPLauncher.createServerLauncher(relevantServer, serverInputStream,
 				serverOutputStream, testRunner, Function.identity());
 		clientInputStream = Channels.newInputStream(serverOutputToClientInput.source());
 		clientOutputStream = Channels.newOutputStream(clientOutputToServerInput.sink());
 		listener = launcher.startListening();
-		MockLanguageServer.INSTANCE.addRemoteProxy(launcher.getRemoteProxy());
+		relevantServer.addRemoteProxy(launcher.getRemoteProxy());
 
 		// Store the output streams so we can close them to clean up. The corresponding input
 		// streams should automatically receive an EOF and close.

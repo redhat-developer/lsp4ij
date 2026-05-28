@@ -62,7 +62,7 @@ public final class MockLanguageServer implements LanguageServer {
 		INSTANCE = new MockLanguageServer(serverConfigurer);
 	}
 
-	private MockLanguageServer(final Supplier<ServerCapabilities> serverConfigurer) {
+	MockLanguageServer(final Supplier<ServerCapabilities> serverConfigurer) {
 		resetInitializeResult(serverConfigurer);
 	}
 
@@ -139,6 +139,7 @@ public final class MockLanguageServer implements LanguageServer {
 		capabilities.setTypeHierarchyProvider(new TypeHierarchyRegistrationOptions());
 		capabilities.setFoldingRangeProvider(new FoldingRangeProviderOptions());
 		capabilities.setDiagnosticProvider(new DiagnosticRegistrationOptions());
+		capabilities.setInlineCompletionProvider(true);
 		return capabilities;
 	}
 
@@ -167,6 +168,10 @@ public final class MockLanguageServer implements LanguageServer {
 
 	public void setCompletionItem(CompletionItem completionItem) {
 		this.textDocumentService.setMockCompletionItem(completionItem);
+	}
+
+	public void setInlineCompletion(Either<List<InlineCompletionItem>, InlineCompletionList> inlineCompletion) {
+		this.textDocumentService.setMockInlineCompletion(inlineCompletion);
 	}
 
 	public void setSemanticTokens(SemanticTokens semanticTokens) {
