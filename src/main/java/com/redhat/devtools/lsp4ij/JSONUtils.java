@@ -15,6 +15,10 @@ package com.redhat.devtools.lsp4ij;
 
 import com.google.gson.*;
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
+import com.redhat.devtools.lsp4ij.internal.adapters.CodeLensOptionsAdapter;
+import com.redhat.devtools.lsp4ij.internal.adapters.TextDocumentEditTypeAdapterFactory;
+import org.eclipse.lsp4j.CodeLensOptions;
+import org.eclipse.lsp4j.TextDocumentEdit;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.adapters.EitherTypeAdapter;
 import org.eclipse.lsp4j.jsonrpc.messages.Either3;
@@ -40,6 +44,26 @@ public class JSONUtils {
             Method/* JsonElement parse(String json) */>> jsonParseMethodCache = new WeakHashMap<>();
 
     private JSONUtils() {
+    }
+
+    /**
+     * Configures a GsonBuilder with compatibility type adapters for lsp4ij.
+     * These adapters handle compatibility issues between different lsp4j versions and legacy language servers.
+     *
+     * @param builder the GsonBuilder to configure
+     */
+    public static void configureCompatibilityAdapters(@NotNull GsonBuilder builder) {
+
+        // Get the original TextDocumentEdit adapter from lsp4j 1.0.0 (defined by @JsonAdapter annotation)
+        // before we register our custom factory. We'll delegate to it for deserialization.
+        TypeAdapter<TextDocumentEdit> originalTextDocumentEditAdapter = builder.create().getAdapter(TextDocumentEdit.class);
+
+        // Support old language servers that use boolean codeLensProvider instead of object
+        builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
+
+        // Handle TextDocumentEdit compatibility between lsp4j versions when plugins coexist
+        // (List<TextEdit> in lsp4j < 1.0 vs List<Either<TextEdit, SnippetTextEdit>> in lsp4j 1.0.0+)
+        builder.registerTypeAdapterFactory(new TextDocumentEditTypeAdapterFactory(originalTextDocumentEditAdapter));
     }
 
     /**

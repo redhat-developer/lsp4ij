@@ -8,7 +8,7 @@
  * Contributors:
  * Red Hat, Inc. - initial API and implementation
  ******************************************************************************/
-package com.redhat.devtools.lsp4ij.internal.capabilities;
+package com.redhat.devtools.lsp4ij.internal.adapters;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
