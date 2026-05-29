@@ -10,11 +10,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server;
 
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.ExtendedConcurrentMessageProcessor;
 import com.redhat.devtools.lsp4ij.internal.ExtendedStreamMessageProducer;
-import com.redhat.devtools.lsp4ij.internal.capabilities.CodeLensOptionsAdapter;
-import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.jsonrpc.*;
 import org.eclipse.lsp4j.jsonrpc.json.ConcurrentMessageProcessor;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
@@ -51,11 +50,7 @@ public class DefaultLauncherBuilder<S extends LanguageServer> extends Launcher.B
 
     public DefaultLauncherBuilder(@NotNull LSPClientFeatures clientFeatures) {
         this.clientFeatures = clientFeatures;
-        configureGson(builder -> {
-            // Add a custom CodeLensOptionsAdapter to support old language server
-            // which declares codeLensProvider with a boolean instead of Json object.
-            builder.registerTypeAdapter(CodeLensOptions.class, new CodeLensOptionsAdapter());
-        });
+        configureGson(JSONUtils::configureCompatibilityAdapters);
     }
 
     /**

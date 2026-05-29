@@ -11,6 +11,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.jsonrpc.JsonRpcException;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
@@ -42,12 +45,25 @@ public class TracingMessageConsumer {
     private final Map<String, RequestMetadata> receivedRequests;
     private final Clock clock;
     private final DateTimeFormatter dateTimeFormatter;
+    private final Gson gson;
 
     public TracingMessageConsumer() {
         this.sentRequests = new ConcurrentHashMap<>();
         this.receivedRequests = new ConcurrentHashMap<>();
         this.clock = Clock.systemDefaultZone();
         this.dateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(clock.getZone());
+
+        // Create Gson with same compatibility adapters as DefaultLauncherBuilder
+        GsonBuilder builder = new GsonBuilder();
+        JSONUtils.configureCompatibilityAdapters(builder);
+        this.gson = builder.create();
+    }
+
+    /**
+     * Converts an object to JSON string using the configured Gson with custom adapters.
+     */
+    private String toJsonString(Object obj) {
+        return gson.toJson(obj);
     }
 
     /**
@@ -80,7 +96,7 @@ public class TracingMessageConsumer {
                 return String.format(format, date, method, id);
             }
             Object params = requestMessage.getParams();
-            String paramsJson = MessageJsonHandler.toString(params);
+            String paramsJson = toJsonString(params);
             String format = "[Trace - %s] Sending request '%s - (%s)'.\nParams: %s\n\n\n";
             return String.format(format, date, method, id, paramsJson);
         } else if (message instanceof ResponseMessage) {
@@ -94,7 +110,7 @@ public class TracingMessageConsumer {
                 return String.format(format, date, method, id, latencyMillis);
             }
             Object result = responseMessage.getResult();
-            String resultJson = MessageJsonHandler.toString(result);
+            String resultJson = toJsonString(result);
             String resultTrace = getResultTrace(resultJson, null);
             String format =
                     "[Trace - %s] Sending response '%s - (%s)'. Processing request took %sms\n%s\n\n\n";
@@ -107,7 +123,7 @@ public class TracingMessageConsumer {
                 return String.format(format, date, method);
             }
             Object params = notificationMessage.getParams();
-            String paramsJson = MessageJsonHandler.toString(params);
+            String paramsJson = toJsonString(params);
             String format = "[Trace - %s] Sending notification '%s'\nParams: %s\n\n\n";
             return String.format(format, date, method, paramsJson);
         } else {
@@ -127,7 +143,7 @@ public class TracingMessageConsumer {
                 return String.format(format, date, method, id);
             }
             Object params = requestMessage.getParams();
-            String paramsJson = MessageJsonHandler.toString(params);
+            String paramsJson = toJsonString(params);
             String format = "[Trace - %s] Received request '%s - (%s)'\nParams: %s\n\n\n";
             return String.format(format, date, method, id, paramsJson);
         } else if (message instanceof ResponseMessage) {
@@ -141,9 +157,9 @@ public class TracingMessageConsumer {
                 return String.format(format, date, method, id, latencyMillis);
             }
             Object result = responseMessage.getResult();
-            String resultJson = MessageJsonHandler.toString(result);
+            String resultJson = toJsonString(result);
             Object error = responseMessage.getError();
-            String errorJson = MessageJsonHandler.toString(error);
+            String errorJson = toJsonString(error);
             String resultTrace = getResultTrace(resultJson, errorJson);
             String format = "[Trace - %s] Received response '%s - (%s)' in %sms.\n%s\n\n\n";
             return String.format(format, date, method, id, latencyMillis, resultTrace);
@@ -155,7 +171,7 @@ public class TracingMessageConsumer {
                 return String.format(format, date, method);
             }
             Object params = notificationMessage.getParams();
-            String paramsJson = MessageJsonHandler.toString(params);
+            String paramsJson = toJsonString(params);
             String format = "[Trace - %s] Received notification '%s'\nParams: %s\n\n\n";
             return String.format(format, date, method, paramsJson);
         } else {
