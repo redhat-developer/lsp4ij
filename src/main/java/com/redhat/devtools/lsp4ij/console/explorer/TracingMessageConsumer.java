@@ -29,6 +29,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,29 +42,33 @@ import java.util.concurrent.ConcurrentHashMap;
  * adapted for IJ.
  */
 public class TracingMessageConsumer {
+
+    private static MessageJsonHandler toStringInstance;
+
     private final Map<String, RequestMetadata> sentRequests;
     private final Map<String, RequestMetadata> receivedRequests;
     private final Clock clock;
     private final DateTimeFormatter dateTimeFormatter;
-    private final Gson gson;
 
     public TracingMessageConsumer() {
         this.sentRequests = new ConcurrentHashMap<>();
         this.receivedRequests = new ConcurrentHashMap<>();
         this.clock = Clock.systemDefaultZone();
         this.dateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(clock.getZone());
-
-        // Create Gson with same compatibility adapters as DefaultLauncherBuilder
-        GsonBuilder builder = new GsonBuilder();
-        JSONUtils.configureCompatibilityAdapters(builder);
-        this.gson = builder.create();
     }
 
     /**
-     * Converts an object to JSON string using the configured Gson with custom adapters.
+     * Perform JSON serialization of the given object using the default configuration of JSON-RPC messages
+     * enhanced with the pretty printing option.
      */
-    private String toJsonString(Object obj) {
-        return gson.toJson(obj);
+    public static String toJsonString(Object object) {
+        if (toStringInstance == null) {
+            toStringInstance = new MessageJsonHandler(Collections.emptyMap(), gsonBuilder -> {
+                JSONUtils.configureCompatibilityAdapters(gsonBuilder);
+                gsonBuilder.setPrettyPrinting();
+            });
+        }
+        return toStringInstance.getGson().toJson(object);
     }
 
     /**
