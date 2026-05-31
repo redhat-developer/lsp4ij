@@ -18,6 +18,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
@@ -69,6 +70,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
 
     // LSP code actions request used to load code action for the diagnostic.
     private CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
+    private CancellationSupport cancellationSupport;
 
     public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
                               @NotNull VirtualFile file,
@@ -144,20 +146,19 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @return list of Intellij {@link IntentionAction} which are used to create Intellij QuickFix.
      */
     private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(@NotNull List<Diagnostic> diagnostics) {
-        return CompletableFutures
-                .computeAsyncCompose(cancelChecker -> languageServer
+        if (cancellationSupport != null) {
+            cancellationSupport.cancel();;
+        }
+        cancellationSupport = new CancellationSupport();
+        return languageServer
                         .getInitializedServer()
                         .thenCompose(ls -> {
-                            // Language server is initialized here
-                            cancelChecker.checkCanceled();
 
                             // Collect code action for the given file by using the language server
                             CodeActionParams params = createCodeActionParams(diagnostics, file, languageServer.getClientFeatures());
-                            return ls.getTextDocumentService()
-                                    .codeAction(params)
+                            return cancellationSupport.execute(ls.getTextDocumentService()
+                                    .codeAction(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION)
                                     .thenApply(codeActions -> {
-                                        // Code action are collected here
-                                        cancelChecker.checkCanceled();
                                         if (codeActions == null || codeActions.isEmpty()) {
                                             return Collections.emptyList();
                                         }
@@ -175,7 +176,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                                                 .map(ca -> new CodeActionData(ca, languageServer))
                                                 .toList();
                                     });
-                        }));
+                        });
     }
 
     /**
@@ -216,6 +217,8 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * Cancel if needed the LSP request textDocument/codeAction
      */
     public void cancel() {
-        CancellationSupport.cancel(lspCodeActionRequest);
+        if (cancellationSupport != null) {
+            cancellationSupport.cancel();
+        }
     }
 }
