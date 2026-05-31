@@ -224,6 +224,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
     private void createUI() {
         explorer = new LanguageServerExplorer(this);
+        Disposer.register(this, explorer);
         var scrollPane = new JBScrollPane(explorer);
         this.consoles = new ConsolesPanel();
 

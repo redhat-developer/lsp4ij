@@ -19,6 +19,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
+import com.intellij.util.Alarm;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.ExecutionAttemptLimitReachedException;
 import org.jetbrains.annotations.NotNull;
@@ -66,6 +67,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     private final Object[] coalesceBy;
     private CancellablePromise<ResultOrError<R>> nonBlockingReadActionPromise;
+    private final Alarm retryAlarm;
 
     public PromiseToCompletableFuture(@NotNull Function<ProgressIndicator, R> code, @NotNull String progressTitle, @NotNull Project project, @Nullable Disposable parentDisposable, Object... coalesceBy) {
         this.code = code;
@@ -74,6 +76,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
         this.parentDisposable = parentDisposable;
         this.coalesceBy = coalesceBy;
         this.nbAttempt = new AtomicInteger(0);
+        this.retryAlarm = new Alarm(parentDisposable != null ? parentDisposable : project);
     }
 
     protected void init() {
@@ -118,7 +121,8 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                 } else {
                     // Retry ...
                     // 1.2 Index are not ready or the read action cannot be done, retry in smart mode...
-                    LOGGER.warn("Restart non blocking read action for '" + progressTitle + "' with attempt " + nbAttempt.get() + "/" + MAX_ATTEMPT + ".", ex);
+                    long timestamp = System.currentTimeMillis();
+                    LOGGER.warn("Restart non blocking read action for '" + progressTitle + "' with attempt " + nbAttempt.get() + "/" + MAX_ATTEMPT + " at " + timestamp + "ms.", ex);
                     var newPromise = nonBlockingReadActionPromise(true);
                     bind(newPromise);
                 }
@@ -146,11 +150,14 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                     } catch (
                             ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
                         //TODO delete block when minimum required version is 2024.2
-                        return new ResultOrError<R>(null, e);
+                        LOGGER.warn("ProcessCanceledException caught at " + System.currentTimeMillis() + "ms for '" + progressTitle + "'", e);
+                       // return new ResultOrError<R>(null, e);
+                        throw e;
                     } catch (CancellationException | IndexNotReadyException e) {
                         // When there is any exception, AsyncPromise report a log error.
                         // As we retry to execute the function code 5 times, we don't want to log this error
                         // To do that we catch the error and recreate a new promise on the promise.onSuccess
+                        LOGGER.warn(e.getClass().getSimpleName() + " caught at " + System.currentTimeMillis() + "ms for '" + progressTitle + "'", e);
                         return new ResultOrError<R>(null, e);
                     }
                 })
