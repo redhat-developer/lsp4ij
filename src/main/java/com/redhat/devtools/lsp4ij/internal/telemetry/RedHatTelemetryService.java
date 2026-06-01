@@ -13,8 +13,8 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal.telemetry;
 
-import com.intellij.ide.plugins.PluginManager;
 import com.intellij.openapi.application.ApplicationManager;
+import com.redhat.devtools.lsp4ij.internal.PluginUtils;
 import com.redhat.devtools.intellij.telemetry.core.service.TelemetryMessageBuilder;
 import com.redhat.devtools.intellij.telemetry.core.util.Lazy;
 import com.redhat.devtools.lsp4ij.telemetry.TelemetryEventName;
@@ -33,7 +33,7 @@ public class RedHatTelemetryService implements TelemetryService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RedHatTelemetryService.class);
 
-    private final Lazy<TelemetryMessageBuilder> builder = new Lazy<>(() -> new TelemetryMessageBuilder(PluginManager.getPluginByClass(this.getClass())));
+    private final Lazy<TelemetryMessageBuilder> builder = new Lazy<>(() -> new TelemetryMessageBuilder(PluginUtils.getPluginDescriptor(this.getClass())));
     private boolean hasError;
 
     /**

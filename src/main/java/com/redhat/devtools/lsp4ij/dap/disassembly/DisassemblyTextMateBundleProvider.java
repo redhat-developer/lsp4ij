@@ -12,8 +12,8 @@
 package com.redhat.devtools.lsp4ij.dap.disassembly;
 
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
-import com.intellij.ide.plugins.PluginManager;
-import com.intellij.openapi.extensions.PluginId;
+import com.intellij.openapi.extensions.PluginDescriptor;
+import com.redhat.devtools.lsp4ij.internal.PluginUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.plugins.textmate.api.TextMateBundleProvider;
 import org.slf4j.Logger;
@@ -48,7 +48,7 @@ public class DisassemblyTextMateBundleProvider implements TextMateBundleProvider
 
     private Path getBundlePath() {
         try {
-            IdeaPluginDescriptor plugin = PluginManager.getInstance().findEnabledPlugin(PluginId.getId("com.redhat.devtools.lsp4ij"));
+            PluginDescriptor plugin = PluginUtils.getPluginDescriptor(this.getClass());
             String version = plugin.getVersion();
             String path = plugin.getPluginPath() + "/bundles/" + version;
             return copyResourceDirectory(path, List.of("package.json", "syntaxes/disassembly.json"));

@@ -157,16 +157,6 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
         this.serverDefinition = serverDefinition;
     }
 
-    public static Path getDebugAdapterServerPath(@NotNull String pluginId,
-                                                 @NotNull String serverPath) {
-        IdeaPluginDescriptor descriptor = PluginManager.getInstance().findEnabledPlugin(PluginId.getId(pluginId));
-        assert descriptor != null;
-        Path pluginPath = descriptor.getPluginPath();
-        assert pluginPath != null;
-        pluginPath = pluginPath.toAbsolutePath();
-        return pluginPath.resolve(serverPath);
-    }
-
     /**
      * Creates a server installer intended to install a server shared by all projects (global scope).
      *
