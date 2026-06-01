@@ -10,9 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.templates;
 
-import com.intellij.ide.plugins.PluginManager;
-import com.intellij.openapi.extensions.PluginId;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.internal.PluginUtils;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
 
 import java.util.Set;
@@ -157,7 +156,6 @@ public class LanguageServerTemplate extends ServerTemplate {
     }
 
     private static boolean isPluginInstalled(String pluginIdString) {
-        PluginId pluginId = PluginId.getId(pluginIdString);
-        return PluginManager.getInstance().findEnabledPlugin(pluginId) != null;
+        return PluginUtils.isPluginInstalled(pluginIdString);
     }
 }
