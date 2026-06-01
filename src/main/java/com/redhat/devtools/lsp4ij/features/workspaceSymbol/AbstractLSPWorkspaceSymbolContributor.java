@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 import com.intellij.ide.util.gotoByName.ChooseByNamePopup;
 import com.intellij.navigation.ChooseByNameContributorEx;
 import com.intellij.navigation.NavigationItem;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.Processor;
@@ -26,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.awaitWithCheckCanceled;
 
 /**
@@ -52,7 +52,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
             var items = workspaceSymbolsFuture.getNow(null);
             if (items != null) {
                 items.stream()
-                        .filter(data -> data.getFile() != null && ReadAction.compute(() -> scope.accept(data.getFile())))
+                        .filter(data -> data.getFile() != null && runCancellableReadAction(() -> scope.accept(data.getFile())))
                         .map(NavigationItem::getName)
                         .forEach(processor::process);
             }
@@ -70,7 +70,7 @@ abstract class AbstractLSPWorkspaceSymbolContributor implements ChooseByNameCont
             if (items != null) {
                 items
                         .stream()
-                        .filter(data -> data.getFile() != null && ReadAction.compute(() -> parameters.getSearchScope().accept(data.getFile())))
+                        .filter(data -> data.getFile() != null && runCancellableReadAction(() -> parameters.getSearchScope().accept(data.getFile())))
                         .forEach(processor::process);
             }
         }

@@ -33,7 +33,7 @@ public class RedHatTelemetryService implements TelemetryService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RedHatTelemetryService.class);
 
-    private final Lazy<TelemetryMessageBuilder> builder = new Lazy<>(() -> new TelemetryMessageBuilder(PluginUtils.getPluginDescriptor(this.getClass())));
+    private final Lazy<TelemetryMessageBuilder> builder = new Lazy<>(() -> new TelemetryMessageBuilder(PluginUtils.getPluginDescriptor()));
     private boolean hasError;
 
     /**

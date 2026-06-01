@@ -249,8 +249,11 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             return;
         }
 
-        // Show loading spinner
-        if (loadingDecorator != null) {
+        // Check if panel already exists in cache
+        boolean panelExists = consoles.getValue(treeNode, false) != null;
+
+        // Only show loading spinner if we need to create a new panel
+        if (!panelExists && loadingDecorator != null) {
             loadingDecorator.startLoading(false);
         }
 
@@ -265,8 +268,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                     consoles.select(node, true);
                 }
             } finally {
-                // Hide loading spinner
-                if (loadingDecorator != null && !isDisposed()) {
+                // Hide loading spinner only if it was started
+                if (!panelExists && loadingDecorator != null && !isDisposed()) {
                     loadingDecorator.stopLoading();
                 }
             }
@@ -302,8 +305,11 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             return;
         }
 
-        // Show loading spinner
-        if (loadingDecorator != null) {
+        // Check if panel already exists in cache
+        boolean panelExists = consoles.getValue(processTreeNode, false) != null;
+
+        // Only show loading spinner if we need to create a new panel
+        if (!panelExists && loadingDecorator != null) {
             loadingDecorator.startLoading(false);
         }
 
@@ -318,8 +324,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
                     consoles.select(node, true);
                 }
             } finally {
-                // Hide loading spinner
-                if (loadingDecorator != null && !isDisposed()) {
+                // Hide loading spinner only if it was started
+                if (!panelExists && loadingDecorator != null && !isDisposed()) {
                     loadingDecorator.stopLoading();
                 }
             }

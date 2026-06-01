@@ -48,7 +48,7 @@ public class DisassemblyTextMateBundleProvider implements TextMateBundleProvider
 
     private Path getBundlePath() {
         try {
-            PluginDescriptor plugin = PluginUtils.getPluginDescriptor(this.getClass());
+            PluginDescriptor plugin = PluginUtils.getPluginDescriptor();
             String version = plugin.getVersion();
             String path = plugin.getPluginPath() + "/bundles/" + version;
             return copyResourceDirectory(path, List.of("package.json", "syntaxes/disassembly.json"));

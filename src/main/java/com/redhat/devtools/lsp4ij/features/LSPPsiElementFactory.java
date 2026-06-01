@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
@@ -24,6 +23,8 @@ import org.eclipse.lsp4j.LocationLink;
 import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 
 /**
  * LSP Psi element factory.
@@ -73,7 +74,7 @@ public interface LSPPsiElementFactory<T extends LSPPsiElement> {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doToPsiElement(location.getUri(), location.getRange(), fileUriSupport, project, factory);
         }
-        return ReadAction.compute(() -> {
+        return runCancellableReadAction(() -> {
             return doToPsiElement(location.getUri(), location.getRange(), fileUriSupport, project, factory);
         });
     }
@@ -107,7 +108,7 @@ public interface LSPPsiElementFactory<T extends LSPPsiElement> {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doToPsiElement(location.getTargetUri(), location.getTargetRange(), fileUriSupport, project, factory);
         }
-        return ReadAction.compute(() -> {
+        return runCancellableReadAction(() -> {
             return doToPsiElement(location.getTargetUri(), location.getTargetRange(), fileUriSupport, project, factory);
         });
     }

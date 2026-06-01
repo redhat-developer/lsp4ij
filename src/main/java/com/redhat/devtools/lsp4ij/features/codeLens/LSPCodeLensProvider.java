@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.features.codeLens;
 
 import com.intellij.codeInsight.codeVision.*;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.DumbService;
@@ -28,10 +27,9 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
-import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.internal.*;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
@@ -48,8 +46,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 
 import static com.intellij.codeInsight.codeVision.CodeVisionState.Ready;
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
@@ -115,7 +115,14 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             LSPCodeLensEditorFactoryListener.setCodelensSupport(editor, codeLensSupport);
             CompletableFuture<CodeLensDataResult> future = fetchCodeLenses(codeLensSupport);
             try {
-                waitUntilDone(future, psiFile);
+                // Wait max 300ms - enough for fast LS (TypeScript) but prevents freeze for slow LS (Qute/Quarkus)
+                waitUntilDone(future, psiFile, 300);
+            } catch (TimeoutException e) {
+                // Future takes too long (e.g., Qute/Quarkus delegating to IntelliJ with heavy ReadActions)
+                // Don't block - schedule async refresh when the future completes
+                EditorFeatureManager.getInstance(project)
+                    .refreshEditorFeatureWhenAllDone(future, psiFile, EditorFeatureType.CODE_VISION, () -> new PsiFileCancelChecker(psiFile));
+                return CodeVisionState.NotReady.INSTANCE;
             } catch (PsiFileChangedException e) {
                 // The file content has changed, cancel the LSP textDocument/codeLens requests.
                 codeLensSupport.cancel();
@@ -152,7 +159,13 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         if (visibleCodeLensToResolve != null) {
                             // Resolve all visible code lens
                             try {
-                                waitUntilDone(visibleCodeLensToResolve, psiFile);
+                                // Wait max 300ms for resolve operations too
+                                waitUntilDone(visibleCodeLensToResolve, psiFile, 300);
+                            } catch (TimeoutException e) {
+                                // Resolve takes too long - schedule async refresh when done
+                                EditorFeatureManager.getInstance(project)
+                                    .refreshEditorFeatureWhenAllDone(visibleCodeLensToResolve, psiFile, EditorFeatureType.CODE_VISION, () -> new PsiFileCancelChecker(psiFile));
+                                return CodeVisionState.NotReady.INSTANCE;
                             } catch (PsiFileChangedException e) {
                                 CancellationSupport.cancel(visibleCodeLensToResolve);
                                 return CodeVisionState.NotReady.INSTANCE;
@@ -279,12 +292,19 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             return CodeVisionState.NotReady.INSTANCE;
         }
         try {
-            if (!EDT.isCurrentThreadEdt()) {
-                return ReadAction.computeCancellable(computable);
-            } else {
+            if (EDT.isCurrentThreadEdt()) {
                 assert (ApplicationManager.getApplication().isUnitTestMode());
-                return ReadAction.compute(computable);
             }
+            return runCancellableReadAction(() -> {
+                try {
+                    return computable.compute();
+                } catch (Throwable t) {
+                    if (t instanceof RuntimeException) {
+                        throw (RuntimeException) t;
+                    }
+                    throw new RuntimeException(t);
+                }
+            });
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

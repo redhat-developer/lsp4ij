@@ -11,6 +11,10 @@
 package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.concurrent.Callable;
 
 /**
  * Application utilities.
@@ -28,5 +32,43 @@ public class ApplicationUtils {
         } else {
             ApplicationManager.getApplication().invokeLater(runnable);
         }
+    }
+
+    /**
+     * Executes a read action in a cancellable way to avoid UI freezes.
+     * <p>
+     * This method uses {@link ReadAction#nonBlocking(Callable)} which creates a cancellable
+     * read action, preventing UI freezes when the operation takes too long or when the user
+     * performs actions that require write access.
+     * </p>
+     * <p>
+     * See <a href="https://blog.jetbrains.com/platform/2026/03/ui-freezes-and-the-dangers-of-non-cancellable-read-actions-in-background-threads/">
+     * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
+     * </p>
+     *
+     * @param action the read action to execute
+     * @param <T>    the type of the result
+     * @return the result of the read action
+     */
+    public static <T> T runCancellableReadAction(@NotNull Callable<T> action) {
+        return ReadAction.nonBlocking(action).executeSynchronously();
+    }
+
+    /**
+     * Executes a read action in a cancellable way to avoid UI freezes.
+     * <p>
+     * This method uses {@link ReadAction#nonBlocking(Runnable)} which creates a cancellable
+     * read action, preventing UI freezes when the operation takes too long or when the user
+     * performs actions that require write access.
+     * </p>
+     * <p>
+     * See <a href="https://blog.jetbrains.com/platform/2026/03/ui-freezes-and-the-dangers-of-non-cancellable-read-actions-in-background-threads/">
+     * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
+     * </p>
+     *
+     * @param action the read action to execute
+     */
+    public static void runCancellableReadAction(@NotNull Runnable action) {
+        ReadAction.nonBlocking(action).executeSynchronously();
     }
 }
