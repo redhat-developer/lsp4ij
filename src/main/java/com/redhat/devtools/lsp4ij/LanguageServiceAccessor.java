@@ -39,6 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -169,7 +171,7 @@ public class LanguageServiceAccessor implements Disposable {
 
     private static boolean match(VirtualFile file, Project fileProject, LanguageServerFileAssociation mapping) {
         if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return ReadAction.compute(() -> mapping.match(file, fileProject));
+            return runCancellableReadAction(() -> mapping.match(file, fileProject));
         }
         return mapping.match(file, fileProject);
     }

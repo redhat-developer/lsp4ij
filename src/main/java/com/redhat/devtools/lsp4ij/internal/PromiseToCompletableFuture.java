@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -78,7 +79,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     protected void init() {
         // if indexation is processing and not in Light Edit mode, we need to execute the promise in smart mode
-        var executeInSmartMode = !LightEdit.owns(project) && DumbService.getInstance(project).isDumb();
+        var executeInSmartMode = true; // !LightEdit.owns(project) && DumbService.getInstance(project).isDumb();
         var promise = nonBlockingReadActionPromise(executeInSmartMode);
         bind(promise);
     }
@@ -116,11 +117,17 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                     LOGGER.warn("Maximum number (" + MAX_ATTEMPT + ")" + " of attempts to start non blocking read action for '" + progressTitle + "' has been reached", ex);
                     this.completeExceptionally(new ExecutionAttemptLimitReachedException(progressTitle, MAX_ATTEMPT, ex));
                 } else {
-                    // Retry ...
+                    // Retry with progressive delay to give time for indexation/write actions to complete
                     // 1.2 Index are not ready or the read action cannot be done, retry in smart mode...
-                    LOGGER.warn("Restart non blocking read action for '" + progressTitle + "' with attempt " + nbAttempt.get() + "/" + MAX_ATTEMPT + ".", ex);
-                    var newPromise = nonBlockingReadActionPromise(true);
-                    bind(newPromise);
+                    int delayMs = getRetryDelayMs(nbAttempt.get());
+                    LOGGER.warn("Restart non blocking read action for '" + progressTitle + "' with attempt " + nbAttempt.get() + "/" + MAX_ATTEMPT + " after " + delayMs + "ms delay.", ex);
+
+                    AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
+                        if (!cancelled) {
+                            var newPromise = nonBlockingReadActionPromise(true);
+                            bind(newPromise);
+                        }
+                    }, delayMs, TimeUnit.MILLISECONDS);
                 }
             } else {
                 this.complete(value.result);
@@ -143,10 +150,8 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                     try {
                         R result = code.apply(indicator);
                         return new ResultOrError<R>(result, null);
-                    } catch (
-                            ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-                        //TODO delete block when minimum required version is 2024.2
-                        return new ResultOrError<R>(null, e);
+                    } catch (ProcessCanceledException e) {
+                        throw e;
                     } catch (CancellationException | IndexNotReadyException e) {
                         // When there is any exception, AsyncPromise report a log error.
                         // As we retry to execute the function code 5 times, we don't want to log this error
@@ -170,6 +175,26 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     protected ProgressIndicator createProgressIndicator() {
         return new EmptyProgressIndicator();
+    }
+
+    /**
+     * Calculate progressive retry delay to avoid retry storms during indexation or heavy operations.
+     * Progressive delays give time for IntelliJ to complete indexing, write actions, or heavy ReadActions
+     * (e.g., Qute/Quarkus visiting Java classes) without constantly interrupting with ProcessCanceledException.
+     *
+     * @param attemptNumber the retry attempt number (1-based)
+     * @return delay in milliseconds
+     */
+    private static int getRetryDelayMs(int attemptNumber) {
+        // Progressive delays: 100ms, 300ms, 600ms, 1000ms, 1500ms
+        // Total: ~3.5 seconds max if all retries needed
+        return switch (attemptNumber) {
+            case 1 -> 100;
+            case 2 -> 300;
+            case 3 -> 600;
+            case 4 -> 1000;
+            default -> 1500;
+        };
     }
 
     @Override

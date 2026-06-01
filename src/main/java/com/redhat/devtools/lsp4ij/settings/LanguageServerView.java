@@ -20,6 +20,7 @@ import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
@@ -409,6 +410,8 @@ public class LanguageServerView implements Disposable {
                 canExecuteInstaller,
                 workspaceFolderStrategy,
                 project);
+        // Register the panel with this LanguageServerView as parent to avoid memory leak
+        Disposer.register(this, languageServerPanel);
         if (languageServerDefinition instanceof UserDefinedLanguageServerDefinition def) {
             languageServerPanel.setCommandLineUpdater(new UICommandLineUpdater(def, project));
         }

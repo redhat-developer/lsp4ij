@@ -44,6 +44,8 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.internal.uri.UriConverterManager;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
@@ -487,7 +489,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doGetFileLanguage(file, project);
         }
-        return ReadAction.compute(() -> doGetFileLanguage(file, project));
+        return runCancellableReadAction(() -> doGetFileLanguage(file, project));
     }
 
     @Nullable
@@ -538,7 +540,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return FileDocumentManager.getInstance().getFile(document);
         }
-        return ReadAction.compute(() -> FileDocumentManager.getInstance().getFile(document));
+        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getFile(document));
     }
 
     /**
@@ -552,7 +554,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doGetPsiFile(file, project);
         }
-        return ReadAction.compute(() -> doGetPsiFile(file, project));
+        return runCancellableReadAction(() -> doGetPsiFile(file, project));
     }
 
     /**
@@ -599,7 +601,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return FileDocumentManager.getInstance().getDocument(file);
         }
-        return ReadAction.compute(() -> FileDocumentManager.getInstance().getDocument(file));
+        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getDocument(file));
     }
 
     /**
@@ -635,7 +637,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return ProjectFileIndex.getInstance(project).getModuleForFile(file, false);
         }
-        return ReadAction.compute(() -> ProjectFileIndex.getInstance(project).getModuleForFile(file, false));
+        return runCancellableReadAction(() -> ProjectFileIndex.getInstance(project).getModuleForFile(file, false));
     }
 
     /**
@@ -1382,7 +1384,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return editor.getSettings().getTabSize(project);
         }
-        return ReadAction.compute(() -> editor.getSettings().getTabSize(project));
+        return runCancellableReadAction(() -> editor.getSettings().getTabSize(project));
     }
 
     public static boolean isInsertSpaces(@NotNull Editor editor) {
@@ -1390,7 +1392,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return !editor.getSettings().isUseTabCharacter(project);
         }
-        return ReadAction.compute(() -> !editor.getSettings().isUseTabCharacter(project));
+        return runCancellableReadAction(() -> !editor.getSettings().isUseTabCharacter(project));
     }
 
     /**

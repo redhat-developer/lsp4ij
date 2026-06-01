@@ -50,7 +50,7 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
     @Override
     public void projectOpened(@NotNull Project project) {
         // Subscribe to file open/close/selection events for this project.
-        com.intellij.util.messages.MessageBusConnection connection = project.getMessageBus().connect();
+        MessageBusConnection connection = project.getMessageBus().connect();
         connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, this);
         projectConnections.put(project, connection);
     }
@@ -83,6 +83,11 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         }
         var project = event.getManager().getProject();
 
+        // Don't start Language Servers if the project is being disposed/closed
+        if (project.isDisposed()) {
+            return;
+        }
+
         // Since file-to-server matching requires a read action,
         // and Language Server startup may be expensive,
         // schedule the connection asynchronously after indexing is finished.
@@ -91,7 +96,8 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         ProjectIndexingManager
                 .waitForIndexingAll()
                 .thenApplyAsync(unused -> {
-                    if (!LanguageServersRegistry.getInstance().isFileSupported(file, project)) {
+                    // Double-check project is still valid after async operations
+                    if (project.isDisposed()) {
                         return null;
                     }
                     PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);

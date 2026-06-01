@@ -10,7 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.client.files;
 
-import com.intellij.openapi.application.ReadAction;
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.util.NotNullLazyValue;
@@ -72,7 +72,7 @@ public abstract class DeferredSourcePosition<T, F extends VirtualFile> extends D
                         }
                         this.line = resolvedLine;
                         // Compute the offset lazily, based on the resolved line.
-                        this.offset = NotNullLazyValue.atomicLazy(() -> ReadAction.compute(() -> {
+                        this.offset = NotNullLazyValue.atomicLazy(() -> runCancellableReadAction(() -> {
                             int column = 0; // Default column to 0 for now, may be extended later
                             Document document = FileDocumentManager.getInstance().getDocument(file);
                             if (document == null) {

@@ -23,6 +23,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
+
 /**
  * Listens to editor events and manages the context for unresolved code lenses.
  * It updates the viewport lines and triggers the resolution and refresh of unresolved code lenses in the editor.
@@ -108,7 +110,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 return false;
             }
             // Update viewport lines in blocking ReadAction
-            ReadAction.run(() -> context.updateViewportLines(newRect));
+            runCancellableReadAction(() -> context.updateViewportLines(newRect));
         } else {
             // We are in ReadAction
             context.updateViewportLines(newRect);
@@ -140,7 +142,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 if (ApplicationManager.getApplication().isReadAccessAllowed()) {
                     context.updateViewportLines(newRect);
                 } else {
-                    ReadAction.run(() -> context.updateViewportLines(newRect));
+                    runCancellableReadAction(() -> context.updateViewportLines(newRect));
                 }
                 // Don't return - continue to process the event normally
             }

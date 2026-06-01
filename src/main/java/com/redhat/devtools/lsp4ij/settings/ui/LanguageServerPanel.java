@@ -16,6 +16,7 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.util.NlsContexts;
@@ -325,6 +326,7 @@ public class LanguageServerPanel implements Disposable {
         }
         FormBuilder installerTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.installer"), false);
         this.installerPanel = new InstallerPanel(installerTab, canExecuteInstaller, project);
+        Disposer.register(this, installerPanel);
     }
 
     public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
@@ -350,6 +352,7 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         workspaceFoldersPanel = new WorkspaceFoldersPanel(project, workspaceFolderStrategy);
+        Disposer.register(this, workspaceFoldersPanel);
         JScrollPane scrollPane = new JBScrollPane(workspaceFoldersPanel);
         tabbedPane.addTab(LanguageServerBundle.message("language.server.tab.workspaceFolders"), scrollPane);
     }
@@ -651,9 +654,7 @@ public class LanguageServerPanel implements Disposable {
         if (configurationWidget != null) {
             configurationWidget.resetJsonSchema();
         }
-        if (installerPanel != null) {
-            installerPanel.dispose();
-        }
+        // InstallerPanel and WorkspaceFoldersPanel are automatically disposed via Disposer.register
     }
 
 }

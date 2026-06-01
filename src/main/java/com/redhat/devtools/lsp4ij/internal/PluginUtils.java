@@ -16,14 +16,23 @@ package com.redhat.devtools.lsp4ij.internal;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManager;
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.extensions.PluginId;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.reflect.Method;
 
 /**
  * Plugin utilities.
  */
 public class PluginUtils {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PluginUtils.class);
+    private static final String LSP4IJ_PLUGIN_ID = "com.redhat.devtools.lsp4ij";
 
     private PluginUtils() {
     }
@@ -31,16 +40,32 @@ public class PluginUtils {
     /**
      * Returns the plugin descriptor for the given class.
      *
-     * @param clazz the class
      * @return the plugin descriptor
      * @throws IllegalStateException if the plugin descriptor cannot be retrieved
      */
     @NotNull
-    public static PluginDescriptor getPluginDescriptor(@NotNull Class<?> clazz) {
+    public static PluginDescriptor getPluginDescriptor() {
+        @NotNull Class<?> clazz = PluginUtils.class;
         ClassLoader classLoader = clazz.getClassLoader();
+
+        // Strategy 1: Use PluginAwareClassLoader (normal case in production)
         if (classLoader instanceof PluginAwareClassLoader pluginAwareClassLoader) {
             return pluginAwareClassLoader.getPluginDescriptor();
         }
+
+        // Strategy 2: Fallback to reflection to call PluginManagerCore.getPlugin()
+        // This API is marked as @Internal but is needed when PluginAwareClassLoader is not available (e.g., test mode)
+        try {
+            Class<?> pluginManagerCoreClass = Class.forName("com.intellij.ide.plugins.PluginManagerCore");
+            Method getPluginMethod = pluginManagerCoreClass.getMethod("getPlugin", PluginId.class);
+            IdeaPluginDescriptor plugin = (IdeaPluginDescriptor) getPluginMethod.invoke(null, PluginId.getId(LSP4IJ_PLUGIN_ID));
+            if (plugin != null) {
+                return plugin;
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Failed to get plugin descriptor via reflection", e);
+        }
+
         throw new IllegalStateException("Unable to get plugin descriptor for class: " + clazz.getName());
     }
 

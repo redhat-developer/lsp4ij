@@ -11,7 +11,8 @@
 package com.redhat.devtools.lsp4ij.dap.client.files;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -104,7 +105,7 @@ public final class DeferredLocalFileSourcePosition extends DeferredSourcePositio
         if (file == null || !file.isValid()) {
             return;
         }
-        int resolvedOffset = ReadAction.compute(() -> computeOffset(file, line));
+        int resolvedOffset = runCancellableReadAction(() -> computeOffset(file, line));
         resolvedFile = file;
         offset = resolvedOffset;
         markResolved();
