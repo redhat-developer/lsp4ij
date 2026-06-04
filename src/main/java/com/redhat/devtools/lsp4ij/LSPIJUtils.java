@@ -611,8 +611,8 @@ public class LSPIJUtils {
      * @return the document corresponding to the PSI element, or {@code null} if no document could be found
      */
     public static @Nullable Document getDocument(@NotNull PsiElement element) {
-        VirtualFile virtualFile = getFile(element);
-        return virtualFile != null ? getDocument(virtualFile) : null;
+        PsiFile psiFile = element.getContainingFile();
+        return psiFile != null ? psiFile.getViewProvider().getDocument() : null;
     }
 
     /**
@@ -621,7 +621,7 @@ public class LSPIJUtils {
      * @param documentUri the uri of the Document to return
      * @return the @{@link Document} associated to <code>documentUri</code>, or <code>null</code>
      */
-    public static @Nullable Document getDocument(URI documentUri) {
+    public static @Nullable Document getDocument(@Nullable URI documentUri) {
         if (documentUri == null) {
             return null;
         }
