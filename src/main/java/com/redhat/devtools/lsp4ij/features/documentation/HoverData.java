@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
  * @param hover               the LSP Hover
  * @param languageServer         the language server which has created the codeLens.
  */
-record HoverData(@NotNull Hover hover,
-                 @NotNull LanguageServerItem languageServer) {
+public record HoverData(@NotNull Hover hover,
+                        @NotNull LanguageServerItem languageServer) {
 
 }

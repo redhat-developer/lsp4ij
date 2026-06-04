@@ -371,6 +371,93 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager"/>
     </extensions>
 
+    <!-- =============================================== -->
+    <!-- MCP (Model Context Protocol) Support           -->
+    <!-- =============================================== -->
+
+    <!-- MCP extension points -->
+    <extensionPoints>
+
+        <!-- MCP Tool extension point - each tool registers individually -->
+        <extensionPoint
+                name="mcpTool"
+                beanClass="com.redhat.devtools.lsp4ij.mcp.toolProvider.MCPToolBean"
+                dynamic="true">
+            <with attribute="implementation" implements="com.redhat.devtools.lsp4ij.mcp.toolProvider.MCPTool"/>
+        </extensionPoint>
+
+    </extensionPoints>
+
+    <!-- Built-in MCP tools -->
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <!-- File operations -->
+        <mcpTool
+                name="lsp4ij_get_file_content"
+                description="Read the content of a file from the project"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.GetFileContentTool"/>
+
+        <!-- LSP Features -->
+        <mcpTool
+                name="lsp4ij_get_diagnostics"
+                description="Get LSP diagnostics (errors, warnings, info, hints) for a file from all associated language servers"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.GetDiagnosticsTool"/>
+        <mcpTool
+                name="lsp4ij_get_hover"
+                description="Get hover information (type, documentation) at a specific position in a file"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.GetHoverTool"/>
+        <mcpTool
+                name="lsp4ij_find_references"
+                description="Find all references to a symbol at a specific position (essential for refactoring and impact analysis)"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.FindReferencesTool"/>
+        <mcpTool
+                name="lsp4ij_code_actions"
+                description="Get available code actions (quick fixes, refactorings) at a position or range. IMPORTANT: When you encounter LSP diagnostics/errors, ALWAYS check this tool FIRST for available quick fixes before attempting manual edits."
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.GetCodeActionsTool"/>
+        <mcpTool
+                name="lsp4ij_start_lsp_server"
+                description="Start a language server by its ID"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.StartLSPServerTool"/>
+        <mcpTool
+                name="lsp4ij_stop_lsp_server"
+                description="Stop a language server by its ID"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.StopLSPServerTool"/>
+        <mcpTool
+                name="lsp4ij_open_file"
+                description="Open a file in the editor (triggers LSP textDocument/didOpen notification)"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.OpenFileTool"/>
+        <mcpTool
+                name="lsp4ij_close_file"
+                description="Close a file in the editor (triggers LSP textDocument/didClose notification)"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.CloseFileTool"/>
+
+        <!-- Server management -->
+        <mcpTool
+                name="lsp4ij_list_servers"
+                description="List all started language servers in the project with their capabilities"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.ListLanguageServersTool"/>
+        <mcpTool
+                name="lsp4ij_execute_command"
+                description="Execute a command on a specific language server"
+                implementation="com.redhat.devtools.lsp4ij.mcp.tools.lsp.ExecuteCommandTool"/>
+    </extensions>
+
+    <!-- MCP Actions -->
+    <!-- MCP Server is now managed via the "MCP - LSP4IJ" tool window -->
+    <!--
+    <actions>
+        <action id="LSP4IJ.StartMCPServer"
+                class="com.redhat.devtools.lsp4ij.mcp.StartMCPServerAction"
+                text="Start MCP Server"
+                description="Start the Model Context Protocol server for this project">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+    -->
+
+    <!-- =============================================== -->
+    <!-- LSP (Language Server Protocol) Support          -->
+    <!-- =============================================== -->
+
     <!-- LSP extension points -->
     <extensionPoints>
 
@@ -962,10 +1049,24 @@
         <applicationService
                 id="com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings"
                 serviceImplementation="com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings"/>
+
+        <applicationService
+                id="com.redhat.devtools.lsp4ij.mcp.MCPServerManager"
+                serviceImplementation="com.redhat.devtools.lsp4ij.mcp.MCPServerManager"/>
+        <applicationService
+                serviceImplementation="com.redhat.devtools.lsp4ij.mcp.settings.MCPSettings"/>
+
         <toolWindow
                 id="Language Servers"
                 anchor="bottom"
                 factoryClass="com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowFactory"
+                canCloseContents="false"
+                icon="AllIcons.Webreferences.Server"/>
+
+        <toolWindow
+                id="MCP - LSP4IJ"
+                anchor="bottom"
+                factoryClass="com.redhat.devtools.lsp4ij.mcp.ui.MCPToolWindowFactory"
                 canCloseContents="false"
                 icon="AllIcons.Webreferences.Server"/>
 

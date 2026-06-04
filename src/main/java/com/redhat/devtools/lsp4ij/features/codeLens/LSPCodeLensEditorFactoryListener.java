@@ -16,6 +16,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
@@ -64,6 +65,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
             return context;
         }
         context = new UnresolvedCodeLensViewportContext(editor);
+        // Register the context with the editor so it gets disposed when editor is closed
         editor.putUserData(UNRESOLVED_CODELENS_CONTEXT_KEY, context);
         return context;
     }

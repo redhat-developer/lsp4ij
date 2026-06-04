@@ -104,6 +104,13 @@ dependencies {
     implementation("com.vladsch.flexmark:flexmark-ext-autolink:$flexmarkVersion")
     implementation("com.vladsch.flexmark:flexmark-ext-gfm-strikethrough:$flexmarkVersion")
 
+    // MCP Java SDK for Model Context Protocol support
+    implementation("io.modelcontextprotocol.sdk:mcp:2.0.0-M2")
+    implementation("io.modelcontextprotocol.sdk:mcp-json-jackson3:2.0.0-M2")
+
+    // Undertow for HTTP/SSE servlet hosting
+    implementation("io.undertow:undertow-servlet:2.3.17.Final")
+
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
