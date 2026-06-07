@@ -142,7 +142,15 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 if (ApplicationManager.getApplication().isReadAccessAllowed()) {
                     context.updateViewportLines(newRect);
                 } else {
-                    runCancellableReadAction(() -> context.updateViewportLines(newRect));
+                    // We're on EDT without read access, schedule on background thread
+                    ReadAction.nonBlocking(() -> {
+                                context.updateViewportLines(newRect);
+                                return null;
+                            })
+                            .expireWhen(() -> editor.isDisposed())
+                            .coalesceBy(editor, LSPCodeLensEditorFactoryListener.this, "viewport-init")
+                            .submit(AppExecutorUtil.getAppExecutorService());
+                    return; // Exit early as viewport update will happen asynchronously
                 }
                 // Don't return - continue to process the event normally
             }
