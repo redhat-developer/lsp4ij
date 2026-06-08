@@ -248,7 +248,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                     .toList(); // Collect the futures in a list.
 
             // Return a CompletableFuture that completes when all resolve futures are done.
-            return CompletableFutures.allOf(resolveFutures.toArray(new CompletableFuture[0]));
+            return CompletableFutures.allOf(resolveFutures.toArray(new CompletableFuture[resolveFutures.size()]));
         }
 
         // If no code lenses need to be resolved, return null.
