@@ -138,20 +138,18 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
             // Initialize viewport on first event (when editor is fully rendered)
             if (!context.isViewportInitialized() && newRect.width > 0 && newRect.height > 0) {
                 // First time - initialize viewport even if it hasn't "changed"
-                // We're on EDT here, and we have a valid rectangle
-                if (ApplicationManager.getApplication().isReadAccessAllowed()) {
-                    context.updateViewportLines(newRect);
-                } else {
-                    // We're on EDT without read access, schedule on background thread
-                    ReadAction.nonBlocking(() -> {
-                                context.updateViewportLines(newRect);
-                                return null;
-                            })
-                            .expireWhen(() -> editor.isDisposed())
-                            .coalesceBy(editor, LSPCodeLensEditorFactoryListener.this, "viewport-init")
-                            .submit(AppExecutorUtil.getAppExecutorService());
+                // updateViewportLines requires EDT access
+                if (!ApplicationManager.getApplication().isDispatchThread()) {
+                    // Not on EDT, schedule on EDT
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (!editor.isDisposed() && !context.isViewportInitialized()) {
+                            context.updateViewportLines(newRect);
+                        }
+                    }, ModalityState.defaultModalityState());
                     return; // Exit early as viewport update will happen asynchronously
                 }
+                // We're on EDT, update viewport lines directly
+                context.updateViewportLines(newRect);
                 // Don't return - continue to process the event normally
             }
 

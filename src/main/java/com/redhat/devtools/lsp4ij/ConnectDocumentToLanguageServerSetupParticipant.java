@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -17,6 +18,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
@@ -95,18 +97,25 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // and isFileSupported() calls off EDT to avoid slow operation violations.
         ProjectIndexingManager
                 .waitForIndexingAll()
-                .thenApplyAsync(unused -> {
+                .thenAccept(unused -> {
                     // Double-check project is still valid after async operations
                     if (project.isDisposed()) {
-                        return null;
+                        return;
                     }
-                    PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-                    if (psiFile == null || LSPFileSupport.hasSupport(psiFile)) {
-                        // No PsiFile available, or the file is already connected to a Language Server.
-                        return null;
-                    }
-                    connectToLanguageServer(file, project);
-                    return null;
+                    // Execute in non-blocking ReadAction since getPsiFile and connectToLanguageServer require it
+                    ReadAction.nonBlocking(() -> {
+                                if (project.isDisposed()) {
+                                    return;
+                                }
+                                PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                                if (psiFile == null || LSPFileSupport.hasSupport(psiFile)) {
+                                    // No PsiFile available, or the file is already connected to a Language Server.
+                                    return;
+                                }
+                                connectToLanguageServer(file, project);
+                            })
+                            .expireWhen(() -> project.isDisposed())
+                            .submit(AppExecutorUtil.getAppExecutorService());
                 });
     }
 
