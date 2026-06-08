@@ -940,6 +940,8 @@
                 class="com.redhat.devtools.lsp4ij.commands.editor.ShowReferencesAction"/>
         <action id="editor.action.triggerParameterHints"
                 class="com.redhat.devtools.lsp4ij.commands.editor.TriggerParameterHintsAction"/>
+        <action id="editor.action.goToLocations"
+                class="com.redhat.devtools.lsp4ij.commands.editor.GoToLocationsAction"/>
     </actions>
 
     <!-- LSP consoles -->

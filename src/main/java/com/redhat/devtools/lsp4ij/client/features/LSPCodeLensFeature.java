@@ -45,7 +45,7 @@ public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
     /**
      * Returns true if the file associated with a language server can support codelens and false otherwise.
      *
-     * @param file    the Psi file.
+     * @param file the Psi file.
      * @return true if the file associated with a language server can support codelens and false otherwise.
      */
     public boolean isCodeLensSupported(@NotNull PsiFile file) {
@@ -89,12 +89,12 @@ public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
         }
 
     }
+
     /**
      * Create an IntelliJ {@link CodeVisionEntry} from the given LSP CodeLens and null otherwise (to ignore the LSP CodeLens).
      *
-     * @param codeLens       the LSP codeLens.
-     * @param providerId     the code vision provider Id.
-     * @param codeLensContext        the LSP CodeLens context.
+     * @param providerId      the code vision provider Id.
+     * @param codeLensContext the LSP CodeLens context.
      * @return an IntelliJ {@link CodeVisionEntry} from the given LSP CodeLens and null otherwise (to ignore the LSP CodeLens).
      */
     @Nullable
@@ -107,8 +107,7 @@ public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
             return null;
         }
         Command command = codeLens.getCommand();
-        String commandId = command.getCommand();
-        if (StringUtils.isEmpty(commandId)) {
+        if (!isClickable(codeLens)) {
             // Create a simple text code vision.
             return new TextCodeVisionEntry(text, providerId, null, text, text, Collections.emptyList());
         }
@@ -116,22 +115,21 @@ public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
         return new ClickableTextCodeVisionEntry(text, providerId, (e, editor) -> {
             LSPCommandContext context = new LSPCommandContext(command, codeLensContext.getPsiFile(), LSPCommandContext.ExecutedBy.CODE_LENS, editor, codeLensContext.getLanguageServer())
                     .setInputEvent(e);
-            if (codeLensContext.isResolveCodeLensSupported()) {
-                codeLensContext.getLanguageServer()
-                        .getTextDocumentService()
-                        .resolveCodeLens(codeLens)
-                        .thenAcceptAsync(resolvedCodeLens -> {
-                                    if (resolvedCodeLens != null) {
-                                        UIUtil.invokeLaterIfNeeded(() ->
-                                                CommandExecutor.executeCommand(context));
-                                    }
-                                }
-                        );
-            } else {
-                CommandExecutor.executeCommand(context);
-            }
+            UIUtil.invokeLaterIfNeeded(() -> CommandExecutor.executeCommand(context));
             return null;
         }, null, text, text, Collections.emptyList());
+    }
+
+    /**
+     * Returns true if it is a clickable code vision entry and false otherwise.
+     *
+     * @param codeLens the LSP codelens
+     * @return true if it is a clickable code vision entry and false otherwise.
+     */
+    public boolean isClickable(@NotNull CodeLens codeLens) {
+        Command command = codeLens.getCommand();
+        String commandId = command.getCommand();
+        return !StringUtils.isEmpty(commandId) || codeLens.getData() != null;
     }
 
     /**
@@ -167,7 +165,7 @@ public class LSPCodeLensFeature extends AbstractLSPDocumentFeature {
 
     @Override
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
-        if(codeLensCapabilityRegistry != null) {
+        if (codeLensCapabilityRegistry != null) {
             codeLensCapabilityRegistry.setServerCapabilities(serverCapabilities);
         }
     }
