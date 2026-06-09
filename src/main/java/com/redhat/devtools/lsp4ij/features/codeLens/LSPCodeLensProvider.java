@@ -304,7 +304,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                     }
                     throw new RuntimeException(t);
                 }
-            });
+            }, project);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

@@ -86,7 +86,7 @@ public abstract class DeferredSourcePosition<T, F extends VirtualFile> extends D
                                 }
                                 return offset;
                             }
-                        }));
+                        }, client));
                         markResolved();
                     } finally {
                         resolveFuture.complete(null);

@@ -110,7 +110,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 return false;
             }
             // Update viewport lines in blocking ReadAction
-            runCancellableReadAction(() -> context.updateViewportLines(newRect));
+            runCancellableReadAction(() -> context.updateViewportLines(newRect), context);
         } else {
             // We are in ReadAction
             context.updateViewportLines(newRect);

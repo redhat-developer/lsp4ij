@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import org.jetbrains.annotations.NotNull;
@@ -26,7 +27,7 @@ public class ApplicationUtils {
      *
      * @param runnable the runnable.
      */
-    public static void invokeLaterIfNeeded(Runnable runnable) {
+    public static void invokeLaterIfNeeded(@NotNull Runnable runnable) {
         if (ApplicationManager.getApplication().isDispatchThread()) {
             runnable.run();
         } else {
@@ -46,12 +47,16 @@ public class ApplicationUtils {
      * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
      * </p>
      *
-     * @param action the read action to execute
-     * @param <T>    the type of the result
+     * @param action           the read action to execute
+     * @param parentDisposable the parent disposable to expire the read action when disposed
+     * @param <T>              the type of the result
      * @return the result of the read action
      */
-    public static <T> T runCancellableReadAction(@NotNull Callable<T> action) {
-        return ReadAction.nonBlocking(action).executeSynchronously();
+    public static <T> T runCancellableReadAction(@NotNull Callable<T> action, @NotNull Disposable parentDisposable) {
+        return ReadAction
+                .nonBlocking(action)
+                .expireWith(parentDisposable)
+                .executeSynchronously();
     }
 
     /**
@@ -66,9 +71,12 @@ public class ApplicationUtils {
      * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
      * </p>
      *
-     * @param action the read action to execute
+     * @param action           the read action to execute
+     * @param parentDisposable the parent disposable to expire the read action when disposed
      */
-    public static void runCancellableReadAction(@NotNull Runnable action) {
-        ReadAction.nonBlocking(action).executeSynchronously();
+    public static void runCancellableReadAction(@NotNull Runnable action, @NotNull Disposable parentDisposable) {
+        ReadAction.nonBlocking(action)
+                .expireWith(parentDisposable)
+                .executeSynchronously();
     }
 }

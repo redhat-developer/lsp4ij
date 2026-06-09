@@ -242,7 +242,7 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                     runCancellableReadAction(() -> LSPExternalReferencesFinder.processExternalReferences(file, offset, reference -> {
                         externalReferences.add(reference);
                         return true;
-                    }));
+                    }), project);
                 }
             });
         }

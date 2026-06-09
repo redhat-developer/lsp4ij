@@ -147,7 +147,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      */
     private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(@NotNull List<Diagnostic> diagnostics) {
         if (cancellationSupport != null) {
-            cancellationSupport.cancel();;
+            cancellationSupport.cancel();
         }
         cancellationSupport = new CancellationSupport();
         return languageServer

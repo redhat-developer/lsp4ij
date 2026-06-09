@@ -105,7 +105,7 @@ public final class DeferredLocalFileSourcePosition extends DeferredSourcePositio
         if (file == null || !file.isValid()) {
             return;
         }
-        int resolvedOffset = runCancellableReadAction(() -> computeOffset(file, line));
+        int resolvedOffset = runCancellableReadAction(() -> computeOffset(file, line), ApplicationManager.getApplication());
         resolvedFile = file;
         offset = resolvedOffset;
         markResolved();
