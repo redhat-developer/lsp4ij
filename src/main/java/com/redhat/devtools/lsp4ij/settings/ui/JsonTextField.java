@@ -89,7 +89,7 @@ public class JsonTextField extends JPanel {
      */
     public void setJsonFilename(@NotNull String jsonFilename) {
         try {
-            VirtualFile file = LSPIJUtils.getFile(editorTextField.getDocument());
+            VirtualFile file = LSPIJUtils.getFile(editorTextField.getDocument(), getProject());
             if (file != null) {
                 file.rename(this, jsonFilename);
             } else {
@@ -119,7 +119,7 @@ public class JsonTextField extends JPanel {
     }
 
     public boolean hasErrors() {
-        VirtualFile file = LSPIJUtils.getFile(editorTextField.getDocument());
+        VirtualFile file = LSPIJUtils.getFile(editorTextField.getDocument(), getProject());
         return file != null && PsiErrorElementUtil.hasErrors(getProject(), file);
     }
 

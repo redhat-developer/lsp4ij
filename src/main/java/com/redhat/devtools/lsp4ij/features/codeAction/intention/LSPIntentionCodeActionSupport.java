@@ -63,7 +63,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
      * @param params the code action parameters (range, context, etc.)
      * @return a future that will complete with the list of code actions
      */
-    public CompletableFuture<List<CodeActionData>> getCodeActions(CodeActionParams params) {
+    public CompletableFuture<List<CodeActionData>> getCodeActions(@NotNull CodeActionParams params) {
         if (previousParams != null && hasChanged(params)) {
             // The caret or selection has changed, cancel the previous loading of textDocument/codeAction
             // to avoid wasting resources on obsolete results

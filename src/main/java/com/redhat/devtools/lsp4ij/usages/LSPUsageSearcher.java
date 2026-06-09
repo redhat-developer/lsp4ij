@@ -109,14 +109,15 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
      */
     @Override
     public void processElementUsages(@NotNull PsiElement element, @NotNull Processor<? super Usage> processor, @NotNull FindUsagesOptions options) {
-        runCancellableReadAction(() -> {
-            PsiFile file = element.getContainingFile();
-            if (file == null) {
+            // 1. Collect only what we need from the element inside a narrow ReadAction
+            Project project = element.getProject();
+            Position position = runCancellableReadAction(() -> getPosition(element, element.getContainingFile()), project);
+            PsiFile file = runCancellableReadAction(() -> element.getContainingFile(), project);
+
+            if (position == null || file == null) {
                 return;
             }
-
-            Project project = element.getProject();
-            if (!isUsageSupportedByLanguageServer(element)) {
+            if (!isUsageSupportedByLanguageServer(file)) {
                 return;
             }
 
@@ -127,57 +128,61 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                 if (elt.getLSPReferences() != null) {
                     elt.getLSPReferences()
                             .forEach(ref -> {
-                                var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, project);
-                                if (psiElement != null) {
-                                    VirtualFile psiElementFile = LSPIJUtils.getFile(psiElement);
-                                    if (psiElementFile != null) {
-                                        processor.process(new UsageInfo2UsageAdapter(new UsageInfo(psiElement)));
+                                runCancellableReadAction(() -> {
+                                    var psiElement = LSPUsagesManager.toPsiElement(ref.location(), ref.languageServer().getClientFeatures(), LSPUsagePsiElement.UsageKind.references, project);
+                                    if (psiElement != null) {
+                                        VirtualFile psiElementFile = LSPIJUtils.getFile(psiElement);
+                                        if (psiElementFile != null) {
+                                            processor.process(new UsageInfo2UsageAdapter(new UsageInfo(psiElement)));
+                                        }
                                     }
-                                }
+                                }, project);
                             });
                     return;
                 }
             }
 
-            Position position = getPosition(element, file);
-            if (position == null) {
-                return;
-            }
-
+            // 2. Dispatch the async LSP request OUTSIDE of the ReadAction
             LSPUsageSupport usageSupport = new LSPUsageSupport(file);
             LSPUsageSupport.LSPUsageSupportParams params = new LSPUsageSupport.LSPUsageSupportParams(position);
             CompletableFuture<List<LSPUsagePsiElement>> usagesFuture = usageSupport.getFeatureData(params);
             try {
+                // 3. Wait for the future OUTSIDE of the ReadAction
+                // This allows the ForkJoinPool background threads to freely acquire ReadActions
+                // to resolve the PSI elements during mapping!
                 waitUntilDone(usagesFuture);
                 if (usagesFuture.isDone()) {
                     List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
                     if (usages != null && !usages.isEmpty()) {
-                        List<LSPUsagePsiElement> filteredUsages = new ArrayList<>(usages);
-                        // Remove invalid usages and deduplicate overlapping ranges
-                        filteredUsages.removeIf(usage -> ContainerUtil.exists(usages, otherUsage -> {
-                            VirtualFile usageFile = LSPIJUtils.getFile(usage);
-                            if (usageFile == null) {
-                                return true;
+                        // 4. Process the results (requires ReadAction again for VFS/PSI mapping)
+                        runCancellableReadAction(() -> {
+                            List<LSPUsagePsiElement> filteredUsages = new ArrayList<>(usages);
+                            // Remove invalid usages and deduplicate overlapping ranges
+                            filteredUsages.removeIf(usage -> ContainerUtil.exists(usages, otherUsage -> {
+                                VirtualFile usageFile = LSPIJUtils.getFile(usage);
+                                if (usageFile == null) {
+                                    return true;
+                                }
+                                // TODO: respect search scope - currently disabled
+                                // if (!searchScope.contains(usageFile)) return true;
+
+                                // Remove usages that fully contain other usages (keep the more specific one)
+                                if (usage != otherUsage) {
+                                    TextRange textRange = usage.getTextRange();
+                                    TextRange otherTextRange = otherUsage.getTextRange();
+                                    return (textRange != null) &&
+                                           (otherTextRange != null) &&
+                                           textRange.contains(otherTextRange) &&
+                                           !textRange.equals(otherTextRange);
+                                }
+
+                                return false;
+                            }));
+
+                            for (LSPUsagePsiElement usage : filteredUsages) {
+                                processor.process(new UsageInfo2UsageAdapter(new UsageInfo(usage)));
                             }
-                            // TODO: respect search scope - currently disabled
-                            // if (!searchScope.contains(usageFile)) return true;
-
-                            // Remove usages that fully contain other usages (keep the more specific one)
-                            if (usage != otherUsage) {
-                                TextRange textRange = usage.getTextRange();
-                                TextRange otherTextRange = otherUsage.getTextRange();
-                                return (textRange != null) &&
-                                       (otherTextRange != null) &&
-                                       textRange.contains(otherTextRange) &&
-                                       !textRange.equals(otherTextRange);
-                            }
-
-                            return false;
-                        }));
-
-                        for (LSPUsagePsiElement usage : filteredUsages) {
-                            processor.process(new UsageInfo2UsageAdapter(new UsageInfo(usage)));
-                        }
+                        }, project);
                     }
                 }
             } catch (ProcessCanceledException pce) {
@@ -192,7 +197,6 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                     searchScope,
                     reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
             );
-        });
     }
 
     /**

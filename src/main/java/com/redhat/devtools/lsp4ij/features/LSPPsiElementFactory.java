@@ -76,7 +76,7 @@ public interface LSPPsiElementFactory<T extends LSPPsiElement> {
         }
         return runCancellableReadAction(() -> {
             return doToPsiElement(location.getUri(), location.getRange(), fileUriSupport, project, factory);
-        });
+        }, project);
     }
 
     /**
@@ -110,7 +110,7 @@ public interface LSPPsiElementFactory<T extends LSPPsiElement> {
         }
         return runCancellableReadAction(() -> {
             return doToPsiElement(location.getTargetUri(), location.getTargetRange(), fileUriSupport, project, factory);
-        });
+        }, project);
     }
 
     @Nullable

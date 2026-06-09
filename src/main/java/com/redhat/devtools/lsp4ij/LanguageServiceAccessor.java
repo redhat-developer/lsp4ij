@@ -171,7 +171,7 @@ public class LanguageServiceAccessor implements Disposable {
 
     private static boolean match(VirtualFile file, Project fileProject, LanguageServerFileAssociation mapping) {
         if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return runCancellableReadAction(() -> mapping.match(file, fileProject));
+            return runCancellableReadAction(() -> mapping.match(file, fileProject), fileProject);
         }
         return mapping.match(file, fileProject);
     }

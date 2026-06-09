@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageUtil;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
@@ -489,7 +490,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doGetFileLanguage(file, project);
         }
-        return runCancellableReadAction(() -> doGetFileLanguage(file, project));
+        return runCancellableReadAction(() -> doGetFileLanguage(file, project), project);
     }
 
     @Nullable
@@ -537,10 +538,22 @@ public class LSPIJUtils {
      * @return the file, or null if the document wasn't created from a virtual file.
      */
     public static @Nullable VirtualFile getFile(@NotNull Document document) {
+        return getFile(document, null);
+    }
+
+    /**
+     * Returns the virtual file corresponding to the specified document.
+     *
+     * @param document         the document for which the virtual file is requested.
+     * @param parentDisposable the parent disposable to expire the read action when disposed, or null to use ApplicationManager.
+     * @return the file, or null if the document wasn't created from a virtual file.
+     */
+    public static @Nullable VirtualFile getFile(@NotNull Document document, @Nullable Disposable parentDisposable) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return FileDocumentManager.getInstance().getFile(document);
         }
-        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getFile(document));
+        Disposable disposable = parentDisposable != null ? parentDisposable : ApplicationManager.getApplication();
+        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getFile(document), disposable);
     }
 
     /**
@@ -554,7 +567,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doGetPsiFile(file, project);
         }
-        return runCancellableReadAction(() -> doGetPsiFile(file, project));
+        return runCancellableReadAction(() -> doGetPsiFile(file, project), project);
     }
 
     /**
@@ -598,10 +611,22 @@ public class LSPIJUtils {
      * @return the document corresponding to the virtual file, or {@code null} if no document could be found
      */
     public static @Nullable Document getDocument(@NotNull VirtualFile file) {
+        return getDocument(file, null);
+    }
+
+    /**
+     * Returns the document corresponding to the virtual file.
+     *
+     * @param file             the virtual file
+     * @param parentDisposable the parent disposable to expire the read action when disposed, or null to use ApplicationManager.
+     * @return the document corresponding to the virtual file, or {@code null} if no document could be found
+     */
+    public static @Nullable Document getDocument(@NotNull VirtualFile file, @Nullable Disposable parentDisposable) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return FileDocumentManager.getInstance().getDocument(file);
         }
-        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getDocument(file));
+        Disposable disposable = parentDisposable != null ? parentDisposable : ApplicationManager.getApplication();
+        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getDocument(file), disposable);
     }
 
     /**
@@ -637,7 +662,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return ProjectFileIndex.getInstance(project).getModuleForFile(file, false);
         }
-        return runCancellableReadAction(() -> ProjectFileIndex.getInstance(project).getModuleForFile(file, false));
+        return runCancellableReadAction(() -> ProjectFileIndex.getInstance(project).getModuleForFile(file, false), project);
     }
 
     /**
@@ -1384,7 +1409,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return editor.getSettings().getTabSize(project);
         }
-        return runCancellableReadAction(() -> editor.getSettings().getTabSize(project));
+        return runCancellableReadAction(() -> editor.getSettings().getTabSize(project), project);
     }
 
     public static boolean isInsertSpaces(@NotNull Editor editor) {
@@ -1392,7 +1417,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return !editor.getSettings().isUseTabCharacter(project);
         }
-        return runCancellableReadAction(() -> !editor.getSettings().isUseTabCharacter(project));
+        return runCancellableReadAction(() -> !editor.getSettings().isUseTabCharacter(project), project);
     }
 
     /**

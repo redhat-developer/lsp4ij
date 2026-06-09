@@ -43,6 +43,7 @@ import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.features.completion.CompletionProposalTools;
 import com.redhat.devtools.lsp4ij.features.completion.SnippetTemplateFactory;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetIndentOptions;
+import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -442,14 +443,14 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         Document document = editor.getDocument();
         switch (variableName) {
             case TM_FILENAME_BASE:
-                String fileName = LSPIJUtils.getFile(document).getNameWithoutExtension();
+                String fileName = LSPIJUtils.getFile(document, file.getProject()).getNameWithoutExtension();
                 return fileName != null ? fileName : ""; //$NON-NLS-1$
             case TM_FILENAME:
-                return LSPIJUtils.getFile(document).getName();
+                return LSPIJUtils.getFile(document, file.getProject()).getName();
             case TM_FILEPATH:
-                return LSPIJUtils.getFile(document).getPath();
+                return LSPIJUtils.getFile(document, file.getProject()).getPath();
             case TM_DIRECTORY:
-                return LSPIJUtils.getFile(document).getParent().getPath();
+                return LSPIJUtils.getFile(document, file.getProject()).getParent().getPath();
             case TM_LINE_INDEX:
                 int lineIndex = getTextEditRange().getStart().getLine();
                 return Integer.toString(lineIndex);
@@ -499,10 +500,11 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         try {
             // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
             waitUntilDone(resolvedCompletionItemFuture, file);
-        } catch (
-                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            return null;
+        } catch (PsiFileChangedException e) {
+            // The file content has changed, cancel the LSP completion/resolve requests.
+            resolvedCompletionItemFuture.cancel(true);
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (CancellationException e) {
             return null;
         } catch (ExecutionException e) {
