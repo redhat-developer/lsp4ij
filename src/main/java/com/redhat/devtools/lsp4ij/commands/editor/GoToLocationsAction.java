@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.commands.editor;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonPrimitive;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DataContext;
@@ -89,11 +90,7 @@ public class GoToLocationsAction extends LSPCommandAction {
         }
 
         // Get the fourth argument (mode: "goto" | "peek" | "gotoAndPeek")
-        String mode = MODE_GOTO; // default
-        Object modeArg = command.getArgumentAt(3);
-        if (modeArg instanceof String) {
-            mode = (String) modeArg;
-        }
+        String mode = resolveMode(command.getArgumentAt(3));
 
         DataContext dataContext = e.getDataContext();
         LanguageServerItem languageServer = dataContext.getData(CommandExecutor.LSP_COMMAND_LANGUAGE_SERVER);
@@ -120,6 +117,29 @@ public class GoToLocationsAction extends LSPCommandAction {
                 handleGoto(locations, project);
                 break;
         }
+    }
+
+    /**
+     * Resolves the optional {@code mode} argument of {@code editor.action.goToLocations} /
+     * {@code editor.action.peekLocations}.
+     * <p>
+     * Command arguments are Gson JSON elements, so a JSON string arrives as a {@link JsonPrimitive}
+     * rather than a {@link String}; a {@code null} or non-string argument falls back to
+     * {@link #MODE_GOTO}.
+     *
+     * @param modeArg the raw fourth command argument (may be {@code null})
+     * @return {@code "goto"}, {@code "peek"} or {@code "gotoAndPeek"} (or the raw string if any);
+     * never {@code null}
+     */
+    static String resolveMode(@Nullable Object modeArg) {
+        if (modeArg instanceof JsonPrimitive primitive && primitive.isString()) {
+            return primitive.getAsString();
+        }
+        if (modeArg instanceof String stringMode) {
+            // Tolerate an already-decoded String (e.g. programmatic invocation).
+            return stringMode;
+        }
+        return MODE_GOTO;
     }
 
     /**
