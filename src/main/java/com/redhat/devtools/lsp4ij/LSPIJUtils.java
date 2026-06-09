@@ -636,8 +636,14 @@ public class LSPIJUtils {
      * @return the document corresponding to the PSI element, or {@code null} if no document could be found
      */
     public static @Nullable Document getDocument(@NotNull PsiElement element) {
-        PsiFile psiFile = element.getContainingFile();
-        return psiFile != null ? psiFile.getViewProvider().getDocument() : null;
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            PsiFile psiFile = element.getContainingFile();
+            return psiFile != null ? psiFile.getViewProvider().getDocument() : null;
+        }
+        return runCancellableReadAction(() -> {
+            PsiFile psiFile = element.getContainingFile();
+            return psiFile != null ? psiFile.getViewProvider().getDocument() : null;
+        }, element.getProject());
     }
 
     /**
