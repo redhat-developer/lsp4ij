@@ -59,10 +59,6 @@ public class LSPDiagnosticsCollector {
 
     @Nullable
     public List<HighlightInfo> collect() {
-        // Requires PsiFile to create AnnotationSession
-        if (psiFile == null) {
-            return null;
-        }
 
         List<HighlightInfo> highlights = new ArrayList<>();
 

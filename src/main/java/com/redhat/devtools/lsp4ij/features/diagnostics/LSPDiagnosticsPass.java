@@ -14,7 +14,6 @@ import com.intellij.codeHighlighting.TextEditorHighlightingPass;
 import com.intellij.codeInsight.daemon.impl.BackgroundUpdateHighlightersUtil;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.psi.PsiFile;
@@ -48,36 +47,24 @@ public class LSPDiagnosticsPass extends TextEditorHighlightingPass implements Du
     @Override
     public void doCollectInformation(@NotNull ProgressIndicator progress) {
         int groupId = LSPDiagnosticsApplier.GROUP_ID;
-        if (groupId == -1 || psiFile == null) {
+        if (groupId == -1) {
             return;
         }
+        // Collect diagnostics
+        LSPDiagnosticsCollector collector = new LSPDiagnosticsCollector(psiFile);
+        List<HighlightInfo> highlights = collector.collect();
+        highlightInfos = highlights != null ? highlights : new ArrayList<>();
 
-        try {
-            // Collect diagnostics
-            LSPDiagnosticsCollector collector = new LSPDiagnosticsCollector(psiFile);
-            List<HighlightInfo> highlights = collector.collect();
-            highlightInfos = highlights != null ? highlights : new ArrayList<>();
-
-            // Apply highlights
-            if (myDocument != null) {
-                BackgroundUpdateHighlightersUtil.setHighlightersToEditor(
-                        myProject,
-                        psiFile,
-                        myDocument,
-                        0,
-                        myDocument.getTextLength(),
-                        highlightInfos,
-                        groupId
-                );
-            }
-        } catch (ProcessCanceledException e) {
-            throw e;
-        } catch (Exception e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            LOGGER.warn("Error collecting LSP diagnostics for file: " + psiFile.getName(), e);
-        }
+        // Apply highlights
+        BackgroundUpdateHighlightersUtil.setHighlightersToEditor(
+                myProject,
+                psiFile,
+                myDocument,
+                0,
+                myDocument.getTextLength(),
+                highlightInfos,
+                groupId
+        );
     }
 
     @Override

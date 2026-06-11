@@ -53,7 +53,7 @@ public class LSPDocumentLinkEditorFeature implements EditorFeature {
         // Trigger reactive refresh
         Runnable runnable = () -> {
             LSPDocumentLinkApplier.getInstance(file.getProject())
-                    .scheduleRefresh(file.getVirtualFile());
+                    .scheduleRefresh(file, editor.getDocument());
         };
         runnableList.add(runnable);
     }
