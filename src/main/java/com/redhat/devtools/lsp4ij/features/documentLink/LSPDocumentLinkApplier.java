@@ -18,14 +18,12 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -58,17 +56,16 @@ public final class LSPDocumentLinkApplier implements Disposable {
      * Schedule a refresh of document links for the given file.
      * Called when document links future completes after the pass timed out.
      */
-    public void scheduleRefresh(@NotNull VirtualFile file) {
+    public void scheduleRefresh(@NotNull PsiFile file,
+                                @NotNull Document document) {
         if (project.isDisposed() || GROUP_ID == -1) {
             return;
         }
 
         // Capture document modification stamp as early as possible
-        Document document = FileDocumentManager.getInstance().getDocument(file);
-        Long modificationStamp = document != null ? document.getModificationStamp() : null;
-
+        Long modificationStamp = document.getModificationStamp();
         ReadAction
-                .nonBlocking(() -> collectDocumentLinks(file, modificationStamp))
+                .nonBlocking(() -> collectDocumentLinks(file, document, modificationStamp))
                 .coalesceBy(this, file)
                 .finishOnUiThread(ModalityState.defaultModalityState(), highlights -> {
                     if (highlights != null && !project.isDisposed()) {
@@ -96,36 +93,15 @@ public final class LSPDocumentLinkApplier implements Disposable {
     }
 
     @Nullable
-    private HighlightsToApply collectDocumentLinks(@NotNull VirtualFile file,
-                                                    @Nullable Long modificationStamp) {
+    private HighlightsToApply collectDocumentLinks(@NotNull PsiFile psiFile,
+                                                   @NotNull Document document,
+                                                   long modificationStamp) {
         if (project.isDisposed() || GROUP_ID == -1) {
             return null;
         }
 
-        Document document = FileDocumentManager.getInstance().getDocument(file);
-        if (document == null) {
-            return null;
-        }
-
-        // Capture stamp here since it wasn't provided
-        if (modificationStamp == null) {
-            modificationStamp = document.getModificationStamp();
-        }
-
-        PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
-        if (psiFile == null) {
-            return null;
-        }
-
-        Editor editor = getActiveEditorForFile(file);
-        if (editor == null) {
-            return null;
-        }
-
         // Collect document links
-        LSPDocumentLinkCollector collector = new LSPDocumentLinkCollector(
-                project, editor, file, psiFile, document
-        );
+        LSPDocumentLinkCollector collector = new LSPDocumentLinkCollector(psiFile, document);
         List<HighlightInfo> highlights = collector.collect();
         if (highlights == null) {
             highlights = List.of();

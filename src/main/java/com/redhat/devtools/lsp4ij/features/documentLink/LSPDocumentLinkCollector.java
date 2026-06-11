@@ -56,21 +56,13 @@ public class LSPDocumentLinkCollector {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPDocumentLinkCollector.class);
 
-    private final Project project;
-    private final Editor editor;
-    private final VirtualFile file;
+
     private final PsiFile psiFile;
     private final Document document;
     private CompletableFuture<List<DocumentLinkData>> pendingFuture;
 
-    public LSPDocumentLinkCollector(@NotNull Project project,
-                                     @NotNull Editor editor,
-                                     @NotNull VirtualFile file,
-                                     @Nullable PsiFile psiFile,
+    public LSPDocumentLinkCollector(@Nullable PsiFile psiFile,
                                      @Nullable Document document) {
-        this.project = project;
-        this.editor = editor;
-        this.file = file;
         this.psiFile = psiFile;
         this.document = document;
     }
@@ -78,11 +70,7 @@ public class LSPDocumentLinkCollector {
     @Nullable
     public List<HighlightInfo> collect() {
         // Check if we can execute LSP feature now
-        if (psiFile != null && ProjectIndexingManager.canExecuteLSPFeature(psiFile) != ExecuteLSPFeatureStatus.NOW) {
-            return null;
-        }
-
-        if (psiFile == null) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(psiFile) != ExecuteLSPFeatureStatus.NOW) {
             return null;
         }
 

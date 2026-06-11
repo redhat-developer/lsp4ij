@@ -62,7 +62,7 @@ public class LSPDocumentLinkPassFactory implements MainHighlightingPassFactory,
             return null;
         }
 
-        return new LSPDocumentLinkPass(file.getProject(), editor, file.getVirtualFile(), file);
+        return new LSPDocumentLinkPass(file, editor.getDocument(), editor);
     }
 
     @Nullable
@@ -75,7 +75,7 @@ public class LSPDocumentLinkPassFactory implements MainHighlightingPassFactory,
         if (virtualFile == null || !virtualFile.isInLocalFileSystem()) {
             return null;
         }
-        return new LSPDocumentLinkPass(file.getProject(), null, virtualFile, file);
+        return new LSPDocumentLinkPass(file, document, null);
     }
 
     public static long getCurrentModificationStamp(@NotNull PsiFile file) {
