@@ -10,22 +10,17 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.diagnostics;
 
-import com.intellij.codeInsight.daemon.impl.AnnotationHolderImpl;
-import com.intellij.codeInsight.daemon.impl.AnnotationSessionImpl;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.HighlightInfoType;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.ProblemHighlightType;
 import com.intellij.lang.annotation.Annotation;
+import com.intellij.lang.annotation.AnnotationHolder;
 import com.intellij.lang.annotation.AnnotationSession;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -45,7 +40,7 @@ import java.util.List;
  *
  * <p>Diagnostics are already cached by the LSP layer, so this is a fast operation.</p>
  *
- * <p>Implementation based on JetBrains LSP: uses deprecated {@link AnnotationHolderImpl}
+ * <p>Implementation based on JetBrains LSP: uses reflection to access internal AnnotationHolderImpl
  * to reuse existing {@link com.redhat.devtools.lsp4ij.client.features.LSPDiagnosticFeature#createAnnotation}
  * logic, then converts {@link Annotation} to {@link HighlightInfo}.</p>
  */
@@ -76,12 +71,23 @@ public class LSPDiagnosticsCollector {
         }
 
         // Create annotation session and holder to reuse existing createAnnotation() logic
-        // Uses deprecated AnnotationHolderImpl because no non-deprecated alternative exists
+        // Uses reflection to access internal AnnotationHolderImpl because no public alternative exists
         // for converting LSP diagnostics to HighlightInfo outside an Annotator.
-        AnnotationSession session = AnnotationSessionImpl.create(psiFile);
-        @SuppressWarnings("deprecation")
-        AnnotationHolderImpl holder = new AnnotationHolderImpl(session, false);
-        holder.runAnnotatorWithContext(psiFile);
+        if (!AnnotationHolderReflection.isAvailable()) {
+            return null;  // Reflection failed - IntelliJ API may have changed
+        }
+
+        AnnotationSession session = AnnotationHolderReflection.createSession(psiFile);
+        if (session == null) {
+            return null;
+        }
+
+        AnnotationHolder holder = AnnotationHolderReflection.createHolder(session, false);
+        if (holder == null) {
+            return null;
+        }
+
+        AnnotationHolderReflection.runAnnotatorWithContext(holder, psiFile);
 
         // Loop through language servers that report diagnostics for this file
         for (var ls : servers) {
@@ -112,15 +118,13 @@ public class LSPDiagnosticsCollector {
                         }
 
                         // Reuse existing createAnnotation() logic
-                        holder.clear();
+                        AnnotationHolderReflection.clear(holder);
                         diagnosticSupport.createAnnotation(diagnostic, document, fixes, holder);
 
                         // Convert annotations to HighlightInfo
-                        for (Annotation annotation : holder) {
+                        for (Annotation annotation : AnnotationHolderReflection.asIterable(holder)) {
                             HighlightInfo info = convertAnnotationToHighlightInfo(annotation);
-                            if (info != null) {
-                                highlights.add(info);
-                            }
+                            highlights.add(info);
                         }
                     } catch (IndexOutOfBoundsException e) {
                         // Diagnostic range is invalid (document changed since server sent it)
