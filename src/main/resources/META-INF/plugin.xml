@@ -457,12 +457,10 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.usages.LSPUsagesManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter"/>
-
-        <!-- LSP textDocument/publishDiagnostics notification support -->
-        <externalAnnotator
-                id="LSPDiagnosticAnnotator"
-                language=""
-                implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkApplier"/>
         <localInspection id="LSPLocalInspectionTool"
                          language=""
                          enabledByDefault="true"
@@ -493,11 +491,15 @@
                 implementation="com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler"
                 order="first"/>
 
-        <!-- LSP textDocument/documentLink request support -->
-        <externalAnnotator
-                id="LSPDocumentLinkAnnotator"
-                language=""
-                implementationClass="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkAnnotator"/>
+        <!-- LSP Diagnostics Pass (batch mode only, reactive via LSPDiagnosticsApplier in normal mode) -->
+        <highlightingPassFactory
+                id="LSPDiagnosticsPassFactory"
+                implementation="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsPassFactory"/>
+
+        <!-- LSP Document Link Pass (with fallback to LSPDocumentLinkApplier when async) -->
+        <highlightingPassFactory
+                id="LSPDocumentLinkPassFactory"
+                implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkPassFactory"/>
         <gotoDeclarationHandler
                 id="LSPDocumentLinkGotoDeclarationHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>

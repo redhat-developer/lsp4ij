@@ -396,7 +396,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                         return;
                     }
                     var clientFeatures = languageServerWrapper.getClientFeatures();
-                    // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticAnnotator.
+                    // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticsApplier.
                     if (diagnosticReport.isLeft()) {
                         RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
                         // Update the diagnostics cache from the opened file
@@ -433,7 +433,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         if (identifier == null) {
             identifier = LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
         }
-        languageServerWrapper.updateDiagnostics(file, identifier, diagnostics);
+        languageServerWrapper.updateDiagnostics(file, identifier, diagnostics, null);
     }
 
     @Nullable

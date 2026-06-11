@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -35,7 +36,7 @@ public class ClosedDocument extends LSPDocumentBase {
 
     @Override
     public boolean updateDiagnostics(@NotNull String identifier,
-                                     @NotNull List<Diagnostic> diagnostics) {
+                                     @NotNull List<Diagnostic> diagnostics, @Nullable Integer version) {
         boolean changed = isDiagnosticsChanged(this.diagnostics != null ? this.diagnostics : Collections.emptyList(), diagnostics);
         this.diagnostics = diagnostics;
         hasErrors = diagnostics

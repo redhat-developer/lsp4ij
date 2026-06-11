@@ -14,7 +14,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsForServer;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.CancellationException;
 
 /**
  * LSP opened document for a given language server.
@@ -36,16 +35,13 @@ public class OpenedDocument extends LSPDocumentBase {
     private final LSPDiagnosticsForServer diagnosticsForServer;
 
     private final @Nullable DocumentContentSynchronizer synchronizer;
-    private long updatedDiagnosticsTime; // time when diagnostics has been updated
-    private long displayingDiagnosticsTime; // time when diagnostics has been displayed with the LSPDiagnosticAnnotator.
 
     public OpenedDocument(@NotNull LanguageServerItem languageServer,
                           @NotNull VirtualFile file,
                           @Nullable DocumentContentSynchronizer synchronizer) {
         this.file = file;
         this.synchronizer = synchronizer;
-        this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer, file);
-        this.displayingDiagnosticsTime = -1;
+        this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer, file, synchronizer);
     }
 
     /**
@@ -67,22 +63,19 @@ public class OpenedDocument extends LSPDocumentBase {
 
     @Override
     public boolean updateDiagnostics(@NotNull String identifier,
-                                     @NotNull List<Diagnostic> diagnostics) {
-        updatedDiagnosticsTime = System.currentTimeMillis();
+                                     @NotNull List<Diagnostic> diagnostics,
+                                     @Nullable Integer version) {
+        if (version != null && synchronizer != null) {
+            if (version != synchronizer.getVersion()) {
+                return false;
+            }
+        }
         if (diagnosticsForServer.update(identifier, diagnostics)) {
             // LSP diagnostics has changed
-            final PsiFile psiFile = LSPIJUtils.getPsiFile(file, diagnosticsForServer.getClientFeatures().getProject());
-            if (psiFile != null) {
-                // Trigger Intellij validation to execute
-                // {@link LSPDiagnosticAnnotator}.
-                // which translates LSP Diagnostics into Intellij Annotation
-                final long currentDisplayingDiagnosticsTime = getDisplayingDiagnosticsTime();
-                LSPFileSupport.getSupport(psiFile).restartDaemonCodeAnalyzerWithDebounce(() -> {
-                    if (!isDiagnosticsMustBeRefreshed(currentDisplayingDiagnosticsTime)) {
-                        throw new CancellationException();
-                    }
-                });
-            }
+
+            // Schedule reactive diagnostics refresh (apply immediately without daemon restart)
+            var project = diagnosticsForServer.getClientFeatures().getProject();
+            LSPDiagnosticsApplier.getInstance(project).scheduleRefresh(file, synchronizer != null ? synchronizer.getDocument() : null);
             return true;
         }
         return false;
@@ -91,23 +84,6 @@ public class OpenedDocument extends LSPDocumentBase {
     @Override
     public Collection<Diagnostic> getDiagnostics() {
         return diagnosticsForServer.getDiagnostics();
-    }
-
-    public void markAsDisplayingDiagnostics() {
-        displayingDiagnosticsTime = System.currentTimeMillis();
-    }
-
-    boolean isDiagnosticsMustBeRefreshed(long displayingDiagnosticsTime) {
-        long lastDisplayingDiagnosticsTime = getDisplayingDiagnosticsTime();
-        if (lastDisplayingDiagnosticsTime == -1) {
-            return true;
-        }
-        return displayingDiagnosticsTime != lastDisplayingDiagnosticsTime// are diagnostics already displayed with LSPDiagnosticAnnotator?
-                || updatedDiagnosticsTime > lastDisplayingDiagnosticsTime; // has the diagnostics update occurred after the last display?
-    }
-
-    long getDisplayingDiagnosticsTime() {
-        return displayingDiagnosticsTime;
     }
 
     @Override

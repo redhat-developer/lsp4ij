@@ -63,6 +63,8 @@ public class EditorFeatureManager implements Disposable {
         addEditorFeature(new DeclarativeInlayHintsEditorFeature());
         addEditorFeature(new SemanticTokensEditorFeature());
         addEditorFeature(new StructureViewEditorFeature());
+        addEditorFeature(new LSPDiagnosticsEditorFeature());
+        addEditorFeature(new LSPDocumentLinkEditorFeature());
     }
 
     private void addEditorFeature(EditorFeature editorFeature) {

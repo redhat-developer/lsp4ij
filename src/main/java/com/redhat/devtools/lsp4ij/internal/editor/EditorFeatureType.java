@@ -23,5 +23,7 @@ public enum EditorFeatureType {
     FOLDING,
     SEMANTIC_TOKENS,
     STRUCTURE_VIEW,
+    LSP_DIAGNOSTICS,
+    LSP_DOCUMENT_LINK,
     ALL
 }

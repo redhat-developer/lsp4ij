@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.redhat.devtools.lsp4ij.DocumentContentSynchronizer;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -55,15 +56,19 @@ public class LSPDiagnosticsForServer {
     // Map which contains all current diagnostics (as key) and future which load associated quick fixes (as value)
     private @NotNull Map<Diagnostic, LSPLazyCodeActions> diagnostics;
 
+    private final @Nullable DocumentContentSynchronizer synchronizer;
+
     private @Nullable Map<String /* diagnostic identifier */, Collection<Diagnostic>> diagnosticsPerIdentifier;
 
     private String firstIdentifier;
 
     public LSPDiagnosticsForServer(@NotNull LanguageServerItem languageServer,
-                                   @Nullable VirtualFile file) {
+                                   @Nullable VirtualFile file,
+                                   @Nullable DocumentContentSynchronizer synchronizer) {
         this.languageServer = languageServer;
         this.file = file;
         this.diagnostics = Collections.emptyMap();
+        this.synchronizer = synchronizer;
     }
 
     /**

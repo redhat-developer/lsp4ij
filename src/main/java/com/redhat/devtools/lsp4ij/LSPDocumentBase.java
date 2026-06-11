@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij;
 
 import org.eclipse.lsp4j.Diagnostic;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
@@ -29,11 +30,14 @@ public abstract class LSPDocumentBase {
 
     /**
      * Update the diagnostics
-     * @param identifier the diagnostic identifier used to cache diagnostics.
+     *
+     * @param identifier  the diagnostic identifier used to cache diagnostics.
      * @param diagnostics the new diagnostics.
+     * @param version
      */
     public abstract boolean updateDiagnostics(@NotNull String identifier,
-                                              @NotNull List<Diagnostic> diagnostics);
+                                              @NotNull List<Diagnostic> diagnostics,
+                                              @Nullable Integer version);
 
     /**
      * Returns the current diagnostics for the file reported by the language server.
