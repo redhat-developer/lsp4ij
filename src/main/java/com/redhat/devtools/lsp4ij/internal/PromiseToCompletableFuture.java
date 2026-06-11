@@ -96,6 +96,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
             if (ex instanceof CancellationException) {
                 // Case 2: cancel the completable future
                 super.cancel(true);
+                LOGGER.warn("Cancel '" + progressTitle, ex);
             } else {
                 // Other case..., mark the completable future as error
                 // to avoid log from LSP4J https://github.com/eclipse-lsp4j/lsp4j/blob/d0757511e66be409ea9c27440e426616e53339e3/org.eclipse.lsp4j.jsonrpc/src/main/java/org/eclipse/lsp4j/jsonrpc/RemoteEndpoint.java#L62
@@ -151,6 +152,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                         R result = code.apply(indicator);
                         return new ResultOrError<R>(result, null);
                     } catch (ProcessCanceledException e) {
+                        LOGGER.warn("Rethrow ProcessCanceledException for '" + progressTitle, e);
                         throw e;
                     } catch (CancellationException | IndexNotReadyException e) {
                         // When there is any exception, AsyncPromise report a log error.
