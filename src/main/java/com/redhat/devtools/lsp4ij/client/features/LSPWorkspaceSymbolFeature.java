@@ -55,4 +55,20 @@ public class LSPWorkspaceSymbolFeature extends AbstractLSPWorkspaceFeature {
         // Default to unsupported
         return false;
     }
+
+    /**
+     * Determines whether workspace/symbol results returned by this language server must be restricted
+     * to the IDE search scope before being shown in Go To Symbol / Go To Class.
+     *
+     * Some language servers legitimately return symbols from files that live outside the IDE search
+     * scope - for example symbols declared in {@code node_modules}, which is typically registered as an
+     * excluded folder and therefore is not contained in any {@code GlobalSearchScope}. For such servers
+     * this method should return {@code false} so those results are not dropped by the scope filter.
+     *
+     * @return {@code true} (default) to filter results by the IDE search scope; {@code false} to bypass
+     * that filter and trust the language server's own scoping.
+     */
+    public boolean filterBySearchScope() {
+        return true;
+    }
 }
