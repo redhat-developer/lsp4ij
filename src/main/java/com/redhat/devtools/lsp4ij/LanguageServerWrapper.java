@@ -1403,7 +1403,8 @@ public class LanguageServerWrapper implements Disposable {
      */
     public void updateDiagnostics(@NotNull VirtualFile file,
                                   @NotNull String identifier,
-                                  @NotNull List<Diagnostic> diagnostics) {
+                                  @NotNull List<Diagnostic> diagnostics,
+                                  @Nullable Integer version) {
         var clientFeatures = getClientFeatures();
         var fileUri = FileUriSupport.getFileUri(file, clientFeatures);
         if (fileUri == null) {
@@ -1418,7 +1419,7 @@ public class LanguageServerWrapper implements Disposable {
         boolean hasErrors = false;
         synchronized (openedOrClosedDocument) {
             hasErrors = openedOrClosedDocument.hasErrors();
-            openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
+            openedOrClosedDocument.updateDiagnostics(identifier, diagnostics, version);
         }
 
         if ((hasErrors != openedOrClosedDocument.hasErrors()) && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {

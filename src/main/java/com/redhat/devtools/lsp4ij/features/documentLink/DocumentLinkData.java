@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
  * @param documentLink               the LSP document link
  * @param languageServer         the language server which has created the document link.
  */
-record DocumentLinkData(@NotNull DocumentLink documentLink,
+public record DocumentLinkData(@NotNull DocumentLink documentLink,
                         @NotNull LanguageServerItem languageServer) {
 }
+

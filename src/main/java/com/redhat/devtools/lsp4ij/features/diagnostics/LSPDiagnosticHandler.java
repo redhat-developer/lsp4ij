@@ -58,7 +58,8 @@ public class LSPDiagnosticHandler implements Consumer<PublishDiagnosticsParams> 
         // Update LSP diagnostic reported by the language server id
         languageServerWrapper.updateDiagnostics(file,
                 LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER,
-                params.getDiagnostics());
+                params.getDiagnostics(),
+                params.getVersion());
     }
 
 }

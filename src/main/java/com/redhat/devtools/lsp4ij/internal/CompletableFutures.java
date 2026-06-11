@@ -138,7 +138,7 @@ public class CompletableFutures {
         // but we use the initial context to determine the max safe timeout
         Integer effectiveTimeout = timeout;
         String initialContext = null;
-        boolean timeoutWasForcedByUs = false;  // Track if we forced the timeout (vs explicit from caller)
+        boolean isSafetyTimeout = false;  // true if we forced the timeout for safety (vs explicit from caller)
 
         if (effectiveTimeout == null) {
             final boolean isOnEDT = ApplicationManager.getApplication().isDispatchThread();
@@ -150,19 +150,17 @@ public class CompletableFutures {
                 // WriteAction: VERY dangerous - future likely needs ReadAction → guaranteed deadlock
                 effectiveTimeout = 500;  // 500ms max
                 initialContext = "WriteAction";
-                timeoutWasForcedByUs = true;
-                LOGGER.warn("waitUntilDone() called from WriteAction - this is very dangerous! Forcing 500ms timeout. File: {}",
-                    file != null ? file.getName() : "null");
+                isSafetyTimeout = true;
             } else if (isInReadAction) {
                 // ReadAction: dangerous - future might need WriteAction → potential deadlock
                 effectiveTimeout = 2000;  // 2s max
                 initialContext = "ReadAction";
-                timeoutWasForcedByUs = true;
+                isSafetyTimeout = true;
             } else if (isOnEDT) {
                 // EDT: dangerous - blocking freezes UI
                 effectiveTimeout = 1000;  // 1s max to avoid visible UI freeze
                 initialContext = "EDT";
-                timeoutWasForcedByUs = true;
+                isSafetyTimeout = true;
             }
             // else: background thread without locks - can wait indefinitely
         }
@@ -174,8 +172,6 @@ public class CompletableFutures {
             initialModificationStamp = file.getFileDocument().getModificationStamp();
         }
 
-        // Track if we already logged the warning (log only once)
-        boolean warningAlreadyLogged = false;
         while (!future.isDone()) {
             try {
                 // check progress canceled
@@ -191,34 +187,35 @@ public class CompletableFutures {
 
                 // wait for 25 ms
                 future.get(25, TimeUnit.MILLISECONDS);
-            } catch (CancellationException e) {
-                // race condition, a cancel has occurred when future.get(...) is called.
-                throw e;
             } catch (TimeoutException timeoutEx) {
                 long time = System.currentTimeMillis() - start;
                 if (effectiveTimeout != null && time > effectiveTimeout) {
-                    if (timeoutWasForcedByUs) {
-                        // WE forced the timeout to prevent deadlock/freeze
-                        // Log warning and throw a special CancellationException with a marker message
-                        // This allows callers to distinguish "safety timeout" from "explicit timeout"
-                        if (!warningAlreadyLogged) {
-                            // Detect current context for accurate logging (may have changed since start)
-                            String currentContext = ApplicationManager.getApplication().isWriteAccessAllowed() ? "WriteAction" :
-                                                  ApplicationManager.getApplication().isReadAccessAllowed() ? "ReadAction" :
-                                                  ApplicationManager.getApplication().isDispatchThread() ? "EDT" : "background";
+                    if (isSafetyTimeout) {
+                        // Safety timeout triggered - log warning with clear explanation of the root cause
+                        // Detect current context for accurate logging (may have changed since start)
+                        String currentContext = ApplicationManager.getApplication().isWriteAccessAllowed() ? "WriteAction" :
+                                ApplicationManager.getApplication().isReadAccessAllowed() ? "ReadAction" :
+                                ApplicationManager.getApplication().isDispatchThread() ? "EDT" : "background";
 
-                            String contextInfo = initialContext != null ?
-                                (initialContext.equals(currentContext) ? initialContext : initialContext + " → " + currentContext) :
-                                currentContext;
+                        String contextInfo = initialContext.equals(currentContext) ? initialContext : initialContext + " → " + currentContext;
 
-                            LOGGER.warn("waitUntilDone() stopping wait after {}ms in {} to prevent deadlock/freeze. " +
-                                    "LSP feature will return no data this time. " +
-                                    "Consider refactoring to avoid blocking in {}. File: {}",
-                                    time, contextInfo, contextInfo, file != null ? file.getName() : "null");
-                            warningAlreadyLogged = true;
-                        }
-                        // Throw CancellationException with marker message - caller can catch and handle gracefully
-                        throw new CancellationException("waitUntilDone safety timeout (" + time + "ms in " + initialContext + ")");
+                        // Explain WHY the timeout was forced based on the context
+                        String reason = switch (initialContext) {
+                            case "WriteAction" ->
+                                    "WriteAction + LSP request = guaranteed deadlock (LSP needs ReadAction)";
+                            case "ReadAction" ->
+                                    "ReadAction + blocking wait = potential deadlock (LSP might need WriteAction)";
+                            case "EDT" -> "EDT + blocking wait = UI freeze";
+                            default -> "dangerous context detected";
+                        };
+
+                        LOGGER.warn("waitUntilDone() TIMEOUT after {}ms in {}. Cause: {}. " +
+                                        "LSP feature will return no data this time. " +
+                                        "File: {}",
+                                time, contextInfo, reason, file != null ? file.getName() : "null", new Throwable());
+
+                        // Throw SafetyTimeoutException - caller can catch and handle gracefully with async fallback
+                        throw new SafetyTimeoutException("Safety timeout after " + time + "ms in " + initialContext);
                     } else {
                         // Timeout was explicitly provided by caller - respect it by throwing TimeoutException
                         throw timeoutEx;
