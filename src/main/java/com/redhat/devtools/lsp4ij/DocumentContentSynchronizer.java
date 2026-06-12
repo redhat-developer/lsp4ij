@@ -155,12 +155,25 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         }
     }
 
-    private void sendDidChangeEvents() {
+    /**
+     * Flushes any pending textDocument/didChange notifications to the language server.
+     * This ensures the server has an up-to-date view of the document before other requests.
+     * <p>
+     * This method should be called before sending requests that depend on the current
+     * document state (e.g., onTypeFormatting) to avoid out-of-bounds position errors.
+     *
+     * @return a CompletableFuture that completes when the didChange notification has been sent
+     */
+    public CompletableFuture<Void> flushPendingChanges() {
+        return sendDidChangeEvents();
+    }
+
+    private CompletableFuture<Void> sendDidChangeEvents() {
         List<TextDocumentContentChangeEvent> events;
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
                 // Don't send didChange notification with empty contentChanges.
-                return;
+                return CompletableFuture.completedFuture(null);
             }
             events = new ArrayList<>(changeEvents);
             changeEvents.clear();
@@ -176,6 +189,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             return ls;
         });
         processPullDiagnosticIfNeeded(didChange, version);
+        return didChange.thenApply(ls -> null);
     }
 
     @Override
