@@ -6,6 +6,12 @@
 
     <change-notes><![CDATA[
 
+    <h3>0.20.1</h3>
+    <ul>
+      <li>Fix bug with invalid MCP view</li>
+    </ul>
+	See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/29?closed=1">changelog</a>.
+
     <h3>0.20.0</h3>
     <ul>
       <li><strong>Fixed ReadAction/WriteAction deadlocks</strong> following <a href="https://blog.jetbrains.com/platform/2026/03/ui-freezes-and-the-dangers-of-non-cancellable-read-actions-in-background-threads/">JetBrains best practices</a> for non-cancellable read actions</li>
@@ -981,27 +987,12 @@
         <applicationService
                 id="com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings"
                 serviceImplementation="com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings"/>
-
-        <applicationService
-                id="com.redhat.devtools.lsp4ij.mcp.MCPServerManager"
-                serviceImplementation="com.redhat.devtools.lsp4ij.mcp.MCPServerManager"/>
-        <applicationService
-                serviceImplementation="com.redhat.devtools.lsp4ij.mcp.settings.MCPSettings"/>
-
         <toolWindow
                 id="Language Servers"
                 anchor="bottom"
                 factoryClass="com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowFactory"
                 canCloseContents="false"
                 icon="AllIcons.Webreferences.Server"/>
-
-        <toolWindow
-                id="MCP - LSP4IJ"
-                anchor="bottom"
-                factoryClass="com.redhat.devtools.lsp4ij.mcp.ui.MCPToolWindowFactory"
-                canCloseContents="false"
-                icon="AllIcons.Webreferences.Server"/>
-
     </extensions>
 
     <!-- Semantic Tokens -->
