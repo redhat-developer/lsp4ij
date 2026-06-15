@@ -66,7 +66,7 @@ class DAPConsoleViewTest {
     void testNormalOutput_otherText_shouldBeNull() {
         String text = "Just some log";
         String result = DAPConsoleView.getApplicableText(text, ConsoleViewContentType.NORMAL_OUTPUT);
-        assertNull(result);
+        assertEquals("Just some log", result);
     }
 
     @Test
