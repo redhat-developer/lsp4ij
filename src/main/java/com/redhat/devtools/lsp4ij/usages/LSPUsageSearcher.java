@@ -77,9 +77,6 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPUsageSearcher.class);
 
-    record ElementContext(Project project, Position position, PsiFile file) {
-    }
-
     /**
      * Processes all usages of the given element by querying the language server.
      * <p>
@@ -113,17 +110,26 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
     @Override
     public void processElementUsages(@NotNull PsiElement element, @NotNull Processor<? super Usage> processor, @NotNull FindUsagesOptions options) {
         // 1. Collect only what we need from the element inside a narrow ReadAction
-        ElementContext ctx = runCancellableReadAction(() -> {
+        record ElementData(Project project, Position position, PsiFile file, int textOffset) {}
+        ElementData data = runCancellableReadAction(() -> {
             PsiFile file = element.getContainingFile();
-            return new ElementContext(file.getProject(), getPosition(element, file), file);
+            if (file == null) {
+                return null;
+            }
+            Position position = getPosition(element, file);
+            if (position == null) {
+                return null;
+            }
+            return new ElementData(element.getProject(), position, file, element.getTextOffset());
         }, ApplicationManager.getApplication());
-        Project project = ctx.project();
-        Position position = ctx.position();
-        PsiFile file = ctx.file();
-        
-        if (position == null || file == null) {
+
+        if (data == null) {
             return;
         }
+
+        Project project = data.project();
+        PsiFile file = data.file();
+        Position position = data.position();
         if (!isUsageSupportedByLanguageServer(file)) {
             return;
         }
@@ -200,7 +206,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
 
         LSPExternalReferencesFinder.processExternalReferences(
                 file,
-                element.getTextOffset(),
+                data.textOffset(),
                 searchScope,
                 reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
         );
