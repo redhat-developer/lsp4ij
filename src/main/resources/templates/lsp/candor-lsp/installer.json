@@ -1,0 +1,36 @@
+{
+  "id": "candor-lsp",
+  "name": "Candor Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/candor-lsp/node_modules"
+  },
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Candor Language Server",
+      "workingDir": "${workingDir}",
+      "ignoreStderr": true,
+      "command": {
+        "windows": "npm.cmd install candor-ts --force",
+        "default": "npm install candor-ts --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Candor Language Server command",
+          "command": {
+            "windows": "${workingDir}/.bin/candor-lsp.cmd",
+            "default": "${workingDir}/.bin/candor-lsp"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}
