@@ -107,6 +107,7 @@ Here are some projects that use LSP4IJ:
  * [Dart](https://github.com/flutter/dart-intellij-third-party)
  * [Semantic Web Language Server](https://github.com/SemanticWebLanguageServer/swls)
  * [Language 1C (BSL) Plugin](https://github.com/1c-syntax/intellij-language-1c-bsl)
+ * [ARO Programming Language](https://github.com/arolang/aro)
 
 ## Requirements
 
