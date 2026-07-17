@@ -24,7 +24,9 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -41,6 +43,9 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
     private final Map<Project, MessageBusConnection> projectConnections = new ConcurrentHashMap<>();
 
     private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {
+        if (project.isDefault() || project.isDisposed()) {
+            return;
+        }
         PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
         if (psiFile != null) {
             // Force the startup of all Language Servers mapped to this file.

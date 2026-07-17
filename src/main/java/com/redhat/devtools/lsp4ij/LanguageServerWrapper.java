@@ -303,8 +303,12 @@ public class LanguageServerWrapper implements Disposable {
                     // 1. send a textDocument/didOpen notification
                     // 2. refresh code vision, inlay hints, folding for all opened editors
                     // which edit the files associated to the language server.
-                    LanguageServiceAccessor.getInstance(getProject()).
-                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, getProject());
+                    Project p = getProject();
+                    if (p.isDefault() || p.isDisposed()) {
+                        return;
+                    }
+                    LanguageServiceAccessor.getInstance(p).
+                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, p);
                 });
     }
 
@@ -622,7 +626,10 @@ public class LanguageServerWrapper implements Disposable {
         // If this is an "interesting" status change, increment the project-level modification tracker and the wrapper's
         // modification tracker before firing events
         if (statusChanged) {
-            LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
+            Project p = getProject();
+            if (!p.isDefault() && !p.isDisposed()) {
+                LanguageServiceAccessor.getInstance(p).incrementModificationCount();
+            }
             incrementModificationCount();
             getLanguageServerLifecycleManager().onStatusChanged(this);
             if (languageClient != null) {
