@@ -717,6 +717,32 @@ public class LanguageServersRegistry implements Disposable {
         notifyServerRemoved(Collections.singleton(definition));
     }
 
+    private boolean hasLanguageAssociation(@NotNull LanguageServerDefinition definition, @NotNull Language language) {
+        return fileAssociations.stream()
+                .anyMatch(association -> definition.equals(association.getServerDefinition())
+                        && language.equals(association.getLanguage()));
+    }
+
+    private boolean hasFileTypeAssociation(@NotNull LanguageServerDefinition definition, @NotNull FileType fileType) {
+        return fileAssociations.stream()
+                .anyMatch(association -> definition.equals(association.getServerDefinition())
+                        && fileType.equals(association.getFileType()));
+    }
+
+    private boolean hasFileNamePatternAssociation(@NotNull LanguageServerDefinition definition, @NotNull List<String> patterns) {
+        Set<String> targetPatternSet = Set.copyOf(patterns);
+        return fileAssociations.stream()
+                .anyMatch(association -> {
+                    if (!definition.equals(association.getServerDefinition())) return false;
+                    var matchers = association.getFileNameMatchers();
+                    if (matchers == null) return false;
+                    Set<String> associationPatterns = matchers.stream()
+                            .map(FileNameMatcher::getPresentableString)
+                            .collect(Collectors.toUnmodifiableSet());
+                    return associationPatterns.equals(targetPatternSet);
+                });
+    }
+
     private void handleLanguageMappingAdded(@NotNull LanguageMappingExtensionPointBean ext) {
         Language language = Language.findLanguageByID(ext.language);
         if (language == null) {
@@ -725,6 +751,10 @@ public class LanguageServersRegistry implements Disposable {
         LanguageServerDefinition definition = serverDefinitions.get(ext.serverId);
         if (definition == null) {
             // Mapping will be picked up later via collectMappingsFromExtensionPoints when the server arrives.
+            return;
+        }
+        if (hasLanguageAssociation(definition, language)) {
+            // Already registered by handleServerExtensionAdded via collectMappingsFromExtensionPoints.
             return;
         }
         var mapping = new ServerLanguageMapping(language, ext.serverId, ext.languageId, ext.getDocumentMatcher());
@@ -762,6 +792,10 @@ public class LanguageServersRegistry implements Disposable {
         if (definition == null) {
             return;
         }
+        if (hasFileTypeAssociation(definition, fileType)) {
+            // Already registered by handleServerExtensionAdded via collectMappingsFromExtensionPoints.
+            return;
+        }
         var mapping = new ServerFileTypeMapping(fileType, ext.serverId, ext.languageId, ext.getDocumentMatcher());
         registerAssociation(definition, mapping);
         updateLanguages();
@@ -793,6 +827,10 @@ public class LanguageServersRegistry implements Disposable {
             return;
         }
         List<String> patterns = Arrays.asList(ext.patterns.split(";"));
+        if (hasFileNamePatternAssociation(definition, patterns)) {
+            // Already registered by handleServerExtensionAdded via collectMappingsFromExtensionPoints.
+            return;
+        }
         var mapping = new ServerFileNamePatternMapping(patterns, ext.serverId, ext.languageId, ext.getDocumentMatcher());
         registerAssociation(definition, mapping);
         updateLanguages();
