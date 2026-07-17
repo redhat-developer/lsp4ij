@@ -53,6 +53,9 @@ public abstract class AbstractLSPWorkspaceFeatureSupport<Params, Result> extends
     protected static CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull Project project,
                                                                                     @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                                     @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
+        if (project.isDefault() || project.isDisposed()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
         return LanguageServiceAccessor.getInstance(project)
                 .getLanguageServers(beforeStartingServerFilter, afterStartingServerFilter);
     }

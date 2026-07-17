@@ -79,6 +79,10 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
     protected static CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull PsiFile file,
                                                                   @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                   @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter) {
+        var project = file.getProject();
+        if (project.isDefault() || project.isDisposed()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
         return LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file,
                         beforeStartingServerFilter,

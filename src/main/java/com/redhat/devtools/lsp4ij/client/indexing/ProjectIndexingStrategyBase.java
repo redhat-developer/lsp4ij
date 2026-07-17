@@ -95,6 +95,9 @@ public abstract class ProjectIndexingStrategyBase {
         if (!ProjectIndexingManager.isIndexingAll()) {
             // All opened project are indexed,
             // refresh all editors which edit the files to refresh
+            if (manager.project.isDefault() || manager.project.isDisposed()) {
+                return;
+            }
             while (!manager.filesToRefresh.isEmpty()) {
                 var files = new HashSet<>(manager.filesToRefresh);
                 for (var file : files) {

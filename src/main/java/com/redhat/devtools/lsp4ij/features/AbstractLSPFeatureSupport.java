@@ -114,4 +114,5 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
         }
         this.future = null;
     }
+
 }
