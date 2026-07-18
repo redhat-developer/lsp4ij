@@ -108,6 +108,7 @@ Here are some projects that use LSP4IJ:
  * [Semantic Web Language Server](https://github.com/SemanticWebLanguageServer/swls)
  * [Language 1C (BSL) Plugin](https://github.com/1c-syntax/intellij-language-1c-bsl)
  * [ARO Programming Language](https://github.com/arolang/aro)
+ * [BBj Language Support for IntelliJ](https://github.com/BBx-Kitchen/bbj-language-server)
 
 ## Requirements
 
