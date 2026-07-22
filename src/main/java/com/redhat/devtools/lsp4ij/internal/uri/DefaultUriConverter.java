@@ -68,11 +68,21 @@ class DefaultUriConverter implements UriConverter {
     @Override
     public @Nullable URI toUri(@NotNull File file) {
         try {
+            // Build the URI path from the absolute path string directly.
+            // Avoid File.toURI() because it calls File.isDirectory() internally,
+            // which triggers a blocking native filesystem call (GetFileAttributesEx0 on Windows)
+            // that can freeze the EDT for seconds.
+            // See https://github.com/redhat-developer/lsp4ij/issues/1604
+            String path = file.getAbsolutePath().replace('\\', '/');
+            if (!path.startsWith("/")) {
+                path = "/" + path;
+            }
             // LSP-compliant file URI: file:///absolute/path
+            // The multi-argument URI constructor handles percent-encoding of the path.
             return new URI(
                     "file",
                     "", // no authority
-                    file.getAbsoluteFile().toURI().getPath(),
+                    path,
                     null
             );
         } catch (URISyntaxException e) {
