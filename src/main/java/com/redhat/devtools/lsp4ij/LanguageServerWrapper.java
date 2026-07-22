@@ -108,6 +108,7 @@ public class LanguageServerWrapper implements Disposable {
     private final LanguageServerDefinition serverDefinition;
     private final ExecutorService dispatcher;
     private final ExecutorService listener;
+    private final ExecutorService messageWriter;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -179,6 +180,16 @@ public class LanguageServerWrapper implements Disposable {
         // Executor service passed through to the LSP4j layer when we attempt to start the LS. It will be used
         // to create a listener that sits on the input stream and processes inbound messages (responses, or server-initiated
         // requests).
+        String messageWriterThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#messageWriter"; //$NON-NLS-1$ //$NON-NLS-2$
+        this.messageWriter = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+                .setNameFormat(messageWriterThreadNameFormat)
+                .setThreadFactory(r -> {
+                    var t = new Thread(r);
+                    t.setContextClassLoader(workerCtxClassLoader);
+                    return t;
+                })
+                .build());
+
         String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
         this.listener = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
                 .setNameFormat(listenerThreadNameFormat)
@@ -225,6 +236,7 @@ public class LanguageServerWrapper implements Disposable {
 
     void stopDispatcher() {
         this.dispatcher.shutdownNow();
+        this.messageWriter.shutdownNow();
 
         // Only really needed for testing - the listener (an instance of ConcurrentMessageProcessor) should exit
         // as soon as the input stream from the LS is closed, and a cached thread pool will recycle idle
@@ -237,6 +249,10 @@ public class LanguageServerWrapper implements Disposable {
         try {
             if (!this.dispatcher.awaitTermination(2, TimeUnit.SECONDS)) {
                 LOGGER.warn("Dispatcher executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
+                        serverDefinition.getId());
+            }
+            if (!this.messageWriter.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOGGER.warn("Message writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
             if (!this.listener.awaitTermination(2, TimeUnit.SECONDS)) {
@@ -459,7 +475,7 @@ public class LanguageServerWrapper implements Disposable {
                                 // To avoid having some lock problem when message is written in the stream output
                                 // (when there are a lot of messages to write it)
                                 // we consume the message in async mode
-                                CompletableFuture.runAsync(() -> consumer.consume(message))
+                                CompletableFuture.runAsync(() -> consumer.consume(message), messageWriter)
                                         .exceptionally(e -> {
                                             // Log in the LSP console the error
                                             getLanguageServerLifecycleManager().onError(this, e);
