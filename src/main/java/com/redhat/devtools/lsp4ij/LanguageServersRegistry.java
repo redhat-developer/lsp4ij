@@ -206,7 +206,7 @@ public class LanguageServersRegistry implements Disposable {
         for (ServerExtensionPointBean server : ServerExtensionPointBean.EP_NAME.getExtensions()) {
             String serverId = server.id;
             if (serverId != null && !serverId.isEmpty()) {
-                List<ServerMapping> mappingsForServer = mappings.get(serverId);
+                List<ServerMapping> mappingsForServer = mappings.getOrDefault(serverId, Collections.emptyList());
                 mappings.remove(serverId);
                 var serverDefinition = new ExtensionLanguageServerDefinition(server);
                 SemanticTokensColorsProvider semanticTokensColorsProvider = semanticTokensColorsProviders.get(serverId);
