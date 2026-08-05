@@ -126,14 +126,21 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
 
     @Override
     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
-        // When a file is closed:
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, source.getProject());
-        if (psiFile != null) {
-            if (LSPFileSupport.hasSupport(psiFile)) {
-                // If the file is associated with a Language Server,
-                // release its resources (code lenses, inlay hints, color providers, etc.).
-                LSPFileSupport.getSupport(psiFile).dispose();
-            }
+        var project = source.getProject();
+        if (project.isDisposed()) {
+            return;
         }
+        ReadAction.nonBlocking(() -> {
+                    if (project.isDisposed()) {
+                        return;
+                    }
+                    PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                    if (psiFile != null && LSPFileSupport.hasSupport(psiFile)) {
+                        LSPFileSupport.getSupport(psiFile).dispose();
+                    }
+                })
+                .coalesceBy(this, file, project)
+                .expireWhen(() -> project.isDisposed())
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 }
