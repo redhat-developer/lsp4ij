@@ -347,6 +347,7 @@
     </description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends optional="true" config-file="plugin-structure-view.xml">intellij.structureView.plugin</depends>
     <depends optional="true" config-file="plugin-textmate.xml">org.jetbrains.plugins.textmate</depends>
     <depends optional="true" config-file="plugin-json.xml">com.intellij.modules.json</depends>
     <depends optional="true" config-file="plugin-terminal.xml">org.jetbrains.plugins.terminal</depends>
