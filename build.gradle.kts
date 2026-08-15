@@ -182,7 +182,6 @@ intellijPlatform {
                 types = listOf(IntelliJPlatformType.IntellijIdea)
                 channels = listOf(ProductRelease.Channel.RELEASE) // Only stable releases
                 sinceBuild = "242" // From your minimum supported version
-                untilBuild = "262.*" // Up to current major version
             }
         }
     }
