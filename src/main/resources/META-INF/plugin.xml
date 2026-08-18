@@ -348,7 +348,6 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends optional="true" config-file="plugin-textmate.xml">org.jetbrains.plugins.textmate</depends>
-    <depends optional="true" config-file="plugin-telemetry.xml">com.redhat.devtools.intellij.telemetry</depends>
     <depends optional="true" config-file="plugin-json.xml">com.intellij.modules.json</depends>
     <depends optional="true" config-file="plugin-terminal.xml">org.jetbrains.plugins.terminal</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
@@ -456,8 +455,6 @@
         <!-- LSP application services -->
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingDumbAndScanningStrategy"/>
-        <applicationService
-                serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry"/>
         <applicationService

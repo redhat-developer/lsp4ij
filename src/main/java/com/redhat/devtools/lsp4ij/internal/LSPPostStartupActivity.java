@@ -13,31 +13,19 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.ProjectActivity;
-import com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager;
 import kotlin.Unit;
 import kotlin.coroutines.Continuation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-
-/**
- * Initializes the Telemetry service once the project is opened
- */
 public class LSPPostStartupActivity implements ProjectActivity, DumbAware {
 
     @Nullable
     @Override
     public Object execute(@NotNull Project project, @NotNull Continuation<? super Unit> continuation) {
-        if (!ApplicationManager.getApplication().isUnitTestMode() && !project.isDisposed()) {
-            // On the first project which is loaded
-            // we register a LanguageServerDefinitionListener to the LanguageServersRegistry,
-            // to report telemetry events for added/removed LanguageServerDefinition.
-            TelemetryManager.instance().initialize();
-        }
         return null;
     }
 }
