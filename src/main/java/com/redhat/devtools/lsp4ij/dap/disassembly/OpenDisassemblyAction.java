@@ -17,6 +17,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebuggerManager;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -41,11 +42,31 @@ public class OpenDisassemblyAction extends AnAction {
      * @return the disassembly file if supported by the current DAP server, otherwise {@code null}
      */
     private static @Nullable DisassemblyFile getDisassemblyFile(AnActionEvent e) {
-        var session = e.getDataContext().getData(XDebugSession.DATA_KEY);
+        var session = getDebugSession(e);
         if (session != null && session.getDebugProcess() instanceof DAPDebugProcess dapDebugProcess) {
             return dapDebugProcess.getDisassemblyFile();
         }
         return null;
+    }
+
+    /**
+     * Retrieves the current {@link XDebugSession} from the action event's data context,
+     * falling back to {@link XDebuggerManager#getCurrentSession()} when the context
+     * does not carry the session (e.g. in the 2026.2 frontend-split debugger UI).
+     *
+     * @param e the action event containing the current data context
+     * @return the current debug session, or {@code null} if none is active
+     */
+    private static @Nullable XDebugSession getDebugSession(@NotNull AnActionEvent e) {
+        var session = e.getDataContext().getData(XDebugSession.DATA_KEY);
+        if (session != null) {
+            return session;
+        }
+        Project project = e.getProject();
+        if (project == null) {
+            return null;
+        }
+        return XDebuggerManager.getInstance(project).getCurrentSession();
     }
 
     /**
