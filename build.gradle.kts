@@ -232,7 +232,6 @@ tasks.withType<Test> {
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
     systemProperty("idea.log.leaked.projects.in.tests", "false")
     systemProperty( "idea.maven.test.mirror", "https://repo1.maven.org/maven2")
-    systemProperty( "com.redhat.devtools.intellij.telemetry.mode", "disabled")
 }
 
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
@@ -264,8 +263,6 @@ tasks {
             jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
         }
 
-        //Use "debug" to send telemetry to dev source at segment.com
-        systemProperties["com.redhat.devtools.intellij.telemetry.mode"] = "debug" // "disabled"
     }
 
     jacocoTestReport {
