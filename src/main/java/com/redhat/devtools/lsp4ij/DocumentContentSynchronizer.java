@@ -56,6 +56,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     private int version = 0;
     private final List<TextDocumentContentChangeEvent> changeEvents;
+    private volatile @NotNull CompletableFuture<Void> lastDidChangeFuture = CompletableFuture.completedFuture(null);
     private @Nullable CompletableFuture<LanguageServer> didOpenFuture;
 
     private volatile Alarm debouncePullDiagnosticsAlarm = null;
@@ -161,8 +162,13 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * <p>
      * This method should be called before sending requests that depend on the current
      * document state (e.g., onTypeFormatting) to avoid out-of-bounds position errors.
+     * <p>
+     * If events are pending, sends them and returns a future that completes when the
+     * notification has been dispatched. If events were already sent by another caller
+     * (e.g., {@code performForCommittedDocument}), returns the future tracking that
+     * dispatch, ensuring the caller waits for it to complete before proceeding.
      *
-     * @return a CompletableFuture that completes when the didChange notification has been sent
+     * @return a CompletableFuture that completes when all didChange notifications have been dispatched
      */
     public CompletableFuture<Void> flushPendingChanges() {
         return sendDidChangeEvents();
@@ -170,13 +176,15 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     private CompletableFuture<Void> sendDidChangeEvents() {
         List<TextDocumentContentChangeEvent> events;
+        CompletableFuture<Void> barrier;
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
-                // Don't send didChange notification with empty contentChanges.
-                return CompletableFuture.completedFuture(null);
+                return lastDidChangeFuture;
             }
             events = new ArrayList<>(changeEvents);
             changeEvents.clear();
+            barrier = new CompletableFuture<>();
+            lastDidChangeFuture = barrier;
         }
 
         final int version = ++this.version;
@@ -189,7 +197,14 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             return ls;
         });
         processPullDiagnosticIfNeeded(didChange, version);
-        return didChange.thenApply(ls -> null);
+        didChange.whenComplete((ls, ex) -> {
+            if (ex != null) {
+                barrier.completeExceptionally(ex);
+            } else {
+                barrier.complete(null);
+            }
+        });
+        return barrier;
     }
 
     @Override
