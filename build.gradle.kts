@@ -175,7 +175,7 @@ intellijPlatform {
     }
 
     pluginVerification {
-        // MISSING_DEPENDENCIES also fails for unavailable optional dependencies; see https://youtrack.jetbrains.com/issue/MP-2974.
+        // MISSING_DEPENDENCIES also fails for unavailable optional="true" dependencies; see https://youtrack.jetbrains.com/issue/MP-2974.
         failureLevel = listOf(INVALID_PLUGIN, COMPATIBILITY_PROBLEMS)
         verificationReportsFormats = listOf(MARKDOWN, PLAIN)
         ides {
