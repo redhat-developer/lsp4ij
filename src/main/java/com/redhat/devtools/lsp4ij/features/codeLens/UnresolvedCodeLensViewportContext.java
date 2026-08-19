@@ -116,7 +116,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
         if (scrollStopAlarm == null) {
             synchronized (this) {
                 if (scrollStopAlarm == null) {
-                    scrollStopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
+                    scrollStopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD);
                 }
             }
         }
@@ -136,6 +136,10 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
 
     @Override
     public void dispose() {
+        Alarm alarm = scrollStopAlarm;
+        if (alarm != null) {
+            alarm.dispose();
+        }
     }
 
     /**
