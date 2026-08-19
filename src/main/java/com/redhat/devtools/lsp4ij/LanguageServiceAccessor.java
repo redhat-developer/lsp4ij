@@ -617,7 +617,12 @@ public class LanguageServiceAccessor implements Disposable {
 
     @Override
     public void dispose() {
-        LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(serverDefinitionListener);
+        // LanguageServersRegistry (application-level service) may already be disposed
+        // during dynamic plugin unloading before this project-level service is disposed.
+        var registry = LanguageServersRegistry.getInstance();
+        if (registry != null) {
+            registry.removeLanguageServerDefinitionListener(serverDefinitionListener);
+        }
         disposeAllServers();
     }
 
