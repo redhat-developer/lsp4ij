@@ -231,10 +231,15 @@ public class DisassemblyFile extends DAPFile {
                 var doc = FileDocumentManager.getInstance().getDocument(this);
                 StringBuilder sb = new StringBuilder();
                 for (var instr : new ArrayList<>(disassembledInstructions)) {
-                    sb.append(String.format("%s: %s %s\n",
-                            instr.instr().getAddress(),
-                            instr.instr().getInstructionBytes(),
-                            instr.instr().getInstruction()));
+                    sb.append(instr.instr().getAddress());
+                    sb.append(": ");
+                    String instructionBytes = instr.instr().getInstructionBytes();
+                    if (instructionBytes != null) {
+                        sb.append(instructionBytes);
+                        sb.append(' ');
+                    }
+                    sb.append(instr.instr().getInstruction());
+                    sb.append('\n');
                 }
                 doc.setText(sb.toString());
                 DisassemblyFile.this.modificationTracker.incModificationCount();
