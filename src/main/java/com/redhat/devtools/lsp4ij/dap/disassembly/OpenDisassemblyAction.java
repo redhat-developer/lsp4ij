@@ -14,11 +14,15 @@ package com.redhat.devtools.lsp4ij.dap.disassembly;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
+import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -108,6 +112,28 @@ public class OpenDisassemblyAction extends AnAction {
         // Open the disassembly file in a standard editor in read-only mode
         // to display the disassembly instructions.
         FileEditorManager.getInstance(project).openFile(file, true);
+
+        // Load disassembly instructions for the current stack frame immediately
+        // so the view is populated even when opened on an already-stopped session.
+        var session = getDebugSession(e);
+        if (session != null && session.getDebugProcess() instanceof DAPDebugProcess dapDebugProcess) {
+            DAPStackFrame currentFrame = dapDebugProcess.getCurrentDapStackFrame();
+            if (currentFrame != null) {
+                String instructionRef = currentFrame.getInstructionPointerReference();
+                if (!StringUtils.isEmpty(instructionRef)) {
+                    file.getInstructionIndex(instructionRef, 0, currentFrame.getClient())
+                            .thenAccept(lineIndex -> {
+                                if (lineIndex >= 0) {
+                                    ApplicationManager.getApplication().invokeLater(() -> {
+                                        if (!project.isDisposed()) {
+                                            new OpenFileDescriptor(project, file, lineIndex, 0).navigate(true);
+                                        }
+                                    });
+                                }
+                            });
+                }
+            }
+        }
     }
 
     /**
