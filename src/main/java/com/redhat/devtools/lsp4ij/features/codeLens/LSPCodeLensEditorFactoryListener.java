@@ -10,12 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
@@ -215,7 +217,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
         Editor editor = event.getEditor();
         UnresolvedCodeLensViewportContext context = editor.getUserData(UNRESOLVED_CODELENS_CONTEXT_KEY);
         if (context != null) {
-            context.dispose();
+            Disposer.dispose(context);
             editor.putUserData(UNRESOLVED_CODELENS_CONTEXT_KEY, null);
         }
         editor.putUserData(CODELENS_SUPPORT_KEY, null);

@@ -31,10 +31,9 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP call hierarchy tree structure base for callHierarchy/incomingCalls / callHierarchy/outgoingCalls.
@@ -66,15 +65,13 @@ public abstract class LSPCallHierarchyTreeStructureBase extends LSPHierarchyTree
         var params = new LSPCallHierarchyPrepareParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<CallHierarchyItemData>> prepareCallHierarchyFuture = prepareCallHierarchySupport.getPrepareCallHierarchies(params);
         try {
-            waitUntilDone(prepareCallHierarchyFuture, psiFile);
+            ProgressIndicatorUtils.awaitWithCheckCanceled(prepareCallHierarchyFuture);
         } catch (ProcessCanceledException ex) {
             // cancel the LSP requests textDocument/prepareCallHierarchy
             prepareCallHierarchySupport.cancel();
         } catch (CancellationException ex) {
             // cancel the LSP requests textDocument/prepareCallHierarchy
             prepareCallHierarchySupport.cancel();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/prepareCallHierarchy' request", e);
         }
         fillChildren(descriptor, prepareCallHierarchyFuture, descriptors);
     }

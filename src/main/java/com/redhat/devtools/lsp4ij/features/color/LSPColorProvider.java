@@ -20,6 +20,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
@@ -28,7 +29,6 @@ import com.intellij.ui.picker.ColorListener;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPInlayHintsProvider;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.Color;
 import org.eclipse.lsp4j.ColorPresentation;
 import org.eclipse.lsp4j.ColorPresentationParams;
@@ -45,12 +45,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.ignoreAllExceptions;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP textDocument/colorInformation support.
@@ -88,33 +86,26 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
         CompletableFuture<List<ColorData>> future = colorSupport.getColors(params);
 
         try {
-            // Wait until the future is done and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
-            if (isDoneNormally(future)) {
-
-                // Collect color information
-                List<Pair<Integer, ColorData>> colors = new ArrayList<>();
-                List<ColorData> data = future.getNow(Collections.emptyList());
-                fillColor(editor.getDocument(), data, colors);
-
-                // Render color information
-                colors.stream()
-                        .collect(Collectors.groupingBy(p -> p.first))
-                        .forEach((offset, list) ->
-                                inlayHintsSink.addInlineElement(
-                                        offset,
-                                        false,
-                                        toPresentation(list, psiFile, factory, editor))
-                        );
-            }
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/documentColor requests.
-            colorSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
-        } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/documentColor' request", e);
+        } catch (CancellationException e) {
+            return;
+        }
+
+        if (isDoneNormally(future)) {
+            List<Pair<Integer, ColorData>> colors = new ArrayList<>();
+            List<ColorData> data = future.getNow(Collections.emptyList());
+            fillColor(editor.getDocument(), data, colors);
+
+            colors.stream()
+                    .collect(Collectors.groupingBy(p -> p.first))
+                    .forEach((offset, list) ->
+                            inlayHintsSink.addInlineElement(
+                                    offset,
+                                    false,
+                                    toPresentation(list, psiFile, factory, editor))
+                    );
         }
     }
 

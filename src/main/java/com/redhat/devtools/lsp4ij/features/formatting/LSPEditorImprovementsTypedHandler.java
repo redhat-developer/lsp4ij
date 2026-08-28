@@ -19,6 +19,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
@@ -30,7 +31,9 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemant
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +41,8 @@ import java.util.regex.Pattern;
  * Improves editor-typed handling of nested quote characters and statement terminators.
  */
 public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
+
+    private static final Map<Set<Character>, Pattern> STRING_LITERAL_PATTERN_CACHE = new ConcurrentHashMap<>();
 
     @NotNull
     @Override
@@ -95,11 +100,26 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
         return false;
     }
 
+    private static final Map<VirtualFile, String> TERMINATOR_CHARS_CACHE = ContainerUtil.createConcurrentWeakMap();
+
     private static boolean isStatementTerminatorCharacter(@NotNull PsiFile file, char charTyped) {
-        return LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
-                file,
-                ls -> ls.getClientFeatures().getStatementTerminatorCharacters(file).indexOf(charTyped) > -1
-        );
+        VirtualFile virtualFile = file.getVirtualFile();
+        if (virtualFile == null) return false;
+        String terminators = TERMINATOR_CHARS_CACHE.computeIfAbsent(virtualFile, vf -> {
+            StringBuilder sb = new StringBuilder();
+            LanguageServiceAccessor.getInstance(file.getProject()).hasAny(
+                    file,
+                    ls -> {
+                        String chars = ls.getClientFeatures().getStatementTerminatorCharacters(file);
+                        if (chars != null) {
+                            sb.append(chars);
+                        }
+                        return false;
+                    }
+            );
+            return sb.toString();
+        });
+        return terminators.indexOf(charTyped) > -1;
     }
 
     private boolean handleStatementTerminator(@NotNull PsiFile file,
@@ -145,12 +165,16 @@ public class LSPEditorImprovementsTypedHandler extends TypedHandlerDelegate {
 
             // This pattern is basically from any quote character to the same character with no unescaped same quote
             // character or line break in between
-            Pattern stringLiteralPattern = Pattern.compile("([" + StringUtil.join(quoteCharacters, "") + "])([^$1\\r\\n]|\\\\\\.)*\\1");
+            Pattern stringLiteralPattern = STRING_LITERAL_PATTERN_CACHE.computeIfAbsent(quoteCharacters,
+                    chars -> Pattern.compile("([" + StringUtil.join(chars, "") + "])([^$1\\r\\n]|\\\\\\.)*\\1"));
             Matcher stringLiteralMatcher = stringLiteralPattern.matcher(fileChars);
             while (stringLiteralMatcher.find()) {
                 int stringLiteralStart = stringLiteralMatcher.start();
+                if (stringLiteralStart > offset) {
+                    break;
+                }
                 int stringLiteralEnd = stringLiteralMatcher.end();
-                if ((stringLiteralStart < offset) && (offset < stringLiteralEnd)) {
+                if (offset < stringLiteralEnd) {
                     return fileChars.subSequence(stringLiteralStart, stringLiteralEnd).toString();
                 }
             }

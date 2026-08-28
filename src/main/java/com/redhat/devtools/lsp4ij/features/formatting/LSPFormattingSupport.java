@@ -22,7 +22,6 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,10 +29,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.applyEdits;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 /**
  * LSP formatting and range formatting support.
@@ -58,14 +56,14 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         LSPFormattingParams params = new LSPFormattingParams(textRange, document, formattingServer, formattingOptions);
         CompletableFuture<List<? extends TextEdit>> formatFuture = this.getFeatureData(params);
         try {
-            waitUntilDone(formatFuture, getFile());
+            ProgressIndicatorUtils.awaitWithCheckCanceled(formatFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
             // cancel the LSP requests textDocument/formatting / textDocument/rangeFormatting
             handleError(formattingRequest, e);
             return;
-        } catch (ExecutionException e) {
+        } catch (Exception e) {
             Throwable cause = e.getCause();
             handleError(formattingRequest, cause != null ? cause : e);
             return;

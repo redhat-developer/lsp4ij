@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -26,7 +27,6 @@ import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntention
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -39,10 +39,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * This class returns 20 IJ {@link LSPLazyCodeActionIntentionAction} which does nothing. It loads the LSP code actions
@@ -109,34 +107,20 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
             // Create LSP textDocument/codeAction request
             lspCodeActionRequest = loadCodeActionsFor(diagnostics);
         }
-        // Get the response of the LSP textDocument/codeAction request.
-        List<CodeActionData> codeActions = null;
-        // Wait for the textDocument/codeAction LSP request to complete.
-        // waitUntilDone() will:
-        // - Poll in 25ms increments without blocking continuously
-        // - Check for cancellation via ProgressManager
-        // - Detect if the PSI file was modified during the wait
-        // - Display a progress indicator if it takes more than 5 seconds
+        // Wait for the LSP response, cooperating with IntelliJ's threading model.
+        // See https://github.com/redhat-developer/lsp4ij/issues/1648
         var future = lspCodeActionRequest;
         try {
-            waitUntilDone(future, file);
-        } catch (PsiFileChangedException e) {
-            // The file was modified while waiting - cancel the now-obsolete LSP request
-            cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
-            // User or IDE canceled the operation - propagate the cancellation
             throw e;
         } catch (CancellationException e) {
-        	// Occur when code action is loading and a cancel has occurred, ignore the error.
-            return null;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/codeAction' request", e);
             return null;
         }
-        if (isDoneNormally(lspCodeActionRequest)) {
-            codeActions = lspCodeActionRequest.getNow(null);
+        if (isDoneNormally(future)) {
+            return future.getNow(null);
         }
-        return codeActions;
+        return null;
     }
 
     /**

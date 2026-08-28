@@ -28,12 +28,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Shared utility class for LSP on-type formatting.
@@ -77,7 +74,7 @@ final class LSPServerSideOnTypeFormattingHelper {
         LSPOnTypeFormattingSupport onTypeFormattingSupport = LSPFileSupport.getSupport(file).getOnTypeFormattingSupport();
         CompletableFuture<List<TextEdit>> onTypeFormattingFutures = onTypeFormattingSupport.onTypeFormatting(onTypeFormattingParams);
         try {
-            waitUntilDone(onTypeFormattingFutures, file);
+            onTypeFormattingFutures.get(500, TimeUnit.MILLISECONDS);
         } catch (ProcessCanceledException e) {
             //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
             //TODO delete block when minimum required version is 2024.2
@@ -86,8 +83,13 @@ final class LSPServerSideOnTypeFormattingHelper {
         } catch (CancellationException e) {
             onTypeFormattingSupport.cancel();
             return false;
+        } catch (TimeoutException e) {
+            LOGGER.warn("On-type formatting timed out after 500ms in WriteAction");
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/onTypeFormatting' request", e);
             return false;
         }
 

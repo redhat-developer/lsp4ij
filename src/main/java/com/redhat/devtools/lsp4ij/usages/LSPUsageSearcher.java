@@ -37,8 +37,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
+
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 import static com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory.isUsageSupportedByLanguageServer;
 
 /**
@@ -163,7 +164,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             // 3. Wait for the future OUTSIDE of the ReadAction
             // This allows the ForkJoinPool background threads to freely acquire ReadActions
             // to resolve the PSI elements during mapping!
-            waitUntilDone(usagesFuture);
+            ProgressIndicatorUtils.awaitWithCheckCanceled(usagesFuture);
             if (usagesFuture.isDone()) {
                 List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
                 if (usages != null && !usages.isEmpty()) {

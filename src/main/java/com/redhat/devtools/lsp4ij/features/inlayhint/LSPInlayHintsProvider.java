@@ -15,13 +15,13 @@ import com.intellij.codeInsight.hints.declarative.*;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDeclarativeInlayHintsProvider;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -34,12 +34,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP textDocument/inlayHint support.
@@ -61,31 +59,24 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         CompletableFuture<List<InlayHintData>> future = inlayHintSupport.getInlayHints(params);
 
         try {
-            // Wait until the future and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
-            if (isDoneNormally(future)) {
-
-                // Collect inlay hints
-                List<Pair<Integer, InlayHintData>> inlayHints = new ArrayList<>();
-                List<InlayHintData> data = future.getNow(Collections.emptyList());
-                fillInlayHints(editor.getDocument(), data, inlayHints);
-
-                // Render inlay hints and collect all unfinished inlayHint/resolve futures
-                inlayHints.stream()
-                        .collect(Collectors.groupingBy(p -> p.first))
-                        .forEach((offset, list) -> {
-                            var position = new InlineInlayPosition(offset, false, 0);
-                            buildInlayHints(psiFile, list, position, inlayHintsSink);
-                        });
-            }
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/inlayHint requests.
-            inlayHintSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
-        } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/inlayHint' request", e);
+        } catch (CancellationException e) {
+            return;
+        }
+
+        if (isDoneNormally(future)) {
+            List<Pair<Integer, InlayHintData>> inlayHints = new ArrayList<>();
+            List<InlayHintData> data = future.getNow(Collections.emptyList());
+            fillInlayHints(editor.getDocument(), data, inlayHints);
+
+            inlayHints.stream()
+                    .collect(Collectors.groupingBy(p -> p.first))
+                    .forEach((offset, list) -> {
+                        var position = new InlineInlayPosition(offset, false, 0);
+                        buildInlayHints(psiFile, list, position, inlayHintsSink);
+                    });
         }
     }
 

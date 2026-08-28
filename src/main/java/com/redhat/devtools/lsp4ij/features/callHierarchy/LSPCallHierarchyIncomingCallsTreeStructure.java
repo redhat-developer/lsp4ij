@@ -27,9 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 /**
  * LSP call hierarchy tree structure base for callHierarchy/incomingCalls.
@@ -52,15 +50,13 @@ public class LSPCallHierarchyIncomingCallsTreeStructure extends LSPCallHierarchy
         var params = new CallHierarchyIncomingCallsParams(hierarchyItem);
         CompletableFuture<List<CallHierarchyItemData>> prepareCallHierarchyFuture = callHierarchyIncomingCallsSupport.getCallHierarchyIncomingCalls(params);
         try {
-            waitUntilDone(prepareCallHierarchyFuture, psiFile);
+            ProgressIndicatorUtils.awaitWithCheckCanceled(prepareCallHierarchyFuture);
         } catch (ProcessCanceledException ex) {
             // cancel the LSP requests callHierarchy/incomingCalls
             callHierarchyIncomingCallsSupport.cancel();
         } catch (CancellationException ex) {
             // cancel the LSP requests callHierarchy/incomingCalls
             callHierarchyIncomingCallsSupport.cancel();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'callHierarchy/incomingCalls' request", e);
         }
         fillChildren(descriptor, prepareCallHierarchyFuture, descriptors);
     }

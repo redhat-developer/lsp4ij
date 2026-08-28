@@ -18,6 +18,7 @@ import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
@@ -86,6 +87,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         createTemplatePanel(builder);
         // Create server name,  command line, mappings, configuration UI
         this.languageServerPanel = new LanguageServerPanel(builder, null, createUIConfiguration(), false, project);
+        Disposer.register(getDisposable(), languageServerPanel);
         languageServerPanel.setCommandLineUpdater(new CommandLineUpdater() {
             @Override
             public String getCommandLine() {

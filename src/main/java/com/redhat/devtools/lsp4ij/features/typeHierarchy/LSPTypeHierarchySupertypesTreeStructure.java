@@ -17,7 +17,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyNodeDescriptor;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.TypeHierarchyItem;
 import org.eclipse.lsp4j.TypeHierarchySupertypesParams;
 import org.jetbrains.annotations.NotNull;
@@ -28,9 +28,6 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP type hierarchy tree structure base for typeHierarchy/supertypes.
@@ -53,15 +50,10 @@ public class LSPTypeHierarchySupertypesTreeStructure extends LSPTypeHierarchyTre
         var params = new TypeHierarchySupertypesParams(hierarchyItem);
         CompletableFuture<List<TypeHierarchyItemData>> prepareTypeHierarchyFuture = typeHierarchySupertypesSupport.getTypeHierarchySupertypes(params);
         try {
-            waitUntilDone(prepareTypeHierarchyFuture, psiFile);
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP typeHierarchy/supertypes requests.
-            typeHierarchySupertypesSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(prepareTypeHierarchyFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'typeHierarchy/supertypes' request", e);
         }
         fillChildren(descriptor, prepareTypeHierarchyFuture, descriptors);
     }

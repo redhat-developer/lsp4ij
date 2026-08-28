@@ -26,7 +26,7 @@ import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.filter.*;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -39,12 +39,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
 import static com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory.isSymbolsSupportedByLanguageServer;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP document symbol structure view model.
@@ -183,15 +181,10 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
 
             try {
-                waitUntilDone(documentSymbolFuture, psiFile);
-            } catch (PsiFileChangedException e) {
-                // The file content has changed, cancel the LSP textDocument/documentSymbol requests.
-                documentSymbolSupport.cancel();
+                ProgressIndicatorUtils.awaitWithCheckCanceled(documentSymbolFuture);
             } catch (ProcessCanceledException e) {
                 throw e;
             } catch (CancellationException ignore) {
-            } catch (ExecutionException e) {
-                LOGGER.error("Error while consuming LSP 'textDocument/documentSymbol' request", e);
             }
 
             if (isDoneNormally(documentSymbolFuture)) {

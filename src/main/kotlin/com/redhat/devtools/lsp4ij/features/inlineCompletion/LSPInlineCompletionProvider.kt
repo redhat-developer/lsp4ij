@@ -24,9 +24,8 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.redhat.devtools.lsp4ij.LSPFileSupport
 import com.redhat.devtools.lsp4ij.LSPIJUtils
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException
 import kotlinx.coroutines.flow.asFlow
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import java.util.concurrent.CancellationException
@@ -93,8 +92,7 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
         val future = support.getInlineCompletions(params)
 
         try {
-            // Use waitUntilDone to properly handle cancellation and file changes
-            waitUntilDone(future, file)
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future)
 
             if (!isDoneNormally(future)) {
                 return InlineCompletionSuggestion.Empty
@@ -185,10 +183,6 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
                 override suspend fun getVariants(): List<InlineCompletionVariant> = variants
             }
 
-        } catch (e: PsiFileChangedException) {
-            // The file content has changed, cancel the LSP textDocument/inlineCompletion requests
-            support.cancel()
-            return InlineCompletionSuggestion.Empty
         } catch (e: ProcessCanceledException) {
             throw e
         } catch (e: CancellationException) {

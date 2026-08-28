@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
@@ -29,9 +30,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Abstract listener that bridges IntelliJ Virtual File System (VFS) events
@@ -245,10 +245,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         try {
             CancellationSupport cancellationSupport = new CancellationSupport();
             future = cancellationSupport.execute(future);
-            CompletableFutures.waitUntilDone(future, null, 500);
-        } catch (ExecutionException e) {
-
-        } catch (TimeoutException e) {
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+        } catch (CancellationException ignore) {
 
         }
         if (CompletableFutures.isDoneNormally(future)) {

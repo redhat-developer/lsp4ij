@@ -37,10 +37,9 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor.getCurrentWord;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Debug Adapter Protocol (DAP) completion processor
@@ -77,16 +76,10 @@ public class DAPCompletionProcessor extends CompletionContributor {
                     client.completion(text, position.getLine() + 1, position.getCharacter() + 1, frameId);
 
             try {
-                // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-                waitUntilDone(future, psiFile);
-            } catch (
-                    ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-                //TODO delete block when minimum required version is 2024.2
+                ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            } catch (ProcessCanceledException ignore) {
                 return;
             } catch (CancellationException ignore) {
-                return;
-            } catch (ExecutionException e) {
-                LOGGER.error("Error while consuming DAP 'completion' request", e);
                 return;
             }
 

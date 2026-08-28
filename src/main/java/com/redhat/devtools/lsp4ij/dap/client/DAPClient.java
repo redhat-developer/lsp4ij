@@ -19,6 +19,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.LightweightHint;
@@ -44,7 +45,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
-import org.eclipse.lsp4j.jsonrpc.validation.ReflectiveMessageValidator;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -59,6 +60,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 
 import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
@@ -141,9 +143,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         }
                     }
                 };
-            }
-            if (true) {
-                result = new ReflectiveMessageValidator(result);
             }
             return result;
         };
@@ -393,22 +392,22 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                     var editor = editors[0];
                                                     int offset = sourcePosition.getOffset();
 
-                                                    // Wait few ms to be sure that scroll of the editor
+                                                    // Wait briefly to be sure that scroll of the editor
                                                     // has occurred before computing the error hint position.
                                                     // TODO: remove this timer by detecting that scroll editor is finished
                                                     // to display the error hint
-                                                    try {
-                                                        Thread.sleep(1000);
-                                                    } catch (InterruptedException e) {
-                                                        throw new RuntimeException(e);
-                                                    }
                                                     StringBuilder error = new StringBuilder("Exception has occurred: ");
                                                     error.append(args.getText());
                                                     if (StringUtils.isNotBlank(args.getDescription())) {
                                                         error.append("\n");
                                                         error.append(args.getDescription());
                                                     }
-                                                    showErrorHint(editor, error.toString(), offset);
+                                                    String errorMessage = error.toString();
+                                                    AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
+                                                        ApplicationManager.getApplication().invokeLater(() -> {
+                                                            showErrorHint(editor, errorMessage, offset);
+                                                        });
+                                                    }, 1, TimeUnit.SECONDS);
                                                 }
                                             }
                                         }

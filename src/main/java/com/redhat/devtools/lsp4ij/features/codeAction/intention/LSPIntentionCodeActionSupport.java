@@ -11,8 +11,8 @@
 package com.redhat.devtools.lsp4ij.features.codeAction.intention;
 
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.psi.PsiFile;
-import com.intellij.util.ui.EDT;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
@@ -20,7 +20,6 @@ import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -33,10 +32,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP code action support which loads and caches code actions by consuming:
@@ -146,28 +143,18 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
     @Override
     public @Nullable Either<CodeActionData, Boolean> getCodeActionAt(int index) {
         var future = super.getValidLSPFuture();
-        // This method is called by IntelliJ when checking if intentions (light bulb) should be displayed.
-        // We must NOT block the EDT, as it would freeze the UI.
-        // See: https://github.com/redhat-developer/lsp4ij/issues/1545
-        if (!EDT.isCurrentThreadEdt()) {
-            // Wait for the textDocument/codeAction LSP request to complete.
-            // waitUntilDone() will:
-            // - Poll in 25ms increments without blocking continuously
-            // - Check for cancellation via ProgressManager
-            // - Detect if the PSI file was modified during the wait
-            // - Display a progress indicator if it takes more than 5 seconds
+        // This method is called from ShowIntentionsPass inside a ReadAction.
+        // Use awaitWithCheckCanceled to cooperate with IntelliJ's threading model:
+        // when a WriteAction is requested, the progress indicator is cancelled
+        // → ProcessCanceledException → ReadAction released → WriteAction proceeds.
+        // IntelliJ reschedules the pass automatically.
+        // See https://github.com/redhat-developer/lsp4ij/issues/1648
+        if (future != null) {
             try {
-                waitUntilDone(future, super.getFile());
-            } catch (PsiFileChangedException e) {
-                // The file was modified while waiting - cancel the now-obsolete LSP request
-                cancel();
+                ProgressIndicatorUtils.awaitWithCheckCanceled(future);
             } catch (ProcessCanceledException e) {
-                // User or IDE canceled the operation - propagate the cancellation
                 throw e;
             } catch (CancellationException e) {
-                return null;
-            } catch (ExecutionException e) {
-                LOGGER.error("Error while consuming LSP 'textDocument/codeAction' request", e);
                 return null;
             }
         }
@@ -176,7 +163,6 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
             List<CodeActionData> codeActions = future.getNow(null);
             if (codeActions != null) {
                 if (codeActions.size() > index) {
-                    // The LSP code actions are loaded and it matches the given index
                     return Either.forLeft(codeActions.get(index));
                 }
                 return Either.forRight(Boolean.FALSE);

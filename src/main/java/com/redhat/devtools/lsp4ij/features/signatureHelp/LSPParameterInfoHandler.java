@@ -16,11 +16,11 @@ package com.redhat.devtools.lsp4ij.features.signatureHelp;
 import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.lang.parameterInfo.*;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,10 +30,8 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP implementation of {@link ParameterInfoHandler} to support
@@ -104,16 +102,11 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         CompletableFuture<SignatureHelp> future = signatureHelpSupport.getSignatureHelp(params);
 
         try {
-            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiElement.getContainingFile());
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/signatureHelp requests.
-            signatureHelpSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
-        } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/signatureHelp' request", e);
+        } catch (CancellationException e) {
+            // ignore
         }
 
         if (isDoneNormally(future)) {
