@@ -158,8 +158,8 @@ public class LanguageServerWrapper implements Disposable {
         this.initialProject = project;
         this.initialPath = initialPath;
         this.serverDefinition = serverDefinition;
-        this.openedDocuments = new HashMap<>();
-        this.closedDocuments = new HashMap<>();
+        this.openedDocuments = new ConcurrentHashMap<>();
+        this.closedDocuments = new ConcurrentHashMap<>();
         this.fileListener = new LSPFileListener(this);
         VirtualFileManager.getInstance().addAsyncFileListener(fileListener, this);
 

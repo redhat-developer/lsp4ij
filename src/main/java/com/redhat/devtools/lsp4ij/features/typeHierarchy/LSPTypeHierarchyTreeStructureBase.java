@@ -21,7 +21,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyNodeDescriptor;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyTreeStructureBase;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TypeHierarchyItem;
 import org.jetbrains.annotations.NotNull;
@@ -32,10 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP type hierarchy tree structure base for typeHierarchy/subtypes / typeHierarchy/supertypes.
@@ -67,15 +64,10 @@ public abstract class LSPTypeHierarchyTreeStructureBase extends LSPHierarchyTree
         var params = new LSPTypeHierarchyPrepareParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<TypeHierarchyItemData>> prepareTypeHierarchyFuture = prepareTypeHierarchySupport.getPrepareTypeHierarchies(params);
         try {
-            waitUntilDone(prepareTypeHierarchyFuture, psiFile);
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/prepareTypeHierarchy requests.
-            prepareTypeHierarchySupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(prepareTypeHierarchyFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/prepareTypeHierarchy' request", e);
         }
         fillChildren(descriptor, prepareTypeHierarchyFuture, descriptors);
     }

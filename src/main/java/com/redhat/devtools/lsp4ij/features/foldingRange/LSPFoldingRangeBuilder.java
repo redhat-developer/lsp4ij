@@ -27,7 +27,6 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Position;
@@ -42,11 +41,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP folding range builder.
@@ -120,19 +118,10 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         var params = new FoldingRangeRequestParams(new TextDocumentIdentifier());
         CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges(params);
         try {
-            waitUntilDone(foldingRangesFuture, file, timeout);
-        } catch (PsiFileChangedException e) {
-            // cancel the LSP requests textDocument/foldingRanges
-            foldingRangeSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(foldingRangesFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
-            return Collections.emptyList();
-        } catch (TimeoutException e) {
-            // Ignore timeout error
-            return Collections.emptyList();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/foldingRanges' request", e);
             return Collections.emptyList();
         }
 

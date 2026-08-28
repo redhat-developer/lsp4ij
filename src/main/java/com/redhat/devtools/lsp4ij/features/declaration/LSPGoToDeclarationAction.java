@@ -19,7 +19,6 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPGoToAction;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.usages.LSPUsageType;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -30,9 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 /**
  * LSP Go To Declaration.
@@ -54,15 +51,10 @@ public class LSPGoToDeclarationAction extends AbstractLSPGoToAction {
         var params = new LSPDeclarationParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> declarationsFuture = declarationSupport.getDeclarations(params);
         try {
-            waitUntilDone(declarationsFuture, psiFile);
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/declaration requests.
-            declarationSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(declarationsFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/declaration' request", e);
         }
         return declarationsFuture;
     }

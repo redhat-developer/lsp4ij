@@ -28,7 +28,6 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationParams;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.ui.LSP4IJUiUtils;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -40,10 +39,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Implements the IDE's standard Go To Implementation(s) action using LSP textDocument/implementation. -->
@@ -100,15 +98,10 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
         LSPImplementationSupport implementationSupport = LSPFileSupport.getSupport(file).getImplementationSupport();
         CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
         try {
-            waitUntilDone(implementationsFuture, file);
-        } catch (PsiFileChangedException e) {
-            // cancel the LSP requests textDocument/implementation
-            implementationSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(implementationsFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/implementation' request", e);
         }
 
         if (isDoneNormally(implementationsFuture)) {

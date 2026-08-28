@@ -25,8 +25,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
-import com.redhat.devtools.lsp4ij.internal.SafetyTimeoutException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -38,11 +37,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Collects LSP document links and converts them to IntelliJ {@link HighlightInfo}.
@@ -80,21 +76,13 @@ public class LSPDocumentLinkCollector {
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
 
         try {
-            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(documentLinkFuture, psiFile);
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/completion requests.
-            documentLinkSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(documentLinkFuture);
         } catch (ProcessCanceledException e) {
-            throw e;
-        } catch (SafetyTimeoutException e) {
-            // Safety timeout triggered - save the future for async fallback via whenReady() callback
+            // ProgressIndicator was cancelled (e.g. WriteAction requested or highlighting pass cancelled).
+            // Save the future for async fallback via whenReady() callback.
             this.pendingFuture = documentLinkFuture;
             return null;
         } catch (CancellationException ignore) {
-            return null;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/completion' request", e);
             return null;
         }
 

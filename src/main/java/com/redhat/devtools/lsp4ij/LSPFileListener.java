@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
@@ -22,8 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CancellationException;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.findResourceFor;
 
@@ -250,9 +250,8 @@ class LSPFileListener extends AbstractLSPFileListener {
                 var didOpen = languageServerWrapper.connect(newFile,
                         languageServerWrapper.createFileConnectionInfo(documentFile, document, true));
                 try {
-                    CompletableFutures.waitUntilDone(didOpen, null, 1000);
-                } catch (ExecutionException e) {
-                } catch (TimeoutException e) {
+                    ProgressIndicatorUtils.awaitWithCheckCanceled(didOpen);
+                } catch (CancellationException ignore) {
                 }
             }
         }

@@ -116,7 +116,7 @@ public class UnresolvedCodeLensViewportContext implements Disposable {
         if (scrollStopAlarm == null) {
             synchronized (this) {
                 if (scrollStopAlarm == null) {
-                    scrollStopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD);
+                    scrollStopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
                 }
             }
         }

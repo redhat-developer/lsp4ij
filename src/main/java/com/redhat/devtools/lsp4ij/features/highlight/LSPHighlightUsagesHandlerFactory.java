@@ -16,6 +16,7 @@ import com.intellij.codeInsight.highlighting.HighlightUsagesHandlerFactory;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -24,7 +25,6 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -38,10 +38,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 
 /**
@@ -80,16 +78,10 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         LSPHighlightSupport highlightSupport = LSPFileSupport.getSupport(psiFile).getHighlightSupport();
         CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
         try {
-            waitUntilDone(highlightFuture, psiFile);
-        } catch (PsiFileChangedException e) {
-            // cancel the LSP requests textDocument/foldingRanges
-            highlightSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(highlightFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
-            return Collections.emptyList();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/documentHighlight' request", e);
             return Collections.emptyList();
         }
 

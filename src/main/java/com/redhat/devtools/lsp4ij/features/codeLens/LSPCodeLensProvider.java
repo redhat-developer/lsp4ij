@@ -28,8 +28,6 @@ import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.internal.*;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
-import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import kotlin.Pair;
 import org.eclipse.lsp4j.CodeLens;
 import org.eclipse.lsp4j.CodeLensParams;
@@ -46,12 +44,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
+
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.intellij.codeInsight.codeVision.CodeVisionState.Ready;
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP textDocument/codeLens support.
@@ -115,18 +113,11 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             LSPCodeLensEditorFactoryListener.setCodelensSupport(editor, codeLensSupport);
             CompletableFuture<CodeLensDataResult> future = fetchCodeLenses(codeLensSupport);
             try {
-                // Wait max 300ms - enough for fast LS (TypeScript) but prevents freeze for slow LS (Qute/Quarkus)
-                waitUntilDone(future, psiFile, 300);
-            } catch (TimeoutException e) {
-                // Future takes too long (e.g., Qute/Quarkus delegating to IntelliJ with heavy ReadActions)
-                // Don't block - schedule async refresh when the future completes
-                EditorFeatureManager.getInstance(project)
-                    .refreshEditorFeatureWhenAllDone(future, psiFile, EditorFeatureType.CODE_VISION, () -> new PsiFileCancelChecker(psiFile));
-                return CodeVisionState.NotReady.INSTANCE;
-            } catch (PsiFileChangedException e) {
-                // The file content has changed, cancel the LSP textDocument/codeLens requests.
-                codeLensSupport.cancel();
+                ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            } catch (ProcessCanceledException e) {
                 throw e;
+            } catch (CancellationException ignore) {
+                return CodeVisionState.Companion.getREADY_EMPTY();
             }
             if (isDoneNormally(future)) {
                 List<Pair<TextRange, CodeVisionEntry>> result = new ArrayList<>();
@@ -159,16 +150,11 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         if (visibleCodeLensToResolve != null) {
                             // Resolve all visible code lens
                             try {
-                                // Wait max 300ms for resolve operations too
-                                waitUntilDone(visibleCodeLensToResolve, psiFile, 300);
-                            } catch (TimeoutException e) {
-                                // Resolve takes too long - schedule async refresh when done
-                                EditorFeatureManager.getInstance(project)
-                                    .refreshEditorFeatureWhenAllDone(visibleCodeLensToResolve, psiFile, EditorFeatureType.CODE_VISION, () -> new PsiFileCancelChecker(psiFile));
-                                return CodeVisionState.NotReady.INSTANCE;
-                            } catch (PsiFileChangedException e) {
-                                CancellationSupport.cancel(visibleCodeLensToResolve);
-                                return CodeVisionState.NotReady.INSTANCE;
+                                ProgressIndicatorUtils.awaitWithCheckCanceled(visibleCodeLensToResolve);
+                            } catch (ProcessCanceledException e) {
+                                throw e;
+                            } catch (CancellationException ignore) {
+                                return CodeVisionState.Companion.getREADY_EMPTY();
                             }
                         }
                     }

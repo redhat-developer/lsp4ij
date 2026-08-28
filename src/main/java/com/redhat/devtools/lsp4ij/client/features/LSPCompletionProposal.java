@@ -43,7 +43,6 @@ import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.features.completion.CompletionProposalTools;
 import com.redhat.devtools.lsp4ij.features.completion.SnippetTemplateFactory;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetIndentOptions;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -57,13 +56,13 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHtml;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
+
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 import static com.redhat.devtools.lsp4ij.internal.CompletionUtils.computePrefixStartFromInsertText;
 
 /**
@@ -498,17 +497,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                     .resolveCompletionItem(item);
         }
         try {
-            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(resolvedCompletionItemFuture, file);
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP completion/resolve requests.
-            resolvedCompletionItemFuture.cancel(true);
+            ProgressIndicatorUtils.awaitWithCheckCanceled(resolvedCompletionItemFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
-            return null;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'completionItem/resolve' request", e);
             return null;
         }
 

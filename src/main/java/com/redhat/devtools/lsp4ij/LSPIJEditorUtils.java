@@ -36,11 +36,11 @@ import org.jetbrains.plugins.textmate.language.syntax.lexer.TextMateScope;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
+
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * Provides utility methods for editor support behaviors.
@@ -411,14 +411,11 @@ public final class LSPIJEditorUtils {
                                       StringUtil.isNotEmpty(clientFeatures.getBlockCommentSuffix(file)),
                     null
             );
-            //noinspection TryWithIdenticalCatches
             try {
-                waitUntilDone(languageServersFuture, file);
+                ProgressIndicatorUtils.awaitWithCheckCanceled(languageServersFuture);
             } catch (ProcessCanceledException e) {
                 return null;
             } catch (CancellationException e) {
-                return null;
-            } catch (ExecutionException e) {
                 return null;
             }
             if (!isDoneNormally(languageServersFuture)) {

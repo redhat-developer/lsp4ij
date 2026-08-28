@@ -23,6 +23,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.AppUIUtil;
@@ -134,7 +135,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 try {
                     // Wait for DAP server is ready...
                     serverReadyFuture.track();
-                    CompletableFutures.waitUntilDone(serverReadyFuture);
+                    ProgressIndicatorUtils.awaitWithCheckCanceled(serverReadyFuture);
                     if (CompletableFutures.isDoneNormally(serverReadyFuture)) {
                         // At this step the DAP server is started and ready to consume it with DAP clients
 
@@ -161,7 +162,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                         connectToServerFuture = parentClient.connectToServer(indicator);
 
                         // Wait for DAP client is connecting to the DAP server...
-                        CompletableFutures.waitUntilDone(connectToServerFuture);
+                        ProgressIndicatorUtils.awaitWithCheckCanceled(connectToServerFuture);
                         DAPDebugProcess.this.status = Status.STARTED;
 
                         // Refresh Threads panel

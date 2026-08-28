@@ -39,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
 
@@ -169,7 +170,13 @@ public class DAPStackFrame extends XStackFrame {
         scopeArgs.setFrameId(stackFrame.getId());
         server.scopes(scopeArgs)
                 .thenAcceptAsync(scopes -> {
-                    for (Scope scope : scopes.getScopes()) {
+                    Scope[] scopeArray = scopes.getScopes();
+                    if (scopeArray == null || scopeArray.length == 0) {
+                        node.addChildren(new XValueChildrenList(), true);
+                        return;
+                    }
+                    AtomicInteger remaining = new AtomicInteger(scopeArray.length);
+                    for (Scope scope : scopeArray) {
                         int parentVariablesReference = scope.getVariablesReference();
                         XValueChildrenList children = new XValueChildrenList();
                         VariablesArguments variablesArgs = new VariablesArguments();
@@ -179,8 +186,7 @@ public class DAPStackFrame extends XStackFrame {
                                     children.addBottomGroup(new DAPValueGroup(this, scope.getName(),
                                             Arrays.asList(variablesResponse.getVariables()),
                                             parentVariablesReference));
-                                    // Add the list to the node as children.
-                                    node.addChildren(children, true);
+                                    node.addChildren(children, remaining.decrementAndGet() == 0);
                                 });
                     }
                 });

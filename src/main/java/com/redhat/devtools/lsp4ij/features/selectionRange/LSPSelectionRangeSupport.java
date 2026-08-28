@@ -22,7 +22,7 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SelectionRange;
@@ -36,11 +36,8 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 /**
  * LSP selectionRange support which loads and caches selection ranges by consuming:
@@ -76,19 +73,10 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
         var params = new LSPSelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position), offset);
         CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);
         try {
-            waitUntilDone(selectionRangesFuture, file, timeout);
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/documentColor requests.
-            selectionRangeSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(selectionRangesFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
-            return Collections.emptyList();
-        } catch (TimeoutException e) {
-            // Ignore timeout error
-            return Collections.emptyList();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/selectionRanges' request", e);
             return Collections.emptyList();
         }
 

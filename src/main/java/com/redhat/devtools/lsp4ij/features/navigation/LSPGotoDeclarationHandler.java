@@ -28,7 +28,6 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -42,11 +41,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory.toPsiElement;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
 
 public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
 
@@ -146,15 +144,10 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         var params = new LSPDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
         try {
-            waitUntilDone(definitionsFuture, psiFile);
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/definition requests.
-            definitionSupport.cancel();
+            ProgressIndicatorUtils.awaitWithCheckCanceled(definitionsFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/definition' request", e);
         }
 
         if (isDoneNormally(definitionsFuture)) {

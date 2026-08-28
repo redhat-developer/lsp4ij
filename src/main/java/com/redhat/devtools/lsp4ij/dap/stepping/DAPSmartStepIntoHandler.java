@@ -20,7 +20,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.debug.StepInTarget;
 import org.eclipse.lsp4j.debug.StepInTargetsResponse;
 import org.jetbrains.annotations.NotNull;
@@ -34,8 +34,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Handles "Smart Step Into" functionality for DAP debug sessions.
@@ -62,13 +62,10 @@ public class DAPSmartStepIntoHandler extends XSmartStepIntoHandler<DAPStepIntoVa
         CompletableFuture<List<DAPStepIntoVariant>> future = getStepInTargetsFuture(position);
 
         try {
-            CompletableFutures.waitUntilDone(future, (com.intellij.psi.PsiFile) null, 5000);
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
-        } catch (ExecutionException e) {
-            LOGGER.warn("Error getting smart step variants", e);
-            return Collections.emptyList();
-        } catch (java.util.concurrent.TimeoutException e) {
+        } catch (CancellationException ignore) {
             return Collections.emptyList();
         }
 
