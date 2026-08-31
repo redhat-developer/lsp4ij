@@ -532,6 +532,9 @@ public class LanguageServiceAccessor implements Disposable {
                                                                                  boolean ignoreMatch) {
 
         var file = psiFile.getVirtualFile();
+        if (file == null) {
+            return MatchedLanguageServerDefinitions.NO_MATCH;
+        }
         Set<LanguageServerDefinition> syncMatchedDefinitions = null;
         Set<LanguageServerFileAssociation> asyncMatchedDefinitions = null;
 
