@@ -297,7 +297,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void output(OutputEventArguments args) {
         String output = args.getOutput();
-        if (StringUtils.isNotBlank(output)) {
+        if (!StringUtils.isEmpty(output)) {
             debugProcess.print(output, getContentType(args.getCategory()));
         }
     }
