@@ -366,7 +366,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     public void print(@Nullable String message, @NotNull ConsoleViewContentType type) {
-        if (message == null || StringUtils.isBlank(message)) {
+        if (StringUtils.isEmpty(message)) {
             return;
         }
         if (message.charAt(message.length() - 1) != '\n') {
