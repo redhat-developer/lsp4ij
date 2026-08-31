@@ -712,6 +712,39 @@ If the language server support requires to implement a custom client command rel
 [LSPCommandAction.java](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/commands/LSPCommandAction.java) and register it
 in `plugin.xml` with a `standard` action element.
 
+The action `id` must match the `command` name the language server sends (for example on a CodeLens).
+When the user clicks that CodeLens, LSP4IJ looks up an IntelliJ action with that id and runs it.
+
+```java
+package com.example.lua;
+
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.redhat.devtools.lsp4ij.commands.LSPCommand;
+import com.redhat.devtools.lsp4ij.commands.LSPCommandAction;
+import org.jetbrains.annotations.NotNull;
+
+public class ShowUsagesCommand extends LSPCommandAction {
+
+    @Override
+    protected void commandPerformed(@NotNull LSPCommand command, @NotNull AnActionEvent e) {
+        // command.getCommand() is the LSP command name, e.g. "lua.showReferences"
+        // command.getArgumentAt(i) reads the arguments the CodeLens sent
+        // getLanguageServer(e) is the server that issued the command
+    }
+}
+```
+
+```xml
+<actions>
+    <action id="lua.showReferences"
+            class="com.example.lua.ShowUsagesCommand"/>
+</actions>
+```
+
+If the language server already uses VS Code's `editor.action.showReferences` command,
+LSP4IJ registers that action and shows the usages popup. No extra action is needed in that case.
+See [editor.action.showReferences](#editoractionshowreferences) below.
+
 ### Default commands
 
 LSP4IJ provides default LSP commands that you language servers leverage.
