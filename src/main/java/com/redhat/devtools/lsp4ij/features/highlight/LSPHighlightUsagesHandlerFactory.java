@@ -20,12 +20,12 @@ import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -60,18 +60,12 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         }
         List<LSPHighlightPsiElement> targets = getTargets(editor, file);
         if (targets.isEmpty()) {
-            // Returning null here would make the IDE cache the empty result for the whole plain-text file,
-            // and it would stop sending 'textDocument/documentHighlight' until the document changes.
+            // For a TEXT or textmate file, returning null here would make the IDE cache the empty result
+            // for the whole file, and it would stop sending 'textDocument/documentHighlight' until the document changes.
             // See https://github.com/redhat-developer/lsp4ij/issues/1300
-            return isWholeFileElementAtCaret(editor, file) ? new LSPHighlightUsagesHandler(editor, file, targets) : null;
+            return SimpleLanguageUtils.isSupported(file.getLanguage()) ? new LSPHighlightUsagesHandler(editor, file, targets) : null;
         }
         return new LSPHighlightUsagesHandler(editor, file, targets);
-    }
-
-    private static boolean isWholeFileElementAtCaret(@NotNull Editor editor, @NotNull PsiFile file) {
-        int offset = TargetElementUtil.adjustOffset(file, editor.getDocument(), editor.getCaretModel().getOffset());
-        PsiElement element = file.findElementAt(offset);
-        return element != null && element.getTextRange().equals(file.getTextRange());
     }
 
     private List<LSPHighlightPsiElement> getTargets(Editor editor, PsiFile psiFile) {
