@@ -42,16 +42,9 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
     // Store connections per project to properly dispose them
     private final Map<Project, MessageBusConnection> projectConnections = new ConcurrentHashMap<>();
 
-    private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {
-        if (project.isDefault() || project.isDisposed()) {
-            return;
-        }
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-        if (psiFile != null) {
-            // Force the startup of all Language Servers mapped to this file.
-            LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(psiFile, null, null);
-        }
+    private static void connectToLanguageServer(@NotNull PsiFile psiFile, @NotNull Project project) {
+        LanguageServiceAccessor.getInstance(project)
+                .getLanguageServers(psiFile, null, null);
     }
 
     @Override
@@ -117,7 +110,7 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
                                     // No PsiFile available, or the file is already connected to a Language Server.
                                     return;
                                 }
-                                connectToLanguageServer(file, project);
+                                connectToLanguageServer(psiFile, project);
                             })
                             .expireWhen(() -> project.isDisposed())
                             .submit(AppExecutorUtil.getAppExecutorService());
