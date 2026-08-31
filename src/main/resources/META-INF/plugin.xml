@@ -6,6 +6,21 @@
 
     <change-notes><![CDATA[
 
+    <h3>0.21.0</h3>
+    <ul>
+      <li><strong>Fixed LSP timeout deadlocks</strong> (#1648): replaced all <code>waitUntilDone</code> calls with <code>ProgressIndicatorUtils.awaitWithCheckCanceled</code> to cooperate with IntelliJ's ReadAction/WriteAction protocol</li>
+      <li>Fixed EDT freezes (#1604, #1620, #1629, #1637) and <code>Too many non-blocking read actions</code> (#1614)</li>
+      <li>Fixed IntelliJ 2026.2 compatibility (#1633): structure view dependency, Alarm Disposable, Disassembly View (#1636)</li>
+      <li>Fixed memory leaks (#1644) and NPE while unloading LSP4IJ (#1632)</li>
+      <li>Fixed on-type formatting running before <code>didChange</code> (#1624)</li>
+      <li>Fixed DAP output not displaying empty lines (#1651)</li>
+      <li>Fixed <code>toUri</code> with directory paths (#1623)</li>
+      <li>Fixed security issue: removed historical malware link from README (#1631)</li>
+      <li>Removed telemetry (#1640) and improved Disassembly View (#1645)</li>
+      <li>Added Candor, Language 1C (BSL), and BBj language server templates</li>
+    </ul>
+	See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/30?closed=1">changelog</a>.
+
     <h3>0.20.1</h3>
     <ul>
       <li>Fix bug with invalid MCP view</li>
