@@ -17,7 +17,6 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -44,6 +43,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP completion contributor.
@@ -78,7 +78,7 @@ public class LSPCompletionContributor extends CompletionContributor {
                 .getCompletionSupport();
         CompletableFuture<List<CompletionData>> future = completionSupport.getCompletions(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.features.codeAction.intention;
 
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
@@ -34,6 +33,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP code action support which loads and caches code actions by consuming:
@@ -151,7 +151,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
         // See https://github.com/redhat-developer/lsp4ij/issues/1648
         if (future != null) {
             try {
-                ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+                awaitWithCheckCanceled(future);
             } catch (ProcessCanceledException e) {
                 throw e;
             } catch (CancellationException e) {

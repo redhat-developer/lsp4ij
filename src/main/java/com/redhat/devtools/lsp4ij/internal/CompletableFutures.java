@@ -125,6 +125,13 @@ public class CompletableFutures {
         });
     }
 
+    public static void awaitWithCheckCanceled(@Nullable Future<?> future) {
+        if (future == null) {
+            return;
+        }
+        ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+    }
+
     public static CompletableFuture<Void> allOf(CompletableFuture<?>... cfs) {
         var allOff = CompletableFuture.allOf(cfs);
         CancellationSupport.forwardCancellation(allOff, cfs);

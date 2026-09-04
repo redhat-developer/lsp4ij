@@ -15,7 +15,6 @@ package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -41,6 +40,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * This class returns 20 IJ {@link LSPLazyCodeActionIntentionAction} which does nothing. It loads the LSP code actions
@@ -111,7 +111,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         // See https://github.com/redhat-developer/lsp4ij/issues/1648
         var future = lspCodeActionRequest;
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

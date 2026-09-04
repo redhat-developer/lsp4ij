@@ -19,8 +19,8 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -245,7 +245,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         try {
             CancellationSupport cancellationSupport = new CancellationSupport();
             future = cancellationSupport.execute(future);
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            awaitWithCheckCanceled(future);
         } catch (CancellationException ignore) {
 
         }

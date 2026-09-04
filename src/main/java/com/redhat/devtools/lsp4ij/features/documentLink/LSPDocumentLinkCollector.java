@@ -25,7 +25,6 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +38,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * Collects LSP document links and converts them to IntelliJ {@link HighlightInfo}.
@@ -76,7 +76,7 @@ public class LSPDocumentLinkCollector {
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
 
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(documentLinkFuture);
+            awaitWithCheckCanceled(documentLinkFuture);
         } catch (ProcessCanceledException e) {
             // ProgressIndicator was cancelled (e.g. WriteAction requested or highlighting pass cancelled).
             // Save the future for async fallback via whenReady() callback.

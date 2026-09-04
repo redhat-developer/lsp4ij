@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
@@ -41,6 +40,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP {@link DocumentationTargetProvider} implementation used to consume
@@ -73,7 +73,7 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
         CompletableFuture<List<HoverData>> hoverFuture = hoverSupport.getHover(params);
 
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(hoverFuture);
+            awaitWithCheckCanceled(hoverFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

@@ -38,9 +38,9 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * Provides utility methods for editor support behaviors.
@@ -412,7 +412,7 @@ public final class LSPIJEditorUtils {
                     null
             );
             try {
-                ProgressIndicatorUtils.awaitWithCheckCanceled(languageServersFuture);
+                awaitWithCheckCanceled(languageServersFuture);
             } catch (ProcessCanceledException e) {
                 return null;
             } catch (CancellationException e) {

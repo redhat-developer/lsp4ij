@@ -16,7 +16,6 @@ package com.redhat.devtools.lsp4ij.features.signatureHelp;
 import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.lang.parameterInfo.*;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -32,6 +31,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP implementation of {@link ParameterInfoHandler} to support
@@ -102,7 +102,7 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         CompletableFuture<SignatureHelp> future = signatureHelpSupport.getSignatureHelp(params);
 
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

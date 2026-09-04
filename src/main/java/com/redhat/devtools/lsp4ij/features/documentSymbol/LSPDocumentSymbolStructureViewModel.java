@@ -26,7 +26,6 @@ import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.filter.*;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -43,6 +42,7 @@ import java.util.stream.Stream;
 
 import static com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory.isSymbolsSupportedByLanguageServer;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP document symbol structure view model.
@@ -181,7 +181,7 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
 
             try {
-                ProgressIndicatorUtils.awaitWithCheckCanceled(documentSymbolFuture);
+                awaitWithCheckCanceled(documentSymbolFuture);
             } catch (ProcessCanceledException e) {
                 throw e;
             } catch (CancellationException ignore) {

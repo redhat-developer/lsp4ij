@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP Go To Implementation.
@@ -51,7 +51,7 @@ public class LSPGoToImplementationAction extends AbstractLSPGoToAction {
         var params = new LSPImplementationParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(implementationsFuture);
+            awaitWithCheckCanceled(implementationsFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {

@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPExpressionCodeFragment;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.debug.CompletionItem;
@@ -37,7 +38,6 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor.getCurrentWord;
 
@@ -76,7 +76,7 @@ public class DAPCompletionProcessor extends CompletionContributor {
                     client.completion(text, position.getLine() + 1, position.getCharacter() + 1, frameId);
 
             try {
-                ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+                awaitWithCheckCanceled(future);
             } catch (ProcessCanceledException ignore) {
                 return;
             } catch (CancellationException ignore) {

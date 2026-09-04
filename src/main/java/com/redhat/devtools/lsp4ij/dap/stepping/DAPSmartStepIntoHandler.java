@@ -20,7 +20,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import org.eclipse.lsp4j.debug.StepInTarget;
 import org.eclipse.lsp4j.debug.StepInTargetsResponse;
 import org.jetbrains.annotations.NotNull;
@@ -62,7 +62,7 @@ public class DAPSmartStepIntoHandler extends XSmartStepIntoHandler<DAPStepIntoVa
         CompletableFuture<List<DAPStepIntoVariant>> future = getStepInTargetsFuture(position);
 
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {

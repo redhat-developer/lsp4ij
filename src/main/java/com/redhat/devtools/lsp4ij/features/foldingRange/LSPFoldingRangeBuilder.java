@@ -42,9 +42,9 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP folding range builder.
@@ -118,7 +118,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         var params = new FoldingRangeRequestParams(new TextDocumentIdentifier());
         CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(foldingRangesFuture);
+            awaitWithCheckCanceled(foldingRangesFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
