@@ -743,6 +743,11 @@
         <typeHierarchyProvider
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider"/>
+        <!-- Required for LSPPsiElement (Language.ANY), otherwise the JetBrains LSP client provider
+             (registered with language="") shadows the TEXT / textmate ones. -->
+        <typeHierarchyProvider
+                language=""
+                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider"/>
 
         <!-- LSP textDocument/callHierarchy request support -->
         <callHierarchyProvider
@@ -750,6 +755,11 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
         <callHierarchyProvider
                 language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
+        <!-- Required for LSPPsiElement (Language.ANY), otherwise the JetBrains LSP client provider
+             (registered with language="") shadows the TEXT / textmate ones. -->
+        <callHierarchyProvider
+                language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
 
         <!-- LSP Find Usages (LSP) support shows:
