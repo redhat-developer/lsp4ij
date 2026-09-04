@@ -39,9 +39,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * Implements the IDE's standard Go To Implementation(s) action using LSP textDocument/implementation. -->
@@ -98,7 +98,7 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
         LSPImplementationSupport implementationSupport = LSPFileSupport.getSupport(file).getImplementationSupport();
         CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(implementationsFuture);
+            awaitWithCheckCanceled(implementationsFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

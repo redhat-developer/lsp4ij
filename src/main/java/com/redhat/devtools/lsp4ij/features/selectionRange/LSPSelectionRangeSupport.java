@@ -22,7 +22,6 @@ import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SelectionRange;
@@ -38,6 +37,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP selectionRange support which loads and caches selection ranges by consuming:
@@ -73,7 +73,7 @@ public class LSPSelectionRangeSupport extends AbstractLSPDocumentFeatureSupport<
         var params = new LSPSelectionRangeParams(textDocumentIdentifier, Collections.singletonList(position), offset);
         CompletableFuture<List<SelectionRange>> selectionRangesFuture = selectionRangeSupport.getSelectionRanges(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(selectionRangesFuture);
+            awaitWithCheckCanceled(selectionRangesFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {

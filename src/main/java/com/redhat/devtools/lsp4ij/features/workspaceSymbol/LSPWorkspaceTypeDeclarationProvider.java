@@ -40,9 +40,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * Implements the IDE's standard Go To Type Declaration action using LSP textDocument/typeDefinition. -->
@@ -91,7 +91,7 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         var params = new LSPTypeDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(typeDefinitionsFuture);
+            awaitWithCheckCanceled(typeDefinitionsFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

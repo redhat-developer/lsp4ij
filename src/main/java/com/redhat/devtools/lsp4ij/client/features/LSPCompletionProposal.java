@@ -60,9 +60,9 @@ import java.util.concurrent.CompletableFuture;
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHtml;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import static com.redhat.devtools.lsp4ij.internal.CompletionUtils.computePrefixStartFromInsertText;
 
 /**
@@ -497,7 +497,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                     .resolveCompletionItem(item);
         }
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(resolvedCompletionItemFuture);
+            awaitWithCheckCanceled(resolvedCompletionItemFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

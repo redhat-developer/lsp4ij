@@ -20,7 +20,6 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
@@ -47,6 +46,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.ignoreAllExceptions;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
@@ -86,7 +86,7 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
         CompletableFuture<List<ColorData>> future = colorSupport.getColors(params);
 
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

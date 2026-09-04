@@ -14,7 +14,6 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens;
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -34,6 +33,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP 'textDocument/semanticTokens' support by implementing IntelliJ {@link HighlightVisitor}.
@@ -170,7 +170,7 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
      *
      * <p>
      * This method is called from {@link #analyze}, which runs inside a read action.
-     * {@code ProgressIndicatorUtils.awaitWithCheckCanceled} integrates with
+     * {@code awaitWithCheckCanceled} integrates with
      * IntelliJ's concurrency model: when a write action is requested, the current
      * progress indicator is cancelled → ProcessCanceledException is thrown →
      * the read lock is released → the write action can proceed immediately.
@@ -200,7 +200,7 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         try {
             // Wait for the LSP future while cooperating with IntelliJ's lock model.
             // See class Javadoc for a detailed explanation of why this is safe.
-            ProgressIndicatorUtils.awaitWithCheckCanceled(semanticTokensFuture);
+            awaitWithCheckCanceled(semanticTokensFuture);
 
         } catch (ProcessCanceledException e) {
             // A write action requested priority, or the pass was cancelled for another

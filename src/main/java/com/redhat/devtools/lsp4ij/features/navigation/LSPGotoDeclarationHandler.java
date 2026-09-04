@@ -41,10 +41,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory.toPsiElement;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
 
@@ -144,7 +144,7 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         var params = new LSPDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(definitionsFuture);
+            awaitWithCheckCanceled(definitionsFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {

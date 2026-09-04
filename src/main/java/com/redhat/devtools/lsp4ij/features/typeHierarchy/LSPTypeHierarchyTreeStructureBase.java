@@ -21,7 +21,6 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyNodeDescriptor;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyTreeStructureBase;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.TypeHierarchyItem;
 import org.jetbrains.annotations.NotNull;
@@ -33,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP type hierarchy tree structure base for typeHierarchy/subtypes / typeHierarchy/supertypes.
@@ -64,7 +64,7 @@ public abstract class LSPTypeHierarchyTreeStructureBase extends LSPHierarchyTree
         var params = new LSPTypeHierarchyPrepareParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<TypeHierarchyItemData>> prepareTypeHierarchyFuture = prepareTypeHierarchySupport.getPrepareTypeHierarchies(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(prepareTypeHierarchyFuture);
+            awaitWithCheckCanceled(prepareTypeHierarchyFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {

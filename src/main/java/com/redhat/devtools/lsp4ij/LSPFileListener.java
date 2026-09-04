@@ -13,8 +13,8 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -250,7 +250,7 @@ class LSPFileListener extends AbstractLSPFileListener {
                 var didOpen = languageServerWrapper.connect(newFile,
                         languageServerWrapper.createFileConnectionInfo(documentFile, document, true));
                 try {
-                    ProgressIndicatorUtils.awaitWithCheckCanceled(didOpen);
+                    awaitWithCheckCanceled(didOpen);
                 } catch (CancellationException ignore) {
                 }
             }

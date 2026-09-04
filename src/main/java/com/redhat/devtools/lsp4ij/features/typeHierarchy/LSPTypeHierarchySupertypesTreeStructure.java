@@ -17,7 +17,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.features.hierarchy.LSPHierarchyNodeDescriptor;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import org.eclipse.lsp4j.TypeHierarchyItem;
 import org.eclipse.lsp4j.TypeHierarchySupertypesParams;
 import org.jetbrains.annotations.NotNull;
@@ -50,7 +50,7 @@ public class LSPTypeHierarchySupertypesTreeStructure extends LSPTypeHierarchyTre
         var params = new TypeHierarchySupertypesParams(hierarchyItem);
         CompletableFuture<List<TypeHierarchyItemData>> prepareTypeHierarchyFuture = typeHierarchySupertypesSupport.getTypeHierarchySupertypes(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(prepareTypeHierarchyFuture);
+            awaitWithCheckCanceled(prepareTypeHierarchyFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {

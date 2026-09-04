@@ -45,11 +45,11 @@ import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 
 import static com.intellij.codeInsight.codeVision.CodeVisionState.Ready;
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP textDocument/codeLens support.
@@ -113,7 +113,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
             LSPCodeLensEditorFactoryListener.setCodelensSupport(editor, codeLensSupport);
             CompletableFuture<CodeLensDataResult> future = fetchCodeLenses(codeLensSupport);
             try {
-                ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+                awaitWithCheckCanceled(future);
             } catch (ProcessCanceledException e) {
                 throw e;
             } catch (CancellationException ignore) {
@@ -150,7 +150,7 @@ public class LSPCodeLensProvider implements CodeVisionProvider<Void> {
                         if (visibleCodeLensToResolve != null) {
                             // Resolve all visible code lens
                             try {
-                                ProgressIndicatorUtils.awaitWithCheckCanceled(visibleCodeLensToResolve);
+                                awaitWithCheckCanceled(visibleCodeLensToResolve);
                             } catch (ProcessCanceledException e) {
                                 throw e;
                             } catch (CancellationException ignore) {

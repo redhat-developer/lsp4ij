@@ -31,7 +31,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.applyEdits;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP formatting and range formatting support.
@@ -56,7 +56,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         LSPFormattingParams params = new LSPFormattingParams(textRange, document, formattingServer, formattingOptions);
         CompletableFuture<List<? extends TextEdit>> formatFuture = this.getFeatureData(params);
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(formatFuture);
+            awaitWithCheckCanceled(formatFuture);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {

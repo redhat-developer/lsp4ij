@@ -15,7 +15,6 @@ import com.intellij.codeInsight.hints.declarative.*;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -38,6 +37,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP textDocument/inlayHint support.
@@ -59,7 +59,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         CompletableFuture<List<InlayHintData>> future = inlayHintSupport.getInlayHints(params);
 
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+            awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
