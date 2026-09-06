@@ -199,11 +199,11 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
             return true;
         }
-        // Generic breakpoint adoption: also accept a language's NATIVE line breakpoint (e.g. a
+        // Generic breakpoint forwarding: also accept a language's NATIVE line breakpoint (e.g. a
         // JavaScript or Python line breakpoint) when its file is mapped to this DAP server. The
         // breakpoint keeps its native type (so non-DAP debug sessions still use it normally); it is
         // only forwarded here because a DAP session is currently running (handlers are session-scoped).
-        // Delivery of those native breakpoints is done by DAPAdoptedLineBreakpointHandler.
+        // Delivery of those native breakpoints is done by DAPForwardedLineBreakpointHandler.
         if (breakpoint instanceof XLineBreakpoint<?>) {
             XSourcePosition sourcePosition = breakpoint.getSourcePosition();
             return sourcePosition != null

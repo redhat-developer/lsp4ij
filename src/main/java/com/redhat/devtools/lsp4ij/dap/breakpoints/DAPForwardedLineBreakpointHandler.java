@@ -19,29 +19,29 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Adopts a language's <b>native</b> line breakpoints (e.g. JavaScript, Python) while a DAP session
- * is running.
+ * Forwards a language's <b>native</b> line breakpoints (e.g. JavaScript, Python) to a running DAP
+ * session.
  * <p>
  * It is registered for a single native {@link com.intellij.xdebugger.breakpoints.XLineBreakpointType}
- * and delegates every breakpoint whose file is mapped to this DAP server (see
+ * and forwards every breakpoint whose file is mapped to this DAP server (see
  * {@link DebugAdapterDescriptor#isDebuggableFile}) to the shared {@link DAPBreakpointHandlerBase},
- * which forwards it via {@code setBreakpoints}.
+ * which sends it via {@code setBreakpoints}.
  * <p>
  * The breakpoint itself keeps its native type, so it continues to work normally with the language's
  * own debugger in other debug constellations. Because this handler is created per
- * {@link com.redhat.devtools.lsp4ij.dap.DAPDebugProcess} (i.e. per DAP debug session), the adoption
- * only happens <em>while a DAP session runs</em> — it never affects native debug sessions.
+ * {@link com.redhat.devtools.lsp4ij.dap.DAPDebugProcess} (i.e. per DAP debug session), the
+ * forwarding only happens <em>while a DAP session runs</em> — it never affects native debug sessions.
  */
-public class DAPAdoptedLineBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<?>> {
+public class DAPForwardedLineBreakpointHandler extends XBreakpointHandler<XLineBreakpoint<?>> {
 
     private final @NotNull DAPBreakpointHandlerBase<?> sharedHandler;
     private final @NotNull DebugAdapterDescriptor debugAdapterDescriptor;
     private final @NotNull Project project;
 
-    public DAPAdoptedLineBreakpointHandler(@NotNull Class<? extends XBreakpointType<XLineBreakpoint<?>, ?>> nativeTypeClass,
-                                           @NotNull DAPBreakpointHandlerBase<?> sharedHandler,
-                                           @NotNull DebugAdapterDescriptor debugAdapterDescriptor,
-                                           @NotNull Project project) {
+    public DAPForwardedLineBreakpointHandler(@NotNull Class<? extends XBreakpointType<XLineBreakpoint<?>, ?>> nativeTypeClass,
+                                             @NotNull DAPBreakpointHandlerBase<?> sharedHandler,
+                                             @NotNull DebugAdapterDescriptor debugAdapterDescriptor,
+                                             @NotNull Project project) {
         super(nativeTypeClass);
         this.sharedHandler = sharedHandler;
         this.debugAdapterDescriptor = debugAdapterDescriptor;
@@ -51,7 +51,7 @@ public class DAPAdoptedLineBreakpointHandler extends XBreakpointHandler<XLineBre
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void registerBreakpoint(@NotNull XLineBreakpoint<?> breakpoint) {
-        if (adopts(breakpoint)) {
+        if (shouldForward(breakpoint)) {
             ((BreakpointHandlerBase) sharedHandler).registerBreakpoint(breakpoint);
         }
     }
@@ -59,16 +59,16 @@ public class DAPAdoptedLineBreakpointHandler extends XBreakpointHandler<XLineBre
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void unregisterBreakpoint(@NotNull XLineBreakpoint<?> breakpoint, boolean temporary) {
-        if (adopts(breakpoint)) {
+        if (shouldForward(breakpoint)) {
             ((BreakpointHandlerBase) sharedHandler).unregisterBreakpoint(breakpoint, temporary);
         }
     }
 
     /**
-     * A breakpoint is adopted when it is NOT a DAP breakpoint (those are handled by the DAP handler
+     * A breakpoint is forwarded when it is NOT a DAP breakpoint (those are handled by the DAP handler
      * itself) and its file is mapped to this DAP server.
      */
-    private boolean adopts(@NotNull XLineBreakpoint<?> breakpoint) {
+    private boolean shouldForward(@NotNull XLineBreakpoint<?> breakpoint) {
         if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
             return false;
         }

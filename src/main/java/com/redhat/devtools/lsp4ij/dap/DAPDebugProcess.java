@@ -40,7 +40,7 @@ import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.stepping.XSmartStepIntoHandler;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
-import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPAdoptedLineBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPForwardedLineBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointTypeBase;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
@@ -86,8 +86,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
     private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
-    /** Session-scoped handlers that adopt native line breakpoints (JS, Python, …) on DAP-mapped files. */
-    private final @NotNull java.util.List<XBreakpointHandler<?>> adoptedBreakpointHandlers;
+    /** Session-scoped handlers that forward native line breakpoints (JS, Python, …) on DAP-mapped files. */
+    private final @NotNull java.util.List<XBreakpointHandler<?>> forwardedBreakpointHandlers;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
     private final ThreadsPanel threadsPanel;
@@ -117,7 +117,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.serverDescriptor = dapState.getServerDescriptor();
         this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
-        this.adoptedBreakpointHandlers = createAdoptedBreakpointHandlers(breakpointHandler, serverDescriptor, project);
+        this.forwardedBreakpointHandlers = createForwardedBreakpointHandlers(breakpointHandler, serverDescriptor, project);
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);
@@ -396,20 +396,20 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         java.util.List<XBreakpointHandler<?>> handlers = new java.util.ArrayList<>();
         handlers.add(breakpointHandler);
         handlers.add(disassemblyBreakpointHandler);
-        // Adopt native line breakpoints (JS, Python, …) on DAP-mapped files while this session runs.
-        handlers.addAll(adoptedBreakpointHandlers);
+        // Forward native line breakpoints (JS, Python, …) on DAP-mapped files while this session runs.
+        handlers.addAll(forwardedBreakpointHandlers);
         return handlers.toArray(new XBreakpointHandler[0]);
     }
 
     /**
-     * Build one {@link DAPAdoptedLineBreakpointHandler} per registered NATIVE line-breakpoint type
+     * Build one {@link DAPForwardedLineBreakpointHandler} per registered NATIVE line-breakpoint type
      * (every {@link XLineBreakpointType} that is not our own DAP type), so that while this DAP
      * session runs, native breakpoints on files mapped to the DAP server are forwarded via
      * {@code setBreakpoints}. Nothing here is language-specific — it is driven purely by the DAP
      * server's file mappings ({@link DebugAdapterDescriptor#isDebuggableFile}).
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static @NotNull java.util.List<XBreakpointHandler<?>> createAdoptedBreakpointHandlers(@NotNull DAPBreakpointHandlerBase<?> sharedHandler,
+    private static @NotNull java.util.List<XBreakpointHandler<?>> createForwardedBreakpointHandlers(@NotNull DAPBreakpointHandlerBase<?> sharedHandler,
                                                                                                   @NotNull DebugAdapterDescriptor descriptor,
                                                                                                   @NotNull com.intellij.openapi.project.Project project) {
         java.util.List<XBreakpointHandler<?>> result = new java.util.ArrayList<>();
@@ -423,10 +423,10 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 }
                 Class<? extends XBreakpointType<XLineBreakpoint<?>, ?>> typeClass =
                         (Class<? extends XBreakpointType<XLineBreakpoint<?>, ?>>) type.getClass();
-                result.add(new DAPAdoptedLineBreakpointHandler(typeClass, sharedHandler, descriptor, project));
+                result.add(new DAPForwardedLineBreakpointHandler(typeClass, sharedHandler, descriptor, project));
             }
         } catch (Exception e) {
-            // Never let breakpoint adoption break the debug session; fall back to DAP-only breakpoints.
+            // Never let breakpoint forwarding break the debug session; fall back to DAP-only breakpoints.
         }
         return result;
     }
