@@ -68,7 +68,9 @@ public class DAPForwardedLineBreakpointHandler extends XBreakpointHandler<XLineB
      * itself) and its file is mapped to this DAP server.
      */
     private boolean shouldForward(@NotNull XLineBreakpoint<?> breakpoint) {
-        return !(breakpoint.getType() instanceof DAPBreakpointTypeBase<?>)
-                && debugAdapterDescriptor.isDebuggableLineBreakpoint(breakpoint, project);
+        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
+            return false;
+        }
+        return debugAdapterDescriptor.isDebuggableLineBreakpoint(breakpoint, project);
     }
 }

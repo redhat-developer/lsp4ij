@@ -198,8 +198,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         // A DAP breakpoint is always supported. A language's NATIVE line breakpoint is supported when
         // its file is mapped to this DAP server, so that while a DAP session runs it can be forwarded
         // (by DAPForwardedLineBreakpointHandler) while keeping its native type for other sessions.
-        return breakpoint.getType() instanceof DAPBreakpointTypeBase<?>
-                || debugAdapterDescriptor.isDebuggableLineBreakpoint(breakpoint, project);
+        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
+            return true;
+        }
+        return debugAdapterDescriptor.isDebuggableLineBreakpoint(breakpoint, project);
     }
 
     /**

@@ -294,7 +294,10 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
             return false;
         }
         XSourcePosition sourcePosition = lineBreakpoint.getSourcePosition();
-        return sourcePosition != null && isDebuggableFile(sourcePosition.getFile(), project);
+        if (sourcePosition == null) {
+            return false;
+        }
+        return isDebuggableFile(sourcePosition.getFile(), project);
     }
 
     public @NotNull DAPBreakpointHandlerBase<?> createBreakpointHandler(@NotNull XDebugSession session, Project project) {
