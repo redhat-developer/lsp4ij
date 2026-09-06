@@ -17,7 +17,6 @@ import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
-import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -196,20 +195,11 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
     }
 
     private <B extends XBreakpoint<?>> boolean supportsBreakpointType(B breakpoint) {
-        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
-            return true;
-        }
-        // Generic breakpoint forwarding: also accept a language's NATIVE line breakpoint (e.g. a
-        // JavaScript or Python line breakpoint) when its file is mapped to this DAP server. The
-        // breakpoint keeps its native type (so non-DAP debug sessions still use it normally); it is
-        // only forwarded here because a DAP session is currently running (handlers are session-scoped).
-        // Delivery of those native breakpoints is done by DAPForwardedLineBreakpointHandler.
-        if (breakpoint instanceof XLineBreakpoint<?>) {
-            XSourcePosition sourcePosition = breakpoint.getSourcePosition();
-            return sourcePosition != null
-                    && debugAdapterDescriptor.isDebuggableFile(sourcePosition.getFile(), project);
-        }
-        return false;
+        // A DAP breakpoint is always supported. A language's NATIVE line breakpoint is supported when
+        // its file is mapped to this DAP server, so that while a DAP session runs it can be forwarded
+        // (by DAPForwardedLineBreakpointHandler) while keeping its native type for other sessions.
+        return breakpoint.getType() instanceof DAPBreakpointTypeBase<?>
+                || debugAdapterDescriptor.isDebuggableLineBreakpoint(breakpoint, project);
     }
 
     /**

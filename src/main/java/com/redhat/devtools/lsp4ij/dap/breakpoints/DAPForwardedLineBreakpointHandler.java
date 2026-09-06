@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
 import com.intellij.openapi.project.Project;
-import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
@@ -69,11 +68,7 @@ public class DAPForwardedLineBreakpointHandler extends XBreakpointHandler<XLineB
      * itself) and its file is mapped to this DAP server.
      */
     private boolean shouldForward(@NotNull XLineBreakpoint<?> breakpoint) {
-        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
-            return false;
-        }
-        XSourcePosition sourcePosition = breakpoint.getSourcePosition();
-        return sourcePosition != null
-                && debugAdapterDescriptor.isDebuggableFile(sourcePosition.getFile(), project);
+        return !(breakpoint.getType() instanceof DAPBreakpointTypeBase<?>)
+                && debugAdapterDescriptor.isDebuggableLineBreakpoint(breakpoint, project);
     }
 }
