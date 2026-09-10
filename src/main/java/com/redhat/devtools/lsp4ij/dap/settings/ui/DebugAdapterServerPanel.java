@@ -315,6 +315,12 @@ public class DebugAdapterServerPanel implements Disposable {
     private void addMappingsTab(JBTabbedPane tabbedPane, EditionMode mode) {
         FormBuilder mappingsTab = addTab(tabbedPane, DAPBundle.message("dap.settings.editor.mappings.tab"));
         this.mappingsPanel = new DAPServerMappingsPanel(mappingsTab, mode != EditionMode.EDIT_EXTENSION);
+
+        // The forwarding option lives here because it governs exactly the files mapped above:
+        // while a DAP session runs, native line breakpoints in those files are forwarded.
+        forwardNativeLineBreakpointsCheckBox = new JBCheckBox(DAPBundle.message("dap.settings.editor.mappings.forward.native.breakpoints"));
+        forwardNativeLineBreakpointsCheckBox.setSelected(true);
+        mappingsTab.addComponent(forwardNativeLineBreakpointsCheckBox);
     }
 
     private void addConfigurationTab(JBTabbedPane tabbedPane) {
@@ -338,10 +344,6 @@ public class DebugAdapterServerPanel implements Disposable {
         radioPanel.add(launchRadioButton);
         radioPanel.add(attachRadioButton);
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.debug.mode"), radioPanel);
-
-        forwardNativeLineBreakpointsCheckBox = new JBCheckBox(DAPBundle.message("dap.settings.editor.configuration.forward.native.breakpoints"));
-        forwardNativeLineBreakpointsCheckBox.setSelected(true);
-        configurationTab.addComponent(forwardNativeLineBreakpointsCheckBox);
 
         // Launch / Attach DAP parameters
         parametersTabbedPane = new JBTabbedPane();
