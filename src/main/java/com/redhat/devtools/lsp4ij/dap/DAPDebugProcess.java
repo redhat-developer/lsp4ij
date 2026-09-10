@@ -117,7 +117,9 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.serverDescriptor = dapState.getServerDescriptor();
         this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
-        this.forwardedBreakpointHandlers = createForwardedBreakpointHandlers(breakpointHandler, serverDescriptor, project);
+        this.forwardedBreakpointHandlers = dapState.isForwardNativeLineBreakpoints()
+                ? createForwardedBreakpointHandlers(breakpointHandler, serverDescriptor, project)
+                : java.util.List.of();
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);

@@ -251,6 +251,14 @@ public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigura
         getOptions().setInstallerConfiguration(installerConfiguration);
     }
 
+    public boolean isForwardNativeLineBreakpoints() {
+        return getOptions().isForwardNativeLineBreakpoints();
+    }
+
+    public void setForwardNativeLineBreakpoints(boolean forwardNativeLineBreakpoints) {
+        getOptions().setForwardNativeLineBreakpoints(forwardNativeLineBreakpoints);
+    }
+
     @NotNull
     @Override
     public SettingsEditor<? extends RunConfiguration> getConfigurationEditor() {

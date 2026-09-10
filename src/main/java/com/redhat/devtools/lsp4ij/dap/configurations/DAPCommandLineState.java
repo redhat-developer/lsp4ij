@@ -130,4 +130,15 @@ public class DAPCommandLineState extends CommandLineState implements CommandLine
         return null;
     }
 
+    /**
+     * Whether native line breakpoints on DAP-mapped files should be forwarded during this session.
+     * Defaults to {@code true} when the option is not available.
+     */
+    public boolean isForwardNativeLineBreakpoints() {
+        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            return dapOptions.isForwardNativeLineBreakpoints();
+        }
+        return true;
+    }
+
 }

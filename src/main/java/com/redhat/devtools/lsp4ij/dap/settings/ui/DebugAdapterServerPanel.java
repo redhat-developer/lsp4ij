@@ -21,6 +21,7 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
@@ -92,6 +93,7 @@ public class DebugAdapterServerPanel implements Disposable {
     // for launch
     private TextFieldWithBrowseButton workingDirectoryField;
     private TextFieldWithBrowseButton fileField;
+    private JBCheckBox forwardNativeLineBreakpointsCheckBox;
     private ComboBox<LaunchConfiguration> launchCombo;
     private SchemaBackedJsonTextField launchConfigurationField;
     // for attach
@@ -336,6 +338,10 @@ public class DebugAdapterServerPanel implements Disposable {
         radioPanel.add(launchRadioButton);
         radioPanel.add(attachRadioButton);
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.debug.mode"), radioPanel);
+
+        forwardNativeLineBreakpointsCheckBox = new JBCheckBox(DAPBundle.message("dap.settings.editor.configuration.forward.native.breakpoints"));
+        forwardNativeLineBreakpointsCheckBox.setSelected(true);
+        configurationTab.addComponent(forwardNativeLineBreakpointsCheckBox);
 
         // Launch / Attach DAP parameters
         parametersTabbedPane = new JBTabbedPane();
@@ -676,6 +682,14 @@ public class DebugAdapterServerPanel implements Disposable {
 
     public void setFile(String file) {
         this.fileField.setText(getText(file));
+    }
+
+    public boolean isForwardNativeLineBreakpoints() {
+        return forwardNativeLineBreakpointsCheckBox.isSelected();
+    }
+
+    public void setForwardNativeLineBreakpoints(boolean forwardNativeLineBreakpoints) {
+        this.forwardNativeLineBreakpointsCheckBox.setSelected(forwardNativeLineBreakpoints);
     }
 
     public String getAttachAddress() {
