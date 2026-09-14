@@ -84,15 +84,18 @@ public final class LSPDiagnosticsApplier implements Disposable {
     }
 
     private static class HighlightsToApply {
+        final VirtualFile file;
         final Document document;
         final List<HighlightInfo> highlights;
         final int groupId;
         final long modificationStamp;
 
-        HighlightsToApply(@NotNull Document document,
+        HighlightsToApply(@NotNull VirtualFile file,
+                          @NotNull Document document,
                           @NotNull List<HighlightInfo> highlights,
                           int groupId,
                           long modificationStamp) {
+            this.file = file;
             this.document = document;
             this.highlights = highlights;
             this.groupId = groupId;
@@ -122,6 +125,11 @@ public final class LSPDiagnosticsApplier implements Disposable {
             if (modificationStamp == null) {
                 modificationStamp = document.getModificationStamp();
             }
+        } else if (psiFile != null) {
+            file = psiFile.getVirtualFile();
+            if (file == null) {
+                return null;
+            }
         }
 
         // Collect diagnostics
@@ -131,14 +139,15 @@ public final class LSPDiagnosticsApplier implements Disposable {
             highlights = List.of();
         }
 
-        return new HighlightsToApply(document, highlights, GROUP_ID, modificationStamp);
+        return new HighlightsToApply(file, document, highlights, GROUP_ID, modificationStamp);
     }
 
     @SuppressWarnings("deprecation")
     private void applyHighlights(@NotNull HighlightsToApply data) {
         // Check if document was modified since we collected diagnostics
-        // If modified, skip applying stale diagnostics to avoid flicker
+        // If modified, reschedule so that diagnostics are eventually applied
         if (data.document.getModificationStamp() != data.modificationStamp) {
+            scheduleRefresh(data.file, null, data.document);
             return;
         }
 
