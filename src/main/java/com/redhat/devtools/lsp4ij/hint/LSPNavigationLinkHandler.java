@@ -78,7 +78,7 @@ public class LSPNavigationLinkHandler extends TooltipLinkHandler {
         }
         result.append(HASH_SEPARATOR);
         result.append("L");
-        result.append(start.getLine());
+        result.append(start.getLine() + 1); // LSP lines are 0-based, #L fragment is 1-based
         result.append(":");
         result.append(start.getCharacter());
     }
