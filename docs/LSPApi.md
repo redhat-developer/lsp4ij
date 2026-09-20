@@ -127,7 +127,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 
 ### Disable a given LSP Feature
 
-All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/LSPAbstractFeature.java), which declares the `isEnabled` method that returns `true` by default:
+All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/AbstractLSPDocumentFeature.java), which declares the `isEnabled` method that returns `true` by default:
 
 ```java
 public boolean isEnabled(@NotNull PsiFile file) {
@@ -139,7 +139,7 @@ By overriding this method, you can return `false` to disable a given LSP feature
 
 ### Supported LSP Feature
 
-All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/LSPAbstractFeature.java), which declares the `isSupported` method that uses the server capabilities:
+All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/AbstractLSPDocumentFeature.java), which declares the `isSupported` method that uses the server capabilities:
 
 ```java
 public boolean isSupported(@NotNull PsiFile file) {

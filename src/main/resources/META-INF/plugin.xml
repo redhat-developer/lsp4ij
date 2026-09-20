@@ -305,13 +305,13 @@
         <li>by <code>developing an IntelliJ plugin</code> with LSP <code>extension points</code>:
             <ul>
                 <li>
-                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-server-with-extension-point">
+                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#extension-point-declaration">
                         com.redhat.devtools.lsp4ij.server
                     </a>
                     extension point to define a language server.
                 </li>
                 <li>
-                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-language-mapping-with-extension-point">
+                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#language-mapping">
                         com.redhat.devtools.lsp4ij.languageMapping
                     </a>
                     to associate an IntelliJ language with a language server definition.
