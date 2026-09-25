@@ -23,6 +23,7 @@ import com.intellij.ui.awt.RelativePoint;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.LocationLink;
@@ -31,6 +32,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.event.MouseEvent;
 import java.util.List;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 
 /**
  * LSP usage manager.
@@ -94,6 +97,29 @@ public class LSPUsagesManager {
         LSPUsagePsiElement element = LSPPsiElementFactory.toPsiElement(location, fileUriSupport, project, USAGE_ELEMENT_FACTORY);
         if (element != null) {
             element.setKind(kind);
+        }
+        return element;
+    }
+
+    /**
+     * Creates the usage element for a location reported by the language server whose client features are given,
+     * and for a reference asks its usage feature whether the reference reads or writes the searched symbol.
+     *
+     * @see com.redhat.devtools.lsp4ij.client.features.LSPUsageFeature#getReadWriteAccess(LSPUsagePsiElement)
+     */
+    @Nullable
+    public static LSPUsagePsiElement toPsiElement(@NotNull Location location,
+                                                  @NotNull LSPClientFeatures clientFeatures,
+                                                  @NotNull LSPUsagePsiElement.UsageKind kind,
+                                                  @NotNull Project project) {
+        if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return runCancellableReadAction(() -> {
+                return toPsiElement(location, clientFeatures, kind, project);
+            }, project);
+        }
+        LSPUsagePsiElement element = toPsiElement(location, (FileUriSupport) clientFeatures, kind, project);
+        if (element != null && kind == LSPUsagePsiElement.UsageKind.references) {
+            element.setAccess(clientFeatures.getUsageFeature().getReadWriteAccess(element));
         }
         return element;
     }
