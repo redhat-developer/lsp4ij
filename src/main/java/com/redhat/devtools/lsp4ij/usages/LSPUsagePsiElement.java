@@ -10,11 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.usages;
 
+import com.intellij.codeInsight.highlighting.ReadWriteAccessDetector;
 import com.intellij.lang.Language;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * LSP usage Psi element.
@@ -22,6 +24,8 @@ import org.jetbrains.annotations.NotNull;
 public class LSPUsagePsiElement extends LSPPsiElement {
 
     private UsageKind kind;
+
+    private @Nullable ReadWriteAccessDetector.Access access;
 
     public static enum UsageKind {
         declarations,
@@ -46,6 +50,21 @@ public class LSPUsagePsiElement extends LSPPsiElement {
 
     public void setKind(UsageKind kind) {
         this.kind = kind;
+    }
+
+    /**
+     * Returns whether this usage reads or writes the searched symbol, or null when that is not known.
+     * Only references can have an access.
+     *
+     * @return whether this usage reads or writes the searched symbol, or null when that is not known.
+     * @see com.redhat.devtools.lsp4ij.client.features.LSPUsageFeature#getReadWriteAccess(LSPUsagePsiElement)
+     */
+    public @Nullable ReadWriteAccessDetector.Access getAccess() {
+        return access;
+    }
+
+    public void setAccess(@Nullable ReadWriteAccessDetector.Access access) {
+        this.access = access;
     }
 
     @Override
