@@ -27,6 +27,7 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.Alarm;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.WorkspaceFolderNotificationManager;
@@ -1696,13 +1697,17 @@ public class LanguageServerWrapper implements Disposable {
             } else {
                 // We need to shutdown, kill and stop the process in a thread to avoid for instance
                 // stopping the new process created with a new start.
+                // Use the IntelliJ application pool instead of ForkJoinPool.commonPool() to avoid
+                // ForkJoinPool.helpAsyncBlocker() executing the blocking shutdown (up to 5 seconds)
+                // in the current thread when stop() is called from a ReadAction.
+                // See: https://github.com/redhat-developer/lsp4ij/issues/1672
                 return CompletableFuture.runAsync(() -> {
                     shutdownAll(languageServer, lspStreamProvider, launcherFuture);
                     boolean delayedCurrent = currentInitializingContext == null || currentInitializingContext.equals(initializingContext);
                     if (delayedCurrent) {
                         updateStatus(ServerStatus.stopped);
                     }
-                });
+                }, AppExecutorUtil.getAppExecutorService());
             }
         } finally {
             if (current) {
