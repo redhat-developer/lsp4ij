@@ -372,6 +372,13 @@ public class LanguageServerWrapper implements Disposable {
             }
         }
         if (serverError != null) {
+            if (this.initializeFuture != null && !this.initializeFuture.isDone()) {
+                // A restart attempt is still initializing: serverError is only cleared once it
+                // succeeds, so stopping here would kill that attempt and spawn another process
+                // on every start() call (e.g. on each Search Everywhere keystroke).
+                // See: https://github.com/redhat-developer/lsp4ij/issues/1673
+                return;
+            }
             // Here the language server has been not possible
             // we stop it and attempts a new restart if needed
             stop();
