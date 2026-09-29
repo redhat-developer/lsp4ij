@@ -99,8 +99,15 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
         return WriteAction.compute(() -> XDebuggerManager.getInstance(getProject()).getBreakpointManager()
             .addLineBreakpoint(new DAPBreakpointType(), file.getUrl(), line, new DAPBreakpointProperties()));
     }
-    private void assertLines(List<SetBreakpointsArguments> requests, Path path, int... lines) {
-        var matches = requests.stream().filter(r -> path.toString().equals(r.getSource().getPath())).toList();
+    private void assertLines(List<SetBreakpointsArguments> requests, Path path, int... lines) throws Exception {
+        // IntelliJ may canonicalize Windows paths (including short directory names).
+        // Match the source file rather than its platform-dependent path spelling.
+        var matches = new ArrayList<SetBreakpointsArguments>();
+        for (var request : requests) {
+            if (Files.isSameFile(path, Path.of(request.getSource().getPath()))) {
+                matches.add(request);
+            }
+        }
         assertEquals("Expected a replacement request for " + path, 1, matches.size());
         assertTrue(Arrays.equals(lines, Arrays.stream(matches.get(0).getBreakpoints()).mapToInt(SourceBreakpoint::getLine).toArray()));
     }
