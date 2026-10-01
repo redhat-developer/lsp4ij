@@ -20,6 +20,7 @@ import com.intellij.codeInspection.util.IntentionName;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.IncorrectOperationException;
@@ -27,6 +28,8 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.WorkspaceEditSnapshot;
+import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import org.eclipse.lsp4j.CodeAction;
@@ -40,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * The lazy IJ Quick fix / Intention.
  */
-public class LSPLazyCodeActionIntentionAction implements IntentionAction {
+public class LSPLazyCodeActionIntentionAction implements IntentionAction, DumbAware {
 
     private LSPLazyCodeActionProvider lazyCodeActions;
 
@@ -76,6 +79,9 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
 
     @Override
     public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile file) {
+        if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
+            return false;
+        }
         loadCodeActionIfNeeded();
         return isValidCodeAction(this.action);
     }
