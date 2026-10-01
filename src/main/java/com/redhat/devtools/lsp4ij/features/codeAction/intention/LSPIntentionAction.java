@@ -17,9 +17,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
-import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
@@ -46,11 +44,6 @@ public abstract class LSPIntentionAction extends LSPLazyCodeActionIntentionActio
      */
     @Override
     public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile file) {
-        // Don't execute LSP features during indexing
-        if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
-            return false;
-        }
-
         // Get the code action support for this file
         LSPIntentionCodeActionSupport intentionCodeActionSupport = LSPFileSupport.getSupport(file).getIntentionCodeActionSupport();
 
