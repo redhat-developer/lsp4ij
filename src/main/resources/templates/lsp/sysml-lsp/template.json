@@ -1,0 +1,28 @@
+{
+  "id": "sysml-lsp",
+  "name": "SysML v2 Language Server",
+  "programArgs": {
+    "default": "sh -c sysml-lsp --stdio",
+    "windows": "sysml-lsp --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "SysML v2",
+        "patterns": [
+          "*.sysml"
+        ]
+      },
+      "languageId": "sysml"
+    },
+    {
+      "fileType": {
+        "name": "KerML",
+        "patterns": [
+          "*.kerml"
+        ]
+      },
+      "languageId": "kerml"
+    }
+  ]
+}
