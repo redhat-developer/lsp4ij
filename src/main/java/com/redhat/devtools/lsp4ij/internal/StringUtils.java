@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.internal;
 
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 public class StringUtils {
@@ -24,6 +25,7 @@ public class StringUtils {
      * @param cs
      * @return
      */
+    @Contract("null -> true")
     public static boolean isEmpty(@Nullable final CharSequence cs) {
         return cs == null || cs.isEmpty();
     }
@@ -33,6 +35,7 @@ public class StringUtils {
      * @param cs
      * @return
      */
+    @Contract("null -> false")
     public static boolean isNotBlank(@Nullable final CharSequence cs) {
         return !isBlank(cs);
     }
@@ -42,6 +45,7 @@ public class StringUtils {
      * @param cs
      * @return
      */
+    @Contract("null -> true")
     public static boolean isBlank(@Nullable final CharSequence cs) {
         final int strLen = length(cs);
         if (strLen == 0) {
