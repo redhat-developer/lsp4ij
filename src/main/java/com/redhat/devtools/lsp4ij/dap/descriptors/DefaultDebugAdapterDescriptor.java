@@ -79,6 +79,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     @Nullable
     protected GeneralCommandLine createStartServerCommandLine(@NotNull RunConfigurationOptions options) throws ExecutionException {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            String workingDirectory = dapOptions.getWorkingDirectory();
             String command = dapOptions.getCommand();
             if (StringUtils.isBlank(command)) {
                 var server = dapOptions.getDebugAdapterServer();
@@ -96,7 +97,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
             }
 
             String resolvedCommandLine = resolveCommandLine(command, environment.getProject());
-            return createStartServerCommandLine(resolvedCommandLine, userEnvironmentVariables, includeSystemEnvironmentVariables);
+            return createStartServerCommandLine(workingDirectory, resolvedCommandLine, userEnvironmentVariables, includeSystemEnvironmentVariables);
         }
         return null;
     }
