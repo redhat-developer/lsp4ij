@@ -1,0 +1,72 @@
+{
+  "id": "sysml-lsp",
+  "name": "Install and verify SysML v2 Language Server",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download SysML v2 Language Server",
+      "github": {
+        "owner": "Open-MBEE",
+        "repository": "OpenSysML",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "x86_64": "sysml-lsp-windows-amd64.zip"
+          },
+          "unix": {
+            "x86_64": "sysml-lsp-linux-amd64.tar.gz",
+            "arm64": "sysml-lsp-linux-arm64.tar.gz"
+          },
+          "mac": {
+            "x86_64": "sysml-lsp-darwin-amd64.tar.gz",
+            "arm64": "sysml-lsp-darwin-arm64.tar.gz"
+          }
+        }
+      },
+      "url": {
+        "windows": {
+          "x86_64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-windows-amd64.zip"
+        },
+        "unix": {
+          "x86_64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-linux-amd64.tar.gz",
+          "arm64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-linux-arm64.tar.gz"
+        },
+        "mac": {
+          "x86_64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-darwin-amd64.tar.gz",
+          "arm64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-darwin-arm64.tar.gz"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/sysml-lsp",
+        "file": {
+          "name": {
+            "windows": "sysml-lsp-windows-amd64.exe",
+            "unix": {
+              "x86_64": "sysml-lsp-linux-amd64",
+              "arm64": "sysml-lsp-linux-arm64"
+            },
+            "mac": {
+              "x86_64": "sysml-lsp-darwin-amd64",
+              "arm64": "sysml-lsp-darwin-arm64"
+            }
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure SysML v2 Language Server command",
+          "command": "${output.dir}/${output.file.name} --stdio",
+          "update": true
+        }
+      }
+    }
+  }
+}

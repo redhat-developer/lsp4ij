@@ -299,6 +299,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md)
 * [Stylelint-LSP](./user-defined-ls/stylelint-lsp.md)
 * [Svelte Language Server](./user-defined-ls/svelte-language-server.md) 
+* [SysML v2 Language Server](./user-defined-ls/sysml-lsp.md)
 * [Terraform Language Server](./user-defined-ls/terraform-ls.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
 * [Vue Language Server](./user-defined-ls/vue-js-language-server.md)
