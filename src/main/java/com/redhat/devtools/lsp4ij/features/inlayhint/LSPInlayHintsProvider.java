@@ -47,6 +47,11 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPInlayHintsProvider.class);
 
     public static final String PROVIDER_ID = "LSPInlayHintsProvider";
+    private static final HintFormat HINT_FORMAT =
+        new HintFormat(
+                HintColorKind.Default,
+                HintFontSize.ABitSmallerThanInEditor,
+                HintMarginPadding.OnlyPadding);
 
     @Override
     protected void doCollect(@NotNull PsiFile psiFile,
@@ -115,7 +120,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     private void buildBasicInlayHint(@NotNull String label,
                                      @NotNull InlayPosition position,
                                      @NotNull InlayTreeSink sink) {
-        sink.addPresentation(position, null, null, true, builder -> {
+        sink.addPresentation(position, null, null, HINT_FORMAT, builder -> {
             builder.text(label, null);
             return null;
         });
@@ -148,7 +153,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             }
             index++;
         }
-        sink.addPresentation(position, null, hasTooltip ? tooltip.toString() : null, true, builder -> {
+        sink.addPresentation(position, null, hasTooltip ? tooltip.toString() : null, HINT_FORMAT, builder -> {
             for (var build: builds) {
                 build.accept(builder);
             }
