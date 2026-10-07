@@ -31,6 +31,7 @@ import org.junit.Assert;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -61,12 +62,13 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                                                       @NotNull IntentionActionKind kind,
                                                       @NotNull String editorContentText,
                                                       @NotNull String codeActionsJson,
+                                                      boolean simulateCancellation,
                                                       @NotNull String... expectedActions) {
         List<CodeAction> codeActions = JSONUtils.getLsp4jGson()
                 .fromJson(codeActionsJson, new TypeToken<List<CodeAction>>() {
                 }.getType());
 
-        return assertCodeActions(fileName, kind, editorContentText, codeActions, expectedActions);
+        return assertCodeActions(fileName, kind, editorContentText, codeActions, simulateCancellation, expectedActions);
     }
 
     /**
@@ -82,6 +84,7 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                                                       @NotNull IntentionActionKind kind,
                                                       @NotNull String editorContentText,
                                                       @NotNull List<CodeAction> codeActions,
+                                                      boolean simulateCancellation,
                                                       @NotNull String... expectedActions) {
         List<Either<Command, CodeAction>> wrappedCodeActions = codeActions.stream()
                 .distinct()
@@ -96,8 +99,20 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                 .collect(Collectors.toList());
 
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
-        MockLanguageServer.INSTANCE.setCodeActions(wrappedCodeActions);
         MockLanguageServer.INSTANCE.setPublishDiagnostics(diagnostics);
+
+        if (simulateCancellation) {
+            // Simulate a cancelled CodeAction request
+            MockLanguageServer.INSTANCE.setCodeActionHandler(params -> {
+                CompletableFuture<List<Either<Command, CodeAction>>> cancelled = new CompletableFuture<>();
+                cancelled.cancel(true);
+                return cancelled;
+            });
+        } else {
+            // Normal code action handling
+            MockLanguageServer.INSTANCE.setCodeActions(wrappedCodeActions);
+        }
+
         myFixture.configureByText(fileName, editorContentText);
 
         // Collect IntelliJ Quick fixes / Intention actions
