@@ -212,9 +212,9 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                 }
             } else if (event instanceof VFileMoveEvent me) {
                 // Move file --> same as Rename file
-                VirtualFile parentFile = me.getOldParent();
+                VirtualFile parentFile = me.getNewParent();
                 VirtualFile oldFile = event.getFile();
-                String newFileName = me.getOldPath();
+                String newFileName = oldFile.getName();
                 onFileRenameBefore(parentFile, oldFile, newFileName, fileRenames);
             }
         }
