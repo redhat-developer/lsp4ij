@@ -70,6 +70,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<FoldingRange> foldingRanges;
     public int codeActionRequests = 0;
     public volatile CodeActionParams lastCodeActionParams;
+    private Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor;
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
         this._futureFactory = futureFactory;
@@ -100,6 +101,9 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<CompletionItem> resolveCompletionItem(CompletionItem unresolved) {
+        if (resolveCompletionItemProcessor != null) {
+            return resolveCompletionItemProcessor.apply(unresolved);
+        }
         return CompletableFuture.completedFuture(mockCompletionItem);
     }
 
@@ -362,6 +366,11 @@ public class MockTextDocumentService implements TextDocumentService {
         this.foldingRanges = new ArrayList<>();
         this.codeActionRequests = 0;
         this.lastCodeActionParams = null;
+        this.resolveCompletionItemProcessor = null;
+    }
+
+    public void setResolveCompletionItemProcessor(Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor) {
+        this.resolveCompletionItemProcessor = resolveCompletionItemProcessor;
     }
 
     public void setPublishDiagnostics(List<Diagnostic> publishDiagnostics) {
