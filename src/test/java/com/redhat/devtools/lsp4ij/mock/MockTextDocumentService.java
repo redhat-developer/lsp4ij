@@ -69,6 +69,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private SemanticTokens mockSemanticTokens;
     private List<FoldingRange> foldingRanges;
     public int codeActionRequests = 0;
+    public volatile CodeActionParams lastCodeActionParams;
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
         this._futureFactory = futureFactory;
@@ -153,6 +154,7 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
         codeActionRequests++;
+        lastCodeActionParams = params;
         // Filter code actions by using params.getContext().getOnly()
         var only = (params.getContext() != null && params.getContext().getOnly() != null && !params.getContext().getOnly().isEmpty()) ?
                 params.getContext().getOnly() : null;
@@ -359,6 +361,7 @@ public class MockTextDocumentService implements TextDocumentService {
         this.documentSymbols = Collections.emptyList();
         this.foldingRanges = new ArrayList<>();
         this.codeActionRequests = 0;
+        this.lastCodeActionParams = null;
     }
 
     public void setPublishDiagnostics(List<Diagnostic> publishDiagnostics) {

@@ -16,8 +16,6 @@ package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -57,8 +55,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     // The diagnostic
     private final List<Diagnostic> diagnostics;
 
-    // The virtual file
-    private final PsiFile file;
+    // The virtual file. Kept as is rather than resolved to a PsiFile: diagnostics are published on the LSP
+    // message thread, where a read action would wait for any pending write action, and a write action on the
+    // EDT may itself be waiting for a response queued behind that very message.
+    private final VirtualFile file;
 
     // The language server which has reported the diagnostic
     private final LanguageServerItem languageServer;
@@ -74,7 +74,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                               @NotNull VirtualFile file,
                               @NotNull LanguageServerItem languageServer) {
         this.diagnostics = diagnostics;
-        this.file = LSPIJUtils.getPsiFile(file, languageServer.getProject());
+        this.file = file;
         this.languageServer = languageServer;
         // Create 20 lazy IJ quick fixes which does nothing (IntentAction#isAvailable returns false)
         codeActions = new ArrayList<>(NB_LAZY_CODE_ACTIONS);
@@ -171,10 +171,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @return the LSP code action parameters for the given diagnostic and file.
      */
     private static CodeActionParams createCodeActionParams(@NotNull List<Diagnostic> diagnostics,
-                                                           @NotNull PsiFile file,
+                                                           @NotNull VirtualFile file,
                                                            @NotNull FileUriSupport fileUriSupport) {
         CodeActionParams params = new CodeActionParams();
-        var identifier = new TextDocumentIdentifier(FileUriSupport.toString(file.getVirtualFile(), fileUriSupport));
+        var identifier = new TextDocumentIdentifier(FileUriSupport.toString(file, fileUriSupport));
         params.setTextDocument(identifier);
         // As diagnostic list is never empty, and it is sorted by the max range, the code action range parameter is the first diagnostic
         Range range = diagnostics.get(0).getRange();
