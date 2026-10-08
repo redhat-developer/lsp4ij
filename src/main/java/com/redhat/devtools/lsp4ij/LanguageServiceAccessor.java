@@ -277,7 +277,8 @@ public class LanguageServiceAccessor implements Disposable {
         var matched = mappings.getMatched();
         for (var startedServer : startedServers) {
             if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
-                    matched.contains(startedServer.getServerDefinition()) && filter.test(startedServer)) {
+                    matched.contains(startedServer.getServerDefinition()) &&
+                    startedServer.getClientFeatures().isEnabled(file.getVirtualFile()) && filter.test(startedServer)) {
                 return true;
             }
         }
@@ -305,7 +306,8 @@ public class LanguageServiceAccessor implements Disposable {
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
         for (var startedServer : startedServers) {
             if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
-                    matchedServerDefinitions.contains(startedServer.getServerDefinition())) {
+                    matchedServerDefinitions.contains(startedServer.getServerDefinition()) &&
+                    startedServer.getClientFeatures().isEnabled(file.getVirtualFile())) {
                 processor.accept(startedServer);
             }
         }
