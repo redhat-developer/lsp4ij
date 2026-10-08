@@ -11,6 +11,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -76,6 +77,7 @@ public class LanguageServerFileEnablementTest extends UsefulTestCase {
         var accessor = LanguageServiceAccessor.getInstance(fixture.getProject());
         assertTrue(accessor.hasAny(file, server -> server.getServerDefinition() == alpha));
         assertFalse(accessor.hasAny(file, server -> server.getServerDefinition() == beta));
+        assertFalse(accessor.hasAny(file, server -> false));
         alpha.enabled = false;
         assertFalse(accessor.hasAny(file, server -> true));
         alpha.enabled = true;
@@ -99,6 +101,18 @@ public class LanguageServerFileEnablementTest extends UsefulTestCase {
 
     public void testWholeFileFormattingUsesOwningServer() throws Exception {
         assertFormatting(false);
+    }
+
+    public void testFilesWithoutVirtualFileAreNotSelected() {
+        var file = (PsiFile) fixture.configureByText("alpha.scoped", "old\n").copy();
+        assertNull(file.getVirtualFile());
+        var accessor = LanguageServiceAccessor.getInstance(fixture.getProject());
+        assertFalse(accessor.hasAny(file, server -> {
+            fail("A file without a virtual file must not reach the filter");
+            return true;
+        }));
+        accessor.processLanguageServers(file, server ->
+                fail("A file without a virtual file must not reach the processor"));
     }
 
     public void testRangeFormattingUsesOwningServer() throws Exception {

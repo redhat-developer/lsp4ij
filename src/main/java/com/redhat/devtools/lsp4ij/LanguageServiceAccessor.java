@@ -276,9 +276,7 @@ public class LanguageServiceAccessor implements Disposable {
         }
         var matched = mappings.getMatched();
         for (var startedServer : startedServers) {
-            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
-                    matched.contains(startedServer.getServerDefinition()) &&
-                    startedServer.getClientFeatures().isEnabled(file.getVirtualFile()) && filter.test(startedServer)) {
+            if (isMatchingStartedServer(file, startedServer, matched, filter)) {
                 return true;
             }
         }
@@ -305,12 +303,21 @@ public class LanguageServiceAccessor implements Disposable {
 
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
         for (var startedServer : startedServers) {
-            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
-                    matchedServerDefinitions.contains(startedServer.getServerDefinition()) &&
-                    startedServer.getClientFeatures().isEnabled(file.getVirtualFile())) {
+            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, server -> true)) {
                 processor.accept(startedServer);
             }
         }
+    }
+
+    private static boolean isMatchingStartedServer(@NotNull PsiFile file,
+                                                   @NotNull LanguageServerWrapper server,
+                                                   @NotNull Set<LanguageServerDefinition> matchedDefinitions,
+                                                   @NotNull Predicate<LanguageServerWrapper> filter) {
+        var virtualFile = file.getVirtualFile();
+        return virtualFile != null &&
+                ServerStatus.started.equals(server.getServerStatus()) &&
+                matchedDefinitions.contains(server.getServerDefinition()) &&
+                server.getClientFeatures().isEnabled(virtualFile) && filter.test(server);
     }
 
     @NotNull
