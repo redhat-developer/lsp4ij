@@ -47,11 +47,18 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPInlayHintsProvider.class);
 
     public static final String PROVIDER_ID = "LSPInlayHintsProvider";
-    private static final HintFormat HINT_FORMAT =
-        new HintFormat(
-                HintColorKind.Default,
-                HintFontSize.ABitSmallerThanInEditor,
-                HintMarginPadding.OnlyPadding);
+    private static final HintFormat TYPE_HINT_FORMAT =
+        HintFormat.Companion.getDefault()
+                .withFontSize(HintFontSize.ABitSmallerThanInEditor);
+
+    private static final HintFormat PARAMETER_HINT_FORMAT =
+        TYPE_HINT_FORMAT.withColorKind(HintColorKind.Parameter);
+
+    private static HintFormat getHintFormat(@NotNull InlayHint inlayHint) {
+        return inlayHint.getKind() == InlayHintKind.Parameter
+                ? PARAMETER_HINT_FORMAT
+                : TYPE_HINT_FORMAT;
+    }
 
     @Override
     protected void doCollect(@NotNull PsiFile psiFile,
@@ -110,7 +117,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         elements.forEach(p -> {
             Either<String, List<InlayHintLabelPart>> label = p.second.inlayHint().getLabel();
             if (label.isLeft()) {
-                buildBasicInlayHint(label.getLeft(), position, sink);
+                buildBasicInlayHint(label.getLeft(), p.second, position, sink);
             } else {
                 buildMultipartInlayHint(psiFile, label.getRight(), p.second, position, sink);
             }
@@ -118,9 +125,10 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     }
 
     private void buildBasicInlayHint(@NotNull String label,
+                                     @NotNull InlayHintData hintData,
                                      @NotNull InlayPosition position,
                                      @NotNull InlayTreeSink sink) {
-        sink.addPresentation(position, null, null, HINT_FORMAT, builder -> {
+        sink.addPresentation(position, null, null, getHintFormat(hintData.inlayHint()), builder -> {
             builder.text(label, null);
             return null;
         });
@@ -153,7 +161,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             }
             index++;
         }
-        sink.addPresentation(position, null, hasTooltip ? tooltip.toString() : null, HINT_FORMAT, builder -> {
+        sink.addPresentation(position, null, hasTooltip ? tooltip.toString() : null, getHintFormat(hintData.inlayHint()), builder -> {
             for (var build: builds) {
                 build.accept(builder);
             }
