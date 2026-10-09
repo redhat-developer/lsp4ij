@@ -117,7 +117,6 @@ dependencies {
 kotlin {
     jvmToolchain {
         languageVersion = JavaLanguageVersion.of(21)
-        vendor = JvmVendorSpec.JETBRAINS
     }
 }
 
