@@ -88,7 +88,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private final Editor editor;
 
-    private CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
+    private volatile CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
     public LSPCompletionProposal(@NotNull CompletionItem item,
                                  @NotNull LSPCompletionFeature.LSPCompletionContext completionContext,
@@ -276,19 +276,23 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         }
         // Here the IJ lookup item is selected.
         if (needToResolveCompletionDetail()) {
-            // The LSP completion item 'detail' is not filled, try to resolve it
-            // inside getExpensiveRenderer() which should not impact performance.
-            CompletionItem resolved = getResolvedCompletionItem();
-            if (resolved != null && resolved.getDetail() != null) {
-                item.setDetail(resolved.getDetail());
-
-                return new LookupElementRenderer<LookupElement>() {
-                    @Override
-                    public void renderElement(LookupElement element, LookupElementPresentation presentation) {
-                        LSPCompletionProposal.this.renderElement(presentation);
+            // The LSP completion item 'detail' is not filled, resolve it in the returned renderer.
+            // IntelliJ calls getExpensiveRenderer() on the EDT, possibly inside the write action of a typed
+            // character, and only the renderer runs in the background, in a read action that a pending
+            // write action cancels: waiting for the language server here would block the EDT on it.
+            return new LookupElementRenderer<LookupElement>() {
+                @Override
+                public void renderElement(LookupElement element, LookupElementPresentation presentation) {
+                    CompletionItem resolved = getResolvedCompletionItem();
+                    if (resolved != null && resolved.getDetail() != null) {
+                        item.setDetail(resolved.getDetail());
+                    } else if (item.getDetail() == null) {
+                        // The detail cannot be resolved, set empty string to avoid trying to resolve again the completion item
+                        item.setDetail("");
                     }
-                };
-            }
+                    LSPCompletionProposal.this.renderElement(presentation);
+                }
+            };
         }
         if (item.getDetail() == null) {
             // The detail cannot be resolved, set empty string to avoid trying to resolve again the completion item
@@ -491,13 +495,9 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
      * @return the resolved completion item and null otherwise.
      */
     private CompletionItem getResolvedCompletionItem() {
-        if (resolvedCompletionItemFuture == null) {
-            resolvedCompletionItemFuture = completionContext.getLanguageServer().getServer()
-                    .getTextDocumentService()
-                    .resolveCompletionItem(item);
-        }
+        var future = getResolvedCompletionItemFuture();
         try {
-            awaitWithCheckCanceled(resolvedCompletionItemFuture);
+            awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
@@ -505,10 +505,25 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         }
 
         ProgressManager.checkCanceled();
-        if (isDoneNormally(resolvedCompletionItemFuture)) {
-            return resolvedCompletionItemFuture.getNow(null);
+        if (isDoneNormally(future)) {
+            return future.getNow(null);
         }
         return null;
+    }
+
+    /**
+     * Returns the LSP 'completionItem/resolve' request of the completion item, sent on the first call.
+     * The EDT (apply) and background threads (expensive renderer, documentation) can both reach it.
+     *
+     * @return the LSP 'completionItem/resolve' request of the completion item.
+     */
+    private synchronized CompletableFuture<CompletionItem> getResolvedCompletionItemFuture() {
+        if (resolvedCompletionItemFuture == null) {
+            resolvedCompletionItemFuture = completionContext.getLanguageServer().getServer()
+                    .getTextDocumentService()
+                    .resolveCompletionItem(item);
+        }
+        return resolvedCompletionItemFuture;
     }
 
     /**
