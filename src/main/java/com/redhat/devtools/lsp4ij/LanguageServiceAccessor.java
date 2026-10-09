@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 @ApiStatus.Internal
 public class LanguageServiceAccessor implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
+    private static final Predicate<LanguageServerWrapper> ACCEPT_ALL_SERVERS = server -> true;
 
     private final Project project;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
@@ -276,8 +277,7 @@ public class LanguageServiceAccessor implements Disposable {
         }
         var matched = mappings.getMatched();
         for (var startedServer : startedServers) {
-            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
-                    matched.contains(startedServer.getServerDefinition()) && filter.test(startedServer)) {
+            if (isMatchingStartedServer(file, startedServer, matched, filter)) {
                 return true;
             }
         }
@@ -304,11 +304,21 @@ public class LanguageServiceAccessor implements Disposable {
 
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
         for (var startedServer : startedServers) {
-            if (ServerStatus.started.equals(startedServer.getServerStatus()) &&
-                    matchedServerDefinitions.contains(startedServer.getServerDefinition())) {
+            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, ACCEPT_ALL_SERVERS)) {
                 processor.accept(startedServer);
             }
         }
+    }
+
+    private static boolean isMatchingStartedServer(@NotNull PsiFile file,
+                                                   @NotNull LanguageServerWrapper server,
+                                                   @NotNull Set<LanguageServerDefinition> matchedDefinitions,
+                                                   @NotNull Predicate<LanguageServerWrapper> filter) {
+        var virtualFile = file.getVirtualFile();
+        return virtualFile != null &&
+                ServerStatus.started.equals(server.getServerStatus()) &&
+                matchedDefinitions.contains(server.getServerDefinition()) &&
+                server.getClientFeatures().isEnabled(virtualFile) && filter.test(server);
     }
 
     @NotNull
