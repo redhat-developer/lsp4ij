@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 @ApiStatus.Internal
 public class LanguageServiceAccessor implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServiceAccessor.class);
+    private static final Predicate<LanguageServerWrapper> ACCEPT_ALL_SERVERS = server -> true;
 
     private final Project project;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
@@ -303,7 +304,7 @@ public class LanguageServiceAccessor implements Disposable {
 
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
         for (var startedServer : startedServers) {
-            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, server -> true)) {
+            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, ACCEPT_ALL_SERVERS)) {
                 processor.accept(startedServer);
             }
         }
