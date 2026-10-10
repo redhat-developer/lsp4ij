@@ -33,8 +33,52 @@ public class CommandUtils {
 
     private static final Logger LOG = Logger.getInstance(CommandUtils.class);
     private static final String COMMAND_LINE_ENV_CUSTOMIZER_EP = "com.intellij.commandLineEnvCustomizer";
-    private static final String COMMAND_LINE_ENV_CUSTOMIZER_CLASS =
-            "com.intellij.execution.process.CommandLineEnvCustomizer";
+
+    /** Caches reflective access to the optional IntelliJ command-line environment customizer API. */
+    private static final class CommandLineEnvCustomizerReflection {
+
+        private static final Method GET_ROOT_AREA;
+        private static final Method GET_EXTENSION_POINT_IF_REGISTERED;
+        private static final Method GET_EXTENSION_LIST;
+        private static final Method CUSTOMIZE_ENV;
+
+        static {
+            Method getRootArea = null;
+            Method getExtensionPointIfRegistered = null;
+            Method getExtensionList = null;
+            Method customizeEnv = null;
+
+            try {
+                Class<?> extensionsClass = Class.forName("com.intellij.openapi.extensions.Extensions");
+                Class<?> extensionsAreaClass = Class.forName("com.intellij.openapi.extensions.ExtensionsArea");
+                Class<?> extensionPointClass = Class.forName("com.intellij.openapi.extensions.ExtensionPoint");
+                Class<?> customizerClass = Class.forName(
+                        "com.intellij.execution.process.CommandLineEnvCustomizer");
+
+                getRootArea = extensionsClass.getMethod("getRootArea");
+                getExtensionPointIfRegistered = extensionsAreaClass.getMethod(
+                        "getExtensionPointIfRegistered", String.class);
+                getExtensionList = extensionPointClass.getMethod("getExtensionList");
+                customizeEnv = customizerClass.getMethod(
+                        "customizeEnv", GeneralCommandLine.class, Map.class);
+            } catch (ReflectiveOperationException | LinkageError e) {
+                // Expected on IDE versions that do not provide CommandLineEnvCustomizer.
+                LOG.debug("Directory-aware command-line environment customization is unavailable", e);
+            }
+
+            GET_ROOT_AREA = getRootArea;
+            GET_EXTENSION_POINT_IF_REGISTERED = getExtensionPointIfRegistered;
+            GET_EXTENSION_LIST = getExtensionList;
+            CUSTOMIZE_ENV = customizeEnv;
+        }
+
+        private static boolean isAvailable() {
+            return GET_ROOT_AREA != null
+                    && GET_EXTENSION_POINT_IF_REGISTERED != null
+                    && GET_EXTENSION_LIST != null
+                    && CUSTOMIZE_ENV != null;
+        }
+    }
 
     /**
      * Returns the commands to execute with {@link Process} from the given commandline.
@@ -109,28 +153,26 @@ public class CommandUtils {
 
     /**
      * Invokes the IntelliJ Platform's directory-aware command-line environment customizers when
-     * they are available. This API was introduced after the platform version supported by LSP4IJ,
-     * so it must be accessed reflectively to keep the plugin loadable on older IDEs.
+     * they are available. Reflection metadata is cached by {@link CommandLineEnvCustomizerReflection}
+     * to avoid repeated class and method lookups for every language server or debug adapter launch.
      *
      * <p>The extension point is optional on older IDEs. Its absence must not prevent a language
      * server or debug adapter from starting.</p>
      */
     private static void customizeEnvironmentForWorkingDirectory(@NotNull GeneralCommandLine commandLine) {
+        if (!CommandLineEnvCustomizerReflection.isAvailable()) {
+            return;
+        }
+
         try {
-            Class<?> extensionsClass = Class.forName("com.intellij.openapi.extensions.Extensions");
-            Object rootArea = extensionsClass.getMethod("getRootArea").invoke(null);
-            Class<?> extensionsAreaClass = Class.forName("com.intellij.openapi.extensions.ExtensionsArea");
-            Method getExtensionPoint = extensionsAreaClass.getMethod("getExtensionPointIfRegistered", String.class);
-            Object extensionPoint = getExtensionPoint.invoke(rootArea, COMMAND_LINE_ENV_CUSTOMIZER_EP);
+            Object rootArea = CommandLineEnvCustomizerReflection.GET_ROOT_AREA.invoke(null);
+            Object extensionPoint = CommandLineEnvCustomizerReflection.GET_EXTENSION_POINT_IF_REGISTERED
+                    .invoke(rootArea, COMMAND_LINE_ENV_CUSTOMIZER_EP);
             if (extensionPoint == null) {
                 return;
             }
 
-            Class<?> customizerClass = Class.forName(COMMAND_LINE_ENV_CUSTOMIZER_CLASS);
-            Method customizeEnvironment = customizerClass.getMethod(
-                    "customizeEnv", GeneralCommandLine.class, Map.class);
-            Class<?> extensionPointClass = Class.forName("com.intellij.openapi.extensions.ExtensionPoint");
-            Object extensions = extensionPointClass.getMethod("getExtensionList").invoke(extensionPoint);
+            Object extensions = CommandLineEnvCustomizerReflection.GET_EXTENSION_LIST.invoke(extensionPoint);
             if (!(extensions instanceof Iterable<?> customizers)) {
                 return;
             }
@@ -141,7 +183,8 @@ public class CommandUtils {
 
             for (Object customizer : customizers) {
                 try {
-                    customizeEnvironment.invoke(customizer, commandLine, effectiveEnvironment);
+                    CommandLineEnvCustomizerReflection.CUSTOMIZE_ENV.invoke(
+                            customizer, commandLine, effectiveEnvironment);
                     customized = true;
                 } catch (InvocationTargetException e) {
                     LOG.warn("Failed to customize command-line environment for working directory "
@@ -154,8 +197,6 @@ public class CommandUtils {
                 commandLine.getEnvironment().putAll(effectiveEnvironment);
                 commandLine.withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.NONE);
             }
-        } catch (ClassNotFoundException | NoSuchMethodException e) {
-            // Expected on IDE versions that do not provide CommandLineEnvCustomizer.
         } catch (ReflectiveOperationException | LinkageError e) {
             LOG.debug("Directory-aware command-line environment customization is unavailable", e);
         }
