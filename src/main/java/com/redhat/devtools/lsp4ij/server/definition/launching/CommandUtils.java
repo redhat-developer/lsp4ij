@@ -12,12 +12,15 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.util.ProgramParametersUtil;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +30,11 @@ import java.util.Map;
  * Command utilities.
  */
 public class CommandUtils {
+
+    private static final Logger LOG = Logger.getInstance(CommandUtils.class);
+    private static final String COMMAND_LINE_ENV_CUSTOMIZER_EP = "com.intellij.commandLineEnvCustomizer";
+    private static final String COMMAND_LINE_ENV_CUSTOMIZER_CLASS =
+            "com.intellij.execution.process.CommandLineEnvCustomizer";
 
     /**
      * Returns the commands to execute with {@link Process} from the given commandline.
@@ -94,8 +102,63 @@ public class CommandUtils {
                 .withEnvironment(environmentVariables);
         if (workingDir != null && !workingDir.isBlank()) {
             generalCommandLine.setWorkDirectory(workingDir);
+            customizeEnvironmentForWorkingDirectory(generalCommandLine);
         }
         return generalCommandLine;
+    }
+
+    /**
+     * Invokes the IntelliJ Platform's directory-aware command-line environment customizers when
+     * they are available. This API was introduced after the platform version supported by LSP4IJ,
+     * so it must be accessed reflectively to keep the plugin loadable on older IDEs.
+     *
+     * <p>The extension point is optional on older IDEs. Its absence must not prevent a language
+     * server or debug adapter from starting.</p>
+     */
+    private static void customizeEnvironmentForWorkingDirectory(@NotNull GeneralCommandLine commandLine) {
+        try {
+            Class<?> extensionsClass = Class.forName("com.intellij.openapi.extensions.Extensions");
+            Object rootArea = extensionsClass.getMethod("getRootArea").invoke(null);
+            Class<?> extensionsAreaClass = Class.forName("com.intellij.openapi.extensions.ExtensionsArea");
+            Method getExtensionPoint = extensionsAreaClass.getMethod("getExtensionPointIfRegistered", String.class);
+            Object extensionPoint = getExtensionPoint.invoke(rootArea, COMMAND_LINE_ENV_CUSTOMIZER_EP);
+            if (extensionPoint == null) {
+                return;
+            }
+
+            Class<?> customizerClass = Class.forName(COMMAND_LINE_ENV_CUSTOMIZER_CLASS);
+            Method customizeEnvironment = customizerClass.getMethod(
+                    "customizeEnv", GeneralCommandLine.class, Map.class);
+            Class<?> extensionPointClass = Class.forName("com.intellij.openapi.extensions.ExtensionPoint");
+            Object extensions = extensionPointClass.getMethod("getExtensionList").invoke(extensionPoint);
+            if (!(extensions instanceof Iterable<?> customizers)) {
+                return;
+            }
+
+            Map<String, String> effectiveEnvironment = new HashMap<>(commandLine.getParentEnvironment());
+            effectiveEnvironment.putAll(commandLine.getEnvironment());
+            boolean customized = false;
+
+            for (Object customizer : customizers) {
+                try {
+                    customizeEnvironment.invoke(customizer, commandLine, effectiveEnvironment);
+                    customized = true;
+                } catch (InvocationTargetException e) {
+                    LOG.warn("Failed to customize command-line environment for working directory "
+                            + commandLine.getWorkDirectory(), e.getCause());
+                }
+            }
+
+            if (customized) {
+                commandLine.getEnvironment().clear();
+                commandLine.getEnvironment().putAll(effectiveEnvironment);
+                commandLine.withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.NONE);
+            }
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            // Expected on IDE versions that do not provide CommandLineEnvCustomizer.
+        } catch (ReflectiveOperationException | LinkageError e) {
+            LOG.debug("Directory-aware command-line environment customization is unavailable", e);
+        }
     }
 
     /**

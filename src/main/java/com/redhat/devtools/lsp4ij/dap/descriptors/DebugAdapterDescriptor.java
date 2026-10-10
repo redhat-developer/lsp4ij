@@ -123,13 +123,15 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
             port = getAvailablePort();
             command = command.replace($_PORT, String.valueOf(port));
         }
-        GeneralCommandLine commandLine = createCommandLine(command, userEnvironmentVariables, includeSystemEnvironmentVariables);
+        String effectiveWorkingDirectory = null;
         if (StringUtils.isNotBlank(workingDirectory)) {
             File workingDir = new File(workingDirectory);
             if (workingDir.isDirectory()) {
-                commandLine = commandLine.withWorkingDirectory(workingDir.toPath());
+                effectiveWorkingDirectory = workingDirectory;
             }
         }
+        GeneralCommandLine commandLine = createCommandLine(command, effectiveWorkingDirectory,
+                userEnvironmentVariables, includeSystemEnvironmentVariables);
         if (port != null) {
             commandLine.putUserData(DebugAdapterDescriptor.SERVER_PORT, port);
         }
