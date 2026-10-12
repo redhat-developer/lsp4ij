@@ -30,6 +30,11 @@ public class MockWorkspaceService implements WorkspaceService {
 	private CompletableFuture<ExecuteCommandParams> executedCommand = new CompletableFuture<>();
 	private List<DidChangeWorkspaceFoldersParams> workspaceFoldersEvents = new ArrayList<>();
     private WorkspaceEdit willRename;
+    private WorkspaceEdit willCreate;
+    private WorkspaceEdit willDelete;
+    private long willCreateDelayMs;
+    private long willDeleteDelayMs;
+    private long willRenameDelayMs;
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
@@ -39,9 +44,49 @@ public class MockWorkspaceService implements WorkspaceService {
         this.willRename = willRename;
     }
 
+    public void setWillCreate(WorkspaceEdit willCreate) {
+        this.willCreate = willCreate;
+    }
+
+    public void setWillDelete(WorkspaceEdit willDelete) {
+        this.willDelete = willDelete;
+    }
+
+    public void setWillCreateDelayMs(long delayMs) {
+        this.willCreateDelayMs = delayMs;
+    }
+
+    public void setWillDeleteDelayMs(long delayMs) {
+        this.willDeleteDelayMs = delayMs;
+    }
+
+    public void setWillRenameDelayMs(long delayMs) {
+        this.willRenameDelayMs = delayMs;
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceEdit> willCreateFiles(CreateFilesParams params) {
+        return delayedResult(willCreate, willCreateDelayMs);
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceEdit> willDeleteFiles(DeleteFilesParams params) {
+        return delayedResult(willDelete, willDeleteDelayMs);
+    }
+
     @Override
     public CompletableFuture<WorkspaceEdit> willRenameFiles(RenameFilesParams params) {
-        return CompletableFuture.supplyAsync(() -> this.willRename);
+        return delayedResult(willRename, willRenameDelayMs);
+    }
+
+    private static CompletableFuture<WorkspaceEdit> delayedResult(WorkspaceEdit result, long delayMs) {
+        if (delayMs <= 0) {
+            return CompletableFuture.supplyAsync(() -> result);
+        }
+        CompletableFuture<WorkspaceEdit> future = new CompletableFuture<>();
+        CompletableFuture.delayedExecutor(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .execute(() -> future.complete(result));
+        return future;
     }
 
     /**

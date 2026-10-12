@@ -17,6 +17,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
@@ -37,6 +38,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultTreeModel;
+import java.awt.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -55,6 +57,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     @NonNls
     private static final String ID = "LanguageServers";
     private String displayNodeName = null;
+    private JSpinner fileOperationsTimeoutSpinner;
 
     private final Project project;
     private final LanguageServerDefinitionListener listener = new LanguageServerDefinitionListener() {
@@ -89,7 +92,25 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
             initTree();
             isTreeInitialized = true;
         }
-        return super.createComponent();
+        JComponent masterDetails = super.createComponent();
+
+        // Global settings panel above the master-details tree
+        fileOperationsTimeoutSpinner = new JSpinner(
+                new SpinnerNumberModel(
+                        LanguageServerSettings.DEFAULT_FILE_OPERATIONS_TIMEOUT,
+                        0, 60000, 500));
+        fileOperationsTimeoutSpinner.setToolTipText(
+                LanguageServerBundle.message("language.server.fileOperations.timeout.tooltip"));
+
+        JPanel globalSettingsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        globalSettingsPanel.add(new JLabel(
+                LanguageServerBundle.message("language.server.fileOperations.timeout")));
+        globalSettingsPanel.add(fileOperationsTimeoutSpinner);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.add(globalSettingsPanel, BorderLayout.NORTH);
+        wrapper.add(masterDetails, BorderLayout.CENTER);
+        return wrapper;
     }
 
     @Override
@@ -193,8 +214,32 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     }
 
     @Override
+    public boolean isModified() {
+        if (fileOperationsTimeoutSpinner != null) {
+            int currentValue = (int) fileOperationsTimeoutSpinner.getValue();
+            if (currentValue != GlobalLanguageServerSettings.getInstance().getFileOperationsTimeout()) {
+                return true;
+            }
+        }
+        return super.isModified();
+    }
+
+    @Override
+    public void apply() throws ConfigurationException {
+        if (fileOperationsTimeoutSpinner != null) {
+            GlobalLanguageServerSettings.getInstance()
+                    .setFileOperationsTimeout((int) fileOperationsTimeoutSpinner.getValue());
+        }
+        super.apply();
+    }
+
+    @Override
     public void reset() {
         reloadTree();
+        if (fileOperationsTimeoutSpinner != null) {
+            fileOperationsTimeoutSpinner.setValue(
+                    GlobalLanguageServerSettings.getInstance().getFileOperationsTimeout());
+        }
         super.reset();
     }
 

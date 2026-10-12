@@ -10,7 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.files;
 
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePropertyEvent;
@@ -19,19 +23,23 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Abstract listener that bridges IntelliJ Virtual File System (VFS) events
@@ -49,11 +57,28 @@ import java.util.concurrent.CompletableFuture;
  *   <li>{@code workspace/didChangeWatchedFiles}</li>
  * </ul>
  * <p>
+ * The {@code workspace/will*} requests are sent during {@link #prepareChange}, which
+ * IntelliJ calls on a <strong>background thread</strong>. This avoids blocking the EDT
+ * while waiting for the language server response. The resulting {@link WorkspaceEdit}s
+ * are then applied quickly under the write lock in {@code beforeVfsChange()}.
+ * <p>
  * Subclasses must implement the abstract hook methods to specify how IntelliJ
  * VFS events are converted into LSP {@link FileEvent}, {@link FileCreate},
  * {@link FileDelete}, and {@link FileRename} structures.
  */
 public abstract class AbstractLSPFileListener implements FileEditorManagerListener, AsyncFileListener {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractLSPFileListener.class);
+
+    /**
+     * Returns the timeout in milliseconds for {@code workspace/will*} file operation requests,
+     * reading the value from global settings (configurable like VS Code's {@code files.participants.timeout}).
+     *
+     * @return the timeout in milliseconds
+     */
+    private static long getFileOperationsTimeoutMs() {
+        return GlobalLanguageServerSettings.getInstance().getFileOperationsTimeout();
+    }
 
     /**
      * The associated language server wrapper.
@@ -81,10 +106,31 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         if (supportedEvents.isEmpty()) {
             return null;
         }
+        // Capture the server instance so we can detect connection recycling
+        // between prepareChange() and beforeVfsChange().
+        var serverSnapshot = languageServerWrapper.getLanguageServer();
+        // Capture document modification stamps before sending will* requests.
+        // These stamps are checked before applying edits to detect and discard
+        // stale edits whose target documents were modified while waiting.
+        Map<String, Long> documentStamps = captureDocumentStamps();
+        // Collect workspace edits on background thread (prepareChange runs off-EDT)
+        // so the UI is never blocked waiting for the language server response
+        List<WorkspaceEdit> workspaceEdits = collectWillEdits(supportedEvents);
         return new ChangeApplier() {
             @Override
             public void beforeVfsChange() {
-                before(supportedEvents);
+                // Discard all edits if the server connection was recycled
+                if (serverSnapshot != languageServerWrapper.getLanguageServer()) {
+                    LOGGER.warn("Discarding workspace/will* edits: server connection was recycled");
+                    return;
+                }
+                for (WorkspaceEdit edit : workspaceEdits) {
+                    if (areTargetDocumentsUnchanged(edit, documentStamps)) {
+                        LSPIJUtils.applyWorkspaceEdit(edit);
+                    } else {
+                        LOGGER.warn("Discarding stale workspace/will* edit: target document(s) modified during request");
+                    }
+                }
             }
 
             @Override
@@ -172,17 +218,42 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     }
 
     /**
-     * Called before VFS events are applied.
+     * Sends {@code workspace/will*} requests to the language server and collects the
+     * resulting {@link WorkspaceEdit}s.
      * <p>
-     * Sends "will*" LSP requests to the server for file creation, deletion, and renaming/movement.
+     * This method is called from {@link #prepareChange}, which runs on a background thread,
+     * so blocking on the server response does not freeze the UI. The collected edits are
+     * then applied under the write lock in {@code beforeVfsChange()}.
+     * <p>
+     * Per the LSP specification (§3.16.4), {@code workspace/will*} requests are only sent
+     * for file operations triggered from within the client (user actions or workspace edits).
+     * Events originating from an external VFS refresh ({@link VFileEvent#isFromRefresh()})
+     * are skipped, matching VS Code's behavior.
+     * <p>
+     * <b>Note on inside-IDE operations:</b> For file operations initiated by the user within
+     * the IDE, IntelliJ holds a write lock on the EDT and waits for the entire VFS pipeline
+     * (including {@code prepareChange()}) to complete. This means the EDT is indirectly
+     * blocked for the duration of the server response. The configurable
+     * {@code fileOperationsTimeout} setting bounds this wait. Unlike VS Code, which can show a cancellable progress
+     * notification because its UI thread is never blocked, IntelliJ's EDT is unavailable
+     * for UI updates during this period.
      *
-     * @param events the list of VFS events before execution
+     * @param events the list of VFS events
+     * @return the non-null workspace edits returned by the server
      */
-    private void before(@NotNull List<? extends @NotNull VFileEvent> events) {
-        List<FileCreate> fileCreates = new ArrayList<>(); // workspace/didCreateFiles events
-        List<FileDelete> fileDeletes = new ArrayList<>(); // workspace/didDeleteFiles events
-        List<FileRename> fileRenames = new ArrayList<>(); // workspace/didRenameFiles events
+    private @NotNull List<WorkspaceEdit> collectWillEdits(@NotNull List<? extends @NotNull VFileEvent> events) {
+        List<FileCreate> fileCreates = new ArrayList<>(); // workspace/willCreateFiles events
+        List<FileDelete> fileDeletes = new ArrayList<>(); // workspace/willDeleteFiles events
+        List<FileRename> fileRenames = new ArrayList<>(); // workspace/willRenameFiles events
         for (VFileEvent event : events) {
+            // Per LSP spec §3.16.4, workspace/will* requests are only sent for changes
+            // triggered from within the client (user actions or workspace edits),
+            // not for external file system changes detected during VFS refresh.
+            // This matches VS Code behavior, which only fires willDeleteFiles for
+            // user gestures or workspace.applyEdit.
+            if (event.isFromRefresh()) {
+                continue;
+            }
             if (event instanceof VFileCreateEvent ce) {
                 // Create file
                 VirtualFile createdFile = ce.getFile();
@@ -218,43 +289,158 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                 onFileRenameBefore(parentFile, oldFile, newFileName, fileRenames);
             }
         }
+
+        List<WorkspaceEdit> edits = new ArrayList<>();
         var ls = languageServerWrapper.getLanguageServer();
         if (ls != null) {
+            long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(getFileOperationsTimeoutMs());
             if (!fileCreates.isEmpty()) {
                 var params = new CreateFilesParams(fileCreates);
-                applyWorkspaceEdit(ls.getWorkspaceService().willCreateFiles(params));
+                var edit = getWorkspaceEdit(ls.getWorkspaceService().willCreateFiles(params), deadlineNanos);
+                if (edit != null) {
+                    edits.add(edit);
+                }
             }
             if (!fileDeletes.isEmpty()) {
                 var params = new DeleteFilesParams(fileDeletes);
-                applyWorkspaceEdit(ls.getWorkspaceService().willDeleteFiles(params));
+                var edit = getWorkspaceEdit(ls.getWorkspaceService().willDeleteFiles(params), deadlineNanos);
+                if (edit != null) {
+                    edits.add(edit);
+                }
             }
             if (!fileRenames.isEmpty()) {
                 var params = new RenameFilesParams(fileRenames);
-                applyWorkspaceEdit(ls.getWorkspaceService().willRenameFiles(params));
+                var edit = getWorkspaceEdit(ls.getWorkspaceService().willRenameFiles(params), deadlineNanos);
+                if (edit != null) {
+                    edits.add(edit);
+                }
             }
+        }
+        return edits;
+    }
+
+    /**
+     * Waits for a {@code workspace/will*} response and returns the resulting {@link WorkspaceEdit},
+     * or {@code null} if the request timed out or failed.
+     * <p>
+     * If the enclosing progress indicator is cancelled while waiting,
+     * {@link ProcessCanceledException} is rethrown so that the caller
+     * ({@code collectWillEdits}) aborts immediately instead of continuing
+     * to the next {@code workspace/will*} request.
+     *
+     * @param future        the future returning the workspace edit
+     * @param deadlineNanos shared deadline (absolute {@link System#nanoTime()})
+     * @return the workspace edit, or {@code null}
+     * @throws ProcessCanceledException if the progress indicator is cancelled
+     */
+    // Package-private for testing
+    static @Nullable WorkspaceEdit getWorkspaceEdit(@NotNull CompletableFuture<WorkspaceEdit> future,
+                                                    long deadlineNanos) {
+        CancellationSupport cancellationSupport = new CancellationSupport();
+        future = cancellationSupport.execute(future);
+        long remainingMs = TimeUnit.NANOSECONDS.toMillis(deadlineNanos - System.nanoTime());
+        if (remainingMs <= 0) {
+            future.cancel(true);
+            return null;
+        }
+        try {
+            var f = future;
+            WorkspaceEdit result = ProgressIndicatorUtils.withTimeout(remainingMs,
+                    () -> ProgressIndicatorUtils.awaitWithCheckCanceled(f));
+            if (result == null) {
+                // withTimeout returns null when its internal timeout fires;
+                // cancel the LSP future so the server receives $/cancelRequest
+                future.cancel(true);
+            }
+            return result;
+        } catch (ProcessCanceledException e) {
+            // The enclosing progress indicator was cancelled (e.g. the VFS
+            // operation is being aborted). Cancel the LSP future and rethrow
+            // so collectWillEdits stops immediately instead of trying the
+            // remaining workspace/will* requests.
+            future.cancel(true);
+            throw e;
+        } catch (Exception e) {
+            return null;
         }
     }
 
     /**
-     * Applies a {@link WorkspaceEdit} returned by a "will*" LSP request.
-     * Waits for up to 500ms to avoid blocking the UI thread.
+     * Captures modification stamps for all documents currently opened in the
+     * language server. Used to detect stale edits before applying them.
      *
-     * @param future the future returning the workspace edit
+     * @return a map of document URI to modification stamp
      */
-    private static void applyWorkspaceEdit(CompletableFuture<WorkspaceEdit> future) {
-        try {
-            CancellationSupport cancellationSupport = new CancellationSupport();
-            future = cancellationSupport.execute(future);
-            awaitWithCheckCanceled(future);
-        } catch (CancellationException ignore) {
-
-        }
-        if (CompletableFutures.isDoneNormally(future)) {
-            var workspaceEdit = future.getNow(null);
-            if (workspaceEdit != null) {
-                LSPIJUtils.applyWorkspaceEdit(workspaceEdit);
+    private @NotNull Map<String, Long> captureDocumentStamps() {
+        Map<String, Long> stamps = new HashMap<>();
+        for (var openedDoc : languageServerWrapper.getOpenedDocuments()) {
+            VirtualFile file = openedDoc.getFile();
+            Document doc = FileDocumentManager.getInstance().getCachedDocument(file);
+            if (doc != null) {
+                stamps.put(languageServerWrapper.toUriString(file), doc.getModificationStamp());
             }
         }
+        return stamps;
+    }
+
+    /**
+     * Checks that none of the documents targeted by the workspace edit have been
+     * modified since the stamps were captured. If any target document changed,
+     * the edit is stale and should be discarded.
+     *
+     * @param edit   the workspace edit to validate
+     * @param stamps the document modification stamps captured before the will* request
+     * @return {@code true} if all target documents are unchanged, {@code false} if any are stale
+     */
+    // Package-private for testing
+    static boolean areTargetDocumentsUnchanged(@NotNull WorkspaceEdit edit,
+                                               @NotNull Map<String, Long> stamps) {
+        if (stamps.isEmpty()) {
+            return true;
+        }
+        if (edit.getDocumentChanges() != null) {
+            for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
+                if (change.isLeft()) {
+                    String uri = change.getLeft().getTextDocument().getUri();
+                    if (isDocumentStale(uri, stamps)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        if (edit.getChanges() != null) {
+            for (String uri : edit.getChanges().keySet()) {
+                if (isDocumentStale(uri, stamps)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean isDocumentStale(@NotNull String uri, @NotNull Map<String, Long> stamps) {
+        VirtualFile file = LSPIJUtils.findResourceFor(uri);
+        if (file == null) {
+            return false;
+        }
+        Document doc = FileDocumentManager.getInstance().getCachedDocument(file);
+        return isDocumentStale(uri, doc, stamps);
+    }
+
+    // Package-private for testing
+    static boolean isDocumentStale(@NotNull String uri,
+                                   @Nullable Document doc,
+                                   @NotNull Map<String, Long> stamps) {
+        if (doc == null) {
+            return false;
+        }
+        Long capturedStamp = stamps.get(uri);
+        if (capturedStamp == null) {
+            // Document was not open when stamps were captured but is now cached;
+            // we cannot verify the server's assumptions about its content.
+            return true;
+        }
+        return doc.getModificationStamp() != capturedStamp;
     }
 
     /**
