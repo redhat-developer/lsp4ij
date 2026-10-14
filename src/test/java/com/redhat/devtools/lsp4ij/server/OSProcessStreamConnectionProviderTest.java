@@ -14,8 +14,14 @@ import com.intellij.testFramework.LightPlatformTestCase;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Regression tests for process ownership and terminal stop semantics.
+ */
 public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase {
 
+    /**
+     * Models shutdown after the wrapper publishes a provider but before its startup task runs.
+     */
     public void testStopBeforeStartRejectsProcessCreation() throws Exception {
         var provider = provider();
         try {
@@ -27,6 +33,9 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
         }
     }
 
+    /**
+     * Checks actual child termination and that stopping remains idempotent and terminal.
+     */
     public void testStartedProcessIsReapedByStop() throws Exception {
         var provider = provider();
         try {
@@ -43,6 +52,9 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
         }
     }
 
+    /**
+     * Ensures a rejected second start preserves ownership of the first child process.
+     */
     public void testRepeatedStartCannotReplaceAnOwnedProcess() throws Exception {
         var provider = provider();
         Process first = null;
@@ -63,6 +75,9 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
         }
     }
 
+    /**
+     * Uses the test JVM to run a quiet child without an external language server installation.
+     */
     private static OSProcessStreamConnectionProvider provider() {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         String classes = PathManager.getJarPathForClass(WaitingServer.class);
@@ -70,10 +85,12 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
                 new GeneralCommandLine(java, "-cp", classes, WaitingServer.class.getName()));
     }
 
+    /**
+     * Releases the tracked child, including orphans produced when testing the unfixed provider.
+     */
     private static void reap(OSProcessStreamConnectionProvider provider) throws Exception {
         provider.stop();
         var handler = provider.getProcessHandler();
-        // Also clean up the orphan when this regression is run against the unfixed provider.
         if (handler != null) {
             var process = handler.getProcess();
             if (process.isAlive()) {
@@ -83,12 +100,17 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
         }
     }
 
+    /**
+     * Waits for actual termination; the deadline only prevents a broken test from hanging CI.
+     */
     private static void awaitExit(Process process) throws Exception {
-        // Wait for actual termination; the deadline only prevents a broken test from hanging CI.
         process.onExit().get(30, TimeUnit.SECONDS);
     }
 
     public static class WaitingServer {
+        /**
+         * Waits for input to keep the child alive while the provider's lifecycle is exercised.
+         */
         public static void main(String[] args) throws Exception {
             System.in.read();
         }

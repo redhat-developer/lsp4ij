@@ -106,6 +106,13 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
         unexpectedServerStopHandlers.add(handler);
     }
 
+    /**
+     * Starts the process for this connection. Serialized with {@link #stop()} so shutdown
+     * cannot miss a process whose creation is already in progress.
+     *
+     * @throws CannotStartProcessException if this provider already owns a process, has been
+     *                                    stopped, has no command line, or cannot create the process
+     */
     @Override
     public synchronized void start() throws CannotStartProcessException {
         if (stopped || processHandler != null) {
@@ -171,6 +178,11 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
         return processHandler.getProcessInput();
     }
 
+    /**
+     * Permanently stops this provider and requests termination of its process, if any.
+     * Waits for an in-progress {@link #start()} call, but does not wait for process exit.
+     * Repeated calls have no effect; restarting requires a new provider instance.
+     */
     @Override
     public synchronized void stop() {
         if (stopped) {
