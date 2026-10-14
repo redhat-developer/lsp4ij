@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -790,7 +791,8 @@ public class LanguageServerWrapper implements Disposable {
                     shouldNotify = workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify);
                 }
 
-                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(toUriString(fileUri), file, document, fileConnectionInfo.documentText(), fileConnectionInfo.languageId());
+                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(
+                        toUriString(fileUri), file, document, fileConnectionInfo);
                 // Synchronizer usually is disposed when document editor is closed.
                 // But in case of closing the project, it does not close all editors,
                 // so to ensure synchronizer is disposed we also register it here
@@ -850,9 +852,9 @@ public class LanguageServerWrapper implements Disposable {
     private DocumentContentSynchronizer createDocumentContentSynchronizer(@NotNull String fileUri,
                                                                           @NotNull VirtualFile file,
                                                                           @NotNull Document document,
-                                                                          @Nullable String documentText,
-                                                                          @Nullable String languageId) {
-        return new DocumentContentSynchronizer(this, fileUri, file, document, documentText, languageId);
+                                                                          @NotNull LSPFileConnectionInfo connectionInfo) {
+        return new DocumentContentSynchronizer(this, fileUri, file, document,
+                connectionInfo.documentText(), connectionInfo.documentModificationStamp(), connectionInfo.languageId());
     }
 
     public @NotNull TextDocumentSyncOptions getSyncOptions() {
@@ -1823,16 +1825,29 @@ public class LanguageServerWrapper implements Disposable {
         return disposed;
     }
 
+    /**
+     * Carries the didOpen text and its editor stamp together across asynchronous connection setup.
+     * A stamp of -1 means no stamp was captured; when text is null, both are read at didOpen.
+     */
     record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
-                                 @Nullable String languageId, boolean waitForDidOpen) {
+                                long documentModificationStamp, @Nullable String languageId, boolean waitForDidOpen) {
+        LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
+                              @Nullable String languageId, boolean waitForDidOpen) {
+            this(document, documentText, -1, languageId, waitForDidOpen);
+        }
     }
 
     public LanguageServerWrapper.@NotNull LSPFileConnectionInfo createFileConnectionInfo(@NotNull VirtualFile file,
                                                                                          @NotNull Document document,
                                                                                          boolean waitForDidOpen) {
-        String text = document.getText();
-        String languageId = getServerDefinition().getLanguageId(file, getProject());
-        return new LanguageServerWrapper.LSPFileConnectionInfo(document, text, languageId, waitForDidOpen);
+        // Capture both under one read action. Using a later stamp with this text could authorize
+        // an edit for content the server never saw. The consumer must not reread text during a VFS rename.
+        return ReadAction.compute(() -> {
+            String text = document.getText();
+            long modificationStamp = document.getModificationStamp();
+            String languageId = getServerDefinition().getLanguageId(file, getProject());
+            return new LSPFileConnectionInfo(document, text, modificationStamp, languageId, waitForDidOpen);
+        });
     }
 
     // LSP traces

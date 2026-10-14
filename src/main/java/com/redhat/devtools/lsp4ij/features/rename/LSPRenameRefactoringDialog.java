@@ -30,6 +30,7 @@ import com.intellij.refactoring.ui.RefactoringDialog;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.WorkspaceEditValidator;
 import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.usages.LSPExternalReferencesFinder;
@@ -193,6 +194,15 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
             } else {
                 // Apply the rename from the LSP WorkspaceEdit list
                 WriteCommandAction.runWriteCommandAction(psiFile.getProject(), () -> {
+                    // Check all server responses before changing any document or external reference.
+                    for (var workspaceEditData : workspaceEdits) {
+                        String reason = WorkspaceEditValidator.validateVersions(workspaceEditData.edit(),
+                                workspaceEditData.languageServer().getServerWrapper());
+                        if (reason != null) {
+                            LSPRenameHandler.showErrorHint(editor, reason);
+                            return;
+                        }
+                    }
                     workspaceEdits.forEach(workspaceEditData -> LSPIJUtils.applyWorkspaceEdit(workspaceEditData.edit()));
 
                     // Update any found external references with the new name
