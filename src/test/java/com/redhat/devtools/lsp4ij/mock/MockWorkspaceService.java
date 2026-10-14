@@ -42,6 +42,17 @@ public class MockWorkspaceService implements WorkspaceService {
     private volatile CompletableFuture<RenameFilesParams> didRenameCallback;
     private volatile CompletableFuture<RenameFilesParams> willRenameCallback;
     private final Map<String, String> documentContents = new ConcurrentHashMap<>();
+    private Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> diagnosticHandler;
+
+    public void setDiagnosticHandler(Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> handler) {
+        this.diagnosticHandler = handler;
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceDiagnosticReport> diagnostic(WorkspaceDiagnosticParams params) {
+        return diagnosticHandler.apply(params);
+    }
+
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;

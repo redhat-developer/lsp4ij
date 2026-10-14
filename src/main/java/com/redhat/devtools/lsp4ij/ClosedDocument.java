@@ -19,8 +19,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.isDiagnosticsChanged;
 
@@ -31,27 +32,37 @@ import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils
  */
 public class ClosedDocument extends LSPDocumentBase {
 
-    private List<Diagnostic> diagnostics;
-    private boolean hasErrors;
+    private final Map<String, List<Diagnostic>> diagnosticsPerIdentifier = new HashMap<>();
+    // Publish the diagnostics and their derived error status together.
+    private volatile DiagnosticSnapshot snapshot = new DiagnosticSnapshot(List.of(), false);
 
     @Override
-    public boolean updateDiagnostics(@NotNull String identifier,
+    public synchronized boolean updateDiagnostics(@NotNull String identifier,
                                      @NotNull List<Diagnostic> diagnostics, @Nullable Integer version) {
-        boolean changed = isDiagnosticsChanged(this.diagnostics != null ? this.diagnostics : Collections.emptyList(), diagnostics);
-        this.diagnostics = diagnostics;
-        hasErrors = diagnostics
+        if (diagnostics.isEmpty()) {
+            diagnosticsPerIdentifier.remove(identifier);
+        } else {
+            diagnosticsPerIdentifier.put(identifier, List.copyOf(diagnostics));
+        }
+        var combined = diagnosticsPerIdentifier.values().stream().flatMap(List::stream).distinct().toList();
+        boolean changed = isDiagnosticsChanged(snapshot.diagnostics(), combined);
+        boolean hasErrors = combined
                 .stream()
                 .anyMatch(diagnostic -> diagnostic.getSeverity() != null && diagnostic.getSeverity() == DiagnosticSeverity.Error);
+        snapshot = new DiagnosticSnapshot(combined, hasErrors);
         return changed;
     }
 
     @Override
     public Collection<Diagnostic> getDiagnostics() {
-        return diagnostics != null ? diagnostics : Collections.emptyList();
+        return snapshot.diagnostics();
     }
 
     @Override
     public boolean hasErrors() {
-        return hasErrors;
+        return snapshot.hasErrors();
+    }
+
+    private record DiagnosticSnapshot(List<Diagnostic> diagnostics, boolean hasErrors) {
     }
 }
