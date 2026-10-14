@@ -23,6 +23,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.function.Predicate;
 
 /**
@@ -88,7 +90,30 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
                         .refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_REGISTER_CAPABILITY);
             }
         }
+        getClientFeatures().getServerWrapper().updateWorkspaceDiagnosticProviders();
         return options;
+    }
+
+    @Override
+    public void unregisterCapability(Object options) {
+        super.unregisterCapability(options);
+        getClientFeatures().getServerWrapper().updateWorkspaceDiagnosticProviders();
+    }
+
+    /** Workspace diagnostic providers, including a null identifier for the default provider. */
+    public Set<String> getWorkspaceDiagnosticIdentifiers() {
+        Set<String> identifiers = new HashSet<>();
+        var capabilities = getServerCapabilities();
+        if (capabilities != null && capabilities.getDiagnosticProvider() != null
+                && capabilities.getDiagnosticProvider().isWorkspaceDiagnostics()) {
+            identifiers.add(capabilities.getDiagnosticProvider().getIdentifier());
+        }
+        for (var option : getOptions()) {
+            if (option.isWorkspaceDiagnostics()) {
+                identifiers.add(option.getIdentifier());
+            }
+        }
+        return identifiers;
     }
 
     /**

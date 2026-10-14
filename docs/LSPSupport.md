@@ -93,7 +93,23 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
  * ✅ [workspace/didRenameFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles).
  * ✅ [workspace/willDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles).
  * ✅ [workspace/didDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles).
- * ❌ [workspace/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic).
+ * ✅ [workspace/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic).
+
+Workspace diagnostics start automatically when a server advertises
+`diagnosticProvider.workspaceDiagnostics`, including dynamic registrations.
+LSP4IJ consumes full, unchanged and streamed partial reports, retains result IDs,
+and reissues completed requests with a short delay. A diagnostic refresh cancels
+and restarts the workspace pull; stopping the server cancels outstanding work.
+Unregistering a provider clears its closed-file diagnostics while retaining other
+providers. Asynchronous document matching does not block refresh, unregistration
+or shutdown; late matches cannot publish after cancellation. A failed matcher
+rejects only that file report, allowing remaining reports and pulls to continue.
+Workspace reports honor server file mappings and synchronous/asynchronous
+DocumentMatchers before updating diagnostics; filtering never starts a server
+or connects a document. Workspace reports update closed-file diagnostics. For open files handled by the
+same document diagnostic provider, a fresh workspace report triggers a document
+pull so current editor diagnostics take precedence over slower workspace results.
+
  
 ## Window Features
 

@@ -35,6 +35,17 @@ public class MockWorkspaceService implements WorkspaceService {
     private long willCreateDelayMs;
     private long willDeleteDelayMs;
     private long willRenameDelayMs;
+    private Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> diagnosticHandler;
+
+    public void setDiagnosticHandler(Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> handler) {
+        this.diagnosticHandler = handler;
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceDiagnosticReport> diagnostic(WorkspaceDiagnosticParams params) {
+        return diagnosticHandler.apply(params);
+    }
+
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
