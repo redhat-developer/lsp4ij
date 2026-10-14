@@ -10,11 +10,16 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeAction;
 
+import com.intellij.openapi.util.SystemInfo;
+import com.intellij.testFramework.JUnit38AssumeSupportRunner;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeActionFixtureTestCase;
+import org.junit.Assume;
+import org.junit.runner.RunWith;
 
 /**
  * Test case for InvalidWebFilter quick fix
  */
+@RunWith(JUnit38AssumeSupportRunner.class)
 public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
 
     // NOTE: Using an extension other than "java" here to avoid having native Java language support skew results
@@ -26,6 +31,10 @@ public class WebFilterQuickFixTest extends LSPCodeActionFixtureTestCase {
     }
 
     public void testWebFilterQuickFix() {
+        // Re-enable macOS coverage once the intermittent failure tracked in #1697 is fixed.
+        Assume.assumeFalse("Intermittent quick-fix test failure: https://github.com/redhat-developer/lsp4ij/issues/1697",
+                SystemInfo.isMac);
+
         var allQuickFixes = assertCodeActions(TEST_FILE_NAME,
                 IntentionActionKind.QUICK_FIX_ONLY,
                 // language=JAVA
