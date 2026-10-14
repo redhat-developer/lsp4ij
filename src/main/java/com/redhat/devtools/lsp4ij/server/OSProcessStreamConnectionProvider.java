@@ -30,15 +30,16 @@ import java.util.Objects;
 /**
  * Process stream connection provider used to start a language server with the
  * IntelliJ {@link OSProcessHandler} and {@link GeneralCommandLine}.
+ * Each provider owns at most one process. Create a new provider to restart a stopped connection.
  */
 public class OSProcessStreamConnectionProvider implements StreamConnectionProvider, ProcessDataProvider {
 
     private GeneralCommandLine commandLine;
-    private OSProcessHandler processHandler;
-    private InputStream inputStream;
+    private volatile OSProcessHandler processHandler;
+    private volatile InputStream inputStream;
     private final List<LanguageServerLogErrorHandler> handlers;
     private final List<Runnable> unexpectedServerStopHandlers;
-    private boolean stopped;
+    private volatile boolean stopped;
 
     public OSProcessStreamConnectionProvider() {
         this(null);
@@ -106,7 +107,10 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
     }
 
     @Override
-    public void start() throws CannotStartProcessException {
+    public synchronized void start() throws CannotStartProcessException {
+        if (stopped || processHandler != null) {
+            throw new CannotStartProcessException("This connection provider has already been started or stopped");
+        }
         if (this.commandLine == null) {
             throw new CannotStartProcessException("Unable to start language server: " + this);
         }
@@ -168,7 +172,7 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
     }
 
     @Override
-    public void stop() {
+    public synchronized void stop() {
         if (stopped) {
             return;
         }
