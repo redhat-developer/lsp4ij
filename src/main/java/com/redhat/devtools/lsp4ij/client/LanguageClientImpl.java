@@ -15,7 +15,6 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.*;
@@ -23,7 +22,6 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
-import com.redhat.devtools.lsp4ij.internal.VirtualFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
@@ -39,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -52,7 +51,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     private @Nullable LanguageServer server;
     private @NotNull LanguageServerWrapper wrapper;
-    private boolean disposed;
+    private volatile boolean disposed;
 
     private Runnable didChangeConfigurationListener;
 
@@ -159,46 +158,31 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshCodeLenses() {
-        return CompletableFuture.runAsync(this::refreshCodeLensForAllOpenedFiles);
-    }
-
-    private void refreshCodeLensForAllOpenedFiles() {
-        for (var openedDocument : wrapper.getOpenedDocuments()) {
-            VirtualFile file = openedDocument.getFile();
-            EditorFeatureManager.getInstance(getProject())
-                    .refreshEditorFeature(file, EditorFeatureType.CODE_VISION, true, new VirtualFileCancelChecker(file));
-        }
+        return refreshEditorFeatures(EditorFeatureType.CODE_VISION);
     }
 
     @Override
     public CompletableFuture<Void> refreshInlayHints() {
-        return CompletableFuture.runAsync(() -> {
-            if (wrapper == null) {
-                return;
-            }
-            refreshInlayHintsForAllOpenedFiles();
-        });
-    }
-
-    private void refreshInlayHintsForAllOpenedFiles() {
-        for (var openedDocument : wrapper.getOpenedDocuments()) {
-            VirtualFile file = openedDocument.getFile();
-            EditorFeatureManager efm = EditorFeatureManager.getInstance(getProject());
-            efm.refreshEditorFeature(file, EditorFeatureType.DECLARATIVE_INLAY_HINT, true, new VirtualFileCancelChecker(file));
-        }
+        return refreshEditorFeatures(EditorFeatureType.DECLARATIVE_INLAY_HINT);
     }
 
     @Override
     public CompletableFuture<Void> refreshSemanticTokens() {
-        return CompletableFuture.runAsync(this::refreshSemanticTokensForAllOpenedFiles);
+        return refreshEditorFeatures(EditorFeatureType.SEMANTIC_TOKENS);
     }
 
-    private void refreshSemanticTokensForAllOpenedFiles() {
-        for (var openedDocument : wrapper.getOpenedDocuments()) {
-            VirtualFile file = openedDocument.getFile();
-            EditorFeatureManager.getInstance(getProject())
-                    .refreshEditorFeature(file, EditorFeatureType.SEMANTIC_TOKENS, true, new VirtualFileCancelChecker(file));
+    private CompletableFuture<Void> refreshEditorFeatures(EditorFeatureType feature) {
+        if (wrapper != null && !isDisposed() && !wrapper.isDisposed()) {
+            EditorFeatureManager.getInstance(project).refreshEditorFeatures(this,
+                    () -> wrapper.getOpenedDocuments().stream().map(OpenedDocument::getFile).toList(), feature,
+                    () -> {
+                        if (isDisposed() || wrapper.isDisposed()) {
+                            throw new CancellationException();
+                        }
+                    });
         }
+        // Acknowledge scheduling. Coalescing superseded work must not fail an LSP refresh RPC.
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override
