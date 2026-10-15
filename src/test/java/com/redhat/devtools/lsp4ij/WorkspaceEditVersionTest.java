@@ -7,22 +7,35 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.mock.MockDocument;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.impl.event.DocumentEventImpl;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupportBase;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams;
 import org.eclipse.lsp4j.ApplyWorkspaceEditResponse;
+import org.eclipse.lsp4j.DocumentOnTypeFormattingOptions;
+import org.eclipse.lsp4j.DocumentOnTypeFormattingParams;
+import org.eclipse.lsp4j.FormattingOptions;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentEdit;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -60,7 +73,11 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private static WorkspaceEdit versioned(URI uri, Integer version) {
-        var text = new TextDocumentEdit(new VersionedTextDocumentIdentifier(uri.toString(), version),
+        return versioned(uri.toString(), version);
+    }
+
+    private static WorkspaceEdit versioned(String uri, Integer version) {
+        var text = new TextDocumentEdit(new VersionedTextDocumentIdentifier(uri, version),
                 List.of(Either.forLeft(replacement())));
         return new WorkspaceEdit(List.of(Either.forLeft(text)));
     }
@@ -93,6 +110,116 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
         assertFalse(response.isApplied());
         assertNotNull(response.getFailureReason());
         assertEquals("new typing", context.document().getText());
+    }
+
+    public void testMalformedUriIsRejected() throws Exception {
+        var context = open();
+        var response = apply(versioned(context.uri() + "%invalid", context.version()));
+
+        assertFalse(response.isApplied());
+        assertNotNull(response.getFailureReason());
+        assertEquals("before", context.document().getText());
+    }
+
+    public void testEquivalentUriCannotBypassVersionCheck() throws Exception {
+        var context = open();
+        int originalVersion = context.version();
+        type(context);
+        String encodedUri = context.uri().toString().replace("test.foo", "%74est.foo");
+        assertFalse(context.uri().equals(URI.create(encodedUri)));
+        assertEquals(myFixture.getFile().getVirtualFile(), FileUriSupport.findFileByUri(encodedUri, context.wrapper().getClientFeatures()));
+
+        var response = apply(versioned(encodedUri, originalVersion));
+        assertFalse(response.isApplied());
+        assertNotNull(response.getFailureReason());
+        assertEquals("new typing", context.document().getText());
+    }
+
+    public void testEquivalentUriWithCurrentVersionIsApplied() throws Exception {
+        var context = open();
+        String encodedUri = context.uri().toString().replace("test.foo", "%74est.foo");
+
+        assertTrue(apply(versioned(encodedUri, context.version())).isApplied());
+        assertEquals("after", context.document().getText());
+    }
+
+    public void testConfiguredUriSupportIsUsedForVersionCheck() throws Exception {
+        var context = open();
+        int originalVersion = context.version();
+        type(context);
+        String alias = "test:///document.foo";
+        VirtualFile file = myFixture.getFile().getVirtualFile();
+        context.wrapper().getClientFeatures().setFileUriSupport(new FileUriSupportBase() {
+            @Override
+            public VirtualFile findFileByUri(String uri) {
+                return alias.equals(uri) ? file : super.findFileByUri(uri);
+            }
+        });
+        try {
+            var response = apply(versioned(alias, originalVersion));
+            assertFalse(response.isApplied());
+            assertNotNull(response.getFailureReason());
+            assertEquals("new typing", context.document().getText());
+        } finally {
+            context.wrapper().getClientFeatures().setFileUriSupport(FileUriSupport.DEFAULT);
+        }
+    }
+
+    public void testBackgroundFlushCapturesStampUnderReadAccess() throws Exception {
+        MockLanguageServer.INSTANCE.getInitializeResult().getCapabilities().setTextDocumentSync(TextDocumentSyncKind.Incremental);
+        var context = open();
+        var readAccess = new ArrayList<Boolean>();
+        var document = new MockDocument() {
+            @Override
+            public long getModificationStamp() {
+                readAccess.add(ApplicationManager.getApplication().isReadAccessAllowed());
+                return 42;
+            }
+        };
+        var synchronizer = new DocumentContentSynchronizer(context.wrapper(), context.uri().toString(),
+                myFixture.getFile().getVirtualFile(), document, null, null);
+        ReadAction.run(() -> synchronizer.beforeDocumentChange(new DocumentEventImpl(context.document(),
+                0, "before", "after", context.document().getModificationStamp(), true, 0, 6, 0)));
+
+        // Observe access at the stamp read itself instead of depending on a race with a writer.
+        var pending = ApplicationManager.getApplication().executeOnPooledThread(
+                () -> synchronizer.flushPendingChanges().get(30, TimeUnit.SECONDS));
+        PlatformTestUtil.waitWithEventsDispatching("background document flush", pending::isDone, 30);
+        pending.get();
+
+        assertEquals(List.of(true), readAccess);
+    }
+
+    public void testOnTypeFormattingFlushesBeforeLeavingWriteAction() throws Exception {
+        var capabilities = MockLanguageServer.INSTANCE.getInitializeResult().getCapabilities();
+        capabilities.setTextDocumentSync(TextDocumentSyncKind.Incremental);
+        capabilities.setDocumentOnTypeFormattingProvider(new DocumentOnTypeFormattingOptions("}"));
+        MockLanguageServer.INSTANCE.setFormattingTextEdits(List.of(replacement()));
+        var context = open();
+        var synchronizer = context.synchronizer();
+        int originalVersion = context.version();
+        var support = LSPFileSupport.getSupport(myFixture.getFile()).getOnTypeFormattingSupport();
+
+        // Queue the change explicitly to model a deferred PSI-commit notification, bypassing
+        // the synchronizer's immediate dispatch in unit-test mode.
+        context.document().removeDocumentListener(synchronizer);
+        try {
+            var pending = WriteCommandAction.writeCommandAction(myFixture.getProject()).compute(() -> {
+                synchronizer.beforeDocumentChange(new DocumentEventImpl(context.document(),
+                        0, "before", "after}", context.document().getModificationStamp(), true, 0, 6, 0));
+                context.document().setText("after}");
+                var params = new DocumentOnTypeFormattingParams(new TextDocumentIdentifier(context.uri().toString()),
+                        new FormattingOptions(4, true), new Position(0, 6), "}");
+                var result = support.onTypeFormatting(params);
+                // The batch and stamp must be captured synchronously, before the caller awaits formatting.
+                assertTrue(synchronizer.isCurrentVersion(originalVersion + 1));
+                return result;
+            });
+            PlatformTestUtil.waitWithEventsDispatching("on-type formatting reply", pending::isDone, 30);
+            assertEquals(List.of(replacement()), pending.join());
+        } finally {
+            context.document().addDocumentListener(synchronizer, synchronizer);
+        }
     }
 
     public void testStaleSecondTargetPreventsAllChanges() throws Exception {

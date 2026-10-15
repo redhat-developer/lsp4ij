@@ -212,39 +212,49 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     }
 
     private CompletableFuture<Void> sendDidChangeEvents() {
-        List<TextDocumentContentChangeEvent> events;
-        CompletableFuture<Void> barrier;
-        final int version;
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
+                // No document state to read. On-type formatting may await this barrier in a write action.
                 return lastDidChangeFuture;
             }
-            events = new ArrayList<>(changeEvents);
-            changeEvents.clear();
-            barrier = new CompletableFuture<>();
-            lastDidChangeFuture = barrier;
-            // Record the state represented by this batch before another flush can advance it.
-            version = ++this.version;
-            synchronizedModificationStamp = document.getModificationStamp();
         }
-
-        // send 'textDocument/didChange' notification
-        DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
-        changeParamsToSend.getTextDocument().setUri(fileUri);
-        changeParamsToSend.getTextDocument().setVersion(version);
-        var didChange = languageServerWrapper.sendNotification(ls -> {
-            ls.getTextDocumentService().didChange(changeParamsToSend);
-            return ls;
-        });
-        processPullDiagnosticIfNeeded(didChange, version);
-        didChange.whenComplete((ls, ex) -> {
-            if (ex != null) {
-                barrier.completeExceptionally(ex);
-            } else {
-                barrier.complete(null);
+        // Incremental events are queued before the document changes. Acquire read access before
+        // consuming them under the monitor so the batch and stamp describe the same completed state.
+        return ReadAction.compute(() -> {
+            List<TextDocumentContentChangeEvent> events;
+            CompletableFuture<Void> barrier;
+            final int version;
+            synchronized (changeEvents) {
+                if (changeEvents.isEmpty()) {
+                    return lastDidChangeFuture;
+                }
+                events = new ArrayList<>(changeEvents);
+                changeEvents.clear();
+                barrier = new CompletableFuture<>();
+                lastDidChangeFuture = barrier;
+                // Record the state represented by this batch before another flush can advance it.
+                version = ++this.version;
+                synchronizedModificationStamp = document.getModificationStamp();
             }
+
+            // send 'textDocument/didChange' notification
+            DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
+            changeParamsToSend.getTextDocument().setUri(fileUri);
+            changeParamsToSend.getTextDocument().setVersion(version);
+            var didChange = languageServerWrapper.sendNotification(ls -> {
+                ls.getTextDocumentService().didChange(changeParamsToSend);
+                return ls;
+            });
+            processPullDiagnosticIfNeeded(didChange, version);
+            didChange.whenComplete((ls, ex) -> {
+                if (ex != null) {
+                    barrier.completeExceptionally(ex);
+                } else {
+                    barrier.complete(null);
+                }
+            });
+            return barrier;
         });
-        return barrier;
     }
 
     @Override

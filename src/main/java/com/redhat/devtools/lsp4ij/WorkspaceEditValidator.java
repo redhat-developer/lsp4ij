@@ -8,6 +8,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -25,7 +26,8 @@ public final class WorkspaceEditValidator {
     }
 
     /**
-     * Returns a refusal reason if an edit targets an outdated version of a synchronized document.
+     * Returns a refusal reason if a versioned edit has an invalid URI or targets an outdated
+     * version of a synchronized document.
      * The caller must keep write access from this check through application so typing cannot
      * invalidate a successful check. All targets are checked before any mutation.
      * <p>
@@ -45,7 +47,18 @@ public final class WorkspaceEditValidator {
                 if (version == null) {
                     continue;
                 }
-                var opened = wrapper.getOpenedDocument(URI.create(identifier.getUri()));
+                URI uri;
+                try {
+                    uri = URI.create(identifier.getUri());
+                    var file = FileUriSupport.findFileByUri(identifier.getUri(), wrapper.getClientFeatures());
+                    if (file != null) {
+                        // Use the same URI as the opened-document map, including custom URI support.
+                        uri = wrapper.toUri(file);
+                    }
+                } catch (IllegalArgumentException e) {
+                    return LanguageServerBundle.message("lsp.workspace.edit.uri.invalid", identifier.getUri());
+                }
+                var opened = wrapper.getOpenedDocument(uri);
                 var synchronizer = opened != null ? opened.getSynchronizer() : null;
                 if (synchronizer != null && !synchronizer.isCurrentVersion(version)) {
                     return LanguageServerBundle.message("lsp.workspace.edit.version.changed", identifier.getUri());
