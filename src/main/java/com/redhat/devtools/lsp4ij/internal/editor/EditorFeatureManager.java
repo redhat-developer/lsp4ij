@@ -28,6 +28,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +115,6 @@ public class EditorFeatureManager implements Disposable {
                         if (psiFile == null) {
                             continue;
                         }
-                        clearLSPCache(psiFile, featureType);
                         for (var editor : editors) {
                             if (!editor.isDisposed()) {
                                 var updates = new ArrayList<Runnable>();
@@ -130,16 +130,22 @@ public class EditorFeatureManager implements Disposable {
                 .expireWhen(cancelChecker::isCanceled)
                 .coalesceBy(this, owner, featureType)
                 .finishOnUiThread(ModalityState.any(), presentations -> {
+                    var clearedFiles = new HashSet<PsiFile>();
                     for (var presentation : presentations) {
-                        if (cancelChecker.isCanceled()) {
-                            return;
+                        if (!presentation.file().isValid()) {
+                            continue;
                         }
-                        if (!presentation.file().isValid() || presentation.editor().isDisposed()) {
+                        if (clearedFiles.add(presentation.file())) {
+                            clearLSPCache(presentation.file(), featureType);
+                        }
+                        if (presentation.editor().isDisposed()) {
                             continue;
                         }
                         clearEditorCache(presentation.editor(), project, featureType);
-                        LSPFileSupport.getSupport(presentation.file()).restartDaemonCodeAnalyzerWithDebounce(cancelChecker);
-                        presentation.updates().forEach(Runnable::run);
+                        LSPFileSupport.getSupport(presentation.file()).restartDaemonCodeAnalyzerWithDebounce();
+                        if (!cancelChecker.isCanceled()) {
+                            presentation.updates().forEach(Runnable::run);
+                        }
                     }
                 }).submit(AppExecutorUtil.getAppExecutorService());
     }
