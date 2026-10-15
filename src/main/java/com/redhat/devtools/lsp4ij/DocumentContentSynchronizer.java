@@ -428,38 +428,40 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         ls.getTextDocumentService()
                 .diagnostic(params)
                 .thenAcceptAsync(diagnosticReport -> {
-                    if (debouncePullDiagnosticsAlarm.isDisposed() || diagnosticReport == null ||
-                            (version != -1 && version != this.version)) {
-                        // The document changed or its synchronizer was retired while the request was pending.
-                        return;
-                    }
-                    var clientFeatures = languageServerWrapper.getClientFeatures();
-                    // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticsApplier.
-                    if (diagnosticReport.isLeft()) {
-                        RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
-                        // Update the diagnostics cache from the opened file
-                        updatePullDiagnostics(file, fileReport);
-                    } else if (diagnosticReport.isRight()) {
-                        RelatedUnchangedDocumentDiagnosticReport allFilesReport = diagnosticReport.getRight();
-                        Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments = allFilesReport.getRelatedDocuments();
-                        if (relatedDocuments != null) {
-                            for (var relatedDocument : relatedDocuments.entrySet()) {
-                                String documentUri = relatedDocument.getKey();
-                                Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport> fileReport = relatedDocument.getValue();
-                                if (fileReport != null) {
-                                    if (fileReport.isLeft()) {
-                                        VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
-                                        if (file != null) {
-                                            updatePullDiagnostics(file, fileReport.getLeft());
+                    // Disposal must wait for publication, or prevent the entire reply from being applied.
+                    synchronized (diagnosticLifetime) {
+                        if (debouncePullDiagnosticsAlarm.isDisposed() || diagnosticReport == null ||
+                                (version != -1 && version != this.version)) {
+                            // The document changed or its synchronizer was retired while the request was pending.
+                            return;
+                        }
+                        var clientFeatures = languageServerWrapper.getClientFeatures();
+                        // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticsApplier.
+                        if (diagnosticReport.isLeft()) {
+                            RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
+                            // Update the diagnostics cache from the opened file
+                            updatePullDiagnostics(file, fileReport);
+                        } else if (diagnosticReport.isRight()) {
+                            RelatedUnchangedDocumentDiagnosticReport allFilesReport = diagnosticReport.getRight();
+                            Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments = allFilesReport.getRelatedDocuments();
+                            if (relatedDocuments != null) {
+                                for (var relatedDocument : relatedDocuments.entrySet()) {
+                                    String documentUri = relatedDocument.getKey();
+                                    Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport> fileReport = relatedDocument.getValue();
+                                    if (fileReport != null) {
+                                        if (fileReport.isLeft()) {
+                                            VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
+                                            if (file != null) {
+                                                updatePullDiagnostics(file, fileReport.getLeft());
+                                            }
+                                        } else if (fileReport.isRight()) {
+                                            // TODO: implement UnchangedDocumentDiagnosticReport
                                         }
-                                    } else if (fileReport.isRight()) {
-                                        // TODO: implement UnchangedDocumentDiagnosticReport
                                     }
                                 }
                             }
                         }
                     }
-
                 });
     }
 
