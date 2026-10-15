@@ -13,6 +13,8 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.LightVirtualFile;
+import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.mock.MockTextDocumentService;
@@ -24,6 +26,7 @@ import org.eclipse.lsp4j.TextDocumentSyncKind;
 import org.eclipse.lsp4j.TextDocumentSyncOptions;
 import org.eclipse.lsp4j.services.LanguageServer;
 
+import java.lang.management.ManagementFactory;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +35,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * Controls disposal and reply delivery explicitly. Future timeouts only guard against hangs;
+ * Controls disposal and reply delivery explicitly. Timeouts only guard against hangs;
  * no assertion depends on a diagnostic debounce delay or a race between threads.
  */
 public class DocumentContentSynchronizerDisposalTest extends LightPlatformTestCase {
@@ -80,6 +83,47 @@ public class DocumentContentSynchronizerDisposalTest extends LightPlatformTestCa
         assertEquals(0, wrapper.updates.get());
     }
 
+    public void testDisposalWaitsForDiagnosticPublication() throws Exception {
+        var wrapper = new RecordingWrapper();
+        var synchronizer = openDocument(wrapper);
+        var publicationStarted = new CompletableFuture<Thread>();
+        var allowPublication = new CompletableFuture<Void>();
+        wrapper.beforeUpdate = () -> {
+            publicationStarted.complete(Thread.currentThread());
+            allowPublication.join();
+        };
+
+        try {
+            wrapper.reply.complete(new DocumentDiagnosticReport(new RelatedFullDocumentDiagnosticReport(List.of())));
+            var publisher = publicationStarted.get(30, TimeUnit.SECONDS);
+            var disposalStarted = new CompletableFuture<Thread>();
+            var disposal = CompletableFuture.runAsync(() -> {
+                disposalStarted.complete(Thread.currentThread());
+                Disposer.dispose(synchronizer);
+            }, AppExecutorUtil.getAppExecutorService());
+            try {
+                var disposer = disposalStarted.get(30, TimeUnit.SECONDS);
+                var threads = ManagementFactory.getThreadMXBean();
+                // Both outcomes are stable while publication is paused: disposal either finishes
+                // (the regression) or blocks on the publisher. Do not infer blocking from a delay.
+                PlatformTestUtil.waitWithEventsDispatching("Disposal did not reach publication", () -> {
+                    var info = threads.getThreadInfo(disposer.getId());
+                    return disposal.isDone() || (info != null && info.getThreadState() == Thread.State.BLOCKED
+                            && info.getLockOwnerId() == publisher.getId());
+                }, 30);
+                assertFalse("Disposal must wait for an active diagnostic publication", disposal.isDone());
+            } finally {
+                allowPublication.complete(null);
+                disposal.get(30, TimeUnit.SECONDS);
+            }
+        } finally {
+            allowPublication.complete(null);
+            wrapper.reply.applied.get(30, TimeUnit.SECONDS);
+        }
+
+        assertEquals(1, wrapper.updates.get());
+    }
+
     private DocumentContentSynchronizer openDocument(RecordingWrapper wrapper) throws Exception {
         var synchronizer = new DocumentContentSynchronizer(wrapper, "file:///diagnostic.test",
                 new LightVirtualFile("diagnostic.test"), EditorFactory.getInstance().createDocument("original"),
@@ -103,6 +147,7 @@ public class DocumentContentSynchronizerDisposalTest extends LightPlatformTestCa
         private final CompletableFuture<Void> firstPull = new CompletableFuture<>();
         private final DiagnosticReply reply = new DiagnosticReply();
         private Runnable beforeNotification = () -> {};
+        private Runnable beforeUpdate = () -> {};
 
         RecordingWrapper() {
             super(DocumentContentSynchronizerDisposalTest.this.getProject(),
@@ -140,6 +185,7 @@ public class DocumentContentSynchronizerDisposalTest extends LightPlatformTestCa
 
         @Override
         public void updateDiagnostics(VirtualFile file, String identifier, List<Diagnostic> diagnostics, Integer version) {
+            beforeUpdate.run();
             updates.incrementAndGet();
         }
     }
