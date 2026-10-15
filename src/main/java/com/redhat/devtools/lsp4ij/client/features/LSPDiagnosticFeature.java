@@ -341,6 +341,25 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
         return true;
     }
 
+    /**
+     * Observes the current cached diagnostics after a report has been processed.
+     * This includes document pulls, published diagnostics, and updates for closed
+     * files. The list combines the cached diagnostic providers for this file;
+     * an empty list clears its problems. Repeated or rejected reports may notify
+     * the same current diagnostics again.
+     * <p>
+     * Called synchronously on the updating thread while holding the document
+     * cache lock. Implementations must return promptly, must not modify the list
+     * or diagnostics, and must schedule UI work separately. Use client lifecycle
+     * callbacks to clear retained results when a server stops or is disposed.
+     *
+     * @param file the file whose diagnostic cache was updated
+     * @param diagnostics a read-only snapshot of its current diagnostics
+     */
+    public void diagnosticsUpdated(@NotNull VirtualFile file,
+                                   @NotNull List<Diagnostic> diagnostics) {
+    }
+
     public DiagnosticCapabilityRegistry getDiagnosticCapabilityRegistry() {
         if (diagnosticCapabilityRegistry == null) {
             initDiagnosticCapabilityRegistry();

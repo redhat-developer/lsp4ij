@@ -1451,6 +1451,14 @@ public class LanguageServerWrapper implements Disposable {
         synchronized (openedOrClosedDocument) {
             hasErrors = openedOrClosedDocument.hasErrors();
             openedOrClosedDocument.updateDiagnostics(identifier, diagnostics, version);
+            try {
+                // Notify in cache-update order, using the accepted/merged cache
+                // rather than the incoming report (which may have been stale).
+                clientFeatures.getDiagnosticFeature().diagnosticsUpdated(file,
+                        List.copyOf(openedOrClosedDocument.getDiagnostics()));
+            } catch (Exception e) {
+                LOGGER.warn("Failed to notify diagnostic update for {}", file, e);
+            }
         }
 
         if ((hasErrors != openedOrClosedDocument.hasErrors()) && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
