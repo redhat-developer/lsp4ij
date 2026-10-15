@@ -16,6 +16,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.util.Alarm;
@@ -59,7 +60,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private volatile @NotNull CompletableFuture<Void> lastDidChangeFuture = CompletableFuture.completedFuture(null);
     private @Nullable CompletableFuture<LanguageServer> didOpenFuture;
 
-    private volatile Alarm debouncePullDiagnosticsAlarm = null;
+    // Create the Alarm while its owner is alive, never from a delayed document callback.
+    // It does not schedule work until a request is added.
+    private final Disposable diagnosticLifetime;
+    private final Alarm debouncePullDiagnosticsAlarm;
     private boolean diagnosticNotPulledOnDidOpen;
 
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
@@ -78,6 +82,8 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
         // Initialize LSP change events
         changeEvents = new ArrayList<>();
+        diagnosticLifetime = Disposer.newDisposable();
+        debouncePullDiagnosticsAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, diagnosticLifetime);
     }
 
     public @NotNull CompletableFuture<LanguageServer> getDidOpenFuture() {
@@ -322,11 +328,13 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     @Override
     public void dispose() {
-        documentClosed();
-        if (debouncePullDiagnosticsAlarm != null) {
-            debouncePullDiagnosticsAlarm.dispose();
-            debouncePullDiagnosticsAlarm = null;
+        // Retire diagnostics before documentClosed can flush changes and schedule another pull.
+        // A private parent lets disposal and scheduling share a lock; registering the Alarm under
+        // this synchronizer would dispose the child before this method can acquire that lock.
+        synchronized (diagnosticLifetime) {
+            Disposer.dispose(diagnosticLifetime);
         }
+        documentClosed();
     }
 
     /**
@@ -360,6 +368,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      */
     private void processPullDiagnosticIfNeeded(@Nullable CompletableFuture<LanguageServer> didFuture,
                                                int version) {
+        if (debouncePullDiagnosticsAlarm.isDisposed()) {
+            // Sending a notification can restart the connection and dispose this synchronizer.
+            return;
+        }
         boolean debounceValidation = didFuture != null && !ApplicationManager.getApplication().isUnitTestMode();
         if (!isPullDiagnosticsSupported()) {
             // The language server doesn't support pull diagnostics.
@@ -387,32 +399,28 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             return;
         }
         // Refresh pull diagnostic with debounce (after a didOpen , didChange).
-        // Initialize the Alarm which consumes 'textDocument/diagnostic' with debounce mode.
-        if (debouncePullDiagnosticsAlarm == null) {
-            debouncePullDiagnosticsAlarm = getDebouncePullDiagnosticsAlarm();
-        } else {
+        synchronized (diagnosticLifetime) {
+            if (debouncePullDiagnosticsAlarm.isDisposed()) {
+                return;
+            }
             debouncePullDiagnosticsAlarm.cancelAllRequests();
         }
         didFuture
                 .thenApply(ls -> {
                     // didOpen, didChange notification has been sent, consume 'textDocument/diagnostic' with debounce mode.
-                    // Check if alarm is not disposed (can happen during rapid start/stop cycles)
-                    // Store local reference to avoid race condition between null check and usage
-                    Alarm alarm = debouncePullDiagnosticsAlarm;
-                    if (alarm != null && !alarm.isDisposed()) {
-                        alarm.addRequest(() -> {
-                            if (version != -1 && version != this.version) {
-                                // The document has changed, do nothing
-                                return;
-                            }
-                            refreshPullDiagnostic(version, ls);
-                        }, 500);
+                    synchronized (diagnosticLifetime) {
+                        if (!debouncePullDiagnosticsAlarm.isDisposed()) {
+                            debouncePullDiagnosticsAlarm.addRequest(() -> refreshPullDiagnostic(version, ls), 500);
+                        }
                     }
                     return ls;
                 });
     }
 
     private void refreshPullDiagnostic(int version, @NotNull LanguageServer ls) {
+        if (debouncePullDiagnosticsAlarm.isDisposed() || (version != -1 && version != this.version)) {
+            return;
+        }
         // Consume 'textDocument/diagnostic'
         DocumentDiagnosticParams params = new DocumentDiagnosticParams();
         params.setIdentifier(getPullIdentifier());
@@ -420,8 +428,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         ls.getTextDocumentService()
                 .diagnostic(params)
                 .thenAcceptAsync(diagnosticReport -> {
-                    if (diagnosticReport == null || (version != -1 && version != this.version)) {
-                        // The document has changed, do nothing
+                    if (debouncePullDiagnosticsAlarm.isDisposed() || diagnosticReport == null ||
+                            (version != -1 && version != this.version)) {
+                        // The document changed or its synchronizer was retired while the request was pending.
                         return;
                     }
                     var clientFeatures = languageServerWrapper.getClientFeatures();
@@ -473,17 +482,6 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     public boolean isPullDiagnosticsSupported() {
         return languageServerWrapper.getClientFeatures().getDiagnosticFeature().isDiagnosticSupported(file);
-    }
-
-    private Alarm getDebouncePullDiagnosticsAlarm() {
-        if (debouncePullDiagnosticsAlarm == null) {
-            synchronized (this) {
-                if (debouncePullDiagnosticsAlarm == null) {
-                    debouncePullDiagnosticsAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
-                }
-            }
-        }
-        return debouncePullDiagnosticsAlarm;
     }
 
     private boolean isDiagnosticNotPulledOnDidOpen() {
