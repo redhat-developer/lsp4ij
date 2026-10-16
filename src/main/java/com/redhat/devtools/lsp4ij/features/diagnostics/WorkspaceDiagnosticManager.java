@@ -24,9 +24,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * One workspace diagnostic pull loop per provider, scoped to one server connection.
- * All state and report delivery are serialized off the JSON-RPC reader thread.
- * A completed request is pulled again; a streaming server may keep it pending.
+ * Workspace diagnostic pull loops for one language server connection.
+ * Provider state and report callbacks are serialized on the owned executor.
+ * Successful pulls are reissued; streamed reports retain their provider's
+ * order.
  */
 @ApiStatus.Internal
 public final class WorkspaceDiagnosticManager implements Disposable {
@@ -41,7 +42,22 @@ public final class WorkspaceDiagnosticManager implements Disposable {
     private final Map<String, Provider> providers = new HashMap<>();
     private volatile boolean disposed;
 
-    /** The executor must serialize tasks and is owned by this manager. */
+    /**
+     * Creates a manager for a server's workspace diagnostic pulls.
+     * Callbacks run on the executor and must return promptly.
+     *
+     * @param server        the service used to request workspace diagnostics
+     * @param executor      the scheduled executor that serializes tasks, owned
+     *                      and shut down by this manager
+     * @param matches       the URI matcher returning a non-null future with
+     *                      {@code true} for files that accept workspace reports
+     * @param reports       the provider/report predicate returning {@code true}
+     *                      when a result ID may be retained; a {@code null}
+     *                      identifier denotes the default provider
+     * @param clearProvider the callback clearing a removed provider's
+     *                      diagnostics, accepting a {@code null} identifier
+     *                      for the default provider
+     */
     public WorkspaceDiagnosticManager(WorkspaceService server, ScheduledExecutorService executor,
                                       Function<String, CompletableFuture<Boolean>> matches,
                                       BiPredicate<String, WorkspaceDocumentDiagnosticReport> reports,
@@ -53,6 +69,14 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         this.clearProvider = clearProvider;
     }
 
+    /**
+     * Reconciles workspace diagnostic pulls with the supplied providers.
+     * Queues cancellation and cleanup for removed providers and starts pulls
+     * for newly added providers.
+     *
+     * @param identifiers the active provider identifiers; a {@code null} entry
+     *                    denotes the default provider
+     */
     public void updateProviders(Set<String> identifiers) {
         var copy = new HashSet<>(identifiers); // null denotes the default diagnostic provider
         execute(() -> {
@@ -75,6 +99,11 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         });
     }
 
+    /**
+     * Queues replacement pulls for all active diagnostic providers.
+     * Pending pulls and matches are cancelled while accepted result IDs are
+     * retained.
+     */
     public void refresh() {
         execute(() -> {
             for (var provider : providers.values()) {
@@ -84,6 +113,12 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         });
     }
 
+    /**
+     * Queues a partial diagnostic report for the pull matching its token.
+     * Notifications without a matching active token are ignored.
+     *
+     * @param params the progress notification containing the token and report
+     */
     public void notifyProgress(ProgressParams params) {
         if (params.getToken() == null || params.getValue() == null || !params.getValue().isRight()) {
             return;
@@ -143,7 +178,12 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         applyNextReport(provider);
     }
 
-    /** Await matching without occupying the executor or reordering this provider's reports. */
+    /**
+     * Processes a provider's queued reports without blocking on matching.
+     * Preserves their arrival order.
+     *
+     * @param provider the provider whose pending reports are processed
+     */
     private void applyNextReport(Provider provider) {
         if (disposed || provider.matching != null) {
             return;
@@ -259,6 +299,11 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         }
     }
 
+    /**
+     * Stops this manager and schedules cancellation of its outstanding work.
+     * Shuts down the owned executor without waiting for pending callbacks.
+     * Repeated calls have no effect.
+     */
     @Override
     public synchronized void dispose() {
         if (disposed) {

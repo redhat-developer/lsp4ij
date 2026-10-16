@@ -78,6 +78,12 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
         return super.isSupported(file, SERVER_CAPABILITIES_PREDICATE);
     }
 
+    /**
+     * Registers diagnostic options and refreshes document and workspace pulls.
+     *
+     * @param registerOptions the options supplied by the server's registration
+     * @return the registered options, or {@code null} if none were created
+     */
     @Override
     public @Nullable DiagnosticRegistrationOptions registerCapability(@NotNull JsonObject registerOptions) {
         var options = super.registerCapability(registerOptions);
@@ -94,13 +100,25 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
         return options;
     }
 
+    /**
+     * Removes diagnostic options and reconciles active workspace providers.
+     *
+     * @param options the options returned by
+     *                {@link #registerCapability(JsonObject)}
+     */
     @Override
     public void unregisterCapability(Object options) {
         super.unregisterCapability(options);
         getClientFeatures().getServerWrapper().updateWorkspaceDiagnosticProviders();
     }
 
-    /** Workspace diagnostic providers, including a null identifier for the default provider. */
+    /**
+     * Returns the identifiers of advertised workspace diagnostic providers.
+     * Includes static capabilities and dynamic registrations.
+     *
+     * @return a new set of provider identifiers, with {@code null} for the
+     *         default provider
+     */
     public Set<String> getWorkspaceDiagnosticIdentifiers() {
         Set<String> identifiers = new HashSet<>();
         var capabilities = getServerCapabilities();

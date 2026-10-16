@@ -1229,6 +1229,10 @@ public class LanguageServerWrapper implements Disposable {
         return serverCapabilities;
     }
 
+    /**
+     * Updates workspace diagnostic providers from this server's capabilities.
+     * Does nothing until a language client is attached.
+     */
     @ApiStatus.Internal
     public void updateWorkspaceDiagnosticProviders() {
         if (languageClient != null) {
@@ -1708,7 +1712,13 @@ public class LanguageServerWrapper implements Disposable {
         updateDiagnostics(file, openedOrClosedDocument, identifier, diagnostics, version);
     }
 
-    /** Clear an unregistered workspace provider without discarding other providers' closed-file reports. */
+    /**
+     * Clears one provider's diagnostics from all cached closed documents.
+     * Diagnostics from other providers are retained.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     */
     @ApiStatus.Internal
     public void clearClosedDocumentDiagnostics(@Nullable String identifier) {
         String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;

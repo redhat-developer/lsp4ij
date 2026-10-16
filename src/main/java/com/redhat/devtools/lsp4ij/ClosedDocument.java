@@ -36,6 +36,16 @@ public class ClosedDocument extends LSPDocumentBase {
     // Publish the diagnostics and their derived error status together.
     private volatile DiagnosticSnapshot snapshot = new DiagnosticSnapshot(List.of(), false);
 
+    /**
+     * Replaces one provider's diagnostics in this closed document's cache.
+     * Diagnostics from other providers are retained.
+     *
+     * @param identifier  the diagnostic provider's cache identifier
+     * @param diagnostics the replacement diagnostics; an empty list removes
+     *                    this provider's diagnostics
+     * @param version     the report's version, ignored for closed files
+     * @return {@code true} if the merged diagnostic list changed
+     */
     @Override
     public synchronized boolean updateDiagnostics(@NotNull String identifier,
                                      @NotNull List<Diagnostic> diagnostics, @Nullable Integer version) {
@@ -53,11 +63,21 @@ public class ClosedDocument extends LSPDocumentBase {
         return changed;
     }
 
+    /**
+     * Returns the merged diagnostic snapshot for this closed document.
+     *
+     * @return an unmodifiable collection with duplicate diagnostics removed
+     */
     @Override
     public Collection<Diagnostic> getDiagnostics() {
         return snapshot.diagnostics();
     }
 
+    /**
+     * Returns whether this closed document's cached diagnostics contain errors.
+     *
+     * @return {@code true} if at least one diagnostic has error severity
+     */
     @Override
     public boolean hasErrors() {
         return snapshot.hasErrors();
