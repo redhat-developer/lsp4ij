@@ -547,6 +547,7 @@ public class LanguageServerWrapper implements Disposable {
                         this.launcherFuture = initializingContext.launcherFuture;
 
                         updateStatus(ServerStatus.started);
+                        languageClient.updateWorkspaceDiagnosticProviders();
                         return initializingContext;
                     })
                     .thenRun(() -> {
@@ -1066,6 +1067,17 @@ public class LanguageServerWrapper implements Disposable {
         return serverCapabilities;
     }
 
+    /**
+     * Updates workspace diagnostic providers from this server's capabilities.
+     * Does nothing until a language client is attached.
+     */
+    @ApiStatus.Internal
+    public void updateWorkspaceDiagnosticProviders() {
+        if (languageClient != null) {
+            languageClient.updateWorkspaceDiagnosticProviders();
+        }
+    }
+
     public void registerCapability(RegistrationParams params) {
         if (initializeFuture == null) {
             return;
@@ -1426,11 +1438,14 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Update diagnostics for the given file URi.
+     * Updates a file's cached diagnostics for one provider.
      *
-     * @param file        the virtual file.
-     * @param identifier  the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
-     * @param diagnostics the diagnostics to update.
+     * @param file        the file whose diagnostic cache is updated
+     * @param identifier  the diagnostic provider's cache identifier
+     * @param diagnostics the replacement diagnostics; an empty list clears this
+     *                    provider's diagnostics
+     * @param version     the report's document version, or {@code null} if
+     *                    absent
      */
     public void updateDiagnostics(@NotNull VirtualFile file,
                                   @NotNull String identifier,
@@ -1447,7 +1462,60 @@ public class LanguageServerWrapper implements Disposable {
         if (openedOrClosedDocument == null) {
             return;
         }
-        boolean hasErrors = false;
+        updateDiagnostics(file, openedOrClosedDocument, identifier, diagnostics, version);
+    }
+
+    /**
+     * Clears one provider's diagnostics from all cached closed documents.
+     * Diagnostics from other providers are retained.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     */
+    @ApiStatus.Internal
+    public void clearClosedDocumentDiagnostics(@Nullable String identifier) {
+        String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+        for (var entry : closedDocuments.entrySet()) {
+            clearClosedDocumentDiagnostics(entry.getKey(), entry.getValue(), cacheIdentifier);
+        }
+    }
+
+    /**
+     * Clears one provider's diagnostics from a cached closed document.
+     * Retains other providers, other files and open-document diagnostics.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     * @param uri        the URI of the closed document to clear
+     */
+    @ApiStatus.Internal
+    public void clearClosedDocumentDiagnostics(@Nullable String identifier, @NotNull String uri) {
+        var features = getClientFeatures();
+        VirtualFile file = FileUriSupport.findFileByUri(uri, features);
+        URI fileUri = file != null ? FileUriSupport.getFileUri(file, features) : URI.create(uri);
+        var document = fileUri != null ? getClosedDocument(fileUri, false) : null;
+        if (document != null) {
+            String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+            clearClosedDocumentDiagnostics(fileUri, document, cacheIdentifier);
+        }
+    }
+
+    private void clearClosedDocumentDiagnostics(URI fileUri, ClosedDocument document, String cacheIdentifier) {
+        var features = getClientFeatures();
+        String uri = FileUriSupport.toString(fileUri, features);
+        VirtualFile file = uri != null ? FileUriSupport.findFileByUri(uri, features) : null;
+        if (file != null && file.isValid() && !getProject().isDisposed()) {
+            updateDiagnostics(file, document, cacheIdentifier, List.of(), null);
+        } else {
+            document.updateDiagnostics(cacheIdentifier, List.of(), null);
+        }
+    }
+
+    private void updateDiagnostics(@NotNull VirtualFile file, @NotNull LSPDocumentBase openedOrClosedDocument,
+                                   @NotNull String identifier, @NotNull List<Diagnostic> diagnostics,
+                                   @Nullable Integer version) {
+        var clientFeatures = getClientFeatures();
+        boolean hasErrors;
         synchronized (openedOrClosedDocument) {
             hasErrors = openedOrClosedDocument.hasErrors();
             openedOrClosedDocument.updateDiagnostics(identifier, diagnostics, version);

@@ -24,6 +24,7 @@ import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
@@ -532,6 +533,33 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Checks whether a file matches the given server's enabled associations.
+     * Evaluates document matchers without starting the server or connecting the
+     * document.
+     *
+     * @param file       the file to check
+     * @param definition the server definition whose associations are checked
+     * @return a future containing {@code true} for a matching association
+     */
+    public CompletableFuture<Boolean> isFileMappedToServer(@NotNull VirtualFile file,
+                                                           @NotNull LanguageServerDefinition definition) {
+        var mappings = runCancellableReadAction(() -> {
+            if (project.isDisposed() || !file.isValid()) {
+                return MatchedLanguageServerDefinitions.NO_MATCH;
+            }
+            var psiFile = PsiManager.getInstance(project).findFile(file);
+            return psiFile == null ? MatchedLanguageServerDefinitions.NO_MATCH
+                    : getMatchedLanguageServerDefinitions(psiFile, false, definition);
+        }, project);
+        if (mappings.getMatched().contains(definition)) {
+            return CompletableFuture.completedFuture(true);
+        }
+        var async = mappings.getAsyncMatched();
+        return async == null ? CompletableFuture.completedFuture(false)
+                : async.thenApply(definitions -> definitions.contains(definition));
+    }
+
+    /**
      * Returns the matched language server definitions for the given file.
      *
      * @param psiFile     the file.
@@ -540,7 +568,13 @@ public class LanguageServiceAccessor implements Disposable {
      */
     private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull PsiFile psiFile,
                                                                                  boolean ignoreMatch) {
+        return getMatchedLanguageServerDefinitions(psiFile, ignoreMatch, null);
+    }
 
+    @NotNull
+    private MatchedLanguageServerDefinitions getMatchedLanguageServerDefinitions(@NotNull PsiFile psiFile,
+                                                                                 boolean ignoreMatch,
+                                                                                 @Nullable LanguageServerDefinition onlyDefinition) {
         var file = psiFile.getVirtualFile();
         if (file == null) {
             return MatchedLanguageServerDefinitions.NO_MATCH;
@@ -571,7 +605,9 @@ public class LanguageServiceAccessor implements Disposable {
             // Loop for server/language mapping
             for (LanguageServerFileAssociation mapping : LanguageServersRegistry.getInstance()
                     .findLanguageServerDefinitionFor(currentLanguage, currentFileType, psiFile.getName())) {
-                if (mapping == null || !mapping.isEnabled(project) || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
+                if (mapping == null || !mapping.isEnabled(project)
+                        || (onlyDefinition != null && !onlyDefinition.equals(mapping.getServerDefinition()))
+                        || (syncMatchedDefinitions != null && syncMatchedDefinitions.contains(mapping.getServerDefinition()))) {
                     // the mapping is disabled
                     // or the server definition has been already added
                     continue;

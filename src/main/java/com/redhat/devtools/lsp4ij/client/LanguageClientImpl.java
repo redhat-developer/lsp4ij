@@ -15,10 +15,13 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.features.diagnostics.WorkspaceDiagnosticManager;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
@@ -36,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -52,6 +56,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     private @Nullable LanguageServer server;
     private @NotNull LanguageServerWrapper wrapper;
     private volatile boolean disposed;
+    private WorkspaceDiagnosticManager workspaceDiagnostics;
 
     private Runnable didChangeConfigurationListener;
 
@@ -86,14 +91,82 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return wrapper.getClientFeatures();
     }
 
+    /**
+     * Attaches this client to a server and prepares diagnostic and progress
+     * handling.
+     *
+     * @param server the language server for this client connection
+     */
     public final void connect(@NotNull LanguageServer server) {
         this.server = server;
         this.diagnosticHandler = new LSPDiagnosticHandler(wrapper);
         this.progressManager.connect(server, wrapper);
+        this.workspaceDiagnostics = new WorkspaceDiagnosticManager(server.getWorkspaceService(),
+                AppExecutorUtil.createBoundedScheduledExecutorService("LSP workspace diagnostics", 1),
+                this::matchWorkspaceDiagnosticFile, this::applyWorkspaceDiagnosticReport,
+                wrapper::clearClosedDocumentDiagnostics, wrapper::clearClosedDocumentDiagnostics);
     }
 
     protected final @Nullable LanguageServer getLanguageServer() {
         return server;
+    }
+
+    /**
+     * Queues diagnostic provider changes from the server's capabilities.
+     * Does nothing before connection or after disposal.
+     */
+    @ApiStatus.Internal
+    public void updateWorkspaceDiagnosticProviders() {
+        if (!isDisposed() && workspaceDiagnostics != null) {
+            workspaceDiagnostics.updateProviders(getClientFeatures().getDiagnosticFeature()
+                    .getDiagnosticCapabilityRegistry().getWorkspaceDiagnosticIdentifiers());
+        }
+    }
+
+    private CompletableFuture<Boolean> matchWorkspaceDiagnosticFile(String uri) {
+        if (isDisposed()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        var features = getClientFeatures();
+        VirtualFile file = FileUriSupport.findFileByUri(uri, features);
+        if (file == null || !ReadAction.compute(() -> !isDisposed() && file.isValid() && features.isEnabled(file))) {
+            return CompletableFuture.completedFuture(false);
+        }
+        // A server may report every workspace file, including files routed to
+        // another server by a DocumentMatcher. Feature enablement alone is not
+        // sufficient: most clients keep its default (true).
+        return LanguageServiceAccessor.getInstance(project).isFileMappedToServer(file, getServerDefinition());
+    }
+
+    private boolean applyWorkspaceDiagnosticReport(String identifier, WorkspaceDocumentDiagnosticReport report) {
+        if (isDisposed()) {
+            return false;
+        }
+        String uri = report.isLeft() ? report.getLeft().getUri() : report.getRight().getUri();
+        Integer version = report.isLeft() ? report.getLeft().getVersion() : report.getRight().getVersion();
+        var features = getClientFeatures();
+        VirtualFile file = FileUriSupport.findFileByUri(uri, features);
+        // Matching may have completed after the file or connection changed.
+        if (file == null || !ReadAction.compute(() -> !isDisposed() && file.isValid() && features.isEnabled(file))) {
+            return false;
+        }
+        var opened = wrapper.getOpenedDocument(FileUriSupport.getFileUri(file, features));
+        var synchronizer = opened != null ? opened.getSynchronizer() : null;
+        if (synchronizer != null && version != null && version < synchronizer.getVersion()) {
+            return false;
+        }
+        if (synchronizer != null && synchronizer.isPullDiagnosticsSupported()
+                && Objects.equals(identifier, features.getDiagnosticFeature().getDiagnosticIdentifier())) {
+            if (report.isLeft()) {
+                // Document pulls take precedence. Re-pull an unchanged open file to
+                // reflect cross-file changes, without overwriting newer editor diagnostics.
+                synchronizer.refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
+            }
+        } else if (report.isLeft()) {
+            wrapper.updateDiagnostics(file, identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER,
+                    report.getLeft().getItems(), version);
+        }
+        return true;
     }
 
     @Override
@@ -190,9 +263,22 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return CompletableFuture.completedFuture(null);
     }
 
+    /**
+     * Requests fresh diagnostics for open documents and workspace providers.
+     *
+     * @return a future completed after refresh work is dispatched, without
+     *         waiting for diagnostic results
+     */
     @Override
     public CompletableFuture<Void> refreshDiagnostics() {
-        return CompletableFuture.runAsync(this::refreshDiagnosticsForAllOpenedFiles);
+        return CompletableFuture.runAsync(() -> {
+            if (!isDisposed()) {
+                refreshDiagnosticsForAllOpenedFiles();
+                if (workspaceDiagnostics != null) {
+                    workspaceDiagnostics.refresh();
+                }
+            }
+        });
     }
 
     private void refreshDiagnosticsForAllOpenedFiles() {
@@ -210,8 +296,17 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return progressManager.createProgress(params);
     }
 
+    /**
+     * Routes progress notifications to workspace diagnostics and progress
+     * tracking.
+     *
+     * @param params the progress notification received from the language server
+     */
     @Override
     public void notifyProgress(ProgressParams params) {
+        if (workspaceDiagnostics != null) {
+            workspaceDiagnostics.notifyProgress(params);
+        }
         progressManager.notifyProgress(params);
     }
 
@@ -322,9 +417,15 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         // Do nothing
     }
 
+    /**
+     * Disposes diagnostic and progress handling and removes settings listeners.
+     */
     @Override
     public void dispose() {
         this.disposed = true;
+        if (workspaceDiagnostics != null) {
+            workspaceDiagnostics.dispose();
+        }
         this.progressManager.dispose();
         GlobalLanguageServerSettings.getInstance().removeSettingsListener(languageServerStartedListener);
         ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(languageServerStartedListener);
