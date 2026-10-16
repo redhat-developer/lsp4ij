@@ -1426,11 +1426,14 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Update diagnostics for the given file URi.
+     * Updates a file's cached diagnostics for one provider.
      *
-     * @param file        the virtual file.
-     * @param identifier  the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
-     * @param diagnostics the diagnostics to update.
+     * @param file        the file whose diagnostic cache is updated
+     * @param identifier  the diagnostic provider's cache identifier
+     * @param diagnostics the replacement diagnostics; an empty list clears this
+     *                    provider's diagnostics
+     * @param version     the report's document version, or {@code null} if
+     *                    absent
      */
     public void updateDiagnostics(@NotNull VirtualFile file,
                                   @NotNull String identifier,
@@ -1451,6 +1454,14 @@ public class LanguageServerWrapper implements Disposable {
         synchronized (openedOrClosedDocument) {
             hasErrors = openedOrClosedDocument.hasErrors();
             openedOrClosedDocument.updateDiagnostics(identifier, diagnostics, version);
+            try {
+                // Notify in cache-update order, using the accepted/merged cache
+                // rather than the incoming report (which may have been stale).
+                clientFeatures.getDiagnosticFeature().diagnosticsUpdated(file,
+                        List.copyOf(openedOrClosedDocument.getDiagnostics()));
+            } catch (Exception e) {
+                LOGGER.warn("Failed to notify diagnostic update for {}", file, e);
+            }
         }
 
         if ((hasErrors != openedOrClosedDocument.hasErrors()) && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {

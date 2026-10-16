@@ -341,6 +341,23 @@ public class LSPDiagnosticFeature extends AbstractLSPDocumentFeature {
         return true;
     }
 
+    /**
+     * Observes the merged diagnostic cache after a report is processed.
+     * Runs synchronously under the document cache lock; implementations must
+     * return promptly, leave diagnostics unchanged, and schedule UI work
+     * separately.
+     * Client lifecycle callbacks must clear retained results when the server
+     * stops or is disposed.
+     *
+     * @param file        the open or closed file whose cache was processed
+     * @param diagnostics the read-only diagnostic snapshot; an empty list
+     *                    clears problems, and repeated or rejected reports may
+     *                    repeat the same snapshot
+     */
+    public void diagnosticsUpdated(@NotNull VirtualFile file,
+                                   @NotNull List<Diagnostic> diagnostics) {
+    }
+
     public DiagnosticCapabilityRegistry getDiagnosticCapabilityRegistry() {
         if (diagnosticCapabilityRegistry == null) {
             initDiagnosticCapabilityRegistry();
