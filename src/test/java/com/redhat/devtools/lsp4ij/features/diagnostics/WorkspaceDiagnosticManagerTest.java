@@ -147,6 +147,7 @@ public class WorkspaceDiagnosticManagerTest {
         h.manager.updateProviders(Set.of("lua"));
         h.next().future.complete(full("file:///not-owned.lua", "one"));
         assertTrue(h.next().params.getPreviousResultIds().isEmpty());
+        assertTrue(h.clearedFiles.isEmpty()); // rejected/stale reports do not invalidate the file's mapping
     }
 
     @Test
@@ -159,6 +160,7 @@ public class WorkspaceDiagnosticManagerTest {
         request.future.complete(full("file:///a.lua", null));
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
         assertTrue(h.next().params.getPreviousResultIds().isEmpty());
+        assertTrue(h.clearedFiles.isEmpty()); // an accepted report need not carry a result ID
     }
 
     @Test
@@ -252,9 +254,10 @@ public class WorkspaceDiagnosticManagerTest {
         assertTrue(blocked.future.isCancelled());
         assertTrue(pending.cancelRequested);
         assertEquals(List.of("lua"), h.clearedProviders);
-        pending.complete(true); // matching may ignore cancellation; it must still not publish
+        pending.complete(false); // a cancelled match must neither publish nor clear diagnostics
         h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
         assertTrue(h.applied.isEmpty());
+        assertTrue(h.clearedFiles.isEmpty());
         h.manager.updateProviders(Set.of("lua", "other"));
         assertTrue(h.next().params.getPreviousResultIds().isEmpty());
     }
@@ -299,6 +302,24 @@ public class WorkspaceDiagnosticManagerTest {
                 full("file:///c.lua", "accepted").getItems().get(0))));
         assertEquals("accepted", h.applied.poll(5, TimeUnit.SECONDS).getLeft().getResultId());
         assertEquals(List.of(new PreviousResultId("file:///c.lua", "accepted")), h.next().params.getPreviousResultIds());
+        assertTrue(h.clearedFiles.isEmpty()); // a matcher failure does not establish loss of ownership
+    }
+
+    @Test
+    public void lostMappingClearsOnlyRejectedFileAndResultId() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Collections.singleton(null));
+        var first = h.next();
+        first.future.complete(new WorkspaceDiagnosticReport(List.of(
+                full("file:///a.lua", "old").getItems().get(0),
+                full("file:///b.lua", "retained").getItems().get(0))));
+        var second = h.next();
+        h.matcher = uri -> CompletableFuture.completedFuture(!uri.endsWith("a.lua"));
+        second.future.complete(new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
+                new WorkspaceUnchangedDocumentDiagnosticReport("old", "file:///a.lua", null)))));
+        assertEquals(List.of(new PreviousResultId("file:///b.lua", "retained")), h.next().params.getPreviousResultIds());
+        assertEquals(List.of("null:file:///a.lua"), h.clearedFiles);
+        assertTrue(h.clearedProviders.isEmpty());
     }
 
     private static class MatchFuture extends CompletableFuture<Boolean> {
@@ -339,10 +360,11 @@ public class WorkspaceDiagnosticManagerTest {
         volatile boolean refuseCancellation;
         volatile java.util.function.Function<String, CompletableFuture<Boolean>> matcher = uri -> CompletableFuture.completedFuture(true);
         final List<String> clearedProviders = new CopyOnWriteArrayList<>();
+        final List<String> clearedFiles = new CopyOnWriteArrayList<>();
         final WorkspaceDiagnosticManager manager = new WorkspaceDiagnosticManager(this, executor, uri -> matcher.apply(uri), (identifier, report) -> {
             applied.add(report);
             return accept;
-        }, clearedProviders::add);
+        }, clearedProviders::add, (identifier, uri) -> clearedFiles.add(identifier + ":" + uri));
         @Override public CompletableFuture<WorkspaceDiagnosticReport> diagnostic(WorkspaceDiagnosticParams params) {
             var future = new Future(refuseCancellation);
             requests.add(new Request(params, future));

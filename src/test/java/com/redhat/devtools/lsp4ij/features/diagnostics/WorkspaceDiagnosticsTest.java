@@ -165,6 +165,50 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 .getDiagnostics().iterator().next().getMessage().getLeft());
     }
 
+    public void testLostMappingClearsOnlyRejectedFileForNamedProvider() throws Exception {
+        assertLostMappingClearsOnlyRejectedFile("test", false);
+    }
+
+    public void testLostMappingClearsOnlyRejectedFileForDefaultProvider() throws Exception {
+        assertLostMappingClearsOnlyRejectedFile(null, true);
+    }
+
+    private void assertLostMappingClearsOnlyRejectedFile(String identifier, boolean unchanged) throws Exception {
+        var accepted = new java.util.concurrent.atomic.AtomicBoolean(true);
+        registerAsyncMatcher(file -> CompletableFuture.completedFuture(
+                accepted.get() || !file.getName().equals("rejected.routed")));
+        var rejected = fixture.addFileToProject("rejected.routed", "value").getVirtualFile();
+        var retained = fixture.addFileToProject("retained.routed", "value").getVirtualFile();
+        start(false);
+        wrapper.updateDiagnostics(rejected, "other", List.of(diagnostic("other provider")), null);
+        var options = JSONUtils.getLsp4jGson().fromJson("{"
+                + (identifier == null ? "" : "\"identifier\":\"" + identifier + "\",")
+                + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
+        definition.client.registerCapability(new RegistrationParams(List.of(
+                new Registration("dynamic", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+        var first = next();
+        assertEquals(identifier, first.params.getIdentifier());
+        var errorReport = report(rejected, "stale", null);
+        errorReport.getLeft().setResultId("old");
+        errorReport.getLeft().getItems().get(0).setSeverity(DiagnosticSeverity.Error);
+        first.future.complete(new WorkspaceDiagnosticReport(List.of(errorReport, report(retained, "retained", null))));
+        var second = next(); // both reports are cached before the mapping changes
+        var rejectedDocument = wrapper.getClosedDocument(LSPIJUtils.toUri(rejected), false);
+        assertEquals(2, rejectedDocument.getDiagnostics().size());
+        assertTrue(rejectedDocument.hasErrors());
+        accepted.set(false);
+        second.future.complete(new WorkspaceDiagnosticReport(List.of(unchanged
+                ? new WorkspaceDocumentDiagnosticReport(new WorkspaceUnchangedDocumentDiagnosticReport(
+                        "old", LSPIJUtils.toUri(rejected).toString(), null))
+                : report(rejected, "must not replace", null))));
+        assertTrue(next().params.getPreviousResultIds().isEmpty());
+        assertEquals(1, rejectedDocument.getDiagnostics().size());
+        assertEquals("other provider", rejectedDocument.getDiagnostics().iterator().next().getMessage().getLeft());
+        assertFalse(rejectedDocument.hasErrors());
+        assertEquals("retained", wrapper.getClosedDocument(LSPIJUtils.toUri(retained), false)
+                .getDiagnostics().iterator().next().getMessage().getLeft());
+    }
+
     public void testNamedProviderUnregistrationClearsClosedDiagnostics() throws Exception {
         assertProviderUnregistrationClearsClosedDiagnostics("dynamic");
     }
