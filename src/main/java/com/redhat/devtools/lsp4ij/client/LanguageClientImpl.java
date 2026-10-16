@@ -91,6 +91,12 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return wrapper.getClientFeatures();
     }
 
+    /**
+     * Attaches this client to a server and prepares diagnostic and progress
+     * handling.
+     *
+     * @param server the language server for this client connection
+     */
     public final void connect(@NotNull LanguageServer server) {
         this.server = server;
         this.diagnosticHandler = new LSPDiagnosticHandler(wrapper);
@@ -105,6 +111,10 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return server;
     }
 
+    /**
+     * Queues diagnostic provider changes from the server's capabilities.
+     * Does nothing before connection or after disposal.
+     */
     @ApiStatus.Internal
     public void updateWorkspaceDiagnosticProviders() {
         if (!isDisposed() && workspaceDiagnostics != null) {
@@ -253,6 +263,12 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return CompletableFuture.completedFuture(null);
     }
 
+    /**
+     * Requests fresh diagnostics for open documents and workspace providers.
+     *
+     * @return a future completed after refresh work is dispatched, without
+     *         waiting for diagnostic results
+     */
     @Override
     public CompletableFuture<Void> refreshDiagnostics() {
         return CompletableFuture.runAsync(() -> {
@@ -280,6 +296,12 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         return progressManager.createProgress(params);
     }
 
+    /**
+     * Routes progress notifications to workspace diagnostics and progress
+     * tracking.
+     *
+     * @param params the progress notification received from the language server
+     */
     @Override
     public void notifyProgress(ProgressParams params) {
         if (workspaceDiagnostics != null) {
@@ -395,6 +417,9 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         // Do nothing
     }
 
+    /**
+     * Disposes diagnostic and progress handling and removes settings listeners.
+     */
     @Override
     public void dispose() {
         this.disposed = true;

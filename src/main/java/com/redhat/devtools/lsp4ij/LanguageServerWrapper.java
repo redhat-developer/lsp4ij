@@ -1067,6 +1067,10 @@ public class LanguageServerWrapper implements Disposable {
         return serverCapabilities;
     }
 
+    /**
+     * Updates workspace diagnostic providers from this server's capabilities.
+     * Does nothing until a language client is attached.
+     */
     @ApiStatus.Internal
     public void updateWorkspaceDiagnosticProviders() {
         if (languageClient != null) {
@@ -1434,11 +1438,14 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Update diagnostics for the given file URi.
+     * Updates a file's cached diagnostics for one provider.
      *
-     * @param file        the virtual file.
-     * @param identifier  the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
-     * @param diagnostics the diagnostics to update.
+     * @param file        the file whose diagnostic cache is updated
+     * @param identifier  the diagnostic provider's cache identifier
+     * @param diagnostics the replacement diagnostics; an empty list clears this
+     *                    provider's diagnostics
+     * @param version     the report's document version, or {@code null} if
+     *                    absent
      */
     public void updateDiagnostics(@NotNull VirtualFile file,
                                   @NotNull String identifier,
@@ -1458,7 +1465,13 @@ public class LanguageServerWrapper implements Disposable {
         updateDiagnostics(file, openedOrClosedDocument, identifier, diagnostics, version);
     }
 
-    /** Clear an unregistered workspace provider without discarding other providers' closed-file reports. */
+    /**
+     * Clears one provider's diagnostics from all cached closed documents.
+     * Diagnostics from other providers are retained.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     */
     @ApiStatus.Internal
     public void clearClosedDocumentDiagnostics(@Nullable String identifier) {
         String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;

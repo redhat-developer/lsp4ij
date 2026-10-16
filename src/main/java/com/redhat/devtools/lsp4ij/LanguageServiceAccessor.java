@@ -532,7 +532,15 @@ public class LanguageServiceAccessor implements Disposable {
         return wrapper;
     }
 
-    /** Check routing without starting a server or connecting a document. */
+    /**
+     * Checks whether a file matches the given server's enabled associations.
+     * Evaluates document matchers without starting the server or connecting the
+     * document.
+     *
+     * @param file       the file to check
+     * @param definition the server definition whose associations are checked
+     * @return a future containing {@code true} for a matching association
+     */
     public CompletableFuture<Boolean> isFileMappedToServer(@NotNull VirtualFile file,
                                                            @NotNull LanguageServerDefinition definition) {
         var mappings = runCancellableReadAction(() -> {
