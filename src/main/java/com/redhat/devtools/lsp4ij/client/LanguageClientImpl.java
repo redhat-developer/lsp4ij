@@ -104,7 +104,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         this.workspaceDiagnostics = new WorkspaceDiagnosticManager(server.getWorkspaceService(),
                 AppExecutorUtil.createBoundedScheduledExecutorService("LSP workspace diagnostics", 1),
                 this::matchWorkspaceDiagnosticFile, this::applyWorkspaceDiagnosticReport,
-                wrapper::clearClosedDocumentDiagnostics);
+                wrapper::clearClosedDocumentDiagnostics, wrapper::clearClosedDocumentDiagnostics);
     }
 
     protected final @Nullable LanguageServer getLanguageServer() {

@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -39,6 +40,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
     private final Function<String, CompletableFuture<Boolean>> matches;
     private final BiPredicate<String, WorkspaceDocumentDiagnosticReport> reports;
     private final Consumer<String> clearProvider;
+    private final BiConsumer<String, String> clearFile;
     private final Map<String, Provider> providers = new HashMap<>();
     private volatile boolean disposed;
 
@@ -57,16 +59,21 @@ public final class WorkspaceDiagnosticManager implements Disposable {
      * @param clearProvider the callback clearing a removed provider's
      *                      diagnostics, accepting a {@code null} identifier
      *                      for the default provider
+     * @param clearFile     the provider/URI callback clearing diagnostics
+     *                      for a closed file that no longer matches; a
+     *                      {@code null} identifier denotes the default provider
      */
     public WorkspaceDiagnosticManager(WorkspaceService server, ScheduledExecutorService executor,
                                       Function<String, CompletableFuture<Boolean>> matches,
                                       BiPredicate<String, WorkspaceDocumentDiagnosticReport> reports,
-                                      Consumer<String> clearProvider) {
+                                      Consumer<String> clearProvider,
+                                      BiConsumer<String, String> clearFile) {
         this.server = server;
         this.executor = executor;
         this.matches = matches;
         this.reports = reports;
         this.clearProvider = clearProvider;
+        this.clearFile = clearFile;
     }
 
     /**
@@ -217,6 +224,12 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                         accepted = reports.test(provider.identifier, item);
                     } catch (RuntimeException failure) {
                         LOGGER.warn("Unable to apply workspace diagnostics for {}", uri, failure);
+                    }
+                } else if (Boolean.FALSE.equals(matched)) {
+                    try {
+                        clearFile.accept(provider.identifier, uri);
+                    } catch (RuntimeException failure) {
+                        LOGGER.warn("Unable to clear workspace diagnostics for {}", uri, failure);
                     }
                 }
                 String resultId = item.isLeft() ? item.getLeft().getResultId() : item.getRight().getResultId();

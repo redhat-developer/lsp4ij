@@ -1475,15 +1475,39 @@ public class LanguageServerWrapper implements Disposable {
     @ApiStatus.Internal
     public void clearClosedDocumentDiagnostics(@Nullable String identifier) {
         String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
-        var features = getClientFeatures();
         for (var entry : closedDocuments.entrySet()) {
-            String uri = features.toString(entry.getKey(), false);
-            VirtualFile file = uri != null ? FileUriSupport.findFileByUri(uri, features) : null;
-            if (file != null && file.isValid() && !getProject().isDisposed()) {
-                updateDiagnostics(file, entry.getValue(), cacheIdentifier, List.of(), null);
-            } else {
-                entry.getValue().updateDiagnostics(cacheIdentifier, List.of(), null);
-            }
+            clearClosedDocumentDiagnostics(entry.getKey(), entry.getValue(), cacheIdentifier);
+        }
+    }
+
+    /**
+     * Clears one provider's diagnostics from a cached closed document.
+     * Retains other providers, other files and open-document diagnostics.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     * @param uri        the URI of the closed document to clear
+     */
+    @ApiStatus.Internal
+    public void clearClosedDocumentDiagnostics(@Nullable String identifier, @NotNull String uri) {
+        var features = getClientFeatures();
+        VirtualFile file = FileUriSupport.findFileByUri(uri, features);
+        URI fileUri = file != null ? FileUriSupport.getFileUri(file, features) : URI.create(uri);
+        var document = fileUri != null ? getClosedDocument(fileUri, false) : null;
+        if (document != null) {
+            String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+            clearClosedDocumentDiagnostics(fileUri, document, cacheIdentifier);
+        }
+    }
+
+    private void clearClosedDocumentDiagnostics(URI fileUri, ClosedDocument document, String cacheIdentifier) {
+        var features = getClientFeatures();
+        String uri = FileUriSupport.toString(fileUri, features);
+        VirtualFile file = uri != null ? FileUriSupport.findFileByUri(uri, features) : null;
+        if (file != null && file.isValid() && !getProject().isDisposed()) {
+            updateDiagnostics(file, document, cacheIdentifier, List.of(), null);
+        } else {
+            document.updateDiagnostics(cacheIdentifier, List.of(), null);
         }
     }
 
