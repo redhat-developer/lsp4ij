@@ -11,12 +11,15 @@
 
 package com.redhat.devtools.lsp4ij.features.formatting;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.DocumentContentSynchronizer;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.OpenedDocument;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
@@ -46,6 +49,21 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
     }
 
     public CompletableFuture<List<TextEdit>> onTypeFormatting(DocumentOnTypeFormattingParams params) {
+        if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
+            PsiFile file = getFile();
+            VirtualFile virtualFile = file.getVirtualFile();
+            if (virtualFile != null) {
+                // The caller may wait for formatting while holding write access. Flush here so the
+                // background request can reuse the dispatch barrier without waiting for read access.
+                LanguageServiceAccessor.getInstance(file.getProject()).processLanguageServers(file, wrapper -> {
+                    var feature = wrapper.getClientFeatures().getOnTypeFormattingFeature();
+                    if (feature.isEnabled(file) && feature.isSupported(file)
+                            && feature.isOnTypeFormattingTriggerCharacter(file, params.getCh())) {
+                        flushPendingChanges(virtualFile, wrapper);
+                    }
+                });
+            }
+        }
         return super.getFeatureData(params);
     }
 
@@ -125,24 +143,19 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
         List<CompletableFuture<Void>> flushFutures = new ArrayList<>();
 
         for (LanguageServerItem languageServer : languageServers) {
-            URI fileUri = FileUriSupport.getFileUri(virtualFile, languageServer.getClientFeatures());
-            if (fileUri == null) {
-                continue;
-            }
-
-            OpenedDocument openedDocument = languageServer.getServerWrapper().getOpenedDocument(fileUri);
-            if (openedDocument == null) {
-                continue;
-            }
-
-            DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
-            if (synchronizer != null) {
-                flushFutures.add(synchronizer.flushPendingChanges());
-            }
+            flushFutures.add(flushPendingChanges(virtualFile, languageServer.getServerWrapper()));
         }
 
         // Wait for all flush operations to complete
         return CompletableFuture.allOf(flushFutures.toArray(new CompletableFuture[0]));
+    }
+
+    private static CompletableFuture<Void> flushPendingChanges(@NotNull VirtualFile file,
+                                                               @NotNull LanguageServerWrapper wrapper) {
+        URI fileUri = FileUriSupport.getFileUri(file, wrapper.getClientFeatures());
+        OpenedDocument openedDocument = fileUri != null ? wrapper.getOpenedDocument(fileUri) : null;
+        DocumentContentSynchronizer synchronizer = openedDocument != null ? openedDocument.getSynchronizer() : null;
+        return synchronizer != null ? synchronizer.flushPendingChanges() : CompletableFuture.completedFuture(null);
     }
 
 }
