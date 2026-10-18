@@ -17,6 +17,16 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * DAP run configuration options for "attach" mode.
+ * <p>
+ * NOTE: this attach configuration type is currently not registered by any {@code ConfigurationType}
+ * / factory and is never instantiated, so it is not reachable from the UI (attach-mode debugging is
+ * handled by the main {@code DAPRunConfiguration} via its "Debug Mode" option). If this type is ever
+ * wired up, it also needs the {@code forwardNativeLineBreakpoints} option, which today lives only on
+ * {@code DAPRunConfigurationOptions}; {@code DAPCommandLineState.isForwardNativeLineBreakpoints()}
+ * therefore falls back to {@code true} for this type. Prefer lifting that option into a shared
+ * capability interface implemented by both option types (compare {@code FileOptionConfigurable},
+ * {@code ServerTraceConfigurable}, …) and read it through that, plus a control in
+ * {@code DAPAttachSettingsEditor}.
  */
 public class DAPAttachRunConfigurationOptions extends DAPRunConfigurationOptionsBase implements AttachConfigurable {
 
