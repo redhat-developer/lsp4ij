@@ -58,10 +58,12 @@ public class DAPForwardedLineBreakpointHandler extends XBreakpointHandler<XLineB
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public void unregisterBreakpoint(@NotNull XLineBreakpoint<?> breakpoint, boolean temporary) {
-        // No shouldForward() guard here: the shared handler removes by breakpoint identity and
-        // applies the same supportsBreakpoint()/source-position guard itself, so delegating
-        // unconditionally is a no-op for breakpoints it never tracked and avoids a stale entry
-        // when an edited breakpoint is unregistered with a state that no longer passes shouldForward().
+        // No shouldForward() guard here: it was redundant. The shared handler removes by breakpoint
+        // identity and applies the same supportsBreakpoint()/source-position guard itself.
+        // NOTE: this does NOT remove a stale entry when an edited breakpoint no longer passes that
+        // guard (e.g. its source position became null) — the shared handler then also returns early
+        // and leaves the previous entry in place. That limitation lives in the upstream
+        // BreakpointHandlerBase and affects native DAP breakpoints too.
         ((BreakpointHandlerBase) sharedHandler).unregisterBreakpoint(breakpoint, temporary);
     }
 
