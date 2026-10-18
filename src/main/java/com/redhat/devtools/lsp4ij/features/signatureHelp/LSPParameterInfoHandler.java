@@ -17,6 +17,7 @@ import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.lang.parameterInfo.*;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiElement;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -140,7 +141,11 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
     public void updateUI(SignatureInformation signatureInformation, @NotNull ParameterInfoUIContext context) {
         int currentParameter = context.getCurrentParameterIndex();
         List<ParameterInformation> parameters = signatureInformation.getParameters();
-        int numParams = parameters.size();
+        int numParams = parameters != null ? parameters.size() : 0;
+        if (currentParameter < 0 || currentParameter >= numParams) {
+            // LSP: an active parameter outside the signature's parameters defaults to the first one.
+            currentParameter = 0;
+        }
 
         StringBuilder html = new StringBuilder(numParams * 8);
         int highlightStartOffset = -1;
@@ -156,19 +161,17 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
                 String name = getParameterName(signatureInformation, j);
                 if (context.isSingleParameterInfo()) {
                     html.append("<b>");
-                }
-
-                if (!context.isSingleParameterInfo()) {
+                    html.append(StringUtil.escapeXmlEntities(String.valueOf(name)));
+                    html.append("</b>");
+                } else {
                     html.append(" ");
                     html.append(name);
-                }
-                if (context.isSingleParameterInfo()) {
-                    html.append("</b>");
                 }
 
                 int endOffset = html.length();
 
-                if (j < numParams - 1) {
+                // A single parameter is shown alone, without the separator that follows it in the list.
+                if (!context.isSingleParameterInfo() && j < numParams - 1) {
                     html.append(", ");
                 }
 
@@ -178,6 +181,11 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
                     highlightEndOffset = endOffset;
                 }
             }
+        } else if (parameters == null) {
+            // Parameters are optional in LSP. Without them, the signature label is all there is to
+            // show: the signature may still take arguments, and there is no range to highlight.
+            String label = signatureInformation.getLabel();
+            html.append(context.isSingleParameterInfo() ? StringUtil.escapeXmlEntities(label) : label);
         } else {
             html.append(CodeInsightBundle.message("parameter.info.no.parameters"));
         }
