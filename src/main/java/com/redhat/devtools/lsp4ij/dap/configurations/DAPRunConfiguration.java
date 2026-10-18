@@ -300,6 +300,7 @@ public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigura
 
         // Mappings
         configuration.setServerMappings(getServerMappings());
+        configuration.setForwardNativeLineBreakpoints(isForwardNativeLineBreakpoints());
 
         // Server
         configuration.setServerId(getServerId());
