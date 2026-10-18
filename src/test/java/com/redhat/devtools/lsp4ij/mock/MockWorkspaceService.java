@@ -35,10 +35,24 @@ public class MockWorkspaceService implements WorkspaceService {
     private long willCreateDelayMs;
     private long willDeleteDelayMs;
     private long willRenameDelayMs;
+    private volatile CompletableFuture<RenameFilesParams> didRenameCallback;
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
 	}
+
+    public void setDidRenameCallback(CompletableFuture<RenameFilesParams> callback) {
+        didRenameCallback = callback;
+    }
+
+    @Override
+    public void didRenameFiles(RenameFilesParams params) {
+        var callback = didRenameCallback;
+        if (callback != null) {
+            didRenameCallback = null;
+            callback.complete(params);
+        }
+    }
 
     public void setWillRename(WorkspaceEdit willRename) {
         this.willRename = willRename;
