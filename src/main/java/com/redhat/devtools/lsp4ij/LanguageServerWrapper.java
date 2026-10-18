@@ -800,6 +800,12 @@ public class LanguageServerWrapper implements Disposable {
                 }
                 disconnect(claim.uri(), false);
             }
+            // As when an editor closes, a server started only for this request then follows the
+            // idle-shutdown policy. Stopping takes this wrapper's monitor before documentsLock,
+            // so it runs after the lock is released.
+            if (!isDisposed()) {
+                maybeShutdown();
+            }
         }, ModalityState.any());
     }
 

@@ -20,7 +20,9 @@ import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.DocumentConnectionScope;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -111,6 +113,28 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
                 () -> wrapper.getOpenedDocument(wrapper.toUri(source)) == null, 5);
         assertEquals(openedCount + 1, service.openedCount.get());
         assertEquals(1, wrapper.getOpenedDocuments().size());
+    }
+
+    public void testServerStartedOnlyForFormattingStopsAfterTheRequest() throws Exception {
+        var service = new OpenDocumentFormattingService();
+        MockLanguageServer.reset();
+        MockLanguageServer.INSTANCE.setTextDocumentService(service);
+        String original = "const value=1;";
+        // No editor and no other document keeps a server running for this file.
+        var file = myFixture.addFileToProject("idle.ts", original);
+        var document = LSPIJUtils.getDocument(file.getVirtualFile());
+        assertNotNull(document);
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+        assertTrue(accessor.getStartedServers().stream().noneMatch(LanguageServerWrapper::isActive));
+
+        var request = new FormattingResult(original, new CompletableFuture<>());
+        new LSPFormattingSupport(file).format(document, file, null, null, request);
+        assertEquals("const value = 1;", request.result().get(5, TimeUnit.SECONDS));
+
+        var wrapper = accessor.getStartedServers().iterator().next();
+        PlatformTestUtil.waitWithEventsDispatching("a server started only for formatting must stop once idle",
+                () -> wrapper.getServerStatus() == ServerStatus.stopped, 5);
+        assertTrue(wrapper.getOpenedDocuments().isEmpty());
     }
 
     public void testChangedBufferRejectsOldFormattingReply() throws Exception {
