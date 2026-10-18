@@ -977,6 +977,50 @@ public class LSPIJUtils {
         return document.getTextLength();
     }
 
+    /**
+     * Returns a refusal reason if a versioned edit has an invalid URI or targets an outdated
+     * version of a synchronized document.
+     * The caller must keep write access from this check through application so typing cannot
+     * invalidate a successful check. All targets are checked before any mutation.
+     * <p>
+     * Unversioned edits and files not synchronized with this server retain their existing behavior:
+     * there is no LSP version to compare for those files. This does not validate resource operations.
+     */
+    @ApiStatus.Internal
+    public static @Nullable String validateWorkspaceEditVersions(@NotNull WorkspaceEdit edit,
+                                                                 @NotNull LanguageServerWrapper wrapper) {
+        ApplicationManager.getApplication().assertWriteAccessAllowed();
+        if (edit.getDocumentChanges() == null) {
+            return null;
+        }
+        for (var change : edit.getDocumentChanges()) {
+            if (change.isLeft()) {
+                var identifier = change.getLeft().getTextDocument();
+                Integer version = identifier.getVersion();
+                if (version == null) {
+                    continue;
+                }
+                URI uri;
+                try {
+                    uri = URI.create(identifier.getUri());
+                    var file = FileUriSupport.findFileByUri(identifier.getUri(), wrapper.getClientFeatures());
+                    if (file != null) {
+                        // Use the same URI as the opened-document map, including custom URI support.
+                        uri = wrapper.toUri(file);
+                    }
+                } catch (IllegalArgumentException e) {
+                    return LanguageServerBundle.message("lsp.workspace.edit.uri.invalid", identifier.getUri());
+                }
+                var opened = wrapper.getOpenedDocument(uri);
+                var synchronizer = opened != null ? opened.getSynchronizer() : null;
+                if (synchronizer != null && !synchronizer.isCurrentVersion(version)) {
+                    return LanguageServerBundle.message("lsp.workspace.edit.version.changed", identifier.getUri());
+                }
+            }
+        }
+        return null;
+    }
+
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit) {
         applyWorkspaceEdit(edit, null);
     }

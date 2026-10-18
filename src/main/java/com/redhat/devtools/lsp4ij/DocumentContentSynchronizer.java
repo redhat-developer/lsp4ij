@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
@@ -33,6 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 
 /**
  * Synchronize IntelliJ document (open, content changed, close, save)
@@ -130,7 +132,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             textDocument.setText(documentText);
             modificationStamp = documentModificationStamp;
         } else {
-            modificationStamp = ReadAction.compute(() -> {
+            modificationStamp = readDocumentState(() -> {
                 textDocument.setText(document.getText());
                 return document.getModificationStamp();
             });
@@ -211,6 +213,17 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         return sendDidChangeEvents();
     }
 
+    /**
+     * Reads document state on this thread when it already has read access, as inside a write action,
+     * and otherwise in a cancellable read action, so a pending write action is never blocked.
+     */
+    private <T> T readDocumentState(@NotNull Supplier<T> read) {
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return read.get();
+        }
+        return runCancellableReadAction(read::get, languageServerWrapper);
+    }
+
     private CompletableFuture<Void> sendDidChangeEvents() {
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
@@ -220,7 +233,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         }
         // Incremental events are queued before the document changes. Acquire read access before
         // consuming them under the monitor so the batch and stamp describe the same completed state.
-        return ReadAction.compute(() -> {
+        // The block makes no cancellation check once it starts, so a cancellable read consumes the
+        // batch once: it is only retried before starting, while a write action is pending.
+        return readDocumentState(() -> {
             List<TextDocumentContentChangeEvent> events;
             CompletableFuture<Void> barrier;
             final int version;

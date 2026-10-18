@@ -132,7 +132,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         CompletableFuture<ApplyWorkspaceEditResponse> future = new CompletableFuture<>();
         WriteCommandAction.runWriteCommandAction(getProject(), () -> {
             // Validate every target before applying any part of the edit, without releasing write access.
-            String reason = WorkspaceEditValidator.validateVersions(params.getEdit(), wrapper);
+            String reason = LSPIJUtils.validateWorkspaceEditVersions(params.getEdit(), wrapper);
             if (reason != null) {
                 var response = new ApplyWorkspaceEditResponse(false);
                 response.setFailureReason(reason);

@@ -15,7 +15,6 @@ import com.google.gson.JsonObject;
 import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -74,6 +73,7 @@ import java.util.function.UnaryOperator;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.findResourceFor;
 import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.clearProblem;
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.showNotificationError;
 import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClientInfo;
 
@@ -1842,12 +1842,20 @@ public class LanguageServerWrapper implements Disposable {
                                                                                          boolean waitForDidOpen) {
         // Capture both under one read action. Using a later stamp with this text could authorize
         // an edit for content the server never saw. The consumer must not reread text during a VFS rename.
-        return ReadAction.compute(() -> {
-            String text = document.getText();
-            long modificationStamp = document.getModificationStamp();
-            String languageId = getServerDefinition().getLanguageId(file, getProject());
-            return new LSPFileConnectionInfo(document, text, modificationStamp, languageId, waitForDidOpen);
-        });
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return captureFileConnectionInfo(file, document, waitForDidOpen);
+        }
+        // The capture has no side effects, so a cancellable read can retry it after a pending write action.
+        return runCancellableReadAction(() -> captureFileConnectionInfo(file, document, waitForDidOpen), this);
+    }
+
+    private @NotNull LSPFileConnectionInfo captureFileConnectionInfo(@NotNull VirtualFile file,
+                                                                   @NotNull Document document,
+                                                                   boolean waitForDidOpen) {
+        String text = document.getText();
+        long modificationStamp = document.getModificationStamp();
+        String languageId = getServerDefinition().getLanguageId(file, getProject());
+        return new LSPFileConnectionInfo(document, text, modificationStamp, languageId, waitForDidOpen);
     }
 
     // LSP traces
