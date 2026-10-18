@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -102,6 +103,22 @@ public class LanguageServerWrapper implements Disposable {
     protected final Map<URI /* file Uri */, ClosedDocument> closedDocuments;
     // Lock object to prevent deadlock when accessing both openedDocuments and closedDocuments
     private final Object documentsLock = new Object();
+    // Guarded by documentsLock. Ordinary lookups promote scoped connections to the
+    // existing editor/feature lifetime; a temporary request must never close those.
+    private final Map<URI, ScopedDocumentConnection> scopedDocuments = new HashMap<>();
+
+    private static final class ScopedDocumentConnection {
+        private int owners;
+        private boolean persistent;
+
+        private ScopedDocumentConnection(boolean persistent) {
+            this.persistent = persistent;
+        }
+    }
+
+    private record DocumentConnectionClaim(URI uri, ScopedDocumentConnection connection,
+                                           AtomicBoolean released) {
+    }
     @Nullable
     protected final URI initialPath;
     protected final InitializeParams initParams = new InitializeParams();
@@ -728,6 +745,67 @@ public class LanguageServerWrapper implements Disposable {
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LanguageServerWrapper.LSPFileConnectionInfo fileConnectionInfo) {
+        synchronized (documentsLock) {
+            promoteConnection(toUri(file));
+        }
+        return connectDocument(file, fileConnectionInfo, null);
+    }
+
+    CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
+                                                        @NotNull LSPFileConnectionInfo info,
+                                                        @NotNull DocumentConnectionScope scope) {
+        URI uri = toUri(file);
+        if (uri == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DocumentConnectionClaim claim;
+        synchronized (documentsLock) {
+            var connection = scopedDocuments.computeIfAbsent(uri,
+                    ignored -> new ScopedDocumentConnection(openedDocuments.containsKey(uri)));
+            connection.owners++;
+            claim = new DocumentConnectionClaim(uri, connection, new AtomicBoolean());
+        }
+        scope.register(() -> releaseConnection(file, claim));
+        return connectDocument(file, info, claim);
+    }
+
+    private void promoteConnection(@Nullable URI uri) {
+        var connection = scopedDocuments.get(uri);
+        if (connection != null) {
+            connection.persistent = true;
+        }
+    }
+
+    private boolean isCurrent(@Nullable DocumentConnectionClaim claim) {
+        return claim == null || (!claim.released().get()
+                && scopedDocuments.get(claim.uri()) == claim.connection());
+    }
+
+    private void releaseConnection(@NotNull VirtualFile file, @NotNull DocumentConnectionClaim claim) {
+        if (!claim.released().compareAndSet(false, true)) {
+            return;
+        }
+        // File opening and the final editor-ownership check are serialized on the EDT.
+        // Do not wait for the EDT here: formatting can run under a read action during save.
+        ApplicationManager.getApplication().invokeLater(() -> {
+            synchronized (documentsLock) {
+                var connection = scopedDocuments.get(claim.uri());
+                if (connection != claim.connection() || --connection.owners != 0) {
+                    return;
+                }
+                scopedDocuments.remove(claim.uri());
+                if (connection.persistent || (!initialProject.isDisposed()
+                        && FileEditorManager.getInstance(initialProject).isFileOpen(file))) {
+                    return;
+                }
+                disconnect(claim.uri(), false);
+            }
+        }, ModalityState.any());
+    }
+
+    private CompletableFuture<@Nullable LanguageServer> connectDocument(@NotNull VirtualFile file,
+                                                                        @NotNull LSPFileConnectionInfo fileConnectionInfo,
+                                                                        @Nullable DocumentConnectionClaim claim) {
         removeStopTimer(false);
 
         URI fileUri = toUri(file);
@@ -737,9 +815,17 @@ public class LanguageServerWrapper implements Disposable {
         }
 
         boolean waitForDidOpen = fileConnectionInfo.waitForDidOpen();
-        var ls = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
-        if (ls != null) {
-            return ls;
+        synchronized (documentsLock) {
+            if (!isCurrent(claim)) {
+                return CompletableFuture.completedFuture(null);
+            }
+            if (claim == null) {
+                promoteConnection(fileUri);
+            }
+            var ls = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
+            if (ls != null) {
+                return ls;
+            }
         }
 
         // start language server if needed
@@ -752,12 +838,6 @@ public class LanguageServerWrapper implements Disposable {
 
         return initializeFuture.thenComposeAsync(theVoid -> {
             // Here, the "initialize" future is initialized
-
-            // Check if file is already opened (without synchronized block)
-            var ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
-            if (ls2 != null) {
-                return ls2;
-            }
 
             // Here the file is not already connected
             // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
@@ -776,11 +856,17 @@ public class LanguageServerWrapper implements Disposable {
             CompletableFuture<LanguageServer> result;
             boolean shouldNotify = false;
             synchronized (documentsLock) {
+                if (!isCurrent(claim)) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                if (claim == null) {
+                    promoteConnection(fileUri);
+                }
                 // Remove from closed documents and check if already opened
                 closedDocuments.remove(fileUri);
 
                 // Check again if file is already opened (within synchronized block)
-                ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
+                var ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
                 if (ls2 != null) {
                     return ls2;
                 }
@@ -902,14 +988,17 @@ public class LanguageServerWrapper implements Disposable {
         if (fileUri == null) {
             return;
         }
-        OpenedDocument openedDocument = this.openedDocuments.remove(fileUri);
-        if (openedDocument != null) {
-            // Remove the listener from the old document stored in synchronizer
-            DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
-            if (synchronizer != null) {
-                Disposer.dispose(synchronizer);
+        synchronized (documentsLock) {
+            scopedDocuments.remove(fileUri);
+            OpenedDocument openedDocument = this.openedDocuments.remove(fileUri);
+            if (openedDocument != null) {
+                // Remove the listener from the old document stored in synchronizer
+                DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
+                if (synchronizer != null) {
+                    Disposer.dispose(synchronizer);
+                }
+                clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
             }
-            clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
         }
         if (stopIfNoOpenedFiles) {
             maybeShutdown();
@@ -1720,6 +1809,9 @@ public class LanguageServerWrapper implements Disposable {
             if (current) {
                 this.launcherFuture = null;
                 this.lspStreamProvider = null;
+                synchronized (documentsLock) {
+                    scopedDocuments.clear();
+                }
                 while (!this.openedDocuments.isEmpty()) {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }

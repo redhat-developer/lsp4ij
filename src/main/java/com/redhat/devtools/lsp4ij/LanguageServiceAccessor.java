@@ -368,11 +368,32 @@ public class LanguageServiceAccessor implements Disposable {
         return getLanguageServers(file, beforeStartingServerFilter, afterStartingServerFilter, null);
     }
 
+    /**
+     * Connects matching servers for one bounded operation. Close the scope after consuming
+     * the response; existing editor and ordinary feature connections remain connected.
+     */
+    public CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServersForScope(
+            @NotNull PsiFile file, @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+            @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
+            @NotNull DocumentConnectionScope scope) {
+        if (project.isDisposed() || project.isDefault()) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+        return getLanguageServers(file, beforeStartingServerFilter, afterStartingServerFilter, null, scope);
+    }
+
     @NotNull
     CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull PsiFile psiFile,
                                                                             @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
                                                                             @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
                                                                             @Nullable LanguageServerDefinition matchServerDefinition) {
+        return getLanguageServers(psiFile, beforeStartingServerFilter, afterStartingServerFilter, matchServerDefinition, null);
+    }
+
+    private CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(
+            @NotNull PsiFile psiFile, @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
+            @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
+            @Nullable LanguageServerDefinition matchServerDefinition, @Nullable DocumentConnectionScope scope) {
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(psiFile, matchServerDefinition, beforeStartingServerFilter);
         var matchedServersNow = matchedServers.getNow(Collections.emptyList());
@@ -415,7 +436,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                         if (info == null) {
                                                             info = new LanguageServerWrapper.LSPFileConnectionInfo(document, null, null, !writeAccessAllowed);
                                                         }
-                                                        return wrapper.connect(file, info);
+                                                        return scope == null ? wrapper.connect(file, info) : wrapper.connect(file, info, scope);
                                                     }
                                                     return CompletableFuture.completedFuture(null);
                                                 }).thenAccept(server -> {
