@@ -67,6 +67,25 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
         assertEquals("<b>items: List&lt;T&gt;</b>", render(signature, 0, true).text);
     }
 
+    public void testSingleParameterPresentationShowsOnlyTheCurrentParameter() {
+        assertEquals("<b>first</b>", render(signature(), 0, true).text);
+    }
+
+    public void testSingleParameterPresentationUsesLabelOffsets() {
+        var signature = new SignatureInformation("first(items: List<T>, count: Int): T");
+        var items = new ParameterInformation();
+        items.setLabel(Either.forRight(Tuple.two(6, 20)));
+        var count = new ParameterInformation();
+        count.setLabel(Either.forRight(Tuple.two(22, 32)));
+        signature.setParameters(List.of(items, count));
+        assertEquals("<b>items: List&lt;T&gt;</b>", render(signature, 0, true).text);
+    }
+
+    public void testCurrentParameterOutsideTheSignatureDefaultsToTheFirst() {
+        assertEquals(" first", render(signature(), 5, false).highlight());
+        assertEquals("<b>first</b>", render(signature(), 5, true).text);
+    }
+
     private static SignatureInformation signature() {
         var signature = new SignatureInformation("read(first, second)");
         signature.setParameters(List.of(new ParameterInformation("first"), new ParameterInformation("second")));

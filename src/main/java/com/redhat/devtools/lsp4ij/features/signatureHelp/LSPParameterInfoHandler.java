@@ -142,6 +142,10 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         int currentParameter = context.getCurrentParameterIndex();
         List<ParameterInformation> parameters = signatureInformation.getParameters();
         int numParams = parameters != null ? parameters.size() : 0;
+        if (currentParameter < 0 || currentParameter >= numParams) {
+            // LSP: an active parameter outside the signature's parameters defaults to the first one.
+            currentParameter = 0;
+        }
 
         StringBuilder html = new StringBuilder(numParams * 8);
         int highlightStartOffset = -1;
@@ -166,7 +170,8 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
 
                 int endOffset = html.length();
 
-                if (j < numParams - 1) {
+                // A single parameter is shown alone, without the separator that follows it in the list.
+                if (!context.isSingleParameterInfo() && j < numParams - 1) {
                     html.append(", ");
                 }
 
