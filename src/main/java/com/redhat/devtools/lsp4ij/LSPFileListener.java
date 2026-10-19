@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 
@@ -353,6 +354,13 @@ class LSPFileListener extends AbstractLSPFileListener {
     private URI getUri(@NotNull VirtualFile parentFile,
                        @NotNull String fileName) {
         URI parentFileUri = languageServerWrapper.toUri(parentFile);
-        return parentFileUri.resolve(fileName);
+        try {
+            // Resolve the name as one escaped path segment, like File.toURI, not as a URI reference:
+            // a space or '%' would not parse, and '#' would start a fragment. The ./ prefix keeps a
+            // ':' in the name from being read as a URI scheme.
+            return parentFileUri.resolve(new URI(null, null, "./" + fileName, null));
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid file name: " + fileName, e);
+        }
     }
 }
