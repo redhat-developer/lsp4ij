@@ -15,6 +15,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.impl.event.DocumentEventImpl;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupportBase;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -287,5 +288,33 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
 
         assertFalse(apply(versioned(context.uri(), context.version())).isApplied());
         assertEquals("new typing", context.document().getText());
+    }
+
+    public void testVersionFromClosedDocumentCannotEditReopenedDocument() throws Exception {
+        var context = open();
+        int closedVersion = context.version();
+        context.wrapper().disconnect(context.uri(), false);
+        // The server never sees this typing, so the reopened document differs from the closed one.
+        type(context);
+        LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(myFixture.getFile(), null, null).get(30, TimeUnit.SECONDS);
+
+        assertFalse(apply(versioned(context.uri(), closedVersion)).isApplied());
+        assertEquals("new typing", context.document().getText());
+        // The reopened document must not restart at a version that identified the closed one.
+        assertTrue(context.version() > closedVersion);
+    }
+
+    public void testRetiredClientCannotApplyIncomingEdit() throws Exception {
+        var context = open();
+        // A replaced client can still receive a request that was queued on its transport.
+        var client = new LanguageClientImpl(myFixture.getProject());
+        client.setServerWrapper(context.wrapper());
+        client.dispose();
+
+        var pending = client.applyEdit(new ApplyWorkspaceEditParams(versioned(context.uri(), context.version())));
+        PlatformTestUtil.waitWithEventsDispatching("workspace/applyEdit reply", pending::isDone, 30);
+        assertFalse(pending.join().isApplied());
+        assertEquals("before", context.document().getText());
     }
 }

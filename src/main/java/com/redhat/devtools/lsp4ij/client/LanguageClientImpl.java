@@ -128,10 +128,13 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<ApplyWorkspaceEditResponse> applyEdit(ApplyWorkspaceEditParams params) {
+        // Capture before queuing the write, and refuse the edit if this client retires meanwhile.
+        // For an unversioned server-initiated edit, receipt is the earliest state we can capture.
+        var snapshot = WorkspaceEditSnapshot.capture(wrapper, () -> !isDisposed());
         CompletableFuture<ApplyWorkspaceEditResponse> future = new CompletableFuture<>();
         WriteCommandAction.runWriteCommandAction(getProject(), () -> {
             // Validate every target before applying any part of the edit, without releasing write access.
-            String reason = LSPIJUtils.validateWorkspaceEditVersions(params.getEdit(), wrapper);
+            String reason = snapshot.validate(params.getEdit());
             if (reason != null) {
                 var response = new ApplyWorkspaceEditResponse(false);
                 response.setFailureReason(reason);

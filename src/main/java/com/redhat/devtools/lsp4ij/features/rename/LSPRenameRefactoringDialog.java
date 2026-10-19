@@ -195,8 +195,7 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                 WriteCommandAction.runWriteCommandAction(psiFile.getProject(), () -> {
                     // Check all server responses before changing any document or external reference.
                     for (var workspaceEditData : workspaceEdits) {
-                        String reason = LSPIJUtils.validateWorkspaceEditVersions(workspaceEditData.edit(),
-                                workspaceEditData.languageServer().getServerWrapper());
+                        String reason = workspaceEditData.snapshot().validate(workspaceEditData.edit());
                         if (reason != null) {
                             LSPRenameHandler.showErrorHint(editor, reason);
                             return;
