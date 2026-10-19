@@ -88,11 +88,11 @@ public class EditorRefreshBatchTest extends LightPlatformTestCase {
         var file = new LightVirtualFile("refresh.txt", "text");
         var document = FileDocumentManager.getInstance().getDocument(file);
         assertNotNull(document);
+        var psiFile = PsiManager.getInstance(getProject()).findFile(file);
+        assertNotNull(psiFile);
+        var support = LSPFileSupport.getSupport(psiFile);
         var editor = EditorFactory.getInstance().createEditor(document, getProject());
         try {
-            var psiFile = PsiManager.getInstance(getProject()).findFile(file);
-            assertNotNull(psiFile);
-            var support = LSPFileSupport.getSupport(psiFile);
             var identifier = new TextDocumentIdentifier(file.getUrl());
             var requests = ReadAction.compute(() -> List.of(
                     support.getCodeLensSupport().getCodeLenses(new CodeLensParams(identifier)),
@@ -118,6 +118,10 @@ public class EditorRefreshBatchTest extends LightPlatformTestCase {
             assertNull(support.getSemanticTokensSupport().getFuture());
         } finally {
             EditorFactory.getInstance().releaseEditor(editor);
+            // The refresh scheduled a debounced daemon restart for this file. The light project
+            // outlives the test, so the restart could run in a later test while the project is
+            // temporarily disposed. Disposing the support cancels it.
+            Disposer.dispose(support);
         }
     }
 
