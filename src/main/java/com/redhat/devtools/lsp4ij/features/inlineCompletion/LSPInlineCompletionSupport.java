@@ -19,7 +19,9 @@ import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.InlineCompletionContext;
 import org.eclipse.lsp4j.InlineCompletionItem;
 import org.eclipse.lsp4j.InlineCompletionList;
+import org.eclipse.lsp4j.InlineCompletionParams;
 import org.eclipse.lsp4j.InlineCompletionTriggerKind;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
@@ -36,18 +38,19 @@ import java.util.concurrent.CompletableFuture;
  */
 public class LSPInlineCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPInlineCompletionParams, List<InlineCompletionData>> {
 
-    private Integer previousOffset;
+    private LSPInlineCompletionParams previousParams;
 
     public LSPInlineCompletionSupport(@NotNull PsiFile file) {
         super(file);
     }
 
-    public CompletableFuture<List<InlineCompletionData>> getInlineCompletions(LSPInlineCompletionParams params) {
-        int offset = params.getOffset();
-        if (previousOffset != null && !previousOffset.equals(offset)) {
+    public synchronized CompletableFuture<List<InlineCompletionData>> getInlineCompletions(LSPInlineCompletionParams params) {
+        // At the same caret position, an explicit invocation or another selected popup
+        // item is a different request and must not reuse an automatic suggestion.
+        if (!params.equals(previousParams)) {
             super.cancel();
         }
-        previousOffset = offset;
+        previousParams = params;
         return super.getFeatureData(params);
     }
 
@@ -88,15 +91,20 @@ public class LSPInlineCompletionSupport extends AbstractLSPDocumentFeatureSuppor
                                                                                          @NotNull LanguageServerItem languageServer,
                                                                                          @NotNull CancellationSupport cancellationSupport) {
 
-        // Update textDocument Uri with custom file Uri if needed
-        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
-        params.setContext(createInlineCompletionContext(params, file, languageServer));
+        // Each server may map the file URI differently. Keep the caller's context and
+        // cache key unchanged while preparing this server's request.
+        var identifier = new TextDocumentIdentifier(params.getTextDocument().getUri());
+        updateTextDocumentUri(identifier, file, languageServer);
+        var context = params.getContext() != null ? params.getContext()
+                : new InlineCompletionContext(InlineCompletionTriggerKind.Automatic);
+        var request = new InlineCompletionParams(identifier, params.getPosition(), context);
+        request.setWorkDoneToken(params.getWorkDoneToken());
 
         // Call textDocument/inlineCompletion
         return cancellationSupport.execute(
                 languageServer
                         .getTextDocumentService()
-                        .inlineCompletion(params),
+                        .inlineCompletion(request),
                 languageServer,
                 LSPRequestConstants.TEXT_DOCUMENT_INLINE_COMPLETION)
                 .thenApplyAsync(result -> {
@@ -108,11 +116,4 @@ public class LSPInlineCompletionSupport extends AbstractLSPDocumentFeatureSuppor
                 });
     }
 
-    private static InlineCompletionContext createInlineCompletionContext(LSPInlineCompletionParams params,
-                                                                          @NotNull PsiFile file,
-                                                                          LanguageServerItem languageServer) {
-        InlineCompletionContext context = new InlineCompletionContext();
-        context.setTriggerKind(InlineCompletionTriggerKind.Automatic);
-        return context;
-    }
 }
