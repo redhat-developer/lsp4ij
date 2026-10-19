@@ -18,6 +18,9 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.application.ex.ApplicationInfoEx;
+import com.intellij.openapi.command.CommandProcessor;
+import com.intellij.openapi.command.undo.BasicUndoableAction;
+import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
@@ -997,7 +1000,8 @@ public class LSPIJUtils {
      *                                   cannot be saved. A language server reads such a document from disk, since
      *                                   no didOpen gives it the content, so until the document is saved it does not
      *                                   see the edit. A document with unsaved changes from before the edit is not
-     *                                   saved, so that the edit does not persist them.
+     *                                   saved, so that the edit does not persist them. Inside a command, the same
+     *                                   documents are saved again after Undo and Redo of the edit.
      */
     @ApiStatus.Internal
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
@@ -1009,6 +1013,11 @@ public class LSPIJUtils {
                 ? document -> {
                     if (EditorFactory.getInstance().getEditors(document).length == 0
                             && !FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
+                        if (documentsToSave.isEmpty()) {
+                            // Undo reverts the changes that follow this action before it reaches it, so this
+                            // saves the documents in their state after Undo
+                            saveOnUndoOrRedo(documentsToSave, true);
+                        }
                         documentsToSave.add(document);
                     }
                 }
@@ -1062,13 +1071,53 @@ public class LSPIJUtils {
             }
         }
 
+        if (!documentsToSave.isEmpty()) {
+            saveDocumentsWithoutEditor(documentsToSave);
+            // Redo applies the changes before it reaches this action, so this saves them after Redo
+            saveOnUndoOrRedo(documentsToSave, false);
+        }
+    }
+
+    private static void saveDocumentsWithoutEditor(@NotNull Set<Document> documents) {
         // A later operation of the edit can have deleted the file; a rename keeps its document
-        for (Document document : documentsToSave) {
+        for (Document document : documents) {
             VirtualFile file = FileDocumentManager.getInstance().getFile(document);
             if (file != null && file.isValid() && EditorFactory.getInstance().getEditors(document).length == 0) {
                 FileDocumentManager.getInstance().saveDocument(document);
             }
         }
+    }
+
+    /**
+     * Registers, in the current command, an action that saves the documents without an editor on Undo or on Redo.
+     * Outside a command the edit cannot be undone, so nothing is registered.
+     */
+    private static void saveOnUndoOrRedo(@NotNull Set<Document> documents, boolean onUndo) {
+        Project project = CommandProcessor.getInstance().getCurrentCommandProject();
+        if (project == null) {
+            return;
+        }
+        UndoManager.getInstance(project).undoableActionPerformed(new BasicUndoableAction() {
+            @Override
+            public void undo() {
+                if (onUndo) {
+                    saveDocumentsWithoutEditor(documents);
+                }
+            }
+
+            @Override
+            public void redo() {
+                if (!onUndo) {
+                    saveDocumentsWithoutEditor(documents);
+                }
+            }
+
+            @Override
+            public boolean isGlobal() {
+                // The documents have no editor, so the edit can only be undone from the global stack
+                return true;
+            }
+        });
     }
 
     private static void applyCreateFile(CreateFile createFile, Consumer<Document> beforeEdit) {
