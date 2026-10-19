@@ -148,7 +148,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
         textDocument.setLanguageId(languageId);
         synchronized (changeEvents) {
-            version = languageServerWrapper.nextDocumentVersion(fileUri);
+            version = languageServerWrapper.nextDocumentVersion();
             synchronizedModificationStamp = modificationStamp;
             textDocument.setVersion(version);
         }
@@ -254,7 +254,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 barrier = new CompletableFuture<>();
                 lastDidChangeFuture = barrier;
                 // Record the state represented by this batch before another flush can advance it.
-                version = languageServerWrapper.nextDocumentVersion(fileUri);
+                version = languageServerWrapper.nextDocumentVersion();
                 this.version = version;
                 synchronizedModificationStamp = document.getModificationStamp();
             }

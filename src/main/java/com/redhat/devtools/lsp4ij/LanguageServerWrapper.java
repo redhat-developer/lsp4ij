@@ -104,9 +104,10 @@ public class LanguageServerWrapper implements Disposable {
     protected final Map<URI /* file Uri */, ClosedDocument> closedDocuments;
     // Lock object to prevent deadlock when accessing both openedDocuments and closedDocuments
     private final Object documentsLock = new Object();
-    // A new synchronizer must not restart at version 1 after close/reopen: a delayed edit
-    // for the previous incarnation could then look current. Keep counters for this connection.
-    private final Map<String, Integer> documentVersions = new ConcurrentHashMap<>();
+    // A new synchronizer must not restart at version 1 after close/reopen: a delayed edit for the
+    // previous incarnation could then look current. LSP versions only have to increase, not be
+    // consecutive, so one counter for all documents of this connection keeps them unique.
+    private final AtomicInteger documentVersion = new AtomicInteger();
     // Guarded by documentsLock. Ordinary lookups promote scoped connections to the
     // existing editor/feature lifetime; a temporary request must never close those.
     private final Map<URI, ScopedDocumentConnection> scopedDocuments = new HashMap<>();
@@ -944,11 +945,11 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Allocates a version for this URI on the current connection, including across reopen.
+     * Allocates a document version on the current connection, unique across documents and reopen.
      * File opens and document notifications can originate on different threads.
      */
-    int nextDocumentVersion(@NotNull String uri) {
-        return documentVersions.merge(uri, 1, Math::addExact);
+    int nextDocumentVersion() {
+        return documentVersion.updateAndGet(Math::incrementExact);
     }
 
     @NotNull
@@ -1846,7 +1847,7 @@ public class LanguageServerWrapper implements Disposable {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }
                 // Old replies are refused by connection identity, so the new connection can start afresh.
-                documentVersions.clear();
+                documentVersion.set(0);
                 if (!closedDocuments.isEmpty()) {
                     Set<URI> fileUris = new HashSet<>(closedDocuments.keySet());
                     closedDocuments.clear();
