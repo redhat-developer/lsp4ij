@@ -1163,7 +1163,19 @@ public class LanguageServerWrapper implements Disposable {
         // Enqueues a notification on the dispatch thread associated with the wrapped language server. This
         // ensures the interleaving of document updates and other requests in the UI is mirrored in the
         // order in which they get dispatched to the server
-        var initializedServer = getInitializedServer();
+        return sendNotification(getInitializedServer(), fn);
+    }
+
+    /**
+     * Sends a notification to the given initialized server, after the notifications sent before it.
+     * Unlike {@link #sendNotification(Function)}, this neither starts the server nor takes any lock other
+     * than the one ordering the notifications, so a caller can hold its own lock while sending.
+     *
+     * @param initializedServer the server, as returned by {@link #getInitializedServer()}
+     * @param fn                LS notification to send
+     */
+    CompletableFuture<LanguageServer> sendNotification(@NotNull CompletableFuture<LanguageServer> initializedServer,
+                                                       @NotNull Function<LanguageServer, LanguageServer> fn) {
         synchronized (notificationLock) {
             // Each notification is dispatched after the previous one. Waiting for the initialized
             // server alone does not keep their order: the dependents of one future complete in

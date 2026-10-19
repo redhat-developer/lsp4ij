@@ -63,8 +63,8 @@ public class DocumentContentSynchronizerDisposalTest extends LightPlatformTestCa
     public void testRestartDuringDidChangeDoesNotPullFromRetiredSynchronizer() throws Exception {
         var wrapper = new RecordingWrapper();
         var synchronizer = openDocument(wrapper);
-        // Sending a notification may restart a failed connection and dispose its synchronizer.
-        wrapper.beforeNotification = () -> Disposer.dispose(synchronizer);
+        // A failed connection can restart, and dispose its synchronizer, while a change is being sent.
+        wrapper.afterQueuingNotification = () -> Disposer.dispose(synchronizer);
         synchronizer.getDocument().addDocumentListener(synchronizer, synchronizer);
 
         ApplicationManager.getApplication().runWriteAction(() -> synchronizer.getDocument().setText("updated"));
@@ -146,7 +146,7 @@ public class DocumentContentSynchronizerDisposalTest extends LightPlatformTestCa
         private final AtomicInteger updates = new AtomicInteger();
         private final CompletableFuture<Void> firstPull = new CompletableFuture<>();
         private final DiagnosticReply reply = new DiagnosticReply();
-        private Runnable beforeNotification = () -> {};
+        private Runnable afterQueuingNotification = () -> {};
         private Runnable beforeUpdate = () -> {};
 
         RecordingWrapper() {
@@ -178,9 +178,11 @@ public class DocumentContentSynchronizerDisposalTest extends LightPlatformTestCa
         }
 
         @Override
-        public CompletableFuture<LanguageServer> sendNotification(Function<LanguageServer, LanguageServer> notification) {
-            beforeNotification.run();
-            return CompletableFuture.completedFuture(notification.apply(server));
+        CompletableFuture<LanguageServer> sendNotification(CompletableFuture<LanguageServer> initializedServer,
+                                                           Function<LanguageServer, LanguageServer> notification) {
+            var sent = super.sendNotification(initializedServer, notification);
+            afterQueuingNotification.run();
+            return sent;
         }
 
         @Override

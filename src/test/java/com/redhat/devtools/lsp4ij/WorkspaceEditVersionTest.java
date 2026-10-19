@@ -182,6 +182,9 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
         };
         var synchronizer = new DocumentContentSynchronizer(context.wrapper(), context.uri().toString(),
                 myFixture.getFile().getVirtualFile(), document, null, null);
+        // Changes wait for the document's didOpen, so open it first; it reads the stamp too
+        synchronizer.getDidOpenFuture().get(30, TimeUnit.SECONDS);
+        readAccess.clear();
         ReadAction.run(() -> synchronizer.beforeDocumentChange(new DocumentEventImpl(context.document(),
                 0, "before", "after", context.document().getModificationStamp(), true, 0, 6, 0)));
 

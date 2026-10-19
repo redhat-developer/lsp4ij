@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -68,6 +69,11 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private final List<TextDocumentContentChangeEvent> changeEvents;
     private volatile @NotNull CompletableFuture<Void> lastDidChangeFuture = CompletableFuture.completedFuture(null);
     private @Nullable CompletableFuture<LanguageServer> didOpenFuture;
+    // Whether didOpen and didClose have been queued. Both change under changeEvents, where the
+    // notifications they describe are queued, so that the server receives didOpen before any
+    // didChange or didClose, nothing after didClose, and didClose only after a didOpen.
+    private boolean opened;
+    private boolean closed;
 
     // Create the Alarm while its owner is alive, never from a delayed document callback.
     // It does not schedule work until a request is added.
@@ -115,7 +121,11 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         if (didOpenFuture != null) {
             return didOpenFuture;
         }
-        return getDidOpenFutureSync();
+        var didOpen = getDidOpenFutureSync();
+        // Changes made since a captured text was read wait for the didOpen; send them after it.
+        // This runs outside the monitor, since sending them may wait for read access.
+        sendDidChangeEvents();
+        return didOpen;
     }
 
     private synchronized @NotNull CompletableFuture<LanguageServer> getDidOpenFutureSync() {
@@ -140,6 +150,12 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             modificationStamp = documentModificationStamp;
         } else {
             modificationStamp = readDocumentState(() -> {
+                // The current text already contains the changes queued so far, since this read
+                // cannot overlap the write action that queued them. A didChange sending them after
+                // this didOpen would apply them twice.
+                synchronized (changeEvents) {
+                    changeEvents.clear();
+                }
                 textDocument.setText(document.getText());
                 return document.getModificationStamp();
             });
@@ -148,18 +164,27 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         @NotNull String languageId = this.languageId != null ? this.languageId :
                 languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
         textDocument.setLanguageId(languageId);
+        var initializedServer = languageServerWrapper.getInitializedServer();
+        CompletableFuture<LanguageServer> didOpen;
         synchronized (changeEvents) {
+            if (closed) {
+                // The document was closed first; an open now could never be balanced by a close
+                return didOpenFuture = CompletableFuture.failedFuture(
+                        new CancellationException("The document was closed before it was opened"));
+            }
             version = languageServerWrapper.nextDocumentVersion();
             synchronizedModificationStamp = modificationStamp;
             textDocument.setVersion(version);
+            // Send didOpen like didChange and didClose, so that it keeps its place among them, and
+            // decide it under the same monitor as them, so that neither can reach the server first
+            opened = true;
+            didOpen = languageServerWrapper.sendNotification(initializedServer, ls -> {
+                ls.getTextDocumentService()
+                        .didOpen(new DidOpenTextDocumentParams(textDocument));
+                return ls;
+            });
         }
-        // Send didOpen like didChange and didClose, so that it keeps its place among them
-        didOpenFuture = languageServerWrapper
-                .sendNotification(ls -> {
-                    ls.getTextDocumentService()
-                            .didOpen(new DidOpenTextDocumentParams(textDocument));
-                    return ls;
-                })
+        didOpenFuture = didOpen
                 .thenCompose(ls ->
                         CompletableFuture.supplyAsync(() -> {
                             if (!ApplicationManager.getApplication().isUnitTestMode()) {
@@ -242,15 +267,21 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         // consuming them under the monitor so the batch and stamp describe the same completed state.
         // The block makes no cancellation check once it starts, so a cancellable read consumes the
         // batch once: it is only retried before starting, while a write action is pending.
+        var initializedServer = languageServerWrapper.getInitializedServer();
         return readDocumentState(() -> {
-            List<TextDocumentContentChangeEvent> events;
             CompletableFuture<Void> barrier;
             final int version;
+            final CompletableFuture<LanguageServer> didChange;
             synchronized (changeEvents) {
                 if (changeEvents.isEmpty()) {
                     return lastDidChangeFuture;
                 }
-                events = new ArrayList<>(changeEvents);
+                if (closed || syncOptions.getOpenClose() && !opened) {
+                    // Before didOpen the changes wait for it, which either contains them or is
+                    // followed by them; after didClose the server no longer has the document.
+                    return lastDidChangeFuture;
+                }
+                List<TextDocumentContentChangeEvent> events = new ArrayList<>(changeEvents);
                 changeEvents.clear();
                 barrier = new CompletableFuture<>();
                 lastDidChangeFuture = barrier;
@@ -258,16 +289,17 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 version = languageServerWrapper.nextDocumentVersion();
                 this.version = version;
                 synchronizedModificationStamp = document.getModificationStamp();
-            }
 
-            // send 'textDocument/didChange' notification
-            DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
-            changeParamsToSend.getTextDocument().setUri(fileUri);
-            changeParamsToSend.getTextDocument().setVersion(version);
-            var didChange = languageServerWrapper.sendNotification(ls -> {
-                ls.getTextDocumentService().didChange(changeParamsToSend);
-                return ls;
-            });
+                // send 'textDocument/didChange' notification, queued under the monitor so that a
+                // concurrent close cannot queue its didClose before it
+                DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
+                changeParamsToSend.getTextDocument().setUri(fileUri);
+                changeParamsToSend.getTextDocument().setVersion(version);
+                didChange = languageServerWrapper.sendNotification(initializedServer, ls -> {
+                    ls.getTextDocumentService().didChange(changeParamsToSend);
+                    return ls;
+                });
+            }
             processPullDiagnosticIfNeeded(didChange, version);
             didChange.whenComplete((ls, ex) -> {
                 if (ex != null) {
@@ -344,7 +376,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     public void documentClosed() {
         // When LS is shut down all documents are being disconnected. No need to send "didClose" message to the LS that is being shut down or not yet started
-        if (syncOptions.getOpenClose() && languageServerWrapper.isActive()) {
+        boolean sendDidClose = syncOptions.getOpenClose() && languageServerWrapper.isActive();
+        CompletableFuture<LanguageServer> initializedServer = null;
+        if (sendDidClose) {
             // Ensure pending textDocument/didChange events are sent before the file is closed.
             //
             // This handles the specific case where a file is being renamed:
@@ -355,14 +389,24 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             if (!changeEvents.isEmpty()) {
                 sendDidChangeEvents();
             }
+            initializedServer = languageServerWrapper.getInitializedServer();
+        }
 
-            // Send textDocument/didClose
-            languageServerWrapper.sendNotification(ls -> {
-                TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
-                DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
-                ls.getTextDocumentService().didClose(params);
-                return ls;
-            });
+        synchronized (changeEvents) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            // A close notification requires a previous open notification
+            if (initializedServer != null && opened) {
+                // Send textDocument/didClose
+                languageServerWrapper.sendNotification(initializedServer, ls -> {
+                    TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
+                    DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
+                    ls.getTextDocumentService().didClose(params);
+                    return ls;
+                });
+            }
         }
     }
 
