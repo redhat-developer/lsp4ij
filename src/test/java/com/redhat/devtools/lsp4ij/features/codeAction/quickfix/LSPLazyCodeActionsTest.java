@@ -173,8 +173,11 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             }, 10);
 
             pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
-            PlatformTestUtil.waitWithEventsDispatching("server must start",
-                    () -> languageServer.getServerWrapper().getServerStatus() == ServerStatus.starting, 5);
+            // The server status cannot tell that the load has created its request, if another start set it
+            PlatformTestUtil.waitWithEventsDispatching("the pending load must create its request",
+                    codeActions::hasRequest, 5);
+            assertEquals("The request must wait for the server to initialize", 0,
+                    textDocumentService.codeActionRequests);
             codeActions.cancel();
         } finally {
             initialize.complete(null);
