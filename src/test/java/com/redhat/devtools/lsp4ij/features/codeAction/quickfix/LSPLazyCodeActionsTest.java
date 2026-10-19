@@ -25,6 +25,7 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -156,29 +157,34 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         quickFix.setDiagnostics(List.of(diagnostic));
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
         var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
-        // The request waits for the server to initialize: delay initialize, then stop the server, so that
-        // the request starts it again and waits. Anything that asks for the server can start it again
-        // before the request does, and then stop() never reports stopped; either way the server is not
-        // initialized, and it initializes slowly.
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(2_000);
-        languageServer.getServerWrapper().stop();
-        // longer than the 5 seconds stop() waits for the shutdown reply
-        PlatformTestUtil.waitWithEventsDispatching("server must stop or start again", () -> {
-            ServerStatus status = languageServer.getServerWrapper().getServerStatus();
-            return status == ServerStatus.stopped || status == ServerStatus.starting;
-        }, 10);
-
         var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
-        Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
-        PlatformTestUtil.waitWithEventsDispatching("server must start",
-                () -> languageServer.getServerWrapper().getServerStatus() == ServerStatus.starting, 5);
-        codeActions.cancel();
+        // The request waits for the server to initialize: hold initialize, then stop the server, so that the
+        // request starts it again and waits. Anything that asks for the server can start it again before the
+        // request does, and then stop() never reports stopped; either way the server stays uninitialized
+        // until initialize is released, after the cancellation.
+        CompletableFuture<Void> initialize = MockLanguageServer.INSTANCE.holdInitialize();
+        Future<?> pending;
+        try {
+            languageServer.getServerWrapper().stop();
+            // longer than the 5 seconds stop() waits for the shutdown reply
+            PlatformTestUtil.waitWithEventsDispatching("server must stop or start again", () -> {
+                ServerStatus status = languageServer.getServerWrapper().getServerStatus();
+                return status == ServerStatus.stopped || status == ServerStatus.starting;
+            }, 10);
+
+            pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
+            PlatformTestUtil.waitWithEventsDispatching("server must start",
+                    () -> languageServer.getServerWrapper().getServerStatus() == ServerStatus.starting, 5);
+            codeActions.cancel();
+        } finally {
+            initialize.complete(null);
+        }
+        // The pending load waits for the server to initialize
         try {
             pending.get(10, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
             // The request cancelled before it was sent fails the pending load; only the next load matters here.
         }
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
 
         var codeAction = codeActions.getCodeActionAt(0);
 
