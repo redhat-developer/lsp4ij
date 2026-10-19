@@ -20,7 +20,6 @@ import com.intellij.testFramework.fixtures.CodeInsightTestUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
-import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.Command;
@@ -184,8 +183,7 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
     // The server publishes diagnostics after didOpen, which highlighting can trigger, and
     // LSPDiagnosticsApplier shows them asynchronously. Highlighting once can finish before they are
-    // shown, so highlight again until every diagnostic is shown. The applier also drops diagnostics
-    // published before the first highlighting registers its pass, so ask it to refresh, as an editor does.
+    // shown, so highlight again until every diagnostic is shown.
     @NotNull
     private List<HighlightInfo> highlightLanguageServerDiagnostics(int diagnosticCount) {
         long deadline = System.currentTimeMillis() + 30_000;
@@ -198,8 +196,6 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
             if (shown >= diagnosticCount || System.currentTimeMillis() > deadline) {
                 return infos;
             }
-            LSPDiagnosticsApplier.getInstance(myFixture.getProject())
-                    .scheduleRefresh(myFixture.getFile(), myFixture.getEditor().getDocument());
             NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
         }
     }
