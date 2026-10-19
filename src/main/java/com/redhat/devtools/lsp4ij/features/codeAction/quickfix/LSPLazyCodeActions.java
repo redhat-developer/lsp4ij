@@ -28,6 +28,7 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,5 +226,13 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         // The editor can keep the quick fixes that use these code actions, for example when the same diagnostics
         // are published again, so the next use must send a new request.
         lspCodeActionRequest = null;
+    }
+
+    /**
+     * Returns true if a textDocument/codeAction request has been created and not cancelled since.
+     */
+    @TestOnly
+    synchronized boolean hasRequest() {
+        return lspCodeActionRequest != null;
     }
 }

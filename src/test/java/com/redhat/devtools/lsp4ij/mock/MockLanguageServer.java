@@ -48,6 +48,7 @@ public final class MockLanguageServer implements LanguageServer {
 	private final MockWorkspaceService workspaceService = new MockWorkspaceService(this::buildMaybeDelayedFuture);
 	private final InitializeResult initializeResult = new InitializeResult();
 	private volatile long delay = 0;
+	private volatile CompletableFuture<Void> initializeGate = CompletableFuture.completedFuture(null);
 	private volatile boolean started;
 
 	private final List<LanguageClient> remoteProxies = new ArrayList<>();
@@ -145,7 +146,18 @@ public final class MockLanguageServer implements LanguageServer {
 
 	@Override
 	public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-		return buildMaybeDelayedFuture(initializeResult);
+		return initializeGate.thenCompose(ignored -> buildMaybeDelayedFuture(initializeResult));
+	}
+
+	/**
+	 * Holds the replies to initialize requests until the returned future is completed, which the caller must do.
+	 *
+	 * @return the future that releases the held and later initialize replies when completed.
+	 */
+	public CompletableFuture<Void> holdInitialize() {
+		CompletableFuture<Void> gate = new CompletableFuture<>();
+		initializeGate = gate;
+		return gate;
 	}
 
 	@Override
