@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.client;
 
 import com.google.gson.JsonObject;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
@@ -128,20 +129,45 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<ApplyWorkspaceEditResponse> applyEdit(ApplyWorkspaceEditParams params) {
+        // Capture before queuing the write, and refuse the edit if this client retires meanwhile.
+        // For an unversioned server-initiated edit, receipt is the earliest state we can capture.
+        var snapshot = WorkspaceEditSnapshot.capture(wrapper, () -> !isDisposed());
         CompletableFuture<ApplyWorkspaceEditResponse> future = new CompletableFuture<>();
-        WriteCommandAction.runWriteCommandAction(getProject(), () -> {
-            // Validate every target before applying any part of the edit, without releasing write access.
-            String reason = LSPIJUtils.validateWorkspaceEditVersions(params.getEdit(), wrapper);
-            if (reason != null) {
-                var response = new ApplyWorkspaceEditResponse(false);
-                response.setFailureReason(reason);
-                future.complete(response);
-            } else {
-                LSPIJUtils.applyWorkspaceEdit(params.getEdit());
-                future.complete(new ApplyWorkspaceEditResponse(true));
+        Runnable apply = () -> {
+            if (getProject().isDisposed()) {
+                future.complete(refused(LanguageServerBundle.message("lsp.workspace.edit.connection.changed")));
+                return;
             }
-        });
+            try {
+                WriteCommandAction.runWriteCommandAction(getProject(), () -> {
+                    // Validate every target before applying any part of the edit, without releasing write access.
+                    String reason = snapshot.validate(params.getEdit());
+                    if (reason != null) {
+                        future.complete(refused(reason));
+                    } else {
+                        LSPIJUtils.applyWorkspaceEdit(params.getEdit());
+                        future.complete(new ApplyWorkspaceEditResponse(true));
+                    }
+                });
+            } catch (RuntimeException e) {
+                future.completeExceptionally(e);
+            }
+        };
+        var application = ApplicationManager.getApplication();
+        if (application.isDispatchThread()) {
+            apply.run();
+        } else {
+            // Don't wait for the EDT on LSP4J's message thread: a write action can be waiting there for a
+            // reply, such as to workspace/willRenameFiles, that only this thread can read.
+            application.invokeLater(apply);
+        }
         return future;
+    }
+
+    private static ApplyWorkspaceEditResponse refused(String reason) {
+        var response = new ApplyWorkspaceEditResponse(false);
+        response.setFailureReason(reason);
+        return response;
     }
 
     @Override

@@ -10,11 +10,14 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.mock.MockDocument;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.impl.event.DocumentEventImpl;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupportBase;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -38,6 +41,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -290,5 +294,54 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
 
         assertFalse(apply(versioned(uri, context.wrapper().getOpenedDocument(uri).getSynchronizer().getVersion())).isApplied());
         assertEquals("new typing", document.getText());
+    }
+
+    public void testVersionFromClosedDocumentCannotEditReopenedDocument() throws Exception {
+        var context = open();
+        int closedVersion = context.version();
+        context.wrapper().disconnect(context.uri(), false);
+        // The server never sees this typing, so the reopened document differs from the closed one.
+        type(context);
+        LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(myFixture.getFile(), null, null).get(30, TimeUnit.SECONDS);
+
+        assertFalse(apply(versioned(context.uri(), closedVersion)).isApplied());
+        assertEquals("new typing", context.document().getText());
+        // The reopened document must not restart at a version that identified the closed one.
+        assertTrue(context.version() > closedVersion);
+    }
+
+    public void testRetiredClientCannotApplyIncomingEdit() throws Exception {
+        var context = open();
+        // A replaced client can still receive a request that was queued on its transport.
+        var client = new LanguageClientImpl(myFixture.getProject());
+        client.setServerWrapper(context.wrapper());
+        client.dispose();
+
+        var pending = client.applyEdit(new ApplyWorkspaceEditParams(versioned(context.uri(), context.version())));
+        PlatformTestUtil.waitWithEventsDispatching("workspace/applyEdit reply", pending::isDone, 30);
+        assertFalse(pending.join().isApplied());
+        assertEquals("before", context.document().getText());
+    }
+
+    public void testApplyEditDoesNotWaitForAWriteAction() throws Exception {
+        var context = open();
+        var client = new LanguageClientImpl(myFixture.getProject());
+        // Dispose with the project: the client reads project services when it is disposed.
+        Disposer.register(myFixture.getProject(), client);
+        client.setServerWrapper(context.wrapper());
+        var params = new ApplyWorkspaceEditParams(versioned(context.uri(), context.version()));
+        // LSP4J calls applyEdit on its message thread. A write action can be waiting for a reply that only
+        // that thread can read, so applyEdit must return while the write action still runs.
+        var returned = new CompletableFuture<CompletableFuture<ApplyWorkspaceEditResponse>>();
+        WriteAction.run(() -> {
+            ApplicationManager.getApplication().executeOnPooledThread(() -> returned.complete(client.applyEdit(params)));
+            returned.get(10, TimeUnit.SECONDS);
+        });
+
+        var pending = returned.join();
+        PlatformTestUtil.waitWithEventsDispatching("workspace/applyEdit reply", pending::isDone, 30);
+        assertTrue(pending.join().isApplied());
+        assertEquals("after", context.document().getText());
     }
 }
