@@ -36,6 +36,7 @@ public class MockWorkspaceService implements WorkspaceService {
     private long willDeleteDelayMs;
     private long willRenameDelayMs;
     private volatile CompletableFuture<RenameFilesParams> didRenameCallback;
+    private volatile CompletableFuture<RenameFilesParams> willRenameCallback;
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
@@ -43,6 +44,10 @@ public class MockWorkspaceService implements WorkspaceService {
 
     public void setDidRenameCallback(CompletableFuture<RenameFilesParams> callback) {
         didRenameCallback = callback;
+    }
+
+    public void setWillRenameCallback(CompletableFuture<RenameFilesParams> callback) {
+        willRenameCallback = callback;
     }
 
     @Override
@@ -90,6 +95,11 @@ public class MockWorkspaceService implements WorkspaceService {
 
     @Override
     public CompletableFuture<WorkspaceEdit> willRenameFiles(RenameFilesParams params) {
+        var callback = willRenameCallback;
+        if (callback != null) {
+            willRenameCallback = null;
+            callback.complete(params);
+        }
         return delayedResult(willRename, willRenameDelayMs);
     }
 
