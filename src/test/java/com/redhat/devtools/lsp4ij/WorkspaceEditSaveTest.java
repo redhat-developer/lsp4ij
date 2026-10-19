@@ -8,6 +8,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -44,6 +45,21 @@ public class WorkspaceEditSaveTest extends LSPCodeInsightFixtureTestCase {
 
         apply(new WorkspaceEdit(Map.of(LSPIJUtils.toUri(file).toString(), List.of(renameClass()))));
 
+        assertSaved(file);
+    }
+
+    public void testUndoAndRedoSaveAFileWithoutAnEditor() throws IOException {
+        VirtualFile file = myFixture.addFileToProject("closed.txt", OLD_TEXT).getVirtualFile();
+        apply(new WorkspaceEdit(Map.of(LSPIJUtils.toUri(file).toString(), List.of(renameClass()))));
+        assertSaved(file);
+
+        UndoManager undoManager = UndoManager.getInstance(myFixture.getProject());
+        undoManager.undo(null);
+        assertEquals(OLD_TEXT, document(file).getText());
+        assertFalse(FileDocumentManager.getInstance().isDocumentUnsaved(document(file)));
+        assertEquals(OLD_TEXT, VfsUtilCore.loadText(file));
+
+        undoManager.redo(null);
         assertSaved(file);
     }
 
