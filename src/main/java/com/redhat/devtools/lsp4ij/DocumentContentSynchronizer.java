@@ -21,6 +21,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -520,28 +521,38 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                             RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
                             // Update the diagnostics cache from the opened file
                             updatePullDiagnostics(file, fileReport);
+                            updateRelatedPullDiagnostics(fileReport.getRelatedDocuments(), clientFeatures);
                         } else if (diagnosticReport.isRight()) {
-                            RelatedUnchangedDocumentDiagnosticReport allFilesReport = diagnosticReport.getRight();
-                            Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments = allFilesReport.getRelatedDocuments();
-                            if (relatedDocuments != null) {
-                                for (var relatedDocument : relatedDocuments.entrySet()) {
-                                    String documentUri = relatedDocument.getKey();
-                                    Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport> fileReport = relatedDocument.getValue();
-                                    if (fileReport != null) {
-                                        if (fileReport.isLeft()) {
-                                            VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
-                                            if (file != null) {
-                                                updatePullDiagnostics(file, fileReport.getLeft());
-                                            }
-                                        } else if (fileReport.isRight()) {
-                                            // TODO: implement UnchangedDocumentDiagnosticReport
-                                        }
-                                    }
-                                }
-                            }
+                            // The opened file's diagnostics are unchanged, but those of related documents can change.
+                            updateRelatedPullDiagnostics(diagnosticReport.getRight().getRelatedDocuments(), clientFeatures);
                         }
                     }
                 });
+    }
+
+    /**
+     * Updates the diagnostics of the documents related to a pulled report. A report of either kind can
+     * carry them: code in one file can produce diagnostics in another file it depends on.
+     */
+    private void updateRelatedPullDiagnostics(@Nullable Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments,
+                                              @NotNull LSPClientFeatures clientFeatures) {
+        if (relatedDocuments == null) {
+            return;
+        }
+        for (var relatedDocument : relatedDocuments.entrySet()) {
+            String documentUri = relatedDocument.getKey();
+            Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport> fileReport = relatedDocument.getValue();
+            if (fileReport != null) {
+                if (fileReport.isLeft()) {
+                    VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
+                    if (file != null) {
+                        updatePullDiagnostics(file, fileReport.getLeft());
+                    }
+                } else if (fileReport.isRight()) {
+                    // TODO: implement UnchangedDocumentDiagnosticReport
+                }
+            }
+        }
     }
 
     private void updatePullDiagnostics(@NotNull VirtualFile file,
