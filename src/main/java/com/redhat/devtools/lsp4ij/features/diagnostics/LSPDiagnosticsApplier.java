@@ -25,7 +25,9 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Service that applies LSP diagnostics reactively when the server sends publishDiagnostics.
@@ -39,6 +41,10 @@ public final class LSPDiagnosticsApplier implements Disposable {
     public static volatile int GROUP_ID = -1;
 
     private final Project project;
+
+    // Refreshes requested before a highlighting pass registrar set GROUP_ID, by file. Checking GROUP_ID
+    // and adding a refresh under this lock means applyPendingRefreshes() cannot miss one.
+    private final Map<Object, Runnable> pendingRefreshes = new LinkedHashMap<>();
 
     public LSPDiagnosticsApplier(@NotNull Project project) {
         this.project = project;
@@ -66,8 +72,18 @@ public final class LSPDiagnosticsApplier implements Disposable {
     private void scheduleRefresh(@Nullable VirtualFile file,
                                  @Nullable PsiFile psiFile,
                                  @Nullable Document document) {
-        if (project.isDisposed() || GROUP_ID == -1) {
+        if (project.isDisposed()) {
             return;
+        }
+        if (GROUP_ID == -1) {
+            synchronized (pendingRefreshes) {
+                if (GROUP_ID == -1) {
+                    // Nothing applies these diagnostics again unless they change, so keep the refresh
+                    // until LSPDiagnosticsPassFactory registers the diagnostics group.
+                    pendingRefreshes.put(file != null ? file : psiFile, () -> scheduleRefresh(file, psiFile, document));
+                    return;
+                }
+            }
         }
 
         // Capture Document modification stamp as early as possible to detect changes
@@ -81,6 +97,18 @@ public final class LSPDiagnosticsApplier implements Disposable {
                     }
                 })
                 .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    /**
+     * Runs the refreshes requested before {@link #GROUP_ID} was set.
+     */
+    void applyPendingRefreshes() {
+        List<Runnable> refreshes;
+        synchronized (pendingRefreshes) {
+            refreshes = List.copyOf(pendingRefreshes.values());
+            pendingRefreshes.clear();
+        }
+        refreshes.forEach(Runnable::run);
     }
 
     private static class HighlightsToApply {
