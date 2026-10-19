@@ -278,14 +278,17 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
 
     public void testDidOpenVersionCannotAuthorizeTextChangedSinceCapture() throws Exception {
         var context = open();
-        var file = myFixture.getFile().getVirtualFile();
-        context.wrapper().disconnect(context.uri(), false);
+        // Use a file without an editor. Selecting an editor schedules its own connection, which
+        // can connect the file with the typed text first, so connect() would ignore this capture.
+        var file = myFixture.addFileToProject("other.foo", "before").getVirtualFile();
+        var document = LSPIJUtils.getDocument(file);
         // Model typing between capturing didOpen's text and asynchronous connection setup.
-        var connectionInfo = context.wrapper().createFileConnectionInfo(file, context.document(), true);
-        type(context);
+        var connectionInfo = context.wrapper().createFileConnectionInfo(file, document, true);
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> document.setText("new typing"));
         context.wrapper().connect(file, connectionInfo).get(30, TimeUnit.SECONDS);
+        var uri = context.wrapper().toUri(file);
 
-        assertFalse(apply(versioned(context.uri(), context.version())).isApplied());
-        assertEquals("new typing", context.document().getText());
+        assertFalse(apply(versioned(uri, context.wrapper().getOpenedDocument(uri).getSynchronizer().getVersion())).isApplied());
+        assertEquals("new typing", document.getText());
     }
 }
