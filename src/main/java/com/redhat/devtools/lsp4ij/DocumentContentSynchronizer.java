@@ -33,6 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 
 /**
  * Synchronize IntelliJ document (open, content changed, close, save)
@@ -53,9 +56,14 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private final @NotNull TextDocumentSyncOptions syncOptions;
     private final @NotNull VirtualFile file;
     private final @Nullable String documentText;
+    private final long documentModificationStamp;
     private final @Nullable String languageId;
 
-    private int version = 0;
+    // Update the LSP version and its matching editor stamp together under changeEvents.
+    // The stamp is -1 until the text associated with a version is known. Volatile also
+    // supports callers that only need getVersion(), without inspecting the pending changes.
+    private volatile int version = 0;
+    private long synchronizedModificationStamp = -1;
     private final List<TextDocumentContentChangeEvent> changeEvents;
     private volatile @NotNull CompletableFuture<Void> lastDidChangeFuture = CompletableFuture.completedFuture(null);
     private @Nullable CompletableFuture<LanguageServer> didOpenFuture;
@@ -66,18 +74,34 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private final Alarm debouncePullDiagnosticsAlarm;
     private boolean diagnosticNotPulledOnDidOpen;
 
+    /**
+     * Compatibility constructor for callers without a stamp for the supplied text.
+     * If documentText is supplied, versioned edits cannot be accepted until a didChange
+     * establishes which editor state the protocol version represents.
+     */
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull String fileUri,
                                        @NotNull VirtualFile file,
                                        @NotNull Document document,
                                        @Nullable String documentText,
                                        @Nullable String languageId) {
+        this(languageServerWrapper, fileUri, file, document, documentText, -1, languageId);
+    }
+
+    DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
+                                @NotNull String fileUri,
+                                @NotNull VirtualFile file,
+                                @NotNull Document document,
+                                @Nullable String documentText,
+                                long documentModificationStamp,
+                                @Nullable String languageId) {
         this.languageServerWrapper = languageServerWrapper;
         this.file = file;
         this.fileUri = fileUri;
         this.syncOptions = languageServerWrapper.getSyncOptions();
         this.document = document;
         this.documentText = documentText;
+        this.documentModificationStamp = documentModificationStamp;
         this.languageId = languageId;
 
         // Initialize LSP change events
@@ -107,12 +131,27 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         // add a document buffer
         TextDocumentItem textDocument = new TextDocumentItem();
         textDocument.setUri(this.fileUri);
-        textDocument.setText(documentText != null ? documentText : document.getText());
+        long modificationStamp;
+        if (documentText != null) {
+            // Reuse the captured text and stamp: rereading the document here can deadlock
+            // when a VFS rename holds the write lock while waiting for reconnection.
+            textDocument.setText(documentText);
+            modificationStamp = documentModificationStamp;
+        } else {
+            modificationStamp = readDocumentState(() -> {
+                textDocument.setText(document.getText());
+                return document.getModificationStamp();
+            });
+        }
 
         @NotNull String languageId = this.languageId != null ? this.languageId :
                 languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
         textDocument.setLanguageId(languageId);
-        textDocument.setVersion(++version);
+        synchronized (changeEvents) {
+            ++version;
+            synchronizedModificationStamp = modificationStamp;
+            textDocument.setVersion(version);
+        }
         didOpenFuture = languageServerWrapper
                 .getInitializedServer()
                 .thenApplyAsync(ls -> {
@@ -180,37 +219,63 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         return sendDidChangeEvents();
     }
 
+    /**
+     * Reads document state on this thread when it already has read access, as inside a write action,
+     * and otherwise in a cancellable read action, so a pending write action is never blocked.
+     */
+    private <T> T readDocumentState(@NotNull Supplier<T> read) {
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return read.get();
+        }
+        return runCancellableReadAction(read::get, languageServerWrapper);
+    }
+
     private CompletableFuture<Void> sendDidChangeEvents() {
-        List<TextDocumentContentChangeEvent> events;
-        CompletableFuture<Void> barrier;
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
+                // No document state to read. On-type formatting may await this barrier in a write action.
                 return lastDidChangeFuture;
             }
-            events = new ArrayList<>(changeEvents);
-            changeEvents.clear();
-            barrier = new CompletableFuture<>();
-            lastDidChangeFuture = barrier;
         }
-
-        final int version = ++this.version;
-        // send 'textDocument/didChange' notification
-        DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
-        changeParamsToSend.getTextDocument().setUri(fileUri);
-        changeParamsToSend.getTextDocument().setVersion(version);
-        var didChange = languageServerWrapper.sendNotification(ls -> {
-            ls.getTextDocumentService().didChange(changeParamsToSend);
-            return ls;
-        });
-        processPullDiagnosticIfNeeded(didChange, version);
-        didChange.whenComplete((ls, ex) -> {
-            if (ex != null) {
-                barrier.completeExceptionally(ex);
-            } else {
-                barrier.complete(null);
+        // Incremental events are queued before the document changes. Acquire read access before
+        // consuming them under the monitor so the batch and stamp describe the same completed state.
+        // The block makes no cancellation check once it starts, so a cancellable read consumes the
+        // batch once: it is only retried before starting, while a write action is pending.
+        return readDocumentState(() -> {
+            List<TextDocumentContentChangeEvent> events;
+            CompletableFuture<Void> barrier;
+            final int version;
+            synchronized (changeEvents) {
+                if (changeEvents.isEmpty()) {
+                    return lastDidChangeFuture;
+                }
+                events = new ArrayList<>(changeEvents);
+                changeEvents.clear();
+                barrier = new CompletableFuture<>();
+                lastDidChangeFuture = barrier;
+                // Record the state represented by this batch before another flush can advance it.
+                version = ++this.version;
+                synchronizedModificationStamp = document.getModificationStamp();
             }
+
+            // send 'textDocument/didChange' notification
+            DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
+            changeParamsToSend.getTextDocument().setUri(fileUri);
+            changeParamsToSend.getTextDocument().setVersion(version);
+            var didChange = languageServerWrapper.sendNotification(ls -> {
+                ls.getTextDocumentService().didChange(changeParamsToSend);
+                return ls;
+            });
+            processPullDiagnosticIfNeeded(didChange, version);
+            didChange.whenComplete((ls, ex) -> {
+                if (ex != null) {
+                    barrier.completeExceptionally(ex);
+                } else {
+                    barrier.complete(null);
+                }
+            });
+            return barrier;
         });
-        return barrier;
     }
 
     @Override
@@ -324,6 +389,19 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      */
     int getVersion() {
         return version;
+    }
+
+    /**
+     * Returns whether the given version describes the current buffer, with no pending changes.
+     * The caller holds read or write access to keep the document stable. Checking the version,
+     * stamp and event queue under the same monitor prevents mixing states from different flushes.
+     * This describes the text assigned to a notification, not an acknowledgement from the server.
+     */
+    boolean isCurrentVersion(int expectedVersion) {
+        synchronized (changeEvents) {
+            return version == expectedVersion && changeEvents.isEmpty()
+                    && document.getModificationStamp() == synchronizedModificationStamp;
+        }
     }
 
     @Override
