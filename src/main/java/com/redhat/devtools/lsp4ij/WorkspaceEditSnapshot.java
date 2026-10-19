@@ -24,8 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 
-import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
-
 /**
  * Checks that a workspace edit still belongs to the connection and documents it was prepared for.
  * Capture before sending a rename request, then validate the response inside the write command
@@ -88,11 +86,10 @@ public final class WorkspaceEditSnapshot {
     private static @NotNull WorkspaceEditSnapshot capture(@NotNull LanguageServerWrapper wrapper,
                                                           @Nullable LanguageServer server,
                                                           @NotNull BooleanSupplier ownerActive) {
-        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return new WorkspaceEditSnapshot(wrapper, server, ownerActive);
-        }
-        // The capture has no side effects, so a cancellable read can retry it after a pending write action.
-        return runCancellableReadAction(() -> new WorkspaceEditSnapshot(wrapper, server, ownerActive), wrapper);
+        // Only thread-safe state is read: the opened-document map, the synchronizers and the documents'
+        // volatile modification stamps. So the capture never waits for a write action: workspace/applyEdit
+        // captures on LSP4J's message thread, which must keep reading replies a write action may wait for.
+        return new WorkspaceEditSnapshot(wrapper, server, ownerActive);
     }
 
     /**
