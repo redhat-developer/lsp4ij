@@ -130,6 +130,8 @@ public class LanguageServerWrapper implements Disposable {
     @NotNull
     private final LanguageServerDefinition serverDefinition;
     private final ExecutorService dispatcher;
+    private final Object notificationLock = new Object();
+    private @NotNull CompletableFuture<LanguageServer> lastNotification = CompletableFuture.completedFuture(null);
     private final ExecutorService listener;
     private final ExecutorService messageWriter;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
@@ -1161,8 +1163,19 @@ public class LanguageServerWrapper implements Disposable {
         // Enqueues a notification on the dispatch thread associated with the wrapped language server. This
         // ensures the interleaving of document updates and other requests in the UI is mirrored in the
         // order in which they get dispatched to the server
-        return getInitializedServer()
-                .thenApplyAsync(fn, this.dispatcher);
+        var initializedServer = getInitializedServer();
+        synchronized (notificationLock) {
+            // Each notification is dispatched after the previous one. Waiting for the initialized
+            // server alone does not keep their order: the dependents of one future complete in
+            // reverse order of registration, so notifications queued during initialization would
+            // reach the dispatcher last to first. A failed notification does not hold back the next.
+            CompletableFuture<LanguageServer> notification = lastNotification
+                    .handle((result, error) -> null)
+                    .thenCompose(previous -> initializedServer)
+                    .thenApplyAsync(fn, this.dispatcher);
+            lastNotification = notification;
+            return notification;
+        }
     }
 
     /**

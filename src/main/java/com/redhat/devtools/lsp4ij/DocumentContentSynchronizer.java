@@ -153,9 +153,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             synchronizedModificationStamp = modificationStamp;
             textDocument.setVersion(version);
         }
+        // Send didOpen like didChange and didClose, so that it keeps its place among them
         didOpenFuture = languageServerWrapper
-                .getInitializedServer()
-                .thenApplyAsync(ls -> {
+                .sendNotification(ls -> {
                     ls.getTextDocumentService()
                             .didOpen(new DidOpenTextDocumentParams(textDocument));
                     return ls;
