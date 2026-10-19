@@ -102,9 +102,9 @@ Workspace diagnostics start automatically when a server advertises
 LSP4IJ consumes full, unchanged and streamed partial reports, retains result IDs,
 and reissues completed requests with a short delay. A diagnostic refresh cancels
 and restarts the workspace pull; stopping the server cancels outstanding work.
-Unregistering a provider clears its closed-file diagnostics while retaining other
-providers. Asynchronous document matching does not block refresh, unregistration
-or shutdown; late matches cannot publish after cancellation. A failed matcher
+Unregistering a provider clears its diagnostics from open and closed files while
+retaining other providers. Asynchronous document matching does not block refresh,
+unregistration or shutdown; late matches cannot publish after cancellation. A failed matcher
 rejects only that file report, allowing remaining reports and pulls to continue.
 Workspace reports honor server file mappings and synchronous/asynchronous
 DocumentMatchers before updating diagnostics; filtering never starts a server

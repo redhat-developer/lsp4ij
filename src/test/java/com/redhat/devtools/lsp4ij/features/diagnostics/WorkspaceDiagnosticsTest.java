@@ -288,6 +288,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
 
     public void testWorkspaceResultsRefreshOpenDocumentWithoutReplacingDocumentDiagnostics() throws Exception {
         start(true);
+        var initial = next();
         definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
                 new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document")))));
         var file = fixture.configureByText("owned.workspace", "value").getVirtualFile();
@@ -296,12 +297,51 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         await(() -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) != null
                 && wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size() == 1);
         var request = next();
+        await(initial.future::isCancelled);
         definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
                 new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("updated document")))));
         stream(request, report(file, "workspace", 1));
         await(() -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().stream()
                 .anyMatch(d -> "updated document".equals(d.getMessage().getLeft())));
         assertEquals(1, wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size());
+    }
+
+    public void testCloseCancelsWorkspacePullWithoutPreviousResultId() throws Exception {
+        definition.keepAlive = true;
+        var psi = fixture.addFileToProject("owned.workspace", "value");
+        var file = psi.getVirtualFile();
+        definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
+                new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document")))));
+        start(false);
+        var editors = FileEditorManager.getInstance(fixture.getProject());
+        editors.openFile(file, false);
+        LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(psi, null, null)
+                .get(10, TimeUnit.SECONDS);
+        var options = JSONUtils.getLsp4jGson().fromJson(
+                "{\"identifier\":\"workspace\",\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
+        definition.client.registerCapability(new RegistrationParams(List.of(
+                new Registration("workspace", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+        var pending = next();
+        assertTrue(pending.params.getPreviousResultIds().isEmpty());
+        editors.closeFile(file);
+        fixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
+                .fileClosed(editors, file);
+        PlatformTestUtil.waitWithEventsDispatching("the closed editor must disconnect",
+                () -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) == null, 10);
+        var replacement = next();
+        await(pending.future::isCancelled);
+        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
+        var stale = report(file, "stale", null);
+        stale.getLeft().setResultId("stale");
+        stream(pending, stale); // late progress must not populate the new closed-file cache
+        var fresh = report(file, "fresh", null);
+        fresh.getLeft().setResultId("fresh");
+        replacement.future.complete(new WorkspaceDiagnosticReport(List.of(fresh)));
+        assertEquals(List.of(new PreviousResultId(LSPIJUtils.toUri(file).toString(), "fresh")),
+                next().params.getPreviousResultIds());
+        var diagnostics = wrapper.getClosedDocument(LSPIJUtils.toUri(file), false).getDiagnostics();
+        assertEquals(1, diagnostics.size());
+        assertEquals("fresh", diagnostics.iterator().next().getMessage().getLeft());
     }
 
     public void testCacheLifetimeForSameProvider() throws Exception {
@@ -416,6 +456,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
             }
         });
         start(true);
+        var initial = next();
         var file = fixture.configureByText("owned.workspace", "value").getVirtualFile();
         LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(fixture.getFile(), null, null)
                 .get(10, TimeUnit.SECONDS);
@@ -423,6 +464,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 && wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size() == 1);
         int before = count.get();
         var request = next();
+        await(initial.future::isCancelled);
         stream(request, report(file, "stale", 0));
         request.future.complete(new WorkspaceDiagnosticReport(List.of()));
         next(); // the previous report has been consumed before the next request

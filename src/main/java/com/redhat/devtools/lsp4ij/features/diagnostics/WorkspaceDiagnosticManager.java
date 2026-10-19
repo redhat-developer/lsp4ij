@@ -94,7 +94,11 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                 if (!copy.contains(entry.getKey())) {
                     cancel(entry.getValue());
                     iterator.remove();
-                    clearProvider.accept(entry.getKey());
+                    try {
+                        clearProvider.accept(entry.getKey());
+                    } catch (RuntimeException failure) {
+                        LOGGER.warn("Unable to clear workspace diagnostics for provider {}", entry.getKey(), failure);
+                    }
                 }
             }
             for (String identifier : copy) {
@@ -123,8 +127,9 @@ public final class WorkspaceDiagnosticManager implements Disposable {
 
     /**
      * Forgets result IDs whose diagnostic cache was discarded or replaced.
-     * Restarts affected providers so unchanged replies cannot refer to lost
-     * diagnostics; other files' result IDs and unaffected providers are retained.
+     * Restarts providers with discarded IDs or in-flight work, so late replies
+     * cannot repopulate a replaced cache even before its first result ID is stored.
+     * Other files' result IDs and idle providers with unaffected caches are retained.
      *
      * @param matchesCache identifies report URIs belonging to the replaced cache;
      *                     evaluated on the manager's executor, never the caller's thread
@@ -132,9 +137,10 @@ public final class WorkspaceDiagnosticManager implements Disposable {
     public void invalidate(Predicate<String> matchesCache) {
         execute(() -> {
             for (var provider : providers.values()) {
-                if (provider.resultIds.keySet().removeIf(matchesCache)) {
-                    // Cancel pending matches and replies as well: a late unchanged
-                    // report must not restore the invalidated result ID.
+                boolean cacheInvalidated = provider.resultIds.keySet().removeIf(matchesCache);
+                if (cacheInvalidated || provider.request != null || provider.matching != null) {
+                    // Active work can contain a full report for a replaced cache
+                    // even if that file has never had a cached result ID.
                     cancel(provider);
                     pull(provider);
                 }

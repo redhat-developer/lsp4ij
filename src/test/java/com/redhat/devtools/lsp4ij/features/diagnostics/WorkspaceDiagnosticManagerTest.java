@@ -91,7 +91,7 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
-    public void cacheInvalidationRetainsOtherFilesAndProviders() throws Exception {
+    public void cacheInvalidationRetainsOtherFilesWhileRestartingActiveProviders() throws Exception {
         var h = harness();
         h.refuseCancellation = true;
         h.manager.updateProviders(Set.of("lua", "other"));
@@ -99,24 +99,97 @@ public class WorkspaceDiagnosticManagerTest {
         var other = h.next();
         h.partial(first, full("file:///lost.lua", "lost"));
         h.partial(first, full("file:///retained.lua", "retained"));
+        h.partial(other, full("file:///other.lua", "other"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
 
         h.manager.invalidate("file:///lost.lua"::equals);
         var replacement = h.next();
+        var otherReplacement = h.next();
+        if (!Objects.equals(first.params.getIdentifier(), replacement.params.getIdentifier())) {
+            var swap = replacement;
+            replacement = otherReplacement;
+            otherReplacement = swap;
+        }
         assertEquals(first.params.getIdentifier(), replacement.params.getIdentifier());
+        assertEquals(other.params.getIdentifier(), otherReplacement.params.getIdentifier());
+        assertEquals(List.of(new PreviousResultId("file:///other.lua", "other")),
+                otherReplacement.params.getPreviousResultIds());
         assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
                 replacement.params.getPreviousResultIds());
         assertTrue(first.future.cancelRequested);
-        assertFalse(other.future.cancelRequested);
+        assertTrue(other.future.cancelRequested);
         // Even a server that refuses cancellation cannot restore the lost ID.
         h.partial(first, full("file:///lost.lua", "late"));
         first.future.complete(full("file:///lost.lua", "late"));
-        h.manager.invalidate("file:///lost.lua"::equals);
         h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
         assertTrue(h.requests.isEmpty());
         assertTrue(h.applied.isEmpty());
         assertFalse(replacement.future.cancelRequested);
+    }
+
+    @Test
+    public void cacheInvalidationCancelsPendingPullWithoutCachedResultId() throws Exception {
+        var h = harness();
+        h.refuseCancellation = true;
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        h.manager.invalidate("file:///a.lua"::equals);
+        var replacement = h.next();
+        assertTrue(first.future.cancelRequested);
+        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
+        assertNotEquals(first.params.getPartialResultToken(), replacement.params.getPartialResultToken());
+        h.partial(first, full("file:///a.lua", "stale-partial"));
+        first.future.complete(full("file:///a.lua", "stale-final"));
+        replacement.future.complete(full("file:///a.lua", "fresh"));
+        var applied = h.applied.poll(5, TimeUnit.SECONDS);
+        assertNotNull(applied);
+        assertEquals("fresh", applied.getLeft().getResultId());
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "fresh")),
+                h.next().params.getPreviousResultIds());
+        assertTrue(h.applied.isEmpty());
+    }
+
+    @Test
+    public void cacheInvalidationCancelsPendingFullMatchWithoutCachedResultId() throws Exception {
+        var h = harness();
+        var pending = new MatchFuture();
+        var started = new CompletableFuture<Void>();
+        h.matcher = uri -> { started.complete(null); return pending; };
+        h.manager.updateProviders(Collections.singleton(null));
+        h.next().future.complete(full("file:///a.lua", "stale"));
+        started.get(5, TimeUnit.SECONDS);
+        h.manager.invalidate("file:///a.lua"::equals);
+        var replacement = h.next();
+        assertTrue(pending.cancelRequested);
+        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
+        h.matcher = uri -> CompletableFuture.completedFuture(true);
+        pending.complete(true); // cancellation-refusing matcher must not restore the stale result
+        replacement.future.complete(full("file:///a.lua", "fresh"));
+        var applied = h.applied.poll(5, TimeUnit.SECONDS);
+        assertNotNull(applied);
+        assertEquals("fresh", applied.getLeft().getResultId());
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "fresh")),
+                h.next().params.getPreviousResultIds());
+        assertTrue(h.applied.isEmpty());
+        assertTrue(h.clearedFiles.isEmpty());
+    }
+
+    @Test
+    public void cacheInvalidationRetainsIdleProvidersWithUnrelatedResults() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        h.partial(first, full("file:///retained.lua", "retained"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        first.future.completeExceptionally(cancelled(new DiagnosticServerCancellationData(false)));
+        h.manager.invalidate("file:///lost.lua"::equals);
+        h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        assertTrue(h.requests.isEmpty());
+        h.manager.refresh();
+        assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
+                h.next().params.getPreviousResultIds());
     }
 
     @Test
@@ -151,6 +224,23 @@ public class WorkspaceDiagnosticManagerTest {
         h.next().future.complete(full("file:///a.lua", "old"));
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
         assertTrue(h.next().params.getPreviousResultIds().isEmpty());
+    }
+
+    @Test
+    public void providerCleanupFailureDoesNotPreventRemainingChanges() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("first", "second"));
+        var first = h.next();
+        var second = h.next();
+        h.failNextProviderClear = true;
+        h.manager.updateProviders(Set.of("replacement"));
+        var replacement = h.next();
+        assertEquals("replacement", replacement.params.getIdentifier());
+        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
+        assertTrue(first.future.cancelRequested);
+        assertTrue(second.future.cancelRequested);
+        assertEquals(2, h.clearedProviders.size());
+        assertEquals(Set.of("first", "second"), new HashSet<>(h.clearedProviders));
     }
 
     @Test
@@ -421,6 +511,7 @@ public class WorkspaceDiagnosticManagerTest {
         final BlockingQueue<WorkspaceDocumentDiagnosticReport> applied = new LinkedBlockingQueue<>();
         volatile boolean accept = true;
         volatile boolean refuseCancellation;
+        volatile boolean failNextProviderClear;
         volatile Runnable beforeApply = () -> {};
         volatile java.util.function.Function<String, CompletableFuture<Boolean>> matcher = uri -> CompletableFuture.completedFuture(true);
         final List<String> clearedProviders = new CopyOnWriteArrayList<>();
@@ -429,7 +520,13 @@ public class WorkspaceDiagnosticManagerTest {
             beforeApply.run();
             applied.add(report);
             return accept;
-        }, clearedProviders::add, (identifier, uri) -> clearedFiles.add(identifier + ":" + uri));
+        }, identifier -> {
+            clearedProviders.add(identifier);
+            if (failNextProviderClear) {
+                failNextProviderClear = false;
+                throw new IllegalStateException("provider cleanup failure");
+            }
+        }, (identifier, uri) -> clearedFiles.add(identifier + ":" + uri));
         @Override public CompletableFuture<WorkspaceDiagnosticReport> diagnostic(WorkspaceDiagnosticParams params) {
             var future = new Future(refuseCancellation);
             requests.add(new Request(params, future));

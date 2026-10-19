@@ -1245,8 +1245,9 @@ public class LanguageServerWrapper implements Disposable {
      */
     @ApiStatus.Internal
     public void updateWorkspaceDiagnosticProviders() {
-        if (languageClient != null) {
-            languageClient.updateWorkspaceDiagnosticProviders();
+        var client = languageClient;
+        if (client != null) {
+            client.updateWorkspaceDiagnosticProviders();
         }
     }
 
