@@ -25,10 +25,12 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.IntStream;
 
 /**
  * Tests for {@link LSPLazyCodeActions}.
@@ -80,6 +82,36 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(FileUriSupport.toString(file.getVirtualFile(), languageServer.getClientFeatures()),
                 params.getTextDocument().getUri());
         assertEquals(diagnostic.getRange(), params.getRange());
+    }
+
+    public void testParallelFirstUsesSendOneRequest() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
+        LanguageServerItem languageServer = getLanguageServer(file);
+        Diagnostic diagnostic = createDiagnostic();
+        CodeAction quickFix = new CodeAction("Remove unused declaration for: 'foo'");
+        quickFix.setKind(CodeActionKind.QuickFix);
+        quickFix.setDiagnostics(List.of(diagnostic));
+        MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
+        var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
+
+        // Highlighting passes run in parallel and can ask the same quick fixes for their code actions at once.
+        // A second load used to cancel the first request before it was sent, and could leave it stored.
+        var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
+        var start = new CountDownLatch(1);
+        var loads = IntStream.range(0, 8)
+                .mapToObj(i -> ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                    start.await();
+                    return codeActions.getCodeActionAt(0);
+                }))
+                .toList();
+        start.countDown();
+        for (var load : loads) {
+            var codeAction = load.get(10, TimeUnit.SECONDS);
+            assertNotNull(codeAction);
+            assertTrue(codeAction.isLeft());
+        }
+        assertEquals(1, textDocumentService.codeActionRequests);
     }
 
     public void testCodeActionsLoadAgainAfterAPendingRequestWasCancelled() throws Exception {
