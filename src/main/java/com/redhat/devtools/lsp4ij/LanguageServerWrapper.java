@@ -1713,6 +1713,22 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Clears one provider's diagnostics from all cached open and closed documents.
+     * Diagnostics from other providers are retained.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     */
+    @ApiStatus.Internal
+    public void clearDocumentDiagnostics(@Nullable String identifier) {
+        clearClosedDocumentDiagnostics(identifier);
+        String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+        for (var document : getOpenedDocuments()) {
+            updateDiagnostics(document.getFile(), document, cacheIdentifier, List.of(), null);
+        }
+    }
+
+    /**
      * Clears one provider's diagnostics from all cached closed documents.
      * Diagnostics from other providers are retained.
      *

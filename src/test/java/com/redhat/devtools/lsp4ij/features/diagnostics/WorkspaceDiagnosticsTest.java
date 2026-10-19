@@ -209,20 +209,34 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 .getDiagnostics().iterator().next().getMessage().getLeft());
     }
 
-    public void testNamedProviderUnregistrationClearsClosedDiagnostics() throws Exception {
-        assertProviderUnregistrationClearsClosedDiagnostics("dynamic");
+    public void testNamedProviderUnregistrationClearsOpenAndClosedDiagnostics() throws Exception {
+        assertProviderUnregistrationClearsOpenAndClosedDiagnostics("dynamic");
     }
 
-    public void testDefaultProviderUnregistrationClearsClosedDiagnostics() throws Exception {
-        assertProviderUnregistrationClearsClosedDiagnostics(null);
+    public void testDefaultProviderUnregistrationClearsOpenAndClosedDiagnostics() throws Exception {
+        assertProviderUnregistrationClearsOpenAndClosedDiagnostics(null);
     }
 
-    private void assertProviderUnregistrationClearsClosedDiagnostics(String identifier) throws Exception {
+    private void assertProviderUnregistrationClearsOpenAndClosedDiagnostics(String identifier) throws Exception {
         definition.allFilesEnabled = true;
         var first = fixture.addFileToProject("first.workspace", "value").getVirtualFile();
         var second = fixture.addFileToProject("second.workspace", "value").getVirtualFile();
         start(false);
         wrapper.updateDiagnostics(first, "other", List.of(diagnostic("retained")), null);
+        // Keep document pulls on a different provider so workspace reports are
+        // cached alongside them, rather than triggering another document pull.
+        var documentOptions = JSONUtils.getLsp4jGson().fromJson(
+                "{\"identifier\":\"document\",\"workspaceDiagnostics\":false}", com.google.gson.JsonObject.class);
+        definition.client.registerCapability(new RegistrationParams(List.of(
+                new Registration("document", "textDocument/diagnostic", documentOptions)))).get(5, TimeUnit.SECONDS);
+        definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
+                new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document retained")))));
+        var open = fixture.configureByText("open.workspace", "value").getVirtualFile();
+        LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(fixture.getFile(), null, null)
+                .get(10, TimeUnit.SECONDS);
+        await(() -> wrapper.getOpenedDocument(LSPIJUtils.toUri(open)) != null
+                && wrapper.getOpenedDocument(LSPIJUtils.toUri(open)).getDiagnostics().size() == 1);
+        var openDocument = wrapper.getOpenedDocument(LSPIJUtils.toUri(open));
         var options = JSONUtils.getLsp4jGson().fromJson("{"
                 + (identifier == null ? "" : "\"identifier\":\"" + identifier + "\",")
                 + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
@@ -230,21 +244,29 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 new Registration("dynamic", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
         var request = next();
         assertEquals(identifier, request.params.getIdentifier());
+        assertEquals("document", wrapper.getClientFeatures().getDiagnosticFeature().getDiagnosticIdentifier());
         var errorReport = report(first, "removed", null);
         errorReport.getLeft().getItems().get(0).setSeverity(DiagnosticSeverity.Error);
-        stream(request, errorReport, report(second, "removed too", null));
+        var openErrorReport = report(open, "removed from editor", null);
+        openErrorReport.getLeft().getItems().get(0).setSeverity(DiagnosticSeverity.Error);
+        stream(request, errorReport, report(second, "removed too", null), openErrorReport);
         await(() -> wrapper.getClosedDocument(LSPIJUtils.toUri(second), false) != null
                 && wrapper.getClosedDocument(LSPIJUtils.toUri(second), false).getDiagnostics().size() == 1);
+        await(() -> openDocument.getDiagnostics().size() == 2);
         var firstDocument = wrapper.getClosedDocument(LSPIJUtils.toUri(first), false);
         var secondDocument = wrapper.getClosedDocument(LSPIJUtils.toUri(second), false);
         assertEquals(2, firstDocument.getDiagnostics().size());
         assertTrue(firstDocument.hasErrors());
+        assertTrue(openDocument.hasErrors());
         definition.client.unregisterCapability(new UnregistrationParams(List.of(
                 new Unregistration("dynamic", "textDocument/diagnostic")))).get(5, TimeUnit.SECONDS);
         await(request.future::isCancelled);
         await(() -> firstDocument.getDiagnostics().size() == 1 && secondDocument.getDiagnostics().isEmpty());
         assertEquals("retained", firstDocument.getDiagnostics().iterator().next().getMessage().getLeft());
         assertFalse(firstDocument.hasErrors());
+        await(() -> openDocument.getDiagnostics().size() == 1);
+        assertEquals("document retained", openDocument.getDiagnostics().iterator().next().getMessage().getLeft());
+        assertFalse(openDocument.hasErrors());
     }
 
     private void registerAsyncMatcher(java.util.function.Function<VirtualFile, CompletableFuture<Boolean>> matcher) {
