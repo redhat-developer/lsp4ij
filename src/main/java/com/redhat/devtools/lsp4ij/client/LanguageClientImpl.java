@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.client;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -47,6 +46,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 
 /**
  * LSP {@link LanguageClient} implementation for IntelliJ.
@@ -140,7 +141,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         }
         var features = getClientFeatures();
         VirtualFile file = FileUriSupport.findFileByUri(uri, features);
-        if (file == null || !ReadAction.compute(() -> !isDisposed() && file.isValid() && features.isEnabled(file))) {
+        if (file == null || !runCancellableReadAction(() -> !isDisposed() && file.isValid() && features.isEnabled(file), project)) {
             return CompletableFuture.completedFuture(false);
         }
         // A server may report every workspace file, including files routed to
@@ -158,7 +159,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         var features = getClientFeatures();
         VirtualFile file = FileUriSupport.findFileByUri(uri, features);
         // Matching may have completed after the file or connection changed.
-        if (file == null || !ReadAction.compute(() -> !isDisposed() && file.isValid() && features.isEnabled(file))) {
+        if (file == null || !runCancellableReadAction(() -> !isDisposed() && file.isValid() && features.isEnabled(file), project)) {
             return false;
         }
         var opened = wrapper.getOpenedDocument(FileUriSupport.getFileUri(file, features));
