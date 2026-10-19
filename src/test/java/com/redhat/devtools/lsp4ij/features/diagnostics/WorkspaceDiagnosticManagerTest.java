@@ -91,7 +91,7 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
-    public void cacheInvalidationRetainsOtherFilesWhileRestartingActiveProviders() throws Exception {
+    public void cacheInvalidationRestartsOnlyAffectedProviders() throws Exception {
         var h = harness();
         h.refuseCancellation = true;
         h.manager.updateProviders(Set.of("lua", "other"));
@@ -106,20 +106,17 @@ public class WorkspaceDiagnosticManagerTest {
 
         h.manager.invalidate("file:///lost.lua"::equals);
         var replacement = h.next();
-        var otherReplacement = h.next();
-        if (!Objects.equals(first.params.getIdentifier(), replacement.params.getIdentifier())) {
-            var swap = replacement;
-            replacement = otherReplacement;
-            otherReplacement = swap;
-        }
         assertEquals(first.params.getIdentifier(), replacement.params.getIdentifier());
+        assertFalse(other.future.cancelRequested);
+        other.future.complete(full("file:///other.lua", "other-updated"));
+        var otherReplacement = h.next();
         assertEquals(other.params.getIdentifier(), otherReplacement.params.getIdentifier());
-        assertEquals(List.of(new PreviousResultId("file:///other.lua", "other")),
+        assertEquals(List.of(new PreviousResultId("file:///other.lua", "other-updated")),
                 otherReplacement.params.getPreviousResultIds());
+        assertEquals("other-updated", h.applied.remove().getLeft().getResultId());
         assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
                 replacement.params.getPreviousResultIds());
         assertTrue(first.future.cancelRequested);
-        assertTrue(other.future.cancelRequested);
         // Even a server that refuses cancellation cannot restore the lost ID.
         h.partial(first, full("file:///lost.lua", "late"));
         first.future.complete(full("file:///lost.lua", "late"));
@@ -130,25 +127,63 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
-    public void cacheInvalidationCancelsPendingPullWithoutCachedResultId() throws Exception {
+    public void unrelatedInvalidationsKeepPendingPullAndFilterLateReports() throws Exception {
         var h = harness();
-        h.refuseCancellation = true;
+        var matchedUris = new CopyOnWriteArrayList<String>();
+        h.matcher = uri -> { matchedUris.add(uri); return CompletableFuture.completedFuture(true); };
         h.manager.updateProviders(Set.of("lua"));
         var first = h.next();
-        h.manager.invalidate("file:///a.lua"::equals);
-        var replacement = h.next();
-        assertTrue(first.future.cancelRequested);
-        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
-        assertNotEquals(first.params.getPartialResultToken(), replacement.params.getPartialResultToken());
-        h.partial(first, full("file:///a.lua", "stale-partial"));
-        first.future.complete(full("file:///a.lua", "stale-final"));
-        replacement.future.complete(full("file:///a.lua", "fresh"));
-        var applied = h.applied.poll(5, TimeUnit.SECONDS);
-        assertNotNull(applied);
-        assertEquals("fresh", applied.getLeft().getResultId());
-        assertEquals(List.of(new PreviousResultId("file:///a.lua", "fresh")),
-                h.next().params.getPreviousResultIds());
+        for (int i = 0; i < 3; i++) {
+            h.manager.invalidate("file:///lost.lua"::equals);
+        }
+        h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        assertFalse(first.future.cancelRequested);
+        assertTrue(h.requests.isEmpty());
+        h.partial(first, full("file:///lost.lua", "stale-partial"));
+        h.partial(first, full("file:///retained.lua", "retained"));
+        first.future.complete(full("file:///lost.lua", "stale-final"));
+        var second = h.next();
+        assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
+                second.params.getPreviousResultIds());
+        assertEquals(List.of("file:///retained.lua"), matchedUris);
+        assertEquals("retained", h.applied.remove().getLeft().getResultId());
         assertTrue(h.applied.isEmpty());
+        // Invalidation belongs to the old request, not subsequent pulls.
+        second.future.complete(full("file:///lost.lua", "fresh"));
+        assertEquals("fresh", h.applied.poll(5, TimeUnit.SECONDS).getLeft().getResultId());
+    }
+
+    @Test
+    public void invalidationFiltersQueuedReportsWithoutCancellingUnrelatedMatcher() throws Exception {
+        var h = harness();
+        var pending = new MatchFuture();
+        var started = new CompletableFuture<Void>();
+        var matchedUris = new CopyOnWriteArrayList<String>();
+        h.matcher = uri -> {
+            matchedUris.add(uri);
+            if (uri.equals("file:///pending.lua")) {
+                started.complete(null);
+                return pending;
+            }
+            return CompletableFuture.completedFuture(false);
+        };
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        h.partial(first, full("file:///pending.lua", "pending"));
+        started.get(5, TimeUnit.SECONDS);
+        h.partial(first, full("file:///lost.lua", "queued-partial"));
+        first.future.complete(full("file:///lost.lua", "queued-final"));
+        h.manager.invalidate("file:///lost.lua"::equals);
+        h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        assertFalse(pending.cancelRequested);
+        assertTrue(h.requests.isEmpty());
+        pending.complete(true);
+        assertEquals(List.of(new PreviousResultId("file:///pending.lua", "pending")),
+                h.next().params.getPreviousResultIds());
+        assertEquals(List.of("file:///pending.lua"), matchedUris);
+        assertEquals("pending", h.applied.remove().getLeft().getResultId());
+        assertTrue(h.applied.isEmpty());
+        assertTrue(h.clearedFiles.isEmpty());
     }
 
     @Test

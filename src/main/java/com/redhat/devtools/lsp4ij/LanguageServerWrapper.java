@@ -1724,8 +1724,9 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Clears one provider's diagnostics from all cached open and closed documents.
-     * Diagnostics from other providers are retained.
+     * Clears a removed workspace provider's diagnostics from cached documents.
+     * Retains other providers and open-document diagnostics owned by an active
+     * document pull provider with the same identifier.
      *
      * @param identifier the provider identifier, or {@code null} for the
      *                   default pull provider
@@ -1735,6 +1736,11 @@ public class LanguageServerWrapper implements Disposable {
         clearClosedDocumentDiagnostics(identifier);
         String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
         for (var document : getOpenedDocuments()) {
+            var synchronizer = document.getSynchronizer();
+            if (synchronizer != null && synchronizer.isPullDiagnosticsSupported()
+                    && Objects.equals(identifier, getClientFeatures().getDiagnosticFeature().getDiagnosticIdentifier())) {
+                continue;
+            }
             updateDiagnostics(document.getFile(), document, cacheIdentifier, List.of(), null);
         }
     }

@@ -127,9 +127,10 @@ public final class WorkspaceDiagnosticManager implements Disposable {
 
     /**
      * Forgets result IDs whose diagnostic cache was discarded or replaced.
-     * Restarts providers with discarded IDs or in-flight work, so late replies
-     * cannot repopulate a replaced cache even before its first result ID is stored.
-     * Other files' result IDs and idle providers with unaffected caches are retained.
+     * Restarts providers with discarded IDs or a match for an affected URI.
+     * Unaffected in-flight work continues, but reports for the replaced cache
+     * are excluded for the remainder of that request, including queued reports.
+     * Other files' result IDs and providers with unaffected caches are retained.
      *
      * @param matchesCache identifies report URIs belonging to the replaced cache;
      *                     evaluated on the manager's executor, never the caller's thread
@@ -138,11 +139,13 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         execute(() -> {
             for (var provider : providers.values()) {
                 boolean cacheInvalidated = provider.resultIds.keySet().removeIf(matchesCache);
-                if (cacheInvalidated || provider.request != null || provider.matching != null) {
-                    // Active work can contain a full report for a replaced cache
-                    // even if that file has never had a cached result ID.
+                if (cacheInvalidated || (provider.matchingUri != null && matchesCache.test(provider.matchingUri))) {
                     cancel(provider);
                     pull(provider);
+                } else if (provider.token != null) {
+                    // A pending request may still return reports for this cache.
+                    // Filter them without restarting unrelated long-running pulls.
+                    provider.invalidatedCaches.add(matchesCache);
                 }
             }
         });
@@ -176,6 +179,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
             return;
         }
         provider.scheduled = null;
+        provider.invalidatedCaches.clear();
         String token = UUID.randomUUID().toString();
         provider.token = token;
         var params = new WorkspaceDiagnosticParams(provider.resultIds.entrySet().stream()
@@ -226,6 +230,9 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         while (!provider.pendingReports.isEmpty()) {
             var item = provider.pendingReports.removeFirst();
             String uri = item.isLeft() ? item.getLeft().getUri() : item.getRight().getUri();
+            if (provider.isInvalidated(uri)) {
+                continue;
+            }
             if (item.isRight() && !provider.resultIds.containsKey(uri)) {
                 continue; // no cached full report to retain
             }
@@ -238,12 +245,18 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                 continue;
             }
             provider.matching = matching;
+            provider.matchingUri = uri;
             String token = provider.token;
             matching.whenComplete((matched, error) -> execute(() -> {
                 if (!Objects.equals(provider.token, token) || provider.matching != matching) {
                     return; // refresh/unregistration invalidated this match, even if cancellation was refused
                 }
                 provider.matching = null;
+                provider.matchingUri = null;
+                if (provider.isInvalidated(uri)) {
+                    applyNextReport(provider);
+                    return;
+                }
                 boolean accepted = false;
                 if (error != null) {
                     LOGGER.warn("Unable to match workspace diagnostic file {}", uri, error);
@@ -273,6 +286,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         if (provider.responseComplete) {
             provider.responseComplete = false;
             provider.token = null;
+            provider.invalidatedCaches.clear();
             schedule(provider);
         }
     }
@@ -307,6 +321,8 @@ public final class WorkspaceDiagnosticManager implements Disposable {
 
     private void cancel(Provider provider) {
         provider.token = null;
+        provider.invalidatedCaches.clear();
+        provider.matchingUri = null;
         provider.responseComplete = false;
         provider.pendingReports.clear();
         if (provider.matching != null) {
@@ -363,7 +379,9 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         final String identifier;
         final Map<String, String> resultIds = new HashMap<>();
         final Deque<WorkspaceDocumentDiagnosticReport> pendingReports = new ArrayDeque<>();
+        final List<Predicate<String>> invalidatedCaches = new ArrayList<>();
         String token;
+        String matchingUri;
         boolean responseComplete;
         CompletableFuture<Boolean> matching;
         CompletableFuture<WorkspaceDiagnosticReport> request;
@@ -371,6 +389,10 @@ public final class WorkspaceDiagnosticManager implements Disposable {
 
         Provider(String identifier) {
             this.identifier = identifier;
+        }
+
+        boolean isInvalidated(String uri) {
+            return invalidatedCaches.stream().anyMatch(predicate -> predicate.test(uri));
         }
     }
 }

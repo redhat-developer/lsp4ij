@@ -14,6 +14,7 @@ import com.google.gson.JsonObject;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -185,7 +186,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         if (file == null || !runCancellableReadAction(() -> !isDisposed() && file.isValid() && features.isEnabled(file), project)) {
             return false;
         }
-        var opened = wrapper.getOpenedDocument(FileUriSupport.getFileUri(file, features));
+        var fileUri = FileUriSupport.getFileUri(file, features);
+        var opened = wrapper.getOpenedDocument(fileUri);
         var synchronizer = opened != null ? opened.getSynchronizer() : null;
         if (synchronizer != null && version != null && version < synchronizer.getVersion()) {
             return false;
@@ -198,8 +200,14 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
                 synchronizer.refreshPullDiagnostic(DocumentContentSynchronizer.RefreshPullDiagnosticOrigin.ON_WORKSPACE_REFRESH);
             }
         } else if (report.isLeft()) {
+            var items = report.getLeft().getItems() != null ? report.getLeft().getItems() : List.<Diagnostic>of();
+            if (opened == null && items.isEmpty()
+                    && !FileEditorManager.getInstance(project).isFileOpen(file)
+                    && (fileUri == null || wrapper.getClosedDocument(fileUri, false) == null)) {
+                return true; // Retain the result ID without allocating an empty document cache.
+            }
             wrapper.updateDiagnostics(file, identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER,
-                    report.getLeft().getItems(), version);
+                    items, version);
         }
         return true;
     }

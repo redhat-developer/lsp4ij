@@ -54,8 +54,15 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
 
     @Override protected void tearDown() throws Exception {
         try {
-            LanguageServersRegistry.getInstance().removeServerDefinition(fixture.getProject(), definition);
-            fixture.tearDown();
+            try {
+                if (fixture != null && definition != null) {
+                    LanguageServersRegistry.getInstance().removeServerDefinition(fixture.getProject(), definition);
+                }
+            } finally {
+                if (fixture != null) {
+                    fixture.tearDown();
+                }
+            }
         } finally {
             super.tearDown();
         }
@@ -81,6 +88,43 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         assertNull(wrapper.getClosedDocument(LSPIJUtils.toUri(foreign), false));
         stream(request, report(owned, null, null));
         await(() -> wrapper.getClosedDocument(LSPIJUtils.toUri(owned), false).getDiagnostics().isEmpty());
+    }
+
+    public void testEmptyReportRetainsResultIdWithoutCreatingClosedCache() throws Exception {
+        assertEmptyReportRetainsResultIdWithoutCreatingClosedCache(false);
+    }
+
+    public void testNullDiagnosticItemsAreTreatedAsEmpty() throws Exception {
+        assertEmptyReportRetainsResultIdWithoutCreatingClosedCache(true);
+    }
+
+    private void assertEmptyReportRetainsResultIdWithoutCreatingClosedCache(boolean nullItems) throws Exception {
+        var file = fixture.addFileToProject("owned.workspace", "value").getVirtualFile();
+        var uri = LSPIJUtils.toUri(file);
+        var empty = report(file, null, null);
+        if (nullItems) {
+            // Malformed JSON can bypass the non-null setter in LSP4J's report class.
+            empty = new WorkspaceDocumentDiagnosticReport(JSONUtils.getLsp4jGson().fromJson(
+                    "{\"kind\":\"full\",\"items\":null,\"uri\":\"" + uri + "\"}", WorkspaceFullDocumentDiagnosticReport.class));
+            assertNull(empty.getLeft().getItems());
+        }
+        empty.getLeft().setResultId("empty");
+        start(true);
+        next().future.complete(new WorkspaceDiagnosticReport(List.of(empty)));
+        var second = next();
+        assertEquals(List.of(new PreviousResultId(uri.toString(), "empty")), second.params.getPreviousResultIds());
+        assertNull(wrapper.getClosedDocument(uri, false));
+
+        var nonempty = report(file, "diagnostic", null);
+        nonempty.getLeft().setResultId("nonempty");
+        second.future.complete(new WorkspaceDiagnosticReport(List.of(nonempty)));
+        var third = next();
+        var cached = wrapper.getClosedDocument(uri, false);
+        assertNotNull(cached);
+        assertEquals(1, cached.getDiagnostics().size());
+        third.future.complete(new WorkspaceDiagnosticReport(List.of(empty)));
+        assertEquals(List.of(new PreviousResultId(uri.toString(), "empty")), next().params.getPreviousResultIds());
+        assertTrue(cached.getDiagnostics().isEmpty());
     }
 
     public void testWorkspaceReportsRespectDocumentMatcher() throws Exception {
@@ -286,6 +330,51 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 }));
     }
 
+    public void testWorkspaceRemovalPreservesNamedDocumentProvider() throws Exception {
+        assertWorkspaceRemovalPreservesDocumentProvider("test");
+    }
+
+    public void testWorkspaceRemovalPreservesDefaultDocumentProvider() throws Exception {
+        assertWorkspaceRemovalPreservesDocumentProvider(null);
+    }
+
+    private void assertWorkspaceRemovalPreservesDocumentProvider(String identifier) throws Exception {
+        definition.allFilesEnabled = true;
+        var staticOptions = new DiagnosticRegistrationOptions();
+        staticOptions.setIdentifier(identifier);
+        staticOptions.setWorkspaceDiagnostics(false);
+        definition.getServer().getInitializeResult().getCapabilities().setDiagnosticProvider(staticOptions);
+        definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
+                new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document retained")))));
+        wrapper = LanguageServerManager.getInstance(fixture.getProject()).getLanguageServer(definition.getId())
+                .get(10, TimeUnit.SECONDS).getServerWrapper();
+        var open = fixture.configureByText("open.workspace", "value").getVirtualFile();
+        LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(fixture.getFile(), null, null)
+                .get(10, TimeUnit.SECONDS);
+        await(() -> wrapper.getOpenedDocument(LSPIJUtils.toUri(open)) != null
+                && wrapper.getOpenedDocument(LSPIJUtils.toUri(open)).getDiagnostics().size() == 1);
+        var openDocument = wrapper.getOpenedDocument(LSPIJUtils.toUri(open));
+        var closed = fixture.addFileToProject("closed.workspace", "value").getVirtualFile();
+        var options = JSONUtils.getLsp4jGson().fromJson("{"
+                + (identifier == null ? "" : "\"identifier\":\"" + identifier + "\",")
+                + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
+        definition.client.registerCapability(new RegistrationParams(List.of(
+                new Registration("workspace", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+        var request = next();
+        stream(request, report(closed, "workspace removed", null));
+        await(() -> wrapper.getClosedDocument(LSPIJUtils.toUri(closed), false) != null
+                && wrapper.getClosedDocument(LSPIJUtils.toUri(closed), false).getDiagnostics().size() == 1);
+        definition.client.unregisterCapability(new UnregistrationParams(List.of(
+                new Unregistration("workspace", "textDocument/diagnostic")))).get(5, TimeUnit.SECONDS);
+        await(request.future::isCancelled);
+        await(() -> wrapper.getClosedDocument(LSPIJUtils.toUri(closed), false).getDiagnostics().isEmpty());
+        // Also check the cleanup synchronously: observing the closed cache alone
+        // does not guarantee that the asynchronous open-cache loop has finished.
+        wrapper.clearDocumentDiagnostics(identifier);
+        assertEquals(1, openDocument.getDiagnostics().size());
+        assertEquals("document retained", openDocument.getDiagnostics().iterator().next().getMessage().getLeft());
+    }
+
     public void testWorkspaceResultsRefreshOpenDocumentWithoutReplacingDocumentDiagnostics() throws Exception {
         start(true);
         var initial = next();
@@ -296,8 +385,8 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 .get(10, TimeUnit.SECONDS);
         await(() -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) != null
                 && wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size() == 1);
-        var request = next();
-        await(initial.future::isCancelled);
+        initial.future.complete(new WorkspaceDiagnosticReport(List.of()));
+        var request = next(); // the new request uses the current editor cache
         definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
                 new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("updated document")))));
         stream(request, report(file, "workspace", 1));
@@ -306,7 +395,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         assertEquals(1, wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size());
     }
 
-    public void testCloseCancelsWorkspacePullWithoutPreviousResultId() throws Exception {
+    public void testCloseFiltersWorkspacePullWithoutPreviousResultId() throws Exception {
         definition.keepAlive = true;
         var psi = fixture.addFileToProject("owned.workspace", "value");
         var file = psi.getVirtualFile();
@@ -328,12 +417,15 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 .fileClosed(editors, file);
         PlatformTestUtil.waitWithEventsDispatching("the closed editor must disconnect",
                 () -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) == null, 10);
-        var replacement = next();
-        await(pending.future::isCancelled);
-        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
         var stale = report(file, "stale", null);
         stale.getLeft().setResultId("stale");
         stream(pending, stale); // late progress must not populate the new closed-file cache
+        pending.future.complete(new WorkspaceDiagnosticReport(List.of(stale)));
+        var replacement = next();
+        assertFalse(pending.future.isCancelled());
+        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
+        var closed = wrapper.getClosedDocument(LSPIJUtils.toUri(file), false);
+        assertTrue(closed == null || closed.getDiagnostics().isEmpty());
         var fresh = report(file, "fresh", null);
         fresh.getLeft().setResultId("fresh");
         replacement.future.complete(new WorkspaceDiagnosticReport(List.of(fresh)));
@@ -463,8 +555,8 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         await(() -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) != null
                 && wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size() == 1);
         int before = count.get();
-        var request = next();
-        await(initial.future::isCancelled);
+        initial.future.complete(new WorkspaceDiagnosticReport(List.of()));
+        var request = next(); // the new request uses the current editor cache
         stream(request, report(file, "stale", 0));
         request.future.complete(new WorkspaceDiagnosticReport(List.of()));
         next(); // the previous report has been consumed before the next request
