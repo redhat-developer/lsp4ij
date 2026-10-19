@@ -73,6 +73,20 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
                 editorQuickFix, diagnostics.getQuickFixesFor(createDiagnostic(), file).get(0));
     }
 
+    public void testAListThatRepeatsADiagnosticDropsTheOneItReplaces() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1; const bar = 2;");
+        LanguageServerItem languageServer = getLanguageServer(file);
+        var diagnostics = new LSPDiagnosticsForServer(languageServer, file.getVirtualFile(), null);
+        Diagnostic foo = diagnostic(6, 9, "'foo' is declared but its value is never read.");
+        Diagnostic bar = diagnostic(21, 24, "'bar' is declared but its value is never read.");
+        assertTrue(diagnostics.update("test", List.of(foo, bar)));
+        assertFalse(diagnostics.getQuickFixesFor(bar, file).isEmpty());
+
+        // As many diagnostics as before, each of them known, but bar is gone
+        assertTrue("A removed diagnostic is a change", diagnostics.update("test", List.of(foo, foo)));
+        assertTrue("The removed diagnostic has no quick fixes", diagnostics.getQuickFixesFor(bar, file).isEmpty());
+    }
+
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
         List<LanguageServerItem> languageServers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null)
@@ -82,8 +96,11 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private static Diagnostic createDiagnostic() {
-        Diagnostic diagnostic = new Diagnostic(new Range(new Position(0, 6), new Position(0, 9)),
-                "'foo' is declared but its value is never read.");
+        return diagnostic(6, 9, "'foo' is declared but its value is never read.");
+    }
+
+    private static Diagnostic diagnostic(int start, int end, String message) {
+        Diagnostic diagnostic = new Diagnostic(new Range(new Position(0, start), new Position(0, end)), message);
         diagnostic.setSeverity(DiagnosticSeverity.Hint);
         return diagnostic;
     }
