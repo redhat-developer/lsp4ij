@@ -162,6 +162,7 @@ public class ClientCapabilitiesFactory {
         completionItemCapabilities.setDeprecatedSupport(Boolean.TRUE);
         completionItemCapabilities.setLabelDetailsSupport(Boolean.TRUE);
         CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
+        completionCapabilities.setInsertTextMode(InsertTextMode.AdjustIndentation);
         completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
         completionCapabilities.setDynamicRegistration(Boolean.TRUE);
         textDocumentClientCapabilities.setCompletion(completionCapabilities);
