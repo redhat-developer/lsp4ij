@@ -14,8 +14,10 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -23,6 +25,7 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -77,6 +80,71 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(FileUriSupport.toString(file.getVirtualFile(), languageServer.getClientFeatures()),
                 params.getTextDocument().getUri());
         assertEquals(diagnostic.getRange(), params.getRange());
+    }
+
+    public void testCodeActionsLoadAgainAfterAPendingRequestWasCancelled() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
+        LanguageServerItem languageServer = getLanguageServer(file);
+        Diagnostic diagnostic = createDiagnostic();
+        CodeAction quickFix = new CodeAction("Remove unused declaration for: 'foo'");
+        quickFix.setKind(CodeActionKind.QuickFix);
+        quickFix.setDiagnostics(List.of(diagnostic));
+        MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
+        var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
+        // Keep the first textDocument/codeAction request pending until it is cancelled.
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(10_000);
+
+        var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
+        Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
+        PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
+                () -> textDocumentService.codeActionRequests > 0, 5);
+        // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
+        // when they are unchanged, and the editor then keeps the quick fixes that use these code actions.
+        codeActions.cancel();
+        try {
+            pending.get(5, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            // The cancelled request may fail the pending load; only the next load matters here.
+        }
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
+
+        var codeAction = codeActions.getCodeActionAt(0);
+
+        assertNotNull(codeAction);
+        assertTrue(codeAction.isLeft());
+        assertEquals("Remove unused declaration for: 'foo'", codeAction.getLeft().codeAction().getRight().getTitle());
+    }
+
+    public void testCodeActionsLoadAgainAfterARequestWasCancelledBeforeItWasSent() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
+        LanguageServerItem languageServer = getLanguageServer(file);
+        Diagnostic diagnostic = createDiagnostic();
+        CodeAction quickFix = new CodeAction("Remove unused declaration for: 'foo'");
+        quickFix.setKind(CodeActionKind.QuickFix);
+        quickFix.setDiagnostics(List.of(diagnostic));
+        MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
+        // The request waits for the server to initialize: stop it, and delay initialize when it starts again.
+        languageServer.getServerWrapper().stop();
+        PlatformTestUtil.waitWithEventsDispatching("server must stop",
+                () -> languageServer.getServerWrapper().getServerStatus() == ServerStatus.stopped, 5);
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(2_000);
+
+        var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
+        Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
+        PlatformTestUtil.waitWithEventsDispatching("server must start",
+                () -> languageServer.getServerWrapper().getServerStatus() == ServerStatus.starting, 5);
+        codeActions.cancel();
+        try {
+            pending.get(10, TimeUnit.SECONDS);
+        } catch (ExecutionException e) {
+            // The request cancelled before it was sent fails the pending load; only the next load matters here.
+        }
+        MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
+
+        var codeAction = codeActions.getCodeActionAt(0);
+
+        assertNotNull(codeAction);
+        assertTrue(codeAction.isLeft());
     }
 
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {

@@ -19,6 +19,8 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.testFramework.fixtures.CodeInsightTestUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.Command;
@@ -103,10 +105,10 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
         // Collect IntelliJ Quick fixes / Intention actions
         List<IntentionAction> actions = new ArrayList<>();
         switch (kind) {
-            case QUICK_FIX_ONLY -> actions.addAll(getAllQuickFixes());
+            case QUICK_FIX_ONLY -> actions.addAll(getAllQuickFixes(diagnostics.size()));
             case INTENTION_ONLY -> actions.addAll(myFixture.getAvailableIntentions());
             case QUICK_FIX_AND_INTENTION_BOTH -> {
-                actions.addAll(getAllQuickFixes());
+                actions.addAll(getAllQuickFixes(diagnostics.size()));
                 actions.addAll(myFixture.getAvailableIntentions());
             }
         }
@@ -168,8 +170,8 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
     }
 
     @NotNull
-    private List<IntentionAction> getAllQuickFixes() {
-        List<HighlightInfo> infos = myFixture.doHighlighting();
+    private List<IntentionAction> getAllQuickFixes(int diagnosticCount) {
+        List<HighlightInfo> infos = highlightLanguageServerDiagnostics(diagnosticCount);
         List<IntentionAction> actions = new ArrayList<>();
         for (HighlightInfo info : infos) {
             info.findRegisteredQuickFix((descriptor, range) -> {
@@ -178,6 +180,28 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
             });
         }
         return actions;
+    }
+
+    // The server publishes diagnostics after didOpen, which highlighting can trigger, and
+    // LSPDiagnosticsApplier shows them asynchronously. Highlighting once can finish before they are
+    // shown, so highlight again until every diagnostic is shown. The applier also drops diagnostics
+    // published before the first highlighting registers its pass, so ask it to refresh, as an editor does.
+    @NotNull
+    private List<HighlightInfo> highlightLanguageServerDiagnostics(int diagnosticCount) {
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (true) {
+            List<HighlightInfo> infos = myFixture.doHighlighting();
+            long shown = infos.stream()
+                    .filter(info -> info.findRegisteredQuickFix((descriptor, range) ->
+                            descriptor.getAction() instanceof LSPLazyCodeActionIntentionAction ? descriptor : null) != null)
+                    .count();
+            if (shown >= diagnosticCount || System.currentTimeMillis() > deadline) {
+                return infos;
+            }
+            LSPDiagnosticsApplier.getInstance(myFixture.getProject())
+                    .scheduleRefresh(myFixture.getFile(), myFixture.getEditor().getDocument());
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        }
     }
 
 }

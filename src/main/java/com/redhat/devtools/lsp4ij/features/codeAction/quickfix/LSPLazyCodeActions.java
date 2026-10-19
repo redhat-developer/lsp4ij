@@ -67,7 +67,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     private final List<IntentionAction> codeActions;
 
     // LSP code actions request used to load code action for the diagnostic.
-    private CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
+    private volatile CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
     private CancellationSupport cancellationSupport;
 
     public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
@@ -103,18 +103,28 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     }
 
     private @Nullable List<CodeActionData> getOrLoadCodeActions() {
-        if (lspCodeActionRequest == null) {
-            // Create LSP textDocument/codeAction request
-            lspCodeActionRequest = loadCodeActionsFor(diagnostics);
+        CompletableFuture<List<CodeActionData>> future;
+        synchronized (this) {
+            future = lspCodeActionRequest;
+            if (future == null || future.isCompletedExceptionally()) {
+                // Create LSP textDocument/codeAction request. A request that failed, for example because it was
+                // cancelled before it was sent, is sent again rather than failing every later use.
+                future = loadCodeActionsFor(diagnostics);
+                lspCodeActionRequest = future;
+            }
         }
         // Wait for the LSP response, cooperating with IntelliJ's threading model.
         // See https://github.com/redhat-developer/lsp4ij/issues/1648
-        var future = lspCodeActionRequest;
         try {
             awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
+            return null;
+        }
+        if (future != lspCodeActionRequest) {
+            // cancel() retired this request while it was pending. A cancelled request completes without code
+            // actions, which says nothing about the available code actions, so report them as not loaded yet.
             return null;
         }
         if (isDoneNormally(future)) {
@@ -200,9 +210,12 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     /**
      * Cancel if needed the LSP request textDocument/codeAction
      */
-    public void cancel() {
+    public synchronized void cancel() {
         if (cancellationSupport != null) {
             cancellationSupport.cancel();
         }
+        // The editor can keep the quick fixes that use these code actions, for example when the same diagnostics
+        // are published again, so the next use must send a new request.
+        lspCodeActionRequest = null;
     }
 }
