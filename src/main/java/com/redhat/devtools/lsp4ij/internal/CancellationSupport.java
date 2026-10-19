@@ -64,7 +64,8 @@ public class CancellationSupport implements CancelChecker {
 
     private final List<CompletableFuture<?>> futuresToCancel;
 
-    private boolean cancelled;
+    // cancel() and execute() can run on different threads.
+    private volatile boolean cancelled;
 
     public CancellationSupport() {
         this.futuresToCancel = new CopyOnWriteArrayList<>();

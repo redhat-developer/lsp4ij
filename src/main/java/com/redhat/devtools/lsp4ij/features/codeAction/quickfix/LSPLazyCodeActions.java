@@ -145,14 +145,20 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         if (cancellationSupport != null) {
             cancellationSupport.cancel();
         }
-        cancellationSupport = new CancellationSupport();
+        // Each request keeps its own cancellation: the field can hold a newer one by the time the server is ready.
+        CancellationSupport requestCancellation = new CancellationSupport();
+        cancellationSupport = requestCancellation;
         return languageServer
                         .getInitializedServer()
                         .thenCompose(ls -> {
+                            if (requestCancellation.isCanceled()) {
+                                // cancel() retired this request while the server initialized: don't send it.
+                                return CompletableFuture.completedFuture(Collections.<CodeActionData>emptyList());
+                            }
 
                             // Collect code action for the given file by using the language server
                             CodeActionParams params = createCodeActionParams(diagnostics, file, languageServer.getClientFeatures());
-                            return cancellationSupport.execute(ls.getTextDocumentService()
+                            return requestCancellation.execute(ls.getTextDocumentService()
                                     .codeAction(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION)
                                     .thenApply(codeActions -> {
                                         if (codeActions == null || codeActions.isEmpty()) {
