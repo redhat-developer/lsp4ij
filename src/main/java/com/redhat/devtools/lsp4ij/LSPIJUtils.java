@@ -65,6 +65,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * Utilities class for LSP.
@@ -983,6 +984,35 @@ public class LSPIJUtils {
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
                                           @Nullable String label) {
+        applyWorkspaceEdit(edit, label, true);
+    }
+
+    /**
+     * Applies the workspace edit.
+     *
+     * @param edit                       the workspace edit.
+     * @param label                      the label of the edit.
+     * @param saveDocumentsWithoutEditor true to save the changed documents that are not open in an editor once the
+     *                                   edit is applied, and false otherwise, as inside a VFS event, where a document
+     *                                   cannot be saved. A language server reads such a document from disk, since
+     *                                   no didOpen gives it the content, so until the document is saved it does not
+     *                                   see the edit. A document with unsaved changes from before the edit is not
+     *                                   saved, so that the edit does not persist them.
+     */
+    @ApiStatus.Internal
+    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                          @Nullable String label,
+                                          boolean saveDocumentsWithoutEditor) {
+        // Documents without an editor and without unsaved changes, captured before their first edit
+        Set<Document> documentsToSave = new LinkedHashSet<>();
+        Consumer<Document> beforeEdit = saveDocumentsWithoutEditor
+                ? document -> {
+                    if (EditorFactory.getInstance().getEditors(document).length == 0
+                            && !FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
+                        documentsToSave.add(document);
+                    }
+                }
+                : document -> {};
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -996,13 +1026,14 @@ public class LSPIJUtils {
                                     .filter(Either::isLeft)
                                     .map(Either::getLeft)
                                     .toList();
+                            beforeEdit.accept(document);
                             applyEdits(null, document, textEdits, false);
                         }
                     }
                 } else if (change.isRight()) {
                     ResourceOperation resourceOperation = change.getRight();
                     if (resourceOperation instanceof CreateFile createFile) {
-                        applyCreateFile(createFile);
+                        applyCreateFile(createFile, beforeEdit);
                     } else if (resourceOperation instanceof DeleteFile deleteFile) {
                         applyDeleteFile(deleteFile);
                     } else if (resourceOperation instanceof RenameFile renameFile) {
@@ -1024,20 +1055,30 @@ public class LSPIJUtils {
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
+                        beforeEdit.accept(document);
                         applyEdits(null, document, change.getValue(), false);
                     }
                 }
             }
         }
+
+        // A later operation of the edit can have deleted the file; a rename keeps its document
+        for (Document document : documentsToSave) {
+            VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+            if (file != null && file.isValid() && EditorFactory.getInstance().getEditors(document).length == 0) {
+                FileDocumentManager.getInstance().saveDocument(document);
+            }
+        }
     }
 
-    private static void applyCreateFile(CreateFile createFile) {
+    private static void applyCreateFile(CreateFile createFile, Consumer<Document> beforeEdit) {
         VirtualFile targetFile = findResourceFor(createFile.getUri());
         if (targetFile != null && createFile.getOptions() != null) {
             if (!createFile.getOptions().getIgnoreIfExists()) {
                 Document document = getDocument(targetFile);
                 if (document != null) {
                     TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
+                    beforeEdit.accept(document);
                     applyEdits(null, document, Collections.singletonList(textEdit), false);
                 }
             }
