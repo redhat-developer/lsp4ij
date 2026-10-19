@@ -23,6 +23,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Workspace diagnostic pull loops for one language server connection.
@@ -116,6 +117,27 @@ public final class WorkspaceDiagnosticManager implements Disposable {
             for (var provider : providers.values()) {
                 cancel(provider);
                 pull(provider);
+            }
+        });
+    }
+
+    /**
+     * Forgets result IDs whose diagnostic cache was discarded or replaced.
+     * Restarts affected providers so unchanged replies cannot refer to lost
+     * diagnostics; other files' result IDs and unaffected providers are retained.
+     *
+     * @param matchesCache identifies report URIs belonging to the replaced cache;
+     *                     evaluated on the manager's executor, never the caller's thread
+     */
+    public void invalidate(Predicate<String> matchesCache) {
+        execute(() -> {
+            for (var provider : providers.values()) {
+                if (provider.resultIds.keySet().removeIf(matchesCache)) {
+                    // Cancel pending matches and replies as well: a late unchanged
+                    // report must not restore the invalidated result ID.
+                    cancel(provider);
+                    pull(provider);
+                }
             }
         });
     }

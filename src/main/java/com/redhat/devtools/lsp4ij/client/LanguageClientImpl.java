@@ -38,6 +38,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -132,6 +133,28 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         if (!isDisposed() && workspaceDiagnostics != null) {
             workspaceDiagnostics.updateProviders(getClientFeatures().getDiagnosticFeature()
                     .getDiagnosticCapabilityRegistry().getWorkspaceDiagnosticIdentifiers());
+        }
+    }
+
+    /**
+     * Queues result-ID invalidation after a document's diagnostic cache changes
+     * ownership. URI resolution runs on the diagnostic executor, so callers
+     * need not wait while holding the document lifecycle lock.
+     *
+     * @param fileUri the URI used by the wrapper's document caches
+     */
+    @ApiStatus.Internal
+    public void invalidateWorkspaceDiagnosticCache(@NotNull URI fileUri) {
+        if (!isDisposed() && workspaceDiagnostics != null) {
+            workspaceDiagnostics.invalidate(uri -> {
+                var features = getClientFeatures();
+                if (Objects.equals(uri, FileUriSupport.toString(fileUri, features))) {
+                    return true;
+                }
+                // A server may use a different spelling for the same file URI.
+                VirtualFile file = FileUriSupport.findFileByUri(uri, features);
+                return file != null && fileUri.equals(FileUriSupport.getFileUri(file, features));
+            });
         }
     }
 

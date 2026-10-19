@@ -7,8 +7,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.diagnostics;
 
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.redhat.devtools.lsp4ij.*;
@@ -301,6 +304,107 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         assertEquals(1, wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size());
     }
 
+    public void testCacheLifetimeForSameProvider() throws Exception {
+        assertCacheLifetime("document");
+    }
+
+    public void testCacheLifetimeForOtherProvider() throws Exception {
+        assertCacheLifetime("workspace");
+    }
+
+    public void testCacheLifetimeForDefaultProvider() throws Exception {
+        assertCacheLifetime(null);
+    }
+
+    public void testCacheLifetimeForEncodedUri() throws Exception {
+        assertCacheLifetime("workspace", true, false);
+    }
+
+    public void testCacheLifetimeForUnsynchronizedCache() throws Exception {
+        assertCacheLifetime("workspace", false, true);
+    }
+
+    private void assertCacheLifetime(String identifier) throws Exception {
+        assertCacheLifetime(identifier, false, false);
+    }
+
+    private void assertCacheLifetime(String identifier, boolean encodedUri, boolean unsynchronized) throws Exception {
+        definition.allFilesEnabled = true;
+        definition.keepAlive = true;
+        var psi = fixture.addFileToProject("owned.workspace", "value");
+        var file = psi.getVirtualFile();
+        var retained = fixture.addFileToProject("retained.workspace", "value").getVirtualFile();
+        start(false);
+        definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
+                new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document")))));
+        var documentOptions = JSONUtils.getLsp4jGson().fromJson(
+                "{\"identifier\":\"document\",\"workspaceDiagnostics\":false}", com.google.gson.JsonObject.class);
+        var workspaceOptions = JSONUtils.getLsp4jGson().fromJson("{"
+                + (identifier == null ? "" : "\"identifier\":\"" + identifier + "\",")
+                + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
+        definition.client.registerCapability(new RegistrationParams(List.of(
+                new Registration("document", "textDocument/diagnostic", documentOptions),
+                new Registration("workspace", "textDocument/diagnostic", workspaceOptions)))).get(5, TimeUnit.SECONDS);
+        var first = next();
+        var ownedReport = report(file, "workspace", null);
+        ownedReport.getLeft().setResultId("owned");
+        if (encodedUri) {
+            ownedReport.getLeft().setUri(ownedReport.getLeft().getUri().replace("/owned.workspace", "/%6fwned.workspace"));
+        }
+        var retainedReport = report(retained, "retained", null);
+        retainedReport.getLeft().setResultId("retained");
+        first.future.complete(new WorkspaceDiagnosticReport(List.of(ownedReport, retainedReport)));
+        var closedPull = next();
+        assertEquals(2, closedPull.params.getPreviousResultIds().size());
+
+        if (unsynchronized) {
+            // Published diagnostics can create an editor cache before didOpen
+            // connects it; replacing that cache must invalidate its IDs too.
+            assertNull(wrapper.getOpenedDocument(LSPIJUtils.toUri(file), true).getSynchronizer());
+            var unsynchronizedPull = next();
+            await(closedPull.future::isCancelled);
+            assertEquals(List.of(new PreviousResultId(LSPIJUtils.toUri(retained).toString(), "retained")),
+                    unsynchronizedPull.params.getPreviousResultIds());
+            unsynchronizedPull.future.complete(new WorkspaceDiagnosticReport(List.of(ownedReport)));
+            closedPull = next();
+            assertEquals(2, closedPull.params.getPreviousResultIds().size());
+        }
+
+        var editors = FileEditorManager.getInstance(fixture.getProject());
+        editors.openFile(file, false);
+        LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(psi, null, null)
+                .get(10, TimeUnit.SECONDS);
+        var openPull = next();
+        await(closedPull.future::isCancelled);
+        assertEquals(List.of(new PreviousResultId(LSPIJUtils.toUri(retained).toString(), "retained")),
+                openPull.params.getPreviousResultIds());
+        openPull.future.complete(new WorkspaceDiagnosticReport(List.of(ownedReport)));
+        var stableOpenPull = next();
+        assertEquals(2, stableOpenPull.params.getPreviousResultIds().size());
+        await(() -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size()
+                == ("document".equals(identifier) ? 1 : 2));
+
+        editors.closeFile(file);
+        // The fixture has no editor provider for this extension, so deliver
+        // the public close event explicitly, as FileEditorManager does in the IDE.
+        fixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
+                .fileClosed(editors, file);
+        PlatformTestUtil.waitWithEventsDispatching("the closed editor must disconnect",
+                () -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) == null, 10);
+        var refreshed = next();
+        await(stableOpenPull.future::isCancelled);
+        assertEquals(List.of(new PreviousResultId(LSPIJUtils.toUri(retained).toString(), "retained")),
+                refreshed.params.getPreviousResultIds());
+        refreshed.future.complete(new WorkspaceDiagnosticReport(List.of(ownedReport)));
+        var stableClosedPull = next();
+        assertEquals(2, stableClosedPull.params.getPreviousResultIds().size());
+        stableClosedPull.future.complete(new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
+                new WorkspaceUnchangedDocumentDiagnosticReport("owned", ownedReport.getLeft().getUri(), null)))));
+        assertEquals(2, next().params.getPreviousResultIds().size());
+        assertEquals("workspace", wrapper.getClosedDocument(LSPIJUtils.toUri(file), false)
+                .getDiagnostics().iterator().next().getMessage().getLeft());
+    }
+
     public void testOlderWorkspaceVersionCannotRefreshCurrentDocument() throws Exception {
         var count = new java.util.concurrent.atomic.AtomicInteger();
         definition.getServer().setTextDocumentService(new com.redhat.devtools.lsp4ij.mock.MockTextDocumentService(
@@ -386,6 +490,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
     private static class ScopedServer extends MockLanguageServerDefinition {
         LanguageClientImpl client;
         boolean allFilesEnabled;
+        boolean keepAlive;
         ScopedServer() { super("workspace-diagnostics", false); }
         @Override public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
             return client = new LanguageClientImpl(project);
@@ -395,6 +500,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 @Override public boolean isEnabled(@NotNull VirtualFile file) {
                     return allFilesEnabled || file.getName().equals("owned.workspace");
                 }
+                @Override public boolean keepServerAlive() { return keepAlive; }
             };
         }
     }

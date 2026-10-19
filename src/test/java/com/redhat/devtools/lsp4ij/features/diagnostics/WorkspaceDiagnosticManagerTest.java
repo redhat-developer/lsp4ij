@@ -91,6 +91,69 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
+    public void cacheInvalidationRetainsOtherFilesAndProviders() throws Exception {
+        var h = harness();
+        h.refuseCancellation = true;
+        h.manager.updateProviders(Set.of("lua", "other"));
+        var first = h.next();
+        var other = h.next();
+        h.partial(first, full("file:///lost.lua", "lost"));
+        h.partial(first, full("file:///retained.lua", "retained"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+
+        h.manager.invalidate("file:///lost.lua"::equals);
+        var replacement = h.next();
+        assertEquals(first.params.getIdentifier(), replacement.params.getIdentifier());
+        assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
+                replacement.params.getPreviousResultIds());
+        assertTrue(first.future.cancelRequested);
+        assertFalse(other.future.cancelRequested);
+        // Even a server that refuses cancellation cannot restore the lost ID.
+        h.partial(first, full("file:///lost.lua", "late"));
+        first.future.complete(full("file:///lost.lua", "late"));
+        h.manager.invalidate("file:///lost.lua"::equals);
+        h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        assertTrue(h.requests.isEmpty());
+        assertTrue(h.applied.isEmpty());
+        assertFalse(replacement.future.cancelRequested);
+    }
+
+    @Test
+    public void cacheInvalidationCancelsPendingUnchangedMatch() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Collections.singleton(null));
+        h.next().future.complete(full("file:///a.lua", "old"));
+        var second = h.next();
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        var pending = new MatchFuture();
+        var started = new CompletableFuture<Void>();
+        h.matcher = uri -> { started.complete(null); return pending; };
+        second.future.complete(new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
+                new WorkspaceUnchangedDocumentDiagnosticReport("old", "file:///a.lua", null)))));
+        started.get(5, TimeUnit.SECONDS);
+        h.manager.invalidate("file:///a.lua"::equals);
+        var replacement = h.next();
+        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
+        assertTrue(pending.cancelRequested);
+        pending.complete(true);
+        h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        assertTrue(h.applied.isEmpty());
+        assertTrue(h.clearedFiles.isEmpty());
+        assertTrue(h.clearedProviders.isEmpty());
+    }
+
+    @Test
+    public void cacheInvalidationDuringPublicationDropsNewlyRetainedId() throws Exception {
+        var h = harness();
+        h.beforeApply = () -> h.manager.invalidate("file:///a.lua"::equals);
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(full("file:///a.lua", "old"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        assertTrue(h.next().params.getPreviousResultIds().isEmpty());
+    }
+
+    @Test
     public void unregisterCancelsAndReregisterStartsWithoutOldResultIds() throws Exception {
         var h = harness();
         h.manager.updateProviders(Set.of("lua"));
@@ -358,10 +421,12 @@ public class WorkspaceDiagnosticManagerTest {
         final BlockingQueue<WorkspaceDocumentDiagnosticReport> applied = new LinkedBlockingQueue<>();
         volatile boolean accept = true;
         volatile boolean refuseCancellation;
+        volatile Runnable beforeApply = () -> {};
         volatile java.util.function.Function<String, CompletableFuture<Boolean>> matcher = uri -> CompletableFuture.completedFuture(true);
         final List<String> clearedProviders = new CopyOnWriteArrayList<>();
         final List<String> clearedFiles = new CopyOnWriteArrayList<>();
         final WorkspaceDiagnosticManager manager = new WorkspaceDiagnosticManager(this, executor, uri -> matcher.apply(uri), (identifier, report) -> {
+            beforeApply.run();
             applied.add(report);
             return accept;
         }, clearedProviders::add, (identifier, uri) -> clearedFiles.add(identifier + ":" + uri));

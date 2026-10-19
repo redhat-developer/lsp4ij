@@ -905,6 +905,7 @@ public class LanguageServerWrapper implements Disposable {
                     document.addDocumentListener(synchronizer, synchronizer);
                     OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
                     LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
+                    invalidateWorkspaceDiagnosticCache(fileUri);
                     if (!waitForDidOpen) {
                         return CompletableFuture.completedFuture(languageServer);
                     }
@@ -1046,6 +1047,7 @@ public class LanguageServerWrapper implements Disposable {
                     Disposer.dispose(synchronizer);
                 }
                 clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
+                invalidateWorkspaceDiagnosticCache(fileUri);
             }
         }
         if (stopIfNoOpenedFiles) {
@@ -1121,9 +1123,17 @@ public class LanguageServerWrapper implements Disposable {
             if (file != null) {
                 openedDocument = new OpenedDocument(new LanguageServerItem(languageServer, this), file, null);
                 openedDocuments.put(fileUri, openedDocument);
+                invalidateWorkspaceDiagnosticCache(fileUri);
             }
         }
         return openedDocument;
+    }
+
+    private void invalidateWorkspaceDiagnosticCache(@NotNull URI fileUri) {
+        var client = languageClient;
+        if (client != null) {
+            client.invalidateWorkspaceDiagnosticCache(fileUri);
+        }
     }
 
     /**
