@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.files;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -35,9 +36,11 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -116,6 +119,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         // Collect workspace edits on background thread (prepareChange runs off-EDT)
         // so the UI is never blocked waiting for the language server response
         List<WorkspaceEdit> workspaceEdits = collectWillEdits(supportedEvents);
+        // The documents without an editor that the edits change, saved once the VFS event is over
+        Set<Document> documentsToSave = new LinkedHashSet<>();
         return new ChangeApplier() {
             @Override
             public void beforeVfsChange() {
@@ -127,7 +132,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                 for (WorkspaceEdit edit : workspaceEdits) {
                     if (areTargetDocumentsUnchanged(edit, documentStamps)) {
                         // A document cannot be saved during a VFS event
-                        LSPIJUtils.applyWorkspaceEdit(edit, null, false);
+                        documentsToSave.addAll(LSPIJUtils.applyWorkspaceEdit(edit, null, false));
                     } else {
                         LOGGER.warn("Discarding stale workspace/will* edit: target document(s) modified during request");
                     }
@@ -137,6 +142,12 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             @Override
             public void afterVfsChange() {
                 after(supportedEvents);
+                if (!documentsToSave.isEmpty()) {
+                    // A language server reads a document without an editor from disk, so save the edited
+                    // ones, which cannot happen during the VFS event this runs in
+                    ApplicationManager.getApplication().invokeLater(
+                            () -> LSPIJUtils.saveDocumentsWithoutEditor(documentsToSave));
+                }
             }
         };
     }

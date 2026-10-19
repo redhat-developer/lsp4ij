@@ -1002,26 +1002,26 @@ public class LSPIJUtils {
      *                                   see the edit. A document with unsaved changes from before the edit is not
      *                                   saved, so that the edit does not persist them. Inside a command, the same
      *                                   documents are saved again after Undo and Redo of the edit.
+     * @return the changed documents that are not open in an editor and had no unsaved changes before the edit, for
+     * a caller that has to save them later, with {@link #saveDocumentsWithoutEditor(Set)}.
      */
     @ApiStatus.Internal
-    public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
-                                          @Nullable String label,
-                                          boolean saveDocumentsWithoutEditor) {
+    public static @NotNull Set<Document> applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                                           @Nullable String label,
+                                                           boolean saveDocumentsWithoutEditor) {
         // Documents without an editor and without unsaved changes, captured before their first edit
         Set<Document> documentsToSave = new LinkedHashSet<>();
-        Consumer<Document> beforeEdit = saveDocumentsWithoutEditor
-                ? document -> {
-                    if (EditorFactory.getInstance().getEditors(document).length == 0
-                            && !FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
-                        if (documentsToSave.isEmpty()) {
-                            // Undo reverts the changes that follow this action before it reaches it, so this
-                            // saves the documents in their state after Undo
-                            saveOnUndoOrRedo(documentsToSave, true);
-                        }
-                        documentsToSave.add(document);
-                    }
+        Consumer<Document> beforeEdit = document -> {
+            if (EditorFactory.getInstance().getEditors(document).length == 0
+                    && !FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
+                if (saveDocumentsWithoutEditor && documentsToSave.isEmpty()) {
+                    // Undo reverts the changes that follow this action before it reaches it, so this
+                    // saves the documents in their state after Undo
+                    saveOnUndoOrRedo(documentsToSave, true);
                 }
-                : document -> {};
+                documentsToSave.add(document);
+            }
+        };
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -1071,14 +1071,21 @@ public class LSPIJUtils {
             }
         }
 
-        if (!documentsToSave.isEmpty()) {
+        if (saveDocumentsWithoutEditor && !documentsToSave.isEmpty()) {
             saveDocumentsWithoutEditor(documentsToSave);
             // Redo applies the changes before it reaches this action, so this saves them after Redo
             saveOnUndoOrRedo(documentsToSave, false);
         }
+        return documentsToSave;
     }
 
-    private static void saveDocumentsWithoutEditor(@NotNull Set<Document> documents) {
+    /**
+     * Saves the given documents that still have a valid file and are not open in an editor.
+     *
+     * @param documents the documents, as returned by {@link #applyWorkspaceEdit(WorkspaceEdit, String, boolean)}.
+     */
+    @ApiStatus.Internal
+    public static void saveDocumentsWithoutEditor(@NotNull Set<Document> documents) {
         // A later operation of the edit can have deleted the file; a rename keeps its document
         for (Document document : documents) {
             VirtualFile file = FileDocumentManager.getInstance().getFile(document);

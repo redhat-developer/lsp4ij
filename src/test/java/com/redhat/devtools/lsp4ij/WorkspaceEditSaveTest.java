@@ -98,8 +98,10 @@ public class WorkspaceEditSaveTest extends LSPCodeInsightFixtureTestCase {
     public void testChangesAreNotSavedWhenSavingIsNotAllowed() throws IOException {
         VirtualFile file = myFixture.addFileToProject("closed.txt", OLD_TEXT).getVirtualFile();
 
-        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> LSPIJUtils.applyWorkspaceEdit(
-                new WorkspaceEdit(Map.of(LSPIJUtils.toUri(file).toString(), List.of(renameClass()))), null, false));
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> {
+            LSPIJUtils.applyWorkspaceEdit(
+                    new WorkspaceEdit(Map.of(LSPIJUtils.toUri(file).toString(), List.of(renameClass()))), null, false);
+        });
 
         assertEquals(NEW_TEXT, document(file).getText());
         assertUnsaved(file);
