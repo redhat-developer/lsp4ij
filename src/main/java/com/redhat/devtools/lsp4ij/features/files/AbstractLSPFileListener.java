@@ -126,7 +126,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                 }
                 for (WorkspaceEdit edit : workspaceEdits) {
                     if (areTargetDocumentsUnchanged(edit, documentStamps)) {
-                        LSPIJUtils.applyWorkspaceEdit(edit);
+                        // A document cannot be saved during a VFS event
+                        LSPIJUtils.applyWorkspaceEdit(edit, null, false);
                     } else {
                         LOGGER.warn("Discarding stale workspace/will* edit: target document(s) modified during request");
                     }
