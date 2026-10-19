@@ -10,11 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
-import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -23,9 +27,6 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CancellationException;
-
-import static com.redhat.devtools.lsp4ij.LSPIJUtils.findResourceFor;
 
 /**
  * {@code LSPFileListener} bridges IntelliJ Virtual File System (VFS) events
@@ -53,6 +54,84 @@ class LSPFileListener extends AbstractLSPFileListener {
      */
     public LSPFileListener(@NotNull LanguageServerWrapper languageServerWrapper) {
         super(languageServerWrapper);
+    }
+
+    @Override
+    public ChangeApplier prepareChange(@NotNull List<? extends VFileEvent> events) {
+        var delegate = super.prepareChange(events);
+        var directories = events.stream().map(event -> {
+            if (event instanceof VFileMoveEvent move) {
+                return move.getFile();
+            }
+            if (event instanceof VFilePropertyChangeEvent rename &&
+                    VirtualFile.PROP_NAME.equals(rename.getPropertyName())) {
+                return rename.getFile();
+            }
+            return null;
+        }).filter(Objects::nonNull).filter(VirtualFile::isDirectory).toList();
+        if (directories.isEmpty()) {
+            return delegate;
+        }
+        return new ChangeApplier() {
+            @Override
+            public void beforeVfsChange() {
+                if (delegate != null) {
+                    delegate.beforeVfsChange();
+                }
+                // Descendants do not receive individual VFS move events. Capture their URIs
+                // before the directory changes, and retire each document only once even when
+                // the transaction contains overlapping parent and child directory moves.
+                var files = languageServerWrapper.getOpenedDocuments().stream().map(OpenedDocument::getFile)
+                        .distinct().filter(file -> directories.stream().anyMatch(dir -> VfsUtilCore.isAncestor(dir, file, true)))
+                        .toList();
+                files.forEach(file -> languageServerWrapper.disconnect(file, false));
+                files.forEach(LSPFileListener.this::reconnectMovedDocument);
+            }
+
+            @Override
+            public void afterVfsChange() {
+                if (delegate != null) {
+                    delegate.afterVfsChange();
+                }
+            }
+        };
+    }
+
+    private void reconnectMovedDocument(VirtualFile file) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (!isOpenDocument(file)) {
+                return;
+            }
+            URI uri = languageServerWrapper.toUri(file);
+            // This runs on the EDT, which already has the read access the connection info needs.
+            var connection = languageServerWrapper.connect(file,
+                    languageServerWrapper.createFileConnectionInfo(file, LSPIJUtils.getDocument(file), true));
+            // Never wait for transport under the VFS write lock. A later Move, Undo, Redo or
+            // tab close may overtake this attempt; retire only this file's stale connection.
+            connection.whenComplete((server, failure) -> ApplicationManager.getApplication().invokeLater(() -> {
+                if (languageServerWrapper.isDisposed() || languageServerWrapper.getProject().isDisposed()) {
+                    return;
+                }
+                boolean open = isOpenDocument(file);
+                if (!open || !Objects.equals(uri, languageServerWrapper.toUri(file))) {
+                    var opened = languageServerWrapper.getOpenedDocument(uri);
+                    if (opened != null && opened.getFile() == file) {
+                        languageServerWrapper.disconnect(uri, false);
+                    }
+                    if (open) {
+                        reconnectMovedDocument(file);
+                    }
+                } else if (failure != null) {
+                    LOGGER.warn("Cannot reconnect moved document {}", uri, failure);
+                }
+            }, ModalityState.any()));
+        }, ModalityState.any());
+    }
+
+    private boolean isOpenDocument(VirtualFile file) {
+        return !languageServerWrapper.isDisposed() && !languageServerWrapper.getProject().isDisposed() &&
+                file.isValid() && (FileEditorManager.getInstance(languageServerWrapper.getProject()).isFileOpen(file) ||
+                LSPIJUtils.editorsForFile(file, languageServerWrapper.getProject()).length > 0);
     }
 
     /**
@@ -243,17 +322,10 @@ class LSPFileListener extends AbstractLSPFileListener {
         if (docIsConnected) {
             // 1. Send a textDocument/didClose for the old file name
             languageServerWrapper.disconnect(oldFileUri, false);
-            // 2. Send a textDocument/didOpen for the new file name
-            if (!languageServerWrapper.isConnectedTo(newFileUri)) {
-                VirtualFile documentFile = findResourceFor(newFileUri.toASCIIString());
-                var document = LSPIJUtils.getDocument(documentFile);
-                var didOpen = languageServerWrapper.connect(newFile,
-                        languageServerWrapper.createFileConnectionInfo(documentFile, document, true));
-                try {
-                    awaitWithCheckCanceled(didOpen);
-                } catch (CancellationException ignore) {
-                }
-            }
+            // 2. Reconnect after the VFS write action has completed, instead of waiting here for
+            // the server while holding the write lock. The notification queue keeps didClose
+            // ahead of the new didOpen.
+            reconnectMovedDocument(newFile);
         }
 
         // 2. Prepare file events to send workspace/didRenameFiles
