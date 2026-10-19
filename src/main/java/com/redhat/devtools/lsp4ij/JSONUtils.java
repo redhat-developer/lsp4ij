@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij;
 import com.google.gson.*;
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
 import com.redhat.devtools.lsp4ij.internal.adapters.CodeLensOptionsAdapter;
+import com.redhat.devtools.lsp4ij.internal.adapters.ConfigurationTypeAdapterFactory;
 import com.redhat.devtools.lsp4ij.internal.adapters.TextDocumentEditTypeAdapterFactory;
 import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.TextDocumentEdit;
@@ -64,6 +65,9 @@ public class JSONUtils {
         // Handle TextDocumentEdit compatibility between lsp4j versions when plugins coexist
         // (List<TextEdit> in lsp4j < 1.0 vs List<Either<TextEdit, SnippetTextEdit>> in lsp4j 1.0.0+)
         builder.registerTypeAdapterFactory(new TextDocumentEditTypeAdapterFactory(originalTextDocumentEditAdapter));
+
+        // Explicit null settings mean reset, not an absent configuration update.
+        builder.registerTypeAdapterFactory(new ConfigurationTypeAdapterFactory());
     }
 
     /**
