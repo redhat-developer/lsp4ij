@@ -106,9 +106,11 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         CompletableFuture<List<CodeActionData>> future;
         synchronized (this) {
             future = lspCodeActionRequest;
-            if (future == null || future.isCompletedExceptionally()) {
-                // Create LSP textDocument/codeAction request. A request that failed, for example because it was
-                // cancelled before it was sent, is sent again rather than failing every later use.
+            if (future == null) {
+                // Create LSP textDocument/codeAction request. Highlighting passes run in parallel: without the lock,
+                // a second load cancels the first request before it is sent, and the stored request can be that
+                // cancelled one. cancel() clears a retired request; other failures are kept, so that availability
+                // checks do not each send a request to a failing server.
                 future = loadCodeActionsFor(diagnostics);
                 lspCodeActionRequest = future;
             }
