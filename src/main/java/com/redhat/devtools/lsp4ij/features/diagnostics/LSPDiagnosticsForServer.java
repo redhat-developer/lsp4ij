@@ -100,8 +100,12 @@ public class LSPDiagnosticsForServer {
         Collection<Diagnostic> oldDiagnostics = getOldDiagnostics();
         Collection<Diagnostic> newDiagnostics = getNewDiagnostics(identifier, diagnostics);
         boolean changed = isDiagnosticsChanged(oldDiagnostics, newDiagnostics);
-        // initialize diagnostics map
-        this.diagnostics = toMap(newDiagnostics, this.diagnostics);
+        if (changed) {
+            // initialize diagnostics map
+            this.diagnostics = toMap(newDiagnostics, this.diagnostics);
+        }
+        // An unchanged set keeps its lazy code actions. The editor is not refreshed for it, so it keeps
+        // using them, and new ones would only cancel their pending textDocument/codeAction requests.
         if (diagnosticsPerIdentifier != null) {
             // Cache must manage several diagnostic identifier (pull, publish), we store the new diagnostics in the cache for the given identifier
             diagnosticsPerIdentifier.put(identifier, diagnostics);
