@@ -21,6 +21,7 @@ import org.eclipse.lsp4j.FileOperationPattern;
 import org.eclipse.lsp4j.FileOperationsServerCapabilities;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
@@ -29,12 +30,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
  * The edits a server returns for workspace/willRenameFiles are applied during the VFS event, where a document
  * cannot be saved. The documents without an editor they change are saved once the event is over, since a language
- * server reads those from disk.
+ * server reads those from disk, and before the server is told of the rename.
  */
 public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
 
@@ -53,6 +55,7 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
             var filters = new FileOperationOptions(List.of(new FileOperationFilter(new FileOperationPattern("**/*.foo"))));
             var operations = new FileOperationsServerCapabilities();
             operations.setWillRename(filters);
+            operations.setDidRename(filters);
             var workspace = new WorkspaceServerCapabilities();
             workspace.setFileOperations(operations);
             capabilities.setWorkspace(workspace);
@@ -64,9 +67,7 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
         var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "text");
         var other = myFixture.getTempDirFixture().createFile("other.foo", OLD_TEXT);
         connect(renamed);
-        MockLanguageServer.INSTANCE.getWorkspaceService().setWillRename(new WorkspaceEdit(Map.of(
-                LSPIJUtils.toUri(other).toString(),
-                List.of(new TextEdit(new Range(new Position(0, 0), new Position(0, OLD_TEXT.length())), NEW_TEXT)))));
+        answerWillRenameWithAnEditTo(other);
 
         rename(renamed, "moved.foo");
 
@@ -75,6 +76,37 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
         PlatformTestUtil.waitWithEventsDispatching("the edited file without an editor must be saved",
                 () -> !FileDocumentManager.getInstance().isDocumentUnsaved(FileDocumentManager.getInstance().getDocument(other)), 10);
         assertEquals(NEW_TEXT, VfsUtilCore.loadText(other));
+    }
+
+    public void testTheServerIsToldOfTheRenameAfterTheSave() throws Exception {
+        var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "text");
+        var other = myFixture.getTempDirFixture().createFile("other.foo", OLD_TEXT);
+        connect(renamed);
+        answerWillRenameWithAnEditTo(other);
+        // What the server reads from disk when it is told of the rename
+        var didRename = new CompletableFuture<RenameFilesParams>();
+        CompletableFuture<String> textAtDidRename = didRename.thenApply(params -> loadText(other));
+        MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(didRename);
+
+        rename(renamed, "moved.foo");
+
+        PlatformTestUtil.waitWithEventsDispatching("the server must be told of the rename", textAtDidRename::isDone, 10);
+        assertEquals("the edited file must be saved before the server is told of the rename",
+                NEW_TEXT, textAtDidRename.get());
+    }
+
+    private static void answerWillRenameWithAnEditTo(VirtualFile file) {
+        MockLanguageServer.INSTANCE.getWorkspaceService().setWillRename(new WorkspaceEdit(Map.of(
+                LSPIJUtils.toUri(file).toString(),
+                List.of(new TextEdit(new Range(new Position(0, 0), new Position(0, OLD_TEXT.length())), NEW_TEXT)))));
+    }
+
+    private static String loadText(VirtualFile file) {
+        try {
+            return VfsUtilCore.loadText(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private void connect(VirtualFile file) throws Exception {

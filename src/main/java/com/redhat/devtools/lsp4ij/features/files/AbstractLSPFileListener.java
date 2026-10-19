@@ -141,12 +141,20 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
 
             @Override
             public void afterVfsChange() {
-                after(supportedEvents);
-                if (!documentsToSave.isEmpty()) {
+                Runnable sendNotifications = after(supportedEvents);
+                if (documentsToSave.isEmpty()) {
+                    sendNotifications.run();
+                } else {
                     // A language server reads a document without an editor from disk, so save the edited
-                    // ones, which cannot happen during the VFS event this runs in
-                    ApplicationManager.getApplication().invokeLater(
-                            () -> LSPIJUtils.saveDocumentsWithoutEditor(documentsToSave));
+                    // ones, which cannot happen during the VFS event this runs in, before telling the server
+                    // of the file operations, whose edits were applied before them
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        try {
+                            LSPIJUtils.saveDocumentsWithoutEditor(documentsToSave);
+                        } finally {
+                            sendNotifications.run();
+                        }
+                    });
                 }
             }
         };
@@ -458,11 +466,12 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     /**
      * Called after VFS events are applied.
      * <p>
-     * Sends "did*" LSP notifications for file creation, deletion, renaming/movement, and content changes.
+     * Collects the "did*" LSP notifications for file creation, deletion, renaming/movement, and content changes.
      *
      * @param events the list of VFS events after execution
+     * @return the action that sends the collected notifications
      */
-    private void after(@NotNull List<? extends @NotNull VFileEvent> events) {
+    private @NotNull Runnable after(@NotNull List<? extends @NotNull VFileEvent> events) {
         List<FileEvent> fileEvents = new ArrayList<>(); // workspace/didChangeWatchedFiles events
         List<FileCreate> fileCreates = new ArrayList<>(); // workspace/didCreateFiles events
         List<FileDelete> fileDeletes = new ArrayList<>(); // workspace/didDeleteFiles events
@@ -509,18 +518,20 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
         }
 
-        if (!fileCreates.isEmpty()) {
-            didCreateFiles(fileCreates);
-        }
-        if (!fileDeletes.isEmpty()) {
-            didDeleteFiles(fileDeletes);
-        }
-        if (!fileRenames.isEmpty()) {
-            didRenameFiles(fileRenames);
-        }
-        if (!fileEvents.isEmpty()) {
-            didChangeWatchedFiles(fileEvents);
-        }
+        return () -> {
+            if (!fileCreates.isEmpty()) {
+                didCreateFiles(fileCreates);
+            }
+            if (!fileDeletes.isEmpty()) {
+                didDeleteFiles(fileDeletes);
+            }
+            if (!fileRenames.isEmpty()) {
+                didRenameFiles(fileRenames);
+            }
+            if (!fileEvents.isEmpty()) {
+                didChangeWatchedFiles(fileEvents);
+            }
+        };
     }
 
     // -------------------- Abstract hooks --------------------
