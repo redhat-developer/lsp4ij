@@ -17,6 +17,7 @@ import com.google.gson.*;
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader;
 import com.redhat.devtools.lsp4ij.internal.adapters.CodeLensOptionsAdapter;
 import com.redhat.devtools.lsp4ij.internal.adapters.ConfigurationTypeAdapterFactory;
+import com.redhat.devtools.lsp4ij.internal.adapters.RelatedDocumentsTypeAdapterFactory;
 import com.redhat.devtools.lsp4ij.internal.adapters.TextDocumentEditTypeAdapterFactory;
 import org.eclipse.lsp4j.CodeLensOptions;
 import org.eclipse.lsp4j.TextDocumentEdit;
@@ -68,6 +69,9 @@ public class JSONUtils {
 
         // Explicit null settings mean reset, not an absent configuration update.
         builder.registerTypeAdapterFactory(new ConfigurationTypeAdapterFactory());
+
+        // Parse the relatedDocuments of pull diagnostic reports until LSP4J can (eclipse-lsp4j/lsp4j#990)
+        builder.registerTypeAdapterFactory(new RelatedDocumentsTypeAdapterFactory());
     }
 
     /**
