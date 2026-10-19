@@ -155,6 +155,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         quickFix.setKind(CodeActionKind.QuickFix);
         quickFix.setDiagnostics(List.of(diagnostic));
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
+        var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
         // The request waits for the server to initialize: stop it, and delay initialize when it starts again.
         languageServer.getServerWrapper().stop();
         PlatformTestUtil.waitWithEventsDispatching("server must stop",
@@ -177,6 +178,8 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
 
         assertNotNull(codeAction);
         assertTrue(codeAction.isLeft());
+        // The request cancelled while the server initialized must not be sent; only the new load's request is.
+        assertEquals(1, textDocumentService.codeActionRequests);
     }
 
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
