@@ -36,6 +36,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -145,8 +146,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
                     if (reason != null) {
                         future.complete(refused(reason));
                     } else {
-                        LSPIJUtils.applyWorkspaceEdit(params.getEdit());
-                        future.complete(new ApplyWorkspaceEditResponse(true));
+                        String failure = LSPIJUtils.applyWorkspaceEdit(params.getEdit(), null, true, new LinkedHashSet<>());
+                        future.complete(failure == null ? new ApplyWorkspaceEditResponse(true) : refused(failure));
                     }
                 });
             } catch (RuntimeException e) {

@@ -65,6 +65,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1009,8 +1010,27 @@ public class LSPIJUtils {
     public static @NotNull Set<Document> applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
                                                            @Nullable String label,
                                                            boolean saveDocumentsWithoutEditor) {
-        // Documents without an editor and without unsaved changes, captured before their first edit
         Set<Document> documentsToSave = new LinkedHashSet<>();
+        applyWorkspaceEdit(edit, label, saveDocumentsWithoutEditor, documentsToSave);
+        return documentsToSave;
+    }
+
+    /**
+     * Applies the workspace edit as {@link #applyWorkspaceEdit(WorkspaceEdit, String, boolean)} does, and stops at
+     * a resource operation that cannot be applied: the changes after it can address its new URI, which is then
+     * another file, or none. The changes before it stay applied.
+     *
+     * @param documentsToSave receives the changed documents that are not open in an editor and had no unsaved
+     *                        changes before the edit, as they are changed, so that a caller still has them when
+     *                        the edit stops.
+     * @return why the edit stopped, and null if it was applied.
+     */
+    @ApiStatus.Internal
+    public static @Nullable String applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                                      @Nullable String label,
+                                                      boolean saveDocumentsWithoutEditor,
+                                                      @NotNull Set<Document> documentsToSave) {
+        // Documents without an editor and without unsaved changes, captured before their first edit
         Consumer<Document> beforeEdit = document -> {
             if (EditorFactory.getInstance().getEditors(document).length == 0
                     && !FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
@@ -1022,6 +1042,7 @@ public class LSPIJUtils {
                 documentsToSave.add(document);
             }
         };
+        String failure = null;
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -1046,7 +1067,11 @@ public class LSPIJUtils {
                     } else if (resourceOperation instanceof DeleteFile deleteFile) {
                         applyDeleteFile(deleteFile);
                     } else if (resourceOperation instanceof RenameFile renameFile) {
-                        applyRenameFile(renameFile);
+                        failure = applyRenameFile(renameFile);
+                        if (failure != null) {
+                            LOGGER.warn("Workspace edit stopped: {}", failure);
+                            break;
+                        }
                     }
                 }
             }
@@ -1076,7 +1101,7 @@ public class LSPIJUtils {
             // Redo applies the changes before it reaches this action, so this saves them after Redo
             saveOnUndoOrRedo(documentsToSave, false);
         }
-        return documentsToSave;
+        return failure;
     }
 
     /**
@@ -1160,7 +1185,12 @@ public class LSPIJUtils {
         }
     }
 
-    private static void applyRenameFile(RenameFile renameFile) {
+    /**
+     * Applies the rename file operation.
+     *
+     * @return why the rename cannot be applied, and null if it was applied or its destination is kept
+     */
+    private static @Nullable String applyRenameFile(RenameFile renameFile) {
         // "documentChanges": [
         //  {
         //    "oldUri": "file://.../foo.clj",
@@ -1168,28 +1198,30 @@ public class LSPIJUtils {
         //    "kind": "rename"
         //  }
         //]
-        // A rename that cannot be applied stops the edit: its later changes can address the new URI, which
-        // would then be another file, or none.
         String oldUri = renameFile.getOldUri();
         String newUri = renameFile.getNewUri();
         VirtualFile resource = findResourceFor(oldUri);
         if (resource == null) {
-            throw new IllegalArgumentException("Rename source does not exist: " + oldUri);
+            return "Rename source does not exist: " + oldUri;
         }
         var destination = Paths.get(URI.create(newUri));
-        if (resource.isDirectory() && destination.startsWith(resource.toNioPath())) {
-            throw new IllegalArgumentException("A directory cannot be moved inside itself: " + newUri);
+        Path destinationParent = destination.getParent();
+        if (destinationParent == null) {
+            return "Rename destination has no directory: " + newUri;
+        }
+        if (resource.isDirectory() && destinationParent.startsWith(resource.toNioPath())) {
+            return "A directory cannot be moved inside itself: " + newUri;
         }
         String name = destination.getFileName().toString();
         VirtualFile parent;
         try {
             // A missing destination directory is created, as by VS Code
-            parent = VfsUtil.createDirectoryIfMissing(destination.getParent().toString());
+            parent = VfsUtil.createDirectoryIfMissing(destinationParent.toString());
         } catch (IOException e) {
-            throw new IllegalStateException("Unable to create the directory of " + newUri, e);
+            return "Unable to create the directory of " + newUri + ": " + e.getMessage();
         }
         if (parent == null || !parent.isDirectory()) {
-            throw new IllegalArgumentException("Rename destination directory does not exist: " + newUri);
+            return "Rename destination directory does not exist: " + newUri;
         }
         VirtualFile existing = parent.findChild(name);
         if (resource.equals(existing)) {
@@ -1200,9 +1232,9 @@ public class LSPIJUtils {
         boolean overwrite = options != null && Boolean.TRUE.equals(options.getOverwrite());
         if (existing != null && !overwrite) {
             if (options != null && Boolean.TRUE.equals(options.getIgnoreIfExists())) {
-                return;
+                return null;
             }
-            throw new IllegalArgumentException("Rename destination already exists: " + newUri);
+            return "Rename destination already exists: " + newUri;
         }
         boolean moving = !parent.equals(resource.getParent());
         boolean renaming = !resource.getName().equals(name);
@@ -1213,8 +1245,8 @@ public class LSPIJUtils {
         boolean renameFirst = moving && renaming && atOldName != null && !atOldName.equals(existing);
         VirtualFile atNewName = resource.getParent().findChild(name);
         if (renameFirst && atNewName != null && !atNewName.equals(resource)) {
-            throw new IllegalArgumentException("Cannot rename " + oldUri + " to " + newUri
-                    + ": its name is taken in both directories");
+            return "Cannot rename " + oldUri + " to " + newUri
+                    + ": its name is taken in both directories";
         }
         try {
             if (existing != null) {
@@ -1230,8 +1262,9 @@ public class LSPIJUtils {
                 resource.rename(null, name);
             }
         } catch (IOException e) {
-            throw new IllegalStateException("Unable to rename " + oldUri + " to " + newUri, e);
+            return "Unable to rename " + oldUri + " to " + newUri + ": " + e.getMessage();
         }
+        return null;
     }
 
     /**
