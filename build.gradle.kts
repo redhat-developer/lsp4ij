@@ -269,6 +269,12 @@ tasks {
 
     }
 
+    publishPlugin {
+        // The IntelliJ Platform Gradle Plugin makes publishing run patchChangelog, which creates an empty CHANGELOG.md;
+        // change notes are maintained in plugin.xml
+        setDependsOn(dependsOn - "patchChangelog")
+    }
+
     jacocoTestReport {
         reports {
             xml.required = true
