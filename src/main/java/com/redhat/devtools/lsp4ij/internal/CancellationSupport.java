@@ -124,6 +124,14 @@ public class CancellationSupport implements CancelChecker {
                 // In this error case, the future will return null as response instead of throwing the ResponseErrorException error
                 // to avoid breaking the LSP request response of another language server (when file is associated to several language servers)
                 future = future.handle(handleLSPFeatureResult(languageServer, featureName, handleLanguageServerError));
+                // Navigation consumers resolve PSI synchronously. Fetch server-owned URIs
+                // before they enter read actions, without changing ordinary query results.
+                future = future.thenCompose(result -> languageServer.getClientFeatures()
+                        .prepareDocumentContent(result, languageServer.getServer()));
+                this.futuresToCancel.add(future);
+                if (cancelled) {
+                    CancellationSupport.cancel(future);
+                }
             }
         }
         return future;

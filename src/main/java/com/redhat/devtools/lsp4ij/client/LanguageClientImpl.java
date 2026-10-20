@@ -21,6 +21,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentProvider;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
@@ -54,6 +55,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     private @Nullable LanguageServer server;
     private @NotNull LanguageServerWrapper wrapper;
     private volatile boolean disposed;
+    private volatile DocumentContentProvider documentContentProvider;
 
     private Runnable didChangeConfigurationListener;
 
@@ -92,6 +94,13 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         this.server = server;
         this.diagnosticHandler = new LSPDiagnosticHandler(wrapper);
         this.progressManager.connect(server, wrapper);
+        this.documentContentProvider = new DocumentContentProvider(project, server, () -> {
+            var capabilities = wrapper.getServerCapabilitiesSync();
+            var workspace = capabilities != null ? capabilities.getWorkspace() : null;
+            var content = workspace != null ? workspace.getTextDocumentContent() : null;
+            return content != null ? content.getSchemes() : List.of();
+        });
+        getClientFeatures().installDocumentContentProvider(documentContentProvider);
     }
 
     protected final @Nullable LanguageServer getLanguageServer() {
@@ -115,7 +124,23 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<ShowDocumentResult> showDocument(ShowDocumentParams params) {
-        return ServerMessageHandler.showDocument(params, getClientFeatures(), getProject());
+        var provider = documentContentProvider;
+        if (isDisposed()) {
+            return CompletableFuture.completedFuture(new ShowDocumentResult(false));
+        }
+        if (provider == null || Boolean.TRUE.equals(params.getExternal()) || params.getUri() == null) {
+            return ServerMessageHandler.showDocument(params, getClientFeatures(), getProject());
+        }
+        return provider.resolve(params.getUri()).thenCompose(ignored -> isDisposed()
+                ? CompletableFuture.completedFuture(new ShowDocumentResult(false))
+                : ServerMessageHandler.showDocument(params, getClientFeatures(), getProject()));
+    }
+
+    @Override
+    public CompletableFuture<Void> refreshTextDocumentContent(TextDocumentContentRefreshParams params) {
+        var provider = documentContentProvider;
+        return isDisposed() || provider == null ? CompletableFuture.completedFuture(null)
+                : provider.refresh(params.getUri());
     }
 
     @Override
@@ -365,6 +390,10 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     @Override
     public void dispose() {
         this.disposed = true;
+        var provider = documentContentProvider;
+        if (provider != null) {
+            getClientFeatures().removeDocumentContentProvider(provider);
+        }
         this.progressManager.dispose();
         var globalSettings = GlobalLanguageServerSettings.getInstance();
         if (globalSettings != null) {

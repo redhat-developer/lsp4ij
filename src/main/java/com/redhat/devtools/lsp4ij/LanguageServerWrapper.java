@@ -1269,6 +1269,27 @@ public class LanguageServerWrapper implements Disposable {
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
                     }
+                } else if (LSPRequestConstants.WORKSPACE_TEXT_DOCUMENT_CONTENT.equals(reg.getMethod())) {
+                    // register 'workspace/textDocumentContent' capability
+                    try {
+                        TextDocumentContentRegistrationOptions options = JSONUtils.getLsp4jGson()
+                                .fromJson((JsonObject) reg.getRegisterOptions(),
+                                        TextDocumentContentRegistrationOptions.class);
+                        List<String> schemes = options.getSchemes();
+                        if (schemes != null && !schemes.isEmpty()) {
+                            synchronized (LanguageServerWrapper.this) {
+                                // The callback can run once its server has stopped, whose schemes must not
+                                // reach the capabilities of the next connection
+                                if (isDisposed() || registrationContext != currentInitializingContext) {
+                                    return;
+                                }
+                                addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
+                                registerDocumentContentSchemes(schemes);
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting 'workspace/textDocumentContent' capability", e);
+                    }
                 } else if (LSPRequestConstants.WORKSPACE_EXECUTE_COMMAND.equals(reg.getMethod())) {
                     // register 'workspace/executeCommand' capability
                     try {
@@ -1377,6 +1398,49 @@ public class LanguageServerWrapper implements Disposable {
                 existingCommands.removeAll(commands);
             }
         }
+    }
+
+    /**
+     * Adds the URI schemes of a dynamic 'workspace/textDocumentContent' registration to the server capabilities, which
+     * the document content provider reads them from.
+     */
+    synchronized void registerDocumentContentSchemes(@NotNull List<String> schemes) {
+        ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
+        if (serverCapabilities != null) {
+            WorkspaceServerCapabilities workspace = serverCapabilities.getWorkspace();
+            if (workspace == null) {
+                workspace = new WorkspaceServerCapabilities();
+                serverCapabilities.setWorkspace(workspace);
+            }
+            TextDocumentContentRegistrationOptions content = workspace.getTextDocumentContent();
+            if (content == null) {
+                content = new TextDocumentContentRegistrationOptions(new ArrayList<>());
+                workspace.setTextDocumentContent(content);
+            }
+            List<String> existingSchemes = new ArrayList<>(content.getSchemes() != null ? content.getSchemes() : List.of());
+            existingSchemes.addAll(schemes);
+            content.setSchemes(existingSchemes);
+        }
+    }
+
+    /**
+     * Removes the URI schemes of a dynamic 'workspace/textDocumentContent' registration, and retires the documents
+     * of the schemes the server no longer provides.
+     */
+    void unregisterDocumentContentSchemes(@NotNull List<String> schemes) {
+        synchronized (this) {
+            ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
+            WorkspaceServerCapabilities workspace = serverCapabilities != null ? serverCapabilities.getWorkspace() : null;
+            TextDocumentContentRegistrationOptions content = workspace != null ? workspace.getTextDocumentContent() : null;
+            if (content != null && content.getSchemes() != null) {
+                // Once per registered scheme: another registration can provide the same scheme
+                List<String> remainingSchemes = new ArrayList<>(content.getSchemes());
+                schemes.forEach(remainingSchemes::remove);
+                content.setSchemes(remainingSchemes);
+            }
+        }
+        // Outside this monitor: retiring reads the schemes, and closes editors later on the EDT
+        getClientFeatures().retireUnprovidedDocumentContent();
     }
 
     public boolean canOperate(@NotNull VirtualFile file) {
