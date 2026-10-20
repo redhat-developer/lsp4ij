@@ -19,6 +19,7 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
@@ -29,6 +30,7 @@ public class MockWorkspaceService implements WorkspaceService {
 	private Function<?, ?> _futureFactory;
 	private CompletableFuture<ExecuteCommandParams> executedCommand = new CompletableFuture<>();
 	private List<DidChangeWorkspaceFoldersParams> workspaceFoldersEvents = new ArrayList<>();
+	private final List<FileEvent> watchedFileEvents = new CopyOnWriteArrayList<>();
     private WorkspaceEdit willRename;
     private WorkspaceEdit willCreate;
     private WorkspaceEdit willDelete;
@@ -137,7 +139,15 @@ public class MockWorkspaceService implements WorkspaceService {
 
 	@Override
 	public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-		// No-op
+		watchedFileEvents.addAll(params.getChanges());
+		MockLanguageServer.INSTANCE.record("didChangeWatchedFiles");
+	}
+
+	/**
+	 * @return the file events of the workspace/didChangeWatchedFiles notifications this server received, in order
+	 */
+	public List<FileEvent> getWatchedFileEvents() {
+		return watchedFileEvents;
 	}
 
 	@Override

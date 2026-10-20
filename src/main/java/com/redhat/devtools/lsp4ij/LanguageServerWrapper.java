@@ -1218,10 +1218,25 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public void registerCapability(RegistrationParams params) {
-        if (initializeFuture == null) {
+        registerCapability(params, null);
+    }
+
+    /**
+     * Registers the capabilities that the server of the given client asks for, unless that client's connection has
+     * stopped.
+     *
+     * @param params the registrations
+     * @param client the client that received them, and null not to check which connection they come from
+     */
+    public void registerCapability(RegistrationParams params, @Nullable LanguageClientImpl client) {
+        var registrationContext = currentInitializingContext;
+        var initialization = initializeFuture;
+        if (initialization == null || registrationContext == null
+                || client != null && registrationContext.languageClient != client) {
+            // A registration from a connection that has stopped, as after a restart
             return;
         }
-        initializeFuture.thenRun(() -> {
+        initialization.thenRun(() -> {
             params.getRegistrations().forEach(reg -> {
                 if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWorkspaceFolders' capability
@@ -1243,8 +1258,14 @@ public class LanguageServerWrapper implements Disposable {
                         DidChangeWatchedFilesRegistrationOptions options = JSONUtils.getLsp4jGson()
                                 .fromJson((JsonObject) reg.getRegisterOptions(),
                                         DidChangeWatchedFilesRegistrationOptions.class);
-                        fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
-                        addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                        synchronized (LanguageServerWrapper.this) {
+                            // The callback can run once its server has stopped, and stop() has dropped its watchers
+                            if (isDisposed() || registrationContext != currentInitializingContext) {
+                                return;
+                            }
+                            fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
+                            addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                        }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
                     }
@@ -1854,6 +1875,8 @@ public class LanguageServerWrapper implements Disposable {
                 }
                 this.serverCapabilities = null;
                 this.dynamicRegistrations.clear();
+                // Dropping the registrations does not run their unregistration, so drop the watchers they added
+                fileListener.clearFileSystemWatchers();
                 if (clientFeatures != null) {
                     clientFeatures.getWorkspaceFolderFeature().reset();
                 }
@@ -1978,6 +2001,7 @@ public class LanguageServerWrapper implements Disposable {
             return;
         }
         this.disposed = true;
+        fileListener.disposeFileSystemWatchers();
         stopAndRefreshEditorFeature(refreshEditorFeature, false);
         stopDispatcher();
         if (clientFeatures != null) {

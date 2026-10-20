@@ -105,7 +105,8 @@ public class PathPatternMatcher {
             } else {
                 basePath = extractedPath;
             }
-            return new PathPatternMatcher(relativePattern, basePath);
+            // As the watched root, so that the paths under it match (e.g. "/a/b/../c/*.txt" matches "/a/c/x.txt")
+            return new PathPatternMatcher(relativePattern, basePath.normalize());
         } catch (Exception e) {
             // If path creation fails, return with original pattern and no base
             return new PathPatternMatcher(fullPattern, defaultBasePath);

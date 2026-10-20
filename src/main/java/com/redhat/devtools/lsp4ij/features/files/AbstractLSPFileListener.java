@@ -675,6 +675,21 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     }
 
     /**
+     * Unregisters all the file system watchers, as when the language server that registered them stops.
+     */
+    public void clearFileSystemWatchers() {
+        fileSystemWatcherManager.clear();
+    }
+
+    /**
+     * Unregisters all the file system watchers and releases the roots watched for them, when the language server
+     * wrapper is disposed.
+     */
+    public void disposeFileSystemWatchers() {
+        fileSystemWatcherManager.dispose();
+    }
+
+    /**
      * Creates a new {@link FileEvent} for the given URI and change type.
      */
     protected FileEvent fe(URI uri, FileChangeType type) {
