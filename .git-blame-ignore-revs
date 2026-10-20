@@ -1,0 +1,5 @@
+# Commits that only reformat, which `git blame --ignore-revs-file .git-blame-ignore-revs`, or
+# `git config blame.ignoreRevsFile .git-blame-ignore-revs`, and GitHub's blame view skip
+
+# chore: store text files with LF line endings, and keep them that way with a .gitattributes (#1745)
+e600c5b288da3f3996db91d6a11435eb139dd894
