@@ -12,11 +12,13 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiElement;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
@@ -156,6 +158,24 @@ public class DocumentContentNavigationTest extends LSPCodeInsightFixtureTestCase
         PlatformTestUtil.waitWithEventsDispatching("the content of an unregistered scheme must close",
                 () -> !manager.isFileOpen(file) && !file.isValid(), 10);
         assertEquals("after the unregistration the scheme is not provided", 0, definitionTargets().length);
+    }
+
+    public void testASchemeRegisteredByAStoppedConnectionIsNotProvided() throws Exception {
+        serverProvidesContentWithoutCapability();
+        var wrapper = open();
+        var stoppedClient = MockLanguageServerDefinition.getLastLanguageClient();
+        assertNotNull(stoppedClient);
+        wrapper.restart();
+        LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(myFixture.getFile(), null, null).get(30, TimeUnit.SECONDS);
+
+        // the registration of the stopped server reaches its client only now, as JSON-RPC delivers it
+        var options = new TextDocumentContentRegistrationOptions(List.of("lsp-source"));
+        await(stoppedClient.registerCapability(new RegistrationParams(List.of(new Registration("late",
+                "workspace/textDocumentContent", JSONUtils.getLsp4jGson().toJsonTree(options))))));
+
+        assertEquals("the restarted server does not provide the stopped server's scheme", 0, definitionTargets().length);
+        assertFalse(MockLanguageServer.INSTANCE.getNotifications().contains("textDocumentContent"));
     }
 
     public void testAnotherSchemeIsNotRequested() throws Exception {

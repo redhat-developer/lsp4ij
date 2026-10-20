@@ -1277,8 +1277,15 @@ public class LanguageServerWrapper implements Disposable {
                                         TextDocumentContentRegistrationOptions.class);
                         List<String> schemes = options.getSchemes();
                         if (schemes != null && !schemes.isEmpty()) {
-                            addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
-                            registerDocumentContentSchemes(schemes);
+                            synchronized (LanguageServerWrapper.this) {
+                                // The callback can run once its server has stopped, whose schemes must not
+                                // reach the capabilities of the next connection
+                                if (isDisposed() || registrationContext != currentInitializingContext) {
+                                    return;
+                                }
+                                addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
+                                registerDocumentContentSchemes(schemes);
+                            }
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/textDocumentContent' capability", e);
