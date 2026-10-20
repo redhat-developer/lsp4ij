@@ -98,10 +98,6 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
     private final StoredProperty<String> installerConfiguration = string("")
             .provideDelegate(this, "installerConfiguration");
 
-    // Breakpoints
-    private final StoredProperty<Boolean> forwardNativeLineBreakpoints = property(true)
-            .provideDelegate(this, "forwardNativeLineBreakpoints");
-
     // Configuration settings
 
     @Override
@@ -318,19 +314,6 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
 
     public void setInstallerConfiguration(String installerConfiguration) {
         this.installerConfiguration.setValue(this, installerConfiguration);
-    }
-
-    /**
-     * Whether a language's native line breakpoints on DAP-mapped files are forwarded to the debug
-     * adapter while this session runs (see {@code DAPForwardedLineBreakpointHandler}). Enabled by
-     * default; disable it to keep native breakpoints purely native (they will not be forwarded).
-     */
-    public boolean isForwardNativeLineBreakpoints() {
-        return forwardNativeLineBreakpoints.getValue(this);
-    }
-
-    public void setForwardNativeLineBreakpoints(boolean forwardNativeLineBreakpoints) {
-        this.forwardNativeLineBreakpoints.setValue(this, forwardNativeLineBreakpoints);
     }
 
     public @Nullable NetworkAddressExtractor getNetworkAddressExtractor() {

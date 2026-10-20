@@ -66,6 +66,14 @@ public class DAPAttachRunConfiguration<T extends DAPAttachRunConfigurationOption
         getOptions().setAttachPort(attachPort);
     }
 
+    public boolean isForwardNativeLineBreakpoints() {
+        return getOptions().isForwardNativeLineBreakpoints();
+    }
+
+    public void setForwardNativeLineBreakpoints(boolean forwardNativeLineBreakpoints) {
+        getOptions().setForwardNativeLineBreakpoints(forwardNativeLineBreakpoints);
+    }
+
     @Override
     protected @NotNull T getOptions() {
         return (T) super.getOptions();

@@ -20,6 +20,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.redhat.devtools.lsp4ij.dap.DAPServerReadyTracker;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
+import com.redhat.devtools.lsp4ij.dap.configurations.options.ForwardNativeLineBreakpointsConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.ServerTraceConfigurable;
 import com.redhat.devtools.lsp4ij.dap.console.DAPTextConsoleBuilderImpl;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
@@ -135,8 +136,8 @@ public class DAPCommandLineState extends CommandLineState implements CommandLine
      * Defaults to {@code true} when the option is not available.
      */
     public boolean isForwardNativeLineBreakpoints() {
-        if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            return dapOptions.isForwardNativeLineBreakpoints();
+        if (options instanceof ForwardNativeLineBreakpointsConfigurable configurable) {
+            return configurable.isForwardNativeLineBreakpoints();
         }
         return true;
     }
