@@ -147,7 +147,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     @ApiStatus.Internal
     public void invalidateWorkspaceDiagnosticCache(@NotNull URI fileUri) {
         if (!isDisposed() && workspaceDiagnostics != null) {
-            workspaceDiagnostics.invalidate(uri -> {
+            workspaceDiagnostics.invalidate(fileUri, uri -> {
                 var features = getClientFeatures();
                 if (Objects.equals(uri, FileUriSupport.toString(fileUri, features))) {
                     return true;

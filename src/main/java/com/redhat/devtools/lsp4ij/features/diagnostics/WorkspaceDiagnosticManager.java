@@ -17,6 +17,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
@@ -131,11 +132,13 @@ public final class WorkspaceDiagnosticManager implements Disposable {
      * Unaffected in-flight work continues, but reports for the replaced cache
      * are excluded for the remainder of that request, including queued reports.
      * Other files' result IDs and providers with unaffected caches are retained.
+     * Repeated invalidations of the same cache replace its pending filter.
      *
+     * @param cacheKey     the stable document-cache URI used by the wrapper
      * @param matchesCache identifies report URIs belonging to the replaced cache;
      *                     evaluated on the manager's executor, never the caller's thread
      */
-    public void invalidate(Predicate<String> matchesCache) {
+    public void invalidate(URI cacheKey, Predicate<String> matchesCache) {
         execute(() -> {
             for (var provider : providers.values()) {
                 boolean cacheInvalidated = provider.resultIds.keySet().removeIf(matchesCache);
@@ -145,7 +148,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                 } else if (provider.token != null) {
                     // A pending request may still return reports for this cache.
                     // Filter them without restarting unrelated long-running pulls.
-                    provider.invalidatedCaches.add(matchesCache);
+                    provider.invalidatedCaches.put(cacheKey, matchesCache);
                 }
             }
         });
@@ -379,7 +382,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         final String identifier;
         final Map<String, String> resultIds = new HashMap<>();
         final Deque<WorkspaceDocumentDiagnosticReport> pendingReports = new ArrayDeque<>();
-        final List<Predicate<String>> invalidatedCaches = new ArrayList<>();
+        final Map<URI, Predicate<String>> invalidatedCaches = new HashMap<>();
         String token;
         String matchingUri;
         boolean responseComplete;
@@ -392,7 +395,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         }
 
         boolean isInvalidated(String uri) {
-            return invalidatedCaches.stream().anyMatch(predicate -> predicate.test(uri));
+            return invalidatedCaches.values().stream().anyMatch(predicate -> predicate.test(uri));
         }
     }
 }

@@ -17,8 +17,10 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 import org.junit.After;
 import org.junit.Test;
 
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 
@@ -104,7 +106,7 @@ public class WorkspaceDiagnosticManagerTest {
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
 
-        h.manager.invalidate("file:///lost.lua"::equals);
+        h.manager.invalidate(URI.create("file:///lost.lua"), "file:///lost.lua"::equals);
         var replacement = h.next();
         assertEquals(first.params.getIdentifier(), replacement.params.getIdentifier());
         assertFalse(other.future.cancelRequested);
@@ -134,7 +136,7 @@ public class WorkspaceDiagnosticManagerTest {
         h.manager.updateProviders(Set.of("lua"));
         var first = h.next();
         for (int i = 0; i < 3; i++) {
-            h.manager.invalidate("file:///lost.lua"::equals);
+            h.manager.invalidate(URI.create("file:///lost.lua"), "file:///lost.lua"::equals);
         }
         h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
         assertFalse(first.future.cancelRequested);
@@ -151,6 +153,44 @@ public class WorkspaceDiagnosticManagerTest {
         // Invalidation belongs to the old request, not subsequent pulls.
         second.future.complete(full("file:///lost.lua", "fresh"));
         assertEquals("fresh", h.applied.poll(5, TimeUnit.SECONDS).getLeft().getResultId());
+    }
+
+    @Test
+    public void repeatedCacheInvalidationsReplaceSupersededFilters() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        var supersededChecks = new AtomicInteger();
+        var currentChecks = new AtomicInteger();
+        // Reopening the same file must not accumulate URI lookups while a
+        // server keeps one workspace request open and streams partial reports.
+        for (int i = 0; i < 20; i++) {
+            h.manager.invalidate(URI.create("file:///lost.lua"), uri -> {
+                supersededChecks.incrementAndGet();
+                return uri.equals("file:///lost.lua");
+            });
+        }
+        h.manager.invalidate(URI.create("file:///lost.lua"), uri -> {
+            currentChecks.incrementAndGet();
+            return uri.equals("file:///lost.lua");
+        });
+        h.manager.invalidate(URI.create("file:///other.lua"), "file:///other.lua"::equals);
+        h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        supersededChecks.set(0);
+        currentChecks.set(0);
+
+        h.partial(first, full("file:///lost.lua", "stale"));
+        h.partial(first, full("file:///other.lua", "also-stale"));
+        h.partial(first, full("file:///retained.lua", "retained"));
+        first.future.complete(new WorkspaceDiagnosticReport(List.of()));
+        var second = h.next();
+        assertFalse(first.future.cancelRequested);
+        assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
+                second.params.getPreviousResultIds());
+        assertEquals("retained", h.applied.remove().getLeft().getResultId());
+        assertTrue(h.applied.isEmpty());
+        assertEquals("Superseded filters must not resolve subsequent report URIs", 0, supersededChecks.get());
+        assertTrue("The current filter must still reject reports for its cache", currentChecks.get() > 0);
     }
 
     @Test
@@ -173,7 +213,7 @@ public class WorkspaceDiagnosticManagerTest {
         started.get(5, TimeUnit.SECONDS);
         h.partial(first, full("file:///lost.lua", "queued-partial"));
         first.future.complete(full("file:///lost.lua", "queued-final"));
-        h.manager.invalidate("file:///lost.lua"::equals);
+        h.manager.invalidate(URI.create("file:///lost.lua"), "file:///lost.lua"::equals);
         h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
         assertFalse(pending.cancelRequested);
         assertTrue(h.requests.isEmpty());
@@ -195,7 +235,7 @@ public class WorkspaceDiagnosticManagerTest {
         h.manager.updateProviders(Collections.singleton(null));
         h.next().future.complete(full("file:///a.lua", "stale"));
         started.get(5, TimeUnit.SECONDS);
-        h.manager.invalidate("file:///a.lua"::equals);
+        h.manager.invalidate(URI.create("file:///a.lua"), "file:///a.lua"::equals);
         var replacement = h.next();
         assertTrue(pending.cancelRequested);
         assertTrue(replacement.params.getPreviousResultIds().isEmpty());
@@ -219,7 +259,7 @@ public class WorkspaceDiagnosticManagerTest {
         h.partial(first, full("file:///retained.lua", "retained"));
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
         first.future.completeExceptionally(cancelled(new DiagnosticServerCancellationData(false)));
-        h.manager.invalidate("file:///lost.lua"::equals);
+        h.manager.invalidate(URI.create("file:///lost.lua"), "file:///lost.lua"::equals);
         h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
         assertTrue(h.requests.isEmpty());
         h.manager.refresh();
@@ -240,7 +280,7 @@ public class WorkspaceDiagnosticManagerTest {
         second.future.complete(new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
                 new WorkspaceUnchangedDocumentDiagnosticReport("old", "file:///a.lua", null)))));
         started.get(5, TimeUnit.SECONDS);
-        h.manager.invalidate("file:///a.lua"::equals);
+        h.manager.invalidate(URI.create("file:///a.lua"), "file:///a.lua"::equals);
         var replacement = h.next();
         assertTrue(replacement.params.getPreviousResultIds().isEmpty());
         assertTrue(pending.cancelRequested);
@@ -254,7 +294,7 @@ public class WorkspaceDiagnosticManagerTest {
     @Test
     public void cacheInvalidationDuringPublicationDropsNewlyRetainedId() throws Exception {
         var h = harness();
-        h.beforeApply = () -> h.manager.invalidate("file:///a.lua"::equals);
+        h.beforeApply = () -> h.manager.invalidate(URI.create("file:///a.lua"), "file:///a.lua"::equals);
         h.manager.updateProviders(Set.of("lua"));
         h.next().future.complete(full("file:///a.lua", "old"));
         assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
