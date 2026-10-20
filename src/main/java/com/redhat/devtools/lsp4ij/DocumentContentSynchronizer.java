@@ -121,11 +121,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         if (didOpenFuture != null) {
             return didOpenFuture;
         }
-        var didOpen = getDidOpenFutureSync();
-        // Changes made since a captured text was read wait for the didOpen; send them after it.
-        // This runs outside the monitor, since sending them may wait for read access.
-        sendDidChangeEvents();
-        return didOpen;
+        return getDidOpenFutureSync();
     }
 
     private synchronized @NotNull CompletableFuture<LanguageServer> getDidOpenFutureSync() {
@@ -185,6 +181,13 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             });
         }
         didOpenFuture = didOpen
+                // Changes made since a captured text was read wait for the didOpen; send them after it,
+                // before the requests that wait for the open. Sending them may wait for read access, so
+                // it runs on a pooled thread: a caller can hold the wrapper's documentsLock, which a
+                // write action can be waiting for.
+                .thenCompose(ls -> CompletableFuture.supplyAsync(this::sendDidChangeEvents)
+                        .thenCompose(sent -> sent)
+                        .thenApply(sent -> ls))
                 .thenCompose(ls ->
                         CompletableFuture.supplyAsync(() -> {
                             if (!ApplicationManager.getApplication().isUnitTestMode()) {
