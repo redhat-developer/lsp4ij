@@ -219,7 +219,7 @@ public class FileSystemWatchRootsTest extends BasePlatformTestCase {
 
     private void assertEvent(Path path, Class<? extends VFileEvent> type) {
         assertTrue("Expected " + type.getSimpleName() + " for " + path + "; got " + events,
-                events.stream().anyMatch(event -> type.isInstance(event) && path.toString().equals(event.getPath())));
+                events.stream().anyMatch(event -> type.isInstance(event) && path.equals(Path.of(event.getPath()))));
     }
 
     private static FileSystemWatcher relative(Path path, String pattern) {
