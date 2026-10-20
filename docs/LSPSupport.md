@@ -93,6 +93,8 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
  * ✅ [workspace/didRenameFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles).
  * ✅ [workspace/willDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles).
  * ✅ [workspace/didDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles).
+ * ✅ [workspace/textDocumentContent](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContent) (LSP 3.18, see [implementation details](#text-document-content))
+ * ✅ [workspace/textDocumentContent/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContentRefresh) (LSP 3.18, see [implementation details](#text-document-content))
  * ❌ [workspace/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic).
  
 ## Window Features
@@ -817,3 +819,22 @@ After setting the cursor position in a file, you can view the Type Hierarchy usi
 Here is an example with the [MicroProfile language server](https://github.com/eclipse/lsp4mp/tree/master/microprofile.ls) collecting JAX-RS endpoints:
 
 ![workspace/symbol](./images/lsp-support/workspace_symbol.gif)
+
+### Text Document Content
+
+[workspace/textDocumentContent](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContent)
+lets a language server provide documents that are not files on disk, such as library sources, decompiled classes or
+generated code, under the URI schemes it lists in its `workspace.textDocumentContent` capability. Dynamic registration
+is not supported, so the server lists the schemes in its capabilities.
+
+ * When a navigation result points to a URI with one of those schemes, its text is fetched with
+   `workspace/textDocumentContent` before IntelliJ navigates there, and it opens in a read-only editor. The results
+   that can point there are locations, such as a definition or a reference, workspace symbols, call and type hierarchy
+   items, and document links. `file` URIs are never fetched.
+ * [window/showDocument](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument)
+   opens such a URI the same way.
+ * The document keeps the server's URI. It is opened on the server with `textDocument/didOpen` under that URI, so the
+   language features work in its editor.
+ * On [workspace/textDocumentContent/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContentRefresh),
+   the text is fetched again and the open editor shows it, without the document becoming modified.
+ * The documents are closed when the language server stops. A request for their text times out after 10 seconds.
