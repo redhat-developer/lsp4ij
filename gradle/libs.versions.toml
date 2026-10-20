@@ -9,7 +9,7 @@ testlogger = "4.0.0"
 # plugin runs against the Kotlin stdlib bundled with the IDE (kotlin.stdlib.default.dependency=false), which is
 # 1.9.24 in IntelliJ 2024.2 (pluginSinceBuild=242). Moving past 2.3.x means raising pluginSinceBuild.
 kotlin = "2.3.21"
-changelog = "2.2.1"
+changelog = "2.5.0"
 gradleIntelliJPlugin = "2.19.0"
 kover = "0.9.11"
 
