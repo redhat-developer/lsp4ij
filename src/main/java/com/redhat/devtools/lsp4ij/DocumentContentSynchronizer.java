@@ -27,6 +27,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -86,6 +87,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private final Disposable diagnosticLifetime;
     private final Alarm debouncePullDiagnosticsAlarm;
     private boolean diagnosticNotPulledOnDidOpen;
+    // The result ID of the last pulled report applied to this document, sent as the next pull's
+    // previousResultId. Guarded by diagnosticLifetime.
+    private @Nullable String pullResultId;
 
     /**
      * Compatibility constructor for callers without a stamp for the supplied text.
@@ -575,6 +579,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         DocumentDiagnosticParams params = new DocumentDiagnosticParams();
         params.setIdentifier(getPullIdentifier());
         params.setTextDocument(new TextDocumentIdentifier(fileUri));
+        synchronized (diagnosticLifetime) {
+            // The server answers with an unchanged report when the result it gave is still accurate
+            params.setPreviousResultId(pullResultId);
+        }
         ls.getTextDocumentService()
                 .diagnostic(params)
                 .thenAcceptAsync(diagnosticReport -> {
@@ -592,9 +600,11 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                             // Update the diagnostics cache from the opened file
                             updatePullDiagnostics(file, fileReport);
                             updateRelatedPullDiagnostics(fileReport.getRelatedDocuments(), clientFeatures);
+                            pullResultId = fileReport.getResultId();
                         } else if (diagnosticReport.isRight()) {
                             // The opened file's diagnostics are unchanged, but those of related documents can change.
                             updateRelatedPullDiagnostics(diagnosticReport.getRight().getRelatedDocuments(), clientFeatures);
+                            pullResultId = diagnosticReport.getRight().getResultId();
                         }
                     }
                 });
@@ -634,6 +644,16 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             identifier = LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
         }
         languageServerWrapper.updateDiagnostics(file, identifier, diagnostics, null);
+    }
+
+    /**
+     * @return the result ID that the next pull sends as its previousResultId
+     */
+    @TestOnly
+    @Nullable String getPullResultId() {
+        synchronized (diagnosticLifetime) {
+            return pullResultId;
+        }
     }
 
     @Nullable

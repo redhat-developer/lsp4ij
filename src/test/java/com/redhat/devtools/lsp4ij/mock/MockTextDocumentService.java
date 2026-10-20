@@ -28,6 +28,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
@@ -62,6 +63,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private DocumentDiagnosticReport pullDiagnostics;
     private List<Either<Command, CodeAction>> mockCodeActions;
     private CodeAction mockResolvedCodeAction;
+    private final List<DocumentDiagnosticParams> diagnosticRequests = new CopyOnWriteArrayList<>();
     private List<ColorInformation> mockDocumentColors;
     private Function<PrepareRenameParams, Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>> prepareRenameProcessor;
     private Function<RenameParams, WorkspaceEdit> renameProcessor;
@@ -360,6 +362,7 @@ public class MockTextDocumentService implements TextDocumentService {
         this.remoteProxies = new ArrayList<>();
         this.mockCodeActions = new ArrayList<>();
         this.mockResolvedCodeAction = new CodeAction();
+        this.diagnosticRequests.clear();
         this.renameProcessor = null;
         this.prepareRenameProcessor = null;
         this.documentSymbols = Collections.emptyList();
@@ -375,6 +378,13 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void setPublishDiagnostics(List<Diagnostic> publishDiagnostics) {
         this.publishDiagnostics = publishDiagnostics;
+    }
+
+    /**
+     * @return the textDocument/diagnostic requests received since the last reset, in order
+     */
+    public List<DocumentDiagnosticParams> getDiagnosticRequests() {
+        return diagnosticRequests;
     }
 
     public void setPullDiagnostics(DocumentDiagnosticReport pullDiagnostics) {
@@ -469,6 +479,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<DocumentDiagnosticReport> diagnostic(DocumentDiagnosticParams params) {
+        diagnosticRequests.add(params);
         return CompletableFuture.completedFuture(this.pullDiagnostics);
     }
 
