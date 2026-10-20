@@ -52,8 +52,9 @@ public class ClientCapabilitiesFactory {
         // Support for 'workspace/configuration'
         workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
 
-        // LSP 3.18 server-owned virtual documents; registrations are static for this connection.
-        workspaceClientCapabilities.setTextDocumentContent(new TextDocumentContentCapabilities(Boolean.FALSE));
+        // Support for 'workspace/textDocumentContent' (LSP 3.18): documents the server provides under its own URI
+        // schemes, which it can also register dynamically
+        workspaceClientCapabilities.setTextDocumentContent(new TextDocumentContentCapabilities(Boolean.TRUE));
 
         // Support for 'workspace/symbol'
         var symbolCapabilities = new SymbolCapabilities();

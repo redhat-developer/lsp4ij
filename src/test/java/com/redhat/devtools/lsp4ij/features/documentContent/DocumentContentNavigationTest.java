@@ -21,9 +21,13 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.Registration;
+import org.eclipse.lsp4j.RegistrationParams;
 import org.eclipse.lsp4j.ShowDocumentParams;
 import org.eclipse.lsp4j.TextDocumentContentRefreshParams;
 import org.eclipse.lsp4j.TextDocumentContentRegistrationOptions;
+import org.eclipse.lsp4j.Unregistration;
+import org.eclipse.lsp4j.UnregistrationParams;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.services.LanguageClient;
 
@@ -131,6 +135,29 @@ public class DocumentContentNavigationTest extends LSPCodeInsightFixtureTestCase
                 () -> !manager.isFileOpen(file) && !file.isValid(), 10);
     }
 
+    public void testASchemeRegisteredDynamicallyIsProvidedUntilItIsUnregistered() throws Exception {
+        serverProvidesContentWithoutCapability();
+        open();
+
+        await(client().registerCapability(new RegistrationParams(List.of(new Registration("content",
+                "workspace/textDocumentContent", new TextDocumentContentRegistrationOptions(List.of("lsp-source")))))));
+
+        var targets = definitionTargets();
+        assertEquals(1, targets.length);
+        var file = targets[0].getContainingFile().getVirtualFile();
+        assertInstanceOf(file, DocumentContentFile.class);
+        ((Navigatable) targets[0]).navigate(true);
+        var manager = FileEditorManager.getInstance(myFixture.getProject());
+        PlatformTestUtil.waitWithEventsDispatching("the target must open", () -> manager.isFileOpen(file), 10);
+
+        await(client().unregisterCapability(new UnregistrationParams(List.of(
+                new Unregistration("content", "workspace/textDocumentContent")))));
+
+        PlatformTestUtil.waitWithEventsDispatching("the content of an unregistered scheme must close",
+                () -> !manager.isFileOpen(file) && !file.isValid(), 10);
+        assertEquals("after the unregistration the scheme is not provided", 0, definitionTargets().length);
+    }
+
     public void testAnotherSchemeIsNotRequested() throws Exception {
         serverServes("other");
         open();
@@ -149,6 +176,18 @@ public class DocumentContentNavigationTest extends LSPCodeInsightFixtureTestCase
         });
         MockLanguageServer.INSTANCE.getWorkspaceService().setDocumentContent(LIBRARY, LIBRARY_TEXT);
         MockLanguageServer.INSTANCE.setDefinition(List.of(new Location(LIBRARY, LIBRARY_NAME)));
+    }
+
+    /** The server has the document and points to it, but does not list its scheme in its capabilities. */
+    private static void serverProvidesContentWithoutCapability() {
+        MockLanguageServer.reset();
+        MockLanguageServer.INSTANCE.getWorkspaceService().setDocumentContent(LIBRARY, LIBRARY_TEXT);
+        MockLanguageServer.INSTANCE.setDefinition(List.of(new Location(LIBRARY, LIBRARY_NAME)));
+    }
+
+    private static void await(CompletableFuture<?> future) throws Exception {
+        PlatformTestUtil.waitWithEventsDispatching("the client must answer", future::isDone, 10);
+        future.get();
     }
 
     private LanguageServerWrapper open() throws Exception {

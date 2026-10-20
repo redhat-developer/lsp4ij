@@ -114,14 +114,36 @@ public final class DocumentContentProvider implements Disposable {
     private @Nullable URI acceptedUri(String value) {
         try {
             var uri = URI.create(value);
-            var scheme = uri.getScheme();
-            var supported = schemes.get();
-            // Disk resources remain owned by IntelliJ's local filesystem.
-            return scheme != null && !"file".equalsIgnoreCase(scheme) && supported != null
-                    && supported.stream().anyMatch(scheme::equalsIgnoreCase) ? uri : null;
+            return provides(uri.getScheme(), schemes.get()) ? uri : null;
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    private static boolean provides(@Nullable String scheme, @Nullable List<String> supported) {
+        // Disk resources remain owned by IntelliJ's local filesystem.
+        return scheme != null && !"file".equalsIgnoreCase(scheme) && supported != null
+                && supported.stream().anyMatch(scheme::equalsIgnoreCase);
+    }
+
+    /**
+     * Retires the documents whose URI scheme the server no longer provides, as after it unregisters the scheme:
+     * lookups stop finding them, and their editors close.
+     */
+    public void retireUnprovided() {
+        var supported = schemes.get();
+        List<Entry> retired;
+        synchronized (this) {
+            if (disposed) {
+                return;
+            }
+            retired = entries.values().stream()
+                    .filter(entry -> !provides(entry.uri.getScheme(), supported))
+                    .toList();
+            retired.forEach(entry -> entries.remove(entry.uri.toString()));
+        }
+        retired.forEach(entry -> entry.available.complete(null));
+        retire(retired);
     }
 
     private CompletableFuture<Void> fetch(Entry entry) {
@@ -254,6 +276,13 @@ public final class DocumentContentProvider implements Disposable {
             completion.complete(null);
         });
         retired.forEach(entry -> entry.available.complete(null));
+        retire(retired);
+    }
+
+    private void retire(List<Entry> retired) {
+        if (retired.isEmpty()) {
+            return;
+        }
         // Lookup ownership is already retired. Close editors and invalidate under the same
         // write action, so no background PSI reader can observe an invalid file still in use.
         // Like the reload, it waits for a modal dialog to close.

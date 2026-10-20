@@ -264,6 +264,14 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         provider.dispose();
     }
 
+    /** Retires the server-provided documents whose URI scheme the server no longer provides. */
+    public void retireUnprovidedDocumentContent() {
+        var provider = documentContentProvider.get();
+        if (provider != null) {
+            provider.retireUnprovided();
+        }
+    }
+
     public <T> CompletableFuture<T> prepareDocumentContent(T result, @NotNull LanguageServer server) {
         var provider = documentContentProvider.get();
         return provider != null && provider.owns(server)

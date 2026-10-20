@@ -824,8 +824,8 @@ Here is an example with the [MicroProfile language server](https://github.com/ec
 
 [workspace/textDocumentContent](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContent)
 lets a language server provide documents that are not files on disk, such as library sources, decompiled classes or
-generated code, under the URI schemes it lists in its `workspace.textDocumentContent` capability. Dynamic registration
-is not supported, so the server lists the schemes in its capabilities.
+generated code, under the URI schemes it lists in its `workspace.textDocumentContent` capability, or registers
+dynamically with `client/registerCapability`.
 
  * When a navigation result points to a URI with one of those schemes, its text is fetched with
    `workspace/textDocumentContent` before IntelliJ navigates there, and it opens in a read-only editor. The results
@@ -837,4 +837,5 @@ is not supported, so the server lists the schemes in its capabilities.
    language features work in its editor.
  * On [workspace/textDocumentContent/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContentRefresh),
    the text is fetched again and the open editor shows it, without the document becoming modified.
- * The documents are closed when the language server stops. A request for their text times out after 10 seconds.
+ * The documents are closed when the language server stops, or when it unregisters their scheme. A request for their
+   text times out after 10 seconds.

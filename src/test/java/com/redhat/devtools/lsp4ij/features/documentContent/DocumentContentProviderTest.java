@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 /** Virtual navigation content belongs to its connection and latest refresh. */
@@ -302,10 +303,34 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
                 () -> FileEditorManager.getInstance(getProject()).isFileOpen(file), 5);
     }
 
-    public void testCapabilitiesAdvertiseStaticDocumentContentOnly() {
+    public void testCapabilitiesAdvertiseDocumentContentWithDynamicRegistration() {
         var capability = ClientCapabilitiesFactory.create(null).getWorkspace().getTextDocumentContent();
         assertNotNull(capability);
-        assertEquals(Boolean.FALSE, capability.getDynamicRegistration());
+        assertEquals(Boolean.TRUE, capability.getDynamicRegistration());
+    }
+
+    public void testDocumentsOfASchemeTheServerNoLongerProvidesAreRetired() {
+        var owner = new ContentServer();
+        var schemes = new CopyOnWriteArrayList<>(List.of("lsp-source", "other"));
+        var dynamic = new DocumentContentProvider(getProject(), owner, () -> schemes);
+        Disposer.register(getTestRootDisposable(), dynamic);
+        var retiredRead = dynamic.resolve(URI_TEXT);
+        owner.reply(0, "retired");
+        var retired = retiredRead.join();
+        var keptRead = dynamic.resolve("other:///kept.txt");
+        owner.reply(1, "kept");
+        var kept = keptRead.join();
+
+        // as when the server unregisters the scheme
+        schemes.remove("lsp-source");
+        dynamic.retireUnprovided();
+
+        assertNull(dynamic.findFile(URI_TEXT));
+        assertSame(kept, dynamic.findFile("other:///kept.txt"));
+        PlatformTestUtil.waitWithEventsDispatching("the retired document becomes invalid", () -> !retired.isValid(), 5);
+        assertTrue(kept.isValid());
+        assertNull("a scheme no longer provided is not fetched", dynamic.resolve(URI_TEXT).join());
+        assertEquals(2, owner.pending.size());
     }
 
     private VirtualFile loaded(String text) {
