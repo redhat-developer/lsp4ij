@@ -18,8 +18,8 @@ Current state of [Text Document Synchronization](https://microsoft.github.io/lan
  * ✅ [textDocument/didChange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didChange).
  * ✅ [textDocument/didClose](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didClose).
  * ✅ [textDocument/didSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didSave).
- * ❌ [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave).
- * ❌ [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil).
+ * ✅ [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave) (see [implementation details](#will-save))
+ * ✅ [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil) (see [implementation details](#will-save))
  
 Notebooks are not supported.
  
@@ -114,6 +114,23 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
 Here a sample with [Eclipse JDT Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls):
 
 ![$/progress](./images/lsp-support/progress.png)
+
+### Will Save
+
+When a document is saved, [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave)
+and [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil)
+are sent before it is written, to each language server that has the document open and asks for them
+(`willSave` and `willSaveWaitUntil` in its `TextDocumentSyncOptions`):
+
+ * The changes not yet sent to the server are sent first, so that it has the text that is saved.
+ * The reason of `willSave` is always `Manual`, since IntelliJ does not say why a document is saved.
+ * The save waits for the edits of `willSaveWaitUntil` for at most 1.5 seconds. The documents saved together, as by
+   `Save All` or on switching to another application, share that time: a document that finds it used up still gets
+   `willSave`, but not `willSaveWaitUntil`.
+ * The edits that arrive in time are applied to the document, in a command of their own so that `Undo` reverts them
+   alone, and are saved with it. The server receives their `didChange` before the `didSave`.
+ * The edits that arrive later are dropped, as LSP allows. After three such timeouts, `willSaveWaitUntil` is no longer
+   sent for that document.
 
 ### Go to Definition
 
