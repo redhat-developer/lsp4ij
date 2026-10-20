@@ -178,6 +178,7 @@ public class ClientCapabilitiesFactory {
         ParameterInformationCapabilities parameterInformationCapabilities = new ParameterInformationCapabilities();
         parameterInformationCapabilities.setLabelOffsetSupport(Boolean.TRUE);
         signatureInformationCapabilities.setParameterInformation(parameterInformationCapabilities);
+        signatureInformationCapabilities.setActiveParameterSupport(Boolean.TRUE);
         signatureHelpCapabilities.setSignatureInformation(signatureInformationCapabilities);
         textDocumentClientCapabilities.setSignatureHelp(signatureHelpCapabilities);
 
