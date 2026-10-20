@@ -24,6 +24,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -97,6 +98,16 @@ public final class LSPDiagnosticsApplier implements Disposable {
                     }
                 })
                 .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    /**
+     * @return true if a refresh requested before {@link #GROUP_ID} was set waits for it
+     */
+    @TestOnly
+    boolean hasPendingRefreshes() {
+        synchronized (pendingRefreshes) {
+            return !pendingRefreshes.isEmpty();
+        }
     }
 
     /**

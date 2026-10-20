@@ -47,13 +47,12 @@ public class LSPDiagnosticsApplierTest extends LSPCodeInsightFixtureTestCase {
             MockLanguageServer.INSTANCE.setPublishDiagnostics(List.of(
                     new Diagnostic(new Range(new Position(0, 0), new Position(0, 6)), "published early")));
             var file = myFixture.configureByText("test.foo", "before");
-            var wrapper = LanguageServiceAccessor.getInstance(myFixture.getProject())
-                    .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS).get(0).getServerWrapper();
-            var uri = wrapper.toUri(file.getVirtualFile());
-            PlatformTestUtil.waitWithEventsDispatching("diagnostics must be published", () -> {
-                var opened = wrapper.getOpenedDocument(uri);
-                return opened != null && !opened.getDiagnostics().isEmpty();
-            }, 30);
+            LanguageServiceAccessor.getInstance(myFixture.getProject())
+                    .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
+            // The document stores the diagnostics before it requests their refresh, so wait for the
+            // refresh itself: one requested after the pass registers is applied as any other
+            var applier = LSPDiagnosticsApplier.getInstance(myFixture.getProject());
+            PlatformTestUtil.waitWithEventsDispatching("the refresh must wait for the pass", applier::hasPendingRefreshes, 30);
             NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
             assertEmpty(shownDiagnostics());
 
@@ -67,10 +66,9 @@ public class LSPDiagnosticsApplierTest extends LSPCodeInsightFixtureTestCase {
                     return groupId;
                 }
             }, myFixture.getProject());
-            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
-            PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
-
-            assertEquals(List.of("published early"), shownDiagnostics());
+            // the refresh collects in the background and applies on the UI thread
+            PlatformTestUtil.waitWithEventsDispatching("the diagnostics published early must be shown",
+                    () -> List.of("published early").equals(shownDiagnostics()), 30);
         } finally {
             LSPDiagnosticsApplier.GROUP_ID = groupId;
         }
