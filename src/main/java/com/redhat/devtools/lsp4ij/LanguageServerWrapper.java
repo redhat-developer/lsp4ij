@@ -1147,8 +1147,11 @@ public class LanguageServerWrapper implements Disposable {
             // The language server cannot be started, return a null language server
             return CompletableFuture.completedFuture(null);
         }
-        if (initializeFuture != null && !this.initializeFuture.isDone()) {
-            return initializeFuture.thenApply(r -> this.languageServer);
+        var initialized = initializeFuture;
+        if (initialized != null) {
+            // Also once it is done: a failed initialization then reaches the caller, instead of a
+            // server that never initialized
+            return initialized.thenApply(r -> this.languageServer);
         }
         return CompletableFuture.completedFuture(this.languageServer);
     }
