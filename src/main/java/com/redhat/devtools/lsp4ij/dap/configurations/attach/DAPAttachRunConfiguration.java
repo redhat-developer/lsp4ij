@@ -23,6 +23,12 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * DAP run configuration for "attach" mode.
+ * <p>
+ * This class is not used internally by LSP4IJ: LSP4IJ does not register an "attach" run
+ * configuration type itself. It is a base class that external plugins can extend to provide their own
+ * DAP "attach" run configuration, for example
+ * <a href="https://github.com/redhat-developer/intellij-quarkus/blob/main/src/main/java/com/redhat/devtools/intellij/qute/run/QuteRunConfiguration.java">QuteRunConfiguration</a>
+ * in intellij-quarkus.
  */
 public class DAPAttachRunConfiguration<T extends DAPAttachRunConfigurationOptions> extends DAPRunConfigurationBase<T> implements AttachConfigurable {
 
@@ -64,6 +70,14 @@ public class DAPAttachRunConfiguration<T extends DAPAttachRunConfigurationOption
     @Override
     public void setAttachPort(@Nullable String attachPort) {
         getOptions().setAttachPort(attachPort);
+    }
+
+    public boolean isForwardNativeLineBreakpoints() {
+        return getOptions().isForwardNativeLineBreakpoints();
+    }
+
+    public void setForwardNativeLineBreakpoints(boolean forwardNativeLineBreakpoints) {
+        getOptions().setForwardNativeLineBreakpoints(forwardNativeLineBreakpoints);
     }
 
     @Override

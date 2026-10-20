@@ -90,6 +90,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         // Configuration settings
         dapPanel.setWorkingDirectory(runConfiguration.getWorkingDirectory());
         dapPanel.setFile(runConfiguration.getFile());
+        dapPanel.setForwardNativeLineBreakpoints(runConfiguration.isForwardNativeLineBreakpoints());
         dapPanel.setAttachAddress(runConfiguration.getAttachAddress());
         dapPanel.setAttachPort(runConfiguration.getAttachPort());
         dapPanel.setDebugMode(runConfiguration.getDebugMode());
@@ -130,6 +131,7 @@ public class DAPSettingsEditor extends SettingsEditor<DAPRunConfiguration> {
         // Configuration settings
         runConfiguration.setWorkingDirectory(dapPanel.getWorkingDirectory());
         runConfiguration.setFile(dapPanel.getFile());
+        runConfiguration.setForwardNativeLineBreakpoints(dapPanel.isForwardNativeLineBreakpoints());
         runConfiguration.setDebugMode(dapPanel.getDebugMode());
         runConfiguration.setLaunchConfigurationId(dapPanel.getLaunchConfigurationId());
         runConfiguration.setLaunchConfiguration(dapPanel.getLaunchConfiguration());

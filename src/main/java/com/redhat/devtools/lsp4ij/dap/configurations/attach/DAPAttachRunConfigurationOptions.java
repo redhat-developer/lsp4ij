@@ -17,6 +17,13 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * DAP run configuration options for "attach" mode.
+ * <p>
+ * LSP4IJ does not register this attach type itself; it is a base class for downstream plugins that
+ * provide their own DAP "attach" run configuration (for example {@code QuteRunConfiguration} in
+ * intellij-quarkus). The {@code forwardNativeLineBreakpoints} option is inherited from
+ * {@link DAPRunConfigurationOptionsBase} (via {@code ForwardNativeLineBreakpointsConfigurable}), so
+ * attach-based configurations support breakpoint forwarding too, and
+ * {@link com.redhat.devtools.lsp4ij.dap.configurations.attach.DAPAttachSettingsEditor} exposes it.
  */
 public class DAPAttachRunConfigurationOptions extends DAPRunConfigurationOptionsBase implements AttachConfigurable {
 

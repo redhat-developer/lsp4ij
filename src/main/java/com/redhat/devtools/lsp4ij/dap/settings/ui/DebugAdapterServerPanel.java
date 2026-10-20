@@ -21,6 +21,7 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.IdeBorderFactory;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
@@ -92,6 +93,8 @@ public class DebugAdapterServerPanel implements Disposable {
     // for launch
     private TextFieldWithBrowseButton workingDirectoryField;
     private TextFieldWithBrowseButton fileField;
+    private JRadioButton forwardNativeBreakpointsRadio;
+    private JRadioButton dontForwardNativeBreakpointsRadio;
     private ComboBox<LaunchConfiguration> launchCombo;
     private SchemaBackedJsonTextField launchConfigurationField;
     // for attach
@@ -312,6 +315,25 @@ public class DebugAdapterServerPanel implements Disposable {
 
     private void addMappingsTab(JBTabbedPane tabbedPane, EditionMode mode) {
         FormBuilder mappingsTab = addTab(tabbedPane, DAPBundle.message("dap.settings.editor.mappings.tab"));
+
+        // A distinct, titled "Breakpoints" section (its own box) placed above the mappings table, so
+        // it reads as a separate concern rather than as the purpose of the file mappings below. While
+        // a DAP session runs, native line breakpoints in the mapped files are forwarded — or kept
+        // native, in which case only DAP breakpoints stop.
+        forwardNativeBreakpointsRadio = new JRadioButton(DAPBundle.message("dap.settings.editor.mappings.breakpoints.forward"));
+        dontForwardNativeBreakpointsRadio = new JRadioButton(DAPBundle.message("dap.settings.editor.mappings.breakpoints.none"));
+        ButtonGroup breakpointsGroup = new ButtonGroup();
+        breakpointsGroup.add(forwardNativeBreakpointsRadio);
+        breakpointsGroup.add(dontForwardNativeBreakpointsRadio);
+        forwardNativeBreakpointsRadio.setSelected(true);
+
+        JPanel breakpointsPanel = new JPanel();
+        breakpointsPanel.setLayout(new BoxLayout(breakpointsPanel, BoxLayout.Y_AXIS));
+        breakpointsPanel.setBorder(IdeBorderFactory.createTitledBorder(DAPBundle.message("dap.settings.editor.mappings.breakpoints.title")));
+        breakpointsPanel.add(forwardNativeBreakpointsRadio);
+        breakpointsPanel.add(dontForwardNativeBreakpointsRadio);
+        mappingsTab.addComponent(breakpointsPanel);
+
         this.mappingsPanel = new DAPServerMappingsPanel(mappingsTab, mode != EditionMode.EDIT_EXTENSION);
     }
 
@@ -676,6 +698,18 @@ public class DebugAdapterServerPanel implements Disposable {
 
     public void setFile(String file) {
         this.fileField.setText(getText(file));
+    }
+
+    public boolean isForwardNativeLineBreakpoints() {
+        return forwardNativeBreakpointsRadio.isSelected();
+    }
+
+    public void setForwardNativeLineBreakpoints(boolean forwardNativeLineBreakpoints) {
+        if (forwardNativeLineBreakpoints) {
+            forwardNativeBreakpointsRadio.setSelected(true);
+        } else {
+            dontForwardNativeBreakpointsRadio.setSelected(true);
+        }
     }
 
     public String getAttachAddress() {

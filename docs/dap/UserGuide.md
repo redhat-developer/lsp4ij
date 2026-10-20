@@ -30,6 +30,10 @@ The `Mappings` tab to specify the files which can be debugged to allow adding/re
 
 ![DAP Configuration Type/Mappings](./images/DAP_config_type_mappings.png)
 
+This tab also hosts a **Breakpoints in mapped files** option that controls whether a language's native line
+breakpoints in mapped files are forwarded to the DAP server — see
+[Forwarding native line breakpoints](#forwarding-native-line-breakpoints).
+
 ### Configuration tab
 
 The `Configuration` tab to specify the working directory and the file you want to run/debug:
@@ -43,6 +47,47 @@ The `Configuration` tab to specify the working directory and the file you want t
 When a file can be debugged using a DAP server specified in the [Mappings tab](#mappings-tab), a breakpoint can be added.
 
 ![DAP Breakpoint set](./images/DAP_breakpoint_set.png)
+
+### Forwarding native line breakpoints
+
+For a mapped file, LSP4IJ contributes its own **DAP Breakpoint** type. However, when the file's
+language already has its own debugger (for example the bundled JavaScript or Python debugger), the
+IDE may instead create that debugger's **native line breakpoint** in the gutter — not a
+`DAP Breakpoint`. Such a native breakpoint would otherwise never be sent to the DAP server, so it
+looks like "breakpoints don't work" even though the mapping and connection are correct.
+
+To avoid this, LSP4IJ forwards native line breakpoints on mapped files to the DAP server while a DAP
+session is running. This is controlled per run configuration in the [Mappings tab](#mappings-tab):
+
+![Breakpoints option](./images/DAP_breakpoints_option.png)
+
+- **Forward native line breakpoints to the DAP server** *(default)* — native line breakpoints set in
+  mapped files are forwarded to the DAP server, so they stop like a `DAP Breakpoint` without you having
+  to disable the language's own debugger.
+- **Use only DAP breakpoints (native ones are ignored)** — nothing is forwarded; only breakpoints of
+  the `DAP Breakpoint` type stop. If your breakpoints are not hit with this option, make sure you are
+  using the `DAP Breakpoint` type.
+
+Forwarding only applies while a DAP session for that configuration is running; the language's own
+debugger is unaffected outside a DAP session.
+
+#### Setting a DAP breakpoint explicitly
+
+If forwarding is off — or you prefer to set `DAP Breakpoint`s explicitly — and the file's language
+already has its own line-breakpoint type, IntelliJ needs two steps to place a `DAP Breakpoint` on a
+line that can also hold the native one:
+
+1. Click the line-number gutter to add the language's native line breakpoint (the example below is a
+   Python file):
+
+   ![Set a DAP breakpoint — step 1](./images/python-debugpy/set_breakpoint_step_1.png)
+
+2. Click the faded red dot next to the code on the same line to add a **DAP Breakpoint**:
+
+   ![Set a DAP breakpoint — step 2](./images/python-debugpy/set_breakpoint_step_2.png)
+
+If you only do step 1, the native breakpoint is not sent to the DAP server (when forwarding is off)
+and will not be hit — you must also complete step 2.
 
 ### Verify breakpoint
 

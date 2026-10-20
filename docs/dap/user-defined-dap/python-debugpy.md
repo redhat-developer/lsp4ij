@@ -104,10 +104,33 @@ in the IntelliJ console. Read [Python debugging in VS Code](https://code.visuals
 
 ## Set Breakpoint
 
-After applying the run configuration, you should set a breakpoint to files which matches file mappings.
-Set a breakpoint in the `test.py` file:
+After applying the run configuration, set a breakpoint in a file that matches the file mappings — for
+example in `test.py`.
 
-![Set Breakpoint](../images/python-debugpy/set_breakpoint.png)
+Because PyCharm provides its own **Python Line Breakpoint** type, clicking the gutter creates that
+native breakpoint rather than LSP4IJ's `DAP Breakpoint`:
+
+![Set Breakpoint Step 1](../images/python-debugpy/set_breakpoint_step_1.png)
+
+### Forwarded breakpoints (recommended)
+
+By default, LSP4IJ forwards native line breakpoints on mapped files to the DAP server while debugging,
+so the Python breakpoint above is hit as-is — **no extra step needed**. This is the
+**Breakpoints in mapped files** option in the `Mappings` tab (enabled by default); see
+[Forwarding native line breakpoints](../UserGuide.md#forwarding-native-line-breakpoints).
+
+![Breakpoints option](../images/python-debugpy/breakpoints_option.png)
+
+### Setting a DAP breakpoint manually
+
+If you turn forwarding off (the second option above) — or prefer to set an explicit `DAP Breakpoint` —
+a second step is needed, because the gutter click only created the native Python breakpoint. Click the
+faded red dot next to the code on the same line to add a **DAP Breakpoint**:
+
+![Set Breakpoint Step 2](../images/python-debugpy/set_breakpoint_step_2.png)
+
+Setting only the Python breakpoint (step 1) is then not enough — the breakpoint will not be hit unless
+it is forwarded or you also create the `DAP Breakpoint`.
 
 ## Start Python program in a Terminal
 

@@ -19,6 +19,7 @@ import com.intellij.openapi.ui.ComponentValidator;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.DocumentAdapter;
+import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -40,6 +41,9 @@ public class DAPAttachSettingsEditor<Settings extends DAPAttachRunConfiguration<
     private final ComboBox<ServerTrace> serverTraceComboBox;
     private final JTextField myAddress = new JTextField();
     private final JTextField myPort = new JTextField(Integer.toString(65535));
+    // Breakpoints: whether native line breakpoints on mapped files are forwarded to the DAP server
+    private final JRadioButton forwardNativeBreakpointsRadio = new JRadioButton(DAPBundle.message("dap.settings.editor.mappings.breakpoints.forward"));
+    private final JRadioButton dontForwardNativeBreakpointsRadio = new JRadioButton(DAPBundle.message("dap.settings.editor.mappings.breakpoints.none"));
 
     public DAPAttachSettingsEditor(@NotNull Project project) {
         this.myPort.setMinimumSize(this.myPort.getPreferredSize());
@@ -70,6 +74,17 @@ public class DAPAttachSettingsEditor<Settings extends DAPAttachRunConfiguration<
         serverTraceComboBox = new ComboBox<>(new DefaultComboBoxModel<>(ServerTrace.values()));
         builder.addLabeledComponent(DAPBundle.message("dap.settings.editor.server.serverTrace.field"), serverTraceComboBox);
 
+        ButtonGroup breakpointsGroup = new ButtonGroup();
+        breakpointsGroup.add(forwardNativeBreakpointsRadio);
+        breakpointsGroup.add(dontForwardNativeBreakpointsRadio);
+        forwardNativeBreakpointsRadio.setSelected(true);
+        JPanel breakpointsPanel = new JPanel();
+        breakpointsPanel.setLayout(new BoxLayout(breakpointsPanel, BoxLayout.Y_AXIS));
+        breakpointsPanel.setBorder(IdeBorderFactory.createTitledBorder(DAPBundle.message("dap.settings.editor.mappings.breakpoints.title")));
+        breakpointsPanel.add(forwardNativeBreakpointsRadio);
+        breakpointsPanel.add(dontForwardNativeBreakpointsRadio);
+        builder.addComponent(breakpointsPanel);
+
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(builder.getPanel(), BorderLayout.CENTER);
         root = panel;
@@ -81,6 +96,11 @@ public class DAPAttachSettingsEditor<Settings extends DAPAttachRunConfiguration<
         myAddress.setText(settings.getAttachAddress());
         myPort.setText(settings.getAttachPort());
         serverTraceComboBox.setSelectedItem(settings.getServerTrace());
+        if (settings.isForwardNativeLineBreakpoints()) {
+            forwardNativeBreakpointsRadio.setSelected(true);
+        } else {
+            dontForwardNativeBreakpointsRadio.setSelected(true);
+        }
     }
 
     @Override
@@ -88,6 +108,7 @@ public class DAPAttachSettingsEditor<Settings extends DAPAttachRunConfiguration<
         settings.setAttachAddress(myAddress.getText());
         settings.setAttachPort(myPort.getText());
         settings.setServerTrace((ServerTrace) serverTraceComboBox.getSelectedItem());
+        settings.setForwardNativeLineBreakpoints(forwardNativeBreakpointsRadio.isSelected());
     }
 
     @Override
