@@ -75,4 +75,23 @@ public class DiagnosticUpdateHookTest extends UsefulTestCase {
         wrapper.updateDiagnostics(file,"pull",List.of(),null);
         assertTrue(reports.get(reports.size()-1).isEmpty());
     }
+
+    public void testProviderRemovalNotifiesOpenCacheWithoutChangingMappingLossCleanup() {
+        var file = myFixture.configureByText("open.lua", "value").getVirtualFile();
+        var removed = warning("workspace");
+        var retained = warning("other provider");
+        wrapper.updateDiagnostics(file, LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER, List.of(removed), null);
+        wrapper.updateDiagnostics(file, "other", List.of(retained), null);
+
+        int reportCount = reports.size();
+        wrapper.clearClosedDocumentDiagnostics(null, LSPIJUtils.toUri(file).toString());
+        assertEquals(reportCount, reports.size());
+        assertEquals(2, wrapper.getOpenedDocument(LSPIJUtils.toUri(file)).getDiagnostics().size());
+
+        wrapper.clearDocumentDiagnostics(null);
+        assertEquals(List.of(retained), reports.get(reports.size() - 1));
+        wrapper.clearDocumentDiagnostics("other");
+        assertTrue(reports.get(reports.size() - 1).isEmpty());
+        assertNull(wrapper.getClosedDocument(LSPIJUtils.toUri(file), false));
+    }
 }
