@@ -115,8 +115,8 @@ native breakpoint rather than LSP4IJ's `DAP Breakpoint`:
 ### Forwarded breakpoints (recommended)
 
 By default, LSP4IJ forwards native line breakpoints on mapped files to the DAP server while debugging,
-so the Python breakpoint above is hit as-is — **no extra step needed**. This is the **Breakpoints**
-option in the `Mappings` tab (enabled by default); see
+so the Python breakpoint above is hit as-is — **no extra step needed**. This is the
+**Breakpoints in mapped files** option in the `Mappings` tab (enabled by default); see
 [Forwarding native line breakpoints](../UserGuide.md#forwarding-native-line-breakpoints).
 
 ![Breakpoints option](../images/python-debugpy/breakpoints_option.png)

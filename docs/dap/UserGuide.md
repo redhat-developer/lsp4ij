@@ -30,7 +30,7 @@ The `Mappings` tab to specify the files which can be debugged to allow adding/re
 
 ![DAP Configuration Type/Mappings](./images/DAP_config_type_mappings.png)
 
-This tab also hosts a **Breakpoints** option that controls whether a language's native line
+This tab also hosts a **Breakpoints in mapped files** option that controls whether a language's native line
 breakpoints in mapped files are forwarded to the DAP server — see
 [Forwarding native line breakpoints](#forwarding-native-line-breakpoints).
 
@@ -61,12 +61,12 @@ session is running. This is controlled per run configuration in the [Mappings ta
 
 ![Breakpoints option](./images/DAP_breakpoints_option.png)
 
-- **Treat line breakpoints in mapped files as DAP breakpoints (while debugging)** *(default)* — native
-  line breakpoints set in mapped files are forwarded to the DAP server, so they stop like a
-  `DAP Breakpoint` without you having to disable the language's own debugger.
-- **Only DAP breakpoints stop — other line breakpoints in mapped files are ignored** — nothing is
-  forwarded; only breakpoints of the `DAP Breakpoint` type stop. If your breakpoints are not hit with
-  this option, make sure you are using the `DAP Breakpoint` type.
+- **Forward native line breakpoints to the DAP server** *(default)* — native line breakpoints set in
+  mapped files are forwarded to the DAP server, so they stop like a `DAP Breakpoint` without you having
+  to disable the language's own debugger.
+- **Use only DAP breakpoints (native ones are ignored)** — nothing is forwarded; only breakpoints of
+  the `DAP Breakpoint` type stop. If your breakpoints are not hit with this option, make sure you are
+  using the `DAP Breakpoint` type.
 
 Forwarding only applies while a DAP session for that configuration is running; the language's own
 debugger is unaffected outside a DAP session.
