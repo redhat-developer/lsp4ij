@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
@@ -28,6 +29,8 @@ import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,7 +38,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
@@ -51,7 +56,12 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         ON_WORKSPACE_REFRESH
     }
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(DocumentContentSynchronizer.class);
+
     private static final long WAIT_AFTER_SENDING_DID_OPEN = 500L;
+
+    // After this many textDocument/willSaveWaitUntil timeouts, the request is no longer sent for the document
+    private static final int WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS = 3;
 
     private final @NotNull LanguageServerWrapper languageServerWrapper;
     private final @NotNull Document document;
@@ -90,6 +100,8 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     // The result ID of the last pulled report applied to this document, sent as the next pull's
     // previousResultId. Guarded by diagnosticLifetime.
     private @Nullable String pullResultId;
+    // The textDocument/willSaveWaitUntil requests that took too long. Saves run on the UI thread.
+    private int willSaveWaitUntilTimeouts;
 
     /**
      * Compatibility constructor for callers without a stamp for the supplied text.
@@ -426,6 +438,77 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             }
         }
         return null;
+    }
+
+    /**
+     * Sends {@code textDocument/willSave} and {@code textDocument/willSaveWaitUntil}, as the server asks for them,
+     * before the document is saved. The edits that willSaveWaitUntil returns by the deadline are applied to the
+     * document, so that they are saved with it. LSP allows dropping the edits of a request that takes too long: after
+     * {@value #WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS} timeouts, the request is no longer sent for this document.
+     * <p>
+     * Called in the write action of the save, on the UI thread, which waits for the server at most until the deadline.
+     * Once it has passed, willSaveWaitUntil is not sent.
+     *
+     * @param deadlineNanos the {@link System#nanoTime()} until which the save may wait for the edits, shared by the
+     *                      documents saved together
+     */
+    void documentWillSave(long deadlineNanos) {
+        boolean willSave = Boolean.TRUE.equals(syncOptions.getWillSave());
+        boolean willSaveWaitUntil = Boolean.TRUE.equals(syncOptions.getWillSaveWaitUntil())
+                && willSaveWaitUntilTimeouts < WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS;
+        if (!willSave && !willSaveWaitUntil) {
+            return;
+        }
+        synchronized (changeEvents) {
+            if (closed || syncOptions.getOpenClose() && !opened) {
+                // The server has no document to save
+                return;
+            }
+        }
+        // The server must have the text that is saved
+        sendDidChangeEvents();
+        // IntelliJ does not say why a document is saved
+        var params = new WillSaveTextDocumentParams(new TextDocumentIdentifier(fileUri), TextDocumentSaveReason.Manual);
+        if (willSave) {
+            languageServerWrapper.sendNotification(ls -> {
+                ls.getTextDocumentService().willSave(params);
+                return ls;
+            });
+        }
+        if (!willSaveWaitUntil || deadlineNanos - System.nanoTime() <= 0) {
+            // A save after the documents saved before it in the same batch have used up the budget waits no more
+            return;
+        }
+        // Sent from the dispatcher once the notifications before it are, so that the server has the text and the willSave
+        CompletableFuture<List<TextEdit>> request = languageServerWrapper.sendNotification(ls -> ls)
+                .thenCompose(ls -> ls != null
+                        ? ls.getTextDocumentService().willSaveWaitUntil(params)
+                        : CompletableFuture.completedFuture(null));
+        List<TextEdit> edits;
+        try {
+            edits = request.get(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException e) {
+            request.cancel(true);
+            willSaveWaitUntilTimeouts++;
+            LOGGER.warn("textDocument/willSaveWaitUntil for '{}' took too long, so its edits are dropped{}", fileUri,
+                    willSaveWaitUntilTimeouts < WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS ? "" : ", and it is no longer sent for this document");
+            return;
+        } catch (ExecutionException | CancellationException e) {
+            LOGGER.warn("textDocument/willSaveWaitUntil for '{}' failed", fileUri, e);
+            return;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        if (edits == null || edits.isEmpty()) {
+            return;
+        }
+        // A command of its own, so that Undo reverts the server's edits alone
+        CommandProcessor.getInstance().executeCommand(languageServerWrapper.getProject(),
+                () -> LSPIJUtils.applyEdits(null, document, edits),
+                LanguageServerBundle.message("lsp.will.save.wait.until.command"), null);
+        // Sent before the didSave of this save
+        sendDidChangeEvents();
     }
 
     public void documentSaved() {
