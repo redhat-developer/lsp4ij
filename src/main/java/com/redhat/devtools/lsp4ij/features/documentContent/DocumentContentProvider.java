@@ -209,6 +209,8 @@ public final class DocumentContentProvider implements Disposable {
             completed.complete(null);
             return;
         }
+        // The reload changes the document, which needs a write-safe modality: with a modal dialog
+        // open, it waits for the dialog to close.
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
                 WriteAction.run(() -> {
@@ -230,7 +232,7 @@ public final class DocumentContentProvider implements Disposable {
                 failed(entry, generation, e);
                 completed.completeExceptionally(e);
             }
-        }, ModalityState.any());
+        }, ModalityState.nonModal());
     }
 
     @Override
@@ -254,6 +256,7 @@ public final class DocumentContentProvider implements Disposable {
         retired.forEach(entry -> entry.available.complete(null));
         // Lookup ownership is already retired. Close editors and invalidate under the same
         // write action, so no background PSI reader can observe an invalid file still in use.
+        // Like the reload, it waits for a modal dialog to close.
         ApplicationManager.getApplication().invokeLater(() -> WriteAction.run(() -> {
             for (var entry : retired) {
                 if (entry.file != null) {
@@ -263,6 +266,6 @@ public final class DocumentContentProvider implements Disposable {
                     entry.file.setValid(false);
                 }
             }
-        }), ModalityState.any());
+        }), ModalityState.nonModal());
     }
 }

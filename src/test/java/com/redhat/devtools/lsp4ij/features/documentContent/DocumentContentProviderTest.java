@@ -7,6 +7,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentContent;
 
+import com.intellij.openapi.application.impl.LaterInvocator;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.util.Disposer;
@@ -153,6 +154,26 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
         assertEquals("new\ncontent", document.getText());
         assertFalse(document.isWritable());
         assertFalse(manager.isDocumentUnsaved(document));
+    }
+
+    public void testRefreshWaitsForAModalDialogToCloseBeforeItChangesTheDocument() {
+        var file = loaded("before");
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        assertNotNull(document);
+        var dialog = new Object();
+        LaterInvocator.enterModal(dialog);
+        CompletableFuture<Void> refreshed;
+        try {
+            refreshed = provider.refresh(URI_TEXT);
+            server.reply(1, "after");
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+            assertFalse("a write action must not run under a modal dialog", refreshed.isDone());
+            assertEquals("before", document.getText());
+        } finally {
+            LaterInvocator.leaveModal(dialog);
+        }
+        await(refreshed);
+        assertEquals("after", document.getText());
     }
 
     public void testOutOfOrderRefreshCannotReplaceNewerContent() {
