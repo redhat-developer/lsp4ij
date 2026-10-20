@@ -169,6 +169,22 @@ public class FileSystemWatchRootsTest extends BasePlatformTestCase {
         assertEvent(source, VFileCreateEvent.class);
     }
 
+    public void testARefreshAfterAChangeDoesNotJoinAPassThatStartedBeforeIt() throws Exception {
+        Path watched = Files.createDirectories(directory.resolve("external"));
+        roots.replace(Set.of(new FileSystemWatchRoots.Root(watched, true)));
+        refresh();
+        var running = roots.refresh();
+        Path source = watched.resolve("data.txt");
+        Files.writeString(source, "created");
+
+        var afterChange = roots.refresh();
+
+        assertNotSame("The running pass may have listed the directory before the change", running, afterChange);
+        PlatformTestUtil.waitWithEventsDispatching("refresh after the change", afterChange::isDone, 10);
+        afterChange.join();
+        assertEvent(source, VFileCreateEvent.class);
+    }
+
     public void testSymlinkRootIsNotTraversedOrWatched() throws Exception {
         Path target = Files.createDirectories(directory.resolve("target"));
         Path link = Files.createSymbolicLink(directory.resolve("link"), target);

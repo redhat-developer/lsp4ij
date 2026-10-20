@@ -54,6 +54,8 @@ final class FileSystemWatchRoots implements Disposable {
     private Set<LocalFileSystem.WatchRequest> requests = Set.of();
     private ScheduledFuture<?> timer;
     private CompletableFuture<Void> refresh = CompletableFuture.completedFuture(null);
+    // The full pass that follows the running one, for the refreshes asked for while it runs
+    private CompletableFuture<Void> queuedRefresh;
     private boolean refreshingFully;
     private int passes;
     private boolean disposed;
@@ -88,17 +90,10 @@ final class FileSystemWatchRoots implements Disposable {
         synchronized (this) {
             fully = passes++ % FULL_REFRESH_EVERY == 0;
         }
-        return refresh(fully);
+        return periodicRefresh(fully);
     }
 
-    /**
-     * Lists every directory of the roots and marks them dirty, so that the VFS reports every change under them.
-     */
-    synchronized CompletableFuture<Void> refresh() {
-        return refresh(true);
-    }
-
-    private synchronized CompletableFuture<Void> refresh(boolean fully) {
+    private synchronized CompletableFuture<Void> periodicRefresh(boolean fully) {
         if (disposed || roots.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
@@ -108,8 +103,36 @@ final class FileSystemWatchRoots implements Disposable {
             }
             // Wait for the old pass, then refresh the new registration generation, or fully.
             // Joining only the old future would acknowledge roots it never loaded.
-            return refresh.handle((ignored, error) -> null).thenCompose(ignored -> refresh(fully));
+            return refresh.handle((ignored, error) -> null).thenCompose(ignored -> periodicRefresh(fully));
         }
+        return startRefresh(fully);
+    }
+
+    /**
+     * Lists every directory of the roots and marks them dirty, so that the VFS reports every change under them,
+     * including the changes made before this call.
+     */
+    synchronized CompletableFuture<Void> refresh() {
+        if (disposed || roots.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        if (refresh.isDone()) {
+            return startRefresh(true);
+        }
+        // The running pass may have listed a directory before the caller changed it, or may be loading roots that
+        // have been replaced since. A full pass follows it, shared by the callers until it starts.
+        if (queuedRefresh == null) {
+            queuedRefresh = refresh.handle((ignored, error) -> null).thenCompose(ignored -> startQueuedRefresh());
+        }
+        return queuedRefresh;
+    }
+
+    private synchronized CompletableFuture<Void> startQueuedRefresh() {
+        queuedRefresh = null;
+        return refresh();
+    }
+
+    private synchronized CompletableFuture<Void> startRefresh(boolean fully) {
         Set<Root> snapshot = roots;
         refreshingRoots = snapshot;
         refreshingFully = fully;
