@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 /**
@@ -54,6 +55,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private CompletableFuture<DidSaveTextDocumentParams> didSaveCallback;
     private CompletableFuture<DidCloseTextDocumentParams> didCloseCallback;
     private List<TextEdit> mockWillSaveWaitUntilTextEdits;
+    private volatile long willSaveWaitUntilDelayMs;
     private ConcurrentLinkedQueue<DidChangeTextDocumentParams> didChangeEvents = new ConcurrentLinkedQueue<>();
 
     private Function<?, ? extends CompletableFuture<?>> _futureFactory;
@@ -273,6 +275,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public void didSave(DidSaveTextDocumentParams params) {
+        MockLanguageServer.INSTANCE.record("didSave");
         if (didSaveCallback != null) {
             didSaveCallback.complete(params);
             didSaveCallback = null;
@@ -280,11 +283,23 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     @Override
+    public void willSave(WillSaveTextDocumentParams params) {
+        MockLanguageServer.INSTANCE.record("willSave:" + params.getReason());
+    }
+
+    @Override
     public CompletableFuture<List<TextEdit>> willSaveWaitUntil(WillSaveTextDocumentParams params) {
-        if (mockWillSaveWaitUntilTextEdits != null) {
-            return CompletableFuture.completedFuture(mockWillSaveWaitUntilTextEdits);
+        MockLanguageServer.INSTANCE.record("willSaveWaitUntil");
+        List<TextEdit> edits = mockWillSaveWaitUntilTextEdits != null ? mockWillSaveWaitUntilTextEdits : List.of();
+        long delay = willSaveWaitUntilDelayMs;
+        if (delay <= 0) {
+            return CompletableFuture.completedFuture(edits);
         }
-        return null;
+        return CompletableFuture.supplyAsync(() -> edits, CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS));
+    }
+
+    public void setWillSaveWaitUntilDelayMs(long delayMs) {
+        this.willSaveWaitUntilDelayMs = delayMs;
     }
 
     @Override
