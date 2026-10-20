@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
@@ -138,8 +139,11 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
     }
 
     @Override
-    public void updateUI(SignatureInformation signatureInformation, @NotNull ParameterInfoUIContext context) {
-        int currentParameter = context.getCurrentParameterIndex();
+    public void updateUI(SignatureInformation shownSignature, @NotNull ParameterInfoUIContext context) {
+        SignatureInformation signatureInformation = getCurrentSignature(shownSignature, context);
+        // LSP: a signature's own active parameter, if provided, is used in place of the signature help's
+        Integer activeParameter = signatureInformation.getActiveParameter();
+        int currentParameter = activeParameter != null ? activeParameter : context.getCurrentParameterIndex();
         List<ParameterInformation> parameters = signatureInformation.getParameters();
         int numParams = parameters != null ? parameters.size() : 0;
         if (currentParameter < 0 || currentParameter >= numParams) {
@@ -204,6 +208,33 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
                     context.getDefaultParameterColor()
             );
         }
+    }
+
+    /**
+     * Returns the overload as the latest signature help describes it. The popup keeps the signatures of
+     * the reply that opened it, while each later reply is stored in the parameter owner; the overload is
+     * the one there with the same label. Without exactly one, the shown signature is returned.
+     */
+    private static @NotNull SignatureInformation getCurrentSignature(@NotNull SignatureInformation shown,
+                                                                     @NotNull ParameterInfoUIContext context) {
+        if (!(context.getParameterOwner() instanceof LSPSignatureHelperPsiElement owner)) {
+            return shown;
+        }
+        SignatureHelp signatureHelp = owner.getActiveSignatureHelp();
+        List<SignatureInformation> signatures = signatureHelp != null ? signatureHelp.getSignatures() : null;
+        if (signatures == null) {
+            return shown;
+        }
+        SignatureInformation current = null;
+        for (SignatureInformation signature : signatures) {
+            if (Objects.equals(signature.getLabel(), shown.getLabel())) {
+                if (current != null) {
+                    return shown;
+                }
+                current = signature;
+            }
+        }
+        return current != null ? current : shown;
     }
 
     private static @Nullable String getParameterName(SignatureInformation signatureInformation, int index) {

@@ -9,9 +9,12 @@ package com.redhat.devtools.lsp4ij.features.signatureHelp;
 
 import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.lang.parameterInfo.ParameterInfoUIContext;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.redhat.devtools.lsp4ij.internal.capabilities.ClientCapabilitiesFactory;
 import org.eclipse.lsp4j.ParameterInformation;
+import org.eclipse.lsp4j.SignatureHelp;
 import org.eclipse.lsp4j.SignatureInformation;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Tuple;
@@ -86,6 +89,42 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
         assertEquals("<b>first</b>", render(signature(), 5, true).text);
     }
 
+    public void testTheClientAdvertisesASignaturesOwnActiveParameter() {
+        assertEquals(Boolean.TRUE, ClientCapabilitiesFactory.create(null).getTextDocument()
+                .getSignatureHelp().getSignatureInformation().getActiveParameterSupport());
+    }
+
+    public void testASignaturesOwnActiveParameterIsHighlighted() {
+        var signature = signature();
+        signature.setActiveParameter(1);
+        // LSP: if provided, it is used in place of the signature help's active parameter
+        assertEquals(" second", render(signature, 0, false).highlight());
+    }
+
+    public void testTheLatestSignatureHelpDescribesTheShownOverload() {
+        // The popup keeps the signatures of the reply that opened it; a retrigger's reply describes them now
+        var retriggered = new SignatureInformation("read(first, second)");
+        retriggered.setParameters(List.of(new ParameterInformation("first: Int"), new ParameterInformation("second: String")));
+        retriggered.setActiveParameter(1);
+        var ui = render(signature(), 0, false, owner(new SignatureHelp(List.of(retriggered), 0, 0)));
+        assertEquals(" first: Int,  second: String", ui.text);
+        assertEquals(" second: String", ui.highlight());
+    }
+
+    public void testWithoutAnOverloadOfTheSameLabelTheShownSignatureIsRendered() {
+        var other = new SignatureInformation("write(value)");
+        other.setParameters(List.of(new ParameterInformation("value")));
+        var ui = render(signature(), 1, false, owner(new SignatureHelp(List.of(other), 0, 0)));
+        assertEquals(" first,  second", ui.text);
+        assertEquals(" second", ui.highlight());
+    }
+
+    private LSPSignatureHelperPsiElement owner(SignatureHelp signatureHelp) {
+        var owner = new LSPSignatureHelperPsiElement(myFixture.configureByText("call.txt", ""), new TextRange(0, 0));
+        owner.setActiveSignatureHelp(signatureHelp);
+        return owner;
+    }
+
     private static SignatureInformation signature() {
         var signature = new SignatureInformation("read(first, second)");
         signature.setParameters(List.of(new ParameterInformation("first"), new ParameterInformation("second")));
@@ -93,7 +132,11 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
     }
 
     private static Presentation render(SignatureInformation signature, int index, boolean single) {
-        var ui = new Presentation(index, single);
+        return render(signature, index, single, null);
+    }
+
+    private static Presentation render(SignatureInformation signature, int index, boolean single, PsiElement owner) {
+        var ui = new Presentation(index, single, owner);
         new LSPParameterInfoHandler().updateUI(signature, ui);
         return ui;
     }
@@ -101,13 +144,15 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
     private static final class Presentation implements ParameterInfoUIContext {
         private final int index;
         private final boolean single;
+        private final PsiElement owner;
         private String text;
         private int start = -1;
         private int end = -1;
 
-        private Presentation(int index, boolean single) {
+        private Presentation(int index, boolean single, PsiElement owner) {
             this.index = index;
             this.single = single;
+            this.owner = owner;
         }
 
         private String highlight() {
@@ -127,7 +172,7 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
         @Override public boolean isUIComponentEnabled() { return true; }
         @Override public void setUIComponentEnabled(boolean enabled) { }
         @Override public int getCurrentParameterIndex() { return index; }
-        @Override public PsiElement getParameterOwner() { return null; }
+        @Override public PsiElement getParameterOwner() { return owner; }
         @Override public boolean isSingleOverload() { return true; }
         @Override public boolean isSingleParameterInfo() { return single; }
         @Override public Color getDefaultParameterColor() { return Color.BLACK; }
