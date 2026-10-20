@@ -828,6 +828,7 @@ public class LanguageServerWrapper implements Disposable {
         }
 
         boolean waitForDidOpen = fileConnectionInfo.waitForDidOpen();
+        DocumentContentSynchronizer connected;
         synchronized (documentsLock) {
             if (!isCurrent(claim)) {
                 return CompletableFuture.completedFuture(null);
@@ -835,10 +836,12 @@ public class LanguageServerWrapper implements Disposable {
             if (claim == null) {
                 promoteConnection(fileUri);
             }
-            var ls = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
-            if (ls != null) {
-                return ls;
-            }
+            connected = getConnectedSynchronizer(fileUri);
+        }
+        if (connected != null) {
+            // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
+            // before documentsLock
+            return getLanguageServerWhenDidOpen(connected, waitForDidOpen);
         }
 
         // start language server if needed
@@ -866,10 +869,10 @@ public class LanguageServerWrapper implements Disposable {
                 folderToNotify = workspaceFolderNotificationManager.computeWorkspaceFolderToNotify(file);
             }
 
-            CompletableFuture<LanguageServer> result;
             // Before the lock: getInitializedServer() calls the synchronized start(), and stop() takes that
             // monitor before documentsLock
             var initializedServer = folderToNotify != null ? getInitializedServer() : null;
+            DocumentContentSynchronizer synchronizer;
             synchronized (documentsLock) {
                 if (!isCurrent(claim)) {
                     return CompletableFuture.completedFuture(null);
@@ -881,57 +884,65 @@ public class LanguageServerWrapper implements Disposable {
                 closedDocuments.remove(fileUri);
 
                 // Check again if file is already opened (within synchronized block)
-                var ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
-                if (ls2 != null) {
-                    return ls2;
-                }
-
-                // Mark the workspace folder as notified and queue its notification before the document's
-                // didOpen, so that the server knows the folder first. Queuing does not wait.
-                if (folderToNotify != null && workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify)) {
-                    sendNotification(initializedServer, workspaceFolderNotificationManager.folderAddedNotification(folderToNotify));
-                }
-
-                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(
-                        toUriString(fileUri), file, document, fileConnectionInfo);
-                // Synchronizer usually is disposed when document editor is closed.
-                // But in case of closing the project, it does not close all editors,
-                // so to ensure synchronizer is disposed we also register it here
-                Disposer.register(this, synchronizer);
-                document.addDocumentListener(synchronizer, synchronizer);
-                OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
-                LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
-
-                if (waitForDidOpen) {
-                    result = getLanguageServerWhenDidOpen(synchronizer);
+                var alreadyConnected = getConnectedSynchronizer(fileUri);
+                if (alreadyConnected != null) {
+                    synchronizer = alreadyConnected;
                 } else {
-                    result = CompletableFuture.completedFuture(languageServer);
+
+                    // Mark the workspace folder as notified and queue its notification before the document's
+                    // didOpen, so that the server knows the folder first. Queuing does not wait.
+                    if (folderToNotify != null && workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify)) {
+                        sendNotification(initializedServer, workspaceFolderNotificationManager.folderAddedNotification(folderToNotify));
+                    }
+
+                    synchronizer = createDocumentContentSynchronizer(
+                            toUriString(fileUri), file, document, fileConnectionInfo);
+                    // Synchronizer usually is disposed when document editor is closed.
+                    // But in case of closing the project, it does not close all editors,
+                    // so to ensure synchronizer is disposed we also register it here
+                    Disposer.register(this, synchronizer);
+                    document.addDocumentListener(synchronizer, synchronizer);
+                    OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
+                    LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
+                    if (!waitForDidOpen) {
+                        return CompletableFuture.completedFuture(languageServer);
+                    }
                 }
             }
-
-            return result;
+            // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
+            // before documentsLock
+            return getLanguageServerWhenDidOpen(synchronizer, waitForDidOpen);
         });
     }
 
-    @Nullable
-    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@Nullable URI fileUri, boolean waitForDidOpen) {
+    /**
+     * Returns the synchronizer of the document if it is already connected, and null otherwise. The caller holds
+     * documentsLock.
+     */
+    private @Nullable DocumentContentSynchronizer getConnectedSynchronizer(@Nullable URI fileUri) {
         if (fileUri == null) {
             return null;
         }
         var openedDocument = openedDocuments.get(fileUri);
-        if (openedDocument != null && openedDocument.getSynchronizer() != null) {
-            var synchronizer = openedDocument.getSynchronizer();
-            if (!waitForDidOpen) {
-                // The caller can hold a write action, so wait only for the changes already sent, which needs
-                // no read access. LanguageServiceAccessor sends the pending ones before it connects.
-                var changesSent = synchronizer.getLastChangeSent();
-                return changesSent.isDone() ? CompletableFuture.completedFuture(languageServer) : whenChangesSent(changesSent);
-            }
-            // The file is already connected.
-            // returns the language server instance when didOpen, and the changes made since, have been sent
-            return getLanguageServerWhenDidOpen(synchronizer);
+        return openedDocument != null ? openedDocument.getSynchronizer() : null;
+    }
+
+    /**
+     * Returns the language server once the connected document can be used with it. The caller must not hold
+     * documentsLock: asking for the didOpen can start the server, in the synchronized start(), and stop() takes that
+     * monitor before documentsLock.
+     */
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull DocumentContentSynchronizer synchronizer,
+                                                                          boolean waitForDidOpen) {
+        if (!waitForDidOpen) {
+            // The caller can hold a write action, so wait only for the changes already sent, which needs
+            // no read access. LanguageServiceAccessor sends the pending ones before it connects.
+            var changesSent = synchronizer.getLastChangeSent();
+            return changesSent.isDone() ? CompletableFuture.completedFuture(languageServer) : whenChangesSent(changesSent);
         }
-        return null;
+        // The file is already connected.
+        // returns the language server instance when didOpen, and the changes made since, have been sent
+        return getLanguageServerWhenDidOpen(synchronizer);
     }
 
     private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull DocumentContentSynchronizer synchronizer) {
