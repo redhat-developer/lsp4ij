@@ -19,9 +19,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,12 +36,17 @@ import java.util.concurrent.TimeUnit;
  * {@link LocalFileSystem}, reports changes only for the directories it has loaded, and does not refresh them while
  * the IDE stays focused.
  * <p>
- * Each root is watched natively, and its directories are loaded and refreshed every 2 seconds while it is
- * registered. A root that does not exist yet is observed through its nearest existing parent, flat, until it appears.
- * Symbolic links are not followed.
+ * Each root is watched natively and its directories are loaded. Every 2 seconds while it is registered, the VFS
+ * refreshes what the native watcher has marked dirty under it. Every 30 seconds, and while a root is not loaded yet,
+ * every directory of the root is listed and marked dirty instead, for the changes the native watcher does not report,
+ * as where it does not run. A root that does not exist yet is observed through its nearest existing parent, flat,
+ * until it appears. A root that is itself a symbolic link is not watched, and links below a root are not followed.
  */
 final class FileSystemWatchRoots implements Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(FileSystemWatchRoots.class);
+    private static final long REFRESH_INTERVAL_SECONDS = 2;
+    // Every this many periodic passes, one lists and dirties every directory, as a fallback for the native watcher
+    private static final int FULL_REFRESH_EVERY = 15;
     private final LocalFileSystem files = LocalFileSystem.getInstance();
     private Set<Root> roots = Set.of();
     private Set<Root> installedRoots = Set.of();
@@ -49,6 +54,8 @@ final class FileSystemWatchRoots implements Disposable {
     private Set<LocalFileSystem.WatchRequest> requests = Set.of();
     private ScheduledFuture<?> timer;
     private CompletableFuture<Void> refresh = CompletableFuture.completedFuture(null);
+    private boolean refreshingFully;
+    private int passes;
     private boolean disposed;
 
     /**
@@ -66,47 +73,66 @@ final class FileSystemWatchRoots implements Disposable {
             timer.cancel(false);
             timer = null;
         }
+        passes = 0;
         if (!roots.isEmpty()) {
             timer = AppExecutorUtil.getAppScheduledExecutorService().scheduleWithFixedDelay(
-                    () -> refresh().exceptionally(error -> {
+                    () -> periodicRefresh().exceptionally(error -> {
                         LOGGER.warn("Cannot refresh language server file watch roots", error);
                         return null;
-                    }), 0, 2, TimeUnit.SECONDS);
+                    }), 0, REFRESH_INTERVAL_SECONDS, TimeUnit.SECONDS);
         }
     }
 
+    private CompletableFuture<Void> periodicRefresh() {
+        boolean fully;
+        synchronized (this) {
+            fully = passes++ % FULL_REFRESH_EVERY == 0;
+        }
+        return refresh(fully);
+    }
+
+    /**
+     * Lists every directory of the roots and marks them dirty, so that the VFS reports every change under them.
+     */
     synchronized CompletableFuture<Void> refresh() {
+        return refresh(true);
+    }
+
+    private synchronized CompletableFuture<Void> refresh(boolean fully) {
         if (disposed || roots.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
         if (!refresh.isDone()) {
-            if (refreshingRoots == roots) {
+            if (refreshingRoots == roots && (refreshingFully || !fully)) {
                 return refresh;
             }
-            // Wait for the old pass, then refresh the new registration generation.
+            // Wait for the old pass, then refresh the new registration generation, or fully.
             // Joining only the old future would acknowledge roots it never loaded.
-            return refresh.handle((ignored, error) -> null).thenCompose(ignored -> refresh());
+            return refresh.handle((ignored, error) -> null).thenCompose(ignored -> refresh(fully));
         }
         Set<Root> snapshot = roots;
         refreshingRoots = snapshot;
+        refreshingFully = fully;
         var result = new CompletableFuture<Void>();
         refresh = result;
-        AppExecutorUtil.getAppExecutorService().execute(() -> prepareRefresh(snapshot, result));
+        AppExecutorUtil.getAppExecutorService().execute(() -> prepareRefresh(snapshot, fully, result));
         return result;
     }
 
-    private void prepareRefresh(Set<Root> snapshot, CompletableFuture<Void> result) {
+    private void prepareRefresh(Set<Root> snapshot, boolean fully, CompletableFuture<Void> result) {
         try {
             Set<Root> watches = new HashSet<>();
             Set<VirtualFile> refreshFiles = new LinkedHashSet<>();
+            Set<VirtualFile> refreshRecursively = new LinkedHashSet<>();
             for (Root root : snapshot) {
-                if (containsSymlink(root.path())) {
+                if (Files.isSymbolicLink(root.path())) {
+                    // Links above a root are followed: on macOS, /tmp and /var are links
                     continue;
                 }
                 // An absent root is observed via its nearest existing ancestor, always flat.
                 // The next pass descends toward the requested root as directories appear.
                 Path existing = root.path();
-                while (existing != null && !Files.isDirectory(existing, LinkOption.NOFOLLOW_LINKS)) {
+                while (existing != null && !Files.isDirectory(existing)) {
                     existing = existing.getParent();
                 }
                 if (existing == null || existing.getParent() == null) {
@@ -120,10 +146,16 @@ final class FileSystemWatchRoots implements Disposable {
                 if (existing.equals(root.path()) && existing.getParent().getParent() != null) {
                     watches.add(new Root(existing.getParent(), false));
                 }
+                boolean present = existing.equals(root.path());
+                VirtualFile loaded = fully || !present ? null : files.findFileByNioFile(existing);
+                if (loaded != null) {
+                    // Between full passes, the VFS refreshes only what the native watcher has marked dirty
+                    (root.recursive() ? refreshRecursively : refreshFiles).add(loaded);
+                    continue;
+                }
                 VirtualFile file = files.refreshAndFindFileByNioFile(existing);
                 if (file != null) {
-                    boolean recursive = root.recursive() && existing.equals(root.path());
-                    collectDirectories(file, recursive, refreshFiles);
+                    collectDirectories(file, root.recursive() && present, refreshFiles);
                 }
             }
             synchronized (this) {
@@ -138,25 +170,25 @@ final class FileSystemWatchRoots implements Disposable {
                     installedRoots = Set.copyOf(watches);
                 }
             }
-            // Refresh only enumerated real directories. Recursive VFS refresh could follow
-            // symlinks or descend into an unrelated ancestor of a missing root.
-            if (refreshFiles.isEmpty()) {
-                result.complete(null);
-            } else {
-                files.refreshFiles(refreshFiles, true, false, () -> result.complete(null));
-            }
+            // A full pass refreshes only the directories it listed: a recursive VFS refresh of what it marked dirty
+            // could follow symlinks or descend into an unrelated ancestor of a missing root. The others refresh the
+            // loaded roots recursively, which visits only what is dirty.
+            var refreshed = new ArrayList<CompletableFuture<Void>>();
+            refreshDirectories(refreshFiles, false, refreshed);
+            refreshDirectories(refreshRecursively, true, refreshed);
+            CompletableFuture.allOf(refreshed.toArray(CompletableFuture[]::new))
+                    .whenComplete((ignored, error) -> result.complete(null));
         } catch (RuntimeException failure) {
             result.completeExceptionally(failure);
         }
     }
 
-    private static boolean containsSymlink(Path path) {
-        for (Path current = path; current != null; current = current.getParent()) {
-            if (Files.isSymbolicLink(current)) {
-                return true;
-            }
+    private void refreshDirectories(Set<VirtualFile> directories, boolean recursive, List<CompletableFuture<Void>> refreshed) {
+        if (!directories.isEmpty()) {
+            var done = new CompletableFuture<Void>();
+            refreshed.add(done);
+            files.refreshFiles(directories, true, recursive, () -> done.complete(null));
         }
-        return false;
     }
 
     private static void collectDirectories(VirtualFile root, boolean recursive, Set<VirtualFile> result) {

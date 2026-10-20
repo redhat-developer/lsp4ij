@@ -172,7 +172,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> registerCapability(RegistrationParams params) {
-        return CompletableFuture.runAsync(() -> wrapper.registerCapability(params));
+        return CompletableFuture.runAsync(() -> wrapper.registerCapability(params, this));
     }
 
     @Override

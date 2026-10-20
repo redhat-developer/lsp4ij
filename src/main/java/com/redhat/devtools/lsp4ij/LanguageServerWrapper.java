@@ -1201,9 +1201,22 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public void registerCapability(RegistrationParams params) {
+        registerCapability(params, null);
+    }
+
+    /**
+     * Registers the capabilities that the server of the given client asks for, unless that client's connection has
+     * stopped.
+     *
+     * @param params the registrations
+     * @param client the client that received them, and null not to check which connection they come from
+     */
+    public void registerCapability(RegistrationParams params, @Nullable LanguageClientImpl client) {
         var registrationContext = currentInitializingContext;
         var initialization = initializeFuture;
-        if (initialization == null || registrationContext == null) {
+        if (initialization == null || registrationContext == null
+                || client != null && registrationContext.languageClient != client) {
+            // A registration from a connection that has stopped, as after a restart
             return;
         }
         initialization.thenRun(() -> {

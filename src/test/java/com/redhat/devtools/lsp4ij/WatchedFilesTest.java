@@ -16,6 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.FileChangeType;
@@ -79,6 +80,29 @@ public class WatchedFilesTest extends LSPCodeInsightFixtureTestCase {
                 () -> MockLanguageServer.INSTANCE.getNotifications().contains("didChangeConfiguration"), 10);
         assertFalse("the server must not be told of changes for a watcher of the stopped server",
                 received(after, FileChangeType.Created));
+    }
+
+    public void testARegistrationThatComesAfterItsConnectionStoppedIsIgnored() throws Exception {
+        var file = myFixture.configureByText("main.foo", "");
+        var wrapper = connect(file);
+        var stoppedClient = MockLanguageServerDefinition.getLastLanguageClient();
+        wrapper.restart();
+        connect(file);
+
+        // the registration of the stopped server reaches its client only now, as JSON-RPC delivers it
+        var options = new DidChangeWatchedFilesRegistrationOptions(List.of(watcher(file.getVirtualFile().getParent().toNioPath(), "**/*.txt")));
+        var registration = new Registration("late", "workspace/didChangeWatchedFiles", JSONUtils.getLsp4jGson().toJsonTree(options));
+        stoppedClient.registerCapability(new RegistrationParams(List.of(registration))).get(30, TimeUnit.SECONDS);
+        var created = myFixture.addFileToProject("late.txt", "").getVirtualFile().toNioPath();
+        // sent after the file event, and received after it, since notifications keep their order
+        wrapper.sendNotification(ls -> {
+            ls.getWorkspaceService().didChangeConfiguration(new DidChangeConfigurationParams(new JsonObject()));
+            return ls;
+        });
+        PlatformTestUtil.waitWithEventsDispatching("the server must receive the later notification",
+                () -> MockLanguageServer.INSTANCE.getNotifications().contains("didChangeConfiguration"), 10);
+        assertFalse("a watcher that the stopped server registered must not be added for the restarted one",
+                received(created, FileChangeType.Created));
     }
 
     private LanguageServerWrapper connect(PsiFile file) throws Exception {

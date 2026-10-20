@@ -23,6 +23,7 @@ import org.eclipse.lsp4j.RelativePattern;
 import org.eclipse.lsp4j.WatchKind;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -176,6 +177,32 @@ public class FileSystemWatchRootsTest extends BasePlatformTestCase {
         assertEquals(0, roots.watchRequestCount());
     }
 
+    public void testARootBelowASymbolicLinkIsWatched() throws Exception {
+        // as on macOS, where /tmp and /var are links
+        Files.createDirectories(directory.resolve("real/external"));
+        Path link = Files.createSymbolicLink(directory.resolve("alias"), directory.resolve("real"));
+        Path watched = link.resolve("external");
+        roots.replace(Set.of(new FileSystemWatchRoots.Root(watched, true)));
+        refresh();
+        assertTrue("a link above the root must not keep it from being watched", roots.watchRequestCount() > 0);
+        Path source = watched.resolve("data.txt");
+        Files.writeString(source, "created");
+        refresh();
+        Path real = source.toRealPath();
+        assertTrue("Expected VFileCreateEvent for " + real + "; got " + events, events.stream().anyMatch(event ->
+                event instanceof VFileCreateEvent && Files.exists(Path.of(event.getPath()))
+                        && real.equals(toRealPath(Path.of(event.getPath())))));
+    }
+
+    public void testAGlobWithDotDotMatchesUnderTheRootItWatches() {
+        var manager = new FileSystemWatcherManager(project);
+        var glob = new FileSystemWatcher(Either.forLeft(directory.resolve("base") + "/../outside/*.txt"));
+        manager.registerFileSystemWatchers("dots", List.of(glob));
+        assertEquals(Set.of(new FileSystemWatchRoots.Root(directory.resolve("outside"), false)),
+                FileSystemWatcherManager.externalRoots(List.of(glob), project));
+        assertTrue(manager.isMatchFilePattern(directory.resolve("outside/data.txt").toUri(), WatchKind.Create));
+    }
+
     public void testExplicitRelativeAndAbsoluteGlobsSelectEquivalentRoots() {
         Path path = directory.resolve("external");
         var expected = Set.of(new FileSystemWatchRoots.Root(path, true));
@@ -220,6 +247,14 @@ public class FileSystemWatchRootsTest extends BasePlatformTestCase {
     private void assertEvent(Path path, Class<? extends VFileEvent> type) {
         assertTrue("Expected " + type.getSimpleName() + " for " + path + "; got " + events,
                 events.stream().anyMatch(event -> type.isInstance(event) && path.equals(Path.of(event.getPath()))));
+    }
+
+    private static Path toRealPath(Path path) {
+        try {
+            return path.toRealPath();
+        } catch (IOException e) {
+            return path;
+        }
     }
 
     private static FileSystemWatcher relative(Path path, String pattern) {
