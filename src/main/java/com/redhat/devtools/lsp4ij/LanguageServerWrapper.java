@@ -935,13 +935,13 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull CompletableFuture<LanguageServer> didOpenFuture) {
-        if (didOpenFuture.isDone()) {
+        if (didOpenFuture.isDone() && !didOpenFuture.isCompletedExceptionally()) {
             // The didOpen has happened, no need to wait for the didOpen
             // to return the language server
             return CompletableFuture.completedFuture(languageServer);
         }
-        // The didOpen has not happened, wait for the end of didOpen
-        // to return the language server
+        // The didOpen has not happened, or it failed, as for a document closed before it was opened:
+        // wait for the end of didOpen to return the language server, or its failure
         return didOpenFuture
                 .thenApplyAsync(theVoid -> languageServer);
     }
