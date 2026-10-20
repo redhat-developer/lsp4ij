@@ -115,9 +115,15 @@ public class DocumentContentNavigationTest extends LSPCodeInsightFixtureTestCase
         var wrapper = open();
         var target = definitionTargets()[0];
         var file = target.getContainingFile().getVirtualFile();
+        var opened = new CompletableFuture<DidOpenTextDocumentParams>();
+        MockLanguageServer.INSTANCE.setDidOpenCallback(opened);
         ((Navigatable) target).navigate(true);
         var manager = FileEditorManager.getInstance(myFixture.getProject());
         PlatformTestUtil.waitWithEventsDispatching("the target must open", () -> manager.isFileOpen(file), 10);
+        // stopped once the document is open on the server: a stop while a document is still being connected can
+        // deadlock, since connectDocument reaches the wrapper's monitor under documentsLock and stop() takes them in
+        // the other order
+        PlatformTestUtil.waitWithEventsDispatching("the server must be told that the document is open", opened::isDone, 10);
 
         wrapper.stop();
 
