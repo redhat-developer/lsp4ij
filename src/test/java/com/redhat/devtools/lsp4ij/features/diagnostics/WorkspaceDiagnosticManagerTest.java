@@ -59,6 +59,145 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
+    public void unchangedReportsReuseMatchingButFullReportsStillMatch() throws Exception {
+        var h = harness();
+        var matches = new AtomicInteger();
+        h.matcher = uri -> {
+            matches.incrementAndGet();
+            return CompletableFuture.completedFuture(true);
+        };
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        h.partial(first, full("file:///a.lua", "one"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        first.future.complete(new WorkspaceDiagnosticReport(List.of()));
+        var second = h.next();
+        for (int i = 0; i < 20; i++) {
+            h.partial(second, new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
+                    new WorkspaceUnchangedDocumentDiagnosticReport("one", "file:///a.lua", null)))));
+            assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        }
+        assertEquals("Unchanged reports should reuse the accepted match across pulls", 1, matches.get());
+        second.future.complete(full("file:///a.lua", "two"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        assertEquals("Full reports must still match", 2, matches.get());
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "two")), h.next().params.getPreviousResultIds());
+    }
+
+    @Test
+    public void changedMatchingVersionRechecksUnchangedReports() throws Exception {
+        var h = harness();
+        var matches = new AtomicInteger();
+        h.matcher = uri -> CompletableFuture.completedFuture(matches.incrementAndGet() == 1);
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(full("file:///a.lua", "one"));
+        var second = h.next();
+        h.matchingVersion.incrementAndGet();
+        second.future.complete(unchanged("file:///a.lua", "one"));
+        assertTrue(h.next().params.getPreviousResultIds().isEmpty());
+        assertEquals(2, matches.get());
+        assertEquals(List.of("lua:file:///a.lua"), h.clearedFiles);
+    }
+
+    @Test
+    public void refreshRechecksRetainedMatches() throws Exception {
+        var h = harness();
+        var matches = new AtomicInteger();
+        h.matcher = uri -> CompletableFuture.completedFuture(matches.incrementAndGet() == 1);
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(full("file:///a.lua", "one"));
+        h.next();
+        h.manager.refresh();
+        var refreshed = h.next();
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "one")), refreshed.params.getPreviousResultIds());
+        refreshed.future.complete(unchanged("file:///a.lua", "one"));
+        assertTrue(h.next().params.getPreviousResultIds().isEmpty());
+        assertEquals(2, matches.get());
+    }
+
+    @Test
+    public void mappingChangeDuringMatchCannotPublishOrClearStaleResult() throws Exception {
+        var h = harness();
+        var pending = new CompletableFuture<Boolean>();
+        var started = new CompletableFuture<Void>();
+        h.matcher = uri -> {
+            started.complete(null);
+            return pending;
+        };
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(full("file:///a.lua", "one"));
+        started.get(5, TimeUnit.SECONDS);
+        h.matcher = uri -> CompletableFuture.completedFuture(true);
+        h.matchingVersion.incrementAndGet();
+        pending.complete(false);
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "one")), h.next().params.getPreviousResultIds());
+        assertTrue("The obsolete negative match must not clear diagnostics", h.clearedFiles.isEmpty());
+    }
+
+    @Test
+    public void unrelatedEditsDoNotInvalidateMatching() throws Exception {
+        var h = harness();
+        var matches = new AtomicInteger();
+        h.matcher = uri -> {
+            matches.incrementAndGet();
+            return CompletableFuture.completedFuture(true);
+        };
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(full("file:///a.lua", "one"));
+        var second = h.next();
+        h.fileVersions.put("file:///other.lua", 1);
+        second.future.complete(unchanged("file:///a.lua", "one"));
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "one")), h.next().params.getPreviousResultIds());
+        assertEquals(1, matches.get());
+    }
+
+    @Test
+    public void continuouslyChangingFileDoesNotBlockOtherReports() throws Exception {
+        var h = harness();
+        var matches = new AtomicInteger();
+        h.matcher = uri -> {
+            if (uri.endsWith("changing.lua")) {
+                matches.incrementAndGet();
+                h.fileVersions.merge(uri, 1, Integer::sum);
+            }
+            return CompletableFuture.completedFuture(true);
+        };
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(new WorkspaceDiagnosticReport(List.of(
+                full("file:///changing.lua", "stale").getItems().get(0),
+                full("file:///other.lua", "live").getItems().get(0))));
+        assertEquals(List.of(new PreviousResultId("file:///other.lua", "live")), h.next().params.getPreviousResultIds());
+        assertEquals("Only one retry is allowed", 2, matches.get());
+        assertEquals(1, h.applied.size());
+        assertEquals("live", h.applied.remove().getLeft().getResultId());
+        assertTrue("An unstable match must not clear diagnostics either", h.clearedFiles.isEmpty());
+    }
+
+    @Test
+    public void failedVersionRecheckDropsCachedResultAndContinuesQueue() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(full("file:///a.lua", "old"));
+        var second = h.next();
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        var checks = new AtomicInteger();
+        h.versionReader = uri -> {
+            if (uri.endsWith("a.lua") && checks.incrementAndGet() == 2) {
+                throw new IllegalStateException("version lookup failed");
+            }
+            return List.of(0, 0);
+        };
+        second.future.complete(new WorkspaceDiagnosticReport(List.of(
+                unchanged("file:///a.lua", "old").getItems().get(0),
+                full("file:///other.lua", "live").getItems().get(0))));
+        assertEquals(List.of(new PreviousResultId("file:///other.lua", "live")), h.next().params.getPreviousResultIds());
+        assertEquals(1, h.applied.size());
+        assertEquals("live", h.applied.remove().getLeft().getResultId());
+        assertTrue(h.clearedFiles.isEmpty());
+    }
+
+    @Test
     public void acceptsStreamedReportsAndLastReportWins() throws Exception {
         var h = harness();
         h.manager.updateProviders(Collections.singleton(null));
@@ -153,6 +292,63 @@ public class WorkspaceDiagnosticManagerTest {
         // Invalidation belongs to the old request, not subsequent pulls.
         second.future.complete(full("file:///lost.lua", "fresh"));
         assertEquals("fresh", h.applied.poll(5, TimeUnit.SECONDS).getLeft().getResultId());
+    }
+
+    @Test
+    public void failedInvalidationPredicateDropsAffectedResultsOnly() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        h.partial(first, full("file:///bad%uri.lua", "bad"));
+        h.partial(first, full("file:///retained.lua", "retained"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        var cache = URI.create("file:///lost.lua");
+        h.manager.invalidate(cache, uri -> cache.equals(URI.create(uri)));
+        assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
+                h.next().params.getPreviousResultIds());
+        assertTrue(first.future.cancelRequested);
+    }
+
+    @Test
+    public void failedInvalidationPredicateCancelsPendingMatch() throws Exception {
+        var h = harness();
+        var pending = new MatchFuture();
+        var started = new CompletableFuture<Void>();
+        h.matcher = uri -> { started.complete(null); return pending; };
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.complete(full("file:///bad%uri.lua", "stale"));
+        started.get(5, TimeUnit.SECONDS);
+        var cache = URI.create("file:///lost.lua");
+        h.manager.invalidate(cache, uri -> cache.equals(URI.create(uri)));
+        var replacement = h.next();
+        assertTrue(pending.cancelRequested);
+        assertTrue(replacement.params.getPreviousResultIds().isEmpty());
+        pending.complete(true);
+        h.matcher = uri -> CompletableFuture.completedFuture(true);
+        replacement.future.complete(full("file:///retained.lua", "fresh"));
+        assertEquals(List.of(new PreviousResultId("file:///retained.lua", "fresh")),
+                h.next().params.getPreviousResultIds());
+        assertEquals("fresh", h.applied.remove().getLeft().getResultId());
+        assertTrue(h.applied.isEmpty());
+    }
+
+    @Test
+    public void failedInvalidationPredicateDoesNotBlockQueuedReports() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        var cache = URI.create("file:///lost.lua");
+        h.manager.invalidate(cache, uri -> cache.equals(URI.create(uri)));
+        h.executor.submit(() -> {}).get(5, TimeUnit.SECONDS);
+        first.future.complete(new WorkspaceDiagnosticReport(List.of(
+                full("file:///bad%uri.lua", "bad").getItems().get(0),
+                full("file:///retained.lua", "retained").getItems().get(0))));
+        assertEquals(List.of(new PreviousResultId("file:///retained.lua", "retained")),
+                h.next().params.getPreviousResultIds());
+        assertFalse(first.future.cancelRequested);
+        assertEquals("retained", h.applied.remove().getLeft().getResultId());
+        assertTrue(h.applied.isEmpty());
     }
 
     @Test
@@ -277,6 +473,7 @@ public class WorkspaceDiagnosticManagerTest {
         var pending = new MatchFuture();
         var started = new CompletableFuture<Void>();
         h.matcher = uri -> { started.complete(null); return pending; };
+        h.matchingVersion.incrementAndGet();
         second.future.complete(new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
                 new WorkspaceUnchangedDocumentDiagnosticReport("old", "file:///a.lua", null)))));
         started.get(5, TimeUnit.SECONDS);
@@ -366,6 +563,28 @@ public class WorkspaceDiagnosticManagerTest {
         assertNull(h.requests.poll(1200, TimeUnit.MILLISECONDS));
         h.manager.refresh();
         assertNotNull(h.next());
+    }
+
+    @Test
+    public void retriesContentModifiedAndRetainsPreviousResults() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        h.partial(first, full("file:///a.lua", "one"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        var error = new ResponseErrorException(new ResponseError(
+                ResponseErrorCode.ContentModified, "content changed", null));
+        first.future.completeExceptionally(error);
+        var second = h.next();
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "one")),
+                second.params.getPreviousResultIds());
+        second.future.completeExceptionally(new CompletionException(error));
+        var third = h.next();
+        assertEquals(second.params.getPreviousResultIds(), third.params.getPreviousResultIds());
+        third.future.complete(full("file:///a.lua", "two"));
+        assertEquals("two", h.applied.poll(5, TimeUnit.SECONDS).getLeft().getResultId());
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "two")),
+                h.next().params.getPreviousResultIds());
     }
 
     @Test
@@ -543,6 +762,7 @@ public class WorkspaceDiagnosticManagerTest {
                 full("file:///b.lua", "retained").getItems().get(0))));
         var second = h.next();
         h.matcher = uri -> CompletableFuture.completedFuture(!uri.endsWith("a.lua"));
+        h.matchingVersion.incrementAndGet();
         second.future.complete(new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
                 new WorkspaceUnchangedDocumentDiagnosticReport("old", "file:///a.lua", null)))));
         assertEquals(List.of(new PreviousResultId("file:///b.lua", "retained")), h.next().params.getPreviousResultIds());
@@ -568,6 +788,11 @@ public class WorkspaceDiagnosticManagerTest {
         return new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(report)));
     }
 
+    private static WorkspaceDiagnosticReport unchanged(String uri, String resultId) {
+        return new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
+                new WorkspaceUnchangedDocumentDiagnosticReport(resultId, uri, null))));
+    }
+
     private static class Future extends CompletableFuture<WorkspaceDiagnosticReport> {
         final boolean refuse;
         volatile boolean cancelRequested;
@@ -591,7 +816,12 @@ public class WorkspaceDiagnosticManagerTest {
         volatile java.util.function.Function<String, CompletableFuture<Boolean>> matcher = uri -> CompletableFuture.completedFuture(true);
         final List<String> clearedProviders = new CopyOnWriteArrayList<>();
         final List<String> clearedFiles = new CopyOnWriteArrayList<>();
-        final WorkspaceDiagnosticManager manager = new WorkspaceDiagnosticManager(this, executor, uri -> matcher.apply(uri), (identifier, report) -> {
+        final AtomicInteger matchingVersion = new AtomicInteger();
+        final Map<String, Integer> fileVersions = new ConcurrentHashMap<>();
+        volatile java.util.function.Function<String, ?> versionReader =
+                uri -> List.of(matchingVersion.get(), fileVersions.getOrDefault(uri, 0));
+        final WorkspaceDiagnosticManager manager = new WorkspaceDiagnosticManager(this, executor,
+                uri -> matcher.apply(uri), uri -> versionReader.apply(uri), (identifier, report) -> {
             beforeApply.run();
             applied.add(report);
             return accept;

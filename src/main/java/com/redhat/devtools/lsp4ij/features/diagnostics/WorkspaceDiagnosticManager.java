@@ -40,6 +40,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
     private final WorkspaceService server;
     private final ScheduledExecutorService executor;
     private final Function<String, CompletableFuture<Boolean>> matches;
+    private final Function<String, ?> matchingVersion;
     private final BiPredicate<String, WorkspaceDocumentDiagnosticReport> reports;
     private final Consumer<String> clearProvider;
     private final BiConsumer<String, String> clearFile;
@@ -55,6 +56,9 @@ public final class WorkspaceDiagnosticManager implements Disposable {
      *                      and shut down by this manager
      * @param matches       the URI matcher returning a non-null future with
      *                      {@code true} for files that accept workspace reports
+     * @param matchingVersion a cheap, non-null per-URI stamp covering file content,
+     *                      paths and server mappings; unchanged reports reuse
+     *                      accepted matches while this stamp remains equal
      * @param reports       the provider/report predicate returning {@code true}
      *                      when a result ID may be retained; a {@code null}
      *                      identifier denotes the default provider
@@ -67,12 +71,14 @@ public final class WorkspaceDiagnosticManager implements Disposable {
      */
     public WorkspaceDiagnosticManager(WorkspaceService server, ScheduledExecutorService executor,
                                       Function<String, CompletableFuture<Boolean>> matches,
+                                      Function<String, ?> matchingVersion,
                                       BiPredicate<String, WorkspaceDocumentDiagnosticReport> reports,
                                       Consumer<String> clearProvider,
                                       BiConsumer<String, String> clearFile) {
         this.server = server;
         this.executor = executor;
         this.matches = matches;
+        this.matchingVersion = matchingVersion;
         this.reports = reports;
         this.clearProvider = clearProvider;
         this.clearFile = clearFile;
@@ -120,6 +126,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
     public void refresh() {
         execute(() -> {
             for (var provider : providers.values()) {
+                provider.matchedVersions.clear();
                 cancel(provider);
                 pull(provider);
             }
@@ -136,13 +143,17 @@ public final class WorkspaceDiagnosticManager implements Disposable {
      *
      * @param cacheKey     the stable document-cache URI used by the wrapper
      * @param matchesCache identifies report URIs belonging to the replaced cache;
-     *                     evaluated on the manager's executor, never the caller's thread
+     *                     evaluated on the manager's executor, never the caller's thread;
+     *                     a failed predicate invalidates that URI conservatively
      */
     public void invalidate(URI cacheKey, Predicate<String> matchesCache) {
         execute(() -> {
             for (var provider : providers.values()) {
-                boolean cacheInvalidated = provider.resultIds.keySet().removeIf(matchesCache);
-                if (cacheInvalidated || (provider.matchingUri != null && matchesCache.test(provider.matchingUri))) {
+                boolean cacheInvalidated = provider.resultIds.keySet()
+                        .removeIf(uri -> matchesCacheSafely(matchesCache, uri));
+                provider.matchedVersions.keySet().retainAll(provider.resultIds.keySet());
+                if (cacheInvalidated || (provider.matchingUri != null
+                        && matchesCacheSafely(matchesCache, provider.matchingUri))) {
                     cancel(provider);
                     pull(provider);
                 } else if (provider.token != null) {
@@ -152,6 +163,15 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                 }
             }
         });
+    }
+
+    private static boolean matchesCacheSafely(Predicate<String> predicate, String uri) {
+        try {
+            return predicate.test(uri);
+        } catch (RuntimeException failure) {
+            LOGGER.warn("Unable to resolve workspace diagnostic file {}", uri, failure);
+            return true;
+        }
     }
 
     /**
@@ -215,7 +235,7 @@ public final class WorkspaceDiagnosticManager implements Disposable {
 
     private void accept(Provider provider, WorkspaceDiagnosticReport report) {
         if (report != null && report.getItems() != null) {
-            provider.pendingReports.addAll(report.getItems());
+            report.getItems().forEach(item -> provider.pendingReports.addLast(new PendingReport(item, false)));
         }
         applyNextReport(provider);
     }
@@ -231,7 +251,8 @@ public final class WorkspaceDiagnosticManager implements Disposable {
             return;
         }
         while (!provider.pendingReports.isEmpty()) {
-            var item = provider.pendingReports.removeFirst();
+            var pending = provider.pendingReports.removeFirst();
+            var item = pending.report();
             String uri = item.isLeft() ? item.getLeft().getUri() : item.getRight().getUri();
             if (provider.isInvalidated(uri)) {
                 continue;
@@ -240,11 +261,16 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                 continue; // no cached full report to retain
             }
             CompletableFuture<Boolean> matching;
+            Object version;
             try {
-                matching = Objects.requireNonNull(matches.apply(uri));
+                version = Objects.requireNonNull(matchingVersion.apply(uri));
+                matching = item.isRight() && Objects.equals(provider.matchedVersions.get(uri), version)
+                        ? CompletableFuture.completedFuture(true)
+                        : Objects.requireNonNull(matches.apply(uri));
             } catch (RuntimeException error) {
                 LOGGER.warn("Unable to match workspace diagnostic file {}", uri, error);
                 provider.resultIds.remove(uri);
+                provider.matchedVersions.remove(uri);
                 continue;
             }
             provider.matching = matching;
@@ -257,6 +283,28 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                 provider.matching = null;
                 provider.matchingUri = null;
                 if (provider.isInvalidated(uri)) {
+                    applyNextReport(provider);
+                    return;
+                }
+                Object currentVersion;
+                try {
+                    currentVersion = Objects.requireNonNull(matchingVersion.apply(uri));
+                } catch (RuntimeException failure) {
+                    LOGGER.warn("Unable to match workspace diagnostic file {}", uri, failure);
+                    provider.resultIds.remove(uri);
+                    provider.matchedVersions.remove(uri);
+                    applyNextReport(provider);
+                    return;
+                }
+                if (!version.equals(currentVersion)) {
+                    // Retry once; a continuously changing file must not hold up
+                    // the provider's queue or publish/clear from a stale match.
+                    if (!pending.rechecked()) {
+                        provider.pendingReports.addFirst(new PendingReport(item, true));
+                    } else {
+                        provider.resultIds.remove(uri);
+                        provider.matchedVersions.remove(uri);
+                    }
                     applyNextReport(provider);
                     return;
                 }
@@ -279,8 +327,10 @@ public final class WorkspaceDiagnosticManager implements Disposable {
                 String resultId = item.isLeft() ? item.getLeft().getResultId() : item.getRight().getResultId();
                 if (accepted && resultId != null) {
                     provider.resultIds.put(uri, resultId);
+                    provider.matchedVersions.put(uri, version);
                 } else {
                     provider.resultIds.remove(uri);
+                    provider.matchedVersions.remove(uri);
                 }
                 applyNextReport(provider);
             }));
@@ -297,6 +347,11 @@ public final class WorkspaceDiagnosticManager implements Disposable {
     private boolean shouldRetrigger(Throwable error) {
         while (error instanceof CompletionException && error.getCause() != null) {
             error = error.getCause();
+        }
+        if (error instanceof ResponseErrorException response
+                && response.getResponseError().getCode() == ResponseErrorCode.ContentModified.getValue()) {
+            // This request is outdated; a fresh pull can still succeed.
+            return true;
         }
         if (error instanceof ResponseErrorException response
                 && response.getResponseError().getCode() == ResponseErrorCode.ServerCancelled.getValue()) {
@@ -378,10 +433,14 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         executor.shutdown();
     }
 
+    private record PendingReport(WorkspaceDocumentDiagnosticReport report, boolean rechecked) { }
+
     private static final class Provider {
         final String identifier;
         final Map<String, String> resultIds = new HashMap<>();
-        final Deque<WorkspaceDocumentDiagnosticReport> pendingReports = new ArrayDeque<>();
+        // Only retained result IDs have reusable successful matches.
+        final Map<String, Object> matchedVersions = new HashMap<>();
+        final Deque<PendingReport> pendingReports = new ArrayDeque<>();
         final Map<URI, Predicate<String>> invalidatedCaches = new HashMap<>();
         String token;
         String matchingUri;
@@ -395,7 +454,8 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         }
 
         boolean isInvalidated(String uri) {
-            return invalidatedCaches.values().stream().anyMatch(predicate -> predicate.test(uri));
+            return invalidatedCaches.values().stream()
+                    .anyMatch(predicate -> matchesCacheSafely(predicate, uri));
         }
     }
 }

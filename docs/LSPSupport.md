@@ -501,7 +501,8 @@ It doesn't support the related documents.
 Workspace diagnostics start automatically when a server advertises
 `diagnosticProvider.workspaceDiagnostics`, including dynamic registrations.
 LSP4IJ consumes full, unchanged and streamed partial reports, retains result IDs,
-and reissues completed requests with a short delay. A diagnostic refresh cancels
+and reissues completed requests with a short delay. Outdated requests rejected
+with `ContentModified` are retried after the same delay. A diagnostic refresh cancels
 and restarts the workspace pull; stopping the server cancels outstanding work.
 Unregistering a provider clears its diagnostics from open and closed files while
 retaining other providers, including an active document pull provider with the same
@@ -512,7 +513,14 @@ unregistration or shutdown; late matches cannot publish after cancellation. A fa
 rejects only that file report, allowing remaining reports and pulls to continue.
 Workspace reports honor server file mappings and synchronous/asynchronous
 DocumentMatchers before updating diagnostics; filtering never starts a server
-or connects a document. Workspace reports update closed-file diagnostics. For open files handled by the
+or connects a document. Unchanged reports reuse successful matching for retained
+results until that file's content or path, server definitions or mappings change, or a
+diagnostic refresh is requested. Full reports always run matching. A change
+during asynchronous matching allows one recheck before publication. A file
+that keeps changing is left for the next pull, allowing other queued reports
+to proceed without publishing stale matches. Match entries are discarded
+together with their result IDs.
+Workspace reports update closed-file diagnostics. For open files handled by the
 same document diagnostic provider, a fresh workspace report triggers a document
 pull so current editor diagnostics take precedence over slower workspace results.
 

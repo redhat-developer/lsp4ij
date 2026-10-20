@@ -15,6 +15,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -117,7 +118,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         getClientFeatures().installDocumentContentProvider(documentContentProvider);
         this.workspaceDiagnostics = new WorkspaceDiagnosticManager(server.getWorkspaceService(),
                 AppExecutorUtil.createBoundedScheduledExecutorService("LSP workspace diagnostics", 1),
-                this::matchWorkspaceDiagnosticFile, this::applyWorkspaceDiagnosticReport,
+                this::matchWorkspaceDiagnosticFile, this::workspaceDiagnosticMatchingVersion,
+                this::applyWorkspaceDiagnosticReport,
                 wrapper::clearDocumentDiagnostics, wrapper::clearClosedDocumentDiagnostics);
     }
 
@@ -173,6 +175,22 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         // sufficient: most clients keep its default (true).
         return LanguageServiceAccessor.getInstance(project).isFileMappedToServer(file, getServerDefinition());
     }
+
+    private WorkspaceDiagnosticMatchingVersion workspaceDiagnosticMatchingVersion(String uri) {
+        // Check only this file: unrelated typing must not invalidate every match.
+        // Cached document stamps include unsaved edits without resolving PSI.
+        VirtualFile file = FileUriSupport.findFileByUri(uri, getClientFeatures());
+        long mappingVersion = LanguageServiceAccessor.getInstance(project).getFileMappingModificationCount(wrapper);
+        if (file == null || !file.isValid()) {
+            return new WorkspaceDiagnosticMatchingVersion(null, null, 0, 0, mappingVersion);
+        }
+        var document = FileDocumentManager.getInstance().getCachedDocument(file);
+        return new WorkspaceDiagnosticMatchingVersion(file, file.getUrl(), file.getModificationStamp(),
+                document != null ? document.getModificationStamp() : 0, mappingVersion);
+    }
+
+    private record WorkspaceDiagnosticMatchingVersion(@Nullable VirtualFile file, @Nullable String url, long fileStamp,
+                                                       long documentStamp, long mappingVersion) { }
 
     private boolean applyWorkspaceDiagnosticReport(String identifier, WorkspaceDocumentDiagnosticReport report) {
         if (isDisposed()) {

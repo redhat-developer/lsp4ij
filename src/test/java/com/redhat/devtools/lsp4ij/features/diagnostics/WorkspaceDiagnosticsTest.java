@@ -8,6 +8,8 @@
 package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -244,6 +246,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         assertEquals(2, rejectedDocument.getDiagnostics().size());
         assertTrue(rejectedDocument.hasErrors());
         accepted.set(false);
+        wrapper.incrementModificationCount();
         second.future.complete(new WorkspaceDiagnosticReport(List.of(unchanged
                 ? new WorkspaceDocumentDiagnosticReport(new WorkspaceUnchangedDocumentDiagnosticReport(
                         "old", LSPIJUtils.toUri(rejected).toString(), null))
@@ -254,6 +257,86 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         assertFalse(rejectedDocument.hasErrors());
         assertEquals("retained", wrapper.getClosedDocument(LSPIJUtils.toUri(retained), false)
                 .getDiagnostics().iterator().next().getMessage().getLeft());
+    }
+
+    public void testUnchangedReportsReuseMatchesUntilDefinitionChanges() throws Exception {
+        assertUnchangedMatchInvalidation(file -> wrapper.incrementModificationCount());
+    }
+
+    public void testUnchangedReportsRecheckAfterUnsavedEdit() throws Exception {
+        assertUnchangedMatchInvalidation(file -> WriteCommandAction.runWriteCommandAction(fixture.getProject(),
+                () -> FileDocumentManager.getInstance().getDocument(file).setText("changed")));
+    }
+
+    public void testUnrelatedUnsavedEditsDoNotInvalidateMatching() throws Exception {
+        var other = fixture.addFileToProject("other.routed", "value").getVirtualFile();
+        var document = FileDocumentManager.getInstance().getDocument(other);
+        assertNotNull(document);
+        assertUnchangedMatchInvalidation(file -> WriteCommandAction.runWriteCommandAction(fixture.getProject(),
+                () -> document.setText("changed")), false);
+    }
+
+    public void testUnchangedReportsRecheckAfterFileDeletion() throws Exception {
+        assertUnchangedMatchInvalidation(file ->
+                WriteCommandAction.writeCommandAction(fixture.getProject()).run(() -> file.delete(this)));
+    }
+
+    public void testUnchangedReportsRecheckAfterAccessorChanges() throws Exception {
+        assertUnchangedMatchInvalidation(file -> {
+            var other = new MockLanguageServerDefinition("other-workspace", false);
+            LanguageServersRegistry.getInstance().addServerDefinition(fixture.getProject(), other,
+                    List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.other"), null)));
+            LanguageServersRegistry.getInstance().removeServerDefinition(fixture.getProject(), other);
+        });
+    }
+
+    private void assertUnchangedMatchInvalidation(MatchingChange change) throws Exception {
+        assertUnchangedMatchInvalidation(change, true);
+    }
+
+    private void assertUnchangedMatchInvalidation(MatchingChange change, boolean invalidated) throws Exception {
+        var accepted = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var matches = new java.util.concurrent.atomic.AtomicInteger();
+        registerAsyncMatcher(file -> {
+            matches.incrementAndGet();
+            return CompletableFuture.completedFuture(accepted.get());
+        });
+        var file = fixture.addFileToProject("cached.routed", "value").getVirtualFile();
+        // Load the document before caching a match, so the unsaved-edit test
+        // changes only its text, not the set of PSI files in the project.
+        assertNotNull(FileDocumentManager.getInstance().getDocument(file));
+        String uri = LSPIJUtils.toUri(file).toString();
+        start(true);
+        var full = report(file, "cached", null);
+        full.getLeft().setResultId("one");
+        next().future.complete(new WorkspaceDiagnosticReport(List.of(full)));
+        var second = next();
+        int initialMatches = matches.get();
+        assertTrue(initialMatches > 0);
+        var unchanged = new WorkspaceDiagnosticReport(List.of(new WorkspaceDocumentDiagnosticReport(
+                new WorkspaceUnchangedDocumentDiagnosticReport("one", uri, null))));
+        second.future.complete(unchanged);
+        var third = next();
+        assertEquals("An unchanged report must reuse matching", initialMatches, matches.get());
+        assertEquals(List.of(new PreviousResultId(uri, "one")), third.params.getPreviousResultIds());
+        accepted.set(false);
+        change.run(file);
+        third.future.complete(unchanged);
+        if (!invalidated) {
+            assertEquals(List.of(new PreviousResultId(uri, "one")), next().params.getPreviousResultIds());
+            assertEquals("Editing another file must not invalidate this match", initialMatches, matches.get());
+            return;
+        }
+        assertTrue("Changed/deleted files must lose their retained match and result ID",
+                next().params.getPreviousResultIds().isEmpty());
+        if (file.isValid()) {
+            assertTrue("The matcher must be rechecked after invalidation", matches.get() > initialMatches);
+            assertTrue(wrapper.getClosedDocument(LSPIJUtils.toUri(file), false).getDiagnostics().isEmpty());
+        }
+    }
+
+    private interface MatchingChange {
+        void run(VirtualFile file) throws Exception;
     }
 
     public void testNamedProviderUnregistrationClearsOpenAndClosedDiagnostics() throws Exception {

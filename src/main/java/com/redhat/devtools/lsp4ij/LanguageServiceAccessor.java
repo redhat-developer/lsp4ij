@@ -732,6 +732,17 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Returns a modification count for a server's file associations, including
+     * project-level definition additions/removals and the wrapper's configuration.
+     *
+     * @param wrapper the server whose cached matching decisions are checked
+     * @return a count that advances when any matching dependency changes
+     */
+    public long getFileMappingModificationCount(@NotNull LanguageServerWrapper wrapper) {
+        return modificationTracker.getModificationCount() + wrapper.getModificationTracker().getModificationCount();
+    }
+
+    /**
      * Returns the modification trackers for all language server definitions for the file.
      *
      * @param file the PSI file
