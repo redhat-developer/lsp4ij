@@ -360,8 +360,17 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     public void dispose() {
         this.disposed = true;
         this.progressManager.dispose();
-        GlobalLanguageServerSettings.getInstance().removeSettingsListener(languageServerStartedListener);
-        ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(languageServerStartedListener);
+        var globalSettings = GlobalLanguageServerSettings.getInstance();
+        if (globalSettings != null) {
+            globalSettings.removeSettingsListener(languageServerStartedListener);
+        }
+        var project = getProject();
+        if (!project.isDisposed()) {
+            var projectSettings = ProjectLanguageServerSettings.getInstance(project);
+            if (projectSettings != null) {
+                projectSettings.removeSettingsListener(languageServerStartedListener);
+            }
+        }
     }
 
     public boolean isDisposed() {
