@@ -170,6 +170,16 @@ public class LanguageServiceAccessor implements Disposable {
         return connectionFileInfo;
     }
 
+    private static void sendPendingChanges(@NotNull VirtualFile file,
+                                           @NotNull Collection<LanguageServerWrapper> languageServers) {
+        for (var ls : languageServers) {
+            var openedDocument = ls.getOpenedDocument(ls.toUri(file));
+            if (openedDocument != null && openedDocument.getSynchronizer() != null) {
+                openedDocument.getSynchronizer().sendPendingChanges();
+            }
+        }
+    }
+
     private static boolean match(VirtualFile file, Project fileProject, LanguageServerFileAssociation mapping) {
         if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
             return runCancellableReadAction(() -> mapping.match(file, fileProject), fileProject);
@@ -417,6 +427,13 @@ public class LanguageServiceAccessor implements Disposable {
         @Nullable
         Map<LanguageServerWrapper, LanguageServerWrapper.LSPFileConnectionInfo> connectionFileInfo =
                 getFileConnectionInfoMap(file, matchedServersNow, document, project);
+        if (readAccessAllowed) {
+            // Send the changes made to the file now, while this thread can read it. The request waits for
+            // them to be dispatched, which needs no read access, so a caller holding a write action, as
+            // when a character is typed, can wait for it. Send them to every server that has the file open,
+            // since the matched servers may not be known yet.
+            sendPendingChanges(file, new ArrayList<>(getStartedServers()));
+        }
 
         // Returns the language servers which match the given file, start them and connect the file to each matched language server
         final List<LanguageServerItem> servers = Collections.synchronizedList(new ArrayList<>());

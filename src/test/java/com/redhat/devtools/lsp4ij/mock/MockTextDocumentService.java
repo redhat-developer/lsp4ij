@@ -111,6 +111,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<Hover> hover(HoverParams position) {
+        MockLanguageServer.INSTANCE.record("hover");
         return CompletableFuture.completedFuture(mockHover);
     }
 
@@ -259,6 +260,7 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public void didChange(DidChangeTextDocumentParams params) {
         this.didChangeEvents.add(params);
+        MockLanguageServer.INSTANCE.record("didChange");
     }
 
     @Override

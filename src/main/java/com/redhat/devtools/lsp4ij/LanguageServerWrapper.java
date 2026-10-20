@@ -903,7 +903,7 @@ public class LanguageServerWrapper implements Disposable {
                 LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
 
                 if (waitForDidOpen) {
-                    result = getLanguageServerWhenDidOpen(synchronizer.getDidOpenFuture());
+                    result = getLanguageServerWhenDidOpen(synchronizer);
                 } else {
                     result = CompletableFuture.completedFuture(languageServer);
                 }
@@ -920,27 +920,44 @@ public class LanguageServerWrapper implements Disposable {
         }
         var openedDocument = openedDocuments.get(fileUri);
         if (openedDocument != null && openedDocument.getSynchronizer() != null) {
+            var synchronizer = openedDocument.getSynchronizer();
             if (!waitForDidOpen) {
-                return CompletableFuture.completedFuture(languageServer);
+                // The caller can hold a write action, so wait only for the changes already sent, which needs
+                // no read access. LanguageServiceAccessor sends the pending ones before it connects.
+                var changesSent = synchronizer.getLastChangeSent();
+                return changesSent.isDone() ? CompletableFuture.completedFuture(languageServer) : whenChangesSent(changesSent);
             }
             // The file is already connected.
-            // returns the language server instance when didOpen happened
-            var didOpenFuture = openedDocument.getSynchronizer().getDidOpenFuture();
-            return getLanguageServerWhenDidOpen(didOpenFuture);
+            // returns the language server instance when didOpen, and the changes made since, have been sent
+            return getLanguageServerWhenDidOpen(synchronizer);
         }
         return null;
     }
 
-    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull CompletableFuture<LanguageServer> didOpenFuture) {
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull DocumentContentSynchronizer synchronizer) {
+        var didOpenFuture = synchronizer.getDidOpenFuture();
         if (didOpenFuture.isDone() && !didOpenFuture.isCompletedExceptionally()) {
             // The didOpen has happened, no need to wait for the didOpen
-            // to return the language server
-            return CompletableFuture.completedFuture(languageServer);
+            // to return the language server, only for the changes made since
+            var changesSent = synchronizer.getChangesSent();
+            if (changesSent.isDone()) {
+                return CompletableFuture.completedFuture(languageServer);
+            }
+            return whenChangesSent(changesSent);
         }
         // The didOpen has not happened, or it failed, as for a document closed before it was opened:
         // wait for the end of didOpen to return the language server, or its failure
         return didOpenFuture
-                .thenApplyAsync(theVoid -> languageServer);
+                .thenCompose(ls -> whenChangesSent(synchronizer.getChangesSent()));
+    }
+
+    /**
+     * Returns the language server once the given changes have been dispatched, so that a request sent
+     * with it reaches the server after them. A change that could not be sent does not fail the request.
+     */
+    private CompletableFuture<LanguageServer> whenChangesSent(@NotNull CompletableFuture<Void> changesSent) {
+        // Continue on a pooled thread, not on the dispatcher that completed the changes
+        return changesSent.handleAsync((result, error) -> languageServer);
     }
 
     /**
