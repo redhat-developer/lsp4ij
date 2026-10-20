@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -206,7 +207,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
     }
 
     private static List<LSPUsagePsiElement> createUsages(@Nullable List<? extends Location> locations,
-                                                         @Nullable FileUriSupport fileUriSupport,
+                                                         @NotNull LSPClientFeatures clientFeatures,
                                                          @NotNull LSPUsagePsiElement.UsageKind usageKind,
                                                          @NotNull Project project) {
         if (locations == null || locations.isEmpty()) {
@@ -214,22 +215,22 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
         }
         return locations
                 .stream()
-                .map(location -> LSPUsagesManager.toPsiElement(location, fileUriSupport, usageKind, project))
+                .map(location -> LSPUsagesManager.toPsiElement(location, clientFeatures, usageKind, project))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     private static List<LSPUsagePsiElement> createUsages(@Nullable Either<List<? extends Location>, List<? extends LocationLink>> locations,
-                                                         @Nullable FileUriSupport fileUriSupport,
+                                                         @NotNull LSPClientFeatures clientFeatures,
                                                          @Nullable LSPUsagePsiElement.UsageKind usageKind,
                                                          @Nullable Project project) {
         if (locations == null) {
             return Collections.emptyList();
         }
         if (locations.isLeft()) {
-            return createUsages(locations.getLeft(), fileUriSupport, usageKind, project);
+            return createUsages(locations.getLeft(), clientFeatures, usageKind, project);
         }
-        return createUsagesFromLocationLinks(locations.getRight(), fileUriSupport, usageKind, project);
+        return createUsagesFromLocationLinks(locations.getRight(), clientFeatures, usageKind, project);
     }
 
     private static List<LSPUsagePsiElement> createUsagesFromLocationLinks(@Nullable List<? extends LocationLink> locations,

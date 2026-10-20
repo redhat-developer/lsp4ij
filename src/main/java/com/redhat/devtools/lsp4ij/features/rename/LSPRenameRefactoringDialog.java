@@ -193,6 +193,14 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
             } else {
                 // Apply the rename from the LSP WorkspaceEdit list
                 WriteCommandAction.runWriteCommandAction(psiFile.getProject(), () -> {
+                    // Check all server responses before changing any document or external reference.
+                    for (var workspaceEditData : workspaceEdits) {
+                        String reason = workspaceEditData.snapshot().validate(workspaceEditData.edit());
+                        if (reason != null) {
+                            LSPRenameHandler.showErrorHint(editor, reason);
+                            return;
+                        }
+                    }
                     workspaceEdits.forEach(workspaceEditData -> LSPIJUtils.applyWorkspaceEdit(workspaceEditData.edit()));
 
                     // Update any found external references with the new name

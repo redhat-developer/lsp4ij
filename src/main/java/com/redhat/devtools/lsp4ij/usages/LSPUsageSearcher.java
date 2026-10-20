@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.usages;
 
+import com.intellij.codeInsight.highlighting.ReadWriteAccessDetector;
 import com.intellij.find.findUsages.CustomUsageSearcher;
 import com.intellij.find.findUsages.FindUsagesOptions;
 import com.intellij.openapi.application.ApplicationManager;
@@ -22,6 +23,8 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.usageView.UsageInfo;
+import com.intellij.usages.ReadWriteAccessUsage;
+import com.intellij.usages.ReadWriteAccessUsageInfo2UsageAdapter;
 import com.intellij.usages.Usage;
 import com.intellij.usages.UsageInfo2UsageAdapter;
 import com.intellij.util.Processor;
@@ -147,7 +150,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                                 if (psiElement != null) {
                                     VirtualFile psiElementFile = LSPIJUtils.getFile(psiElement);
                                     if (psiElementFile != null) {
-                                        processor.process(new UsageInfo2UsageAdapter(new UsageInfo(psiElement)));
+                                        processor.process(toUsage(psiElement));
                                     }
                                 }
                             }, project);
@@ -194,7 +197,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                         }));
 
                         for (LSPUsagePsiElement usage : filteredUsages) {
-                            processor.process(new UsageInfo2UsageAdapter(new UsageInfo(usage)));
+                            processor.process(toUsage(usage));
                         }
                     }, project);
                 }
@@ -211,6 +214,22 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                 searchScope,
                 reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
         );
+    }
+
+    /**
+     * Wraps a usage element for the usage view.
+     * <p>
+     * A usage whose access is known becomes a {@link ReadWriteAccessUsage}, which is what the read and write
+     * access filters and icons of the usage view act on. Any other usage is wrapped as it always was.
+     * </p>
+     *
+     * @param usage the usage element.
+     * @return the usage to report.
+     */
+    static @NotNull Usage toUsage(@NotNull LSPUsagePsiElement usage) {
+        UsageInfo usageInfo = new UsageInfo(usage);
+        ReadWriteAccessDetector.Access access = usage.getAccess();
+        return access != null ? new ReadWriteAccessUsageInfo2UsageAdapter(usageInfo, access) : new UsageInfo2UsageAdapter(usageInfo);
     }
 
     /**

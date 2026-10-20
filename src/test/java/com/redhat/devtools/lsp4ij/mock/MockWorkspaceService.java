@@ -18,7 +18,10 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
@@ -29,19 +32,102 @@ public class MockWorkspaceService implements WorkspaceService {
 	private Function<?, ?> _futureFactory;
 	private CompletableFuture<ExecuteCommandParams> executedCommand = new CompletableFuture<>();
 	private List<DidChangeWorkspaceFoldersParams> workspaceFoldersEvents = new ArrayList<>();
+	private final List<FileEvent> watchedFileEvents = new CopyOnWriteArrayList<>();
     private WorkspaceEdit willRename;
+    private WorkspaceEdit willCreate;
+    private WorkspaceEdit willDelete;
+    private long willCreateDelayMs;
+    private long willDeleteDelayMs;
+    private long willRenameDelayMs;
+    private volatile CompletableFuture<RenameFilesParams> didRenameCallback;
+    private volatile CompletableFuture<RenameFilesParams> willRenameCallback;
+    private final Map<String, String> documentContents = new ConcurrentHashMap<>();
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
 	}
 
+    public void setDidRenameCallback(CompletableFuture<RenameFilesParams> callback) {
+        didRenameCallback = callback;
+    }
+
+    public void setWillRenameCallback(CompletableFuture<RenameFilesParams> callback) {
+        willRenameCallback = callback;
+    }
+
+    @Override
+    public void didRenameFiles(RenameFilesParams params) {
+        var callback = didRenameCallback;
+        if (callback != null) {
+            didRenameCallback = null;
+            callback.complete(params);
+        }
+    }
+
     public void setWillRename(WorkspaceEdit willRename) {
         this.willRename = willRename;
     }
 
+    public void setWillCreate(WorkspaceEdit willCreate) {
+        this.willCreate = willCreate;
+    }
+
+    public void setWillDelete(WorkspaceEdit willDelete) {
+        this.willDelete = willDelete;
+    }
+
+    public void setWillCreateDelayMs(long delayMs) {
+        this.willCreateDelayMs = delayMs;
+    }
+
+    public void setWillDeleteDelayMs(long delayMs) {
+        this.willDeleteDelayMs = delayMs;
+    }
+
+    public void setWillRenameDelayMs(long delayMs) {
+        this.willRenameDelayMs = delayMs;
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceEdit> willCreateFiles(CreateFilesParams params) {
+        return delayedResult(willCreate, willCreateDelayMs);
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceEdit> willDeleteFiles(DeleteFilesParams params) {
+        return delayedResult(willDelete, willDeleteDelayMs);
+    }
+
     @Override
     public CompletableFuture<WorkspaceEdit> willRenameFiles(RenameFilesParams params) {
-        return CompletableFuture.supplyAsync(() -> this.willRename);
+        var callback = willRenameCallback;
+        if (callback != null) {
+            willRenameCallback = null;
+            callback.complete(params);
+        }
+        return delayedResult(willRename, willRenameDelayMs);
+    }
+
+    public void setDocumentContent(String uri, String text) {
+        documentContents.put(uri, text);
+    }
+
+    @Override
+    public CompletableFuture<TextDocumentContentResult> textDocumentContent(TextDocumentContentParams params) {
+        MockLanguageServer.INSTANCE.record("textDocumentContent");
+        var text = documentContents.get(params.getUri());
+        return text != null ? CompletableFuture.completedFuture(new TextDocumentContentResult(text))
+                : CompletableFuture.failedFuture(new IllegalArgumentException("No content for " + params.getUri()));
+    }
+
+    private static CompletableFuture<WorkspaceEdit> delayedResult(WorkspaceEdit result, long delayMs) {
+        if (delayMs <= 0) {
+            return CompletableFuture.supplyAsync(() -> result);
+        }
+        CompletableFuture<WorkspaceEdit> future = new CompletableFuture<>();
+        CompletableFuture.delayedExecutor(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .execute(() -> future.complete(result));
+        return future;
     }
 
     /**
@@ -63,17 +149,26 @@ public class MockWorkspaceService implements WorkspaceService {
 
 	@Override
 	public void didChangeConfiguration(DidChangeConfigurationParams params) {
-		// No-op
+		MockLanguageServer.INSTANCE.record("didChangeConfiguration");
 	}
 
 	@Override
 	public void didChangeWatchedFiles(DidChangeWatchedFilesParams params) {
-		// No-op
+		watchedFileEvents.addAll(params.getChanges());
+		MockLanguageServer.INSTANCE.record("didChangeWatchedFiles");
+	}
+
+	/**
+	 * @return the file events of the workspace/didChangeWatchedFiles notifications this server received, in order
+	 */
+	public List<FileEvent> getWatchedFileEvents() {
+		return watchedFileEvents;
 	}
 
 	@Override
 	public void didChangeWorkspaceFolders(DidChangeWorkspaceFoldersParams params) {
 		workspaceFoldersEvents.add(params);
+		MockLanguageServer.INSTANCE.record("didChangeWorkspaceFolders");
 	}
 
 	public List<DidChangeWorkspaceFoldersParams> getWorkspaceFoldersEvents() {

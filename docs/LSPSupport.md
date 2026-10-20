@@ -18,8 +18,8 @@ Current state of [Text Document Synchronization](https://microsoft.github.io/lan
  * ✅ [textDocument/didChange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didChange).
  * ✅ [textDocument/didClose](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didClose).
  * ✅ [textDocument/didSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didSave).
- * ❌ [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave).
- * ❌ [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil).
+ * ✅ [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave) (see [implementation details](#will-save))
+ * ✅ [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil) (see [implementation details](#will-save))
  
 Notebooks are not supported.
  
@@ -46,7 +46,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/inlineCompletion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_inlineCompletion) (see [implementation details](#inline-completion))
  * ✅ [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp) (see [implementation details](#signature-help))
  * ✅ [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) (see [implementation details](#publish-diagnostics))
- * ✅ [textDocument/codeAction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction) (see [implementation details](#codeAction))
+ * ✅ [textDocument/codeAction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction) (see [implementation details](#code-action))
  * ✅ [codeAction/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve)
  * ✅ [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) (see [implementation details](#document-color))
  * ✅ [textDocument/colorPresentation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation) (see [implementation details](#document-color))
@@ -93,6 +93,8 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
  * ✅ [workspace/didRenameFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles).
  * ✅ [workspace/willDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles).
  * ✅ [workspace/didDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles).
+ * ✅ [workspace/textDocumentContent](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContent) (LSP 3.18, see [implementation details](#text-document-content))
+ * ✅ [workspace/textDocumentContent/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContentRefresh) (LSP 3.18, see [implementation details](#text-document-content))
  * ❌ [workspace/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic).
  
 ## Window Features
@@ -114,6 +116,23 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
 Here a sample with [Eclipse JDT Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls):
 
 ![$/progress](./images/lsp-support/progress.png)
+
+### Will Save
+
+When a document is saved, [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave)
+and [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil)
+are sent before it is written, to each language server that has the document open and asks for them
+(`willSave` and `willSaveWaitUntil` in its `TextDocumentSyncOptions`):
+
+ * The changes not yet sent to the server are sent first, so that it has the text that is saved.
+ * The reason of `willSave` is always `Manual`, since IntelliJ does not say why a document is saved.
+ * The save waits for the edits of `willSaveWaitUntil` for at most 1.5 seconds. The documents saved together, as by
+   `Save All` or on switching to another application, share that time: a document that finds it used up still gets
+   `willSave`, but not `willSaveWaitUntil`.
+ * The edits that arrive in time are applied to the document, in a command of their own so that `Undo` reverts them
+   alone, and are saved with it. The server receives their `didChange` before the `didSave`.
+ * The edits that arrive later are dropped, as LSP allows. After three such timeouts, `willSaveWaitUntil` is no longer
+   sent for that document.
 
 ### Go to Definition
 
@@ -447,7 +466,7 @@ Here is an example with the [TypeScript Language Server](https://github.com/type
 ### Code block provider
 
 LSP4IJ registers the an implementation of the `codeBlockProvider` extension point with
-[LSPCodeBlockProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/foldingRange/LSPCodeBlockProvider.java) for `TEXT` and `textmate` languages to provide block brace matching and easy navigation to
+[LSPCodeBlockProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/codeBlockProvider/LSPCodeBlockProvider.java) for `TEXT` and `textmate` languages to provide block brace matching and easy navigation to
 the beginning/end of the containing block. For maximum flexibility in the absence of a true AST in the LSP client, code
 blocks are derived from `textDocument/selectionRange` first and, failing that, from `textDocument/foldingRange`.
 
@@ -817,3 +836,23 @@ After setting the cursor position in a file, you can view the Type Hierarchy usi
 Here is an example with the [MicroProfile language server](https://github.com/eclipse/lsp4mp/tree/master/microprofile.ls) collecting JAX-RS endpoints:
 
 ![workspace/symbol](./images/lsp-support/workspace_symbol.gif)
+
+### Text Document Content
+
+[workspace/textDocumentContent](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContent)
+lets a language server provide documents that are not files on disk, such as library sources, decompiled classes or
+generated code, under the URI schemes it lists in its `workspace.textDocumentContent` capability, or registers
+dynamically with `client/registerCapability`.
+
+ * When a navigation result points to a URI with one of those schemes, its text is fetched with
+   `workspace/textDocumentContent` before IntelliJ navigates there, and it opens in a read-only editor. The results
+   that can point there are locations, such as a definition or a reference, workspace symbols, call and type hierarchy
+   items, and document links. `file` URIs are never fetched.
+ * [window/showDocument](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument)
+   opens such a URI the same way.
+ * The document keeps the server's URI. It is opened on the server with `textDocument/didOpen` under that URI, so the
+   language features work in its editor.
+ * On [workspace/textDocumentContent/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContentRefresh),
+   the text is fetched again and the open editor shows it, without the document becoming modified.
+ * The documents are closed when the language server stops, or when it unregisters their scheme. A request for their
+   text times out after 10 seconds.

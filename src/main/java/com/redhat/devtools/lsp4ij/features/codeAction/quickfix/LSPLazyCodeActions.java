@@ -16,8 +16,6 @@ package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -30,6 +28,7 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,8 +56,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     // The diagnostic
     private final List<Diagnostic> diagnostics;
 
-    // The virtual file
-    private final PsiFile file;
+    // The virtual file. Kept as is rather than resolved to a PsiFile: diagnostics are published on the LSP
+    // message thread, where a read action would wait for any pending write action, and a write action on the
+    // EDT may itself be waiting for a response queued behind that very message.
+    private final VirtualFile file;
 
     // The language server which has reported the diagnostic
     private final LanguageServerItem languageServer;
@@ -67,14 +68,14 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     private final List<IntentionAction> codeActions;
 
     // LSP code actions request used to load code action for the diagnostic.
-    private CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
+    private volatile CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
     private CancellationSupport cancellationSupport;
 
     public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
                               @NotNull VirtualFile file,
                               @NotNull LanguageServerItem languageServer) {
         this.diagnostics = diagnostics;
-        this.file = LSPIJUtils.getPsiFile(file, languageServer.getProject());
+        this.file = file;
         this.languageServer = languageServer;
         // Create 20 lazy IJ quick fixes which does nothing (IntentAction#isAvailable returns false)
         codeActions = new ArrayList<>(NB_LAZY_CODE_ACTIONS);
@@ -103,18 +104,30 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     }
 
     private @Nullable List<CodeActionData> getOrLoadCodeActions() {
-        if (lspCodeActionRequest == null) {
-            // Create LSP textDocument/codeAction request
-            lspCodeActionRequest = loadCodeActionsFor(diagnostics);
+        CompletableFuture<List<CodeActionData>> future;
+        synchronized (this) {
+            future = lspCodeActionRequest;
+            if (future == null) {
+                // Create LSP textDocument/codeAction request. Highlighting passes run in parallel: without the lock,
+                // a second load cancels the first request before it is sent, and the stored request can be that
+                // cancelled one. cancel() clears a retired request; other failures are kept, so that availability
+                // checks do not each send a request to a failing server.
+                future = loadCodeActionsFor(diagnostics);
+                lspCodeActionRequest = future;
+            }
         }
         // Wait for the LSP response, cooperating with IntelliJ's threading model.
         // See https://github.com/redhat-developer/lsp4ij/issues/1648
-        var future = lspCodeActionRequest;
         try {
             awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException e) {
+            return null;
+        }
+        if (future != lspCodeActionRequest) {
+            // cancel() retired this request while it was pending. A cancelled request completes without code
+            // actions, which says nothing about the available code actions, so report them as not loaded yet.
             return null;
         }
         if (isDoneNormally(future)) {
@@ -133,14 +146,20 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         if (cancellationSupport != null) {
             cancellationSupport.cancel();
         }
-        cancellationSupport = new CancellationSupport();
+        // Each request keeps its own cancellation: the field can hold a newer one by the time the server is ready.
+        CancellationSupport requestCancellation = new CancellationSupport();
+        cancellationSupport = requestCancellation;
         return languageServer
                         .getInitializedServer()
                         .thenCompose(ls -> {
+                            if (requestCancellation.isCanceled()) {
+                                // cancel() retired this request while the server initialized: don't send it.
+                                return CompletableFuture.completedFuture(Collections.<CodeActionData>emptyList());
+                            }
 
                             // Collect code action for the given file by using the language server
                             CodeActionParams params = createCodeActionParams(diagnostics, file, languageServer.getClientFeatures());
-                            return cancellationSupport.execute(ls.getTextDocumentService()
+                            return requestCancellation.execute(ls.getTextDocumentService()
                                     .codeAction(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION)
                                     .thenApply(codeActions -> {
                                         if (codeActions == null || codeActions.isEmpty()) {
@@ -171,10 +190,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @return the LSP code action parameters for the given diagnostic and file.
      */
     private static CodeActionParams createCodeActionParams(@NotNull List<Diagnostic> diagnostics,
-                                                           @NotNull PsiFile file,
+                                                           @NotNull VirtualFile file,
                                                            @NotNull FileUriSupport fileUriSupport) {
         CodeActionParams params = new CodeActionParams();
-        var identifier = new TextDocumentIdentifier(FileUriSupport.toString(file.getVirtualFile(), fileUriSupport));
+        var identifier = new TextDocumentIdentifier(FileUriSupport.toString(file, fileUriSupport));
         params.setTextDocument(identifier);
         // As diagnostic list is never empty, and it is sorted by the max range, the code action range parameter is the first diagnostic
         Range range = diagnostics.get(0).getRange();
@@ -200,9 +219,20 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     /**
      * Cancel if needed the LSP request textDocument/codeAction
      */
-    public void cancel() {
+    public synchronized void cancel() {
         if (cancellationSupport != null) {
             cancellationSupport.cancel();
         }
+        // The editor can keep the quick fixes that use these code actions, for example when the same diagnostics
+        // are published again, so the next use must send a new request.
+        lspCodeActionRequest = null;
+    }
+
+    /**
+     * Returns true if a textDocument/codeAction request has been created and not cancelled since.
+     */
+    @TestOnly
+    synchronized boolean hasRequest() {
+        return lspCodeActionRequest != null;
     }
 }

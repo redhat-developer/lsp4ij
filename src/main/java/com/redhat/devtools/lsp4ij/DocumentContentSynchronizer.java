@@ -12,26 +12,38 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 
 /**
  * Synchronize IntelliJ document (open, content changed, close, save)
@@ -44,7 +56,12 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         ON_WORKSPACE_REFRESH
     }
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(DocumentContentSynchronizer.class);
+
     private static final long WAIT_AFTER_SENDING_DID_OPEN = 500L;
+
+    // After this many textDocument/willSaveWaitUntil timeouts, the request is no longer sent for the document
+    private static final int WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS = 3;
 
     private final @NotNull LanguageServerWrapper languageServerWrapper;
     private final @NotNull Document document;
@@ -52,32 +69,74 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     private final @NotNull TextDocumentSyncOptions syncOptions;
     private final @NotNull VirtualFile file;
     private final @Nullable String documentText;
+    private final long documentModificationStamp;
     private final @Nullable String languageId;
 
-    private int version = 0;
+    // Update the LSP version and its matching editor stamp together under changeEvents.
+    // The stamp is -1 until the text associated with a version is known. Volatile also
+    // supports callers that only need getVersion(), without inspecting the pending changes.
+    private volatile int version = 0;
+    private long synchronizedModificationStamp = -1;
     private final List<TextDocumentContentChangeEvent> changeEvents;
     private volatile @NotNull CompletableFuture<Void> lastDidChangeFuture = CompletableFuture.completedFuture(null);
     private @Nullable CompletableFuture<LanguageServer> didOpenFuture;
+    // Whether didOpen and didClose have been queued. Both change under changeEvents, where the
+    // notifications they describe are queued, so that the server receives didOpen before any
+    // didChange or didClose, nothing after didClose, and didClose only after a didOpen.
+    private boolean opened;
+    private boolean closed;
+    // The didOpen notification once it is queued: a later didChange or didClose waits for it, and is not
+    // sent if it failed. Guarded by changeEvents.
+    private @Nullable CompletableFuture<LanguageServer> didOpenNotification;
+    // Completes once the didOpen and the changes queued before it are dispatched, without the pause
+    // that didOpenFuture adds for other requests
+    private volatile @Nullable CompletableFuture<Void> openSent;
 
-    private volatile Alarm debouncePullDiagnosticsAlarm = null;
+    // Create the Alarm while its owner is alive, never from a delayed document callback.
+    // It does not schedule work until a request is added.
+    private final Disposable diagnosticLifetime;
+    private final Alarm debouncePullDiagnosticsAlarm;
     private boolean diagnosticNotPulledOnDidOpen;
+    // The result ID of the last pulled report applied to this document, sent as the next pull's
+    // previousResultId. Guarded by diagnosticLifetime.
+    private @Nullable String pullResultId;
+    // The textDocument/willSaveWaitUntil requests that took too long. Saves run on the UI thread.
+    private int willSaveWaitUntilTimeouts;
 
+    /**
+     * Compatibility constructor for callers without a stamp for the supplied text.
+     * If documentText is supplied, versioned edits cannot be accepted until a didChange
+     * establishes which editor state the protocol version represents.
+     */
     public DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
                                        @NotNull String fileUri,
                                        @NotNull VirtualFile file,
                                        @NotNull Document document,
                                        @Nullable String documentText,
                                        @Nullable String languageId) {
+        this(languageServerWrapper, fileUri, file, document, documentText, -1, languageId);
+    }
+
+    DocumentContentSynchronizer(@NotNull LanguageServerWrapper languageServerWrapper,
+                                @NotNull String fileUri,
+                                @NotNull VirtualFile file,
+                                @NotNull Document document,
+                                @Nullable String documentText,
+                                long documentModificationStamp,
+                                @Nullable String languageId) {
         this.languageServerWrapper = languageServerWrapper;
         this.file = file;
         this.fileUri = fileUri;
         this.syncOptions = languageServerWrapper.getSyncOptions();
         this.document = document;
         this.documentText = documentText;
+        this.documentModificationStamp = documentModificationStamp;
         this.languageId = languageId;
 
         // Initialize LSP change events
         changeEvents = new ArrayList<>();
+        diagnosticLifetime = Disposer.newDisposable();
+        debouncePullDiagnosticsAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, diagnosticLifetime);
     }
 
     public @NotNull CompletableFuture<LanguageServer> getDidOpenFuture() {
@@ -101,19 +160,60 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         // add a document buffer
         TextDocumentItem textDocument = new TextDocumentItem();
         textDocument.setUri(this.fileUri);
-        textDocument.setText(documentText != null ? documentText : document.getText());
+        long modificationStamp;
+        if (documentText != null) {
+            // Reuse the captured text and stamp: rereading the document here can deadlock
+            // when a VFS rename holds the write lock while waiting for reconnection.
+            textDocument.setText(documentText);
+            modificationStamp = documentModificationStamp;
+        } else {
+            modificationStamp = readDocumentState(() -> {
+                // The current text already contains the changes queued so far, since this read
+                // cannot overlap the write action that queued them. A didChange sending them after
+                // this didOpen would apply them twice.
+                synchronized (changeEvents) {
+                    changeEvents.clear();
+                }
+                textDocument.setText(document.getText());
+                return document.getModificationStamp();
+            });
+        }
 
         @NotNull String languageId = this.languageId != null ? this.languageId :
                 languageServerWrapper.getServerDefinition().getLanguageId(file, languageServerWrapper.getProject());
         textDocument.setLanguageId(languageId);
-        textDocument.setVersion(++version);
-        didOpenFuture = languageServerWrapper
-                .getInitializedServer()
-                .thenApplyAsync(ls -> {
-                    ls.getTextDocumentService()
-                            .didOpen(new DidOpenTextDocumentParams(textDocument));
-                    return ls;
-                })
+        var initializedServer = languageServerWrapper.getInitializedServer();
+        CompletableFuture<LanguageServer> didOpen;
+        synchronized (changeEvents) {
+            if (closed) {
+                // The document was closed first; an open now could never be balanced by a close
+                return didOpenFuture = CompletableFuture.failedFuture(
+                        new CancellationException("The document was closed before it was opened"));
+            }
+            version = languageServerWrapper.nextDocumentVersion();
+            synchronizedModificationStamp = modificationStamp;
+            textDocument.setVersion(version);
+            // Send didOpen like didChange and didClose, so that it keeps its place among them, and
+            // decide it under the same monitor as them, so that neither can reach the server first
+            opened = true;
+            didOpen = languageServerWrapper.sendNotification(initializedServer, ls -> {
+                ls.getTextDocumentService()
+                        .didOpen(new DidOpenTextDocumentParams(textDocument));
+                return ls;
+            });
+            didOpenNotification = didOpen;
+        }
+        // Changes made since a captured text was read wait for the didOpen; send them after it, before
+        // the requests that wait for the open. Sending them needs read access: a thread that has it, as
+        // in a write action, sends them now, and any other from a pooled thread, since a caller can hold
+        // the wrapper's documentsLock, which a write action can be waiting for.
+        CompletableFuture<Void> changesSent = ApplicationManager.getApplication().isReadAccessAllowed()
+                ? sendDidChangeEvents()
+                : didOpen.thenCompose(ls -> CompletableFuture.supplyAsync(this::sendDidChangeEvents)
+                        .thenCompose(sent -> sent));
+        openSent = didOpen.thenCompose(ls -> changesSent);
+        didOpenFuture = didOpen
+                .thenCompose(ls -> changesSent.thenApply(sent -> ls))
                 .thenCompose(ls ->
                         CompletableFuture.supplyAsync(() -> {
                             if (!ApplicationManager.getApplication().isUnitTestMode()) {
@@ -167,44 +267,132 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * notification has been dispatched. If events were already sent by another caller
      * (e.g., {@code performForCommittedDocument}), returns the future tracking that
      * dispatch, ensuring the caller waits for it to complete before proceeding.
+     * <p>
+     * Before the document is opened, the server has no document for such a request, so this opens it;
+     * the didOpen is followed by the pending changes, and the future completes once both are dispatched.
      *
      * @return a CompletableFuture that completes when all didChange notifications have been dispatched
      */
     public CompletableFuture<Void> flushPendingChanges() {
+        boolean beforeOpen;
+        synchronized (changeEvents) {
+            beforeOpen = syncOptions.getOpenClose() && !opened && !closed;
+        }
+        if (beforeOpen) {
+            var open = getDidOpenFuture();
+            var sent = openSent;
+            return sent != null ? sent : open.thenApply(ls -> null);
+        }
         return sendDidChangeEvents();
     }
 
-    private CompletableFuture<Void> sendDidChangeEvents() {
-        List<TextDocumentContentChangeEvent> events;
-        CompletableFuture<Void> barrier;
+    /**
+     * Sends the pending changes now, which outside unit-test mode wait for the document to be committed,
+     * so that a request about to be sent can wait for them with {@link #getLastChangeSent()}. The caller
+     * must have read access, as in a write action, and must not hold the wrapper's documentsLock: sending
+     * takes the wrapper's monitor, which stop() takes before documentsLock.
+     */
+    void sendPendingChanges() {
+        sendDidChangeEvents();
+    }
+
+    /**
+     * Returns a future that completes once the changes made to the opened document so far have been
+     * dispatched, so that a request sent after it is answered for the current text. Pending changes are
+     * sent from a pooled thread: sending them needs read access and takes the wrapper's monitor, and the
+     * caller can hold the wrapper's documentsLock, which a write action can be waiting for.
+     *
+     * @return a CompletableFuture that completes when the changes made so far have been dispatched
+     */
+    @NotNull
+    CompletableFuture<Void> getChangesSent() {
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
                 return lastDidChangeFuture;
             }
-            events = new ArrayList<>(changeEvents);
-            changeEvents.clear();
-            barrier = new CompletableFuture<>();
-            lastDidChangeFuture = barrier;
         }
+        return CompletableFuture.supplyAsync(this::sendDidChangeEvents)
+                .thenCompose(sent -> sent);
+    }
 
-        final int version = ++this.version;
-        // send 'textDocument/didChange' notification
-        DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
-        changeParamsToSend.getTextDocument().setUri(fileUri);
-        changeParamsToSend.getTextDocument().setVersion(version);
-        var didChange = languageServerWrapper.sendNotification(ls -> {
-            ls.getTextDocumentService().didChange(changeParamsToSend);
-            return ls;
-        });
-        processPullDiagnosticIfNeeded(didChange, version);
-        didChange.whenComplete((ls, ex) -> {
-            if (ex != null) {
-                barrier.completeExceptionally(ex);
-            } else {
-                barrier.complete(null);
+    /**
+     * Returns a future that completes once the changes already sent have been dispatched. Unlike
+     * {@link #getChangesSent()}, it does not send pending changes, so waiting for it never needs
+     * read access.
+     *
+     * @return a CompletableFuture that completes when the last didChange sent has been dispatched
+     */
+    @NotNull
+    CompletableFuture<Void> getLastChangeSent() {
+        return lastDidChangeFuture;
+    }
+
+    /**
+     * Reads document state on this thread when it already has read access, as inside a write action,
+     * and otherwise in a cancellable read action, so a pending write action is never blocked.
+     */
+    private <T> T readDocumentState(@NotNull Supplier<T> read) {
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return read.get();
+        }
+        return runCancellableReadAction(read::get, languageServerWrapper);
+    }
+
+    private CompletableFuture<Void> sendDidChangeEvents() {
+        synchronized (changeEvents) {
+            if (changeEvents.isEmpty()) {
+                // No document state to read. On-type formatting may await this barrier in a write action.
+                return lastDidChangeFuture;
             }
+        }
+        // Incremental events are queued before the document changes. Acquire read access before
+        // consuming them under the monitor so the batch and stamp describe the same completed state.
+        // The block makes no cancellation check once it starts, so a cancellable read consumes the
+        // batch once: it is only retried before starting, while a write action is pending.
+        var initializedServer = languageServerWrapper.getInitializedServer();
+        return readDocumentState(() -> {
+            CompletableFuture<Void> barrier;
+            final int version;
+            final CompletableFuture<LanguageServer> didChange;
+            synchronized (changeEvents) {
+                if (changeEvents.isEmpty()) {
+                    return lastDidChangeFuture;
+                }
+                if (closed || syncOptions.getOpenClose() && !opened) {
+                    // Before didOpen the changes wait for it, which either contains them or is
+                    // followed by them; after didClose the server no longer has the document.
+                    return lastDidChangeFuture;
+                }
+                List<TextDocumentContentChangeEvent> events = new ArrayList<>(changeEvents);
+                changeEvents.clear();
+                barrier = new CompletableFuture<>();
+                lastDidChangeFuture = barrier;
+                // Record the state represented by this batch before another flush can advance it.
+                version = languageServerWrapper.nextDocumentVersion();
+                this.version = version;
+                synchronizedModificationStamp = document.getModificationStamp();
+
+                // send 'textDocument/didChange' notification, queued under the monitor so that a
+                // concurrent close cannot queue its didClose before it
+                DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
+                changeParamsToSend.getTextDocument().setUri(fileUri);
+                changeParamsToSend.getTextDocument().setVersion(version);
+                didChange = languageServerWrapper.sendNotification(
+                        didOpenNotification != null ? didOpenNotification : initializedServer, ls -> {
+                    ls.getTextDocumentService().didChange(changeParamsToSend);
+                    return ls;
+                });
+            }
+            processPullDiagnosticIfNeeded(didChange, version);
+            didChange.whenComplete((ls, ex) -> {
+                if (ex != null) {
+                    barrier.completeExceptionally(ex);
+                } else {
+                    barrier.complete(null);
+                }
+            });
+            return barrier;
         });
-        return barrier;
     }
 
     @Override
@@ -252,6 +440,77 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         return null;
     }
 
+    /**
+     * Sends {@code textDocument/willSave} and {@code textDocument/willSaveWaitUntil}, as the server asks for them,
+     * before the document is saved. The edits that willSaveWaitUntil returns by the deadline are applied to the
+     * document, so that they are saved with it. LSP allows dropping the edits of a request that takes too long: after
+     * {@value #WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS} timeouts, the request is no longer sent for this document.
+     * <p>
+     * Called in the write action of the save, on the UI thread, which waits for the server at most until the deadline.
+     * Once it has passed, willSaveWaitUntil is not sent.
+     *
+     * @param deadlineNanos the {@link System#nanoTime()} until which the save may wait for the edits, shared by the
+     *                      documents saved together
+     */
+    void documentWillSave(long deadlineNanos) {
+        boolean willSave = Boolean.TRUE.equals(syncOptions.getWillSave());
+        boolean willSaveWaitUntil = Boolean.TRUE.equals(syncOptions.getWillSaveWaitUntil())
+                && willSaveWaitUntilTimeouts < WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS;
+        if (!willSave && !willSaveWaitUntil) {
+            return;
+        }
+        synchronized (changeEvents) {
+            if (closed || syncOptions.getOpenClose() && !opened) {
+                // The server has no document to save
+                return;
+            }
+        }
+        // The server must have the text that is saved
+        sendDidChangeEvents();
+        // IntelliJ does not say why a document is saved
+        var params = new WillSaveTextDocumentParams(new TextDocumentIdentifier(fileUri), TextDocumentSaveReason.Manual);
+        if (willSave) {
+            languageServerWrapper.sendNotification(ls -> {
+                ls.getTextDocumentService().willSave(params);
+                return ls;
+            });
+        }
+        if (!willSaveWaitUntil || deadlineNanos - System.nanoTime() <= 0) {
+            // A save after the documents saved before it in the same batch have used up the budget waits no more
+            return;
+        }
+        // Sent from the dispatcher once the notifications before it are, so that the server has the text and the willSave
+        CompletableFuture<List<TextEdit>> request = languageServerWrapper.sendNotification(ls -> ls)
+                .thenCompose(ls -> ls != null
+                        ? ls.getTextDocumentService().willSaveWaitUntil(params)
+                        : CompletableFuture.completedFuture(null));
+        List<TextEdit> edits;
+        try {
+            edits = request.get(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException e) {
+            request.cancel(true);
+            willSaveWaitUntilTimeouts++;
+            LOGGER.warn("textDocument/willSaveWaitUntil for '{}' took too long, so its edits are dropped{}", fileUri,
+                    willSaveWaitUntilTimeouts < WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS ? "" : ", and it is no longer sent for this document");
+            return;
+        } catch (ExecutionException | CancellationException e) {
+            LOGGER.warn("textDocument/willSaveWaitUntil for '{}' failed", fileUri, e);
+            return;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        if (edits == null || edits.isEmpty()) {
+            return;
+        }
+        // A command of its own, so that Undo reverts the server's edits alone
+        CommandProcessor.getInstance().executeCommand(languageServerWrapper.getProject(),
+                () -> LSPIJUtils.applyEdits(null, document, edits),
+                LanguageServerBundle.message("lsp.will.save.wait.until.command"), null);
+        // Sent before the didSave of this save
+        sendDidChangeEvents();
+    }
+
     public void documentSaved() {
         if (!languageServerWrapper.isSaveSupported()) {
             // Don't send textDocument/didSave
@@ -271,7 +530,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     public void documentClosed() {
         // When LS is shut down all documents are being disconnected. No need to send "didClose" message to the LS that is being shut down or not yet started
-        if (syncOptions.getOpenClose() && languageServerWrapper.isActive()) {
+        boolean sendDidClose = syncOptions.getOpenClose() && languageServerWrapper.isActive();
+        CompletableFuture<LanguageServer> initializedServer = null;
+        if (sendDidClose) {
             // Ensure pending textDocument/didChange events are sent before the file is closed.
             //
             // This handles the specific case where a file is being renamed:
@@ -282,14 +543,24 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             if (!changeEvents.isEmpty()) {
                 sendDidChangeEvents();
             }
+            initializedServer = languageServerWrapper.getInitializedServer();
+        }
 
-            // Send textDocument/didClose
-            languageServerWrapper.sendNotification(ls -> {
-                TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
-                DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
-                ls.getTextDocumentService().didClose(params);
-                return ls;
-            });
+        synchronized (changeEvents) {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            // A close notification requires a previous open notification
+            if (initializedServer != null && opened) {
+                // Send textDocument/didClose, after a didOpen that was sent
+                languageServerWrapper.sendNotification(didOpenNotification, ls -> {
+                    TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
+                    DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
+                    ls.getTextDocumentService().didClose(params);
+                    return ls;
+                });
+            }
         }
     }
 
@@ -320,13 +591,28 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         return version;
     }
 
+    /**
+     * Returns whether the given version describes the current buffer, with no pending changes.
+     * The caller holds read or write access to keep the document stable. Checking the version,
+     * stamp and event queue under the same monitor prevents mixing states from different flushes.
+     * This describes the text assigned to a notification, not an acknowledgement from the server.
+     */
+    boolean isCurrentVersion(int expectedVersion) {
+        synchronized (changeEvents) {
+            return version == expectedVersion && changeEvents.isEmpty()
+                    && document.getModificationStamp() == synchronizedModificationStamp;
+        }
+    }
+
     @Override
     public void dispose() {
-        documentClosed();
-        if (debouncePullDiagnosticsAlarm != null) {
-            debouncePullDiagnosticsAlarm.dispose();
-            debouncePullDiagnosticsAlarm = null;
+        // Retire diagnostics before documentClosed can flush changes and schedule another pull.
+        // A private parent lets disposal and scheduling share a lock; registering the Alarm under
+        // this synchronizer would dispose the child before this method can acquire that lock.
+        synchronized (diagnosticLifetime) {
+            Disposer.dispose(diagnosticLifetime);
         }
+        documentClosed();
     }
 
     /**
@@ -360,6 +646,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      */
     private void processPullDiagnosticIfNeeded(@Nullable CompletableFuture<LanguageServer> didFuture,
                                                int version) {
+        if (debouncePullDiagnosticsAlarm.isDisposed()) {
+            // Sending a notification can restart the connection and dispose this synchronizer.
+            return;
+        }
         boolean debounceValidation = didFuture != null && !ApplicationManager.getApplication().isUnitTestMode();
         if (!isPullDiagnosticsSupported()) {
             // The language server doesn't support pull diagnostics.
@@ -387,71 +677,86 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             return;
         }
         // Refresh pull diagnostic with debounce (after a didOpen , didChange).
-        // Initialize the Alarm which consumes 'textDocument/diagnostic' with debounce mode.
-        if (debouncePullDiagnosticsAlarm == null) {
-            debouncePullDiagnosticsAlarm = getDebouncePullDiagnosticsAlarm();
-        } else {
+        synchronized (diagnosticLifetime) {
+            if (debouncePullDiagnosticsAlarm.isDisposed()) {
+                return;
+            }
             debouncePullDiagnosticsAlarm.cancelAllRequests();
         }
         didFuture
                 .thenApply(ls -> {
                     // didOpen, didChange notification has been sent, consume 'textDocument/diagnostic' with debounce mode.
-                    // Check if alarm is not disposed (can happen during rapid start/stop cycles)
-                    // Store local reference to avoid race condition between null check and usage
-                    Alarm alarm = debouncePullDiagnosticsAlarm;
-                    if (alarm != null && !alarm.isDisposed()) {
-                        alarm.addRequest(() -> {
-                            if (version != -1 && version != this.version) {
-                                // The document has changed, do nothing
-                                return;
-                            }
-                            refreshPullDiagnostic(version, ls);
-                        }, 500);
+                    synchronized (diagnosticLifetime) {
+                        if (!debouncePullDiagnosticsAlarm.isDisposed()) {
+                            debouncePullDiagnosticsAlarm.addRequest(() -> refreshPullDiagnostic(version, ls), 500);
+                        }
                     }
                     return ls;
                 });
     }
 
     private void refreshPullDiagnostic(int version, @NotNull LanguageServer ls) {
+        if (debouncePullDiagnosticsAlarm.isDisposed() || (version != -1 && version != this.version)) {
+            return;
+        }
         // Consume 'textDocument/diagnostic'
         DocumentDiagnosticParams params = new DocumentDiagnosticParams();
         params.setIdentifier(getPullIdentifier());
         params.setTextDocument(new TextDocumentIdentifier(fileUri));
+        synchronized (diagnosticLifetime) {
+            // The server answers with an unchanged report when the result it gave is still accurate
+            params.setPreviousResultId(pullResultId);
+        }
         ls.getTextDocumentService()
                 .diagnostic(params)
                 .thenAcceptAsync(diagnosticReport -> {
-                    if (diagnosticReport == null || (version != -1 && version != this.version)) {
-                        // The document has changed, do nothing
-                        return;
-                    }
-                    var clientFeatures = languageServerWrapper.getClientFeatures();
-                    // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticsApplier.
-                    if (diagnosticReport.isLeft()) {
-                        RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
-                        // Update the diagnostics cache from the opened file
-                        updatePullDiagnostics(file, fileReport);
-                    } else if (diagnosticReport.isRight()) {
-                        RelatedUnchangedDocumentDiagnosticReport allFilesReport = diagnosticReport.getRight();
-                        Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments = allFilesReport.getRelatedDocuments();
-                        if (relatedDocuments != null) {
-                            for (var relatedDocument : relatedDocuments.entrySet()) {
-                                String documentUri = relatedDocument.getKey();
-                                Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport> fileReport = relatedDocument.getValue();
-                                if (fileReport != null) {
-                                    if (fileReport.isLeft()) {
-                                        VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
-                                        if (file != null) {
-                                            updatePullDiagnostics(file, fileReport.getLeft());
-                                        }
-                                    } else if (fileReport.isRight()) {
-                                        // TODO: implement UnchangedDocumentDiagnosticReport
-                                    }
-                                }
-                            }
+                    // Disposal must wait for publication, or prevent the entire reply from being applied.
+                    synchronized (diagnosticLifetime) {
+                        if (debouncePullDiagnosticsAlarm.isDisposed() || diagnosticReport == null ||
+                                (version != -1 && version != this.version)) {
+                            // The document changed or its synchronizer was retired while the request was pending.
+                            return;
+                        }
+                        var clientFeatures = languageServerWrapper.getClientFeatures();
+                        // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticsApplier.
+                        if (diagnosticReport.isLeft()) {
+                            RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
+                            // Update the diagnostics cache from the opened file
+                            updatePullDiagnostics(file, fileReport);
+                            updateRelatedPullDiagnostics(fileReport.getRelatedDocuments(), clientFeatures);
+                            pullResultId = fileReport.getResultId();
+                        } else if (diagnosticReport.isRight()) {
+                            // The opened file's diagnostics are unchanged, but those of related documents can change.
+                            updateRelatedPullDiagnostics(diagnosticReport.getRight().getRelatedDocuments(), clientFeatures);
+                            pullResultId = diagnosticReport.getRight().getResultId();
                         }
                     }
-
                 });
+    }
+
+    /**
+     * Updates the diagnostics of the documents related to a pulled report. A report of either kind can
+     * carry them: code in one file can produce diagnostics in another file it depends on.
+     */
+    private void updateRelatedPullDiagnostics(@Nullable Map<String, Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport>> relatedDocuments,
+                                              @NotNull LSPClientFeatures clientFeatures) {
+        if (relatedDocuments == null) {
+            return;
+        }
+        for (var relatedDocument : relatedDocuments.entrySet()) {
+            String documentUri = relatedDocument.getKey();
+            Either<FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport> fileReport = relatedDocument.getValue();
+            if (fileReport != null) {
+                if (fileReport.isLeft()) {
+                    VirtualFile file = FileUriSupport.findFileByUri(documentUri, clientFeatures);
+                    if (file != null) {
+                        updatePullDiagnostics(file, fileReport.getLeft());
+                    }
+                } else if (fileReport.isRight()) {
+                    // TODO: implement UnchangedDocumentDiagnosticReport
+                }
+            }
+        }
     }
 
     private void updatePullDiagnostics(@NotNull VirtualFile file,
@@ -465,6 +770,16 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         languageServerWrapper.updateDiagnostics(file, identifier, diagnostics, null);
     }
 
+    /**
+     * @return the result ID that the next pull sends as its previousResultId
+     */
+    @TestOnly
+    @Nullable String getPullResultId() {
+        synchronized (diagnosticLifetime) {
+            return pullResultId;
+        }
+    }
+
     @Nullable
     private String getPullIdentifier() {
         var clientFeatures = languageServerWrapper.getClientFeatures();
@@ -473,17 +788,6 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
 
     public boolean isPullDiagnosticsSupported() {
         return languageServerWrapper.getClientFeatures().getDiagnosticFeature().isDiagnosticSupported(file);
-    }
-
-    private Alarm getDebouncePullDiagnosticsAlarm() {
-        if (debouncePullDiagnosticsAlarm == null) {
-            synchronized (this) {
-                if (debouncePullDiagnosticsAlarm == null) {
-                    debouncePullDiagnosticsAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
-                }
-            }
-        }
-        return debouncePullDiagnosticsAlarm;
     }
 
     private boolean isDiagnosticNotPulledOnDidOpen() {

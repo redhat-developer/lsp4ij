@@ -19,12 +19,14 @@ import com.redhat.devtools.lsp4ij.ServerStatus;
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersChangeEvent;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.function.Function;
 
 /**
  * Manager for sending workspace folder notifications to the language server.
@@ -73,39 +75,36 @@ public class WorkspaceFolderNotificationManager {
     }
 
     /**
-     * Sends workspace/didChangeWorkspaceFolders notification to add a folder.
-     * This should be called OUTSIDE synchronized blocks as it performs network I/O.
+     * Sends a workspace/didChangeWorkspaceFolders notification to add a folder, after the notifications sent
+     * before it.
      *
      * @param folder the workspace folder to notify
      */
     public void sendFolderAddedNotification(@NotNull WorkspaceFolder folder) {
-        notifyWorkspaceFolderAdded(folder);
+        if (serverWrapper.getLanguageServer() == null) {
+            return;
+        }
+        serverWrapper.sendNotification(folderAddedNotification(folder));
     }
 
     /**
-     * Sends a workspace/didChangeWorkspaceFolders notification to add a new folder.
+     * Returns the workspace/didChangeWorkspaceFolders notification that adds a folder, to send with
+     * {@link LanguageServerWrapper#sendNotification(Function)}.
      *
      * @param folder the workspace folder to add
+     * @return the notification
      */
-    private void notifyWorkspaceFolderAdded(@NotNull WorkspaceFolder folder) {
-        var languageServer = serverWrapper.getLanguageServer();
-        if (languageServer == null) {
-            return;
-        }
+    public @NotNull Function<LanguageServer, LanguageServer> folderAddedNotification(@NotNull WorkspaceFolder folder) {
+        WorkspaceFoldersChangeEvent event = new WorkspaceFoldersChangeEvent();
+        event.setAdded(Collections.singletonList(folder));
+        event.setRemoved(Collections.emptyList());
 
-        try {
-            WorkspaceFoldersChangeEvent event = new WorkspaceFoldersChangeEvent();
-            event.setAdded(Collections.singletonList(folder));
-            event.setRemoved(Collections.emptyList());
-
-            DidChangeWorkspaceFoldersParams params = new DidChangeWorkspaceFoldersParams();
-            params.setEvent(event);
-
+        DidChangeWorkspaceFoldersParams params = new DidChangeWorkspaceFoldersParams();
+        params.setEvent(event);
+        return languageServer -> {
             languageServer.getWorkspaceService().didChangeWorkspaceFolders(params);
-
             LOGGER.info("Workspace folder added: " + folder.getUri());
-        } catch (Exception e) {
-            LOGGER.error("Error sending workspace folder notification", e);
-        }
+            return languageServer;
+        };
     }
 }

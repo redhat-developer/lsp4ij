@@ -24,8 +24,11 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Service that applies LSP diagnostics reactively when the server sends publishDiagnostics.
@@ -39,6 +42,10 @@ public final class LSPDiagnosticsApplier implements Disposable {
     public static volatile int GROUP_ID = -1;
 
     private final Project project;
+
+    // Refreshes requested before a highlighting pass registrar set GROUP_ID, by file. Checking GROUP_ID
+    // and adding a refresh under this lock means applyPendingRefreshes() cannot miss one.
+    private final Map<Object, Runnable> pendingRefreshes = new LinkedHashMap<>();
 
     public LSPDiagnosticsApplier(@NotNull Project project) {
         this.project = project;
@@ -66,8 +73,18 @@ public final class LSPDiagnosticsApplier implements Disposable {
     private void scheduleRefresh(@Nullable VirtualFile file,
                                  @Nullable PsiFile psiFile,
                                  @Nullable Document document) {
-        if (project.isDisposed() || GROUP_ID == -1) {
+        if (project.isDisposed()) {
             return;
+        }
+        if (GROUP_ID == -1) {
+            synchronized (pendingRefreshes) {
+                if (GROUP_ID == -1) {
+                    // Nothing applies these diagnostics again unless they change, so keep the refresh
+                    // until LSPDiagnosticsPassFactory registers the diagnostics group.
+                    pendingRefreshes.put(file != null ? file : psiFile, () -> scheduleRefresh(file, psiFile, document));
+                    return;
+                }
+            }
         }
 
         // Capture Document modification stamp as early as possible to detect changes
@@ -83,16 +100,41 @@ public final class LSPDiagnosticsApplier implements Disposable {
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 
+    /**
+     * @return true if a refresh requested before {@link #GROUP_ID} was set waits for it
+     */
+    @TestOnly
+    boolean hasPendingRefreshes() {
+        synchronized (pendingRefreshes) {
+            return !pendingRefreshes.isEmpty();
+        }
+    }
+
+    /**
+     * Runs the refreshes requested before {@link #GROUP_ID} was set.
+     */
+    void applyPendingRefreshes() {
+        List<Runnable> refreshes;
+        synchronized (pendingRefreshes) {
+            refreshes = List.copyOf(pendingRefreshes.values());
+            pendingRefreshes.clear();
+        }
+        refreshes.forEach(Runnable::run);
+    }
+
     private static class HighlightsToApply {
+        final VirtualFile file;
         final Document document;
         final List<HighlightInfo> highlights;
         final int groupId;
         final long modificationStamp;
 
-        HighlightsToApply(@NotNull Document document,
+        HighlightsToApply(@NotNull VirtualFile file,
+                          @NotNull Document document,
                           @NotNull List<HighlightInfo> highlights,
                           int groupId,
                           long modificationStamp) {
+            this.file = file;
             this.document = document;
             this.highlights = highlights;
             this.groupId = groupId;
@@ -122,6 +164,11 @@ public final class LSPDiagnosticsApplier implements Disposable {
             if (modificationStamp == null) {
                 modificationStamp = document.getModificationStamp();
             }
+        } else if (psiFile != null) {
+            file = psiFile.getVirtualFile();
+            if (file == null) {
+                return null;
+            }
         }
 
         // Collect diagnostics
@@ -131,14 +178,15 @@ public final class LSPDiagnosticsApplier implements Disposable {
             highlights = List.of();
         }
 
-        return new HighlightsToApply(document, highlights, GROUP_ID, modificationStamp);
+        return new HighlightsToApply(file, document, highlights, GROUP_ID, modificationStamp);
     }
 
     @SuppressWarnings("deprecation")
     private void applyHighlights(@NotNull HighlightsToApply data) {
         // Check if document was modified since we collected diagnostics
-        // If modified, skip applying stale diagnostics to avoid flicker
+        // If modified, reschedule so that diagnostics are eventually applied
         if (data.document.getModificationStamp() != data.modificationStamp) {
+            scheduleRefresh(data.file, null, data.document);
             return;
         }
 

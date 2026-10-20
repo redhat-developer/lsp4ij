@@ -1,0 +1,10 @@
+{
+  "caseSensitive": true,
+  "lineCommentPrefix": "//",
+  "completion": {
+    "useContextAwareSorting": true
+  },
+  "workspaceSymbol": {
+    "supportsGotoClass": true
+  }
+}

@@ -102,8 +102,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             return;
         }
         breakpoints.remove(breakpoint);
-        sendBreakpoints(null,
-                breakpoints.isEmpty() ? new TemporaryBreakpoint(sourcePosition, false) : null);
+        // DAP replaces breakpoints per source, not per session. Include the removed
+        // source even when other files still have breakpoints, so its last breakpoint
+        // is cleared by an empty setBreakpoints request.
+        sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, false));
     }
 
     @Override

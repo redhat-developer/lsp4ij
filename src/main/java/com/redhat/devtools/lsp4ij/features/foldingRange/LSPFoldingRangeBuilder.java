@@ -194,7 +194,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     private static int getStartOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
         if (foldingRange.getStartCharacter() == null) {
             // Be defensive against language servers that return lines that are out of bounds for the document
-            return document.getLineEndOffset(Math.max(foldingRange.getStartLine(), 0));
+            return document.getLineEndOffset(toDocumentLine(foldingRange.getStartLine(), document));
         }
         return LSPIJUtils.toOffset(new Position(foldingRange.getStartLine(), foldingRange.getStartCharacter()), document);
     }
@@ -202,9 +202,17 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     private static int getEndOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
         if (foldingRange.getEndCharacter() == null) {
             // Be defensive against language servers that return lines that are out of bounds for the document
-            return document.getLineEndOffset(Math.min(foldingRange.getEndLine(), document.getLineCount() - 1));
+            return document.getLineEndOffset(toDocumentLine(foldingRange.getEndLine(), document));
         }
         return LSPIJUtils.toOffset(new Position(foldingRange.getEndLine(), foldingRange.getEndCharacter()), document);
+    }
+
+    /**
+     * Returns the given line clamped to the lines of the document, in both directions. A reply can name
+     * lines the document no longer has, for instance when it was computed before lines were deleted.
+     */
+    private static int toDocumentLine(int line, @NotNull Document document) {
+        return Math.max(0, Math.min(line, document.getLineCount() - 1));
     }
 
     @Override

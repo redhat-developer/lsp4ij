@@ -30,7 +30,7 @@ You need to adjust this command to point to the location of the extracted Rust A
 
    ![Rust Analyzer template configuration](../images/user-defined-ls/rust-analyzer/RustAnalyzerTemplateConfiguration.png)
 
-6. **Click OK** to apply the changes. You should now have Rust language support enabled in your IDE, with the [Rust language server](https://pkg.Rust.dev/Rustlang.org/x/tools/Rustpls) integrated,
+6. **Click OK** to apply the changes. You should now have Rust language support enabled in your IDE, with the [Rust language server](https://rust-analyzer.github.io/) integrated,
    and you should see the language server in the [LSP console](../UserGuide.md#lsp-console):
 
    ![Rust Analyzer in LSP Console](../images/user-defined-ls/rust-analyzer/RustAnalyzerInLSPConsole.png)

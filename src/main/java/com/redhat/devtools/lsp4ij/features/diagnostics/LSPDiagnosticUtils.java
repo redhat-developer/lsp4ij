@@ -27,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -50,15 +51,9 @@ public class LSPDiagnosticUtils {
      */
     public static boolean isDiagnosticsChanged(@NotNull Collection<Diagnostic> oldDiagnostics,
                                                @NotNull Collection<Diagnostic> newDiagnostics) {
-        if (oldDiagnostics.size() != newDiagnostics.size()) {
-            return true;
-        }
-        for (var d : newDiagnostics) {
-            if (!oldDiagnostics.contains(d)) {
-                return true;
-            }
-        }
-        return false;
+        // Compare the contents as sets: a published list can repeat a diagnostic, so equal sizes
+        // with every new diagnostic among the old ones do not mean that none was removed
+        return !new HashSet<>(oldDiagnostics).equals(new HashSet<>(newDiagnostics));
     }
 
     /**

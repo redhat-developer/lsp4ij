@@ -10,9 +10,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.client.features;
 
+import com.intellij.codeInsight.highlighting.ReadWriteAccessDetector;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
+import com.redhat.devtools.lsp4ij.usages.LSPUsagePsiElement;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
@@ -109,6 +111,29 @@ public class LSPUsageFeature extends AbstractLSPDocumentFeature {
                 || SemanticTokenTypes.Keyword.equals(tokenType)
                 || SemanticTokenTypes.Modifier.equals(tokenType)
                 || SemanticTokenTypes.Operator.equals(tokenType));
+    }
+
+    /**
+     * Returns whether the given reference reads or writes the symbol whose usages are being searched,
+     * or null when that is not known.
+     * <p>
+     * <code>textDocument/references</code> reports locations only, so by default the access is never known
+     * and a reference is listed as it always was. An integration that can tell a read from a write - from its
+     * own parser, for example - overrides this method. A reference with a known access has the usage type
+     * "Value read" or "Value write", is shown with a read or write access icon, and can be hidden with the read
+     * and write access filters of Find Usages and of the Show Usages popup. Rider does not group language server
+     * usages by usage type at all, so there the icon and the filters are what changes.
+     * </p>
+     * <p>
+     * Called in a read action, once for each result of <code>textDocument/references</code>, and for no other
+     * kind of usage.
+     * </p>
+     *
+     * @param reference a result of <code>textDocument/references</code>.
+     * @return the access, or null if it is not known.
+     */
+    public @Nullable ReadWriteAccessDetector.Access getReadWriteAccess(@NotNull LSPUsagePsiElement reference) {
+        return null;
     }
 
     @Override
