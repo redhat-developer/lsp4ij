@@ -1,0 +1,4 @@
+# Store text files with LF line endings, and check them out with LF on every platform (#1709)
+* text=auto eol=lf
+# Windows scripts are checked out with CRLF, as in Gradle's own template
+*.bat text eol=crlf
