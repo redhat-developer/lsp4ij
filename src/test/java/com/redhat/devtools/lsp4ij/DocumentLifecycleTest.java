@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The server receives a document's didOpen before any didChange or didClose of it, nothing after its
@@ -57,6 +58,28 @@ public class DocumentLifecycleTest extends LightPlatformTestCase {
         synchronizer.getDidOpenFuture().get(10, TimeUnit.SECONDS);
 
         // The didOpen sends the captured text, so the change must follow it
+        assertEquals(List.of("open:1:first", "change:2:second"), wrapper.sentSoFar());
+    }
+
+    public void testRequestingTheOpenDoesNotWaitForAWriteAction() throws Exception {
+        var wrapper = new RecordingWrapper();
+        var synchronizer = synchronizer(wrapper, "first");
+        change(synchronizer, "second");
+
+        // A caller can hold the wrapper's documentsLock, which a write action can be waiting for, so
+        // requesting the open must not wait for read access, as sending the change after it does
+        var open = new AtomicReference<CompletableFuture<LanguageServer>>();
+        ApplicationManager.getApplication().runWriteAction(() -> {
+            var request = ApplicationManager.getApplication()
+                    .executeOnPooledThread(() -> open.set(synchronizer.getDidOpenFuture()));
+            try {
+                request.get(5, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new AssertionError("Requesting the open waited for the write action", e);
+            }
+        });
+
+        open.get().get(10, TimeUnit.SECONDS);
         assertEquals(List.of("open:1:first", "change:2:second"), wrapper.sentSoFar());
     }
 
