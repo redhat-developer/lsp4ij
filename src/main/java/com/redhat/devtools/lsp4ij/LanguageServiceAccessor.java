@@ -430,8 +430,9 @@ public class LanguageServiceAccessor implements Disposable {
         if (readAccessAllowed) {
             // Send the changes made to the file now, while this thread can read it. The request waits for
             // them to be dispatched, which needs no read access, so a caller holding a write action, as
-            // when a character is typed, can wait for it.
-            sendPendingChanges(file, matchedServersNow);
+            // when a character is typed, can wait for it. Send them to every server that has the file open,
+            // since the matched servers may not be known yet.
+            sendPendingChanges(file, new ArrayList<>(getStartedServers()));
         }
 
         // Returns the language servers which match the given file, start them and connect the file to each matched language server
