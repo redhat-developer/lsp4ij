@@ -17,6 +17,9 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentFile;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentProvider;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentTargets;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.DefaultLauncherBuilder;
@@ -32,6 +35,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * LSP  client features.
@@ -44,6 +49,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     private ServerInstaller serverInstaller;
 
     private FileUriSupport fileUriSupport;
+
+    private final AtomicReference<DocumentContentProvider> documentContentProvider = new AtomicReference<>();
 
     private LSPCallHierarchyFeature callHierarchyFeature;
 
@@ -216,6 +223,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable URI getFileUri(@NotNull VirtualFile file) {
+        if (file instanceof DocumentContentFile contentFile) {
+            return contentFile.getUri();
+        }
         return fileUriSupport != null ? fileUriSupport.getFileUri(file) : null;
     }
 
@@ -227,12 +237,37 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
-        return fileUriSupport != null ? fileUriSupport.findFileByUri(fileUri) : null;
+        var provider = documentContentProvider.get();
+        var content = provider != null ? provider.findFile(fileUri) : null;
+        return content != null ? content : fileUriSupport != null ? fileUriSupport.findFileByUri(fileUri) : null;
     }
 
     @Override
     public String toString(@NotNull VirtualFile file) {
+        if (file instanceof DocumentContentFile contentFile) {
+            return contentFile.getUri().toString();
+        }
         return fileUriSupport != null ? fileUriSupport.toString(file) : null;
+    }
+
+    /** Installs one connection's document provider, retiring any previous connection. */
+    public void installDocumentContentProvider(@NotNull DocumentContentProvider provider) {
+        var previous = documentContentProvider.getAndSet(provider);
+        if (previous != null && previous != provider) {
+            previous.dispose();
+        }
+    }
+
+    /** A retired client must not detach its replacement's provider. */
+    public void removeDocumentContentProvider(@NotNull DocumentContentProvider provider) {
+        documentContentProvider.compareAndSet(provider, null);
+        provider.dispose();
+    }
+
+    public <T> CompletableFuture<T> prepareDocumentContent(T result, @NotNull LanguageServer server) {
+        var provider = documentContentProvider.get();
+        return provider != null && provider.owns(server)
+                ? DocumentContentTargets.prepare(result, provider) : CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -1450,6 +1485,10 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public void dispose() {
+        var provider = documentContentProvider.getAndSet(null);
+        if (provider != null) {
+            provider.dispose();
+        }
         if (callHierarchyFeature != null) {
             callHierarchyFeature.dispose();
         }

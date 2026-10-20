@@ -18,7 +18,9 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
@@ -39,6 +41,7 @@ public class MockWorkspaceService implements WorkspaceService {
     private long willRenameDelayMs;
     private volatile CompletableFuture<RenameFilesParams> didRenameCallback;
     private volatile CompletableFuture<RenameFilesParams> willRenameCallback;
+    private final Map<String, String> documentContents = new ConcurrentHashMap<>();
 
 	public <U> MockWorkspaceService(Function<U, CompletableFuture<U>> futureFactory) {
 		this._futureFactory = futureFactory;
@@ -103,6 +106,18 @@ public class MockWorkspaceService implements WorkspaceService {
             callback.complete(params);
         }
         return delayedResult(willRename, willRenameDelayMs);
+    }
+
+    public void setDocumentContent(String uri, String text) {
+        documentContents.put(uri, text);
+    }
+
+    @Override
+    public CompletableFuture<TextDocumentContentResult> textDocumentContent(TextDocumentContentParams params) {
+        MockLanguageServer.INSTANCE.record("textDocumentContent");
+        var text = documentContents.get(params.getUri());
+        return text != null ? CompletableFuture.completedFuture(new TextDocumentContentResult(text))
+                : CompletableFuture.failedFuture(new IllegalArgumentException("No content for " + params.getUri()));
     }
 
     private static CompletableFuture<WorkspaceEdit> delayedResult(WorkspaceEdit result, long delayMs) {
