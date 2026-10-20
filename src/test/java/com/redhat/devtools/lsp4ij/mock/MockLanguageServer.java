@@ -159,7 +159,7 @@ public final class MockLanguageServer implements LanguageServer {
 
 	/**
 	 * @return the initialize request, the initialized notification, the workspace configuration and folder
-	 * notifications and the opened documents this server received, in order
+	 * notifications, the opened and changed documents and the hover requests this server received, in order
 	 */
 	public List<String> getNotifications() {
 		return notifications;

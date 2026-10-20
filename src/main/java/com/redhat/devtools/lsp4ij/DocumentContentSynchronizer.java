@@ -275,6 +275,47 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     }
 
     /**
+     * Sends the pending changes now, which outside unit-test mode wait for the document to be committed,
+     * so that a request about to be sent can wait for them with {@link #getLastChangeSent()}. The caller
+     * must have read access, as in a write action, and must not hold the wrapper's documentsLock: sending
+     * takes the wrapper's monitor, which stop() takes before documentsLock.
+     */
+    void sendPendingChanges() {
+        sendDidChangeEvents();
+    }
+
+    /**
+     * Returns a future that completes once the changes made to the opened document so far have been
+     * dispatched, so that a request sent after it is answered for the current text. Pending changes are
+     * sent from a pooled thread: sending them needs read access and takes the wrapper's monitor, and the
+     * caller can hold the wrapper's documentsLock, which a write action can be waiting for.
+     *
+     * @return a CompletableFuture that completes when the changes made so far have been dispatched
+     */
+    @NotNull
+    CompletableFuture<Void> getChangesSent() {
+        synchronized (changeEvents) {
+            if (changeEvents.isEmpty()) {
+                return lastDidChangeFuture;
+            }
+        }
+        return CompletableFuture.supplyAsync(this::sendDidChangeEvents)
+                .thenCompose(sent -> sent);
+    }
+
+    /**
+     * Returns a future that completes once the changes already sent have been dispatched. Unlike
+     * {@link #getChangesSent()}, it does not send pending changes, so waiting for it never needs
+     * read access.
+     *
+     * @return a CompletableFuture that completes when the last didChange sent has been dispatched
+     */
+    @NotNull
+    CompletableFuture<Void> getLastChangeSent() {
+        return lastDidChangeFuture;
+    }
+
+    /**
      * Reads document state on this thread when it already has read access, as inside a write action,
      * and otherwise in a cancellable read action, so a pending write action is never blocked.
      */
