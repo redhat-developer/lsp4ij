@@ -10,6 +10,9 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import org.eclipse.lsp4j.CreateFile;
+import org.eclipse.lsp4j.CreateFileOptions;
+import org.eclipse.lsp4j.DeleteFile;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.RenameFile;
@@ -152,6 +155,31 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         var stale = new WorkspaceEdit(List.of(Either.forRight(new RenameFile(oldDirectory, newDirectory)), Either.forLeft(text)));
         assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", oldDirectory + "other.foo"),
                 validate(snapshot, stale));
+    }
+
+    public void testDeletingADocumentChangedSinceCaptureIsRefused() throws Exception {
+        var server = open();
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        String uri = uri(server, myFixture.getFile());
+        var delete = new WorkspaceEdit(List.of(Either.forRight(new DeleteFile(uri))));
+        assertNull(validate(snapshot, delete));
+
+        type("changed");
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri), validate(snapshot, delete));
+    }
+
+    public void testOverwritingADocumentChangedSinceCaptureIsRefused() throws Exception {
+        var server = open();
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        String uri = uri(server, myFixture.getFile());
+        var overwrite = new WorkspaceEdit(List.of(Either.forRight(new CreateFile(uri, new CreateFileOptions(true, false)))));
+        assertNull(validate(snapshot, overwrite));
+
+        type("changed");
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri), validate(snapshot, overwrite));
+        // a new file has no document to lose
+        String created = URI.create(uri).resolve("created.foo").toString();
+        assertNull(validate(snapshot, new WorkspaceEdit(List.of(Either.forRight(new CreateFile(created))))));
     }
 
     public void testStoppedConnectionCannotApplyItsResponse() throws Exception {

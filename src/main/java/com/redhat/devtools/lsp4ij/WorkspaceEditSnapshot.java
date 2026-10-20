@@ -10,6 +10,8 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import org.eclipse.lsp4j.CreateFile;
+import org.eclipse.lsp4j.DeleteFile;
 import org.eclipse.lsp4j.RenameFile;
 import org.eclipse.lsp4j.TextDocumentEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
@@ -93,7 +95,8 @@ public final class WorkspaceEditSnapshot {
     }
 
     /**
-     * Returns a refusal reason, or {@code null} if the connection and text targets are current.
+     * Returns a refusal reason, or {@code null} if the connection and the documents that the edit changes,
+     * renames, overwrites or deletes are current.
      * The caller must retain write access from this check through application: releasing it
      * between the two would let typing invalidate a successful check. Validation itself does
      * not mutate files, including when a later target in the edit is stale.
@@ -123,6 +126,18 @@ public final class WorkspaceEditSnapshot {
                         return reason;
                     }
                     originalUris.put(withoutTrailingSlash(rename.getNewUri()), withoutTrailingSlash(original));
+                } else if (change.getRight() instanceof CreateFile create) {
+                    // Creating with overwrite replaces the text of an existing document
+                    String reason = validateDocument(originalUri(originalUris, create.getUri()), null);
+                    if (reason != null) {
+                        return reason;
+                    }
+                } else if (change.getRight() instanceof DeleteFile delete) {
+                    // Deleting a document discards its text
+                    String reason = validateDocument(originalUri(originalUris, delete.getUri()), null);
+                    if (reason != null) {
+                        return reason;
+                    }
                 }
             }
         } else if (edit.getChanges() != null) {
