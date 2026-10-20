@@ -76,12 +76,37 @@ public class WillSaveTest extends LSPCodeInsightFixtureTestCase {
             save();
             assertTrue("the save must not wait much longer than the willSaveWaitUntil budget",
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 4000);
+            // ends the UI event, as between two saves by the user
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
             assertFalse("edits that come too late must be dropped", VfsUtilCore.loadText(file.getVirtualFile()).startsWith("late"));
         }
         PlatformTestUtil.waitWithEventsDispatching("the server must be told of the saves",
                 () -> received().stream().filter("didSave"::equals).count() == 4, 10);
         assertEquals("after three timeouts, willSaveWaitUntil is no longer sent for the document",
                 3, received().stream().filter("willSaveWaitUntil"::equals).count());
+    }
+
+    public void testTheDocumentsSavedTogetherShareTheBudget() throws Exception {
+        serverAsks(true, true);
+        MockLanguageServer.INSTANCE.getTextDocumentService().setWillSaveWaitUntilDelayMs(5000);
+        open("text");
+        var other = myFixture.addFileToProject("other.foo", "other");
+        LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(other, null, null).get(30, TimeUnit.SECONDS);
+        MockLanguageServer.INSTANCE.getNotifications().clear();
+        var otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        type("more ");
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> otherDocument.insertString(0, "more "));
+
+        long start = System.nanoTime();
+        FileDocumentManager.getInstance().saveAllDocuments();
+
+        assertTrue("Save All must wait once for a slow server, not once per document",
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 2500);
+        PlatformTestUtil.waitWithEventsDispatching("the server must be told of both saves",
+                () -> received().stream().filter("didSave"::equals).count() == 2, 10);
+        assertEquals(2, received().stream().filter("willSave:Manual"::equals).count());
+        assertEquals("the second document finds the budget used up", 1,
+                received().stream().filter("willSaveWaitUntil"::equals).count());
     }
 
     public void testAServerThatDoesNotAskGetsNeither() throws Exception {

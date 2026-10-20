@@ -447,8 +447,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * {@value #WILL_SAVE_WAIT_UNTIL_MAX_TIMEOUTS} timeouts, the request is no longer sent for this document.
      * <p>
      * Called in the write action of the save, on the UI thread, which waits for the server at most until the deadline.
+     * Once it has passed, willSaveWaitUntil is not sent.
      *
-     * @param deadlineNanos the {@link System#nanoTime()} until which the save may wait for the edits
+     * @param deadlineNanos the {@link System#nanoTime()} until which the save may wait for the edits, shared by the
+     *                      documents saved together
      */
     void documentWillSave(long deadlineNanos) {
         boolean willSave = Boolean.TRUE.equals(syncOptions.getWillSave());
@@ -473,7 +475,8 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 return ls;
             });
         }
-        if (!willSaveWaitUntil) {
+        if (!willSaveWaitUntil || deadlineNanos - System.nanoTime() <= 0) {
+            // A save after the documents saved before it in the same batch have used up the budget waits no more
             return;
         }
         // Sent from the dispatcher once the notifications before it are, so that the server has the text and the willSave
