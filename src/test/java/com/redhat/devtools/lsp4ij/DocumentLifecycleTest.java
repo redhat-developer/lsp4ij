@@ -84,6 +84,34 @@ public class DocumentLifecycleTest extends LightPlatformTestCase {
         assertEquals(List.of("open:1:first", "change:2:second"), wrapper.sentSoFar());
     }
 
+    public void testFlushingBeforeTheOpenOpensTheDocumentWithItsChanges() throws Exception {
+        var wrapper = new RecordingWrapper();
+        var synchronizer = synchronizer(wrapper, "first");
+        change(synchronizer, "second");
+
+        // A request that waits for the flush, as on-type formatting does, must find the current text
+        synchronizer.flushPendingChanges().get(10, TimeUnit.SECONDS);
+
+        assertEquals(List.of("open:1:first", "change:2:second"), wrapper.sentSoFar());
+    }
+
+    public void testFlushingBeforeTheOpenDuringAWriteActionDoesNotWaitForIt() throws Exception {
+        var wrapper = new RecordingWrapper();
+        var synchronizer = synchronizer(wrapper, "first");
+        change(synchronizer, "second");
+
+        // On-type formatting flushes while it holds write access, which it keeps while it waits
+        ApplicationManager.getApplication().runWriteAction(() -> {
+            try {
+                synchronizer.flushPendingChanges().get(5, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new AssertionError("Flushing before the open waited for the write action", e);
+            }
+        });
+
+        assertEquals(List.of("open:1:first", "change:2:second"), wrapper.sentSoFar());
+    }
+
     public void testNothingFollowsAFailedOpen() throws Exception {
         var wrapper = new RecordingWrapper();
         wrapper.failOpen = true;

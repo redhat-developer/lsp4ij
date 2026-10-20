@@ -77,6 +77,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     // The didOpen notification once it is queued: a later didChange or didClose waits for it, and is not
     // sent if it failed. Guarded by changeEvents.
     private @Nullable CompletableFuture<LanguageServer> didOpenNotification;
+    // Completes once the didOpen and the changes queued before it are dispatched, without the pause
+    // that didOpenFuture adds for other requests
+    private volatile @Nullable CompletableFuture<Void> openSent;
 
     // Create the Alarm while its owner is alive, never from a delayed document callback.
     // It does not schedule work until a request is added.
@@ -184,14 +187,17 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             });
             didOpenNotification = didOpen;
         }
+        // Changes made since a captured text was read wait for the didOpen; send them after it, before
+        // the requests that wait for the open. Sending them needs read access: a thread that has it, as
+        // in a write action, sends them now, and any other from a pooled thread, since a caller can hold
+        // the wrapper's documentsLock, which a write action can be waiting for.
+        CompletableFuture<Void> changesSent = ApplicationManager.getApplication().isReadAccessAllowed()
+                ? sendDidChangeEvents()
+                : didOpen.thenCompose(ls -> CompletableFuture.supplyAsync(this::sendDidChangeEvents)
+                        .thenCompose(sent -> sent));
+        openSent = didOpen.thenCompose(ls -> changesSent);
         didOpenFuture = didOpen
-                // Changes made since a captured text was read wait for the didOpen; send them after it,
-                // before the requests that wait for the open. Sending them may wait for read access, so
-                // it runs on a pooled thread: a caller can hold the wrapper's documentsLock, which a
-                // write action can be waiting for.
-                .thenCompose(ls -> CompletableFuture.supplyAsync(this::sendDidChangeEvents)
-                        .thenCompose(sent -> sent)
-                        .thenApply(sent -> ls))
+                .thenCompose(ls -> changesSent.thenApply(sent -> ls))
                 .thenCompose(ls ->
                         CompletableFuture.supplyAsync(() -> {
                             if (!ApplicationManager.getApplication().isUnitTestMode()) {
@@ -245,10 +251,22 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * notification has been dispatched. If events were already sent by another caller
      * (e.g., {@code performForCommittedDocument}), returns the future tracking that
      * dispatch, ensuring the caller waits for it to complete before proceeding.
+     * <p>
+     * Before the document is opened, the server has no document for such a request, so this opens it;
+     * the didOpen is followed by the pending changes, and the future completes once both are dispatched.
      *
      * @return a CompletableFuture that completes when all didChange notifications have been dispatched
      */
     public CompletableFuture<Void> flushPendingChanges() {
+        boolean beforeOpen;
+        synchronized (changeEvents) {
+            beforeOpen = syncOptions.getOpenClose() && !opened && !closed;
+        }
+        if (beforeOpen) {
+            var open = getDidOpenFuture();
+            var sent = openSent;
+            return sent != null ? sent : open.thenApply(ls -> null);
+        }
         return sendDidChangeEvents();
     }
 
