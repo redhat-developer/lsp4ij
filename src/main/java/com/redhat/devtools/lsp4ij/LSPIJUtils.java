@@ -1168,19 +1168,69 @@ public class LSPIJUtils {
         //    "kind": "rename"
         //  }
         //]
+        // A rename that cannot be applied stops the edit: its later changes can address the new URI, which
+        // would then be another file, or none.
+        String oldUri = renameFile.getOldUri();
+        String newUri = renameFile.getNewUri();
+        VirtualFile resource = findResourceFor(oldUri);
+        if (resource == null) {
+            throw new IllegalArgumentException("Rename source does not exist: " + oldUri);
+        }
+        var destination = Paths.get(URI.create(newUri));
+        if (resource.isDirectory() && destination.startsWith(resource.toNioPath())) {
+            throw new IllegalArgumentException("A directory cannot be moved inside itself: " + newUri);
+        }
+        String name = destination.getFileName().toString();
+        VirtualFile parent;
         try {
-            VirtualFile resource = findResourceFor(renameFile.getOldUri());
-            if (resource != null) {
-                // TODO: use renameFile.getOptions()
-
-                // The IJ rename works only with a file name which is hosted in the same directory
-                // as the old file
-                var path = Paths.get(URI.create(renameFile.getNewUri()));
-                String newFileName = path.toFile().getName();
-                resource.rename(null, newFileName);
+            // A missing destination directory is created, as by VS Code
+            parent = VfsUtil.createDirectoryIfMissing(destination.getParent().toString());
+        } catch (IOException e) {
+            throw new IllegalStateException("Unable to create the directory of " + newUri, e);
+        }
+        if (parent == null || !parent.isDirectory()) {
+            throw new IllegalArgumentException("Rename destination directory does not exist: " + newUri);
+        }
+        VirtualFile existing = parent.findChild(name);
+        if (resource.equals(existing)) {
+            // The resource itself, as when only the case of its name changes on a case-insensitive file system
+            existing = null;
+        }
+        var options = renameFile.getOptions();
+        boolean overwrite = options != null && Boolean.TRUE.equals(options.getOverwrite());
+        if (existing != null && !overwrite) {
+            if (options != null && Boolean.TRUE.equals(options.getIgnoreIfExists())) {
+                return;
+            }
+            throw new IllegalArgumentException("Rename destination already exists: " + newUri);
+        }
+        boolean moving = !parent.equals(resource.getParent());
+        boolean renaming = !resource.getName().equals(name);
+        // Moving first would collide with a file of the old name in the destination directory, so the
+        // resource is renamed first then, unless that collides too. A temporary name would send the server
+        // file operations it did not request.
+        VirtualFile atOldName = parent.findChild(resource.getName());
+        boolean renameFirst = moving && renaming && atOldName != null && !atOldName.equals(existing);
+        VirtualFile atNewName = resource.getParent().findChild(name);
+        if (renameFirst && atNewName != null && !atNewName.equals(resource)) {
+            throw new IllegalArgumentException("Cannot rename " + oldUri + " to " + newUri
+                    + ": its name is taken in both directories");
+        }
+        try {
+            if (existing != null) {
+                existing.delete(null);
+            }
+            if (renameFirst) {
+                resource.rename(null, name);
+            }
+            if (moving) {
+                resource.move(null, parent);
+            }
+            if (renaming && !renameFirst) {
+                resource.rename(null, name);
             }
         } catch (IOException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
+            throw new IllegalStateException("Unable to rename " + oldUri + " to " + newUri, e);
         }
     }
 
