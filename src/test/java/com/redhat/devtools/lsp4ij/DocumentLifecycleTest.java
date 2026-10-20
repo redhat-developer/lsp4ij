@@ -29,6 +29,7 @@ import org.eclipse.lsp4j.services.WorkspaceService;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -83,6 +84,23 @@ public class DocumentLifecycleTest extends LightPlatformTestCase {
         assertEquals(List.of("open:1:first", "change:2:second"), wrapper.sentSoFar());
     }
 
+    public void testNothingFollowsAFailedOpen() throws Exception {
+        var wrapper = new RecordingWrapper();
+        wrapper.failOpen = true;
+        var synchronizer = synchronizer(wrapper, null);
+        try {
+            synchronizer.getDidOpenFuture().get(10, TimeUnit.SECONDS);
+            fail("The open must fail");
+        } catch (ExecutionException expected) {
+            // the server never had the document
+        }
+
+        change(synchronizer, "second");
+        synchronizer.documentClosed();
+
+        assertEquals(List.of(), wrapper.sentSoFar());
+    }
+
     public void testACloseWithoutAnOpenSendsNothing() throws Exception {
         var wrapper = new RecordingWrapper();
         var synchronizer = synchronizer(wrapper, null);
@@ -126,9 +144,13 @@ public class DocumentLifecycleTest extends LightPlatformTestCase {
      */
     private class RecordingWrapper extends LanguageServerWrapper {
         private final List<String> events = new CopyOnWriteArrayList<>();
+        private volatile boolean failOpen;
         private final TextDocumentService documents = new MockTextDocumentService(CompletableFuture::completedFuture) {
             @Override
             public void didOpen(DidOpenTextDocumentParams params) {
+                if (failOpen) {
+                    throw new IllegalStateException("didOpen failed");
+                }
                 events.add("open:" + params.getTextDocument().getVersion() + ":" + params.getTextDocument().getText());
             }
 

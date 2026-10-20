@@ -74,6 +74,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     // didChange or didClose, nothing after didClose, and didClose only after a didOpen.
     private boolean opened;
     private boolean closed;
+    // The didOpen notification once it is queued: a later didChange or didClose waits for it, and is not
+    // sent if it failed. Guarded by changeEvents.
+    private @Nullable CompletableFuture<LanguageServer> didOpenNotification;
 
     // Create the Alarm while its owner is alive, never from a delayed document callback.
     // It does not schedule work until a request is added.
@@ -179,6 +182,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                         .didOpen(new DidOpenTextDocumentParams(textDocument));
                 return ls;
             });
+            didOpenNotification = didOpen;
         }
         didOpenFuture = didOpen
                 // Changes made since a captured text was read wait for the didOpen; send them after it,
@@ -298,7 +302,8 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
                 changeParamsToSend.getTextDocument().setUri(fileUri);
                 changeParamsToSend.getTextDocument().setVersion(version);
-                didChange = languageServerWrapper.sendNotification(initializedServer, ls -> {
+                didChange = languageServerWrapper.sendNotification(
+                        didOpenNotification != null ? didOpenNotification : initializedServer, ls -> {
                     ls.getTextDocumentService().didChange(changeParamsToSend);
                     return ls;
                 });
@@ -402,8 +407,8 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             closed = true;
             // A close notification requires a previous open notification
             if (initializedServer != null && opened) {
-                // Send textDocument/didClose
-                languageServerWrapper.sendNotification(initializedServer, ls -> {
+                // Send textDocument/didClose, after a didOpen that was sent
+                languageServerWrapper.sendNotification(didOpenNotification, ls -> {
                     TextDocumentIdentifier identifier = new TextDocumentIdentifier(fileUri);
                     DidCloseTextDocumentParams params = new DidCloseTextDocumentParams(identifier);
                     ls.getTextDocumentService().didClose(params);
