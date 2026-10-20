@@ -867,7 +867,9 @@ public class LanguageServerWrapper implements Disposable {
             }
 
             CompletableFuture<LanguageServer> result;
-            boolean shouldNotify = false;
+            // Before the lock: getInitializedServer() calls the synchronized start(), and stop() takes that
+            // monitor before documentsLock
+            var initializedServer = folderToNotify != null ? getInitializedServer() : null;
             synchronized (documentsLock) {
                 if (!isCurrent(claim)) {
                     return CompletableFuture.completedFuture(null);
@@ -884,9 +886,10 @@ public class LanguageServerWrapper implements Disposable {
                     return ls2;
                 }
 
-                // Mark workspace folder as notified BEFORE didOpen (fast operation in synchronized block)
-                if (folderToNotify != null) {
-                    shouldNotify = workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify);
+                // Mark the workspace folder as notified and queue its notification before the document's
+                // didOpen, so that the server knows the folder first. Queuing does not wait.
+                if (folderToNotify != null && workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify)) {
+                    sendNotification(initializedServer, workspaceFolderNotificationManager.folderAddedNotification(folderToNotify));
                 }
 
                 DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(
@@ -904,12 +907,6 @@ public class LanguageServerWrapper implements Disposable {
                 } else {
                     result = CompletableFuture.completedFuture(languageServer);
                 }
-            }
-
-            // Send notification AFTER synchronized block to avoid blocking other file opens
-            // Only send if folder was newly marked (not already notified)
-            if (shouldNotify) {
-                workspaceFolderNotificationManager.sendFolderAddedNotification(folderToNotify);
             }
 
             return result;

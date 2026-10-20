@@ -132,7 +132,7 @@ public class MockWorkspaceService implements WorkspaceService {
 
 	@Override
 	public void didChangeConfiguration(DidChangeConfigurationParams params) {
-		// No-op
+		MockLanguageServer.INSTANCE.record("didChangeConfiguration");
 	}
 
 	@Override
@@ -143,6 +143,7 @@ public class MockWorkspaceService implements WorkspaceService {
 	@Override
 	public void didChangeWorkspaceFolders(DidChangeWorkspaceFoldersParams params) {
 		workspaceFoldersEvents.add(params);
+		MockLanguageServer.INSTANCE.record("didChangeWorkspaceFolders");
 	}
 
 	public List<DidChangeWorkspaceFoldersParams> getWorkspaceFoldersEvents() {

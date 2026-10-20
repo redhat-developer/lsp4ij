@@ -55,6 +55,8 @@ public final class MockLanguageServer implements LanguageServer {
 
 	private final List<CompletableFuture<?>> inFlight = new CopyOnWriteArrayList<>();
 
+	private final List<String> notifications = new CopyOnWriteArrayList<>();
+
 	public static void reset() {
 		INSTANCE = new MockLanguageServer(MockLanguageServer::defaultServerCapabilities);
 	}
@@ -146,7 +148,25 @@ public final class MockLanguageServer implements LanguageServer {
 
 	@Override
 	public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+		notifications.add("initialize");
 		return initializeGate.thenCompose(ignored -> buildMaybeDelayedFuture(initializeResult));
+	}
+
+	@Override
+	public void initialized(InitializedParams params) {
+		notifications.add("initialized");
+	}
+
+	/**
+	 * @return the initialize request, the initialized notification, the workspace configuration and folder
+	 * notifications and the opened documents this server received, in order
+	 */
+	public List<String> getNotifications() {
+		return notifications;
+	}
+
+	void record(String notification) {
+		notifications.add(notification);
 	}
 
 	/**

@@ -326,7 +326,12 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
             settings = new JsonObject();
         }
         DidChangeConfigurationParams params = new DidChangeConfigurationParams(settings);
-        languageServer.getWorkspaceService().didChangeConfiguration(params);
+        // Through the wrapper's notifications: they wait for the end of initialization, before which the
+        // client must send the server no notification, and keep their order with the document notifications
+        wrapper.sendNotification(ls -> {
+            ls.getWorkspaceService().didChangeConfiguration(params);
+            return ls;
+        });
     }
 
 

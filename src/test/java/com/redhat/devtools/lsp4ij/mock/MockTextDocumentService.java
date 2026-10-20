@@ -229,6 +229,8 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public void didOpen(DidOpenTextDocumentParams params) {
+        String opened = params.getTextDocument().getUri();
+        MockLanguageServer.INSTANCE.record("didOpen:" + opened.substring(opened.lastIndexOf('/') + 1));
         if (didOpenCallback != null) {
             didOpenCallback.complete(params);
             didOpenCallback = null;
