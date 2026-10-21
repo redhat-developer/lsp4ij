@@ -21,6 +21,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePropertyEvent;
 import com.intellij.openapi.vfs.newvfs.events.*;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -86,6 +87,14 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     private static long getFileOperationsTimeoutMs() {
         return GlobalLanguageServerSettings.getInstance().getFileOperationsTimeout();
+    }
+
+    /**
+     * Returns the deadline, as an absolute {@link System#nanoTime()}, for the responses to
+     * {@code workspace/will*} requests sent now.
+     */
+    private static long getFileOperationsDeadlineNanos() {
+        return System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(getFileOperationsTimeoutMs());
     }
 
     /**
@@ -320,7 +329,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         List<WillEdit> edits = new ArrayList<>();
         var ls = languageServerWrapper.getLanguageServer();
         if (ls != null) {
-            long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(getFileOperationsTimeoutMs());
+            long deadlineNanos = getFileOperationsDeadlineNanos();
             if (!fileCreates.isEmpty()) {
                 var params = new CreateFilesParams(fileCreates);
                 var edit = getWorkspaceEdit(ls.getWorkspaceService().willCreateFiles(params), deadlineNanos);
@@ -356,7 +365,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     void sendWillRenameFiles(@NotNull List<WillRenameFilesPreparation.FileRenamePlan> renames) {
         var ls = languageServerWrapper.getLanguageServer();
-        if (ls == null || !languageServerWrapper.isActive() || !canRenameFilesSupported()) {
+        if (ls == null || !languageServerWrapper.isActive() ||
+                !LanguageServerItem.isWillRenameFilesSupported(languageServerWrapper.getServerCapabilitiesSync())) {
             return;
         }
         List<FileRename> fileRenames = new ArrayList<>();
@@ -367,7 +377,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         if (unmade.isEmpty()) {
             return;
         }
-        long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(getFileOperationsTimeoutMs());
+        long deadlineNanos = getFileOperationsDeadlineNanos();
         Map<String, Long> documentStamps = captureDocumentStamps();
         var request = ls.getWorkspaceService().willRenameFiles(new RenameFilesParams(new ArrayList<>(unmade)));
         synchronized (preparedRenames) {
@@ -814,8 +824,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         private final @NotNull Map<String, Long> documentStamps;
         private final @NotNull CompletableFuture<WorkspaceEdit> request;
         private final long deadlineNanos;
-        private @Nullable WorkspaceEdit edit;
-        private boolean awaited;
+        // Guarded by preparedRenames
         private boolean editTaken;
 
         private PreparedRenames(@NotNull LanguageServer server,
@@ -831,21 +840,20 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         }
 
         private void await() {
-            var response = getWorkspaceEdit(request, deadlineNanos);
-            synchronized (this) {
-                edit = response;
-                awaited = true;
-            }
+            // Cancels the request when it times out
+            getWorkspaceEdit(request, deadlineNanos);
         }
 
         /**
-         * Returns the edit of the response the first time only, or {@code null} if the response
-         * was not awaited, timed out or failed.
+         * Returns the edit of the response the first time only, or {@code null} if the request
+         * has not completed, timed out or failed.
          */
-        private synchronized @Nullable WorkspaceEdit takeEdit() {
-            var taken = editTaken || !awaited ? null : edit;
+        private @Nullable WorkspaceEdit takeEdit() {
+            if (editTaken) {
+                return null;
+            }
             editTaken = true;
-            return taken;
+            return request.isDone() && !request.isCompletedExceptionally() ? request.join() : null;
         }
     }
 

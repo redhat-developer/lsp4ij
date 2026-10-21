@@ -9,7 +9,6 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationListener;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiElement;
@@ -137,11 +136,11 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
     }
 
     private static String text(VirtualFile file) {
-        return FileDocumentManager.getInstance().getDocument(file).getText();
+        return LSPIJUtils.getDocument(file).getText();
     }
 
     private PsiFile psiFile(VirtualFile file) {
-        return PsiManager.getInstance(myFixture.getProject()).findFile(file);
+        return LSPIJUtils.getPsiFile(file, myFixture.getProject());
     }
 
     private PsiDirectory psiDirectory(VirtualFile directory) {
