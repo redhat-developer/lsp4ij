@@ -14,7 +14,12 @@
 package com.redhat.devtools.lsp4ij.features.signatureHelp;
 
 import com.intellij.codeInsight.CodeInsightBundle;
+import com.intellij.codeInsight.hint.ParameterInfoControllerBase;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.lang.parameterInfo.*;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
@@ -27,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
@@ -36,10 +42,11 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
- * LSP implementation of {@link ParameterInfoHandler} to support
- * <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp>LSP 'textDocument/signatureHelp'</a>.
- * <p>
- * Some copy/paste from <a href="https://github.com/JetBrains/intellij-community/blob/4fe13f3bee1568a78facb3e4a0d851fa77adeb1a/java/java-impl/src/com/intellij/codeInsight/hint/api/impls/MethodParameterInfoHandler.java#L694-L785">MethodParameterInfoHandler.java</a> has been done.
+ * Provides IntelliJ parameter hints from LSP signature-help replies.
+ * Parameter rendering is adapted from IntelliJ's
+ * <a href="https://github.com/JetBrains/intellij-community/blob/4fe13f3bee1568a78facb3e4a0d851fa77adeb1a/java/java-impl/src/com/intellij/codeInsight/hint/api/impls/MethodParameterInfoHandler.java#L694-L785">MethodParameterInfoHandler</a>.
+ *
+ * @see <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp">LSP signature help</a>
  */
 public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatureHelperPsiElement, SignatureInformation> {
 
@@ -89,12 +96,16 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         return psiSignatureHelperElement;
     }
 
+    /**
+     * Refreshes an open parameter hint from the server's current signature help.
+     * Replies without signatures close the hint; changed overload lists schedule
+     * a new popup, while unchanged lists update the active signature and parameter.
+     *
+     * @param psiElement the hint owner that retains the latest reply
+     * @param context the existing hint's update state
+     */
     @Override
     public void updateParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement, @NotNull UpdateParameterInfoContext context) {
-        boolean removeHint = false;
-
-        // Here the popup hint not displayed, the signature help
-        // is triggered by the cursor moving or by the document content changing.
         SignatureHelpParams params = toSignatureHelpParams(context, SignatureHelpTriggerKind.ContentChange);
         params.getContext().setIsRetrigger(true);
         params.getContext().setActiveSignatureHelp(psiElement.getActiveSignatureHelp());
@@ -112,37 +123,139 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         }
 
         if (isDoneNormally(future)) {
-            SignatureHelp activeSignatureHelp = future.getNow(null);
-            List<SignatureInformation> signatures = activeSignatureHelp != null ? activeSignatureHelp.getSignatures() : null;
-            if (signatures == null || signatures.isEmpty()) {
-                // No signature helper found, close the popup hint
-                removeHint = true;
-            } else {
-                // A signature help is found
-
-                // Update enable/disable of signature
-                int activateSignature = activeSignatureHelp.getActiveSignature() != null ? activeSignatureHelp.getActiveSignature() : -1;
-                for (int i = 0; i < signatures.size(); i++) {
-                    context.setUIComponentEnabled(i, activateSignature == -1 || activateSignature == i);
-                }
-                // Update the IntelliJ parameter info context to highlight the proper parameter
-                Integer activeParameter = activeSignatureHelp.getActiveParameter();
-                context.setCurrentParameter(activeParameter != null ? activeParameter : 0);
-                // Update the Psi element with the active signature help
-                psiElement.setActiveSignatureHelp(activeSignatureHelp);
-            }
-        }
-        if (removeHint) {
-            // Close the popup hint
-            context.removeHint();
+            updateParameterInfo(psiElement, context, future.getNow(null));
         }
     }
 
+    /**
+     * Applies a signature-help reply to an existing parameter hint.
+     * A {@code null} or empty reply closes the hint and invalidates queued refreshes.
+     * Changed overloads are refreshed asynchronously without writing the
+     * original row state.
+     *
+     * @param psiElement the hint owner that retains the latest reply
+     * @param context the existing hint's update state
+     * @param signatureHelp the server reply, or {@code null} if no help is available
+     */
+    void updateParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement,
+                             @NotNull UpdateParameterInfoContext context,
+                             @Nullable SignatureHelp signatureHelp) {
+        // Also invalidate any queued refresh when the latest reply has no signatures.
+        psiElement.setActiveSignatureHelp(signatureHelp);
+        List<SignatureInformation> signatures = signatureHelp != null ? signatureHelp.getSignatures() : null;
+        if (signatures == null || signatures.isEmpty()) {
+            context.removeHint();
+            return;
+        }
+
+        Object[] shown = context.getObjectsToView();
+        if (!hasSameOverloads(shown, signatures)) {
+            refreshOverloads(psiElement, context, signatureHelp, shown);
+            return;
+        }
+
+        int activeSignature = signatureHelp.getActiveSignature() != null ? signatureHelp.getActiveSignature() : -1;
+        for (int i = 0; i < shown.length; i++) {
+            context.setUIComponentEnabled(i, activeSignature < 0 || activeSignature >= shown.length || activeSignature == i);
+        }
+        Integer activeParameter = signatureHelp.getActiveParameter();
+        context.setCurrentParameter(activeParameter != null ? activeParameter : 0);
+    }
+
+    /**
+     * Tests whether the existing overload rows can be reused for a reply.
+     * Labels must match in order, and duplicate labels must retain identical
+     * metadata because rendering cannot match them unambiguously.
+     *
+     * @param shown the descriptors held by the existing popup
+     * @param signatures the overloads in the new server reply
+     * @return {@code true} if the existing rows can display the reply correctly
+     */
+    private static boolean hasSameOverloads(Object[] shown, List<SignatureInformation> signatures) {
+        if (shown.length != signatures.size()) {
+            return false;
+        }
+        var labels = new HashSet<String>();
+        var duplicateLabels = new HashSet<String>();
+        for (int i = 0; i < shown.length; i++) {
+            if (!(shown[i] instanceof SignatureInformation signature)
+                    || !Objects.equals(signature.getLabel(), signatures.get(i).getLabel())) {
+                return false;
+            }
+            if (!labels.add(signature.getLabel())) {
+                duplicateLabels.add(signature.getLabel());
+            }
+        }
+        for (int i = 0; i < shown.length; i++) {
+            var signature = signatures.get(i);
+            if (duplicateLabels.contains(signature.getLabel()) && !Objects.equals(shown[i], signature)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Schedules replacement of the original popup on the event dispatch thread.
+     * The replacement is discarded if the popup, reply, caret or document has
+     * changed, or if the hint has been dismissed.
+     * Disposing the old controller before creating new rows preserves the
+     * validity of its fixed-size update state.
+     *
+     * @param owner the hint owner that retains the latest reply
+     * @param context the original popup's update state
+     * @param signatureHelp the reply whose overloads should be displayed
+     * @param shown the original descriptor array, compared by identity
+     */
+    private void refreshOverloads(LSPSignatureHelperPsiElement owner, UpdateParameterInfoContext context,
+                                  SignatureHelp signatureHelp, Object[] shown) {
+        var project = context.getProject();
+        var editor = context.getEditor();
+        int startOffset = context.getParameterListStart();
+        int caretOffset = editor.getCaretModel().getOffset();
+        long documentStamp = editor.getDocument().getModificationStamp();
+        ApplicationManager.getApplication().invokeLater(() -> ReadAction.run(() -> {
+            if (editor.isDisposed() || !owner.isValid()
+                    || editor.getCaretModel().getOffset() != caretOffset
+                    || editor.getDocument().getModificationStamp() != documentStamp
+                    || owner.getActiveSignatureHelp() != signatureHelp) {
+                return;
+            }
+            var controller = ParameterInfoControllerBase.findControllerAtOffset(editor, startOffset);
+            // Do not resurrect a dismissed popup or replace a newer popup at this offset.
+            if (controller == null || controller.getObjects() != shown || context.getParameterOwner() != owner
+                    || controller.isPreservedOnHintHidden() && !controller.isHintShown(true)) {
+                return;
+            }
+            boolean preserved = controller.isPreservedOnHintHidden();
+            Disposer.dispose(controller);
+            var replacement = ParameterInfoControllerBase.createParameterInfoController(project, editor, startOffset,
+                    signatureHelp.getSignatures().toArray(new SignatureInformation[0]), null, owner, this, true, false);
+            replacement.setPreservedOnHintHidden(preserved);
+        }), ModalityState.stateForComponent(editor.getComponent()), project.getDisposed());
+    }
+
+    /**
+     * Renders an overload using the latest available signature metadata.
+     * A signature's active parameter takes precedence over the reply's active
+     * parameter, with the UI context used when neither is available.
+     * When parameters are present, an out-of-range index selects the first one.
+     *
+     * @param shownSignature the overload stored when the current popup was created
+     * @param context the presentation and selection state of the popup row
+     */
     @Override
     public void updateUI(SignatureInformation shownSignature, @NotNull ParameterInfoUIContext context) {
         SignatureInformation signatureInformation = getCurrentSignature(shownSignature, context);
         // LSP: a signature's own active parameter, if provided, is used in place of the signature help's
         Integer activeParameter = signatureInformation.getActiveParameter();
+        if (activeParameter == null && context.getParameterOwner() instanceof LSPSignatureHelperPsiElement owner) {
+            SignatureHelp signatureHelp = owner.getActiveSignatureHelp();
+            if (signatureHelp != null && signatureHelp.getSignatures() != null
+                    && signatureHelp.getSignatures().contains(signatureInformation)) {
+                activeParameter = signatureHelp.getActiveParameter();
+            }
+        }
         int currentParameter = activeParameter != null ? activeParameter : context.getCurrentParameterIndex();
         List<ParameterInformation> parameters = signatureInformation.getParameters();
         int numParams = parameters != null ? parameters.size() : 0;
