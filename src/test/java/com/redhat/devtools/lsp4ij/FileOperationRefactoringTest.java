@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -111,6 +112,29 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
         assertEquals(destination, first.getParent());
         assertEquals(destination, second.getParent());
         assertEquals("the willRenameFiles edit must be applied once", NEW_TEXT, text(other));
+    }
+
+    public void testARenameThatStoppedBeforeItsWriteActionAddsNothingToALaterMove() throws Exception {
+        var moved = myFixture.getTempDirFixture().createFile("moved.foo", "text");
+        var other = myFixture.getTempDirFixture().createFile("other.foo", OLD_TEXT);
+        var destination = myFixture.getTempDirFixture().findOrCreateDir("destination");
+        connect(moved);
+        answerWillRenameSlowlyWithAnEditTo(other);
+        // A rename plans the renames of its files before it searches for usages, and stops there when,
+        // for example, the user cancels its preview
+        var renames = new LinkedHashMap<PsiElement, String>(Map.of(psiFile(moved), "renamed.foo"));
+        new RenameProcessor(myFixture.getProject(), psiFile(moved), "renamed.foo", false, false)
+                .prepareRenaming(psiFile(moved), "renamed.foo", renames);
+
+        new MoveFilesOrDirectoriesProcessor(myFixture.getProject(), new PsiElement[]{psiFile(moved)},
+                psiDirectory(destination), false, false, null, null).run();
+
+        var requests = MockLanguageServer.INSTANCE.getWorkspaceService().getWillRenameRequests();
+        assertEquals("the move must send workspace/willRenameFiles once", 1, requests.size());
+        var files = requests.get(0).getFiles();
+        assertEquals("the request must contain the move only", 1, files.size());
+        assertTrue(files.get(0).getNewUri(), files.get(0).getNewUri().endsWith("/destination/moved.foo"));
+        assertEquals(destination, moved.getParent());
     }
 
     /**

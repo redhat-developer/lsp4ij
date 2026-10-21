@@ -18,9 +18,10 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Sends the {@code workspace/willRenameFiles} requests of a rename or move refactoring before its
@@ -55,12 +56,16 @@ public final class WillRenameFilesPreparation {
                           @NotNull VirtualFile file,
                           @NotNull VirtualFile newParent,
                           @NotNull String newName) {
+
+        private boolean hasSameDestination(@NotNull FileRenamePlan other) {
+            return newParent.equals(other.newParent) && newName.equals(other.newName);
+        }
     }
 
     private final @NotNull Project project;
 
-    // The renames planned since the last refactoring sent its requests, guarded by itself
-    private final List<FileRenamePlan> plans = new ArrayList<>();
+    // The renames planned since the last refactoring sent its requests, by file, guarded by itself
+    private final Map<VirtualFile, FileRenamePlan> plans = new LinkedHashMap<>();
 
     public WillRenameFilesPreparation(@NotNull Project project) {
         this.project = project;
@@ -82,7 +87,11 @@ public final class WillRenameFilesPreparation {
 
     void plan(@NotNull FileRenamePlan rename) {
         synchronized (plans) {
-            plans.add(rename);
+            // A rename plans the files again for each element it renames automatically, so a plan for the
+            // same destination keeps the element the refactoring was invoked on. A plan for another
+            // destination was made by a refactoring that stopped before its write action.
+            plans.merge(rename.file(), rename, (planned, latest) ->
+                    planned.element().isValid() && planned.hasSameDestination(latest) ? planned : latest);
         }
     }
 
@@ -96,7 +105,7 @@ public final class WillRenameFilesPreparation {
         var refactored = new HashSet<>(elements);
         List<FileRenamePlan> renames;
         synchronized (plans) {
-            renames = plans.stream().filter(rename -> refactored.contains(rename.element())).toList();
+            renames = plans.values().stream().filter(rename -> refactored.contains(rename.element())).toList();
             // The others were planned by a refactoring that stopped before its write action
             plans.clear();
         }
@@ -104,6 +113,8 @@ public final class WillRenameFilesPreparation {
             return;
         }
         var servers = List.copyOf(LanguageServiceAccessor.getInstance(project).getStartedServers());
+        // A refactoring without an id publishes no refactoringDone that would have dropped its requests
+        servers.forEach(server -> server.getFileListener().clearWillRenameFiles());
         // Send all the requests before waiting for any of their responses
         servers.forEach(server -> server.getFileListener().sendWillRenameFiles(renames));
         servers.forEach(server -> server.getFileListener().awaitWillRenameFiles());
