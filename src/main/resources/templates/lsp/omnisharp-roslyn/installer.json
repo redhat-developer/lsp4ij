@@ -1,0 +1,53 @@
+{
+  "id": "omnisharp-roslyn",
+  "name": "Omnisharp Roslyn",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download Omnisharp Roslyn",
+      "github": {
+        "owner": "OmniSharp",
+        "repository": "omnisharp-roslyn",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "x86_64": "omnisharp-win-x64.zip",
+            "x86": "omnisharp-win-x86.zip",
+            "arm64": "omnisharp-win-arm64.zip"
+          },
+          "unix": {
+            "x86_64": "omnisharp-linux-x86.zip",
+            "amd64": "omnisharp-linux-x64.zip",
+            "arm64": "omnisharp-linux-arm64.zip"
+          },
+          "mac": "omnisharp-osx.zip"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/omnisharp-roslyn",
+        "file": {
+          "name": {
+            "windows": "OmniSharp.exe",
+            "unix": "OmniSharp",
+            "mac": "OmniSharp"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Omnisharp Roslyn server command",
+          "command": "${output.dir}/${output.file.name} --languageserver",
+          "update": true
+        }
+      }
+    }
+  }
+}
