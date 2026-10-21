@@ -14,6 +14,7 @@ import com.intellij.psi.PsiFileSystemItem;
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFileHandler;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.util.containers.MultiMap;
+import com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation.FileRenamePlan;
 
 import java.util.List;
 import java.util.Map;
@@ -45,9 +46,9 @@ public class WillRenameFilesMoveHandler extends MoveFileHandler {
         var preparation = WillRenameFilesPreparation.getInstance(targetDirectory.getProject());
         var newParent = targetDirectory.getVirtualFile();
         for (PsiElement element : elementsToMove) {
-            if (element instanceof PsiFileSystemItem item && item.getVirtualFile() != null) {
-                var file = item.getVirtualFile();
-                preparation.plan(new WillRenameFilesPreparation.FileRenamePlan(element, file, newParent, file.getName()));
+            var file = element instanceof PsiFileSystemItem item ? item.getVirtualFile() : null;
+            if (file != null) {
+                preparation.plan(new FileRenamePlan(element, file, newParent, file.getName()));
             }
         }
     }

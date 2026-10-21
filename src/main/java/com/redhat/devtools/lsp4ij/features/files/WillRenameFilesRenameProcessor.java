@@ -11,7 +11,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFileSystemItem;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.refactoring.rename.RenamePsiElementProcessor;
-import com.intellij.refactoring.rename.RenamePsiElementProcessorBase;
+import com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation.FileRenamePlan;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -28,18 +28,11 @@ public class WillRenameFilesRenameProcessor extends RenamePsiElementProcessor {
 
     @Override
     public boolean canProcessElement(@NotNull PsiElement element) {
-        if (!element.isValid() || !WillRenameFilesPreparation.isWillRenameFilesSupported(element.getProject())) {
-            return false;
-        }
-        for (RenamePsiElementProcessorBase processor : EP_NAME.getExtensionList()) {
-            if (processor == this) {
-                return false;
-            }
-            if (processor.canProcessElement(element)) {
-                return true;
-            }
-        }
-        return false;
+        return element.isValid() &&
+                WillRenameFilesPreparation.isWillRenameFilesSupported(element.getProject()) &&
+                EP_NAME.getExtensionList().stream()
+                        .takeWhile(processor -> processor != this)
+                        .anyMatch(processor -> processor.canProcessElement(element));
     }
 
     @Override
@@ -51,12 +44,10 @@ public class WillRenameFilesRenameProcessor extends RenamePsiElementProcessor {
         // the file of a renamed class
         var preparation = WillRenameFilesPreparation.getInstance(element.getProject());
         allRenames.forEach((renamed, name) -> {
-            if (renamed instanceof PsiFileSystemItem item) {
-                var file = item.getVirtualFile();
-                var parent = file != null ? file.getParent() : null;
-                if (parent != null) {
-                    preparation.plan(new WillRenameFilesPreparation.FileRenamePlan(element, file, parent, name));
-                }
+            var file = renamed instanceof PsiFileSystemItem item ? item.getVirtualFile() : null;
+            var parent = file != null ? file.getParent() : null;
+            if (parent != null) {
+                preparation.plan(new FileRenamePlan(element, file, parent, name));
             }
         });
     }

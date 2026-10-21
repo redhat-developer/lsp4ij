@@ -14,7 +14,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.refactoring.listeners.RefactoringEventData;
 import com.intellij.refactoring.listeners.RefactoringEventListener;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,7 +21,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Sends the {@code workspace/willRenameFiles} requests of a rename or move refactoring before its
@@ -95,7 +93,7 @@ public final class WillRenameFilesPreparation {
      * @param elements the elements the refactoring was invoked on
      */
     void sendAndAwait(@NotNull List<PsiElement> elements) {
-        Set<PsiElement> refactored = new HashSet<>(elements);
+        var refactored = new HashSet<>(elements);
         List<FileRenamePlan> renames;
         synchronized (plans) {
             renames = plans.stream().filter(rename -> refactored.contains(rename.element())).toList();
@@ -105,23 +103,18 @@ public final class WillRenameFilesPreparation {
         if (renames.isEmpty()) {
             return;
         }
-        var servers = new ArrayList<>(LanguageServiceAccessor.getInstance(project).getStartedServers());
+        var servers = List.copyOf(LanguageServiceAccessor.getInstance(project).getStartedServers());
         // Send all the requests before waiting for any of their responses
-        for (LanguageServerWrapper server : servers) {
-            server.getFileListener().sendWillRenameFiles(renames);
-        }
-        for (LanguageServerWrapper server : servers) {
-            server.getFileListener().awaitWillRenameFiles();
-        }
+        servers.forEach(server -> server.getFileListener().sendWillRenameFiles(renames));
+        servers.forEach(server -> server.getFileListener().awaitWillRenameFiles());
     }
 
     private void clear() {
         synchronized (plans) {
             plans.clear();
         }
-        for (LanguageServerWrapper server : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
-            server.getFileListener().clearWillRenameFiles();
-        }
+        LanguageServiceAccessor.getInstance(project).getStartedServers()
+                .forEach(server -> server.getFileListener().clearWillRenameFiles());
     }
 
     /**
