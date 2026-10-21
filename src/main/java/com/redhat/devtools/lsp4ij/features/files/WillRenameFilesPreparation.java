@@ -13,13 +13,16 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.refactoring.listeners.RefactoringEventData;
 import com.intellij.refactoring.listeners.RefactoringEventListener;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Sends the {@code workspace/willRenameFiles} requests of a rename or move refactoring before its
@@ -75,7 +78,8 @@ public final class WillRenameFilesPreparation {
      */
     static boolean isWillRenameFilesSupported(@NotNull Project project) {
         return LanguageServiceAccessor.getInstance(project).getStartedServers().stream()
-                .anyMatch(server -> server.isActive() && server.canRenameFilesSupported());
+                .anyMatch(server -> server.isActive() &&
+                        LanguageServerItem.isWillRenameFilesSupported(server.getServerCapabilitiesSync()));
     }
 
     void plan(@NotNull FileRenamePlan rename) {
@@ -91,16 +95,17 @@ public final class WillRenameFilesPreparation {
      * @param elements the elements the refactoring was invoked on
      */
     void sendAndAwait(@NotNull List<PsiElement> elements) {
+        Set<PsiElement> refactored = new HashSet<>(elements);
         List<FileRenamePlan> renames;
         synchronized (plans) {
-            renames = plans.stream().filter(rename -> elements.contains(rename.element())).toList();
+            renames = plans.stream().filter(rename -> refactored.contains(rename.element())).toList();
             // The others were planned by a refactoring that stopped before its write action
             plans.clear();
         }
         if (renames.isEmpty()) {
             return;
         }
-        var servers = LanguageServiceAccessor.getInstance(project).getStartedServers();
+        var servers = new ArrayList<>(LanguageServiceAccessor.getInstance(project).getStartedServers());
         // Send all the requests before waiting for any of their responses
         for (LanguageServerWrapper server : servers) {
             server.getFileListener().sendWillRenameFiles(renames);
@@ -111,13 +116,16 @@ public final class WillRenameFilesPreparation {
     }
 
     private void clear() {
+        synchronized (plans) {
+            plans.clear();
+        }
         for (LanguageServerWrapper server : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             server.getFileListener().clearWillRenameFiles();
         }
     }
 
     /**
-     * Drops the responses of a refactoring that its VFS events did not use, once it is done.
+     * Drops the plans and the responses of a refactoring that its VFS events did not use, once it is done.
      */
     public static final class RefactoringListener implements RefactoringEventListener {
 
@@ -129,7 +137,11 @@ public final class WillRenameFilesPreparation {
 
         @Override
         public void refactoringDone(@NotNull String refactoringId, @Nullable RefactoringEventData afterData) {
-            getInstance(project).clear();
+            // Without the service, no refactoring planned a rename
+            var preparation = project.getServiceIfCreated(WillRenameFilesPreparation.class);
+            if (preparation != null) {
+                preparation.clear();
+            }
         }
     }
 }
