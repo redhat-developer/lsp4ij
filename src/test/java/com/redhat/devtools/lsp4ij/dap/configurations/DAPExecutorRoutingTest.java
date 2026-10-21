@@ -5,6 +5,7 @@ import com.intellij.execution.executors.DefaultDebugExecutor;
 import com.intellij.execution.executors.DefaultRunExecutor;
 import com.intellij.execution.runners.ProgramRunner;
 import com.intellij.testFramework.LightPlatformTestCase;
+import com.redhat.devtools.lsp4ij.dap.DAPDebugRunner;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import java.util.Arrays;
 
@@ -40,7 +41,7 @@ public class DAPExecutorRoutingTest extends LightPlatformTestCase {
             }
         };
         assertTrue(config.canRun("custom-profiler"));
-        assertNotNull(ProgramRunner.getRunner("custom-profiler", config));
+        assertTrue(ProgramRunner.getRunner("custom-profiler", config) instanceof DAPDebugRunner);
         assertFalse(config.canRun("unrelated-executor"));
         assertTrue(config.canRun(DefaultDebugExecutor.EXECUTOR_ID));
     }
