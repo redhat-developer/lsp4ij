@@ -41,6 +41,7 @@ public class MockWorkspaceService implements WorkspaceService {
     private long willRenameDelayMs;
     private volatile CompletableFuture<RenameFilesParams> didRenameCallback;
     private volatile CompletableFuture<RenameFilesParams> willRenameCallback;
+    private final List<RenameFilesParams> willRenameRequests = new CopyOnWriteArrayList<>();
     private final Map<String, String> documentContents = new ConcurrentHashMap<>();
     private Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> diagnosticHandler;
 
@@ -64,6 +65,13 @@ public class MockWorkspaceService implements WorkspaceService {
 
     public void setWillRenameCallback(CompletableFuture<RenameFilesParams> callback) {
         willRenameCallback = callback;
+    }
+
+    /**
+     * @return the workspace/willRenameFiles requests this server received, in order
+     */
+    public List<RenameFilesParams> getWillRenameRequests() {
+        return willRenameRequests;
     }
 
     @Override
@@ -111,6 +119,7 @@ public class MockWorkspaceService implements WorkspaceService {
 
     @Override
     public CompletableFuture<WorkspaceEdit> willRenameFiles(RenameFilesParams params) {
+        willRenameRequests.add(params);
         var callback = willRenameCallback;
         if (callback != null) {
             willRenameCallback = null;

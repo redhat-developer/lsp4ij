@@ -36,6 +36,7 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
+import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
@@ -1168,6 +1169,14 @@ public class LanguageServerWrapper implements Disposable {
 
     public LanguageServer getLanguageServer() {
         return languageServer;
+    }
+
+    /**
+     * Returns the listener that sends the file operations and the watched file changes to this server.
+     */
+    @ApiStatus.Internal
+    public @NotNull AbstractLSPFileListener getFileListener() {
+        return fileListener;
     }
 
     /**
