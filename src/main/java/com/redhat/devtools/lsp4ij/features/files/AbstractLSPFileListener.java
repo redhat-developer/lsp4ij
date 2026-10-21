@@ -23,6 +23,7 @@ import com.intellij.openapi.vfs.newvfs.events.*;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation.FileRenamePlan;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
@@ -326,7 +327,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
         }
 
-        List<WillEdit> edits = new ArrayList<>();
+        var edits = new ArrayList<WillEdit>();
         var ls = languageServerWrapper.getLanguageServer();
         if (ls != null) {
             long deadlineNanos = getFileOperationsDeadlineNanos();
@@ -363,23 +364,21 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      *
      * @param renames the files and directories the refactoring renames or moves
      */
-    void sendWillRenameFiles(@NotNull List<WillRenameFilesPreparation.FileRenamePlan> renames) {
+    void sendWillRenameFiles(@NotNull List<FileRenamePlan> renames) {
         var ls = languageServerWrapper.getLanguageServer();
         if (ls == null || !languageServerWrapper.isActive() ||
                 !LanguageServerItem.isWillRenameFilesSupported(languageServerWrapper.getServerCapabilitiesSync())) {
             return;
         }
-        List<FileRename> fileRenames = new ArrayList<>();
-        for (var rename : renames) {
-            onFileRenameBefore(rename.newParent(), rename.file(), rename.newName(), fileRenames);
-        }
-        Set<FileRename> unmade = new LinkedHashSet<>(fileRenames);
+        var fileRenames = new ArrayList<FileRename>();
+        renames.forEach(rename -> onFileRenameBefore(rename.newParent(), rename.file(), rename.newName(), fileRenames));
+        var unmade = new LinkedHashSet<>(fileRenames);
         if (unmade.isEmpty()) {
             return;
         }
         long deadlineNanos = getFileOperationsDeadlineNanos();
-        Map<String, Long> documentStamps = captureDocumentStamps();
-        var request = ls.getWorkspaceService().willRenameFiles(new RenameFilesParams(new ArrayList<>(unmade)));
+        var documentStamps = captureDocumentStamps();
+        var request = ls.getWorkspaceService().willRenameFiles(new RenameFilesParams(List.copyOf(unmade)));
         synchronized (preparedRenames) {
             preparedRenames.add(new PreparedRenames(ls, unmade, documentStamps, request, deadlineNanos));
         }
@@ -392,11 +391,9 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     void awaitWillRenameFiles() {
         List<PreparedRenames> prepared;
         synchronized (preparedRenames) {
-            prepared = new ArrayList<>(preparedRenames);
+            prepared = List.copyOf(preparedRenames);
         }
-        for (PreparedRenames renames : prepared) {
-            renames.await();
-        }
+        prepared.forEach(PreparedRenames::await);
     }
 
     /**
@@ -426,22 +423,22 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             if (preparedRenames.isEmpty()) {
                 return fileRenames;
             }
-            List<FileRename> unprepared = new ArrayList<>();
+            var unprepared = new ArrayList<FileRename>();
             for (FileRename fileRename : fileRenames) {
                 // A response from before the server connection was recycled does not apply to the new one
                 var prepared = preparedRenames.stream()
                         .filter(renames -> renames.server == ls && renames.unmade.contains(fileRename))
-                        .findFirst();
-                if (prepared.isEmpty()) {
+                        .findFirst()
+                        .orElse(null);
+                if (prepared == null) {
                     unprepared.add(fileRename);
-                    continue;
-                }
-                var renames = prepared.get();
-                renames.unmade.remove(fileRename);
-                // The edit of a request for several renames is applied before the first of them
-                var edit = renames.takeEdit();
-                if (edit != null) {
-                    edits.add(new WillEdit(edit, renames.documentStamps));
+                } else {
+                    prepared.unmade.remove(fileRename);
+                    // The edit of a request for several renames is applied before the first of them
+                    var edit = prepared.takeEdit();
+                    if (edit != null) {
+                        edits.add(new WillEdit(edit, prepared.documentStamps));
+                    }
                 }
             }
             preparedRenames.removeIf(renames -> renames.unmade.isEmpty());
