@@ -32,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
@@ -41,10 +42,11 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
- * LSP implementation of {@link ParameterInfoHandler} to support
- * <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp>LSP 'textDocument/signatureHelp'</a>.
- * <p>
- * Some copy/paste from <a href="https://github.com/JetBrains/intellij-community/blob/4fe13f3bee1568a78facb3e4a0d851fa77adeb1a/java/java-impl/src/com/intellij/codeInsight/hint/api/impls/MethodParameterInfoHandler.java#L694-L785">MethodParameterInfoHandler.java</a> has been done.
+ * Provides IntelliJ parameter hints from LSP signature-help replies.
+ * Parameter rendering is adapted from IntelliJ's
+ * <a href="https://github.com/JetBrains/intellij-community/blob/4fe13f3bee1568a78facb3e4a0d851fa77adeb1a/java/java-impl/src/com/intellij/codeInsight/hint/api/impls/MethodParameterInfoHandler.java#L694-L785">MethodParameterInfoHandler</a>.
+ *
+ * @see <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp">LSP signature help</a>
  */
 public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatureHelperPsiElement, SignatureInformation> {
 
@@ -94,10 +96,16 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         return psiSignatureHelperElement;
     }
 
+    /**
+     * Refreshes an open parameter hint from the server's current signature help.
+     * Replies without signatures close the hint; changed overload lists schedule
+     * a new popup, while unchanged lists update the active signature and parameter.
+     *
+     * @param psiElement the hint owner that retains the latest reply
+     * @param context the existing hint's update state
+     */
     @Override
     public void updateParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement, @NotNull UpdateParameterInfoContext context) {
-        // Here the popup hint not displayed, the signature help
-        // is triggered by the cursor moving or by the document content changing.
         SignatureHelpParams params = toSignatureHelpParams(context, SignatureHelpTriggerKind.ContentChange);
         params.getContext().setIsRetrigger(true);
         params.getContext().setActiveSignatureHelp(psiElement.getActiveSignatureHelp());
@@ -119,6 +127,16 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         }
     }
 
+    /**
+     * Applies a signature-help reply to an existing parameter hint.
+     * A {@code null} or empty reply closes the hint and invalidates queued refreshes.
+     * Changed overloads are refreshed asynchronously without writing the
+     * original row state.
+     *
+     * @param psiElement the hint owner that retains the latest reply
+     * @param context the existing hint's update state
+     * @param signatureHelp the server reply, or {@code null} if no help is available
+     */
     void updateParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement,
                              @NotNull UpdateParameterInfoContext context,
                              @Nullable SignatureHelp signatureHelp) {
@@ -144,19 +162,51 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         context.setCurrentParameter(activeParameter != null ? activeParameter : 0);
     }
 
+    /**
+     * Tests whether the existing overload rows can be reused for a reply.
+     * Labels must match in order, and duplicate labels must retain identical
+     * metadata because rendering cannot match them unambiguously.
+     *
+     * @param shown the descriptors held by the existing popup
+     * @param signatures the overloads in the new server reply
+     * @return {@code true} if the existing rows can display the reply correctly
+     */
     private static boolean hasSameOverloads(Object[] shown, List<SignatureInformation> signatures) {
         if (shown.length != signatures.size()) {
             return false;
         }
+        var labels = new HashSet<String>();
+        var duplicateLabels = new HashSet<String>();
         for (int i = 0; i < shown.length; i++) {
             if (!(shown[i] instanceof SignatureInformation signature)
                     || !Objects.equals(signature.getLabel(), signatures.get(i).getLabel())) {
+                return false;
+            }
+            if (!labels.add(signature.getLabel())) {
+                duplicateLabels.add(signature.getLabel());
+            }
+        }
+        for (int i = 0; i < shown.length; i++) {
+            var signature = signatures.get(i);
+            if (duplicateLabels.contains(signature.getLabel()) && !Objects.equals(shown[i], signature)) {
                 return false;
             }
         }
         return true;
     }
 
+    /**
+     * Schedules replacement of the original popup on the event dispatch thread.
+     * The replacement is discarded if the popup, reply, caret or document has
+     * changed, or if the hint has been dismissed.
+     * Disposing the old controller before creating new rows preserves the
+     * validity of its fixed-size update state.
+     *
+     * @param owner the hint owner that retains the latest reply
+     * @param context the original popup's update state
+     * @param signatureHelp the reply whose overloads should be displayed
+     * @param shown the original descriptor array, compared by identity
+     */
     private void refreshOverloads(LSPSignatureHelperPsiElement owner, UpdateParameterInfoContext context,
                                   SignatureHelp signatureHelp, Object[] shown) {
         var project = context.getProject();
@@ -164,9 +214,6 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         int startOffset = context.getParameterListStart();
         int caretOffset = editor.getCaretModel().getOffset();
         long documentStamp = editor.getDocument().getModificationStamp();
-        // An update context has a fixed-size enabled array. Replacing descriptors on its
-        // controller would still break applyUIChanges(), even if this handler avoided it.
-        // Dispose that controller on the EDT and create one with the new row count.
         ApplicationManager.getApplication().invokeLater(() -> ReadAction.run(() -> {
             if (editor.isDisposed() || !owner.isValid()
                     || editor.getCaretModel().getOffset() != caretOffset
@@ -188,6 +235,15 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         }), ModalityState.stateForComponent(editor.getComponent()), project.getDisposed());
     }
 
+    /**
+     * Renders an overload using the latest available signature metadata.
+     * A signature's active parameter takes precedence over the reply's active
+     * parameter, with the UI context used when neither is available.
+     * When parameters are present, an out-of-range index selects the first one.
+     *
+     * @param shownSignature the overload stored when the current popup was created
+     * @param context the presentation and selection state of the popup row
+     */
     @Override
     public void updateUI(SignatureInformation shownSignature, @NotNull ParameterInfoUIContext context) {
         SignatureInformation signatureInformation = getCurrentSignature(shownSignature, context);

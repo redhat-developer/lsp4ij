@@ -28,7 +28,7 @@ import java.awt.Color;
 import java.lang.reflect.Proxy;
 import java.util.List;
 
-/** Exercises the parameter popup renderer with optional server metadata. */
+/** Exercises parameter popup rendering and overload refreshes. */
 public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
 
     public void testMissingParametersShowTheSignatureLabel() {
@@ -159,6 +159,39 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
         assertTrue(popup.enabled[0]);
     }
 
+    public void testDuplicateLabelsWithNewParametersReplaceTheRows() {
+        var withoutParameters = new SignatureInformation(signature().getLabel());
+        checkChangedOverloads(List.of(withoutParameters, signature()), List.of(signature(), signature()));
+    }
+
+    public void testDuplicateLabelsWithChangedActiveParametersReplaceTheRows() {
+        var before = signature();
+        before.setActiveParameter(0);
+        var after = signature();
+        after.setActiveParameter(1);
+        checkChangedOverloads(List.of(before, signature()), List.of(after, signature()));
+    }
+
+    public void testUnchangedDuplicateLabelsKeepTheController() {
+        var popup = new Popup(List.of(signature(), signature()));
+        popup.update(new SignatureHelp(List.of(signature(), signature()), 1, 1));
+        UIUtil.dispatchAllInvocationEvents();
+        assertSame(popup.controller, popup.current());
+        assertFalse(popup.enabled[0]);
+        assertTrue(popup.enabled[1]);
+    }
+
+    public void testUniqueLabelUsesNewParametersWithoutReplacingTheController() {
+        var withoutParameters = new SignatureInformation(signature().getLabel());
+        var popup = new Popup(List.of(withoutParameters));
+        popup.update(new SignatureHelp(List.of(signature()), 0, 1));
+        UIUtil.dispatchAllInvocationEvents();
+        assertSame(popup.controller, popup.current());
+        var ui = render(withoutParameters, -1, false, popup.owner);
+        assertEquals(" first,  second", ui.text);
+        assertEquals(" second", ui.highlight());
+    }
+
     public void testRecreatedPopupUsesTheLatestGlobalActiveParameter() {
         var shown = signature();
         var ui = render(shown, -1, false, owner(new SignatureHelp(List.of(signature()), 0, 1)));
@@ -235,6 +268,11 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
         return signature;
     }
 
+    /**
+     * Models a real popup with the update context's original, fixed row count.
+     * The proxy deliberately keeps its enabled-state array at that size so
+     * stale row writes fail exactly as they do in IntelliJ.
+     */
     private final class Popup {
         private final LSPSignatureHelperPsiElement owner;
         private final LSPParameterInfoHandler handler = new LSPParameterInfoHandler() {
