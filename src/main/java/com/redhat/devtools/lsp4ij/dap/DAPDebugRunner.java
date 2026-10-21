@@ -211,6 +211,17 @@ public class DAPDebugRunner extends AsyncProgramRunner<RunnerSettings> {
                 var sessionResult = startSessionMethod.invoke(builder);
                 // .getRunContentDescriptor()
                 return (RunContentDescriptor) getRunContentDescriptorMethod.invoke(sessionResult);
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                // Unwrap the reflection wrapper so the real error (ex: "Cannot run program ...") is shown to the user,
+                // like with the old API.
+                Throwable cause = e.getCause();
+                if (cause instanceof ExecutionException executionException) {
+                    throw executionException;
+                }
+                if (cause instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+                throw new ExecutionException(cause != null ? cause.getMessage() : e.getMessage(), cause != null ? cause : e);
             } catch (Exception e) {
                 throw new ExecutionException("Failed to start debug session using new API", e);
             }
