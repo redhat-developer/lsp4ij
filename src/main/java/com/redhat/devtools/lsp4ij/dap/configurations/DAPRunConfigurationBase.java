@@ -11,6 +11,8 @@
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
 import com.intellij.execution.Executor;
+import com.intellij.execution.executors.DefaultDebugExecutor;
+import com.intellij.execution.executors.DefaultRunExecutor;
 import com.intellij.execution.configurations.ConfigurationFactory;
 import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.execution.configurations.RunConfigurationBase;
@@ -70,7 +72,9 @@ public abstract class DAPRunConfigurationBase<T> extends RunConfigurationBase<T>
      */
     public boolean canRun(@NotNull String executorId) {
         var serverFactory = getServerFactory();
-        return serverFactory == null || serverFactory.canRun(executorId);
+        return serverFactory != null ? serverFactory.canRun(executorId)
+                : DefaultRunExecutor.EXECUTOR_ID.equals(executorId)
+                || DefaultDebugExecutor.EXECUTOR_ID.equals(executorId);
     }
 
     protected abstract @Nullable DebugAdapterServerDefinition getDebugAdapterServer();

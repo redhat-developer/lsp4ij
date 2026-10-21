@@ -13,6 +13,8 @@ package com.redhat.devtools.lsp4ij.dap.descriptors;
 import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.runners.ExecutionEnvironment;
+import com.intellij.execution.executors.DefaultDebugExecutor;
+import com.intellij.execution.executors.DefaultRunExecutor;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManager;
 import com.intellij.openapi.extensions.PluginId;
@@ -117,8 +119,13 @@ public abstract class DebugAdapterDescriptorFactory implements DebuggableFile {
         return new DAPSettingsEditor(project);
     }
 
+    /**
+     * Generic DAP supports Run and Debug. Adapters providing a custom executor
+     * must opt into it explicitly, rather than claiming unrelated profilers.
+     */
     public boolean canRun(@NotNull String executorId) {
-        return true;
+        return DefaultRunExecutor.EXECUTOR_ID.equals(executorId)
+                || DefaultDebugExecutor.EXECUTOR_ID.equals(executorId);
     }
 
     public boolean prepareConfiguration(@NotNull RunConfiguration configuration,
