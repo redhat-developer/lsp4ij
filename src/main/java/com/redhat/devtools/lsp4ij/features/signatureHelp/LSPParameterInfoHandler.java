@@ -14,7 +14,12 @@
 package com.redhat.devtools.lsp4ij.features.signatureHelp;
 
 import com.intellij.codeInsight.CodeInsightBundle;
+import com.intellij.codeInsight.hint.ParameterInfoControllerBase;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.lang.parameterInfo.*;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
@@ -91,8 +96,6 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
 
     @Override
     public void updateParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement, @NotNull UpdateParameterInfoContext context) {
-        boolean removeHint = false;
-
         // Here the popup hint not displayed, the signature help
         // is triggered by the cursor moving or by the document content changing.
         SignatureHelpParams params = toSignatureHelpParams(context, SignatureHelpTriggerKind.ContentChange);
@@ -112,30 +115,77 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         }
 
         if (isDoneNormally(future)) {
-            SignatureHelp activeSignatureHelp = future.getNow(null);
-            List<SignatureInformation> signatures = activeSignatureHelp != null ? activeSignatureHelp.getSignatures() : null;
-            if (signatures == null || signatures.isEmpty()) {
-                // No signature helper found, close the popup hint
-                removeHint = true;
-            } else {
-                // A signature help is found
+            updateParameterInfo(psiElement, context, future.getNow(null));
+        }
+    }
 
-                // Update enable/disable of signature
-                int activateSignature = activeSignatureHelp.getActiveSignature() != null ? activeSignatureHelp.getActiveSignature() : -1;
-                for (int i = 0; i < signatures.size(); i++) {
-                    context.setUIComponentEnabled(i, activateSignature == -1 || activateSignature == i);
-                }
-                // Update the IntelliJ parameter info context to highlight the proper parameter
-                Integer activeParameter = activeSignatureHelp.getActiveParameter();
-                context.setCurrentParameter(activeParameter != null ? activeParameter : 0);
-                // Update the Psi element with the active signature help
-                psiElement.setActiveSignatureHelp(activeSignatureHelp);
+    void updateParameterInfo(@NotNull LSPSignatureHelperPsiElement psiElement,
+                             @NotNull UpdateParameterInfoContext context,
+                             @Nullable SignatureHelp signatureHelp) {
+        // Also invalidate any queued refresh when the latest reply has no signatures.
+        psiElement.setActiveSignatureHelp(signatureHelp);
+        List<SignatureInformation> signatures = signatureHelp != null ? signatureHelp.getSignatures() : null;
+        if (signatures == null || signatures.isEmpty()) {
+            context.removeHint();
+            return;
+        }
+
+        Object[] shown = context.getObjectsToView();
+        if (!hasSameOverloads(shown, signatures)) {
+            refreshOverloads(psiElement, context, signatureHelp, shown);
+            return;
+        }
+
+        int activeSignature = signatureHelp.getActiveSignature() != null ? signatureHelp.getActiveSignature() : -1;
+        for (int i = 0; i < shown.length; i++) {
+            context.setUIComponentEnabled(i, activeSignature < 0 || activeSignature >= shown.length || activeSignature == i);
+        }
+        Integer activeParameter = signatureHelp.getActiveParameter();
+        context.setCurrentParameter(activeParameter != null ? activeParameter : 0);
+    }
+
+    private static boolean hasSameOverloads(Object[] shown, List<SignatureInformation> signatures) {
+        if (shown.length != signatures.size()) {
+            return false;
+        }
+        for (int i = 0; i < shown.length; i++) {
+            if (!(shown[i] instanceof SignatureInformation signature)
+                    || !Objects.equals(signature.getLabel(), signatures.get(i).getLabel())) {
+                return false;
             }
         }
-        if (removeHint) {
-            // Close the popup hint
-            context.removeHint();
-        }
+        return true;
+    }
+
+    private void refreshOverloads(LSPSignatureHelperPsiElement owner, UpdateParameterInfoContext context,
+                                  SignatureHelp signatureHelp, Object[] shown) {
+        var project = context.getProject();
+        var editor = context.getEditor();
+        int startOffset = context.getParameterListStart();
+        int caretOffset = editor.getCaretModel().getOffset();
+        long documentStamp = editor.getDocument().getModificationStamp();
+        // An update context has a fixed-size enabled array. Replacing descriptors on its
+        // controller would still break applyUIChanges(), even if this handler avoided it.
+        // Dispose that controller on the EDT and create one with the new row count.
+        ApplicationManager.getApplication().invokeLater(() -> ReadAction.run(() -> {
+            if (editor.isDisposed() || !owner.isValid()
+                    || editor.getCaretModel().getOffset() != caretOffset
+                    || editor.getDocument().getModificationStamp() != documentStamp
+                    || owner.getActiveSignatureHelp() != signatureHelp) {
+                return;
+            }
+            var controller = ParameterInfoControllerBase.findControllerAtOffset(editor, startOffset);
+            // Do not resurrect a dismissed popup or replace a newer popup at this offset.
+            if (controller == null || controller.getObjects() != shown || context.getParameterOwner() != owner
+                    || controller.isPreservedOnHintHidden() && !controller.isHintShown(true)) {
+                return;
+            }
+            boolean preserved = controller.isPreservedOnHintHidden();
+            Disposer.dispose(controller);
+            var replacement = ParameterInfoControllerBase.createParameterInfoController(project, editor, startOffset,
+                    signatureHelp.getSignatures().toArray(new SignatureInformation[0]), null, owner, this, true, false);
+            replacement.setPreservedOnHintHidden(preserved);
+        }), ModalityState.stateForComponent(editor.getComponent()), project.getDisposed());
     }
 
     @Override
@@ -143,6 +193,13 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         SignatureInformation signatureInformation = getCurrentSignature(shownSignature, context);
         // LSP: a signature's own active parameter, if provided, is used in place of the signature help's
         Integer activeParameter = signatureInformation.getActiveParameter();
+        if (activeParameter == null && context.getParameterOwner() instanceof LSPSignatureHelperPsiElement owner) {
+            SignatureHelp signatureHelp = owner.getActiveSignatureHelp();
+            if (signatureHelp != null && signatureHelp.getSignatures() != null
+                    && signatureHelp.getSignatures().contains(signatureInformation)) {
+                activeParameter = signatureHelp.getActiveParameter();
+            }
+        }
         int currentParameter = activeParameter != null ? activeParameter : context.getCurrentParameterIndex();
         List<ParameterInformation> parameters = signatureInformation.getParameters();
         int numParams = parameters != null ? parameters.size() : 0;

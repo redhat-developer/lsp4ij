@@ -8,6 +8,11 @@
 package com.redhat.devtools.lsp4ij.features.signatureHelp;
 
 import com.intellij.codeInsight.CodeInsightBundle;
+import com.intellij.codeInsight.hint.ParameterInfoControllerBase;
+import com.intellij.lang.parameterInfo.UpdateParameterInfoContext;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.util.ui.UIUtil;
 import com.intellij.lang.parameterInfo.ParameterInfoUIContext;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
@@ -20,6 +25,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Tuple;
 
 import java.awt.Color;
+import java.lang.reflect.Proxy;
 import java.util.List;
 
 /** Exercises the parameter popup renderer with optional server metadata. */
@@ -117,6 +123,168 @@ public class LSPParameterInfoHandlerTest extends BasePlatformTestCase {
         var ui = render(signature(), 1, false, owner(new SignatureHelp(List.of(other), 0, 0)));
         assertEquals(" first,  second", ui.text);
         assertEquals(" second", ui.highlight());
+    }
+
+    public void testGrowingOverloadsReplaceTheControllerWithoutWritingPastItsRows() {
+        checkChangedOverloads(List.of(signature()), List.of(signature(), otherSignature()));
+    }
+
+    public void testShrinkingOverloadsRemoveOldRows() {
+        checkChangedOverloads(List.of(signature(), otherSignature()), List.of(otherSignature()));
+    }
+
+    public void testReorderingOverloadsReplacesTheirRows() {
+        checkChangedOverloads(List.of(signature(), otherSignature()), List.of(otherSignature(), signature()));
+    }
+
+    public void testDifferentOverloadWithTheSameRowCountReplacesTheRow() {
+        checkChangedOverloads(List.of(signature()), List.of(otherSignature()));
+    }
+
+    public void testUnchangedOverloadsUpdateTheActiveRowWithoutReplacingTheController() {
+        var popup = new Popup(List.of(signature(), otherSignature()));
+        var reply = new SignatureHelp(List.of(signature(), otherSignature()), 1, 1);
+        popup.update(reply);
+        assertFalse(popup.enabled[0]);
+        assertTrue(popup.enabled[1]);
+        assertEquals(1, popup.parameter);
+        UIUtil.dispatchAllInvocationEvents();
+        assertSame(popup.controller, popup.current());
+        assertSame(reply, popup.owner.getActiveSignatureHelp());
+    }
+
+    public void testInvalidActiveSignatureDoesNotDisableEveryRow() {
+        var popup = new Popup(List.of(signature()));
+        popup.update(new SignatureHelp(List.of(signature()), 4, 0));
+        assertTrue(popup.enabled[0]);
+    }
+
+    public void testRecreatedPopupUsesTheLatestGlobalActiveParameter() {
+        var shown = signature();
+        var ui = render(shown, -1, false, owner(new SignatureHelp(List.of(signature()), 0, 1)));
+        assertEquals(" second", ui.highlight());
+    }
+
+    public void testQueuedRefreshDoesNotReopenADismissedPopup() {
+        var popup = new Popup(List.of(signature()));
+        popup.update(new SignatureHelp(List.of(signature(), otherSignature()), 1, 0));
+        Disposer.dispose(popup.controller);
+        UIUtil.dispatchAllInvocationEvents();
+        assertNull(popup.current());
+    }
+
+    public void testQueuedRefreshDoesNotReplaceANewerPopup() {
+        var popup = new Popup(List.of(signature()));
+        popup.update(new SignatureHelp(List.of(signature(), otherSignature()), 1, 0));
+        Disposer.dispose(popup.controller);
+        var newer = popup.create(List.of(otherSignature()));
+        UIUtil.dispatchAllInvocationEvents();
+        assertSame(newer, popup.current());
+    }
+
+    public void testQueuedRefreshIsDiscardedAfterAnEdit() {
+        var popup = new Popup(List.of(signature()));
+        popup.update(new SignatureHelp(List.of(signature(), otherSignature()), 1, 0));
+        WriteCommandAction.runWriteCommandAction(getProject(), () -> myFixture.getEditor().getDocument().insertString(0, " "));
+        UIUtil.dispatchAllInvocationEvents();
+        assertFalse(Disposer.isDisposed(popup.controller));
+    }
+
+    public void testQueuedRefreshIsDiscardedAfterTheCaretMoves() {
+        var popup = new Popup(List.of(signature()));
+        popup.update(new SignatureHelp(List.of(signature(), otherSignature()), 1, 0));
+        myFixture.getEditor().getCaretModel().moveToOffset(1);
+        UIUtil.dispatchAllInvocationEvents();
+        assertSame(popup.controller, popup.current());
+    }
+
+    public void testOnlyTheLatestQueuedReplyReplacesThePopup() {
+        var popup = new Popup(List.of(signature()));
+        popup.update(new SignatureHelp(List.of(signature(), otherSignature()), 0, 0));
+        var latest = new SignatureHelp(List.of(otherSignature()), 0, 0);
+        popup.update(latest);
+        UIUtil.dispatchAllInvocationEvents();
+        assertEquals(List.of(otherSignature()), List.of(popup.current().getObjects()));
+        assertSame(latest, popup.owner.getActiveSignatureHelp());
+    }
+
+    public void testEmptyReplyCancelsAPendingOverloadRefresh() {
+        var popup = new Popup(List.of(signature()));
+        popup.update(new SignatureHelp(List.of(signature(), otherSignature()), 0, 0));
+        popup.update(new SignatureHelp(List.of(), null, null));
+        assertTrue(popup.removed);
+        UIUtil.dispatchAllInvocationEvents();
+        assertFalse(Disposer.isDisposed(popup.controller));
+    }
+
+    private void checkChangedOverloads(List<SignatureInformation> before, List<SignatureInformation> after) {
+        var popup = new Popup(before);
+        var reply = new SignatureHelp(after, after.size() - 1, 1);
+        popup.update(reply);
+        assertEquals("No writes to the obsolete update context", 0, popup.enableWrites);
+        UIUtil.dispatchAllInvocationEvents();
+        assertTrue(Disposer.isDisposed(popup.controller));
+        assertNotNull(popup.current());
+        assertEquals(after, List.of(popup.current().getObjects()));
+        assertSame(reply, popup.owner.getActiveSignatureHelp());
+    }
+
+    private static SignatureInformation otherSignature() {
+        var signature = new SignatureInformation("read(value)");
+        signature.setParameters(List.of(new ParameterInformation("value")));
+        return signature;
+    }
+
+    private final class Popup {
+        private final LSPSignatureHelperPsiElement owner;
+        private final LSPParameterInfoHandler handler = new LSPParameterInfoHandler() {
+            // The response under test is supplied explicitly; automatic controller
+            // refreshes must not start an unrelated language server in this fixture.
+            @Override public void updateParameterInfo(LSPSignatureHelperPsiElement element, UpdateParameterInfoContext context) { }
+        };
+        private final ParameterInfoControllerBase controller;
+        private final UpdateParameterInfoContext context;
+        private final boolean[] enabled;
+        private int enableWrites;
+        private int parameter = -1;
+        private boolean removed;
+
+        private Popup(List<SignatureInformation> signatures) {
+            var file = myFixture.configureByText("call.txt", "read(<caret>)");
+            owner = new LSPSignatureHelperPsiElement(file, new TextRange(5, 5));
+            owner.setActiveSignatureHelp(new SignatureHelp(signatures, 0, 0));
+            controller = create(signatures);
+            Object[] shown = controller.getObjects();
+            enabled = new boolean[shown.length];
+            context = (UpdateParameterInfoContext) Proxy.newProxyInstance(UpdateParameterInfoContext.class.getClassLoader(),
+                    new Class<?>[]{UpdateParameterInfoContext.class}, (proxy, method, args) -> switch (method.getName()) {
+                        case "getProject" -> getProject();
+                        case "getEditor" -> myFixture.getEditor();
+                        case "getFile" -> file;
+                        case "getOffset" -> 5;
+                        case "getParameterListStart" -> 5;
+                        case "getParameterOwner" -> owner;
+                        case "getObjectsToView" -> shown;
+                        case "setUIComponentEnabled" -> {
+                            enabled[(int) args[0]] = (boolean) args[1];
+                            enableWrites++;
+                            yield null;
+                        }
+                        case "setCurrentParameter" -> { parameter = (int) args[0]; yield null; }
+                        case "removeHint" -> { removed = true; yield null; }
+                        default -> throw new AssertionError("Unexpected context operation: " + method.getName());
+                    });
+        }
+
+        private ParameterInfoControllerBase create(List<SignatureInformation> signatures) {
+            return ParameterInfoControllerBase.createParameterInfoController(getProject(), myFixture.getEditor(), 5,
+                    signatures.toArray(), null, owner, handler, true, false);
+        }
+
+        private void update(SignatureHelp reply) { handler.updateParameterInfo(owner, context, reply); }
+        private ParameterInfoControllerBase current() {
+            return ParameterInfoControllerBase.findControllerAtOffset(myFixture.getEditor(), 5);
+        }
     }
 
     private LSPSignatureHelperPsiElement owner(SignatureHelp signatureHelp) {
