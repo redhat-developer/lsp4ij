@@ -431,7 +431,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
     }
 
-    private static void doShowErrorHint(@NotNull Editor editor, @NotNull String hintText, int offset) {
+    static void doShowErrorHint(@NotNull Editor editor, @NotNull String hintText, int offset) {
+        if (editor.isDisposed()) {
+            // The editor was closed between the stop and the hint
+            return;
+        }
         JComponent label = HintUtil.createErrorLabel(hintText);
         LightweightHint hint = new LightweightHint(label);
         final VisualPosition pos1 = editor.offsetToVisualPosition(offset);
