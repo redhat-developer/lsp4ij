@@ -57,6 +57,7 @@ import java.lang.Thread;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -339,83 +340,175 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void stopped(StoppedEventArguments args) {
         var server = getDebugProtocolServer();
-        if (server == null) {
-            return;
-        }
         Integer threadId = args.getThreadId();
-        if (threadId == null) {
+        if (server == null || threadId == null) {
             return;
         }
-        getThreads(true)
-                .thenAcceptAsync(threads -> {
-                    var threadResult = Arrays.stream(threads)
-                            .filter(t -> threadId.equals(t.getId()))
-                            .findFirst();
-                    if (threadResult.isEmpty()) {
-                        // The Thread doesn't exist
-                        return;
+        getThreads(true).thenAcceptAsync(threads -> {
+            var stoppedThread = Arrays.stream(threads)
+                    .filter(thread -> threadId.equals(thread.getId()))
+                    .findFirst();
+            // A thread which the debug adapter doesn't report doesn't suspend the session
+            stoppedThread.ifPresent(thread -> getStackFrames(server, threadId)
+                    .thenAcceptAsync(frames -> suspend(server, args, threads, thread, frames)));
+        });
+    }
+
+    /**
+     * Returns the stack frames of the given thread, innermost first, and none if the debug adapter returns none.
+     *
+     * @param server   the debug adapter.
+     * @param threadId the DAP thread.
+     * @return the stack frames of the given thread, innermost first.
+     */
+    private static CompletableFuture<StackFrame[]> getStackFrames(@NotNull IDebugProtocolServer server, int threadId) {
+        StackTraceArguments args = new StackTraceArguments();
+        args.setThreadId(threadId);
+        return server.stackTrace(args)
+                .thenApply(response -> response != null && response.getStackFrames() != null ? response.getStackFrames() : new StackFrame[0]);
+    }
+
+    /**
+     * Suspends the session where the given thread stopped. At a breakpoint, the session is told which one; elsewhere,
+     * the session is suspended at the top frame, and an exception which stopped the thread is shown there.
+     *
+     * @param server        the debug adapter.
+     * @param args          the stopped event.
+     * @param threads       the threads the debug adapter reports.
+     * @param stoppedThread the thread which stopped.
+     * @param frames        the stack frames of the stopped thread, innermost first.
+     */
+    private void suspend(@NotNull IDebugProtocolServer server,
+                         @NotNull StoppedEventArguments args,
+                         org.eclipse.lsp4j.debug.Thread[] threads,
+                         org.eclipse.lsp4j.debug.Thread stoppedThread,
+                         StackFrame[] frames) {
+        if (frames.length == 0) {
+            return;
+        }
+        StackFrame topFrame = frames[0];
+        DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
+        XBreakpoint<?> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(topFrame);
+        if (breakpoint != null) {
+            breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
+                    .exceptionally(this::reportBreakpointFailure);
+            return;
+        }
+        getSession().positionReached(context);
+        if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
+            showExceptionHint(context, getExceptionHint(args));
+        }
+    }
+
+    /**
+     * Returns the session's suspend context, or a new one if the session is not suspended, with an execution stack
+     * per thread: the stopped thread's has the frames it stopped in, and the others' are computed when shown.
+     */
+    private @NotNull DAPSuspendContext getSuspendContext(org.eclipse.lsp4j.debug.Thread[] threads,
+                                                        org.eclipse.lsp4j.debug.Thread stoppedThread,
+                                                        StackFrame[] frames) {
+        var context = getSession().getSuspendContext() instanceof DAPSuspendContext suspended ? suspended : new DAPSuspendContext(this);
+        for (var thread : threads) {
+            context.addToExecutionStack(thread, thread.equals(stoppedThread) ? frames : null);
+        }
+        return context;
+    }
+
+    /**
+     * Shows the given text as an error hint where the program stopped, in an editor of the top frame's file.
+     *
+     * @param context the suspend context of the stop.
+     * @param hint    the text of the error hint.
+     */
+    private void showExceptionHint(@NotNull XSuspendContext context, @NotNull String hint) {
+        var stack = context.getActiveExecutionStack();
+        var topFrame = stack != null ? stack.getTopFrame() : null;
+        var position = topFrame != null ? topFrame.getSourcePosition() : null;
+        if (position == null) {
+            return;
+        }
+        Editor[] editors = LSPIJUtils.editorsForFile(position.getFile(), getProject());
+        if (editors == null || editors.length == 0) {
+            return;
+        }
+        Editor editor = editors[0];
+        int offset = position.getOffset();
+        // Wait briefly to be sure that scroll of the editor
+        // has occurred before computing the error hint position.
+        // TODO: remove this timer by detecting that scroll editor is finished
+        // to display the error hint
+        AppExecutorUtil.getAppScheduledExecutorService().schedule(
+                () -> ApplicationManager.getApplication().invokeLater(() -> showErrorHint(editor, hint, offset)),
+                1, TimeUnit.SECONDS);
+    }
+
+    private static @NotNull String getExceptionHint(@NotNull StoppedEventArguments args) {
+        String hint = "Exception has occurred: " + args.getText();
+        return StringUtils.isNotBlank(args.getDescription()) ? hint + "\n" + args.getDescription() : hint;
+    }
+
+    private @Nullable Void reportBreakpointFailure(@NotNull Throwable error) {
+        // e.g. the program could not be resumed: say so instead of leaving it stopped silently
+        debugProcess.print("Cannot handle the breakpoint: " + getCause(error).getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+        return null;
+    }
+
+    private static @NotNull Throwable getCause(@NotNull Throwable error) {
+        return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+    }
+
+    /**
+     * Tells the session that the program stopped at the given breakpoint, with the value of the breakpoint's
+     * "Evaluate and log" expression in the stopped frame, and resumes the program if the breakpoint doesn't suspend.
+     * <p>
+     * A breakpoint which doesn't suspend is sent as a logpoint, so a debug adapter which supports logpoints doesn't
+     * stop at it; one which doesn't support them stops, and is resumed here once IntelliJ has logged.
+     *
+     * @param session    the debug session.
+     * @param server     the debug adapter.
+     * @param breakpoint the IntelliJ breakpoint where the program stopped.
+     * @param context    the suspend context of the stop.
+     * @param frameId    the DAP frame where the program stopped.
+     * @param threadId   the DAP thread which stopped.
+     * @return the future, completed once the session is told and the program resumed if it must be.
+     */
+    static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
+                                                               @NotNull IDebugProtocolServer server,
+                                                               @NotNull XBreakpoint<?> breakpoint,
+                                                               @NotNull XSuspendContext context,
+                                                               int frameId,
+                                                               int threadId) {
+        return evaluateLogExpression(server, breakpoint, frameId)
+                .thenCompose(logged -> {
+                    if (session.breakpointReached(breakpoint, logged, context)) {
+                        return CompletableFuture.completedFuture(null);
                     }
-                    var activeThread = threadResult.get();
-                    // get the stack trace
-                    StackTraceArguments stackTraceArgs = new StackTraceArguments();
-                    stackTraceArgs.setThreadId(args.getThreadId());
-                    server
-                            .stackTrace(stackTraceArgs)
-                            .thenAcceptAsync(stackTraceResponse -> {
-                                StackFrame[] stackFrames = stackTraceResponse.getStackFrames();
-                                if (stackFrames != null && stackFrames.length > 0) {
-                                    var stackFrame = stackFrames[0];
-                                    XBreakpoint<?> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrame);
-                                    XSuspendContext context = getSession().getSuspendContext();
-                                    if (context == null) {
-                                        context = new DAPSuspendContext(this);
-                                    }
-                                    // Create an execution stack per thread and
-                                    // initialize the stack with current DAP stack frames for the active thread
-                                    for(var thread : threads) {
-                                        ((DAPSuspendContext) context).addToExecutionStack(thread, thread.equals(activeThread) ? stackFrames : null);
-                                    }
-                                    XDebugSession session = getSession();
-                                    if (breakpoint == null) {
-                                        session.positionReached(context);
+                    // The breakpoint doesn't suspend: resume the program
+                    ContinueArguments args = new ContinueArguments();
+                    args.setThreadId(threadId);
+                    return server.continue_(args).thenAccept(response -> {
+                    });
+                });
+    }
 
-                                        if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
-                                            // The stopped event comes from an Exception
-                                            // Show an error hint with the exception description in the proper line
-                                            var sourcePosition = context.getActiveExecutionStack() != null
-                                                    && context.getActiveExecutionStack().getTopFrame() != null ?
-                                                    context.getActiveExecutionStack().getTopFrame().getSourcePosition() : null;
-                                            if (sourcePosition != null) {
-                                                var file = sourcePosition.getFile();
-                                                Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
-                                                if (editors != null && editors.length > 0) {
-                                                    var editor = editors[0];
-                                                    int offset = sourcePosition.getOffset();
-
-                                                    // Wait briefly to be sure that scroll of the editor
-                                                    // has occurred before computing the error hint position.
-                                                    // TODO: remove this timer by detecting that scroll editor is finished
-                                                    // to display the error hint
-                                                    StringBuilder error = new StringBuilder("Exception has occurred: ");
-                                                    error.append(args.getText());
-                                                    if (StringUtils.isNotBlank(args.getDescription())) {
-                                                        error.append("\n");
-                                                        error.append(args.getDescription());
-                                                    }
-                                                    String errorMessage = error.toString();
-                                                    AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
-                                                        ApplicationManager.getApplication().invokeLater(() -> {
-                                                            showErrorHint(editor, errorMessage, offset);
-                                                        });
-                                                    }, 1, TimeUnit.SECONDS);
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        session.breakpointReached(breakpoint, null, context);
-                                    }
-                                }
-                            });
+    private static CompletableFuture<@Nullable String> evaluateLogExpression(@NotNull IDebugProtocolServer server,
+                                                                             @NotNull XBreakpoint<?> breakpoint,
+                                                                             int frameId) {
+        var logExpression = breakpoint.getLogExpressionObject();
+        if (logExpression == null || StringUtils.isBlank(logExpression.getExpression())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String expression = logExpression.getExpression();
+        EvaluateArguments args = new EvaluateArguments();
+        args.setExpression(expression);
+        args.setFrameId(frameId);
+        args.setContext(EvaluateArgumentsContext.WATCH);
+        return server.evaluate(args)
+                .handle((response, error) -> {
+                    if (error != null) {
+                        return "Cannot evaluate '" + expression + "': " + getCause(error).getMessage();
+                    }
+                    return response != null ? response.getResult() : null;
                 });
     }
 
